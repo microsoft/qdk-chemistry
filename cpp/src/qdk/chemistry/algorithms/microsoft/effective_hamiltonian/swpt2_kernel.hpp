@@ -8,8 +8,9 @@
 // Split H into H_BD, block diagonal in the external occupation, and the
 // occupation-changing H_OD. For
 // bare denominators, a separate diagonal generalized-Fock operator F0 defines
-// the anti-Hermitian generator through [F0, S] = H_OD. The flow and shift
-// options instead use a regularized generator. In either case the implemented
+// the anti-Hermitian generator through [F0, S] = H_OD. The flow and
+// imaginary-shift options instead build a regularized generator, which solves
+// that equation only approximately. In either case the implemented
 // approximation is H_eff = H_BD + 1/2 [S, H_OD], projected onto the reference
 // external occupation and truncated to <= 2-body. The projected commutator is
 // evaluated by bounded-rank generalized-Wick contractions over external legs.
@@ -25,6 +26,7 @@
 
 #include <Eigen/Dense>
 #include <cstddef>
+#include <unordered_set>
 #include <vector>
 
 namespace qdk::chemistry::algorithms::microsoft::swpt2 {
@@ -39,18 +41,20 @@ inline std::size_t idx4(int p, int q, int r, int s, int n) {
 // ===========================================================================
 
 /// SW energy-denominator options. Callers select one scheme by setting either
-/// flow or shift positive; otherwise the floor-guarded bare inverse is used.
+/// the flow or the imaginary shift positive; otherwise the floor-guarded bare
+/// inverse is used.
 struct RegularizerOptions {
   double denom_floor = 1e-8;  ///< hard cutoff: skip couplings with |D| < floor
-  double denom_shift = 0.0;   ///< CASPT2-like shift: 1/D -> D / (D^2 + shift^2)
+  double denom_imaginary_shift =
+      0.0;  ///< imaginary level shift: 1/D -> D/(D^2+s^2)
   /// Smooth flow-parameter regularizer 1/D -> (1 - exp(-s*D^2))/D that damps
   /// near-degenerate (intruder) channels; `s` is the SRG/DSRG "flow parameter"
-  /// (units of inverse energy squared). < 0 : disabled.
-  double denom_flow = -1.0;
+  /// (units of inverse energy squared). 0 disables.
+  double denom_flow = 0.0;
 };
 
 /// Regularized inverse energy denominator.
-double reg_inv(double delta, const RegularizerOptions& reg);
+double regularized_inverse(double delta, const RegularizerOptions& reg);
 
 /// Spin-orbital partition + single-determinant reference occupation.
 ///
@@ -62,7 +66,7 @@ double reg_inv(double delta, const RegularizerOptions& reg);
 /// is `inactive | virtual`. Inactive and virtual are kept as separate masks so
 /// the occupation-change test catches inactive<->virtual excitations (which are
 /// net-zero on the combined external set).
-struct SoPartition {
+struct SpinOrbitalPartition {
   int n_so = 0;
   std::vector<char> is_active, is_inactive, is_virtual;
 };
@@ -157,7 +161,8 @@ struct ActiveDownfoldResult {
 /// time but store nothing.
 ///
 /// The retained Wick contractions are evaluated from packed active/external
-/// panels through BLAS matrix products. The one-line `S2 * V2` channel
+/// panels through matrix products, by BLAS GEMM except in the one-line channel
+/// noted next. The one-line `S2 * V2` channel
 /// enumerates only the active-index coincidences that can survive two-body
 /// truncation, operand-internal reference contractions are reduced while
 /// packing the panels, and disconnected highest-rank products are canceled
@@ -168,21 +173,57 @@ struct ActiveDownfoldResult {
 ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
                                       const SpinBlockedTwoBody& blk,
                                       const Eigen::VectorXd& eps,
-                                      const SoPartition& part,
+                                      const SpinOrbitalPartition& part,
                                       const RegularizerOptions& reg,
                                       double e_core);
 
 /// Relabel the compact `ActiveDownfoldResult` active block to compact spatial
 /// chemist integrals for a qdk CanonicalFourCenter Hamiltonian.
 ActiveHamiltonian to_spatial_chemist(const ActiveDownfoldResult& down,
-                                     const SoPartition& part);
+                                     const SpinOrbitalPartition& part);
 
 /// Assemble the spin-orbital role masks from an explicit spatial partition of
 /// a window of `norb` orbitals. The three index lists must be disjoint and
 /// together cover [0, norb). Deciding which folded orbital counts as doubly
 /// occupied is the caller's policy, not this function's.
-SoPartition make_partition(int norb, const std::vector<int>& active_spatial,
-                           const std::vector<int>& inactive_spatial,
-                           const std::vector<int>& virtual_spatial);
+SpinOrbitalPartition make_partition(int norb,
+                                    const std::vector<int>& active_spatial,
+                                    const std::vector<int>& inactive_spatial,
+                                    const std::vector<int>& virtual_spatial);
+
+/// Window roles chosen by the folding policy, plus the rounding diagnostics a
+/// caller needs to judge how much the fold perturbed the reference density.
+struct WindowPartition {
+  /// Positions into the window, suitable for `make_partition`.
+  std::vector<int> active_spatial, inactive_spatial, virtual_spatial;
+  int active_electrons = 0;       ///< window electrons the rounded fold leaves
+  double worst_deviation = 0.0;   ///< largest folded |occupation - rounded|
+  double worst_occupation = 0.0;  ///< occupation attaining `worst_deviation`
+  std::size_t worst_orbital = 0;  ///< global index attaining it
+  /// Rounded folded electron count minus the reference occupation over the
+  /// folded orbitals. Roundings of opposite sign cancel here, so this is the
+  /// monopole of the density error and can grow where `worst_deviation` cannot.
+  double folded_charge_error = 0.0;
+};
+
+/// Apply the folding policy to a window: orbitals in `kept_global` become the
+/// active space, and each remaining orbital is folded into the external space
+/// as inactive or virtual by rounding its reference occupation to the nearer of
+/// 2 or 0. Rounding preserves the total electron count -- the active space
+/// receives whatever the folded orbitals do not take -- but it perturbs the
+/// mean field the active space feels, so the deviations are reported.
+///
+/// `occupation` is indexed by window position and `window_global` maps those
+/// positions to global orbital indices; `window_electrons` is the (integer)
+/// electron count the reference density places in the window. Throws
+/// `std::invalid_argument` if a folded orbital deviates from an integer
+/// occupation by more than `max_folded_occupation_deviation`, which must lie in
+/// [0, 1) so a singly occupied orbital is never folded on an arbitrary
+/// rounding.
+WindowPartition partition_window(
+    const std::vector<double>& occupation,
+    const std::vector<std::size_t>& window_global,
+    const std::unordered_set<std::size_t>& kept_global, int window_electrons,
+    double max_folded_occupation_deviation);
 
 }  // namespace qdk::chemistry::algorithms::microsoft::swpt2

@@ -23,6 +23,7 @@
 #include <map>
 #include <random>
 #include <stdexcept>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -111,7 +112,7 @@ TEST(Swpt2KernelTest, InactiveFockFoldMeanField) {
   set_eri(g, 1, 0, 0, 1, norb, K);
   set_eri(g, 1, 1, 1, 1, norb, Udd);
 
-  sw::SoPartition part;
+  sw::SpinOrbitalPartition part;
   part.n_so = 4;
   part.is_active = {1, 1, 0, 0};
   part.is_inactive = {0, 0, 1, 1};
@@ -144,7 +145,7 @@ TEST(Swpt2KernelTest, EmptyExternalSpaceIsIdentity) {
   set_eri(g, 0, 0, 0, 0, norb, 1.0);  // some active interaction
   const double e0 = 0.7;
 
-  sw::SoPartition part;
+  sw::SpinOrbitalPartition part;
   part.n_so = 4;
   part.is_active = {1, 1, 1, 1};
   part.is_inactive = {0, 0, 0, 0};
@@ -174,7 +175,7 @@ struct TwoOrbital {
   Eigen::MatrixXd one_body;
   sw::SpinBlockedTwoBody two_body;
   Eigen::VectorXd eps;
-  sw::SoPartition part;
+  sw::SpinOrbitalPartition part;
   TwoOrbital(double e_active, double e_ext, double tau,
              bool external_is_virtual) {
     const int norb = 2;
@@ -336,7 +337,7 @@ struct MatrixSwParts {
 MatrixSwParts build_matrix_sw_parts(const Eigen::MatrixXd& h1,
                                     const Eigen::VectorXd& g,
                                     const Eigen::VectorXd& eps,
-                                    const sw::SoPartition& part,
+                                    const sw::SpinOrbitalPartition& part,
                                     double core_energy,
                                     const sw::RegularizerOptions& reg = {}) {
   const int norb = static_cast<int>(h1.rows());
@@ -359,12 +360,9 @@ MatrixSwParts build_matrix_sw_parts(const Eigen::MatrixXd& h1,
     double denominator = 0.0;
     for (int orbital : create) denominator += eps(orbital);
     for (int orbital : annihilate) denominator -= eps(orbital);
-    if (std::abs(denominator) <= 1e-12 && reg.denom_flow == 0.0 &&
-        reg.denom_shift == 0.0)
-      throw std::runtime_error("matrix reference has a zero denominator");
     add_term_matrix(result.generator, n_so,
-                    coefficient * sw::reg_inv(denominator, reg), create,
-                    annihilate);
+                    coefficient * sw::regularized_inverse(denominator, reg),
+                    create, annihilate);
   };
 
   for (int p = 0; p < norb; ++p)
@@ -508,7 +506,7 @@ TEST(Swpt2KernelTest, VirtualExternalSpaceConvergesAsCouplingShrinks) {
     nb << 1, 0, 0;
     const Eigen::VectorXd eps = diagonal_fock_energies(h1, g, na, nb, norb);
 
-    sw::SoPartition part;
+    sw::SpinOrbitalPartition part;
     part.n_so = 2 * norb;
     part.is_active = {1, 1, 1, 1, 0, 0};
     part.is_inactive = {0, 0, 0, 0, 0, 0};
@@ -580,7 +578,7 @@ TEST(Swpt2KernelTest, ProductionMatchesIndependentFockSpaceMatrix) {
 
   sw::RegularizerOptions bare;
   sw::RegularizerOptions shifted;
-  shifted.denom_shift = 0.4;
+  shifted.denom_imaginary_shift = 0.4;
   sw::RegularizerOptions flow;
   flow.denom_flow = 1.2;
 
@@ -714,7 +712,8 @@ TEST(Swpt2KernelTest, EmitSpatialChemistRoundTrip) {
   nb << 1, 1, 0;
   const Eigen::VectorXd eps = diagonal_fock_energies(h1, g, na, nb, norb);
 
-  sw::SoPartition part;  // whole window active => downfold is the identity
+  sw::SpinOrbitalPartition
+      part;  // whole window active => downfold is the identity
   part.n_so = 2 * norb;
   part.is_active.assign(2 * norb, 1);
   part.is_inactive.assign(2 * norb, 0);
@@ -764,7 +763,7 @@ TEST(Swpt2KernelTest, EmitPreservesDressedEnergy) {
   nb << 1, 0, 0;
   const Eigen::VectorXd eps = diagonal_fock_energies(h1, g, na, nb, norb);
 
-  sw::SoPartition part;
+  sw::SpinOrbitalPartition part;
   part.n_so = n_so;
   part.is_active = {1, 1, 1, 1, 0, 0};
   part.is_inactive = {0, 0, 0, 0, 0, 0};
@@ -843,7 +842,6 @@ TEST(Swpt2KernelTest, EmitPreservesDressedEnergy) {
 // ---------------------------------------------------------------------------
 // make_partition: explicit active / inactive / virtual index lists must be
 // disjoint and cover the window.
-// occupation into inactive (doubly occupied) / virtual (empty).
 // ---------------------------------------------------------------------------
 TEST(Swpt2KernelTest, MakePartitionRolesFromExplicitLists) {
   // window of 4 spatial orbitals; active = {1,2}, inactive = {0}, virtual = {3}
@@ -865,6 +863,89 @@ TEST(Swpt2KernelTest, MakePartitionRolesFromExplicitLists) {
   EXPECT_THROW(sw::make_partition(2, {5}, {0}, {1}), std::invalid_argument);
   EXPECT_THROW(sw::make_partition(2, {0}, {0}, {1}), std::invalid_argument);
   EXPECT_THROW(sw::make_partition(2, {0}, {}, {}), std::invalid_argument);
+}
+
+// ---------------------------------------------------------------------------
+// partition_window: the folding policy. Kept orbitals become active; the rest
+// are folded by rounding their reference occupation to the nearer of 2 or 0.
+// ---------------------------------------------------------------------------
+TEST(Swpt2KernelTest, PartitionWindowRoundsFoldedOccupations) {
+  const std::vector<std::size_t> window = {10, 11, 12, 13};
+  const std::unordered_set<std::size_t> kept = {11, 12};
+
+  // Integer occupations: nothing to round.
+  {
+    const auto split = sw::partition_window({2.0, 1.0, 1.0, 0.0}, window, kept,
+                                            /*window_electrons=*/4, 0.5);
+    EXPECT_EQ(split.active_spatial, (std::vector<int>{1, 2}));
+    EXPECT_EQ(split.inactive_spatial, (std::vector<int>{0}));
+    EXPECT_EQ(split.virtual_spatial, (std::vector<int>{3}));
+    EXPECT_EQ(split.active_electrons, 2);
+    EXPECT_DOUBLE_EQ(split.worst_deviation, 0.0);
+    EXPECT_DOUBLE_EQ(split.folded_charge_error, 0.0);
+  }
+
+  // A correlated pair kept together on the folded side: both orbitals round,
+  // but in opposite directions, so the charge error cancels exactly.
+  {
+    const auto split = sw::partition_window({1.98, 1.0, 1.0, 0.02}, window,
+                                            kept, /*window_electrons=*/4, 0.5);
+    EXPECT_EQ(split.inactive_spatial, (std::vector<int>{0}));
+    EXPECT_EQ(split.virtual_spatial, (std::vector<int>{3}));
+    EXPECT_EQ(split.active_electrons, 2);
+    EXPECT_NEAR(split.worst_deviation, 0.02, 1e-12);
+    EXPECT_EQ(split.worst_orbital, 10u);
+    EXPECT_NEAR(split.worst_occupation, 1.98, 1e-12);
+    EXPECT_NEAR(split.folded_charge_error, 0.0, 1e-12);
+  }
+}
+
+TEST(Swpt2KernelTest, PartitionWindowChargeErrorAccumulates) {
+  // Three folded orbitals rounding the same way: the charge error is three
+  // times the largest single deviation, which worst_deviation alone cannot
+  // show.
+  const std::vector<std::size_t> window = {0, 1, 2, 3};
+  const std::unordered_set<std::size_t> kept = {3};
+  const auto split = sw::partition_window({1.9, 1.9, 1.9, 1.3}, window, kept,
+                                          /*window_electrons=*/7, 0.5);
+  EXPECT_EQ(split.inactive_spatial, (std::vector<int>{0, 1, 2}));
+  EXPECT_TRUE(split.virtual_spatial.empty());
+  EXPECT_NEAR(split.worst_deviation, 0.1, 1e-12);
+  EXPECT_NEAR(split.folded_charge_error, 0.3, 1e-12);
+  // The active electron count is what the fold leaves behind, not the
+  // reference occupation summed over the kept space (1.3 here).
+  EXPECT_EQ(split.active_electrons, 1);
+}
+
+TEST(Swpt2KernelTest, PartitionWindowRejectsAmbiguousFolds) {
+  const std::vector<std::size_t> window = {0, 1, 2, 3};
+  const std::unordered_set<std::size_t> kept = {1, 2};
+
+  // A singly occupied orbital cannot be folded on an arbitrary rounding.
+  EXPECT_THROW(sw::partition_window({1.0, 1.0, 1.0, 1.0}, window, kept, 4, 0.5),
+               std::invalid_argument);
+  // A zero tolerance admits only exactly integer folded occupations.
+  EXPECT_NO_THROW(
+      sw::partition_window({2.0, 1.0, 1.0, 0.0}, window, kept, 4, 0.0));
+  EXPECT_THROW(
+      sw::partition_window({1.98, 1.0, 1.0, 0.02}, window, kept, 4, 0.0),
+      std::invalid_argument);
+  // The tolerance itself must lie in [0, 1).
+  EXPECT_THROW(sw::partition_window({2.0, 1.0, 1.0, 0.0}, window, kept, 4, 1.0),
+               std::invalid_argument);
+  EXPECT_THROW(
+      sw::partition_window({2.0, 1.0, 1.0, 0.0}, window, kept, 4, -0.1),
+      std::invalid_argument);
+  // An empty kept space, and inputs of inconsistent length.
+  EXPECT_THROW(sw::partition_window({2.0, 0.0}, {0, 1}, {}, 2, 0.5),
+               std::invalid_argument);
+  EXPECT_THROW(sw::partition_window({2.0, 0.0}, {0, 1, 2}, {0}, 2, 0.5),
+               std::invalid_argument);
+  // Rounding that leaves an active electron count the kept space cannot hold.
+  EXPECT_THROW(sw::partition_window({2.0, 0.0}, {0, 1}, {1}, 5, 0.5),
+               std::invalid_argument);
+  EXPECT_THROW(sw::partition_window({2.0, 0.0}, {0, 1}, {1}, 1, 0.5),
+               std::invalid_argument);
 }
 
 TEST(Swpt2KernelTest, SemicanonicalPrimitivesAreCovariantAndReversible) {

@@ -174,17 +174,20 @@ Second-order Schrieffer-Wolff (Van Vleck) effective-Hamiltonian downfold.
 Computes ``H_eff = H_BD + 1/2 [S, H_OD]``, truncated to ``<= 2``-body, folding
 the external space ``Q`` of the window onto the reference active space ``P``.
 With bare denominators, the generator solves ``[F0, S] = H_OD`` for a diagonal
-generalized-Fock ``F0``. Flow and shift settings use a regularized generator.
+generalized-Fock ``F0``. The flow and imaginary-shift settings instead build a
+regularized generator, which solves that equation only approximately.
 The reference and window must use the same restricted MO basis. RHF, ROHF, and
 spin-adapted CAS references are supported; every singly occupied ROHF orbital
 must belong to the active space. UHF orbitals are not supported. Registered as
-``"qdk_swpt2"`` (aliases ``"swpt2"``, ``"sw"``, and
-``"schrieffer_wolff"``).
+``"qdk_swpt2"``, with the aliases ``"swpt2"`` and ``"schrieffer_wolff"``.
 
-The ``regularizer`` setting selects ``"flow"`` (default), ``"shift"``, or
-``"bare"``. The corresponding ``denom_flow`` / ``denom_shift`` parameter
-controls that scheme; ``denom_floor`` is the bare-denominator cutoff. The flow
-option borrows the DSRG damping form but is not a full DSRG calculation.
+Denominator regularization is selected by setting a parameter rather than a
+mode: ``denom_flow`` (flow parameter in :math:`E_h^{-2}`, default ``1.0``) and
+``denom_imaginary_shift`` (imaginary level shift in :math:`E_h`, default ``0``)
+are mutually exclusive, and a positive value enables that scheme. Setting both
+is an error. With both at zero the unregularized inverse is used, floored by
+``denom_floor``. The flow option borrows the DSRG damping form but is not a full
+DSRG calculation.
 ``semicanonicalize`` is enabled by default and diagonalizes the generalized
 Fock independently within inactive, active, and virtual orbital blocks before
 forming denominators; the emitted Hamiltonian is rotated back to the original
@@ -192,7 +195,7 @@ reference basis. ROHF uses the spin-traced density and common spin-free
 orbital energies, preserving spin symmetry while the active solve selects the
 desired spin sector.
 
-The selected regularizer, minimum denominator, maximum raw intruder amplitude,
+The active regularization, minimum denominator, maximum raw intruder amplitude,
 and semicanonicalization status are logged when construction completes. A
 warning is also logged when the raw amplitude exceeds
 ``intruder_warn_amplitude``.
@@ -215,8 +218,8 @@ Typical usage:
     import qdk_chemistry.algorithms as alg
 
     downfolder = alg.create("effective_hamiltonian_constructor", "qdk_swpt2")
-    downfolder.settings().set("regularizer", "shift")
-    downfolder.settings().set("denom_shift", 0.5)
+    downfolder.settings().set("denom_flow", 0.0)
+    downfolder.settings().set("denom_imaginary_shift", 0.5)
     h_eff = downfolder.run(reference, window_hamiltonian, p_indices)
 
 See Also:
@@ -228,6 +231,6 @@ See Also:
 Default constructor.
 
 Initializes a Schrieffer-Wolff PT2 downfold with flow regularization enabled by
-default. Set ``regularizer`` to ``"bare"`` for unregularized second-order PT.
+default. Set ``denom_flow`` to 0 for unregularized second-order PT.
 )");
 }

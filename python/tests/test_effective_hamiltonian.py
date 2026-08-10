@@ -42,7 +42,7 @@ class TestEffectiveHamiltonianConstructor:
         with pytest.raises((KeyError, RuntimeError)):
             algorithms.create(_TYPE, "nonexistent_downfolder")
 
-    @pytest.mark.parametrize("alias", ["swpt2", "sw", "schrieffer_wolff"])
+    @pytest.mark.parametrize("alias", ["swpt2", "schrieffer_wolff"])
     def test_aliases_resolve(self, alias):
         """Aliases resolve to the qdk_swpt2 implementation."""
         assert algorithms.create(_TYPE, alias).name() == "qdk_swpt2"
@@ -58,19 +58,18 @@ class TestEffectiveHamiltonianConstructor:
         constructor = algorithms.create(_TYPE, "swpt2")
         settings = constructor.settings()
         # flow regularization is on by default at the constructor layer
-        assert settings.get("regularizer") == "flow"
         assert settings.get("denom_floor") == pytest.approx(1e-8)
-        assert settings.get("denom_shift") == pytest.approx(0.0)
+        assert settings.get("denom_imaginary_shift") == pytest.approx(0.0)
         assert settings.get("denom_flow") == pytest.approx(1.0)
         assert settings.get("intruder_warn_amplitude") == pytest.approx(1.0)
         assert settings.get("semicanonicalize") is True
         assert settings.get("semicanonical_tolerance") == pytest.approx(1e-10)
         assert settings.get("max_folded_occupation_deviation") == pytest.approx(0.5)
 
-        settings.set("regularizer", "shift")
-        settings.set("denom_shift", 0.5)
-        assert constructor.settings().get("regularizer") == "shift"
-        assert constructor.settings().get("denom_shift") == pytest.approx(0.5)
+        settings.set("denom_flow", 0.0)
+        settings.set("denom_imaginary_shift", 0.5)
+        assert constructor.settings().get("denom_flow") == pytest.approx(0.0)
+        assert constructor.settings().get("denom_imaginary_shift") == pytest.approx(0.5)
 
     def test_accepts_mean_field_hf_reference(self):
         """A mean-field HF reference (no active 1-RDM) is accepted directly."""

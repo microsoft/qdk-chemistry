@@ -19,8 +19,8 @@ namespace qdk::chemistry::algorithms::microsoft::swpt2 {
 namespace {
 inline int alpha(int p) { return 2 * p; }
 inline int beta(int p) { return 2 * p + 1; }
-inline Eigen::Index n4(int M) {
-  return static_cast<Eigen::Index>(M) * M * M * M;
+inline Eigen::Index n4(int n) {
+  return static_cast<Eigen::Index>(n) * n * n * n;
 }
 }  // namespace
 
@@ -29,14 +29,15 @@ inline Eigen::Index n4(int M) {
 // occupation-change masks, and projected-commutator Wick machinery.
 // ===========================================================================
 
-double reg_inv(double delta, const RegularizerOptions& reg) {
+double regularized_inverse(double delta, const RegularizerOptions& reg) {
   if (reg.denom_flow > 0.0) {
     const double d2 = delta * delta;
     if (reg.denom_flow * d2 < 1e-14) return reg.denom_flow * delta;
     return (1.0 - std::exp(-reg.denom_flow * d2)) / delta;
   }
-  if (reg.denom_shift > 0.0) {
-    return delta / (delta * delta + reg.denom_shift * reg.denom_shift);
+  if (reg.denom_imaginary_shift > 0.0) {
+    return delta / (delta * delta +
+                    reg.denom_imaginary_shift * reg.denom_imaginary_shift);
   }
   if (std::abs(delta) < reg.denom_floor) return 0.0;
   return 1.0 / delta;
@@ -144,10 +145,11 @@ inline int net2(const std::vector<char>& role, int P, int Q, int R, int S) {
   return role[P] + role[Q] - role[R] - role[S];
 }
 // a term is external-off-diagonal if it changes the inactive OR virtual count.
-inline bool is_od1(const SoPartition& part, int P, int Q) {
+inline bool is_od1(const SpinOrbitalPartition& part, int P, int Q) {
   return net1(part.is_inactive, P, Q) != 0 || net1(part.is_virtual, P, Q) != 0;
 }
-inline bool is_od2(const SoPartition& part, int P, int Q, int R, int S) {
+inline bool is_od2(const SpinOrbitalPartition& part, int P, int Q, int R,
+                   int S) {
   return net2(part.is_inactive, P, Q, R, S) != 0 ||
          net2(part.is_virtual, P, Q, R, S) != 0;
 }
@@ -158,10 +160,8 @@ inline bool is_od2(const SoPartition& part, int P, int Q, int R, int S) {
 // ---------------------------------------------------------------------------
 namespace {
 
-using Term = std::vector<std::pair<int, int>>;  // (spin-orbital, 1=cre / 0=ann)
-
 struct RetainedOperator {
-  using Operator = std::pair<int, int>;
+  using Operator = std::pair<int, int>;  // (spin-orbital, 1=cre / 0=ann)
 
   explicit RetainedOperator(const std::vector<int>& active_so)
       : so2c(active_so.empty() ? 0 : active_so.back() + 1, -1),
@@ -226,12 +226,6 @@ void normalize_retained(std::array<RetainedOperator::Operator, 8> ops, int n,
   if (n <= 4) out.add(ops.data(), n, coeff);
 }
 
-void normalize(const Term& ops, double coeff, RetainedOperator& out) {
-  std::array<RetainedOperator::Operator, 8> fixed_ops{};
-  std::copy(ops.begin(), ops.end(), fixed_ops.begin());
-  normalize_retained(fixed_ops, static_cast<int>(ops.size()), coeff, out);
-}
-
 template <std::size_t N>
 void normalize_slots(const std::array<int, N>& values,
                      const std::array<int, N>& is_cre,
@@ -279,13 +273,6 @@ bool is_two_cross_line_matching(int rA, int rB,
   });
 }
 
-bool is_one_cross_line_matching(int rA, int rB,
-                                const std::vector<std::pair<int, int>>& match) {
-  if (match.size() != 1) return false;
-  const int boundary = 2 * rA;
-  return (match[0].first < boundary) != (match[0].second < boundary);
-}
-
 Eigen::Index integer_power(Eigen::Index base, int exponent) {
   Eigen::Index result = 1;
   for (int i = 0; i < exponent; ++i) result *= base;
@@ -304,144 +291,35 @@ void assign_active_slots(std::array<int, 8>& slots,
   }
 }
 
-// One cross line between two two-body operators. Three active operators remain
-// on each side, so the rank-three part of the product is discarded and a
-// retained term needs an annihilator of A to coincide with a creator of B.
-// Enumerating those coincidences visits far fewer than the nactive^6 row pairs
-// a plain matrix product would, which is why this one channel is specialized
-// instead of being left to project_remaining_blas.
-template <class A2Get, class B2Get, class Output>
-void project_two_body_one_line_blas(A2Get A2get, B2Get B2get,
-                                    const SoPartition& part, double scale,
-                                    Output& out) {
-  std::vector<int> active_list, inactive_list, virtual_list;
+/// Spin-orbitals of each role, ascending, plus the inverse map for the active
+/// ones (-1 elsewhere).
+struct RoleLists {
+  std::vector<int> active, inactive, virtuals, active_position;
+};
+
+RoleLists role_lists(const SpinOrbitalPartition& part) {
+  RoleLists lists;
+  lists.active_position.assign(part.n_so, -1);
   for (int orbital = 0; orbital < part.n_so; ++orbital) {
-    if (part.is_active[orbital]) active_list.push_back(orbital);
-    if (part.is_inactive[orbital]) inactive_list.push_back(orbital);
-    if (part.is_virtual[orbital]) virtual_list.push_back(orbital);
+    if (part.is_active[orbital]) {
+      lists.active_position[orbital] = static_cast<int>(lists.active.size());
+      lists.active.push_back(orbital);
+    }
+    if (part.is_inactive[orbital]) lists.inactive.push_back(orbital);
+    if (part.is_virtual[orbital]) lists.virtuals.push_back(orbital);
   }
-  if (active_list.empty()) return;
-
-  constexpr int boundary = 4;
-  constexpr int nslots = 8;
-  const std::array<int, nslots> is_cre{1, 1, 0, 0, 1, 1, 0, 0};
-  std::vector<int> slots(nslots);
-  std::iota(slots.begin(), slots.end(), 0);
-  std::vector<std::vector<std::pair<int, int>>> matches;
-  enum_matchings(slots, {}, matches);
-
-  for (const auto& match : matches) {
-    if (!is_one_cross_line_matching(2, 2, match)) continue;
-    const auto [left, right] = match[0];
-    if (is_cre[left] == is_cre[right]) continue;
-
-    std::vector<int> ext, ext_a, ext_b;
-    for (int slot = 0; slot < nslots; ++slot) {
-      if (slot == left || slot == right) continue;
-      ext.push_back(slot);
-      (slot < boundary ? ext_a : ext_b).push_back(slot);
-    }
-    std::vector<int> order{left, right};
-    order.insert(order.end(), ext.begin(), ext.end());
-    const double prefactor = scale * perm_sign(order) / 16.0;
-    const auto& external_list = is_cre[left] ? inactive_list : virtual_list;
-    if (external_list.empty()) continue;
-
-    const Eigen::Index nactive = active_list.size();
-    const Eigen::Index nrow_a = integer_power(nactive, ext_a.size());
-    const Eigen::Index nrow_b = integer_power(nactive, ext_b.size());
-    const Eigen::Index n_external = external_list.size();
-    Eigen::MatrixXd a(nrow_a, n_external);
-    Eigen::MatrixXd b(nrow_b, n_external);
-    for (Eigen::Index row = 0; row < nrow_a; ++row) {
-      for (Eigen::Index q = 0; q < n_external; ++q) {
-        std::array<int, 8> values{};
-        assign_active_slots(values, ext_a, row, active_list);
-        values[left] = values[right] = external_list[q];
-        a(row, q) = A2get(values[0], values[1], values[2], values[3]);
-      }
-    }
-    for (Eigen::Index row = 0; row < nrow_b; ++row) {
-      for (Eigen::Index q = 0; q < n_external; ++q) {
-        std::array<int, 8> values{};
-        assign_active_slots(values, ext_b, row, active_list);
-        values[left] = values[right] = external_list[q];
-        b(row, q) = B2get(values[boundary], values[boundary + 1],
-                          values[boundary + 2], values[boundary + 3]);
-      }
-    }
-
-    std::vector<int> a_annihilators, b_creators;
-    for (int slot : ext_a)
-      if (!is_cre[slot]) a_annihilators.push_back(slot);
-    for (int slot : ext_b)
-      if (is_cre[slot]) b_creators.push_back(slot);
-
-    std::vector<int> active_position(part.n_so, -1);
-    for (int index = 0; index < static_cast<int>(active_list.size()); ++index)
-      active_position[active_list[index]] = index;
-    std::vector<char> seen(nrow_b, 0);
-    std::vector<Eigen::Index> candidates;
-    candidates.reserve(a_annihilators.size() * b_creators.size() *
-                       integer_power(nactive, ext_b.size() - 1));
-
-    for (Eigen::Index row_a = 0; row_a < nrow_a; ++row_a) {
-      std::array<int, 8> values_a{};
-      assign_active_slots(values_a, ext_a, row_a, active_list);
-      candidates.clear();
-      for (int a_slot : a_annihilators) {
-        for (int b_slot : b_creators) {
-          const Eigen::Index free_count =
-              integer_power(nactive, ext_b.size() - 1);
-          for (Eigen::Index free = 0; free < free_count; ++free) {
-            std::array<int, 8> values_b{};
-            values_b[b_slot] = values_a[a_slot];
-            Eigen::Index remaining = free;
-            for (auto slot = ext_b.rbegin(); slot != ext_b.rend(); ++slot) {
-              if (*slot == b_slot) continue;
-              values_b[*slot] = active_list[remaining % nactive];
-              remaining /= nactive;
-            }
-            Eigen::Index row_b = 0;
-            for (int slot : ext_b)
-              row_b = row_b * nactive + active_position[values_b[slot]];
-            if (!seen[row_b]) {
-              seen[row_b] = 1;
-              candidates.push_back(row_b);
-            }
-          }
-        }
-      }
-
-      for (Eigen::Index row_b : candidates) {
-        double product = 0.0;
-        for (Eigen::Index q = 0; q < n_external; ++q)
-          product += a(row_a, q) * b(row_b, q);
-        const double coeff = prefactor * product;
-        if (coeff == 0.0) continue;
-        std::array<int, 8> values = values_a;
-        assign_active_slots(values, ext_b, row_b, active_list);
-        normalize_slots(values, is_cre, ext, coeff, out);
-      }
-      for (Eigen::Index row_b : candidates) seen[row_b] = 0;
-    }
-  }
+  return lists;
 }
 
 // Two cross-operator contractions in A2 * B2 leave two active legs on each
 // tensor. Flattening each active pair into a row and the two external indices
 // into a column turns every Wick matching into one matrix multiplication.
 template <class A2Get, class B2Get, class Output>
-void project_two_cross_line_blas(A2Get A2get, B2Get B2get,
-                                 const SoPartition& part, double scale,
-                                 const Eigen::VectorXd& hvec,
-                                 const Eigen::VectorXd& pvec, Output& out) {
-  std::vector<int> active_list, inactive_list, virtual_list;
-  for (int orbital = 0; orbital < part.n_so; ++orbital) {
-    if (part.is_active[orbital]) active_list.push_back(orbital);
-    if (part.is_inactive[orbital]) inactive_list.push_back(orbital);
-    if (part.is_virtual[orbital]) virtual_list.push_back(orbital);
-  }
+void project_two_cross_line(A2Get A2get, B2Get B2get,
+                            const SpinOrbitalPartition& part, double scale,
+                            Output& out) {
+  const RoleLists lists = role_lists(part);
+  const std::vector<int>& active_list = lists.active;
   if (active_list.empty()) return;
 
   constexpr int nslots = 8;
@@ -481,8 +359,11 @@ void project_two_cross_line_blas(A2Get A2get, B2Get B2get,
     std::array<const std::vector<int>*, 2> external_lists{};
     bool empty_external = false;
     for (int pair = 0; pair < 2; ++pair) {
+      // Reference propagators: <a^dag a> is nonzero only on inactive orbitals
+      // and <a a^dag> only on virtual ones, so each contracted pair sums over
+      // that list alone.
       external_lists[pair] =
-          is_cre[match[pair].first] ? &inactive_list : &virtual_list;
+          is_cre[match[pair].first] ? &lists.inactive : &lists.virtuals;
       empty_external = empty_external || external_lists[pair]->empty();
     }
     if (empty_external) continue;
@@ -501,20 +382,18 @@ void project_two_cross_line_blas(A2Get A2get, B2Get B2get,
         for (Eigen::Index q0 = 0; q0 < n_external0; ++q0) {
           for (Eigen::Index q1 = 0; q1 < n_external1; ++q1) {
             const Eigen::Index col = q0 * n_external1 + q1;
-            std::array<int, nslots> sv{};
-            sv[ext_a[0]] = active_list[i];
-            sv[ext_a[1]] = active_list[j];
-            sv[match[0].first] = sv[match[0].second] = (*external_lists[0])[q0];
-            sv[match[1].first] = sv[match[1].second] = (*external_lists[1])[q1];
-            double prop = is_cre[match[0].first] ? pvec(sv[match[0].first])
-                                                 : hvec(sv[match[0].first]);
-            prop *= is_cre[match[1].first] ? pvec(sv[match[1].first])
-                                           : hvec(sv[match[1].first]);
-            a(row, col) = A2get(sv[0], sv[1], sv[2], sv[3]) * prop;
+            std::array<int, nslots> values{};
+            values[ext_a[0]] = active_list[i];
+            values[ext_a[1]] = active_list[j];
+            values[match[0].first] = values[match[0].second] =
+                (*external_lists[0])[q0];
+            values[match[1].first] = values[match[1].second] =
+                (*external_lists[1])[q1];
+            a(row, col) = A2get(values[0], values[1], values[2], values[3]);
 
-            sv[ext_b[0]] = active_list[i];
-            sv[ext_b[1]] = active_list[j];
-            b(row, col) = B2get(sv[4], sv[5], sv[6], sv[7]);
+            values[ext_b[0]] = active_list[i];
+            values[ext_b[1]] = active_list[j];
+            b(row, col) = B2get(values[4], values[5], values[6], values[7]);
           }
         }
       }
@@ -529,15 +408,12 @@ void project_two_cross_line_blas(A2Get A2get, B2Get B2get,
       for (Eigen::Index row_b = 0; row_b < nrow; ++row_b) {
         const double coeff = prefactor * product(row_a, row_b);
         if (coeff == 0.0) continue;
-        std::array<int, nslots> sv{};
-        sv[ext_a[0]] = active_list[row_a / nactive];
-        sv[ext_a[1]] = active_list[row_a % nactive];
-        sv[ext_b[0]] = active_list[row_b / nactive];
-        sv[ext_b[1]] = active_list[row_b % nactive];
-        Term ops;
-        ops.reserve(ext.size());
-        for (int slot : ext) ops.push_back({sv[slot], is_cre[slot]});
-        normalize(ops, coeff, out);
+        std::array<int, nslots> values{};
+        values[ext_a[0]] = active_list[row_a / nactive];
+        values[ext_a[1]] = active_list[row_a % nactive];
+        values[ext_b[0]] = active_list[row_b / nactive];
+        values[ext_b[1]] = active_list[row_b % nactive];
+        normalize_slots(values, is_cre, ext, coeff, out);
       }
     }
   }
@@ -546,19 +422,21 @@ void project_two_cross_line_blas(A2Get A2get, B2Get B2get,
 // All remaining nonempty matchings factor into two operand-local panels.
 // External active legs form the rows, cross-operator external lines form the
 // shared column, and contractions internal to one operand are reduced while
-// packing that operand's panel. Matchings owned by the specialized one- and
-// two-line kernels above are excluded.
+// packing that operand's panel. The two-cross-line matching owned by the
+// specialized kernel above is excluded.
+//
+// A matching leaving more than four active legs produces a rank-three or
+// higher operator, which survives the two-body truncation only if an
+// annihilator of A coincides with a creator of B. Those channels therefore
+// enumerate the coinciding row pairs instead of forming the full product.
 template <class A2Get, class B2Get, class Output>
-void project_remaining_blas(const Eigen::MatrixXd& A1, A2Get A2get,
-                            const Eigen::MatrixXd& B1, B2Get B2get,
-                            const SoPartition& part, double scale,
-                            Output& out) {
-  std::vector<int> active_list, inactive_list, virtual_list;
-  for (int orbital = 0; orbital < part.n_so; ++orbital) {
-    if (part.is_active[orbital]) active_list.push_back(orbital);
-    if (part.is_inactive[orbital]) inactive_list.push_back(orbital);
-    if (part.is_virtual[orbital]) virtual_list.push_back(orbital);
-  }
+void project_remaining(const Eigen::MatrixXd& A1, A2Get A2get,
+                       const Eigen::MatrixXd& B1, B2Get B2get,
+                       const SpinOrbitalPartition& part, double scale,
+                       Output& out) {
+  const RoleLists lists = role_lists(part);
+  const std::vector<int>& active_list = lists.active;
+  const std::vector<int>& active_position = lists.active_position;
   if (active_list.empty()) return;
 
   for (const auto [rA, rB] :
@@ -574,12 +452,9 @@ void project_remaining_blas(const Eigen::MatrixXd& A1, A2Get A2get,
     std::vector<std::vector<std::pair<int, int>>> matches;
     enum_matchings(slots, {}, matches);
     for (const auto& match : matches) {
-      // The specialized kernels above own the two-cross-line channel and the
-      // one-cross-line channel between two two-body operators; every other
-      // nonempty matching is handled here.
-      if (match.empty() || is_two_cross_line_matching(rA, rB, match) ||
-          (rA == 2 && rB == 2 && is_one_cross_line_matching(rA, rB, match)))
-        continue;
+      // The specialized kernel above owns the two-cross-line channel; every
+      // other nonempty matching is handled here.
+      if (match.empty() || is_two_cross_line_matching(rA, rB, match)) continue;
       if (std::any_of(match.begin(), match.end(), [&](const auto& pair) {
             return is_cre[pair.first] == is_cre[pair.second];
           }))
@@ -604,6 +479,16 @@ void project_remaining_blas(const Eigen::MatrixXd& A1, A2Get A2get,
         ext.push_back(slot);
         (slot < boundary ? ext_a : ext_b).push_back(slot);
       }
+      // Above two-body rank only an A-annihilator / B-creator coincidence
+      // survives normal ordering, so without one the whole matching is dropped.
+      std::vector<int> a_annihilators, b_creators;
+      for (int slot : ext_a)
+        if (!is_cre[slot]) a_annihilators.push_back(slot);
+      for (int slot : ext_b)
+        if (is_cre[slot]) b_creators.push_back(slot);
+      const bool needs_coincidence = ext.size() > 4;
+      if (needs_coincidence && (a_annihilators.empty() || b_creators.empty()))
+        continue;
       std::vector<int> order;
       for (const auto& pair : match) {
         order.push_back(pair.first);
@@ -618,7 +503,7 @@ void project_remaining_blas(const Eigen::MatrixXd& A1, A2Get A2get,
       bool empty_external = false;
       for (int pair = 0; pair < static_cast<int>(match.size()); ++pair) {
         pair_lists[pair] =
-            is_cre[match[pair].first] ? &inactive_list : &virtual_list;
+            is_cre[match[pair].first] ? &lists.inactive : &lists.virtuals;
         empty_external = empty_external || pair_lists[pair]->empty();
       }
       if (empty_external) continue;
@@ -685,22 +570,61 @@ void project_remaining_blas(const Eigen::MatrixXd& A1, A2Get A2get,
         }
       }
 
-      Eigen::MatrixXd product = Eigen::MatrixXd::Zero(nrow_a, nrow_b);
-      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
-                 nrow_a, nrow_b, ncol, 1.0, a.data(), nrow_a, b.data(), nrow_b,
-                 0.0, product.data(), nrow_a);
+      const auto emit = [&](Eigen::Index row_a, Eigen::Index row_b,
+                            double dot) {
+        const double coeff = prefactor * dot;
+        if (coeff == 0.0) return;
+        std::array<int, 8> values{};
+        assign_active_slots(values, ext_a, row_a, active_list);
+        assign_active_slots(values, ext_b, row_b, active_list);
+        normalize_slots(values, is_cre, ext, coeff, out);
+      };
+
+      if (!needs_coincidence) {
+        Eigen::MatrixXd product = Eigen::MatrixXd::Zero(nrow_a, nrow_b);
+        blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+                   nrow_a, nrow_b, ncol, 1.0, a.data(), nrow_a, b.data(),
+                   nrow_b, 0.0, product.data(), nrow_a);
+        for (Eigen::Index row_a = 0; row_a < nrow_a; ++row_a)
+          for (Eigen::Index row_b = 0; row_b < nrow_b; ++row_b)
+            emit(row_a, row_b, product(row_a, row_b));
+        continue;
+      }
+
+      // `assign_active_slots` reads ext_b back to front, so the k-th ext_b slot
+      // is the digit of weight nactive^(|ext_b| - 1 - k) in row_b. Fixing that
+      // digit to an A-annihilator's orbital enumerates the surviving rows.
+      std::vector<char> seen(nrow_b, 0);
+      std::vector<Eigen::Index> candidates;
       for (Eigen::Index row_a = 0; row_a < nrow_a; ++row_a) {
-        for (Eigen::Index row_b = 0; row_b < nrow_b; ++row_b) {
-          const double coeff = prefactor * product(row_a, row_b);
-          if (coeff == 0.0) continue;
-          std::array<int, 8> values{};
-          assign_active_slots(values, ext_a, row_a, active_list);
-          assign_active_slots(values, ext_b, row_b, active_list);
-          Term ops;
-          ops.reserve(ext.size());
-          for (int slot : ext) ops.push_back({values[slot], is_cre[slot]});
-          normalize(ops, coeff, out);
+        std::array<int, 8> values_a{};
+        assign_active_slots(values_a, ext_a, row_a, active_list);
+        candidates.clear();
+        for (std::size_t k = 0; k < ext_b.size(); ++k) {
+          if (!is_cre[ext_b[k]]) continue;
+          const Eigen::Index stride =
+              integer_power(nactive, static_cast<int>(ext_b.size() - 1 - k));
+          const Eigen::Index high_count =
+              integer_power(nactive, static_cast<int>(k));
+          for (int a_slot : a_annihilators) {
+            const Eigen::Index digit = active_position[values_a[a_slot]];
+            for (Eigen::Index high = 0; high < high_count; ++high)
+              for (Eigen::Index low = 0; low < stride; ++low) {
+                const Eigen::Index row_b =
+                    (high * nactive + digit) * stride + low;
+                if (seen[row_b]) continue;
+                seen[row_b] = 1;
+                candidates.push_back(row_b);
+              }
+          }
         }
+        for (Eigen::Index row_b : candidates) {
+          double dot = 0.0;
+          for (Eigen::Index col = 0; col < ncol; ++col)
+            dot += a(row_a, col) * b(row_b, col);
+          emit(row_a, row_b, dot);
+        }
+        for (Eigen::Index row_b : candidates) seen[row_b] = 0;
       }
     }
   }
@@ -764,8 +688,8 @@ double so_v_from_blocked(const SpinBlockedTwoBody& b, int P, int Q, int R,
 
 Eigen::MatrixXd spin_orbital_one_body(const Eigen::MatrixXd& h1a,
                                       const Eigen::MatrixXd& h1b, int norb) {
-  const int M = 2 * norb;
-  Eigen::MatrixXd f = Eigen::MatrixXd::Zero(M, M);
+  const int n_so = 2 * norb;
+  Eigen::MatrixXd f = Eigen::MatrixXd::Zero(n_so, n_so);
   for (int p = 0; p < norb; ++p)
     for (int q = 0; q < norb; ++q) {
       f(alpha(p), alpha(q)) = h1a(p, q);
@@ -777,15 +701,15 @@ Eigen::MatrixXd spin_orbital_one_body(const Eigen::MatrixXd& h1a,
 ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
                                       const SpinBlockedTwoBody& blk,
                                       const Eigen::VectorXd& eps,
-                                      const SoPartition& part,
+                                      const SpinOrbitalPartition& part,
                                       const RegularizerOptions& reg,
                                       double e_core) {
-  const int M = part.n_so;
+  const int n_so = part.n_so;
 
   // Active spin-orbitals (ascending) + full -> compact index map, so the
   // result is stored over the active space only.
   std::vector<int> active_so;
-  for (int o = 0; o < M; ++o)
+  for (int o = 0; o < n_so; ++o)
     if (part.is_active[o]) active_so.push_back(o);
 
   // On-the-fly two-body element accessors (no dense n_so^4 storage).
@@ -803,11 +727,11 @@ ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
     const double vv = v_at(P, Q, R, S);
     if (vv == 0.0) return 0.0;
     const double d = eps(P) + eps(Q) - eps(R) - eps(S);
-    return vv * reg_inv(d, reg);
+    return vv * regularized_inverse(d, reg);
   };
 
   // Generator: s1 dense (cheap), s2 on the fly; plus intruder diagnostics.
-  Eigen::MatrixXd s1 = Eigen::MatrixXd::Zero(M, M);
+  Eigen::MatrixXd s1 = Eigen::MatrixXd::Zero(n_so, n_so);
   double min_denom = std::numeric_limits<double>::infinity();
   double max_amp = 0.0;
   const auto track = [&](double coupling, double delta) {
@@ -816,11 +740,11 @@ ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
     max_amp =
         std::max(max_amp, std::abs(coupling) / std::max(ad, reg.denom_floor));
   };
-  for (int P = 0; P < M; ++P)
-    for (int Q = 0; Q < M; ++Q)
+  for (int P = 0; P < n_so; ++P)
+    for (int Q = 0; Q < n_so; ++Q)
       if (is_od1(part, P, Q) && f(P, Q) != 0.0) {
         const double d = eps(P) - eps(Q);
-        s1(P, Q) = f(P, Q) * reg_inv(d, reg);
+        s1(P, Q) = f(P, Q) * regularized_inverse(d, reg);
         track(f(P, Q), d);
       }
   // Intruder diagnostics over the occupation-changing two-body couplings: a
@@ -830,7 +754,7 @@ ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
   static constexpr int spin_patterns[6][4] = {{0, 0, 0, 0}, {1, 1, 1, 1},
                                               {0, 1, 0, 1}, {0, 1, 1, 0},
                                               {1, 0, 0, 1}, {1, 0, 1, 0}};
-  const int n_spatial = M / 2;
+  const int n_spatial = n_so / 2;
   for (int p = 0; p < n_spatial; ++p)
     for (int q = 0; q < n_spatial; ++q)
       for (int r = 0; r < n_spatial; ++r)
@@ -845,15 +769,15 @@ ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
           }
 
   // Block-diagonal / off-diagonal one-body split (dense, cheap).
-  Eigen::MatrixXd od_f = Eigen::MatrixXd::Zero(M, M);
-  Eigen::MatrixXd bd_f = Eigen::MatrixXd::Zero(M, M);
-  for (int P = 0; P < M; ++P)
-    for (int Q = 0; Q < M; ++Q)
+  Eigen::MatrixXd od_f = Eigen::MatrixXd::Zero(n_so, n_so);
+  Eigen::MatrixXd bd_f = Eigen::MatrixXd::Zero(n_so, n_so);
+  for (int P = 0; P < n_so; ++P)
+    for (int Q = 0; Q < n_so; ++Q)
       (is_od1(part, P, Q) ? od_f : bd_f)(P, Q) = f(P, Q);
 
   // Reference-occupation mean-field fold of the block-diagonal part.
-  Eigen::VectorXd nb = Eigen::VectorXd::Zero(M);
-  for (int P = 0; P < M; ++P)
+  Eigen::VectorXd nb = Eigen::VectorXd::Zero(n_so);
+  for (int P = 0; P < n_so; ++P)
     if (part.is_inactive[P]) nb(P) = 1.0;
 
   ActiveDownfoldResult res;
@@ -863,15 +787,17 @@ ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
   // be closed under spin (paired spin-orbitals 2s, 2s+1); only the
   // opposite-spin block is stored and emitted.
   const int n_active_spatial = n_active_so / 2;
-  for (int k = 0; k < n_active_spatial; ++k)
-    if (active_so[2 * k] % 2 != 0 ||
-        active_so[2 * k + 1] != active_so[2 * k] + 1)
-      throw std::invalid_argument(
-          "downfold_blocked: active space is not spin-restricted");
+  bool spin_restricted = n_active_so % 2 == 0;
+  for (int k = 0; k < n_active_spatial && spin_restricted; ++k)
+    spin_restricted = active_so[2 * k] % 2 == 0 &&
+                      active_so[2 * k + 1] == active_so[2 * k] + 1;
+  if (!spin_restricted)
+    throw std::invalid_argument(
+        "downfold_blocked: active space is not spin-restricted");
   res.e = e_core;
-  for (int P = 0; P < M; ++P) res.e += bd_f(P, P) * nb(P);
-  for (int P = 0; P < M; ++P)
-    for (int Q = 0; Q < M; ++Q)
+  for (int P = 0; P < n_so; ++P) res.e += bd_f(P, P) * nb(P);
+  for (int P = 0; P < n_so; ++P)
+    for (int Q = 0; Q < n_so; ++Q)
       res.e -= 0.5 * bd_v_at(P, Q, P, Q) * nb(P) * nb(Q);
 
   res.f_active = Eigen::MatrixXd::Zero(n_active_so, n_active_so);
@@ -880,7 +806,7 @@ ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
     for (int cj = 0; cj < n_active_so; ++cj) {
       const int j = active_so[cj];
       double fold = 0.0;
-      for (int b = 0; b < M; ++b) fold += bd_v_at(i, b, b, j) * nb(b);
+      for (int b = 0; b < n_so; ++b) fold += bd_v_at(i, b, b, j) * nb(b);
       res.f_active(ci, cj) = bd_f(i, j) + fold;
     }
   }
@@ -893,23 +819,13 @@ ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
           res.v_abab(idx4(p, q, r, s, n_active_spatial)) =
               bd_v_at(active_so[2 * p], active_so[2 * q + 1], active_so[2 * r],
                       active_so[2 * s + 1]);
-  // reference-occupation propagators: hole line on virtual, particle on
-  // inactive
-  Eigen::VectorXd hvec = Eigen::VectorXd::Zero(M);
-  Eigen::VectorXd pvec = Eigen::VectorXd::Zero(M);
-  for (int P = 0; P < M; ++P) {
-    if (part.is_virtual[P]) hvec(P) = 1.0;
-    if (part.is_inactive[P]) pvec(P) = 1.0;
-  }
 
   // projected 1/2 [S, V] = 1/2 (project(S*V) - project(V*S)), on the fly.
   RetainedOperator comm(active_so);
-  project_two_cross_line_blas(s2_at, od_v_at, part, +0.5, hvec, pvec, comm);
-  project_two_cross_line_blas(od_v_at, s2_at, part, -0.5, hvec, pvec, comm);
-  project_two_body_one_line_blas(s2_at, od_v_at, part, +0.5, comm);
-  project_two_body_one_line_blas(od_v_at, s2_at, part, -0.5, comm);
-  project_remaining_blas(s1, s2_at, od_f, od_v_at, part, +0.5, comm);
-  project_remaining_blas(od_f, od_v_at, s1, s2_at, part, -0.5, comm);
+  project_two_cross_line(s2_at, od_v_at, part, +0.5, comm);
+  project_two_cross_line(od_v_at, s2_at, part, -0.5, comm);
+  project_remaining(s1, s2_at, od_f, od_v_at, part, +0.5, comm);
+  project_remaining(od_f, od_v_at, s1, s2_at, part, -0.5, comm);
 
   res.min_denominator = std::isinf(min_denom) ? 0.0 : min_denom;
   res.max_amplitude = max_amp;
@@ -920,10 +836,10 @@ ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
 }
 
 ActiveHamiltonian to_spatial_chemist(const ActiveDownfoldResult& down,
-                                     const SoPartition& part) {
-  const int M = part.n_so;
+                                     const SpinOrbitalPartition& part) {
+  const int n_so = part.n_so;
   std::vector<int> spatial;
-  for (int o = 0; 2 * o + 1 < M; ++o) {
+  for (int o = 0; 2 * o + 1 < n_so; ++o) {
     const bool a = part.is_active[2 * o], b = part.is_active[2 * o + 1];
     if (a != b)
       throw std::invalid_argument(
@@ -932,7 +848,7 @@ ActiveHamiltonian to_spatial_chemist(const ActiveDownfoldResult& down,
   }
   const int norb = static_cast<int>(spatial.size());
   const int n_active_so = static_cast<int>(down.active_so.size());
-  std::vector<int> so2c(M, -1);
+  std::vector<int> so2c(n_so, -1);
   for (int c = 0; c < n_active_so; ++c) so2c[down.active_so[c]] = c;
 
   ActiveHamiltonian out;
@@ -956,17 +872,18 @@ ActiveHamiltonian to_spatial_chemist(const ActiveDownfoldResult& down,
   return out;
 }
 
-SoPartition make_partition(int norb, const std::vector<int>& active_spatial,
-                           const std::vector<int>& inactive_spatial,
-                           const std::vector<int>& virtual_spatial) {
+SpinOrbitalPartition make_partition(int norb,
+                                    const std::vector<int>& active_spatial,
+                                    const std::vector<int>& inactive_spatial,
+                                    const std::vector<int>& virtual_spatial) {
   if (norb < 0)
     throw std::invalid_argument("make_partition: negative orbital count");
-  const int M = 2 * norb;
-  SoPartition part;
-  part.n_so = M;
-  part.is_active.assign(M, 0);
-  part.is_inactive.assign(M, 0);
-  part.is_virtual.assign(M, 0);
+  const int n_so = 2 * norb;
+  SpinOrbitalPartition part;
+  part.n_so = n_so;
+  part.is_active.assign(n_so, 0);
+  part.is_inactive.assign(n_so, 0);
+  part.is_virtual.assign(n_so, 0);
 
   std::vector<char> assigned(norb, 0);
   const auto assign = [&](const std::vector<int>& orbitals,
@@ -989,6 +906,73 @@ SoPartition make_partition(int norb, const std::vector<int>& active_spatial,
     if (!assigned[o])
       throw std::invalid_argument("make_partition: orbital has no role");
   return part;
+}
+
+WindowPartition partition_window(
+    const std::vector<double>& occupation,
+    const std::vector<std::size_t>& window_global,
+    const std::unordered_set<std::size_t>& kept_global, int window_electrons,
+    double max_folded_occupation_deviation) {
+  if (occupation.size() != window_global.size())
+    throw std::invalid_argument(
+        "SchriefferWolffPT2: occupation and window index lists differ in "
+        "length.");
+  if (!std::isfinite(max_folded_occupation_deviation) ||
+      max_folded_occupation_deviation < 0.0 ||
+      max_folded_occupation_deviation >= 1.0)
+    throw std::invalid_argument(
+        "SchriefferWolffPT2: max_folded_occupation_deviation must lie in "
+        "[0, 1); a half-occupied orbital cannot be folded unambiguously.");
+
+  WindowPartition out;
+  const int norb = static_cast<int>(occupation.size());
+  for (int i = 0; i < norb; ++i) {
+    if (kept_global.count(window_global[i])) {
+      out.active_spatial.push_back(i);
+      continue;
+    }
+    const double to_occupied = std::abs(occupation[i] - 2.0);
+    const double to_empty = std::abs(occupation[i]);
+    const double deviation = std::min(to_occupied, to_empty);
+    if (deviation > max_folded_occupation_deviation)
+      throw std::invalid_argument(
+          "SchriefferWolffPT2: folded external orbital " +
+          std::to_string(window_global[i]) + " has reference occupation " +
+          std::to_string(occupation[i]) +
+          ", which deviates from an integer occupation by more than "
+          "max_folded_occupation_deviation. Keep strongly correlated or "
+          "open-shell orbitals in the active space P (p_indices), or raise "
+          "the setting to accept the rounding.");
+    if (deviation > out.worst_deviation) {
+      out.worst_deviation = deviation;
+      out.worst_occupation = occupation[i];
+      out.worst_orbital = window_global[i];
+    }
+    (to_occupied <= to_empty ? out.inactive_spatial : out.virtual_spatial)
+        .push_back(i);
+  }
+  if (out.active_spatial.empty())
+    throw std::invalid_argument(
+        "SchriefferWolffPT2: the kept active space P is empty.");
+
+  // Rounding preserves the total, so the active electron count is fixed by
+  // what the folded orbitals take. This is the count to hand the active-space
+  // solver; it need not equal the reference occupation summed over P.
+  const int folded_electrons =
+      2 * static_cast<int>(out.inactive_spatial.size());
+  out.active_electrons = window_electrons - folded_electrons;
+  if (out.active_electrons < 0 ||
+      out.active_electrons > 2 * static_cast<int>(out.active_spatial.size()))
+    throw std::invalid_argument(
+        "SchriefferWolffPT2: the rounded external occupation leaves an "
+        "impossible active electron count; the active/external partition is "
+        "inconsistent with the reference density.");
+
+  double folded_occupation = 0.0;
+  for (int i : out.inactive_spatial) folded_occupation += occupation[i];
+  for (int i : out.virtual_spatial) folded_occupation += occupation[i];
+  out.folded_charge_error = folded_electrons - folded_occupation;
+  return out;
 }
 
 }  // namespace qdk::chemistry::algorithms::microsoft::swpt2

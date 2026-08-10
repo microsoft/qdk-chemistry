@@ -20,8 +20,13 @@ The ``"qdk_swpt2"`` implementation evaluates
 
 and retains scalar, one-body, and two-body operators in the active space
 :math:`P`. Here :math:`F_0` is a diagonal, spin-free generalized Fock
-operator. Restricted HF, restricted open-shell HF, and spin-adapted CAS
+operator. Enabling a denominator regularizer replaces the bare inverse
+denominators of :math:`S`, which then satisfies the commutator equation only
+approximately. Restricted HF, restricted open-shell HF, and spin-adapted CAS
 references are supported. Unrestricted orbitals are not supported.
+
+The implementation is registered as ``"qdk_swpt2"`` and also answers to the
+aliases ``"swpt2"`` and ``"schrieffer_wolff"``.
 
 Preparing the inputs
 --------------------
@@ -38,9 +43,10 @@ The three inputs describe different orbital spaces:
 ``window_hamiltonian``
    A :class:`~qdk_chemistry.data.Hamiltonian` built after marking every orbital
    in the full downfolding window :math:`W=P\cup Q` as active. Its inactive
-   orbitals must match the reference core. Building this Hamiltonian only over
-   :math:`P` removes the :math:`P\leftrightarrow Q` couplings before
-   downfolding and is therefore invalid.
+   orbitals must be exactly the reference core orbitals lying outside
+   :math:`W`, since those are the ones it folded into its core energy. Building
+   this Hamiltonian only over :math:`P` removes the :math:`P\leftrightarrow Q`
+   couplings before downfolding and is therefore invalid.
 
 ``p_indices``
    A :class:`~qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet` naming the
@@ -91,7 +97,8 @@ After preparing the reference over :math:`P` and the Hamiltonian over
        reference, window_hamiltonian, p_indices
    )
 
-The returned Hamiltonian uses the reference active-space indexing and can be
+The returned Hamiltonian has :math:`P` as its active index set, with the folded
+doubly-occupied orbitals and the original core as its inactive set, and can be
 passed to an active-space solver. The original inputs are not modified.
 
 Settings
@@ -105,22 +112,18 @@ Settings
      - Type
      - Default
      - Description
-   * - ``regularizer``
-     - string
-     - ``"flow"``
-     - Inverse-denominator scheme: ``"flow"``, ``"shift"``, or ``"bare"``.
    * - ``denom_flow``
      - float
      - ``1.0``
-     - Flow parameter in :math:`E_h^{-2}` for flow regularization.
-   * - ``denom_shift``
+     - Flow parameter in :math:`E_h^{-2}`. ``0`` disables it.
+   * - ``denom_imaginary_shift``
      - float
      - ``0.0``
-     - Shift in :math:`E_h` for shifted inverse denominators.
+     - Imaginary level shift in :math:`E_h`. ``0`` disables it.
    * - ``denom_floor``
      - float
      - ``1\times10^{-8}``
-     - Absolute cutoff in :math:`E_h` used by bare denominators.
+     - Absolute cutoff in :math:`E_h` used by unregularized denominators.
    * - ``intruder_warn_amplitude``
      - float
      - ``1.0``
@@ -139,20 +142,24 @@ Settings
      - Largest deviation from an integer reference occupation allowed for a
        folded orbital. Must be below 1.
 
-For example, select shifted denominators before the first run:
+``denom_flow`` and ``denom_imaginary_shift`` are mutually exclusive: a positive
+value enables that scheme, and setting both raises an error rather than silently
+applying one of them. With both at zero the unregularized inverse is used,
+floored by ``denom_floor``. For example, to replace the default flow
+regularization by an imaginary shift before the first run:
 
 .. code-block:: python
 
    settings = downfolder.settings()
-   settings.set("regularizer", "shift")
-   settings.set("denom_shift", 0.5)
+   settings.set("denom_flow", 0.0)
+   settings.set("denom_imaginary_shift", 0.5)
 
 Settings lock when ``run`` begins.
 
 Diagnostic logging
 ------------------
 
-The constructor logs the selected regularizer, minimum denominator, maximum raw
+The constructor logs the active regularization, minimum denominator, maximum raw
 amplitude, whether a semicanonical rotation was applied, and the derived active
 electron count. Small denominators
 and large raw amplitudes indicate sensitivity to intruder states; amplitudes

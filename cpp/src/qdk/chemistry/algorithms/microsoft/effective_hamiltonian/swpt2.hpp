@@ -14,10 +14,10 @@ namespace qdk::chemistry::algorithms::microsoft {
 /**
  * @brief Settings for the second-order Schrieffer-Wolff downfold.
  *
- * `regularizer` selects flow (default), shift, or bare inverse denominators;
- * the corresponding numeric setting controls the selected scheme. The current
- * denominator operator is a semicanonical, spin-free generalized Fock. The
- * kept space P is a required `run()` argument, not a setting.
+ * `denom_flow` and `denom_imaginary_shift` are mutually exclusive denominator
+ * regularizers; a positive value enables one, zero disables it, and with both
+ * disabled the floored inverse is used. The current denominator operator is a
+ * semicanonical, spin-free generalized Fock.
  */
 class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
  public:
@@ -30,10 +30,10 @@ class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
  * downfold with semicanonical generalized-Fock orbital-energy denominators.
  *
  * Computes `H_eff = H_BD + 1/2 [S, H_OD]`, truncated to <= 2-body, folding the
- * external space Q of the window onto the reference active space P. With bare
- * denominators, S solves `[F0, S] = H_OD` for a diagonal generalized-Fock F0;
- * flow and shift settings replace `1/Delta` by a regularized inverse and hence
- * define regularized variants of that generator.
+ * window's external space Q onto its kept space P. S solves
+ * `[F0, S] = H_OD` for a diagonal generalized-Fock F0; a regularizer setting
+ * replaces the bare inverse denominators to damp intruder-state channels, at
+ * the cost of solving that equation only approximately.
  *
  * The implementation assumes a common restricted MO basis, supporting RHF,
  * ROHF, and spin-adapted CAS references. Every singly occupied ROHF orbital
@@ -41,14 +41,12 @@ class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
  * within inactive, active, and virtual blocks. Intruder diagnostics are logged,
  * with an additional warning for large raw amplitudes.
  *
- * The kept space P is a required `run()` argument (`p_indices`): a
- * `SymmetryBlockedIndexSet` of window (spatial) orbital indices. The reference
- * wavefunction supplies the density over W; P selects which orbitals are kept
- * and need not coincide with the reference active space. Folded (external)
- * orbitals have their reference occupation rounded to doubly occupied or
- * empty, bounded by `max_folded_occupation_deviation`; the total electron
- * count is preserved because the active space receives whatever the folded
- * orbitals do not take.
+ * The reference wavefunction supplies the density over W; P selects which
+ * orbitals are kept and need not coincide with the reference active space.
+ * Folded (external) orbitals have their reference occupation rounded to doubly
+ * occupied or empty, bounded by `max_folded_occupation_deviation`; the total
+ * electron count is preserved because the active space receives whatever the
+ * folded orbitals do not take.
  * See `swpt2_kernel.hpp` for the operator and tensor conventions.
  */
 class SchriefferWolffPT2Constructor
@@ -61,7 +59,7 @@ class SchriefferWolffPT2Constructor
 
   std::string name() const final { return "qdk_swpt2"; }
   std::vector<std::string> aliases() const override {
-    return {"qdk_swpt2", "swpt2", "sw", "schrieffer_wolff"};
+    return {"qdk_swpt2", "swpt2", "schrieffer_wolff"};
   }
 
  protected:
