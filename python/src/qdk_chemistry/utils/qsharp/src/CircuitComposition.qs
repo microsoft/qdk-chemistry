@@ -47,7 +47,12 @@ namespace QDKChemistry.Utils.CircuitComposition {
     }
 
     /// Adapts a control-register operation to the single-control-qubit shape phase estimation takes.
-    function MakeSingleControlOp<'T>(op : (Qubit[], 'T) => Unit) : ((Qubit, 'T) => Unit) {
+    ///
+    /// The specializations have to be carried through rather than dropped: standard phase
+    /// estimation composes these into an adjointable circuit so amplitude amplification can
+    /// reflect about it, and a bare `=> Unit` here leaves the result with no `Adj`
+    /// specialization to invoke.
+    function MakeSingleControlOp<'T>(op : (Qubit[], 'T) => Unit is Adj + Ctl) : ((Qubit, 'T) => Unit is Adj + Ctl) {
         (control, target) => op([control], target)
     }
 
