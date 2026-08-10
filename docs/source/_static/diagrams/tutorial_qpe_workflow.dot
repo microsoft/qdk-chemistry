@@ -1,0 +1,79 @@
+digraph TutorialQpeWorkflow {
+    rankdir=TB;
+    ranksep=0.9;
+    nodesep=0.5;
+    newrank=true;
+    compound=true;
+    overlap=false;
+    splines=spline;
+    pad=0.2;
+    bgcolor="#FAFAFA";
+
+    node [shape=box, style="rounded,filled", fontname="Arial", width=2.8, height=0.9, margin="0.20,0.16"];
+    edge [penwidth=2.5, arrowsize=1.0];
+
+    subgraph cluster_goal {
+        label="Goal and reference";
+        style="filled,rounded";
+        fillcolor="#E8EAF6";
+        color="#5C6BC0";
+        penwidth=2.5;
+        fontsize=14;
+        fontname="Arial Bold";
+        fontcolor="#3949AB";
+
+        Goal [label=<<B>Define the energy target</B><BR/><BR/><FONT POINT-SIZE="11">Choose the matching classical reference</FONT>>, fillcolor="#FFFFFF", color="#5C6BC0", penwidth=2.5, fontcolor="#3949AB", group=left];
+    }
+
+    subgraph cluster_classical {
+        label="Classical molecular model";
+        style="filled,rounded";
+        fillcolor="#E3F2FD";
+        color="#42A5F5";
+        penwidth=2.5;
+        fontsize=14;
+        fontname="Arial Bold";
+        fontcolor="#1976D2";
+        rank=same;
+
+        Molecule [label=<<B>Describe stretched N<SUB>2</SUB></B><BR/><BR/><FONT POINT-SIZE="11" COLOR="#E3F2FD">Geometry, charge, spin, Hartree-Fock</FONT>>, fillcolor="#1976D2", color="#0D47A1", penwidth=2.5, fontcolor="#FFFFFF", group=left];
+        ActiveSpace [label=<<B>Select the active space</B><BR/><BR/><FONT POINT-SIZE="11" COLOR="#E3F2FD">Define the correlated molecular model</FONT>>, fillcolor="#1976D2", color="#0D47A1", penwidth=2.5, fontcolor="#FFFFFF", group=right];
+
+        Molecule -> ActiveSpace [color="#1976D2"];
+    }
+
+    subgraph cluster_quantum {
+        label="Quantum workflow";
+        style="filled,rounded";
+        fillcolor="#E0F2F1";
+        color="#26A69A";
+        penwidth=2.5;
+        fontsize=14;
+        fontname="Arial Bold";
+        fontcolor="#00796B";
+        rank=same;
+
+        Mapping [label=<<B>Map to qubits</B><BR/><BR/><FONT POINT-SIZE="11" COLOR="#E0F2F1">Jordan-Wigner occupation encoding</FONT>>, fillcolor="#00796B", color="#004D40", penwidth=2.5, fontcolor="#FFFFFF", group=right];
+        TrialState [label=<<B>Prepare the trial state</B><BR/><BR/><FONT POINT-SIZE="11" COLOR="#E0F2F1">Approximate the target ground state</FONT>>, fillcolor="#00796B", color="#004D40", penwidth=2.5, fontcolor="#FFFFFF", group=center];
+        Iqpe [label=<<B>Estimate the energy</B><BR/><BR/><FONT POINT-SIZE="11" COLOR="#E0F2F1">Iterative phase-estimation simulation</FONT>>, fillcolor="#00796B", color="#004D40", penwidth=2.5, fontcolor="#FFFFFF", group=left];
+
+        Mapping -> TrialState -> Iqpe [color="#00796B"];
+    }
+
+    subgraph cluster_result {
+        label="Reconstruction and validation";
+        style="filled,rounded";
+        fillcolor="#F3E5F5";
+        color="#AB47BC";
+        penwidth=2.5;
+        fontsize=14;
+        fontname="Arial Bold";
+        fontcolor="#7B1FA2";
+
+        Result [label=<<B>Reconstruct and compare</B><BR/><BR/><FONT POINT-SIZE="11" COLOR="#F3E5F5">Add core energy; compare with CASCI</FONT>>, fillcolor="#7B1FA2", color="#4A148C", penwidth=2.5, fontcolor="#FFFFFF", group=left];
+    }
+
+    Goal:s -> Molecule:n [color="#1976D2", ltail=cluster_goal, lhead=cluster_classical, weight=10];
+    ActiveSpace:s -> Mapping:n [color="#00796B", ltail=cluster_classical, lhead=cluster_quantum, weight=10];
+    Iqpe:s -> Result:n [color="#7B1FA2", ltail=cluster_quantum, lhead=cluster_result, weight=10];
+}

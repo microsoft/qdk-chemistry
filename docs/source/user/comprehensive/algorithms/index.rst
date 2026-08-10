@@ -24,6 +24,7 @@ All algorithms follow a :doc:`factory pattern <factory_pattern>` design, allowin
    hadamard_test
    phase_estimation
    qpe_circuit_builder
+   amplitude_amplification
    evolution_circuit_builder
    hamiltonian_unitary_builder
    circuit_mapper
