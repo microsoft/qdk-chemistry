@@ -66,12 +66,12 @@ Output contract
 The returned :class:`~qdk_chemistry.data.Hamiltonian` is expressed over :math:`P` and satisfies:
 
 - its orbitals have ``active_indices()`` equal to the requested target-space indices;
-- its orbitals carry the input Hamiltonian's ``inactive_indices()`` unchanged, so a :class:`~qdk_chemistry.data.Wavefunction` later solved in :math:`P` stays consistent with it;
-- the input Hamiltonian's inactive Fock matrix, when present, is carried over unchanged: it spans the full molecular-orbital space and is fixed by the inactive density, neither of which downfolding changes;
-- the orbitals of :math:`Q = W \setminus P` are left unclassified rather than marked inactive, because :class:`~qdk_chemistry.data.Hamiltonian` assumes inactive orbitals are fully occupied while :math:`Q` generally also spans virtuals;
-- the scalar shift from folding in :math:`Q` is added to the constant core energy term, and the remaining :math:`Q` contribution is folded into the integrals.
+- its orbitals classify fully occupied orbitals of :math:`Q = W \setminus P` as inactive and unoccupied orbitals of :math:`Q` as virtual, while preserving the input Hamiltonian's inactive orbitals;
+- its inactive Fock matrix, when present, is consistent with the output inactive orbitals and may therefore differ from the input Hamiltonian's inactive Fock matrix;
+- the scalar shift from folding in :math:`Q` is added to the constant (zero-body) energy term, and the remaining :math:`Q` contribution is folded into the integrals.
 
-Because :math:`Q` is left unclassified, it becomes indistinguishable from orbitals that were never correlated.
+The occupied/virtual partition of :math:`Q` is method dependent and is determined by the concrete implementation from its reference state.
+Classifying an orbital of :math:`Q` as virtual describes its occupation in the output orbital metadata; it does not place that orbital in the effective active space.
 Consumers of an effective Hamiltonian should not attempt to re-correlate :math:`Q`, since its contribution is already folded in.
 
 Input validation is opt-in.

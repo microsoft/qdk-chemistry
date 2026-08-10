@@ -26,16 +26,15 @@ namespace qdk::chemistry::algorithms {
  *
  * The returned Hamiltonian is expressed over P and must satisfy:
  * - its orbitals have @c active_indices() equal to @c p_indices;
- * - its orbitals carry the input Hamiltonian's @c inactive_indices()
- *   unchanged, so a wavefunction later solved in P stays consistent with it;
- * - the input Hamiltonian's inactive Fock matrix, when present, is carried
- *   over unchanged: it spans the full MO space and is fixed by the inactive
- *   density, neither of which downfolding changes;
- * - the orbitals of @f$Q = W \setminus P@f$ are left unclassified rather than
- *   marked inactive, because @ref data::Hamiltonian assumes inactive orbitals
- *   are fully occupied while Q generally also spans virtuals;
- * - the scalar shift from folding in Q is added to the constant core energy
- *   term, and the remaining Q contribution is folded into the integrals.
+ * - its orbitals classify fully occupied orbitals of @f$Q = W \setminus P@f$
+ *   as inactive and unoccupied orbitals of Q as virtual, while preserving the
+ *   input Hamiltonian's inactive orbitals;
+ * - its inactive Fock matrix, when present, is consistent with the output
+ *   inactive orbitals and may therefore differ from the input Hamiltonian's
+ *   inactive Fock matrix;
+ * - the scalar shift from folding in Q is added to the constant (zero-body)
+ *   energy term, and the remaining Q contribution is folded into the
+ *   integrals.
  *
  * Input validation is opt-in. The base @ref run method does not validate its
  * arguments; concrete implementations decide whether to call

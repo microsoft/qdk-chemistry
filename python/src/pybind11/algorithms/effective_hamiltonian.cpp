@@ -63,17 +63,15 @@ index universe as ``Orbitals.active_indices()``.
 The returned Hamiltonian is expressed over ``P`` and must satisfy:
 
 - its orbitals have ``active_indices()`` equal to ``p_indices``;
-- its orbitals carry the input Hamiltonian's ``inactive_indices()`` unchanged,
-  so a wavefunction later solved in ``P`` stays consistent with it;
-- the input Hamiltonian's inactive Fock matrix, when present, is carried over
-  unchanged: it spans the full MO space and is fixed by the inactive density,
-  neither of which downfolding changes;
-- the orbitals of :math:`Q = W \setminus P` are left unclassified rather than
-  marked inactive, because :class:`~qdk_chemistry.data.Hamiltonian` assumes
-  inactive orbitals are fully occupied while ``Q`` generally also spans
-  virtuals;
-- the scalar shift from folding in ``Q`` is added to the constant core energy
-  term, and the remaining ``Q`` contribution is folded into the integrals.
+- its orbitals classify fully occupied orbitals of :math:`Q = W \setminus P`
+  as inactive and unoccupied orbitals of ``Q`` as virtual, while preserving
+  the input Hamiltonian's inactive orbitals;
+- its inactive Fock matrix, when present, is consistent with the output
+  inactive orbitals and may therefore differ from the input Hamiltonian's
+  inactive Fock matrix;
+- the scalar shift from folding in ``Q`` is added to the constant (zero-body)
+  energy term, and the remaining ``Q`` contribution is folded into the
+  integrals.
 
 Input validation is opt-in. ``run()`` does not validate its arguments; concrete
 implementations decide whether to call ``_validate_inputs``.
