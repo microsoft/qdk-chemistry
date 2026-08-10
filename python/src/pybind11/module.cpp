@@ -127,9 +127,11 @@ PYBIND11_MODULE(_core, m) {
           py::module_::import("qdk_chemistry.algorithms.registry");
       py::object instance = reg.attr("create")(type, name);
       py::object py_settings = instance.attr("settings")();
-      auto json_obj =
-          py_settings.cast<qdk::chemistry::data::Settings&>().to_json();
-      return qdk::chemistry::data::Settings::from_json(json_obj);
+      // Adopt the Python object rather than round-tripping through JSON, so
+      // Settings subclasses (and any Python-only slots they declare) survive.
+      // create() already returns a fresh instance, so nothing is shared.
+      return py_settings
+          .cast<std::shared_ptr<qdk::chemistry::data::Settings>>();
     } catch (...) {
       return nullptr;
     }

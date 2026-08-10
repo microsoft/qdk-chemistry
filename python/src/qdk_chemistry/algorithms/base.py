@@ -20,6 +20,100 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 
+class LiveSettings(Settings):
+    """Settings base supporting slots that hold live, non-serializable objects.
+
+    Declare slot names in ``_live_keys``. Values stored there are held in Python
+    only: they never appear in ``keys()``, are never written to JSON/HDF5, and never
+    contribute to the algorithm content hash. Use this for handles that cannot be
+    rebuilt from configuration, such as an authenticated service client.
+
+    Examples:
+        >>> class MySettings(LiveSettings):
+        ...     _live_keys = ("client",)
+
+    """
+
+    _live_keys: tuple[str, ...] = ()
+
+    def __init__(self) -> None:
+        """Initialize the live-slot storage."""
+        super().__init__()
+        # object.__setattr__: Settings routes normal attribute writes to setting keys.
+        object.__setattr__(self, "_live_values", {})
+
+    def live_items(self) -> dict[str, Any]:
+        """Return the currently populated live slots.
+
+        Returns:
+            dict[str, Any]: Mapping of slot name to live object.
+
+        """
+        return {key: value for key, value in self._live_values.items() if value is not None}
+
+    def set(self, key: str, value: Any) -> None:
+        """Set a setting value, routing live slots to Python-only storage.
+
+        Args:
+            key: The setting key name.
+            value: The new value.
+
+        """
+        if key in self._live_keys:
+            self._live_values[key] = value
+            return
+        super().set(key, value)
+
+    def get(self, key: str) -> Any:
+        """Return a setting value, routing live slots to Python-only storage.
+
+        Args:
+            key: The setting key name.
+
+        Returns:
+            Any: The stored value, or None for an unpopulated live slot.
+
+        """
+        if key in self._live_keys:
+            return self._live_values.get(key)
+        return super().get(key)
+
+    def has(self, key: str) -> bool:
+        """Return whether *key* is a known setting, including live slots.
+
+        Args:
+            key: The setting key name.
+
+        Returns:
+            bool: True if the key is known.
+
+        """
+        return key in self._live_keys or super().has(key)
+
+    def update(self, *args: Any, **kwargs: Any) -> None:
+        """Update existing settings, extracting live slots before delegating.
+
+        Mirrors the bound overloads ``update(key, value)`` and ``update(dict)``.
+
+        Args:
+            args: Either a single mapping, or a ``(key, value)`` pair.
+            kwargs: Forwarded to the base implementation.
+
+        """
+        if len(args) == 2 and args[0] in self._live_keys:
+            self._live_values[args[0]] = args[1]
+            return
+        if len(args) == 1 and isinstance(args[0], dict):
+            remaining = dict(args[0])
+            for key in self._live_keys:
+                if key in remaining:
+                    self._live_values[key] = remaining.pop(key)
+            if not remaining:
+                return
+            args = (remaining,)
+        super().update(*args, **kwargs)
+
+
 class Algorithm(ABC):
     """Base class for custom algorithms in QDK/Chemistry.
 
@@ -273,6 +367,7 @@ def create_from_ref(settings, setting_key: str):
     ref = settings.get(setting_key)
     if ref.settings is not None:
         kwargs = {k: ref.settings.get(k) for k in ref.settings}
+        kwargs.update(getattr(ref.settings, "live_items", dict)())
         return registry.create(ref.algorithm_type, ref.algorithm_name, **kwargs)
     return registry.create(ref.algorithm_type, ref.algorithm_name)
 

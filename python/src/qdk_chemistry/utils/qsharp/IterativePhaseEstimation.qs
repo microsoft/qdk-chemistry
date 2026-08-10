@@ -135,7 +135,7 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
             within {
                 H(phase);
             } apply {
-                Rz(accumulatePhase, phase);
+                Rz(-accumulatePhase, phase);
                 for _ in 1..rep {
                     repControlledUnitary(phase, allTargets);
                 }

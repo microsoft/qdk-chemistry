@@ -15,8 +15,9 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
+from qdk_chemistry.algorithms.base import LiveSettings
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
-from qdk_chemistry.data import Circuit, CircuitExecutorData, QuantumErrorProfile, Settings
+from qdk_chemistry.data import Circuit, CircuitExecutorData, QuantumErrorProfile
 from qdk_chemistry.utils import Logger
 
 if TYPE_CHECKING:
@@ -42,6 +43,10 @@ def _process_raw_results(raw_results: dict) -> tuple[dict[str, int], dict[str, i
     with at least one lost qubit are separated into a loss dictionary, with
     ``'-'`` rendered as ``'L'`` to match the loss-bitstring convention.
 
+    The ``outcome`` list is ordered first-recorded-result-first; it is reversed
+    here so the emitted bitstrings follow the qubit-0-rightmost convention used
+    by the QDK and Qiskit executors.
+
     Args:
         raw_results: Histogram results from ``job.get_results_histogram()``.
 
@@ -56,16 +61,25 @@ def _process_raw_results(raw_results: dict) -> tuple[dict[str, int], dict[str, i
         count = entry["count"]
         outcome_bits = outcome if isinstance(outcome, (list, tuple)) else (outcome,)
         if "-" in outcome_bits:
-            key = "".join("L" if bit == "-" else str(bit) for bit in outcome_bits)
+            key = "".join("L" if bit == "-" else str(bit) for bit in reversed(outcome_bits))
             loss[key] = loss.get(key, 0) + count
         else:
-            key = "".join(str(bit) for bit in outcome_bits)
+            key = "".join(str(bit) for bit in reversed(outcome_bits))
             counts[key] = counts.get(key, 0) + count
     return counts, loss
 
 
-class AzureQuantumEmulatorSettings(Settings):
-    """Settings for the Azure Quantum Emulator circuit executor."""
+class AzureQuantumEmulatorSettings(LiveSettings):
+    """Settings for the Azure Quantum Emulator circuit executor.
+
+    In addition to the serializable settings declared below, this class accepts a
+    ``"target"`` key holding a live Azure Quantum :class:`~azure.quantum.target.Target`.
+    A ``Target`` owns an authenticated client and cannot be represented by the
+    ``SettingValue`` variant, so it is held in Python only: it is never serialized to
+    JSON/HDF5, never appears in ``keys()``, and never contributes to the content hash.
+    """
+
+    _live_keys = ("target",)
 
     def __init__(self) -> None:
         """Initialize Azure Quantum Emulator settings."""
@@ -96,13 +110,11 @@ class AzureQuantumEmulator(CircuitExecutor):
 
         Build the ``Workspace``/``Target`` yourself (with your own credential) and
         provide the resolved ``Target`` here, or later via
-        ``set_algorithm_instance("target", target)``. The live target is never stored in
-        ``Settings``; to use this executor as a nested algorithm (e.g. a phase-estimation
-        ``circuit_executor``), attach the pre-built instance via the parent's
-        ``set_algorithm_instance()`` as well.
+        ``settings().set("target", target)``. The target is held in Python only and is
+        never serialized or hashed.
 
         Args:
-            target: Pre-resolved Azure Quantum ``Target``; may be set later via set_algorithm_instance().
+            target: Pre-resolved Azure Quantum ``Target``; may be set later via settings().set("target", ...).
             emulation_settings: Azure Quantum ``emulationSettings`` dict; defaults to a Clifford-rounding config.
             job_name: Name for the submitted Azure Quantum job.
             timeout_secs: Maximum seconds to wait for job completion.
@@ -112,7 +124,7 @@ class AzureQuantumEmulator(CircuitExecutor):
         super().__init__()
         self._settings = AzureQuantumEmulatorSettings()
         if target is not None:
-            self.set_algorithm_instance("target", target)
+            self._settings.set("target", target)
         if emulation_settings is not None:
             self._settings.set("emulation_settings", json.dumps(emulation_settings))
         self._settings.set("job_name", job_name)
@@ -122,17 +134,17 @@ class AzureQuantumEmulator(CircuitExecutor):
         """Return the target to submit to.
 
         Returns:
-            Target: The target provided via the constructor or set_algorithm_instance().
+            Target: The target provided via the constructor or settings.
 
         Raises:
             ValueError: If no target has been set.
 
         """
-        target = self._get_algorithm_instance("target")
+        target = self._settings.get("target")
         if target is None:
             raise ValueError(
-                "No Azure Quantum target set; pass one to the constructor or provide it via"
-                " set_algorithm_instance('target', target)."
+                "No Azure Quantum target set; pass one to the constructor, to create() as"
+                " target=..., or via settings().set('target', target)."
             )
         return target
 
