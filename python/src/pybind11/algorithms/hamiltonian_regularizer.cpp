@@ -70,9 +70,10 @@ applied via :func:`rebuild_bliss_shifted_hamiltonian`.
                std::to_string(s.xi.cols()) + ">";
       });
 
-  // Module-level rebuild_bliss_shifted_hamiltonian: apply a BlissShift to a Hamiltonian.
-  m.def("rebuild_bliss_shifted_hamiltonian", &rebuild_bliss_shifted_hamiltonian, py::arg("original"),
-        py::arg("shift"), py::arg("num_electrons"), R"(
+  // Module-level rebuild_bliss_shifted_hamiltonian: apply a BlissShift to a
+  // Hamiltonian.
+  m.def("rebuild_bliss_shifted_hamiltonian", &rebuild_bliss_shifted_hamiltonian,
+        py::arg("original"), py::arg("shift"), py::arg("num_electrons"), R"(
 Apply a BLISS shift to a Hamiltonian and assemble the shifted Hamiltonian.
 
 Applies the shift parameters (mu1, mu2, xi) in ``shift`` to the dense one- and

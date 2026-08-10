@@ -76,7 +76,6 @@ class TestHamiltonianRegularizerCorrectness:
 
     def test_energy_invariant_under_shift(self, water_hamiltonian):
         """The correctness check: FCI energy cannot change after FLR-BLISS shift."""
-
         mc = algorithms.create("multi_configuration_calculator", "macis_cas")
         e_before, _ = mc.run(water_hamiltonian, 5, 5)
 

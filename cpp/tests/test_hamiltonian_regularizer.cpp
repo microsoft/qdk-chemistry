@@ -18,14 +18,15 @@ class HamiltonianRegularizerTest : public ::testing::Test {};
 
 TEST_F(HamiltonianRegularizerTest, FactoryHygiene) {
   auto available = HamiltonianRegularizerFactory::available();
-  EXPECT_TRUE(std::find(available.begin(), available.end(), "fermionic_low_rank") !=
-              available.end());
+  EXPECT_TRUE(std::find(available.begin(), available.end(),
+                        "fermionic_low_rank") != available.end());
 
   auto regularizer = HamiltonianRegularizerFactory::create();
   EXPECT_EQ(regularizer->name(), "fermionic_low_rank");
   EXPECT_EQ(regularizer->type_name(), "hamiltonian_regularizer");
 
-  auto regularizer_named = HamiltonianRegularizerFactory::create("fermionic_low_rank");
+  auto regularizer_named =
+      HamiltonianRegularizerFactory::create("fermionic_low_rank");
   EXPECT_EQ(regularizer_named->name(), "fermionic_low_rank");
 
   EXPECT_THROW(HamiltonianRegularizerFactory::create("nonexistent"),
@@ -33,7 +34,8 @@ TEST_F(HamiltonianRegularizerTest, FactoryHygiene) {
 }
 
 TEST_F(HamiltonianRegularizerTest, DefaultTruncationThresholdIsZero) {
-  auto regularizer = HamiltonianRegularizerFactory::create("fermionic_low_rank");
+  auto regularizer =
+      HamiltonianRegularizerFactory::create("fermionic_low_rank");
   EXPECT_DOUBLE_EQ(
       regularizer->settings().get<double>("df_truncation_threshold"), 0.0);
 }
@@ -49,7 +51,8 @@ TEST_F(HamiltonianRegularizerTest, ThrowsOnUnrestrictedHamiltonian) {
   auto ham = hamiltonian_constructor->run(wfn_HF->get_orbitals());
   ASSERT_FALSE(ham->is_restricted());
 
-  auto regularizer = HamiltonianRegularizerFactory::create("fermionic_low_rank");
+  auto regularizer =
+      HamiltonianRegularizerFactory::create("fermionic_low_rank");
   EXPECT_THROW(regularizer->run(ham, 1, 0), std::invalid_argument);
 }
 
@@ -72,7 +75,8 @@ TEST_F(HamiltonianRegularizerTest, Water_STO3G_EnergyInvariantUnderShift) {
   auto [E_before, wfn_before] = mc->run(ham, 5, 5);
 
   for (const double threshold : {0.0, 1e-6}) {
-    auto regularizer = HamiltonianRegularizerFactory::create("fermionic_low_rank");
+    auto regularizer =
+        HamiltonianRegularizerFactory::create("fermionic_low_rank");
     regularizer->settings().set("df_truncation_threshold", threshold);
     auto shifted_ham = regularizer->run(ham, 5, 5);
     ASSERT_NE(shifted_ham, nullptr);
@@ -98,7 +102,8 @@ TEST_F(HamiltonianRegularizerTest, Water_STO3G_ReducesOneNorm) {
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   auto ham = hamiltonian_constructor->run(wfn_HF->get_orbitals());
 
-  auto regularizer = HamiltonianRegularizerFactory::create("fermionic_low_rank");
+  auto regularizer =
+      HamiltonianRegularizerFactory::create("fermionic_low_rank");
   auto shifted_ham = regularizer->run(ham, 5, 5);
 
   auto norm_after =
@@ -108,9 +113,9 @@ TEST_F(HamiltonianRegularizerTest, Water_STO3G_ReducesOneNorm) {
 }
 
 /**
- * @brief compute_shift() + rebuild_bliss_shifted_hamiltonian() must reproduce run() exactly.
- * This locks the refactor that split the regularizer into a public
- * shift-computation step and a public, shift-agnostic rebuild step.
+ * @brief compute_shift() + rebuild_bliss_shifted_hamiltonian() must reproduce
+ * run() exactly. This locks the refactor that split the regularizer into a
+ * public shift-computation step and a public, shift-agnostic rebuild step.
  */
 TEST_F(HamiltonianRegularizerTest, ComputeShiftThenRebuildMatchesRun) {
   auto water = testing::create_water_structure();
@@ -120,11 +125,13 @@ TEST_F(HamiltonianRegularizerTest, ComputeShiftThenRebuildMatchesRun) {
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   auto ham = hamiltonian_constructor->run(wfn_HF->get_orbitals());
 
-  auto regularizer = HamiltonianRegularizerFactory::create("fermionic_low_rank");
+  auto regularizer =
+      HamiltonianRegularizerFactory::create("fermionic_low_rank");
   auto shifted_run = regularizer->run(ham, 5, 5);
   ASSERT_NE(shifted_run, nullptr);
 
-  auto regularizer2 = HamiltonianRegularizerFactory::create("fermionic_low_rank");
+  auto regularizer2 =
+      HamiltonianRegularizerFactory::create("fermionic_low_rank");
   auto shift = regularizer2->compute_shift(*ham, 5, 5);
   auto shifted_manual = rebuild_bliss_shifted_hamiltonian(*ham, shift, 10.0);
   ASSERT_NE(shifted_manual, nullptr);
@@ -158,7 +165,8 @@ TEST_F(HamiltonianRegularizerTest, ThrowsOnUnknownShiftMethod) {
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   auto ham = hamiltonian_constructor->run(wfn_HF->get_orbitals());
 
-  auto regularizer = HamiltonianRegularizerFactory::create("fermionic_low_rank");
+  auto regularizer =
+      HamiltonianRegularizerFactory::create("fermionic_low_rank");
   // The "shift_method" setting is constrained to the known methods, so an
   // unknown value is rejected at set-time rather than deferred to run().
   EXPECT_THROW(

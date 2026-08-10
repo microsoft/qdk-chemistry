@@ -56,10 +56,10 @@ GlobalTwoBodyShift accumulate_fragment_shifts(
     // the low-1-norm shifted fragment as H^(a) + K^(a) (plus a 1-electron term
     // and a constant), i.e. the per-fragment BLISS operator is *added*. The
     // global operator is *subtracted* from H (H - K, Eq. 5), so the aggregated
-    // (mu2, xi) that rebuild_bliss_shifted_hamiltonian applies are the NEGATED sum of the
-    // per-fragment K^(a) parameters. (Fragments come from double-factorizing
-    // the PHYSICAL coefficient 1/2 g, so mu2/xi are already on the correct
-    // scale for rebuild_bliss_shifted_hamiltonian.)
+    // (mu2, xi) that rebuild_bliss_shifted_hamiltonian applies are the NEGATED
+    // sum of the per-fragment K^(a) parameters. (Fragments come from
+    // double-factorizing the PHYSICAL coefficient 1/2 g, so mu2/xi are already
+    // on the correct scale for rebuild_bliss_shifted_hamiltonian.)
     result.mu2 -= fragment.sign * mu2_alpha;
     result.xi -= fragment.sign * (fragment.U * theta_alpha.asDiagonal() *
                                   fragment.U.transpose());
@@ -118,8 +118,8 @@ OneElectronShiftResult solve_one_electron_shift(
 
   // In-place: coulomb/exchange now hold the shifted contractions coul(g~)/
   // exch(g~). See TwoBodyBlissCorrection (hamiltonian_regularizer.hpp) for the
-  // g~ definition and why this stays consistent with rebuild_bliss_shifted_hamiltonian's
-  // full tensor.
+  // g~ definition and why this stays consistent with
+  // rebuild_bliss_shifted_hamiltonian's full tensor.
   const TwoBodyBlissCorrection correction{mu2, xi};
   correction.add_coulomb_contraction(coulomb);
   correction.add_exchange_contraction(exchange);

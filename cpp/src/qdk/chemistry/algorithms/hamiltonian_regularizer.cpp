@@ -16,8 +16,9 @@
 namespace qdk::chemistry::algorithms {
 
 // ---------------------------------------------------------------------------
-// rebuild_bliss_shifted_hamiltonian: apply a BlissShift to the dense integrals and rebuild.
-// Independent of how `shift` was computed (BlissRegularizer or external).
+// rebuild_bliss_shifted_hamiltonian: apply a BlissShift to the dense integrals
+// and rebuild. Independent of how `shift` was computed (BlissRegularizer or
+// external).
 // ---------------------------------------------------------------------------
 
 std::shared_ptr<data::Hamiltonian> rebuild_bliss_shifted_hamiltonian(
