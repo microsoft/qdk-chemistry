@@ -120,12 +120,19 @@ set(GAUXC_ENABLE_CUDA ${QDK_CHEMISTRY_ENABLE_GPU} CACHE BOOL "Enable gauxc CUDA 
 set(GAUXC_ENABLE_MPI  ${QDK_CHEMISTRY_ENABLE_MPI} CACHE BOOL "Enable gauxc MPI Support"  FORCE)
 set(GAUXC_ENABLE_OPENMP ${QDK_ENABLE_OPENMP} CACHE BOOL "Enable gauxc OpenMP Support" FORCE)
 
+set(_gauxc_patch_args "")
+if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND CMAKE_C_SIMULATE_ID STREQUAL "MSVC")
+  set(_gauxc_patch_args FETCHCONTENT_ARGS
+      PATCH_COMMAND "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_LIST_DIR}/patches/gauxc-clang-cl-gau2grid-stdlib.cmake"
+  )
+endif()
 handle_dependency(gauxc
   GIT_REPOSITORY https://github.com/wavefunction91/gauxc.git
   GIT_TAG 162e4562552323a871af17ae4acd73b71071bd24
   BUILD_TARGET gauxc::gauxc
   INSTALL_TARGET gauxc::gauxc
   ${DEPENDENCY_BUILD_FLAGS}
+  ${_gauxc_patch_args}
   REQUIRED
 )
 
