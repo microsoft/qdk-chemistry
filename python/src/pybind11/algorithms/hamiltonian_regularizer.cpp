@@ -93,8 +93,8 @@ Returns:
     qdk_chemistry.data.Hamiltonian: The BLISS-shifted Hamiltonian.
 
 Raises:
-    ValueError: If ``original`` is unrestricted, ``shift.xi`` is not norb x norb,
-        or ``num_electrons`` is negative or non-integer.
+    ValueError: If ``original`` is unrestricted or ``shift.xi`` is not norb x norb.
+    TypeError: If ``num_electrons`` is negative or non-integer.
 )");
 
   py::class_<BlissRegularizer, HamiltonianRegularizerBase, py::smart_holder>

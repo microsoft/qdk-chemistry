@@ -59,6 +59,11 @@ HamiltonianOneNorm hamiltonian_one_norm(
   // lambda_1e = sum_i |gamma_i| (Eq. 15), with gamma_i the eigenvalues of the
   // (symmetric) effective one-electron tensor.
   Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(effective_one_body);
+  if (solver.info() != Eigen::Success) {
+    throw std::runtime_error(
+        "hamiltonian_one_norm: failed to diagonalize the effective "
+        "one-electron operator.");
+  }
   result.one_body = solver.eigenvalues().array().abs().sum();
 
   // lambda_2e: double-factorize the PHYSICAL two-electron coefficient

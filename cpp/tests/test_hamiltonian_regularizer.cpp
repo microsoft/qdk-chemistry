@@ -133,7 +133,7 @@ TEST_F(HamiltonianRegularizerTest, ComputeShiftThenRebuildMatchesRun) {
   auto regularizer2 =
       HamiltonianRegularizerFactory::create("fermionic_low_rank");
   auto shift = regularizer2->compute_shift(*ham, 5, 5);
-  auto shifted_manual = rebuild_bliss_shifted_hamiltonian(*ham, shift, 10.0);
+  auto shifted_manual = rebuild_bliss_shifted_hamiltonian(*ham, shift, 10u);
   ASSERT_NE(shifted_manual, nullptr);
 
   auto [h_run, h_run_beta] = shifted_run->get_one_body_integrals();

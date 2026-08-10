@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry import algorithms
+from qdk_chemistry.algorithms import rebuild_bliss_shifted_hamiltonian
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import Structure
 from qdk_chemistry.utils import double_factorize, hamiltonian_one_norm
@@ -104,6 +105,29 @@ class TestHamiltonianRegularizerCorrectness:
         norm_after = hamiltonian_one_norm(shifted_ham, 0.0)
 
         assert norm_after.total <= norm_before.total + 1e-10
+
+    def test_compute_shift_then_rebuild_matches_run(self, water_hamiltonian):
+        """compute_shift() + rebuild_bliss_shifted_hamiltonian() must reproduce run()."""
+        regularizer = algorithms.create("hamiltonian_regularizer", "fermionic_low_rank")
+        shifted_run = regularizer.run(water_hamiltonian, 5, 5)
+        assert shifted_run is not None
+
+        regularizer2 = algorithms.create("hamiltonian_regularizer", "fermionic_low_rank")
+        shift = regularizer2.compute_shift(water_hamiltonian, 5, 5)
+        shifted_manual = rebuild_bliss_shifted_hamiltonian(water_hamiltonian, shift, 10)
+        assert shifted_manual is not None
+
+        h_run = shifted_run.get_one_body_integrals()[0]
+        h_manual = shifted_manual.get_one_body_integrals()[0]
+        assert np.allclose(h_run, h_manual, atol=1e-12)
+
+        g_run = shifted_run.get_two_body_integrals()[0]
+        g_manual = shifted_manual.get_two_body_integrals()[0]
+        assert np.allclose(g_run, g_manual, atol=1e-12)
+
+        assert np.isclose(
+            shifted_run.get_core_energy(), shifted_manual.get_core_energy(), atol=1e-12
+        )
 
 
 class TestDoubleFactorizationUtils:

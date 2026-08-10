@@ -20,8 +20,7 @@ namespace qdk::chemistry::utils {
 /// underlying eigenvalue of the reshaped two-electron supermatrix is
 /// negative (see Patel et al., arXiv:2409.18277, Eq. 16 -- the paper's
 /// formula implicitly assumes a positive fragment; the sign here is a
-/// generalization derived to also cover negative-eigenvalue fragments,
-/// worth double-checking against the reference implementation).
+/// generalization derived to also cover negative-eigenvalue fragments).
 struct TwoBodyFragment {
   Eigen::MatrixXd U;       ///< norb x norb orbital rotation. Columns are the
                            ///< orthonormal new-orbital vectors expressed in the
