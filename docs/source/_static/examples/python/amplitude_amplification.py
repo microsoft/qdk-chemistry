@@ -1,0 +1,96 @@
+"""Amplitude amplification usage examples."""
+
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
+################################################################################
+# start-cell-create
+from qdk_chemistry.algorithms import create
+
+# Number of Grover iterates. Choose it from an estimate of the overlap a,
+# the success probability after k rounds is sin^2((2k+1) arcsin(sqrt(a))).
+amplitude_amplification = create("amplitude_amplification", "qdk_base", rounds=2)
+
+# end-cell-create
+################################################################################
+
+################################################################################
+# start-cell-run
+import math
+
+import numpy as np
+from qdk_chemistry.algorithms import create, phase_marking_oracle
+from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
+from qdk_chemistry.data.circuit import QsharpFactoryData
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+
+# 1. A two-qubit Hamiltonian
+qubit_hamiltonian = QubitOperator(
+    pauli_strings=["ZI", "IZ"], coefficients=np.array([math.pi / 4.0, math.pi / 4.0])
+)
+
+# 2. A guiding state with 0.3 amplitude on the target eigenvector |11>
+state_vector = [0.0, 0.0, 0.0, 0.0]
+state_vector[3] = 0.3
+state_vector[0] = math.sqrt(1.0 - 0.3**2)
+prep_parameters = {
+    "rowMap": [1, 0],
+    "stateVector": state_vector,
+    "expansionOps": [],
+    "numQubits": 2,
+}
+state_preparation = Circuit(
+    qsharp_factory=QsharpFactoryData(
+        program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+        parameter=prep_parameters,
+    ),
+    qsharp_op=QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(prep_parameters),
+)
+
+# 3. Build a measurement-free QPE circuit. This whole circuit is the preparation that
+# gets amplified, so the phase register and its ancillas stay inside the amplified
+# register and every round reflects about the full prepared state.
+num_bits = 4
+builder = create(
+    "qpe_circuit_builder",
+    "qdk_standard",
+    num_bits=num_bits,
+    controlled_circuit_mapper=AlgorithmRef(
+        "controlled_circuit_mapper", "prepare_select_prepare"
+    ),
+    unitary_builder=AlgorithmRef(
+        "hamiltonian_unitary_builder", "lcu", quantum_walk=True
+    ),
+    measure_phase=False,
+)
+state_prep_oracle = builder.run(
+    state_preparation=state_preparation, qubit_hamiltonian=qubit_hamiltonian
+)[0]
+
+# 4. Mark the phase bins holding the target eigenvalue. QPE writes the phase phi of
+# the eigenvalue exp(2 pi i phi) into bin round(phi * 2**num_bits), so the half-open
+# window (8, 9) accepts bin 8 alone, that is phi = 0.5.
+target_phase_bins = (8, 9)
+good_state_oracle = phase_marking_oracle(state_prep_oracle, target_phase_bins)
+
+# The same window can be named by energy instead. The walk maps E to
+# phi = arccos(E / lambda) / 2 pi, with lambda the L1 norm of the Hamiltonian, and
+# marks both signs of that phase. Here it selects bin 8 again.
+good_state_oracle = phase_marking_oracle(
+    state_prep_oracle,
+    target_energy_range=(-np.inf, -0.99 * qubit_hamiltonian.schatten_norm),
+    qubit_hamiltonian=qubit_hamiltonian,
+)
+
+# 5. Amplify, then execute
+amplitude_amplification = create("amplitude_amplification", "qdk_base", rounds=2)
+circuit = amplitude_amplification.run(state_prep_oracle, good_state_oracle)
+
+executor = create("circuit_executor", "qdk_sparse_state_simulator")
+shots = 400
+counts = executor.run(circuit, shots=shots).bitstring_counts
+
+# end-cell-run
+################################################################################
