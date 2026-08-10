@@ -1,4 +1,4 @@
-"""Tests for the HamiltonianRegularizer (FLR-BLISS) algorithm."""
+"""Tests for the HamiltonianRegularizer (fermionic low-rank BLISS) algorithm."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -76,7 +76,7 @@ class TestHamiltonianRegularizerCorrectness:
     """Physics correctness tests: energy invariance and 1-norm reduction."""
 
     def test_energy_invariant_under_shift(self, water_hamiltonian):
-        """The correctness check: FCI energy cannot change after FLR-BLISS shift."""
+        """The correctness check: FCI energy cannot change after the fermionic low-rank BLISS shift."""
         mc = algorithms.create("multi_configuration_calculator", "macis_cas")
         e_before, _ = mc.run(water_hamiltonian, 5, 5)
 

@@ -11,10 +11,11 @@
 #include <qdk/chemistry/utils/double_factorization.hpp>
 #include <vector>
 
-// This header collects the internal building blocks of the FLR-BLISS shift
-// method (Patel et al., arXiv:2409.18277), which is the default "shift_method"
+// This header collects the internal building blocks of the fermionic low-rank
+// BLISS shift method (Patel et al., arXiv:2409.18277), the default
+// "shift_method"
 // of qdk::chemistry::algorithms::BlissRegularizer. They run in the order used
-// by compute_flr_bliss_shift():
+// by compute_fermionic_low_rank_shift():
 //   1. double_factorize() (external, see double_factorization.hpp)
 //   2. accumulate_fragment_shifts() -- per-fragment median shift (Eq. 27),
 //      aggregated into a single global two-electron BLISS shift (mu2, xi).
@@ -29,7 +30,7 @@
 // rebuild_bliss_shifted_hamiltonian's full O(norb^4) tensor derived from the
 // same closed-form dg_ijkl definition, so they cannot silently drift apart.
 
-namespace qdk::chemistry::algorithms::microsoft::flr_bliss {
+namespace qdk::chemistry::algorithms::microsoft::fermionic_low_rank {
 
 /// Median of a vector's entries (average of the two middle entries for even
 /// size), matching the paper's phi^(opt) = median{epsilon_i} rule
@@ -60,8 +61,8 @@ struct GlobalTwoBodyShift {
   double lambda_df_shifted = 0.0;   ///< Sum of post-shift fragment 1-norms.
 };
 
-/// Apply the FLR-BLISS per-fragment median shift (Eq. 27) to every
-/// fragment and accumulate the resulting global (mu_2, xi) BLISS shift
+/// Apply the fermionic low-rank BLISS per-fragment median shift (Eq. 27) to
+/// every fragment and accumulate the resulting global (mu_2, xi) BLISS shift
 /// parameters (Eq. 24, summed over fragments and rotated back into the
 /// original orbital basis). Fragments are expected to come from
 /// double-factorizing the PHYSICAL two-electron coefficient 1/2 g, so the
@@ -112,8 +113,8 @@ OneElectronShiftResult solve_one_electron_shift(
     const Eigen::MatrixXd& h, const Eigen::VectorXd& two_body_integrals,
     double mu2, const Eigen::MatrixXd& xi, double num_electrons);
 
-/// Compute the FLR-BLISS shift (mu1, mu2, xi) for `hamiltonian` in the
-/// (n_alpha, n_beta)-electron sector (Patel et al., arXiv:2409.18277).
+/// Compute the fermionic low-rank BLISS shift (mu1, mu2, xi) for `hamiltonian`
+/// in the (n_alpha, n_beta)-electron sector (Patel et al., arXiv:2409.18277).
 ///
 /// Pipeline: double-factorize the physical two-electron coefficient 1/2 g,
 /// accumulate the per-fragment median shift into a global (mu2, xi), then
@@ -126,9 +127,9 @@ OneElectronShiftResult solve_one_electron_shift(
 /// @param n_beta_electrons Target number of beta electrons.
 /// @param df_truncation_threshold Fragments whose eigenvalue magnitude falls
 ///        below this threshold are dropped (0.0 = no truncation).
-BlissShift compute_flr_bliss_shift(
+BlissShift compute_fermionic_low_rank_shift(
     const qdk::chemistry::data::Hamiltonian& hamiltonian,
     unsigned int n_alpha_electrons, unsigned int n_beta_electrons,
     double df_truncation_threshold);
 
-}  // namespace qdk::chemistry::algorithms::microsoft::flr_bliss
+}  // namespace qdk::chemistry::algorithms::microsoft::fermionic_low_rank

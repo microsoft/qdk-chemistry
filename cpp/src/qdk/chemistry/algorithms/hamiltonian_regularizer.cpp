@@ -11,7 +11,7 @@
 #include <stdexcept>
 #include <string>
 
-#include "microsoft/flr_bliss/flr_bliss_regularizer.hpp"
+#include "microsoft/fermionic_low_rank/fermionic_low_rank_regularizer.hpp"
 
 namespace qdk::chemistry::algorithms {
 
@@ -99,10 +99,10 @@ BlissShift BlissRegularizer::compute_shift(
 
   const std::string shift_method = _settings->get<std::string>("shift_method");
 
-  if (shift_method == "flr_bliss") {
+  if (shift_method == "fermionic_low_rank") {
     const double df_truncation_threshold =
         _settings->get<double>("df_truncation_threshold");
-    return microsoft::flr_bliss::compute_flr_bliss_shift(
+    return microsoft::fermionic_low_rank::compute_fermionic_low_rank_shift(
         hamiltonian, n_alpha_electrons, n_beta_electrons,
         df_truncation_threshold);
   }
@@ -133,7 +133,7 @@ std::shared_ptr<data::Hamiltonian> BlissRegularizer::_run_impl(
 
 namespace {
 
-std::unique_ptr<BlissRegularizer> make_flr_bliss_regularizer() {
+std::unique_ptr<BlissRegularizer> make_fermionic_low_rank_regularizer() {
   QDK_LOG_TRACE_ENTERING();
   return std::make_unique<BlissRegularizer>();
 }
@@ -143,7 +143,8 @@ std::unique_ptr<BlissRegularizer> make_flr_bliss_regularizer() {
 void HamiltonianRegularizerFactory::register_default_instances() {
   QDK_LOG_TRACE_ENTERING();
 
-  HamiltonianRegularizerFactory::register_instance(&make_flr_bliss_regularizer);
+  HamiltonianRegularizerFactory::register_instance(
+      &make_fermionic_low_rank_regularizer);
 }
 
 }  // namespace qdk::chemistry::algorithms

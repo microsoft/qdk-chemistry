@@ -59,7 +59,7 @@ TEST_F(HamiltonianRegularizerTest, ThrowsOnUnrestrictedHamiltonian) {
 /**
  * @brief The strongest correctness check: BLISS shifts should not change the
  * physical energy of the target electron-number sector. Run exact FCI before
- * and after applying the FLR-BLISS shift and confirm the energies agree
+ * and after applying the fermionic low-rank BLISS shift and confirm the energies agree
  * to within the standard CI energy tolerance, both at the default
  * (no-truncation) setting and with an explicit truncation threshold.
  */
@@ -90,7 +90,7 @@ TEST_F(HamiltonianRegularizerTest, Water_STO3G_EnergyInvariantUnderShift) {
 }
 
 /**
- * @brief The FLR-BLISS shift should reduce (or at least not increase) the
+ * @brief The fermionic low-rank BLISS shift should reduce (or at least not increase) the
  * fermionic double-factorization 1-norm relative to the unshifted
  * Hamiltonian.
  */

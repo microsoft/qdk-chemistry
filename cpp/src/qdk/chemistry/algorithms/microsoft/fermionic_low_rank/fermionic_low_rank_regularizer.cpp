@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include "flr_bliss_regularizer.hpp"
+#include "fermionic_low_rank_regularizer.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -11,7 +11,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace qdk::chemistry::algorithms::microsoft::flr_bliss {
+namespace qdk::chemistry::algorithms::microsoft::fermionic_low_rank {
 
 namespace {
 
@@ -146,10 +146,10 @@ OneElectronShiftResult solve_one_electron_shift(
 }
 
 // ---------------------------------------------------------------------------
-// Top-level FLR-BLISS driver: wires steps 1-3 into a BlissShift.
+// Top-level fermionic low-rank BLISS driver: wires steps 1-3 into a BlissShift.
 // ---------------------------------------------------------------------------
 
-BlissShift compute_flr_bliss_shift(
+BlissShift compute_fermionic_low_rank_shift(
     const qdk::chemistry::data::Hamiltonian& hamiltonian,
     unsigned int n_alpha_electrons, unsigned int n_beta_electrons,
     double df_truncation_threshold) {
@@ -157,7 +157,7 @@ BlissShift compute_flr_bliss_shift(
 
   if (!hamiltonian.is_restricted()) {
     throw std::invalid_argument(
-        "compute_flr_bliss_shift currently only supports restricted "
+        "compute_fermionic_low_rank_shift currently only supports restricted "
         "(spin-restricted) Hamiltonians.");
   }
 
@@ -172,7 +172,7 @@ BlissShift compute_flr_bliss_shift(
 
   const size_t norb = static_cast<size_t>(h_alpha.rows());
   QDK_LOGGER().debug(
-      "compute_flr_bliss_shift: num_orbitals={}, num_electrons={}, "
+      "compute_fermionic_low_rank_shift: num_orbitals={}, num_electrons={}, "
       "df_truncation_threshold={}",
       norb, num_electrons, df_truncation_threshold);
 
@@ -191,8 +191,9 @@ BlissShift compute_flr_bliss_shift(
       global_shift.lambda_df_shifted + one_electron.lambda_1e;
 
   QDK_LOGGER().debug(
-      "compute_flr_bliss_shift: lambda_total before={} ({} + {}), after={} ({} "
-      "+ {}); lambda_DF baseline={}, shifted={}; lambda_1e baseline={}, "
+      "compute_fermionic_low_rank_shift: lambda_total before={} ({} + {}), "
+      "after={} ({} + {}); lambda_DF baseline={}, shifted={}; lambda_1e "
+      "baseline={}, "
       "shifted={}; mu1={}, mu2={}",
       lambda_total_before, one_electron.lambda_1e_baseline,
       global_shift.lambda_df_baseline, lambda_total_after,
@@ -208,4 +209,4 @@ BlissShift compute_flr_bliss_shift(
   return shift;
 }
 
-}  // namespace qdk::chemistry::algorithms::microsoft::flr_bliss
+}  // namespace qdk::chemistry::algorithms::microsoft::fermionic_low_rank

@@ -89,7 +89,6 @@ Eigen::VectorXd reconstruct(const std::vector<TwoBodyFragment>& fragments,
 class DoubleFactorizationTest : public ::testing::Test {};
 
 TEST_F(DoubleFactorizationTest, ExactReconstructionNoTruncation) {
-  const size_t norb = 4;
   auto water = testing::create_water_structure();
   auto scf_solver = qdk::chemistry::algorithms::ScfSolverFactory::create();
   auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
@@ -112,7 +111,6 @@ TEST_F(DoubleFactorizationTest, ExactReconstructionNoTruncation) {
       g_reconstructed.isApprox(g_aaaa, testing::numerical_zero_tolerance * 100))
       << "Reconstruction max abs diff: "
       << (g_reconstructed - g_aaaa).cwiseAbs().maxCoeff();
-  (void)norb;
 }
 
 TEST_F(DoubleFactorizationTest,

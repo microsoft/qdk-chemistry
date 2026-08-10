@@ -9,7 +9,7 @@
 #include <qdk/chemistry.hpp>
 
 #include "factory_bindings.hpp"
-#include "qdk/chemistry/algorithms/microsoft/flr_bliss/flr_bliss_regularizer.hpp"
+#include "qdk/chemistry/algorithms/microsoft/fermionic_low_rank/fermionic_low_rank_regularizer.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::algorithms;
@@ -109,7 +109,7 @@ coefficients (e.g. the fermionic 1-norm lambda) may be reduced.
 
 It is a thin composition of two public steps: :meth:`compute_shift` computes
 the BLISS parameters (mu1, mu2, xi) via the method selected by the
-``shift_method`` setting (default ``"flr_bliss"``), and
+``shift_method`` setting (default ``"fermionic_low_rank"``), and
 :func:`rebuild_bliss_shifted_hamiltonian` applies a shift to a Hamiltonian. Callers can
 obtain a :class:`BlissShift` on its own, or supply an externally computed one to
 :func:`rebuild_bliss_shifted_hamiltonian` directly.
@@ -124,7 +124,7 @@ Examples:
 
   regularizer.def(py::init<>(), R"(
 Create a HamiltonianRegularizer instance with default settings
-(shift_method = "flr_bliss", df_truncation_threshold = 0.0).
+(shift_method = "fermionic_low_rank", df_truncation_threshold = 0.0).
 
 )");
 
@@ -192,6 +192,10 @@ Returns:
       },
       [](HamiltonianRegularizerBase &algo,
          std::unique_ptr<qdk::chemistry::data::Settings> new_settings) {
+        if (!new_settings) {
+          throw py::type_error(
+              "_settings must be a Settings instance, not None.");
+        }
         algo.replace_settings(std::move(new_settings));
       },
       py::return_value_policy::reference_internal,
