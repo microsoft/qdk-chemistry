@@ -15,6 +15,7 @@
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/microsoft/localization/qio.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
+#include <qdk/chemistry/data/orbital_entropy.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 
@@ -1733,10 +1734,9 @@ static void expect_qio_entropy_helper_matches_wavefunction(
     const auto index = static_cast<Eigen::Index>(orbital);
     const auto diagonal_index = static_cast<Eigen::Index>(
         ((orbital * dim + orbital) * dim + orbital) * dim + orbital);
-    const double actual =
-        qdk::chemistry::algorithms::microsoft::detail::single_orbital_entropy(
-            rdm_alpha(index, index), rdm_beta(index, index),
-            rdm_aabb(diagonal_index));
+    const double actual = qdk::chemistry::data::detail::single_orbital_entropy(
+        rdm_alpha(index, index), rdm_beta(index, index),
+        rdm_aabb(diagonal_index));
     EXPECT_DOUBLE_EQ(actual, expected(index)) << "orbital " << orbital;
   }
 }

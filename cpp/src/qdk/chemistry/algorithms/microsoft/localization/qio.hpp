@@ -12,33 +12,9 @@
 
 namespace qdk::chemistry::algorithms::microsoft {
 
-namespace detail {
-
-double single_orbital_entropy(double occ_alpha, double occ_beta,
-                              double double_occ);
-
-}  // namespace detail
-
 /**
  * @class QIOLocalizerSettings
  * @brief Tunable Jacobi-sweep controls for the QIO localizer.
- *
- * - "max_cycles" (int): maximum number of Jacobi sweeps over all active
- *   orbital pairs (default 200, must be >= 1).
- * - "convergence_tolerance" (double): sweep-to-sweep change in the
- *   single-orbital entropy sum below which the optimization stops
- *   (default 1e-10, must be >= 0).
- * - "coarse_angle_step" (double): coarse grid spacing in radians for the
- *   per-pair angle scan over [0, pi) (default 0.02, must be in [1e-4, pi]).
- * - "fine_samples" (int): number of samples in the fine-refinement angle scan
- *   around the best coarse angle (default 201, must be >= 2).
- * - "improvement_tolerance" (double): minimum single-orbital entropy decrease
- *   required to accept a pair rotation (default 1e-12, must be >= 0).
- *
- * The numeric bounds are enforced at set-time, so out-of-range values are
- * rejected (e.g. a negative max_cycles that would underflow to a huge size_t,
- * or a coarse_angle_step outside [1e-4, pi] that would make the scan run
- * forever or take pathologically many iterations).
  */
 class QIOLocalizerSettings : public data::Settings {
  public:
@@ -55,8 +31,8 @@ class QIOLocalizerSettings : public data::Settings {
     set_default(
         "coarse_angle_step", 0.02,
         "Coarse grid spacing (radians) for the per-pair angle scan over "
-        "[0, pi); practical range [1e-4, pi]",
-        data::BoundConstraint<double>{1e-4, std::numbers::pi});
+        "[0, pi/2); practical range [1e-4, pi/2]",
+        data::BoundConstraint<double>{1e-4, std::numbers::pi / 2.0});
     set_default("fine_samples", int64_t{201},
                 "Number of samples in the fine-refinement angle scan",
                 data::BoundConstraint<int64_t>{
@@ -73,44 +49,9 @@ class QIOLocalizerSettings : public data::Settings {
  * @class QIOLocalizer
  * @brief Quantum-information orbital (QIO/QICAS) localizer.
  *
- * This class provides a concrete implementation of the Localizer interface that
- * rotates the active orbitals so as to minimize the total single-orbital
- * entanglement entropy
- *
- *     F_QI = sum_{i in active} S(rho_i),
- *
- * following the quantum-information CAS (QICAS) scheme of Ding, Knecht &
- * Schilling (arXiv:2309.01676). The single-orbital entropy S(rho_i) is built
- * from the four orbital occupation eigenvalues {1 - n_a - n_b + D, n_a - D, n_b
- * - D, D} where D = Gamma_{i ibar i ibar} is the alpha-beta (aabb) two-particle
- * RDM diagonal. This is the same convention used by
- * Wavefunction::get_single_orbital_entropies.
- *
- * The objective is minimized with the paper's gradient-free Jacobi-sweep
- * scheme: each active orbital pair (i, j) is rotated by the angle that
- * minimizes the only two entropy terms that change (S_i + S_j), located by a
- * coarse-then-fine 1-D scan. The corresponding plane rotation is applied to the
- * cached active 1- and 2-RDMs and accumulated into a single unitary U, and the
- * active orbital coefficients are updated once as C_active <- C_active * U.
- *
- * @note This localizer performs a SINGLE orbital rotation: the Jacobi sweeps
- * are iterated to convergence against the FIXED input RDMs. It does not
- * re-solve the electronic structure problem to refresh the RDMs. Callers
- * wanting the full self-consistent QICAS outer loop (rotate -> recompute RDMs
- * -> repeat) should implement that loop themselves around repeated calls to
- * this localizer.
- *
- * Restrictions:
- * - Requires a single spatial orbital set (RHF or ROHF). Open-shell / high-spin
- *   states are supported: the alpha and beta occupations may differ, and the
- *   spin-resolved 1-RDMs are handled separately. Unrestricted (UHF) orbitals,
- *   where alpha and beta use different spatial orbitals, are not supported --
- *   a single spatial rotation is ill-defined in that case.
- * - Requires loc_indices_a == loc_indices_b, matching the active-space indices
- *   exactly (QIO produces a single spatial orbital set).
- * - Requires spin-dependent active 1- and 2-RDMs in the input wavefunction.
- * - Requires an AO overlap matrix in the orbitals (carried over to the output
- *   orbitals).
+ * Rotates restricted active orbitals to minimize the total single-orbital
+ * entropy using gradient-free Jacobi sweeps. The input wavefunction must
+ * provide spin-dependent active-space 1- and 2-RDMs.
  *
  * @see Wavefunction::get_single_orbital_entropies
  */
@@ -146,10 +87,8 @@ class QIOLocalizer : public Localizer {
    * @return Wavefunction with the active orbitals replaced by the
    * quantum-information-optimized orbitals.
    *
-   * @throws std::invalid_argument if the selected indices are invalid or do not
-   * match the active space, the orbitals are unrestricted or lack an active
-   * space or overlap matrix, or the required spin-dependent active RDMs are
-   * unavailable or not real-valued.
+   * @throws std::invalid_argument If the selected indices, orbitals, or RDMs do
+   * not satisfy the QIO input requirements.
    */
   std::shared_ptr<data::Wavefunction> _run_impl(
       std::shared_ptr<data::Wavefunction> wavefunction,

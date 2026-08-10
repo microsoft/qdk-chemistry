@@ -342,47 +342,15 @@ Initializes a natural orbital transformer with default settings.
       m, "QdkQIOLocalizer", R"(
 QDK quantum-information orbital (QIO/QICAS) localizer.
 
-This class provides a concrete implementation that rotates the active orbitals
-to minimize the total single-orbital entanglement entropy
-``F_QI = sum_i S(rho_i)``, following the quantum-information CAS (QICAS) scheme
-of Ding, Knecht & Schilling (arXiv:2309.01676). The single-orbital entropy uses
-the same convention as the
-``get_single_orbital_entropies`` method of
-:class:`qdk_chemistry.data.Wavefunction`. The objective is minimized
-with a gradient-free Jacobi sweep over active orbital pairs.
+Rotates restricted active orbitals to minimize the total single-orbital entropy
+using gradient-free Jacobi sweeps.
 
 .. note::
-    Performs a single orbital rotation: the Jacobi sweeps converge against the
-    fixed input RDMs. The localizer does not re-solve the electronic structure
-    to refresh the RDMs. Implement the self-consistent QICAS outer loop
-    (rotate, recompute RDMs, repeat) yourself if required.
-
-.. note::
-    Requires a single spatial orbital set (RHF or ROHF) with a defined active
-    space. Open-shell / high-spin states are supported (alpha and beta
-    occupations may differ); unrestricted (UHF) orbitals are not.
-    Requires ``loc_indices_a == loc_indices_b`` matching the orbitals'
-    active-space indices exactly (QIO is a single spatial orbital set).
-    Requires spin-dependent active 1- and 2-RDMs in the wavefunction.
-    Jacobi-sweep controls are configurable via ``settings()``:
-    ``max_cycles``, ``convergence_tolerance``, ``coarse_angle_step``,
-    ``fine_samples``, ``improvement_tolerance``.
-
-Typical usage:
-
-.. code-block:: python
-
-    import qdk_chemistry.algorithms as alg
-
-    # Create a quantum-information orbital localizer
-    localizer = alg.QdkQIOLocalizer()
-
-    # Rotate the active orbitals to minimize single-orbital entropy
-    qio_wfn = localizer.run(wavefunction, active_indices, active_indices)
+    Requires a restricted active orbital space, matching alpha and beta
+    localization indices, and spin-dependent active-space 1- and 2-RDMs.
 
 See Also:
     :class:`OrbitalLocalizer`
-    :class:`QdkNaturalOrbitalLocalizer`
     :class:`qdk_chemistry.data.Wavefunction`
 
 )")

@@ -6,10 +6,12 @@
 
 #include <Eigen/Dense>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <numbers>
 #include <optional>
+#include <qdk/chemistry/data/orbital_entropy.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
@@ -22,32 +24,6 @@
 namespace qdk::chemistry::algorithms::microsoft {
 
 namespace detail {
-
-/**
- * @brief Single-orbital (von Neumann) entropy from orbital occupations.
- *
- * Uses the four occupation eigenvalues {1 - na - nb + d, na - d, nb - d, d}.
- * Only strictly-positive eigenvalues contribute (w -> 0+ gives w*ln(w) -> 0),
- * matching WavefunctionContainer::get_single_orbital_entropies (w > 0).
- *
- * @param occ_alpha Alpha occupation gamma_{ii} of the orbital.
- * @param occ_beta Beta occupation gamma_{ibar,ibar} of the orbital.
- * @param double_occ Double occupation Gamma_{i,ibar,i,ibar} (aabb 2-RDM diag).
- * @return The single-orbital entropy S(rho_i) >= 0.
- */
-double single_orbital_entropy(double occ_alpha, double occ_beta,
-                              double double_occ) {
-  const double omega[4] = {1.0 - occ_alpha - occ_beta + double_occ,
-                           occ_alpha - double_occ, occ_beta - double_occ,
-                           double_occ};
-  double entropy = 0.0;
-  for (double weight : omega) {
-    if (weight > 0.0) {
-      entropy -= weight * std::log(weight);
-    }
-  }
-  return entropy;
-}
 
 /**
  * @brief Flat row-major offset into an (dim x dim x dim x dim) tensor.
@@ -82,34 +58,21 @@ inline std::size_t flat_index(std::size_t dim, std::size_t i, std::size_t j,
 void rotate_two_rdm_axis(std::vector<double>& rdm_aabb, std::size_t dim,
                          int axis, std::size_t i, std::size_t j,
                          double cos_theta, double sin_theta) {
-  const std::size_t strides[4] = {dim * dim * dim, dim * dim, dim, 1};
+  const std::array<std::size_t, 4> strides{dim * dim * dim, dim * dim, dim, 1};
   const std::size_t axis_stride = strides[axis];
-  int other_axes[3];
-  int count = 0;
-  for (int ax = 0; ax < 4; ++ax) {
-    if (ax != axis) {
-      other_axes[count++] = ax;
-    }
-  }
-  // Each (x, y, z, active in {i, j}) maps to a unique flat index, so every
-  // touched element is written at most once: the (x, y) iterations are
-  // independent and safe to run in parallel. OpenMP schedules the outer two
-  // axes; when OpenMP is disabled the pragma is ignored and the loop is serial.
-#pragma omp parallel for collapse(2) schedule(static)
-  for (std::size_t x = 0; x < dim; ++x) {
-    for (std::size_t y = 0; y < dim; ++y) {
-      for (std::size_t z = 0; z < dim; ++z) {
-        const std::size_t base = x * strides[other_axes[0]] +
-                                 y * strides[other_axes[1]] +
-                                 z * strides[other_axes[2]];
-        double& elem_i = rdm_aabb[base + i * axis_stride];
-        double& elem_j = rdm_aabb[base + j * axis_stride];
-        const double val_i = elem_i;
-        const double val_j = elem_j;
-        elem_i = cos_theta * val_i + sin_theta * val_j;
-        elem_j = -sin_theta * val_i + cos_theta * val_j;
-      }
-    }
+  const std::size_t axis_span = dim * axis_stride;
+  const std::size_t block_count = dim * dim * dim;
+
+#pragma omp parallel for schedule(static)
+  for (std::size_t block = 0; block < block_count; ++block) {
+    const std::size_t base =
+        (block / axis_stride) * axis_span + block % axis_stride;
+    double& elem_i = rdm_aabb[base + i * axis_stride];
+    double& elem_j = rdm_aabb[base + j * axis_stride];
+    const double val_i = elem_i;
+    const double val_j = elem_j;
+    elem_i = cos_theta * val_i + sin_theta * val_j;
+    elem_j = -sin_theta * val_i + cos_theta * val_j;
   }
 }
 
@@ -176,8 +139,9 @@ double total_single_orbital_entropy(const Eigen::MatrixXd& rdm_alpha,
   double entropy = 0.0;
   for (std::size_t i = 0; i < dim; ++i) {
     const Eigen::Index ii = static_cast<Eigen::Index>(i);
-    entropy += single_orbital_entropy(rdm_alpha(ii, ii), rdm_beta(ii, ii),
-                                      rdm_aabb[flat_index(dim, i, i, i, i)]);
+    entropy += data::detail::single_orbital_entropy(
+        rdm_alpha(ii, ii), rdm_beta(ii, ii),
+        rdm_aabb[flat_index(dim, i, i, i, i)]);
   }
   return entropy;
 }
@@ -197,7 +161,7 @@ double total_single_orbital_entropy(const Eigen::MatrixXd& rdm_alpha,
  * @param dim Active-space dimension.
  * @param max_cycles Maximum number of Jacobi sweeps.
  * @param convergence_tolerance Sweep-to-sweep entropy-sum change to stop at.
- * @param coarse_angle_step Coarse angle-scan spacing (radians) over [0, pi).
+ * @param coarse_angle_step Coarse angle-scan spacing (radians) over [0, pi/2).
  * @param fine_samples Number of samples in the fine refinement scan.
  * @param improvement_tolerance Minimum entropy decrease to accept a rotation.
  * @return The accumulated active-space rotation U (dim x dim).
@@ -217,33 +181,39 @@ Eigen::MatrixXd optimize_rotation(Eigen::MatrixXd& rdm_alpha,
 
   double entropy_prev =
       total_single_orbital_entropy(rdm_alpha, rdm_beta, rdm_aabb, dim);
+  constexpr double angle_period = std::numbers::pi / 2.0;
   for (std::size_t cycle = 0; cycle < max_cycles; ++cycle) {
     for (std::size_t i = 0; i < dim; ++i) {
       for (std::size_t j = i + 1; j < dim; ++j) {
         const Eigen::Index ii = static_cast<Eigen::Index>(i);
         const Eigen::Index jj = static_cast<Eigen::Index>(j);
-        const std::size_t pair[2] = {i, j};
+        const std::array<std::size_t, 2> pair{i, j};
         const double a_ii = rdm_alpha(ii, ii), a_ij = rdm_alpha(ii, jj),
                      a_jj = rdm_alpha(jj, jj);
         const double b_ii = rdm_beta(ii, ii), b_ij = rdm_beta(ii, jj),
                      b_jj = rdm_beta(jj, jj);
 
-        // Double occupation Gamma for orbital weights (w0, w1) over the pair.
-        auto double_occupation = [&](double w0, double w1) {
-          const double weight[2] = {w0, w1};
-          double value = 0.0;
-          for (int a = 0; a < 2; ++a) {
-            for (int b = 0; b < 2; ++b) {
-              for (int c = 0; c < 2; ++c) {
-                for (int d = 0; d < 2; ++d) {
-                  value += weight[a] * weight[b] * weight[c] * weight[d] *
-                           rdm_aabb[flat_index(dim, pair[a], pair[b], pair[c],
-                                               pair[d])];
-                }
+        std::array<double, 5> double_occupation_coefficients{};
+        for (std::size_t a = 0; a < 2; ++a) {
+          for (std::size_t b = 0; b < 2; ++b) {
+            for (std::size_t c = 0; c < 2; ++c) {
+              for (std::size_t d = 0; d < 2; ++d) {
+                double_occupation_coefficients[a + b + c + d] +=
+                    rdm_aabb[flat_index(dim, pair[a], pair[b], pair[c],
+                                        pair[d])];
               }
             }
           }
-          return value;
+        }
+
+        auto double_occupation = [&](double w0, double w1) {
+          const double w0_squared = w0 * w0;
+          const double w1_squared = w1 * w1;
+          return double_occupation_coefficients[0] * w0_squared * w0_squared +
+                 double_occupation_coefficients[1] * w0_squared * w0 * w1 +
+                 double_occupation_coefficients[2] * w0_squared * w1_squared +
+                 double_occupation_coefficients[3] * w0 * w1_squared * w1 +
+                 double_occupation_coefficients[4] * w1_squared * w1_squared;
         };
 
         // Pair entropy after rotating by theta: i' = (c, s), j' = (-s, c).
@@ -264,14 +234,16 @@ Eigen::MatrixXd optimize_rotation(Eigen::MatrixXd& rdm_alpha,
                                     cos_theta * cos_theta * b_jj;
           const double double_occ_i = double_occupation(cos_theta, sin_theta);
           const double double_occ_j = double_occupation(-sin_theta, cos_theta);
-          return single_orbital_entropy(occ_alpha_i, occ_beta_i, double_occ_i) +
-                 single_orbital_entropy(occ_alpha_j, occ_beta_j, double_occ_j);
+          return data::detail::single_orbital_entropy(occ_alpha_i, occ_beta_i,
+                                                      double_occ_i) +
+                 data::detail::single_orbital_entropy(occ_alpha_j, occ_beta_j,
+                                                      double_occ_j);
         };
 
         const double entropy_current = pair_entropy(0.0);
         double best_theta = 0.0;
         double best_entropy = entropy_current;
-        for (double theta = 0.0; theta < std::numbers::pi;
+        for (double theta = 0.0; theta < angle_period;
              theta += coarse_angle_step) {
           const double value = pair_entropy(theta);
           if (value < best_entropy) {
@@ -279,12 +251,8 @@ Eigen::MatrixXd optimize_rotation(Eigen::MatrixXd& rdm_alpha,
             best_theta = theta;
           }
         }
-        // Clamp the fine-scan window to the documented half-open domain
-        // [0, pi): the upper bound is the largest double strictly below pi, so
-        // no sample ever reaches pi (equivalent to 0 for this rotation).
-        const double theta_lo = std::max(0.0, best_theta - coarse_angle_step);
-        const double theta_hi = std::min(std::nextafter(std::numbers::pi, 0.0),
-                                         best_theta + coarse_angle_step);
+        const double theta_lo = best_theta - coarse_angle_step;
+        const double theta_hi = best_theta + coarse_angle_step;
         for (int k = 0; k < fine_samples; ++k) {
           const double theta =
               theta_lo +
@@ -294,6 +262,10 @@ Eigen::MatrixXd optimize_rotation(Eigen::MatrixXd& rdm_alpha,
             best_entropy = value;
             best_theta = theta;
           }
+        }
+        best_theta = std::fmod(best_theta, angle_period);
+        if (best_theta < 0.0) {
+          best_theta += angle_period;
         }
 
         if (best_entropy < entropy_current - improvement_tolerance) {

@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import numpy as np
+import pytest
 
 from qdk_chemistry import algorithms, data
 from qdk_chemistry.algorithms import (
@@ -82,10 +83,36 @@ class TestQIOLocalizerBindings:
         localizer = QdkQIOLocalizer()
         assert localizer.settings() is not None
 
-    def test_reduces_single_orbital_entropy(self, test_data_files_path):
-        """QIO rotation does not increase the total single-orbital entropy."""
-        active_wfn, _, cas_wfn = _correlated_cas_wavefunction(
-            test_data_files_path / "ethylene.structure.xyz", 1, 4, 4, "def2-svp"
+    @pytest.mark.parametrize(
+        (
+            "structure_name",
+            "multiplicity",
+            "n_active_e",
+            "n_active_o",
+            "basis",
+            "expected_entropy",
+            "reference_tolerance",
+        ),
+        [
+            ("ethylene.structure.xyz", 1, 4, 4, "def2-svp", 0.28733427, entropy_tol),
+            ("o2.structure.xyz", 3, 8, 6, "cc-pvdz", 0.93445155, 1e-4),
+        ],
+        ids=["singlet", "multiplet"],
+    )
+    def test_reference_entropy_and_energy_invariant(
+        self,
+        test_data_files_path,
+        structure_name,
+        multiplicity,
+        n_active_e,
+        n_active_o,
+        basis,
+        expected_entropy,
+        reference_tolerance,
+    ):
+        """QIO produces reference entropies and preserves CASCI energies."""
+        active_wfn, energy_before, cas_wfn = _correlated_cas_wavefunction(
+            test_data_files_path / structure_name, multiplicity, n_active_e, n_active_o, basis
         )
         active_orbitals = active_wfn.get_orbitals()
 
@@ -94,17 +121,16 @@ class TestQIOLocalizerBindings:
         active_indices = list(alpha_indices)
         n = len(active_indices)
         n_a, n_b = active_wfn.get_active_num_electrons()
+        if multiplicity == 1:
+            assert n_a == n_b
+        else:
+            assert n_a != n_b
 
-        # Input (canonical) single-orbital entropy sum, from the library method.
         entropy_before = float(np.sum(cas_wfn.get_single_orbital_entropies()))
-
-        # Run the QIO localizer (single rotation).
         localizer = create("orbital_localizer", "qdk_qio")
         qio_wfn = localizer.run(cas_wfn, active_indices, active_indices)
         assert qio_wfn is not None
 
-        # The active-space rotation U = Ca_can^T S Ca_qio is unitary and the QIO
-        # orbitals are orthonormal.
         s = np.asarray(active_orbitals.get_overlap_matrix())
         ca_can = np.asarray(active_orbitals.get_coefficients()[0])[:, active_indices]
         ca_qio = np.asarray(qio_wfn.get_orbitals().get_coefficients()[0])[:, active_indices]
@@ -112,36 +138,12 @@ class TestQIOLocalizerBindings:
         np.testing.assert_allclose(u @ u.conj().T, np.eye(n), atol=orthonormality_error_tolerance)
         np.testing.assert_allclose(ca_qio.conj().T @ s @ ca_qio, np.eye(n), atol=orthonormality_error_tolerance)
 
-        # Re-solve the CAS in the QIO-rotated basis and take the entropy from the
-        # library method (get_single_orbital_entropies) rather than recomputing it.
-        _, rotated_cas_wfn = _run_cas(qio_wfn.get_orbitals(), n_a, n_b)
+        energy_after, rotated_cas_wfn = _run_cas(qio_wfn.get_orbitals(), n_a, n_b)
         entropy_after = float(np.sum(rotated_cas_wfn.get_single_orbital_entropies()))
 
-        # The QIO objective must not increase under the optimized rotation.
         assert entropy_after <= entropy_before + entropy_tol
-
-    def test_open_shell_triplet_energy_invariant(self, test_data_files_path):
-        """ROHF triplet (open-shell) is accepted; the CASCI energy is invariant.
-
-        "Restricted" means a single spatial orbital set (RHF/ROHF), not
-        closed-shell: an open-shell reference with na != nb is supported.
-        """
-        # Triplet O2 (ground state) via ROHF -> restricted open-shell orbitals.
-        active_wfn, e_before, cas_wfn = _correlated_cas_wavefunction(
-            test_data_files_path / "o2.structure.xyz", 3, 8, 6, "cc-pvdz"
-        )
-        active_orbs = active_wfn.get_orbitals()
-        assert active_orbs.is_restricted()
-        n_a, n_b = active_wfn.get_active_num_electrons()
-        assert n_a != n_b  # genuinely open-shell
-
-        idx = list(active_orbs.get_active_space_indices()[0])
-        qio_wfn = create("orbital_localizer", "qdk_qio").run(cas_wfn, idx, idx)
-        e_after, _ = _run_cas(qio_wfn.get_orbitals(), n_a, n_b)
-
-        # A unitary rotation of the active orbitals leaves the CASCI energy
-        # invariant, even for an open-shell (na != nb) reference.
-        assert abs(e_before - e_after) < ci_energy_tolerance
+        np.testing.assert_allclose(entropy_after, expected_entropy, atol=reference_tolerance, rtol=0.0)
+        assert abs(energy_before - energy_after) < ci_energy_tolerance
 
     def test_settings_defaults_and_override(self):
         """The Jacobi-sweep controls are exposed with defaults and settable."""
