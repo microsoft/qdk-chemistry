@@ -125,9 +125,7 @@ class TestHamiltonianRegularizerCorrectness:
         g_manual = shifted_manual.get_two_body_integrals()[0]
         assert np.allclose(g_run, g_manual, atol=1e-12)
 
-        assert np.isclose(
-            shifted_run.get_core_energy(), shifted_manual.get_core_energy(), atol=1e-12
-        )
+        assert np.isclose(shifted_run.get_core_energy(), shifted_manual.get_core_energy(), atol=1e-12)
 
 
 class TestDoubleFactorizationUtils:
