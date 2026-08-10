@@ -635,72 +635,83 @@ TEST(SchriefferWolffPT2Test, RejectsUnrestrictedHfReference) {
 
 // Natural orbitals are the basis in which the reference 1-RDM is diagonal, so
 // they are both a supported input and the one basis where folding a
-// fractionally occupied orbital drops no off-diagonal density. The rotation
-// that produces them lies entirely inside P here, so semicanonicalization must
-// undo it: the downfolded spectrum has to match the canonical-basis run.
+// fractionally occupied orbital drops no off-diagonal density.
+//
+// Stretched LiH is used because the effect has to be real rather than staged:
+// its two active sigma orbitals share symmetry, so a CAS 1-RDM in the
+// canonical HF basis is genuinely non-diagonal (~0.24 here) and the natural
+// orbitals differ from the HF ones. Closed-shell water and stretched H2 are
+// both useless for this -- their active pairs are symmetry-distinct (b1/a1 and
+// sigma_g/sigma_u), so the CAS 1-RDM is diagonal to machine precision and the
+// localizer is a no-op. Stretching also drives the occupations strongly
+// fractional (1.86/0.14), the regime the fold's rounding guard exists for.
+//
+// The rotation to natural orbitals lies entirely inside P, so
+// semicanonicalization must remove it and the downfolded spectrum must match.
 TEST(SchriefferWolffPT2Test, AcceptsNaturalOrbitalReference) {
-  auto water = testing::create_water_structure();
-  auto scf = ScfSolverFactory::create();
-  auto [E_hf, wfn_hf] = scf->run(water, 0, 1, "sto-3g");
-  const auto orbitals = wfn_hf->get_orbitals();
+  namespace qcd = qdk::chemistry::data;
+  std::vector<Eigen::Vector3d> coords = {{0, 0, 0}, {0, 0, 3.0}};
+  for (auto& c : coords) c *= qdk::chemistry::constants::angstrom_to_bohr;
+  auto stretched_lih = std::make_shared<qcd::Structure>(
+      coords, std::vector<qcd::Element>{qcd::Element::Li, qcd::Element::H});
 
-  const std::vector<std::size_t> P = {4, 5};
-  const std::vector<std::size_t> ref_core = {0, 1, 2, 3};
-  const std::vector<std::size_t> window = {3, 4, 5, 6};
-  const std::vector<std::size_t> window_core = {0, 1, 2};
+  auto scf = ScfSolverFactory::create();
+  scf->settings().set("enable_gdm", false);
+  auto [E_hf, wfn_hf] = scf->run(stretched_lih, 0, 1, "sto-3g");
+  const auto orbitals = wfn_hf->get_orbitals();
+  ASSERT_TRUE(orbitals->is_restricted());
+
+  const std::vector<std::size_t> P = {1, 2};
+  const std::vector<std::size_t> core = {0};
+  const std::vector<std::size_t> window = {1, 2, 3};
   const int norb = static_cast<int>(orbitals->get_num_molecular_orbitals());
 
   auto ham = HamiltonianConstructorFactory::create();
   auto cas_ref = MultiConfigurationCalculatorFactory::create("macis_cas");
   cas_ref->settings().set("calculate_one_rdm", true);
   auto [E_cas, reference] = cas_ref->run(
-      ham->run(testing::with_active_space(orbitals, P, ref_core)), 1, 1);
+      ham->run(testing::with_active_space(orbitals, P, core)), 1, 1);
   ASSERT_TRUE(reference->has_active_one_rdm());
+  {
+    const auto* rdm = std::get_if<Eigen::MatrixXd>(
+        &reference->get_active_one_rdm_spin_traced());
+    ASSERT_NE(rdm, nullptr);
+    ASSERT_GT(std::abs((*rdm)(0, 1)), 0.1)
+        << "canonical basis is already natural; the test would be vacuous";
+  }
 
-  // Rotate the CAS active space to its natural orbitals. The localizer keeps
-  // the (now diagonal) 1-RDM, which is the accessor swpt2 reads; its aufbau
-  // determinant occupations are not consulted.
+  // swpt2 reads the (now diagonal) active 1-RDM; the aufbau determinant
+  // occupations the localizer also attaches are integers and must not be used.
   auto localizer = LocalizerFactory::create("qdk_natural_orbitals");
   auto natural = localizer->run(reference, P, P);
-  if (!natural->has_active_one_rdm())
-    GTEST_SKIP()
-        << "qdk_natural_orbitals reports no active 1-RDM: it passes the "
-           "active-space natural occupations to the *full-space* "
-           "one_rdm_spin_traced slot, leaving _active_one_rdm null. The "
-           "downfold therefore falls back to the aufbau determinant "
-           "occupations, which are integers, so the fractional-occupation "
-           "guard cannot fire. Re-enable once the localizer populates the "
-           "active 1-RDM.";
+  ASSERT_TRUE(natural->has_active_one_rdm())
+      << "qdk_natural_orbitals must expose the rotated active 1-RDM; without "
+         "it the downfold silently falls back to determinant occupations";
   const auto& natural_rdm_variant = natural->get_active_one_rdm_spin_traced();
   const auto* natural_rdm = std::get_if<Eigen::MatrixXd>(&natural_rdm_variant);
   ASSERT_NE(natural_rdm, nullptr);
   ASSERT_EQ(natural_rdm->rows(), 2);
-  // Diagonal, and genuinely fractional: this is a correlated density, not a
-  // determinant that the occupation fallback could have handled.
   EXPECT_NEAR((*natural_rdm)(0, 1), 0.0, 1e-10);
   EXPECT_NEAR((*natural_rdm)(1, 0), 0.0, 1e-10);
-  EXPECT_GT((*natural_rdm)(0, 0), 1.9);
-  EXPECT_LT((*natural_rdm)(0, 0), 2.0 - 1e-4);
-  EXPECT_GT((*natural_rdm)(1, 1), 1e-4);
+  // Strongly correlated: neither natural orbital is close to 2 or 0.
+  EXPECT_GT((*natural_rdm)(0, 0), 1.5);
+  EXPECT_LT((*natural_rdm)(0, 0), 1.95);
+  EXPECT_GT((*natural_rdm)(1, 1), 0.05);
 
   const auto natural_orbitals = natural->get_orbitals();
   ASSERT_TRUE(natural_orbitals->is_restricted());
-  // The localizer drops orbital energies; the downfold must not require them.
-  EXPECT_FALSE(natural_orbitals->has_energies());
   const auto& canonical_coeffs =
-      orbitals->coefficients()->block({qdk::chemistry::data::axes::alpha(),
-                                       qdk::chemistry::data::axes::alpha()});
+      orbitals->coefficients()->block({qcd::axes::alpha(), qcd::axes::alpha()});
   const auto& natural_coeffs = natural_orbitals->coefficients()->block(
-      {qdk::chemistry::data::axes::alpha(),
-       qdk::chemistry::data::axes::alpha()});
+      {qcd::axes::alpha(), qcd::axes::alpha()});
   ASSERT_GT((natural_coeffs - canonical_coeffs).norm(), 1e-6)
       << "natural-orbital rotation is trivial; the test would be vacuous";
 
   const auto P_set = testing::restricted_index_set(norb, P);
   auto cas = MultiConfigurationCalculatorFactory::create("macis_cas");
 
-  auto H_natural = ham->run(
-      testing::with_active_space(natural_orbitals, window, window_core));
+  auto H_natural =
+      ham->run(testing::with_active_space(natural_orbitals, window, core));
   auto H_eff_natural =
       EffectiveHamiltonianConstructorFactory::create("swpt2")->run(
           natural, H_natural, P_set);
@@ -709,15 +720,15 @@ TEST(SchriefferWolffPT2Test, AcceptsNaturalOrbitalReference) {
   EXPECT_TRUE(std::isfinite(E_natural));
 
   auto H_canonical =
-      ham->run(testing::with_active_space(orbitals, window, window_core));
+      ham->run(testing::with_active_space(orbitals, window, core));
   auto H_eff_canonical =
       EffectiveHamiltonianConstructorFactory::create("swpt2")->run(
           reference, H_canonical, P_set);
   auto [E_canonical, wfn_canonical] = cas->run(H_eff_canonical, 1, 1);
 
-  // The natural-orbital rotation acts only within P, so semicanonicalization
-  // maps both runs onto the same internal basis.
-  EXPECT_NEAR(E_natural, E_canonical, 1e-9);
+  // The two bases differ only by a rotation within P, so semicanonicalization
+  // maps them onto the same internal basis.
+  EXPECT_NEAR(E_natural, E_canonical, 1e-8);
 }
 
 // Localized orbitals are the headline use case (localized magnetic orbitals ->

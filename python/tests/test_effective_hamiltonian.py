@@ -95,15 +95,21 @@ class TestEffectiveHamiltonianConstructor:
 
         def with_active_space(orb, active, inactive):
             """Return a copy of `orb` with the given active/inactive index sets."""
-            ca, _ = orb.get_coefficients()
-            ea, _ = orb.get_energies()
-            return Orbitals(ca, ea, None, orb.get_basis_set(), (list(active), list(inactive)))
+            n = orb.get_num_molecular_orbitals()
+            return Orbitals(
+                orb.coefficients().block([alpha, alpha]),
+                orb.energies().block([alpha]),
+                None,
+                orb.get_basis_set(),
+                active_indices=spin_index_set(n, list(active), list(active)),
+                inactive_indices=spin_index_set(n, list(inactive), list(inactive)),
+            )
 
         # small window = active P + the lowest orbital outside P and the core
         ref_orbs = reference.get_orbitals()
         active = list(ref_orbs.active_indices().indices(alpha))
         core = list(ref_orbs.inactive_indices().indices(alpha))
-        norb = orbitals.get_coefficients()[0].shape[1]
+        norb = orbitals.get_num_molecular_orbitals()
         used = set(active) | set(core)
         window = sorted([*active, next(i for i in range(norb) if i not in used)])
 
