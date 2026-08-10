@@ -13,7 +13,7 @@ from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import
 from qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation import StandardPhaseEstimation
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
-from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_AER
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .reference_tolerances import (
@@ -217,7 +217,9 @@ class TestQPEWithQubitization:
         )
         assert np.isclose(result.raw_energy, reference_energy, atol=0.02)
 
-    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+    @pytest.mark.skipif(
+        not QDK_CHEMISTRY_HAS_QISKIT_AER or not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit Aer not available."
+    )
     def test_standard_qpe_with_qubitization_h2(self, h2_hamiltonian):
         """Verify standard QPE with qubitization recovers H2 ground-state energy."""
         # Exact ground state from qubit Hamiltonian solver (dense diagonalization)

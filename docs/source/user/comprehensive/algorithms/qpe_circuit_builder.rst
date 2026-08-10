@@ -54,6 +54,9 @@ The :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeC
    * - ``num_bits``
      - int
      - Number of phase bits to estimate. Must be a positive integer. Default: ``-1`` (invalid; user must set).
+   * - ``measure_phase``
+     - bool
+     - Measure the phase register in the computational basis. Default: ``True``.
    * - ``unitary_builder``
      - :class:`~qdk_chemistry.data.AlgorithmRef`
      - Reference to the algorithm that constructs the target unitary :math:`U`. Default: :class:`~qdk_chemistry.data.AlgorithmRef` to ``"hamiltonian_unitary_builder"`` with method ``"trotter"``.
