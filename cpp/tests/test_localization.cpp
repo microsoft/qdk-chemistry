@@ -440,10 +440,45 @@ TEST_F(LocalizationTest, MP2) {
       mp2_orbitals.coefficients()->block({axes::beta(), axes::beta()});
   const size_t num_occupied_orbitals = wfn->get_total_num_electrons().first;
 
+  const auto& one_rdm_variant =
+      mp2_orbitals_wfn_ptr->get_active_one_rdm_spin_traced();
+  const auto* one_rdm = std::get_if<Eigen::MatrixXd>(&one_rdm_variant);
+  ASSERT_NE(one_rdm, nullptr);
+  auto [alpha_occupations, beta_occupations] =
+      mp2_orbitals_wfn_ptr->get_active_orbital_occupations();
+  ASSERT_EQ(alpha_occupations.size(), one_rdm->rows());
+  ASSERT_EQ(beta_occupations.size(), one_rdm->rows());
+  EXPECT_TRUE((alpha_occupations + beta_occupations)
+                  .isApprox(one_rdm->diagonal(), testing::wf_tolerance));
+  EXPECT_NEAR(one_rdm->trace(), 2.0 * num_occupied_orbitals,
+              testing::wf_tolerance);
+
+  Eigen::VectorXd mean_field_occupations =
+      Eigen::VectorXd::Zero(one_rdm->rows());
+  mean_field_occupations.head(num_occupied_orbitals).setConstant(2.0);
+  EXPECT_GT((one_rdm->diagonal() - mean_field_occupations).norm(),
+            testing::numerical_zero_tolerance);
+
   // Randomly choose indices to localize, then the transformation
   // should be unitary and localized orbitals should be orthonormal
   std::vector<size_t> random_indices = {0, 2, 4, 6};  // Random subset
   auto mp2_random_ptr = localizer->run(wfn, random_indices, random_indices);
+  const auto& random_rdm_variant =
+      mp2_random_ptr->get_active_one_rdm_spin_traced();
+  const auto* random_rdm = std::get_if<Eigen::MatrixXd>(&random_rdm_variant);
+  ASSERT_NE(random_rdm, nullptr);
+  EXPECT_NEAR(random_rdm->trace(), 2.0 * num_occupied_orbitals,
+              testing::wf_tolerance);
+  for (size_t orbital_idx = 0; orbital_idx < all_indices.size();
+       ++orbital_idx) {
+    if (std::find(random_indices.begin(), random_indices.end(), orbital_idx) ==
+        random_indices.end()) {
+      const double expected_occupation =
+          orbital_idx < num_occupied_orbitals ? 2.0 : 0.0;
+      EXPECT_NEAR((*random_rdm)(orbital_idx, orbital_idx), expected_occupation,
+                  testing::wf_tolerance);
+    }
+  }
   const auto& Ca_mp2_rand =
       mp2_random_ptr->get_orbitals()->coefficients()->block(
           {axes::alpha(), axes::alpha()});
@@ -1392,9 +1427,16 @@ TEST_F(LocalizationTest, NaturalOrbitals) {
   // Check that the reference active 1-RDM diagonalization succeeds.
   ASSERT_EQ(es.info(), Eigen::Success);
   Eigen::VectorXd expected_noons = es.eigenvalues().reverse();
+  auto [alpha_occupations, beta_occupations] =
+      no_wfn_ptr->get_active_orbital_occupations();
+  ASSERT_EQ(alpha_occupations.size(), expected_noons.size());
+  ASSERT_EQ(beta_occupations.size(), expected_noons.size());
   for (Eigen::Index i = 0; i < expected_noons.size(); ++i) {
     // Check that the output 1-RDM diagonal stores the expected NOONs.
     EXPECT_NEAR(expected_noons(i), (*output_rdm)(i, i), 1e-8);
+    EXPECT_NEAR(expected_noons(i), alpha_occupations(i) + beta_occupations(i),
+                1e-8);
+    EXPECT_NEAR(alpha_occupations(i), beta_occupations(i), 1e-8);
   }
 }
 
@@ -1425,6 +1467,40 @@ TEST_F(LocalizationTest, NaturalOrbitalsRejectsPartialActiveSpaceIndices) {
   std::vector<size_t> partial_indices({1, 3});
   EXPECT_THROW(localizer->run(wfn, partial_indices, partial_indices),
                std::invalid_argument);
+}
+
+TEST_F(LocalizationTest, NaturalOrbitalsPreserveOpenShellSpinOccupations) {
+  Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(4, 4);
+  Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(4, 4);
+  auto basis_set = testing::create_random_basis_set(4, "test");
+  auto orbitals = std::make_shared<Orbitals>(
+      coeffs, std::nullopt, std::make_optional(overlap), basis_set);
+  Eigen::MatrixXd one_rdm_aa = Eigen::MatrixXd::Zero(4, 4);
+  Eigen::MatrixXd one_rdm_bb = Eigen::MatrixXd::Zero(4, 4);
+  one_rdm_aa.diagonal() << 0.9, 0.6, 0.4, 0.1;
+  one_rdm_bb.diagonal() << 0.6, 0.3, 0.1, 0.0;
+  const Eigen::MatrixXd one_rdm = one_rdm_aa + one_rdm_bb;
+  Eigen::VectorXd ci_coeffs = Eigen::VectorXd::Ones(1);
+  std::vector<Configuration> dets = {
+      Configuration::from_spin_half_string("2u00")};
+  auto wfn =
+      std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+          ci_coeffs, dets, orbitals, one_rdm, one_rdm_aa, one_rdm_bb,
+          std::nullopt,  // two_rdm_spin_traced
+          std::nullopt,  // two_rdm_aaaa
+          std::nullopt,  // two_rdm_aabb
+          std::nullopt,  // two_rdm_bbbb
+          "electrons"));
+  std::vector<size_t> indices({0, 1, 2, 3});
+
+  auto localizer = LocalizerFactory::create("qdk_natural_orbitals");
+  auto no_wfn = localizer->run(wfn, indices, indices);
+
+  auto [alpha_occ, beta_occ] = no_wfn->get_active_orbital_occupations();
+  EXPECT_TRUE(alpha_occ.isApprox(one_rdm_aa.diagonal(), testing::wf_tolerance));
+  EXPECT_TRUE(beta_occ.isApprox(one_rdm_bb.diagonal(), testing::wf_tolerance));
+  EXPECT_FALSE(no_wfn->has_two_rdm_spin_dependent());
+  EXPECT_FALSE(no_wfn->has_two_rdm_spin_traced());
 }
 
 TEST_F(LocalizationTest, StretchedN2NaturalOrbitals) {
@@ -1510,6 +1586,13 @@ TEST_F(LocalizationTest, StretchedN2NaturalOrbitals) {
     }
   }
   EXPECT_TRUE(has_fractional) << "No fractional NOONs found";
+
+  const auto [alpha_occupations, beta_occupations] =
+      no_wfn->get_active_orbital_occupations();
+  EXPECT_NEAR(alpha_occupations.sum(), n_a, 1e-6);
+  EXPECT_NEAR(beta_occupations.sum(), n_b, 1e-6);
+  EXPECT_FALSE(no_wfn->has_two_rdm_spin_dependent());
+  EXPECT_FALSE(no_wfn->has_two_rdm_spin_traced());
 }
 
 TEST_F(LocalizationTest, NaturalOrbitals_EdgeCase) {

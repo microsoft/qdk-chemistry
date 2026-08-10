@@ -17,9 +17,9 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     /// - `systems`: An array of indices representing the system qubits.
     /// - `numAncillaQubits`: Number of extra ancilla qubits needed by the controlled unitary (0 for Trotter, >0 for block encoding).
     struct StandardPhaseEstimationParams {
-        statePrep : Qubit[] => Unit,
-        controlledUnitary : ((Qubit, Qubit[]) => Unit)[],
-        phaseQubitPrep : Qubit[] => Unit,
+        statePrep : Qubit[] => Unit is Adj,
+        controlledUnitary : ((Qubit, Qubit[]) => Unit is Adj)[],
+        phaseQubitPrep : Qubit[] => Unit is Adj,
         numBits : Int,
         ancillas : Int[],
         systems : Int[],
@@ -27,14 +27,13 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     }
 
     /// Runs the standard Quantum Phase Estimation (QPE) circuit based on the provided parameters.
-    /// The circuit uses multiple ancilla qubits and the inverse QFT.
+    /// The circuit uses multiple ancilla qubits and the inverse QFT. Nothing is measured, so the
+    /// operation is adjointable and can be composed, for example as the preparation amplitude
+    /// amplification reflects about.
     /// # Parameters
     /// - `params`: A `StandardPhaseEstimationParams` struct.
-    /// # Returns
-    /// - `Result[]`: The measurement results of the ancilla qubits (MSB first).
-    operation RunStandardQPE(params : StandardPhaseEstimationParams) : Result[] {
-        let totalQubits = params.numBits + Length(params.systems) + params.numAncillaQubits;
-        use qs = Qubit[totalQubits];
+    /// - `qs`: The register to act on, indexed by `params.ancillas` and `params.systems`.
+    operation RunStandardQPE(params : StandardPhaseEstimationParams, qs : Qubit[]) : Unit is Adj {
         let ancillas = Subarray(params.ancillas, qs);
         let systems = Subarray(params.systems, qs);
         let unitaryAncillas = if params.numAncillaQubits == 0 {
@@ -59,14 +58,33 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
 
         // Step 4: Apply inverse QFT on ancilla qubits
         Adjoint ApplyQFT(ancillas);
+    }
 
-        // Step 5: Measure ancilla qubits and reset system qubits
-        mutable results = [Zero, size = params.numBits];
-        for idx in 0..params.numBits - 1 {
-            set results w/= idx <- MResetZ(ancillas[idx]);
-        }
-        ResetAll(allTargets);
-        return results;
+    /// Prepare a standard QPE operation that acts in place on a caller-owned register.
+    /// Parameters match `MakeStandardQPECircuit`.
+    /// # Returns
+    /// - `Qubit[] => Unit is Adj`: A callable that applies QPE without measuring.
+    function MakeStandardQPEOp(
+        statePrep : Qubit[] => Unit is Adj,
+        controlledUnitary : ((Qubit, Qubit[]) => Unit is Adj)[],
+        numBits : Int,
+        ancillas : Int[],
+        systems : Int[],
+        phaseQubitPrep : Qubit[] => Unit is Adj,
+        numAncillaQubits : Int,
+    ) : Qubit[] => Unit is Adj {
+        RunStandardQPE(
+            new StandardPhaseEstimationParams {
+                statePrep = statePrep,
+                controlledUnitary = controlledUnitary,
+                phaseQubitPrep = phaseQubitPrep,
+                numBits = numBits,
+                ancillas = ancillas,
+                systems = systems,
+                numAncillaQubits = numAncillaQubits,
+            },
+            _
+        )
     }
 
     /// Prepare a standard QPE circuit (factory entry point).
@@ -79,25 +97,43 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     /// - `systems`: An array of indices for the system qubits.
     /// - `phaseQubitPrep`: A function to prepare the phase qubits (e.g., Hadamard on all).
     /// - `numAncillaQubits`: Number of extra ancilla qubits needed by the controlled unitary (0 for Trotter).
+    /// - `measurePhase`: Measure the ancilla qubits. When `false` nothing is measured.
     /// # Returns
-    /// The measurement results of the ancilla qubits.
+    /// The measurement results of the ancilla qubits, or an empty array when `measurePhase` is `false`.
     operation MakeStandardQPECircuit(
-        statePrep : Qubit[] => Unit,
-        controlledUnitary : ((Qubit, Qubit[]) => Unit)[],
+        statePrep : Qubit[] => Unit is Adj,
+        controlledUnitary : ((Qubit, Qubit[]) => Unit is Adj)[],
         numBits : Int,
         ancillas : Int[],
         systems : Int[],
-        phaseQubitPrep : Qubit[] => Unit,
+        phaseQubitPrep : Qubit[] => Unit is Adj,
         numAncillaQubits : Int,
+        measurePhase : Bool,
     ) : Result[] {
-        return RunStandardQPE(new StandardPhaseEstimationParams {
-            statePrep = statePrep,
-            controlledUnitary = controlledUnitary,
-            phaseQubitPrep = phaseQubitPrep,
-            numBits = numBits,
-            ancillas = ancillas,
-            systems = systems,
-            numAncillaQubits = numAncillaQubits,
-        });
+        let totalQubits = numBits + Length(systems) + numAncillaQubits;
+        use qs = Qubit[totalQubits];
+        RunStandardQPE(
+            new StandardPhaseEstimationParams {
+                statePrep = statePrep,
+                controlledUnitary = controlledUnitary,
+                phaseQubitPrep = phaseQubitPrep,
+                numBits = numBits,
+                ancillas = ancillas,
+                systems = systems,
+                numAncillaQubits = numAncillaQubits,
+            },
+            qs
+        );
+
+        mutable results : Result[] = [];
+        if measurePhase {
+            let phaseQubits = Subarray(ancillas, qs);
+            set results = [Zero, size = numBits];
+            for idx in 0..numBits - 1 {
+                set results w/= idx <- MResetZ(phaseQubits[idx]);
+            }
+        }
+        ResetAll(qs);
+        return results;
     }
 }

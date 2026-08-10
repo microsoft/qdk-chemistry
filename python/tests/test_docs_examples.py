@@ -39,6 +39,11 @@ _INSTALLED_MAJOR_MINOR = tuple(int(x) for x in _INSTALLED_VERSION.split(".")[:2]
 _RELEASE_NOTES_RE = re.compile(r"^release_notes_v(\d+)_(\d+)\.py$")
 
 
+def _generic_python_examples() -> list[Path]:
+    """Return examples owned by the shared source-build test lane."""
+    return sorted(path for path in PYTHON_EXAMPLES_DIR.glob("*.py") if not path.name.startswith("tutorial_"))
+
+
 def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bool, bool, bool, bool]:
     """Check if an example file requires qiskit, pyscf, openfermion, geomeTRIC or contains slow tests.
 
@@ -141,6 +146,10 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
     if 'create("expectation_estimator"' in content or "create('expectation_estimator'" in content:
         is_slow = True
 
+    # Individual examples can declare intentionally long execution explicitly.
+    if "# docs-example: slow" in content:
+        is_slow = True
+
     return (
         requires_pyscf,
         requires_qiskit,
@@ -163,7 +172,7 @@ class TestExampleScripts(unittest.TestCase):
         if not PYTHON_EXAMPLES_DIR.exists():
             raise FileNotFoundError(f"Python examples directory not found: {PYTHON_EXAMPLES_DIR}")
 
-        cls.py_example_files = sorted(PYTHON_EXAMPLES_DIR.glob("*.py"))
+        cls.py_example_files = _generic_python_examples()
 
         if not cls.py_example_files:
             raise FileNotFoundError(f"No Python example files found in {PYTHON_EXAMPLES_DIR}")
@@ -171,15 +180,18 @@ class TestExampleScripts(unittest.TestCase):
     def _run_python_example(self, example_file: Path):
         """Helper method to run a Python example file."""
         with TemporaryDirectory(dir=example_file.parent.parent) as tmpdir:
+            example_env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+            example_timeout = 1200 if "# docs-example: slow" in example_file.read_text(encoding="utf-8") else 360
+
             result = subprocess.run(
                 [sys.executable, str(example_file)],
                 check=False,
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
-                timeout=360,
+                timeout=example_timeout,
                 cwd=tmpdir,
-                env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+                env=example_env,
             )
 
             assert result.returncode == 0, (
@@ -192,7 +204,8 @@ def _create_test_methods():
     """Create individual test methods for each example file."""
     if PYTHON_EXAMPLES_DIR.exists():
         # Python examples
-        py_example_files = sorted(PYTHON_EXAMPLES_DIR.glob("*.py"))
+        # Version-pinned tutorial scripts run in tutorial-compatibility.yaml.
+        py_example_files = _generic_python_examples()
 
         for example_file in py_example_files:
             # Create a test method name from the file name

@@ -116,6 +116,8 @@ You can discover available implementations programmatically:
       :start-after: // start-cell-list-implementations
       :end-before: // end-cell-list-implementations
 
+.. _qdk-valence-active-space:
+
 QDK Valence
 ~~~~~~~~~~~
 
@@ -208,6 +210,8 @@ See :ref:`autoCAS Algorithm <autocas-algorithm-details>` below for a detailed de
      - bool
      - ``True``
      - Whether to normalize entropy values
+
+.. _qdk-autocas-eos:
 
 QDK autoCAS EOS
 ~~~~~~~~~~~~~~~
