@@ -1,0 +1,44 @@
+digraph TutorialQpeIqpeIteration {
+    rankdir=TB;
+    ranksep=0.62;
+    nodesep=0.55;
+    newrank=true;
+    overlap=false;
+    splines=ortho;
+    pad=0.2;
+    bgcolor="#FAFAFA";
+
+    node [shape=box, style="rounded,filled", fontname="Arial", width=3.6, height=0.95, margin="0.22,0.18"];
+    edge [penwidth=2.5, arrowsize=0.9, fontname="Arial"];
+
+    subgraph inputs {
+        rank=same;
+
+        Compute [label=<<B>Fresh compute register</B><BR/><BR/><FONT POINT-SIZE="11">Prepare the trial state |Ψ<SUB>trial</SUB>⟩</FONT>>, fillcolor="#E0F2F1", color="#00796B", penwidth=2.5, fontcolor="#004D40", group=left];
+
+        Ancilla [label=<<B>Fresh readout ancilla |0⟩</B><BR/><BR/><FONT POINT-SIZE="11">Apply the first H gate</FONT>>, fillcolor="#E8EAF6", color="#5C6BC0", penwidth=2.5, fontcolor="#283593", group=right];
+    }
+
+    Feedback [label=<<B>Apply phase feedback</B><BR/><BR/><FONT POINT-SIZE="11">Use angle Φ<SUB>k</SUB> from earlier measured bits</FONT>>, fillcolor="#E8EAF6", color="#5C6BC0", penwidth=2.5, fontcolor="#283593", width=4.2];
+
+    Evolution [label=<<B>Apply controlled time evolution</B><BR/><BR/><FONT POINT-SIZE="11">Ancilla controls U^(2^(m−k−1)) on the compute register</FONT>>, fillcolor="#E0F2F1", color="#00796B", penwidth=2.5, fontcolor="#004D40", width=5.0];
+
+    Measure [label=<<B>Apply H and measure the ancilla</B><BR/><BR/><FONT POINT-SIZE="11">One shot returns 0 or 1</FONT>>, fillcolor="#E8EAF6", color="#5C6BC0", penwidth=2.5, fontcolor="#283593", width=4.2];
+
+    Shots [label=<<B>Repeat with freshly prepared registers</B><BR/><BR/><FONT POINT-SIZE="11">Collect an odd number of outcomes for iteration k</FONT>>, fillcolor="#FFFFFF", color="#5C6BC0", penwidth=2.5, fontcolor="#3949AB", width=4.8];
+
+    Majority [label=<<B>Majority vote selects bit b<SUB>k</SUB></B><BR/><BR/><FONT POINT-SIZE="11">Classical result for this iteration</FONT>>, fillcolor="#F3E5F5", color="#7B1FA2", penwidth=2.5, fontcolor="#4A148C", width=4.2];
+
+    Update [label=<<B>Update the classical feedback angle</B><BR/><BR/><FONT POINT-SIZE="11">Use b<SUB>k</SUB> to compute Φ<SUB>k+1</SUB></FONT>>, fillcolor="#F3E5F5", color="#7B1FA2", penwidth=2.5, fontcolor="#4A148C", width=4.4];
+
+    Next [label=<<B>Continue to iteration k + 1</B><BR/><BR/><FONT POINT-SIZE="11">Build the next controlled power and repeat</FONT>>, fillcolor="#FFFFFF", color="#7B1FA2", penwidth=2.5, fontcolor="#4A148C", width=4.4];
+
+    Ancilla -> Feedback [color="#5C6BC0"];
+    Compute -> Evolution [color="#00796B"];
+    Feedback -> Evolution [color="#5C6BC0"];
+    Evolution -> Measure [color="#00796B"];
+    Measure -> Shots [color="#5C6BC0"];
+    Shots -> Majority [color="#7B1FA2"];
+    Majority -> Update [color="#7B1FA2"];
+    Update -> Next [color="#7B1FA2"];
+}

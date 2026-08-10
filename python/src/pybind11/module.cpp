@@ -34,6 +34,7 @@ void bind_mcscf(py::module& m);
 void bind_hamiltonian_constructor(py::module& m);
 void bind_scf(py::module& m);
 void bind_nuclear_derivative(py::module& m);
+void bind_geometry_optimization(py::module& m);
 void bind_active_space(py::module& m);
 void bind_constants(py::module& m);
 void bind_pmc(py::module& m);
@@ -99,6 +100,7 @@ PYBIND11_MODULE(_core, m) {
   bind_hamiltonian_constructor(algorithms);
   bind_scf(algorithms);
   bind_nuclear_derivative(algorithms);
+  bind_geometry_optimization(algorithms);
   bind_active_space(algorithms);
   bind_dynamical_correlation_calculator(algorithms);
   bind_pmc(algorithms);

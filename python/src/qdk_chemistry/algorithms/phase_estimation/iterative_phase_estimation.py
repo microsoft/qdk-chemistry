@@ -123,7 +123,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         # Iterate over the number of phase bits
         for iteration in range(num_bits):
             # Create the iteration circuit via the builder
-            circuit_builder.settings().update("phase_correction", phase_feedback)
+            circuit_builder.settings().update("phase_correction", -phase_feedback)
             circuit_builder.settings().update("num_iteration", iteration)
             iteration_circuits = circuit_builder._run_impl(  # noqa: SLF001
                 state_preparation=state_preparation, qubit_hamiltonian=qubit_hamiltonian
@@ -152,7 +152,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             method=self.name(),
             phase_fraction=phase_fraction,
             eigenvalue_from_phase=container.eigenvalue_from_phase,
-            bits_msb_first=bits,
+            bits_msb_first=bits[::-1],
         )
 
     def _run_single_circuit(

@@ -176,8 +176,10 @@ class QdkSparseStateSimulator(CircuitExecutor):
         Logger.trace_entering()
         noise_config = noise.to_qdk_noise_config() if noise is not None else None
         if circuit._qsharp_factory is not None:  # noqa: SLF001
-            raw_results = qsharp.run(
-                circuit._qsharp_factory.program,  # noqa: SLF001
+            program = circuit._qsharp_factory.program  # noqa: SLF001
+            context = getattr(program, "_qdk_context", qsharp)
+            raw_results = context.run(
+                program,
                 shots,
                 *circuit._qsharp_factory.parameter.values(),  # noqa: SLF001
                 noise=noise_config,
