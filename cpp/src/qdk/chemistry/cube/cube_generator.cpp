@@ -141,7 +141,7 @@ struct CubeGenerator::Impl {
         gauxc_basis(to_gauxc_basis(require_basis_set(basis_set))),
         gauxc_mol(to_gauxc_mol(*require_basis_set(basis_set).get_structure())),
         evaluator(GauXC::OrbitalEvaluatorFactory::make_orbital_evaluator(
-            GauXC::ExecutionSpace::Host, gauxc_basis, 1e-12)),
+            GauXC::ExecutionSpace::Host, gauxc_basis)),
         nbf(gauxc_basis.nbf()) {}
 };
 
