@@ -16,11 +16,11 @@
 namespace qdk::chemistry::algorithms {
 
 // ---------------------------------------------------------------------------
-// rebuild_hamiltonian: apply a BlissShift to the dense integrals and rebuild.
+// rebuild_bliss_shifted_hamiltonian: apply a BlissShift to the dense integrals and rebuild.
 // Independent of how `shift` was computed (BlissRegularizer or external).
 // ---------------------------------------------------------------------------
 
-std::shared_ptr<data::Hamiltonian> rebuild_hamiltonian(
+std::shared_ptr<data::Hamiltonian> rebuild_bliss_shifted_hamiltonian(
     const data::Hamiltonian& original, const BlissShift& shift,
     unsigned int input_num_electrons) {
   using qdk::chemistry::data::CanonicalFourCenterHamiltonianContainer;
@@ -28,7 +28,7 @@ std::shared_ptr<data::Hamiltonian> rebuild_hamiltonian(
 
   if (!original.is_restricted()) {
     throw std::invalid_argument(
-        "rebuild_hamiltonian currently only supports restricted "
+        "rebuild_bliss_shifted_hamiltonian currently only supports restricted "
         "(spin-restricted) Hamiltonians.");
   }
 
@@ -46,7 +46,7 @@ std::shared_ptr<data::Hamiltonian> rebuild_hamiltonian(
   if (shift.xi.rows() != static_cast<Eigen::Index>(norb) ||
       shift.xi.cols() != static_cast<Eigen::Index>(norb)) {
     throw std::invalid_argument(
-        "rebuild_hamiltonian: shift.xi must be norb x norb.");
+        "rebuild_bliss_shifted_hamiltonian: shift.xi must be norb x norb.");
   }
 
   const double mu1 = shift.mu1;
@@ -123,7 +123,7 @@ std::shared_ptr<data::Hamiltonian> BlissRegularizer::_run_impl(
       compute_shift(*hamiltonian, n_alpha_electrons, n_beta_electrons);
   unsigned int num_electrons = n_alpha_electrons + n_beta_electrons;
 
-  return rebuild_hamiltonian(*hamiltonian, shift, num_electrons);
+  return rebuild_bliss_shifted_hamiltonian(*hamiltonian, shift, num_electrons);
 }
 
 // ---------------------------------------------------------------------------

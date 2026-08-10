@@ -56,7 +56,7 @@ subtracted from a Hamiltonian to reduce its fermionic 1-norm while leaving the
 target electron-number sector's energy invariant. A BlissShift carries only the
 *result* of a shift computation, so it can come from
 :meth:`HamiltonianRegularizer.compute_shift` or from an external source and be
-applied via :func:`rebuild_hamiltonian`.
+applied via :func:`rebuild_bliss_shifted_hamiltonian`.
 )")
       .def(py::init<>())
       .def_readwrite("mu1", &BlissShift::mu1, "One-electron BLISS shift.")
@@ -70,8 +70,8 @@ applied via :func:`rebuild_hamiltonian`.
                std::to_string(s.xi.cols()) + ">";
       });
 
-  // Module-level rebuild_hamiltonian: apply a BlissShift to a Hamiltonian.
-  m.def("rebuild_hamiltonian", &rebuild_hamiltonian, py::arg("original"),
+  // Module-level rebuild_bliss_shifted_hamiltonian: apply a BlissShift to a Hamiltonian.
+  m.def("rebuild_bliss_shifted_hamiltonian", &rebuild_bliss_shifted_hamiltonian, py::arg("original"),
         py::arg("shift"), py::arg("num_electrons"), R"(
 Apply a BLISS shift to a Hamiltonian and assemble the shifted Hamiltonian.
 
@@ -109,15 +109,15 @@ coefficients (e.g. the fermionic 1-norm lambda) may be reduced.
 It is a thin composition of two public steps: :meth:`compute_shift` computes
 the BLISS parameters (mu1, mu2, xi) via the method selected by the
 ``shift_method`` setting (default ``"flr_bliss"``), and
-:func:`rebuild_hamiltonian` applies a shift to a Hamiltonian. Callers can
+:func:`rebuild_bliss_shifted_hamiltonian` applies a shift to a Hamiltonian. Callers can
 obtain a :class:`BlissShift` on its own, or supply an externally computed one to
-:func:`rebuild_hamiltonian` directly.
+:func:`rebuild_bliss_shifted_hamiltonian` directly.
 
 Examples:
     >>> import qdk_chemistry.algorithms as alg
     >>> regularizer = alg.HamiltonianRegularizer()
     >>> shift = regularizer.compute_shift(hamiltonian, n_alpha, n_beta)
-    >>> shifted = alg.rebuild_hamiltonian(hamiltonian, shift, n_alpha + n_beta)
+    >>> shifted = alg.rebuild_bliss_shifted_hamiltonian(hamiltonian, shift, n_alpha + n_beta)
 
 )");
 
@@ -154,7 +154,7 @@ Compute the BLISS shift (mu1, mu2, xi) for a target electron count.
 
 Dispatches to the method selected by the ``shift_method`` setting and returns
 the resulting parameters *without* rebuilding the Hamiltonian. Use
-:func:`rebuild_hamiltonian` to apply the returned (or an externally sourced)
+:func:`rebuild_bliss_shifted_hamiltonian` to apply the returned (or an externally sourced)
 :class:`BlissShift`.
 
 Args:

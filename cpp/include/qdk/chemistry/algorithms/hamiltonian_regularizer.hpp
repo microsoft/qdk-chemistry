@@ -25,7 +25,7 @@ namespace qdk::chemistry::algorithms {
  * BlissShift deliberately carries only the *result* of a shift computation, so
  * the parameters can come from any method (see BlissRegularizer's
  * "shift_method" setting) -- or from an entirely external source -- and be
- * applied to a Hamiltonian via rebuild_hamiltonian().
+ * applied to a Hamiltonian via rebuild_bliss_shifted_hamiltonian().
  */
 struct BlissShift {
   double mu1 = 0.0;    ///< One-electron BLISS shift.
@@ -38,7 +38,7 @@ struct BlissShift {
 ///
 ///   dg_ijkl = -2*mu2*delta_ij*delta_kl - xi_ij*delta_kl - delta_ij*xi_kl
 ///
-/// This is the SINGLE SOURCE OF TRUTH for that tensor. rebuild_hamiltonian()
+/// This is the SINGLE SOURCE OF TRUTH for that tensor. rebuild_bliss_shifted_hamiltonian()
 /// adds dg (via add_two_body_correction()) directly onto g to build
 /// g~ = g + dg. A one-electron shift solver (e.g. the flr_bliss method's
 /// solve_one_electron_shift()) never needs the whole O(norb^4) tensor -- it
@@ -79,7 +79,7 @@ struct TwoBodyBlissCorrection {
   /// Add the two-body BLISS correction dg_ijkl onto `g` in place, where `g` is
   /// the flattened two-electron tensor ((i*norb+j)*norb+k)*norb+l with side
   /// length `norb`. On return `g` holds g~ = g + dg without materializing a
-  /// separate O(norb^4) dg tensor. Used by rebuild_hamiltonian() to build g~.
+  /// separate O(norb^4) dg tensor. Used by rebuild_bliss_shifted_hamiltonian() to build g~.
   ///
   /// dg is structurally sparse -- each of its three terms is delta-supported --
   /// so instead of an O(norb^4) full sweep we apply only the non-zero entries:
@@ -154,7 +154,7 @@ struct TwoBodyBlissCorrection {
  * @throws std::invalid_argument if `original` is unrestricted, if
  *         `shift.xi` is not norb x norb
  */
-std::shared_ptr<data::Hamiltonian> rebuild_hamiltonian(
+std::shared_ptr<data::Hamiltonian> rebuild_bliss_shifted_hamiltonian(
     const data::Hamiltonian& original, const BlissShift& shift,
     unsigned int input_num_electrons);
 
@@ -199,14 +199,14 @@ class BlissSettings : public qdk::chemistry::data::Settings {
  * The regularizer is a thin composition of two steps:
  *  1. compute_shift() -- compute the BLISS parameters (mu1, mu2, xi) via the
  *     method selected by the "shift_method" setting (default "flr_bliss").
- *  2. rebuild_hamiltonian() -- apply that BlissShift to the dense integrals.
+ *  2. rebuild_bliss_shifted_hamiltonian() -- apply that BlissShift to the dense integrals.
  * Both steps are public so callers can obtain a BlissShift on its own, or
- * supply an externally computed BlissShift to rebuild_hamiltonian() directly.
+ * supply an externally computed BlissShift to rebuild_bliss_shifted_hamiltonian() directly.
  *
  * Only restricted (spin-restricted) Hamiltonians are currently supported.
  *
  * @see BlissShift
- * @see rebuild_hamiltonian
+ * @see rebuild_bliss_shifted_hamiltonian
  * @see BlissSettings
  * @see qdk::chemistry::utils::hamiltonian_one_norm for a standalone way to
  *      inspect a Hamiltonian's fermionic 1-norm without running a regularizer.
@@ -250,7 +250,7 @@ class BlissRegularizer
    *
    * Dispatches to the method selected by the "shift_method" setting and
    * returns the resulting parameters *without* rebuilding the Hamiltonian.
-   * Use rebuild_hamiltonian() to apply the returned (or an externally
+   * Use rebuild_bliss_shifted_hamiltonian() to apply the returned (or an externally
    * sourced) BlissShift.
    *
    * @param hamiltonian The Hamiltonian to analyze. Must be restricted.
@@ -270,7 +270,7 @@ class BlissRegularizer
    *
    * @return The algorithm's name.
    */
-  std::string name() const override { return "flr_bliss"; }
+  std::string name() const override { return "fermionic_low_rank"; }
 
   /**
    * @brief Access the algorithm's type name.
@@ -283,7 +283,7 @@ class BlissRegularizer
   /**
    * @brief Implementation of Hamiltonian regularization.
    *
-   * Composes compute_shift() and rebuild_hamiltonian(). Automatically called
+   * Composes compute_shift() and rebuild_bliss_shifted_hamiltonian(). Automatically called
    * by run() after settings have been locked.
    */
   std::shared_ptr<data::Hamiltonian> _run_impl(
@@ -298,7 +298,7 @@ class BlissRegularizer
  * Typical usage:
  * ```
  * auto regularizer =
- *     qdk::chemistry::algorithms::HamiltonianRegularizerFactory::create("flr_bliss");
+ *     qdk::chemistry::algorithms::HamiltonianRegularizerFactory::create("fermionic_low_rank");
  * regularizer->settings().set("df_truncation_threshold", 1e-8);
  * auto shifted = regularizer->run(hamiltonian, n_alpha, n_beta);
  * ```
@@ -309,7 +309,7 @@ struct HamiltonianRegularizerFactory
     : public AlgorithmFactory<BlissRegularizer, HamiltonianRegularizerFactory> {
   static std::string algorithm_type_name() { return "hamiltonian_regularizer"; }
   static void register_default_instances();
-  static std::string default_algorithm_name() { return "flr_bliss"; }
+  static std::string default_algorithm_name() { return "fermionic_low_rank"; }
 };
 
 }  // namespace qdk::chemistry::algorithms

@@ -36,7 +36,7 @@ from qdk_chemistry.algorithms.hamiltonian_constructor import (
 from qdk_chemistry.algorithms.hamiltonian_regularizer import (
     BlissShift,
     HamiltonianRegularizer,
-    rebuild_hamiltonian,
+    rebuild_bliss_shifted_hamiltonian,
 )
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import HamiltonianUnitaryBuilder, TimeEvolutionBuilder
 from qdk_chemistry.algorithms.multi_configuration_calculator import (
@@ -86,7 +86,7 @@ __all__ = [
     "HamiltonianConstructor",
     "BlissShift",
     "HamiltonianRegularizer",
-    "rebuild_hamiltonian",
+    "rebuild_bliss_shifted_hamiltonian",
     "HamiltonianUnitaryBuilder",
     "MultiConfigurationCalculator",
     "MultiConfigurationScf",

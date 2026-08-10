@@ -54,20 +54,20 @@ class TestHamiltonianRegularizerFactory:
     def test_factory(self):
         available = algorithms.available("hamiltonian_regularizer")
         assert isinstance(available, list)
-        assert "flr_bliss" in available
+        assert "fermionic_low_rank" in available
 
         regularizer = algorithms.create("hamiltonian_regularizer")
         assert regularizer is not None
-        assert regularizer.name() == "flr_bliss"
+        assert regularizer.name() == "fermionic_low_rank"
 
-        regularizer_named = algorithms.create("hamiltonian_regularizer", "flr_bliss")
-        assert regularizer_named.name() == "flr_bliss"
+        regularizer_named = algorithms.create("hamiltonian_regularizer", "fermionic_low_rank")
+        assert regularizer_named.name() == "fermionic_low_rank"
 
         with pytest.raises(KeyError):
             algorithms.create("hamiltonian_regularizer", "nonexistent")
 
     def test_default_truncation_threshold_is_zero(self):
-        regularizer = algorithms.create("hamiltonian_regularizer", "flr_bliss")
+        regularizer = algorithms.create("hamiltonian_regularizer", "fermionic_low_rank")
         assert regularizer.settings().get("df_truncation_threshold") == 0.0
 
 
@@ -81,7 +81,7 @@ class TestHamiltonianRegularizerCorrectness:
         e_before, _ = mc.run(water_hamiltonian, 5, 5)
 
         for threshold in (0.0, 1e-6):
-            regularizer = algorithms.create("hamiltonian_regularizer", "flr_bliss")
+            regularizer = algorithms.create("hamiltonian_regularizer", "fermionic_low_rank")
             regularizer.settings().set("df_truncation_threshold", threshold)
             shifted_ham = regularizer.run(water_hamiltonian, 5, 5)
             assert shifted_ham is not None
@@ -99,7 +99,7 @@ class TestHamiltonianRegularizerCorrectness:
     def test_reduces_one_norm(self, water_hamiltonian):
         norm_before = hamiltonian_one_norm(water_hamiltonian, 0.0)
 
-        regularizer = algorithms.create("hamiltonian_regularizer", "flr_bliss")
+        regularizer = algorithms.create("hamiltonian_regularizer", "fermionic_low_rank")
         shifted_ham = regularizer.run(water_hamiltonian, 5, 5)
 
         norm_after = hamiltonian_one_norm(shifted_ham, 0.0)

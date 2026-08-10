@@ -21,11 +21,11 @@
 //   3. solve_one_electron_shift() -- optimal one-electron BLISS shift mu1
 //      against the effective one-electron operator implied by (mu2, xi).
 // The resulting (mu1, mu2, xi) are packaged into a BlissShift and applied by
-// qdk::chemistry::algorithms::rebuild_hamiltonian().
+// qdk::chemistry::algorithms::rebuild_bliss_shifted_hamiltonian().
 //
 // The shared TwoBodyBlissCorrection helper (declared alongside
-// rebuild_hamiltonian in hamiltonian_regularizer.hpp) keeps step 3's
-// Coulomb/exchange-type contractions and rebuild_hamiltonian's full O(norb^4)
+// rebuild_bliss_shifted_hamiltonian in hamiltonian_regularizer.hpp) keeps step 3's
+// Coulomb/exchange-type contractions and rebuild_bliss_shifted_hamiltonian's full O(norb^4)
 // tensor derived from the same closed-form dg_ijkl definition, so they cannot
 // silently drift apart.
 
@@ -65,7 +65,7 @@ struct GlobalTwoBodyShift {
 /// parameters (Eq. 24, summed over fragments and rotated back into the
 /// original orbital basis). Fragments are expected to come from
 /// double-factorizing the PHYSICAL two-electron coefficient 1/2 g, so the
-/// aggregated (mu2, xi) are directly usable by rebuild_hamiltonian().
+/// aggregated (mu2, xi) are directly usable by rebuild_bliss_shifted_hamiltonian().
 GlobalTwoBodyShift accumulate_fragment_shifts(
     const std::vector<qdk::chemistry::utils::TwoBodyFragment>& fragments);
 
@@ -94,7 +94,7 @@ struct OneElectronShiftResult {
 /// Hamiltonian.
 ///
 /// The effective operator is evaluated for the BLISS-shifted two-electron
-/// integrals g~ implied by (mu2, xi), matching rebuild_hamiltonian():
+/// integrals g~ implied by (mu2, xi), matching rebuild_bliss_shifted_hamiltonian():
 ///   g~_ijkl = g_ijkl - 2*mu2*d_ij*d_kl - xi_ij*d_kl - d_ij*xi_kl
 ///   Heff0_ij = h_ij + (Ne-1)*xi_ij - mu2*d_ij
 ///              + sum_k g~[i,j,k,k] - 1/2 sum_k g~[i,k,k,j]   (mu1 = 0)
@@ -116,7 +116,7 @@ OneElectronShiftResult solve_one_electron_shift(
 /// Pipeline: double-factorize the physical two-electron coefficient 1/2 g,
 /// accumulate the per-fragment median shift into a global (mu2, xi), then
 /// solve for the optimal one-electron shift mu1. The result is returned as a
-/// BlissShift ready for rebuild_hamiltonian(). The Hamiltonian must be
+/// BlissShift ready for rebuild_bliss_shifted_hamiltonian(). The Hamiltonian must be
 /// restricted.
 ///
 /// @param hamiltonian The Hamiltonian to analyze (restricted).
