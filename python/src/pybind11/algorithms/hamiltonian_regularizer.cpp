@@ -57,16 +57,12 @@ target electron-number sector's energy invariant. A BlissShift carries only the
 *result* of a shift computation, so it can come from
 :meth:`HamiltonianRegularizer.compute_shift` or from an external source and be
 applied via :func:`rebuild_hamiltonian`.
-
-Attributes:
-    mu1 (float): One-electron BLISS shift.
-    mu2 (float): Two-electron BLISS shift.
-    xi (numpy.ndarray): Two-electron BLISS shift matrix (norb x norb).
 )")
       .def(py::init<>())
-      .def_readwrite("mu1", &BlissShift::mu1)
-      .def_readwrite("mu2", &BlissShift::mu2)
-      .def_readwrite("xi", &BlissShift::xi)
+      .def_readwrite("mu1", &BlissShift::mu1, "One-electron BLISS shift.")
+      .def_readwrite("mu2", &BlissShift::mu2, "Two-electron BLISS shift.")
+      .def_readwrite("xi", &BlissShift::xi,
+                     "Two-electron BLISS shift matrix (norb x norb).")
       .def("__repr__", [](const BlissShift &s) {
         return "<qdk_chemistry.algorithms.BlissShift mu1=" +
                std::to_string(s.mu1) + " mu2=" + std::to_string(s.mu2) +
