@@ -3,12 +3,14 @@
 // license information.
 
 #include <cstdint>
+#include <cstdio>
 #include <filesystem>
 #include <gauxc/basisset.hpp>
 #include <gauxc/external/cube.hpp>
 #include <gauxc/molecule.hpp>
 #include <gauxc/orbital_evaluator.hpp>
 #include <gauxc/shell.hpp>
+#include <limits>
 #include <qdk/chemistry/cube/cube_generator.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
@@ -20,6 +22,10 @@ namespace qdk::chemistry::cube {
 CubeGrid CubeGrid::from_basis_set(const data::BasisSet& basis_set,
                                   std::size_t nx, std::size_t ny,
                                   std::size_t nz, double margin) {
+  if (nx == 0 || ny == 0 || nz == 0)
+    throw std::invalid_argument("CubeGrid: dimensions must be positive.");
+  if (margin < 0.0)
+    throw std::invalid_argument("CubeGrid: margin cannot be negative.");
   const auto structure = basis_set.get_structure();
   if (!structure)
     throw std::runtime_error("CubeGrid: basis set has no structure.");
@@ -27,9 +33,9 @@ CubeGrid CubeGrid::from_basis_set(const data::BasisSet& basis_set,
   if (coords.rows() == 0)
     throw std::runtime_error("CubeGrid: structure has no atoms.");
 
-  Eigen::Vector3d lo = coords.colwise().minCoeff();
-  Eigen::Vector3d extent =
-      (coords.colwise().maxCoeff() - lo).array() + 2.0 * margin;
+  Eigen::Vector3d lo = coords.colwise().minCoeff().transpose();
+  Eigen::Vector3d hi = coords.colwise().maxCoeff().transpose();
+  Eigen::Vector3d extent = (hi - lo).array() + 2.0 * margin;
 
   CubeGrid g;
   g.origin = lo.array() - margin;
@@ -42,7 +48,25 @@ CubeGrid CubeGrid::from_basis_set(const data::BasisSet& basis_set,
   return g;
 }
 
+std::size_t CubeGrid::num_points() const {
+  if (nx == 0 || ny == 0 || nz == 0)
+    throw std::invalid_argument("CubeGrid: dimensions must be positive.");
+  if (nx > std::numeric_limits<std::size_t>::max() / ny ||
+      nx * ny > std::numeric_limits<std::size_t>::max() / nz)
+    throw std::overflow_error("CubeGrid: point count overflows size_t.");
+  return nx * ny * nz;
+}
+
 namespace {
+
+const data::BasisSet& require_basis_set(
+    const std::shared_ptr<data::BasisSet>& basis_set) {
+  if (!basis_set)
+    throw std::invalid_argument("CubeGenerator: basis set cannot be null.");
+  if (!basis_set->get_structure())
+    throw std::invalid_argument("CubeGenerator: basis set has no structure.");
+  return *basis_set;
+}
 
 GauXC::BasisSet<double> to_gauxc_basis(const data::BasisSet& qdk) {
   using PA = GauXC::Shell<double>::prim_array;
@@ -56,12 +80,21 @@ GauXC::BasisSet<double> to_gauxc_basis(const data::BasisSet& qdk) {
   for (std::size_t ia = 0; ia < qdk.get_num_atoms(); ++ia) {
     CA center{coords(ia, 0), coords(ia, 1), coords(ia, 2)};
     for (const auto& sh : qdk.get_shells_for_atom(ia)) {
+      if (sh.has_radial_powers())
+        throw std::invalid_argument(
+            "CubeGenerator: radial-power shells are unsupported.");
       const int l = sh.get_angular_momentum();
+      if (l < 0)
+        throw std::invalid_argument(
+            "CubeGenerator: ECP potential shells are unsupported.");
       const auto np = static_cast<int32_t>(sh.exponents.size());
       PA alpha{}, coeff{};
+      if (static_cast<std::size_t>(np) > alpha.size())
+        throw std::invalid_argument(
+            "CubeGenerator: shell exceeds gauXC's primitive limit.");
       for (int i = 0; i < np; ++i) {
-        alpha[i] = sh.exponents[i];
-        coeff[i] = sh.coefficients[i];
+        alpha.at(i) = sh.exponents[i];
+        coeff.at(i) = sh.coefficients[i];
       }
       basis.emplace_back(GauXC::PrimSize(np), GauXC::AngularMomentum(l),
                          GauXC::SphericalType(l > 1 && sph), alpha, coeff,
@@ -82,6 +115,11 @@ GauXC::Molecule to_gauxc_mol(const data::Structure& st) {
 }
 
 GauXC::CubeGrid to_gauxc_grid(const CubeGrid& g) {
+  g.num_points();
+  constexpr auto max =
+      static_cast<std::size_t>(std::numeric_limits<int64_t>::max());
+  if (g.nx > max || g.ny > max || g.nz > max)
+    throw std::overflow_error("CubeGrid: dimension exceeds gauXC's limit.");
   return {{g.origin[0], g.origin[1], g.origin[2]},
           {g.spacing[0], g.spacing[1], g.spacing[2]},
           int64_t(g.nx),
@@ -100,12 +138,11 @@ struct CubeGenerator::Impl {
 
   explicit Impl(std::shared_ptr<data::BasisSet> bs)
       : basis_set(std::move(bs)),
-        gauxc_basis(to_gauxc_basis(*basis_set)),
-        gauxc_mol(to_gauxc_mol(*basis_set->get_structure())),
+        gauxc_basis(to_gauxc_basis(require_basis_set(basis_set))),
+        gauxc_mol(to_gauxc_mol(*require_basis_set(basis_set).get_structure())),
         evaluator(GauXC::OrbitalEvaluatorFactory::make_orbital_evaluator(
             GauXC::ExecutionSpace::Host, gauxc_basis, 1e-12)),
-        nbf(gauxc_basis.nbf()) {
-  }
+        nbf(gauxc_basis.nbf()) {}
 };
 
 CubeGenerator::CubeGenerator(std::shared_ptr<data::BasisSet> bs)
@@ -147,7 +184,8 @@ std::vector<std::string> generate_orbital_cubes(
     const std::string& output_dir, const CubeGrid& grid,
     const std::string& prefix) {
   CubeGenerator gen(wfn.get_orbitals()->get_basis_set());
-  auto [C_a, C_b] = wfn.get_orbitals()->get_coefficients();
+  const auto& C_a = wfn.get_orbitals()->coefficients()->block(
+      {data::axes::alpha(), data::axes::alpha()});
   std::filesystem::create_directories(output_dir);
 
   std::vector<std::string> paths;
@@ -155,9 +193,12 @@ std::vector<std::string> generate_orbital_cubes(
   for (auto p : indices) {
     if (std::size_t(C_a.cols()) <= p)
       throw std::out_of_range("generate_orbital_cubes: index OOB.");
-    char buf[64];
-    std::snprintf(buf, sizeof(buf), "%s%04zu.cube", prefix.c_str(), p);
-    auto path = (std::filesystem::path(output_dir) / buf).string();
+    const auto filename = prefix + [&] {
+      char index[32];
+      std::snprintf(index, sizeof(index), "%04zu.cube", p);
+      return std::string(index);
+    }();
+    auto path = (std::filesystem::path(output_dir) / filename).string();
     gen.orbital(C_a.col(p), path, grid,
                 "Orbital " + std::to_string(p) + " (alpha)");
     paths.push_back(std::move(path));

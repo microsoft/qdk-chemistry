@@ -26,7 +26,7 @@ struct CubeGrid {
   static CubeGrid from_basis_set(const data::BasisSet&, std::size_t nx = 80,
                                  std::size_t ny = 80, std::size_t nz = 80,
                                  double margin = 3.0);
-  std::size_t num_points() const { return nx * ny * nz; }
+  std::size_t num_points() const;
 };
 
 class CubeGenerator {
