@@ -21,6 +21,26 @@ namespace qdk::chemistry::algorithms {
  * implementation constructs an effective Hamiltonian in an explicitly
  * specified target P-space.
  *
+ * @c p_indices holds absolute molecular-orbital indices, drawn from the same
+ * index universe as @c data::Orbitals::active_indices().
+ *
+ * The returned Hamiltonian is expressed over P and must satisfy:
+ * - its orbitals have @c active_indices() equal to @c p_indices;
+ * - its orbitals carry the input Hamiltonian's @c inactive_indices()
+ *   unchanged, so a wavefunction later solved in P stays consistent with it;
+ * - the input Hamiltonian's inactive Fock matrix, when present, is carried
+ *   over unchanged: it spans the full MO space and is fixed by the inactive
+ *   density, neither of which downfolding changes;
+ * - the orbitals of @f$Q = W \setminus P@f$ are left unclassified rather than
+ *   marked inactive, because @ref data::Hamiltonian assumes inactive orbitals
+ *   are fully occupied while Q generally also spans virtuals;
+ * - the scalar shift from folding in Q is added to the constant core energy
+ *   term, and the remaining Q contribution is folded into the integrals.
+ *
+ * Input validation is opt-in. The base @ref run method does not validate its
+ * arguments; concrete implementations decide whether to call
+ * @ref _validate_inputs.
+ *
  * Typical usage:
  * @code
  * auto constructor =
@@ -56,15 +76,19 @@ class EffectiveHamiltonianConstructor
    *
    * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
    * @param reference Reference wavefunction providing the reference state.
-   * @param hamiltonian Input Hamiltonian built over the whole window W = P u Q.
-   * @param p_indices The target space P within the reference wavefunction's
-   *        active orbital space.
+   * @param hamiltonian Input Hamiltonian built over the whole window @f$W = P
+   * \cup Q@f$.
+   * @param p_indices Absolute molecular-orbital indices of the target space P,
+   *        which must lie within the reference wavefunction's active space.
    * \endcond
-   * @return The effective Hamiltonian acting on the target space P.
+   * @return The effective Hamiltonian acting on the target space P, following
+   *         the output contract documented on this class.
    * @throws qdk::chemistry::data::SettingsAreLocked if attempting to modify
    *         settings after run() is called.
    * @note Settings are automatically locked when this method is called and
    *       cannot be modified during or after execution.
+   * @note This method performs no input validation of its own. Any argument
+   *       checking is the responsibility of the concrete implementation.
    */
   using Algorithm::run;
 
@@ -91,11 +115,13 @@ class EffectiveHamiltonianConstructor
    * @param reference Reference wavefunction whose active orbital space must be
    *        a subset of the Hamiltonian's active orbital window.
    * @param hamiltonian Input Hamiltonian defining the outer orbital window.
-   * @param p_indices Target P-space, which must be a subset of the reference
-   *        wavefunction's active orbital space.
+   * @param p_indices Target P-space as absolute molecular-orbital indices,
+   *        which must be a subset of the reference wavefunction's active
+   *        orbital space.
    * @throws std::invalid_argument if an input is null, the Hamiltonian and
    *         wavefunction use incompatible orbital bases or spin restrictions,
-   *         or the spaces do not satisfy P subset W_ref subset W_H.
+   *         or the spaces do not satisfy @f$P \subseteq W_{\mathrm{ref}}
+   * \subseteq W_H@f$.
    */
   void _validate_inputs(
       const std::shared_ptr<data::Wavefunction>& reference,
@@ -111,10 +137,12 @@ class EffectiveHamiltonianConstructor
    * classes.
    *
    * @param reference Reference wavefunction providing the reference state.
-   * @param hamiltonian Input Hamiltonian built over the whole window W = P u Q.
-   * @param p_indices The target space P within the reference wavefunction's
-   *        active orbital space.
-   * @return The effective Hamiltonian acting on the target space P.
+   * @param hamiltonian Input Hamiltonian built over the whole window @f$W = P
+   * \cup Q@f$.
+   * @param p_indices Absolute molecular-orbital indices of the target space P,
+   *        which must lie within the reference wavefunction's active space.
+   * @return The effective Hamiltonian acting on the target space P. It must
+   *         satisfy the output contract documented on this class.
    */
   virtual std::shared_ptr<data::Hamiltonian> _run_impl(
       std::shared_ptr<data::Wavefunction> reference,

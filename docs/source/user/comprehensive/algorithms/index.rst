@@ -11,9 +11,9 @@ All algorithms follow a :doc:`factory pattern <factory_pattern>` design, allowin
    factory_pattern
    settings
    active_space
+   effective_hamiltonian_constructor
    expectation_estimator
    hamiltonian_constructor
-   effective_hamiltonian_constructor
    localizer
    mc_calculator
    mcscf

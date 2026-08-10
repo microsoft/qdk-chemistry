@@ -57,7 +57,25 @@ Input Hamiltonian
    A :class:`~qdk_chemistry.data.Hamiltonian` expressed over the complete orbital window :math:`W`.
 
 Target-space indices
-   A :class:`~qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet` containing the indices of :math:`P` within the active space of :math:`W`.
+   A :class:`~qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet` containing the indices of :math:`P`.
+   These are absolute molecular-orbital indices, drawn from the same index universe as ``Orbitals.active_indices()``, and must lie within the active space of :math:`W`.
+
+Output contract
+~~~~~~~~~~~~~~~
+
+The returned :class:`~qdk_chemistry.data.Hamiltonian` is expressed over :math:`P` and satisfies:
+
+- its orbitals have ``active_indices()`` equal to the requested target-space indices;
+- its orbitals carry the input Hamiltonian's ``inactive_indices()`` unchanged, so a :class:`~qdk_chemistry.data.Wavefunction` later solved in :math:`P` stays consistent with it;
+- the input Hamiltonian's inactive Fock matrix, when present, is carried over unchanged: it spans the full molecular-orbital space and is fixed by the inactive density, neither of which downfolding changes;
+- the orbitals of :math:`Q = W \setminus P` are left unclassified rather than marked inactive, because :class:`~qdk_chemistry.data.Hamiltonian` assumes inactive orbitals are fully occupied while :math:`Q` generally also spans virtuals;
+- the scalar shift from folding in :math:`Q` is added to the constant core energy term, and the remaining :math:`Q` contribution is folded into the integrals.
+
+Because :math:`Q` is left unclassified, it becomes indistinguishable from orbitals that were never correlated.
+Consumers of an effective Hamiltonian should not attempt to re-correlate :math:`Q`, since its contribution is already folded in.
+
+Input validation is opt-in.
+The ``run`` method does not validate its arguments; each concrete implementation decides whether to check the nested-space contract :math:`P \subseteq W_{\mathrm{ref}} \subseteq W_H` before computing.
 
 The base interface defines no common settings.
 Concrete implementations can expose method-specific configuration through the ``settings()`` object.

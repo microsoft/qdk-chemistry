@@ -22,6 +22,10 @@ try:
 except ImportError:
     PYSCF_AVAILABLE = False
 
+# Algorithm types that ship as an interface only, with no registered implementation
+# and therefore an empty default name. Remove entries here as implementations land.
+INTERFACE_ONLY_TYPES = {"effective_hamiltonian_constructor"}
+
 
 class TestRegistryShowDefault:
     """Test the show_default function in the registry module."""
@@ -59,8 +63,8 @@ class TestRegistryShowDefault:
         for algorithm_type in expected_types:
             assert algorithm_type in defaults, f"Expected algorithm type '{algorithm_type}' not found in defaults"
             assert isinstance(defaults[algorithm_type], str), f"Default for '{algorithm_type}' should be a string"
-            if algorithm_type == "effective_hamiltonian_constructor":
-                assert defaults[algorithm_type] == ""
+            if algorithm_type in INTERFACE_ONLY_TYPES:
+                assert defaults[algorithm_type] == "", f"Interface-only '{algorithm_type}' should have an empty default"
             else:
                 assert len(defaults[algorithm_type]) > 0, f"Default for '{algorithm_type}' should not be empty"
 
@@ -135,7 +139,10 @@ class TestRegistryShowDefault:
         for algorithm_type, default_name in defaults.items():
             # Each default should be in the available list for that type
             assert algorithm_type in available, f"Algorithm type '{algorithm_type}' not in available algorithms"
-            if algorithm_type == "effective_hamiltonian_constructor" and not available[algorithm_type]:
+            if algorithm_type in INTERFACE_ONLY_TYPES:
+                assert not available[algorithm_type], (
+                    f"Interface-only '{algorithm_type}' should have no implementations"
+                )
                 continue
             if algorithm_type == "geometry_optimizer" and not available[algorithm_type]:
                 continue  # geomeTRIC-backed optimizer is optional
@@ -151,7 +158,7 @@ class TestRegistryShowDefault:
         defaults = registry.show_default()
 
         for algorithm_type, default_name in defaults.items():
-            if algorithm_type == "effective_hamiltonian_constructor" and not registry.available(algorithm_type):
+            if algorithm_type in INTERFACE_ONLY_TYPES:
                 continue
             if algorithm_type == "geometry_optimizer" and default_name not in registry.available(algorithm_type):
                 continue  # geomeTRIC-backed optimizer is optional
@@ -310,7 +317,8 @@ class TestRegistryAvailable:
         all_algorithms = registry.available()
         for algorithm_type, algorithms in all_algorithms.items():
             assert isinstance(algorithms, list), f"Expected list for {algorithm_type}"
-            if algorithm_type == "effective_hamiltonian_constructor" and not algorithms:
+            if algorithm_type in INTERFACE_ONLY_TYPES:
+                assert not algorithms, f"Interface-only '{algorithm_type}' should have no implementations"
                 continue
             if algorithm_type == "geometry_optimizer" and not algorithms:
                 continue  # geomeTRIC-backed optimizer is optional

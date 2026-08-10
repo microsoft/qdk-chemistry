@@ -57,6 +57,27 @@ Abstract base class for effective-Hamiltonian construction.
 Concrete implementations construct an effective Hamiltonian from a reference
 wavefunction and an input Hamiltonian in the explicitly specified P-space.
 
+``p_indices`` holds absolute molecular-orbital indices, drawn from the same
+index universe as ``Orbitals.active_indices()``.
+
+The returned Hamiltonian is expressed over ``P`` and must satisfy:
+
+- its orbitals have ``active_indices()`` equal to ``p_indices``;
+- its orbitals carry the input Hamiltonian's ``inactive_indices()`` unchanged,
+  so a wavefunction later solved in ``P`` stays consistent with it;
+- the input Hamiltonian's inactive Fock matrix, when present, is carried over
+  unchanged: it spans the full MO space and is fixed by the inactive density,
+  neither of which downfolding changes;
+- the orbitals of :math:`Q = W \setminus P` are left unclassified rather than
+  marked inactive, because :class:`~qdk_chemistry.data.Hamiltonian` assumes
+  inactive orbitals are fully occupied while ``Q`` generally also spans
+  virtuals;
+- the scalar shift from folding in ``Q`` is added to the constant core energy
+  term, and the remaining ``Q`` contribution is folded into the integrals.
+
+Input validation is opt-in. ``run()`` does not validate its arguments; concrete
+implementations decide whether to call ``_validate_inputs``.
+
 Examples:
     >>> import qdk_chemistry.algorithms as alg
     >>> constructor = alg.create("effective_hamiltonian_constructor", "algorithm_name")
@@ -76,14 +97,11 @@ Construct the effective Hamiltonian acting on the target space ``P``.
 
 Args:
     reference: Reference wavefunction providing the reference state.
-    hamiltonian: Input Hamiltonian built over the whole window ``W = P union Q``.
-  p_indices: Target ``P`` indices within the reference wavefunction's active space.
+    hamiltonian: Input Hamiltonian built over the whole window :math:`W = P \cup Q`.
+    p_indices: Absolute molecular-orbital indices of the target space ``P``, which must lie within the reference wavefunction's active space.
 
 Returns:
-    The effective Hamiltonian acting on ``P``.
-
-Raises:
-    ValueError: If the inputs have incompatible orbital bases, spin restrictions, or nested orbital spaces.
+    The effective Hamiltonian acting on ``P``, following the output contract documented on this class.
 )");
   constructor.def("settings", &EffectiveHamiltonianConstructor::settings,
                   py::return_value_policy::reference_internal, R"(
@@ -103,16 +121,17 @@ Returns:
       py::arg("reference"), py::arg("hamiltonian"), py::arg("p_indices"), R"(
 Validate the common nested-space input contract.
 
-Concrete implementations may call this helper from ``_run_impl`` before
-performing method-specific validation or computation.
+Validation is opt-in: ``run()`` never calls this helper. Concrete
+implementations may call it from ``_run_impl`` before performing
+method-specific validation or computation.
 
 Args:
-  reference: Reference wavefunction whose active orbital space must be a subset of the Hamiltonian's active orbital window.
-  hamiltonian: Input Hamiltonian defining the outer orbital window.
-  p_indices: Target P-space, which must be a subset of the reference wavefunction's active orbital space.
+    reference: Reference wavefunction whose active orbital space must be a subset of the Hamiltonian's active orbital window.
+    hamiltonian: Input Hamiltonian defining the outer orbital window.
+    p_indices: Target P-space as absolute molecular-orbital indices, which must be a subset of the reference wavefunction's active orbital space.
 
 Raises:
-  ValueError: If an input is null, the orbital bases or spin restrictions are incompatible, or the spaces are not nested.
+    ValueError: If an input is null, the orbital bases or spin restrictions are incompatible, or the spaces are not nested.
 )");
   constructor.def_property(
       "_settings",
@@ -143,7 +162,17 @@ Returns:
 )");
   constructor.def("hash", &EffectiveHamiltonianConstructor::hash,
                   py::arg("reference"), py::arg("hamiltonian"),
-                  py::arg("p_indices"));
+                  py::arg("p_indices"), R"(
+Compute a deterministic content hash for a run with these inputs.
+
+Args:
+    reference: Reference wavefunction providing the reference state.
+    hamiltonian: Input Hamiltonian built over the whole window :math:`W = P \cup Q`.
+    p_indices: Target ``P`` indices within the reference wavefunction's active space.
+
+Returns:
+    str: 16-character hex content hash.
+)");
   constructor.def("__repr__", [](const EffectiveHamiltonianConstructor&) {
     return "<qdk_chemistry.algorithms.EffectiveHamiltonianConstructor>";
   });

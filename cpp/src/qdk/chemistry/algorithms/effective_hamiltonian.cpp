@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <limits>
 #include <qdk/chemistry/algorithms/effective_hamiltonian.hpp>
+#include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <stdexcept>
@@ -28,10 +29,7 @@ bool is_subset(const SymmetryBlockedIndexSet& subset,
     return false;
   }
 
-  for (const auto& [label, extent] : subset.extents()) {
-    (void)extent;
-    if (!subset.has(label)) continue;
-
+  for (const auto& label : subset.labels()) {
     const auto selected = subset.indices(label);
     if (!superset.has(label)) {
       if (!selected.empty()) return false;
@@ -60,6 +58,17 @@ void validate_orbital_basis(const Orbitals& hamiltonian_orbitals,
       wavefunction_orbitals.get_num_atomic_orbitals()) {
     throw_incompatible(
         "Hamiltonian and wavefunction must use the same AO basis size");
+  }
+  if (hamiltonian_orbitals.has_basis_set() !=
+      wavefunction_orbitals.has_basis_set()) {
+    throw_incompatible(
+        "Hamiltonian and wavefunction must both carry an AO basis set");
+  }
+  if (hamiltonian_orbitals.has_basis_set() &&
+      hamiltonian_orbitals.get_basis_set()->content_hash() !=
+          wavefunction_orbitals.get_basis_set()->content_hash()) {
+    throw_incompatible(
+        "Hamiltonian and wavefunction must use the same AO basis set");
   }
   if (hamiltonian_orbitals.is_restricted() !=
       wavefunction_orbitals.is_restricted()) {
