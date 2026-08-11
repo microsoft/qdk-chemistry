@@ -113,7 +113,7 @@ for quantum chemistry calculations. It contains:
 
 * One-electron integrals (kinetic + nuclear attraction) in MO representation
 * Molecular orbital information for the active space
-* Core energy contributions from inactive orbitals and nuclear repulsion
+* A constant (zero-body) energy term
 
 Derived classes implement specific storage formats for two-electron integrals
 (e.g., canonical 4-center, density-fitted, etc.).
@@ -250,10 +250,10 @@ Returns:
   bind_getter_as_property(hamiltonian_container, "get_core_energy",
                           &HamiltonianContainer::get_core_energy,
                           R"(
-Get core energy in atomic units.
+Get the constant (zero-body) energy term in atomic units.
 
 Returns:
-    float: Core energy contribution in Hartree
+    float: Constant energy term in Hartree
 )");
 
   bind_getter_as_property(hamiltonian_container, "get_type",
@@ -303,7 +303,7 @@ specifically designed for active space methods. It contains:
 * One-electron integrals (kinetic + nuclear attraction) in MO representation
 * Three-center two-electron integrals (ij|Q) in MO representation
 * Molecular orbital information for the active space
-* Core energy contributions from inactive orbitals and nuclear repulsion
+* A constant (zero-body) energy term
 
 Four-center integrals are lazily computed from three-center integrals on first access.
 
@@ -333,7 +333,7 @@ Args:
     three_center_integrals (numpy.ndarray): Three-center two-electron integrals
         in MO basis [(norb*norb) x naux]
     orbitals (Orbitals): Molecular orbital data
-    core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
+    core_energy (float): Constant (zero-body) energy term
     inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix [norb x norb]
     ao_cholesky_vectors (numpy.ndarray or None, optional): AO Cholesky vectors
         for potential reuse. Defaults to None.
@@ -372,7 +372,7 @@ Args:
     three_center_integrals_bb (numpy.ndarray): Beta-beta three-center integrals
         [(norb*norb) x naux], orbital pair index in row-major order
     orbitals (Orbitals): Molecular orbital data
-    core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
+    core_energy (float): Constant (zero-body) energy term
     inactive_fock_matrix_alpha (numpy.ndarray): Alpha inactive Fock matrix [norb x norb]
     inactive_fock_matrix_beta (numpy.ndarray): Beta inactive Fock matrix [norb x norb]
     ao_cholesky_vectors (numpy.ndarray or None, optional): AO Cholesky vectors
@@ -557,7 +557,7 @@ specifically designed for active space methods. It contains:
 * One-electron integrals (kinetic + nuclear attraction) in MO representation
 * Two-electron integrals (electron-electron repulsion) in MO representation
 * Molecular orbital information for the active space
-* Core energy contributions from inactive orbitals and nuclear repulsion
+* A constant (zero-body) energy term
 
 This is the standard full integral storage format where two-electron integrals
 are stored as a flattened [norb^4] vector.
@@ -587,7 +587,7 @@ Args:
     one_body_integrals (numpy.ndarray): One-electron integrals matrix [norb x norb]
     two_body_integrals (numpy.ndarray): Two-electron integrals vector [norb^4]
     orbitals (Orbitals): Molecular orbital data
-    core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
+    core_energy (float): Constant (zero-body) energy term
     inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix [norb x norb]
     type (HamiltonianType, optional): Type of Hamiltonian (Hermitian by default)
 
@@ -622,7 +622,7 @@ Args:
     two_body_integrals_aabb (numpy.ndarray): Alpha-beta-alpha-beta integrals [norb^4]
     two_body_integrals_bbbb (numpy.ndarray): Beta-beta-beta-beta integrals [norb^4]
     orbitals (Orbitals): Molecular orbital data
-    core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
+    core_energy (float): Constant (zero-body) energy term
     inactive_fock_matrix_alpha (numpy.ndarray): Alpha inactive Fock matrix [norb x norb]
     inactive_fock_matrix_beta (numpy.ndarray): Beta inactive Fock matrix [norb x norb]
     type (HamiltonianType, optional): Type of Hamiltonian (Hermitian by default)
@@ -1212,7 +1212,7 @@ wrapping a HamiltonianContainer implementation. It supports:
 * One-electron integrals (kinetic + nuclear attraction) in MO representation
 * Two-electron integrals (electron-electron repulsion) in MO representation
 * Molecular orbital information for the active space
-* Core energy contributions from inactive orbitals and nuclear repulsion
+* A constant (zero-body) energy term
 
 The actual integral storage is handled by the underlying container, which
 can use different representations (canonical 4-center, density-fitted, etc.).
@@ -1354,10 +1354,10 @@ Returns:
   bind_getter_as_property(hamiltonian, "get_core_energy",
                           &Hamiltonian::get_core_energy,
                           R"(
-Get core energy in atomic units.
+Get the constant (zero-body) energy term in atomic units.
 
 Returns:
-    float: Core energy contribution in Hartree
+    float: Constant energy term in Hartree
 )");
 
   hamiltonian.def("has_inactive_fock_matrix",
