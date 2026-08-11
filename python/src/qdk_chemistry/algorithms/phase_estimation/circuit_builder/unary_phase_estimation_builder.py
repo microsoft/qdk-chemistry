@@ -152,8 +152,9 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
 
         Raises:
             RuntimeError: If the state preparation circuit has no Q# operation.
-            ValueError: If the unitary representation is not a quantum walk, or if the block
-                encoding has no ancilla register for the walk to reflect about.
+            ValueError: If the unitary representation is not a quantum walk, if the mapper does
+                not declare its register width, or if the block encoding has no ancilla register
+                for the walk to reflect about.
 
         """
         unitary_builder = self._create_nested("unitary_builder")
@@ -189,12 +190,21 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         block_encoding_op = block_encoding._qsharp_op  # noqa: SLF001
 
         num_system_qubits = qubit_hamiltonian.num_qubits
-        num_ancilla_qubits = unitary_rep.get_num_qubits() - num_system_qubits
-        if num_ancilla_qubits == 0:
-            raise ValueError("Requires a non-empty ancilla register to reflect about.")
+        if block_encoding.num_qubits is None:
+            raise ValueError(
+                f"Circuit mapper '{type(mapper).__name__}' did not report num_qubits, so the walk cannot tell "
+                "which qubits to reflect about. Use a mapper that declares its register width, such as "
+                "'prepare_select_prepare'."
+            )
+        num_ancilla_qubits = block_encoding.num_qubits - num_system_qubits
+        if num_ancilla_qubits <= 0:
+            raise ValueError(
+                f"Requires a non-empty ancilla register to reflect about, but the block encoding spans "
+                f"{block_encoding.num_qubits} qubits for a {num_system_qubits}-qubit system."
+            )
 
-        # MakeUnaryQPECircuit lays the walk register out as [system | ancilla], so the builder can name
-        # the qubits to reflect about instead of asking the mapper for a reflection.
+        # The mapper puts every qubit it wants reflected about after the system register, so naming the
+        # tail of its register is enough — the builder never has to ask the mapper for a reflection.
         apply_reflection = QSHARP_UTILS.PrepSelPrep.MakeIndexReflectionOp(
             list(range(num_system_qubits, num_system_qubits + num_ancilla_qubits))
         )
@@ -224,7 +234,8 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
             qsharp_factory=QsharpFactoryData(
                 program=QSHARP_UTILS.UnaryPhaseEstimation.MakeUnaryQPECircuit,
                 parameter=parameters,
-            )
+            ),
+            num_qubits=num_bits + num_system_qubits + num_ancilla_qubits,
         )
         Logger.info(f"Built unary QPE circuit with {num_queries} queries and {num_bits} phase qubits.")
         return [circuit]

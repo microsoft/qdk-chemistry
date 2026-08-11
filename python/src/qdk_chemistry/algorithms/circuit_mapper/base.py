@@ -25,6 +25,13 @@ class CircuitMapper(Algorithm):
     def _run_impl(self, evolution: UnitaryRepresentation) -> Circuit:
         """Construct a Circuit representing the given UnitaryRepresentation.
 
+        Implementations that expose a flat ``[system | ancilla]`` register should set the
+        returned circuit's :attr:`~qdk_chemistry.data.Circuit.num_qubits` to its width, so
+        callers can locate the ancillas without reaching into the mapper. Only ancillas the
+        caller may act on belong in that register: qubits that exist purely as scratch, and
+        that a caller must never reflect about or control on, are to be allocated inside the
+        Q# operation with a ``use`` block instead.
+
         Args:
             evolution: The unitary representation.
 

@@ -9,7 +9,10 @@ import numpy as np
 import pytest
 from qdk.test_utils import dump_operation_on_state
 
+from qdk_chemistry.algorithms.circuit_mapper.psp_mapper import PSPMapper
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.unary_phase_estimation_builder import (
+    QdkUnaryQpeCircuitBuilder,
     cosine_window_state,
 )
 from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import (
@@ -18,10 +21,28 @@ from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import (
 )
 from qdk_chemistry.data import AlgorithmRef, QubitOperator
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
+from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 _PAULI_X = np.array([[0.0, 1.0], [1.0, 0.0]], dtype=complex)
 _PAULI_Z = np.array([[1.0, 0.0], [0.0, -1.0]], dtype=complex)
+
+
+def _identity_state_preparation(num_qubits: int) -> Circuit:
+    """A state preparation that leaves the register in ``|0...0>``."""
+    params = {
+        "rowMap": list(range(num_qubits - 1, -1, -1)),
+        "stateVector": [1.0] + [0.0] * (2**num_qubits - 1),
+        "expansionOps": [],
+        "numQubits": num_qubits,
+    }
+    return Circuit(
+        qsharp_factory=QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+            parameter=params,
+        ),
+        qsharp_op=QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(params),
+    )
 
 
 def _address_qubits(num_actions: int) -> int:
@@ -287,3 +308,67 @@ class TestUnaryQpeEndToEnd:
         result = qpe.run(qubit_hamiltonian=hamiltonian, state_preparation=state_preparation)
 
         assert result.raw_energy == pytest.approx(float(energies[0]), abs=1e-9)
+
+
+class TestReflectionRegisterContract:
+    """The builder locates the reflected qubits from the circuit, not from the mapper."""
+
+    @staticmethod
+    def _walk_representation() -> UnitaryRepresentation:
+        """A quantum-walk representation of ``H = (X + Z)/2``."""
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([0.5, 0.5]))
+        return LCUBuilder(quantum_walk=True).run(hamiltonian)
+
+    def test_the_mapper_declares_the_width_of_the_register_it_maps(self):
+        """``Circuit.num_qubits`` has to agree with the container the mapper was handed.
+
+        The builder subtracts the system size from it to name the reflected qubits, so a
+        disagreement here would silently reflect about the wrong register.
+        """
+        unitary_rep = self._walk_representation()
+        block_encoding = PSPMapper().run(unitary_rep)
+
+        assert block_encoding.num_qubits == unitary_rep.get_num_qubits()
+
+    def test_the_builder_reflects_the_ancilla_tail_the_mapper_declared(self):
+        """Every qubit the mapper exposes past the system register is reflected about."""
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([0.5, 0.5]))
+        declared = PSPMapper().run(self._walk_representation()).num_qubits
+        assert declared is not None
+
+        builder = QdkUnaryQpeCircuitBuilder(num_queries=3)
+        circuit = builder.run(
+            state_preparation=_identity_state_preparation(hamiltonian.num_qubits),
+            qubit_hamiltonian=hamiltonian,
+        )[0]
+
+        assert circuit._qsharp_factory.parameter["numAncillas"] == declared - hamiltonian.num_qubits
+
+    def test_a_mapper_without_a_declared_width_is_rejected(self, monkeypatch):
+        """Guessing the ancilla count from the container is exactly what this change removes."""
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([0.5, 0.5]))
+        create_nested = QdkUnaryQpeCircuitBuilder._create_nested
+
+        class UndeclaredWidthMapper:
+            """A mapper that maps faithfully but never says how wide its register is."""
+
+            def __init__(self, inner):
+                self._inner = inner
+
+            def run(self, *args, **kwargs) -> Circuit:
+                """Strip ``num_qubits`` off whatever the real mapper returned."""
+                mapped = self._inner.run(*args, **kwargs)
+                return Circuit(qsharp_op=mapped._qsharp_op, qsharp_factory=mapped._qsharp_factory)
+
+        def patched(self, setting_key):
+            nested = create_nested(self, setting_key)
+            return UndeclaredWidthMapper(nested) if setting_key == "circuit_mapper" else nested
+
+        monkeypatch.setattr(QdkUnaryQpeCircuitBuilder, "_create_nested", patched)
+
+        builder = QdkUnaryQpeCircuitBuilder(num_queries=3)
+        with pytest.raises(ValueError, match="did not report num_qubits"):
+            builder.run(
+                state_preparation=_identity_state_preparation(hamiltonian.num_qubits),
+                qubit_hamiltonian=hamiltonian,
+            )

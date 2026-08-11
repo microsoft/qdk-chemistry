@@ -188,6 +188,11 @@ class PSPMapper(CircuitMapper):
     def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
         r"""Construct the block-encoding circuit on the flat ``[system | ancilla]`` register.
 
+        Every ancilla in that register is one the PREPARE amplitudes live on, so a caller can
+        reflect about ``num_qubits - num_system`` qubits at the end of the register to turn the
+        block encoding into a walk. The reflection's own scratch qubits are allocated inside Q#
+        and never surface here.
+
         Args:
             unitary: The unitary representation containing either an
                 :class:`LCUContainer` (plain block encoding) or an
@@ -220,4 +225,8 @@ class PSPMapper(CircuitMapper):
             },
         )
 
-        return Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
+        return Circuit(
+            qsharp_factory=qsharp_factory,
+            qsharp_op=qsharp_op,
+            num_qubits=num_system + lcu.num_prepare_ancillas,
+        )

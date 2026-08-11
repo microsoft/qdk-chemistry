@@ -95,6 +95,20 @@ class TestCircuitConstruction:
         assert retrieved_qasm == qasm
         assert "h q[0];" in retrieved_qasm
 
+    def test_num_qubits_is_undeclared_by_default(self):
+        """A producer that does not know its register width leaves num_qubits unset."""
+        assert Circuit(qasm="OPENQASM 3.0;").num_qubits is None
+
+    def test_num_qubits_records_the_declared_width(self):
+        """Callers read the register width off the circuit rather than its producer."""
+        assert Circuit(qasm="OPENQASM 3.0;", num_qubits=5).num_qubits == 5
+        assert Circuit(qasm="OPENQASM 3.0;", num_qubits=0).num_qubits == 0
+
+    def test_num_qubits_rejects_a_negative_width(self):
+        """A negative width is a producer bug, so fail at construction rather than later."""
+        with pytest.raises(ValueError, match="num_qubits must be non-negative"):
+            Circuit(qasm="OPENQASM 3.0;", num_qubits=-1)
+
 
 class TestGetQsharpCircuit:
     """Test cases for get_qsharp method."""
@@ -217,6 +231,40 @@ class TestCircuitSerialization:
 
         assert reconstructed.qasm == original.qasm
         assert reconstructed.qir == original.qir
+
+    def test_json_roundtrip_preserves_num_qubits(self, simple_qasm, simple_qir):
+        """A declared register width has to survive a save/load cycle."""
+        original = Circuit(qasm=simple_qasm, qir=simple_qir, num_qubits=7)
+        reconstructed = Circuit.from_json(original.to_json())
+
+        assert reconstructed.num_qubits == 7
+
+    def test_json_omits_an_undeclared_num_qubits(self, simple_qasm, simple_qir):
+        """Undeclared stays undeclared; it must not round-trip as a made-up width."""
+        json_data = Circuit(qasm=simple_qasm, qir=simple_qir).to_json()
+
+        assert "num_qubits" not in json_data
+        assert Circuit.from_json(json_data).num_qubits is None
+
+    def test_hdf5_roundtrip_preserves_num_qubits(self, simple_qasm, simple_qir):
+        """HDF5 stores attributes as numpy scalars, so check the width comes back as an int."""
+        original = Circuit(qasm=simple_qasm, qir=simple_qir, num_qubits=7)
+
+        with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as tmp:
+            tmp_path = Path(tmp.name)
+
+        try:
+            with h5py.File(tmp_path, "w") as f:
+                original.to_hdf5(f.create_group("circuit"))
+
+            with h5py.File(tmp_path, "r") as f:
+                reconstructed = Circuit.from_hdf5(f["circuit"])
+
+            assert reconstructed.num_qubits == 7
+            assert isinstance(reconstructed.num_qubits, int)
+
+        finally:
+            tmp_path.unlink()
 
     def test_to_hdf5(self, simple_qasm, simple_qir):
         """Test that to_hdf5 saves Circuit correctly."""
