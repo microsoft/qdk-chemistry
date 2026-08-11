@@ -14,7 +14,7 @@ class BasisSet;
 class Wavefunction;
 }  // namespace qdk::chemistry::data
 
-namespace qdk::chemistry::cube {
+namespace qdk::chemistry::utils {
 
 using CubeField = std::vector<double>;
 
@@ -54,4 +54,4 @@ std::vector<std::string> generate_orbital_cubes(
     const std::string& output_dir, const CubeGrid& grid,
     const std::string& label_prefix = "orbital_");
 
-}  // namespace qdk::chemistry::cube
+}  // namespace qdk::chemistry::utils

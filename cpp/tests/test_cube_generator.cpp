@@ -10,21 +10,21 @@
 #include <limits>
 #include <memory>
 #include <numbers>
-#include <qdk/chemistry/cube/cube_generator.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/utils/cube_generator.hpp>
 #include <stdexcept>
 #include <vector>
 
 namespace {
 
-using qdk::chemistry::cube::CubeGenerator;
-using qdk::chemistry::cube::CubeGrid;
 using qdk::chemistry::data::BasisSet;
 using qdk::chemistry::data::Element;
 using qdk::chemistry::data::OrbitalType;
 using qdk::chemistry::data::Shell;
 using qdk::chemistry::data::Structure;
+using qdk::chemistry::utils::CubeGenerator;
+using qdk::chemistry::utils::CubeGrid;
 
 std::shared_ptr<BasisSet> make_hydrogen_basis(
     std::vector<double> exponents = {1.0},

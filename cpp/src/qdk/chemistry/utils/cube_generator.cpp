@@ -11,13 +11,13 @@
 #include <gauxc/orbital_evaluator.hpp>
 #include <gauxc/shell.hpp>
 #include <limits>
-#include <qdk/chemistry/cube/cube_generator.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
+#include <qdk/chemistry/utils/cube_generator.hpp>
 #include <stdexcept>
 
-namespace qdk::chemistry::cube {
+namespace qdk::chemistry::utils {
 
 CubeGrid CubeGrid::from_basis_set(const data::BasisSet& basis_set,
                                   std::size_t nx, std::size_t ny,
@@ -203,4 +203,4 @@ std::vector<std::string> generate_orbital_cubes(
   return paths;
 }
 
-}  // namespace qdk::chemistry::cube
+}  // namespace qdk::chemistry::utils
