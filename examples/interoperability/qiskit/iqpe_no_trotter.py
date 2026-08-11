@@ -127,8 +127,7 @@ def run_iterative_exact_qpe(
 
     Returns:
         Tuple ``(bits, phase_fraction)`` with the measured bits in execution order
-        (LSB first, MSB last) and
-        the resulting phase fraction.
+        (LSB first, MSB last) and the resulting phase fraction.
 
     Notes:
         This routine runs the iterativeqpe with the exact evolution
@@ -283,7 +282,8 @@ result = QpeResult.from_phase_fraction(
     method="iterative_exact",
     phase_fraction=phase_fraction,
     eigenvalue_from_phase=_energy_from_phase,
-    bits_msb_first=bits,
+    # ``bits`` come back in execution order (LSB first), so reverse them to get MSB first.
+    bits_msb_first=bits[::-1],
 )
 
 raw_energy = result.raw_energy

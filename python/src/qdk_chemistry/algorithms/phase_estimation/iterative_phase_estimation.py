@@ -3,8 +3,10 @@
 This module implements the Kitaev-style iterative quantum phase estimation (IQPE)
 algorithm, which measures phase bits sequentially from least-significant to most-significant
 using a single ancilla qubit and adaptive feedback corrections. The first iteration applies
-the largest controlled power :math:`U^{2^{m-1}}` and therefore measures the least-significant
-bit; subsequent iterations proceed toward the most-significant bit.
+the largest controlled power :math:`U^{2^{n-1}}` (``n`` = ``num_bits``) and therefore measures
+the least-significant bit; subsequent iterations proceed toward the most-significant bit.
+The returned :attr:`~qdk_chemistry.data.QpeResult.bits_msb_first` reverses this execution
+order into the conventional most-significant-first bitstring.
 
 References:
     Kitaev, A. (1995). arXiv:quant-ph/9511026. :cite:`Kitaev1995`
