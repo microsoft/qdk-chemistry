@@ -428,11 +428,16 @@ class SparseIsometryStatePreparation(StatePreparation):
             Composed Circuit operating on the full qubit register.
 
         """
-        if dense_circuit._qsharp_op is not None:  # noqa: SLF001
+        factory = dense_circuit._qsharp_factory  # noqa: SLF001
+        dense_prep_program = "QDKChemistry.Utils.StatePreparation.MakeStatePreparationCircuit"
+        if factory is not None and getattr(factory.program, "__name__", None) == dense_prep_program:
+            # Compose with the dense preparation parameters rather than its callable: a callable capturing
+            # another callable cannot be resolved statically by the adaptive-profile code generator.
+            dense_params = QSHARP_UTILS.StatePreparation.StatePreparationParams(**factory.parameter)
             serialized_be = [op.to_qsharp_parameter() for op in binary_encoding_ops]
             serialized_ge = [op.to_qsharp_parameter() for op in gaussian_elimination_ops]
             qsharp_op = QSHARP_UTILS.BinaryEncoding.MakeComposeBinaryEncodingOp(
-                dense_circuit._qsharp_op,  # noqa: SLF001
+                dense_params,
                 dense_row_map,
                 serialized_be,
                 serialized_ge,
@@ -441,7 +446,7 @@ class SparseIsometryStatePreparation(StatePreparation):
             qsharp_factory = QsharpFactoryData(
                 program=QSHARP_UTILS.BinaryEncoding.MakeComposeBinaryEncodingCircuit,
                 parameter={
-                    "denseOp": dense_circuit._qsharp_op,  # noqa: SLF001
+                    "denseParams": dense_params,
                     "embeddingMap": dense_row_map,
                     "binaryEncodingOps": serialized_be,
                     "gaussianEliminationOps": serialized_ge,

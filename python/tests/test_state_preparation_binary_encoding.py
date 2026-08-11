@@ -22,10 +22,11 @@ from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
     Configuration,
-    QubitHamiltonian,
+    QubitOperator,
     StateVectorContainer,
     Wavefunction,
 )
+from qdk_chemistry.data.symmetry import SymmetryLabel, axes
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix
 
@@ -44,7 +45,7 @@ def _matrix_qubit_counts(wf: Wavefunction) -> tuple[int, int]:
           after subtracting Pool A (idle GF2X qubits: system qubits absent from row_map).
 
     """
-    num_orbitals = len(wf.get_orbitals().get_active_space_indices()[0])
+    num_orbitals = len(list(wf.get_orbitals().active_indices().indices(SymmetryLabel([axes.alpha()]))))
     dets = wf.get_active_determinants()
     bitstrings = []
     for det in dets:
@@ -298,7 +299,7 @@ class TestSparseIsometryBinaryEncoding:
         )
 
         # Confirm this case is genuinely a fallback case before testing.
-        num_orbitals = len(wf.get_orbitals().get_active_space_indices()[0])
+        num_orbitals = len(list(wf.get_orbitals().active_indices().indices(SymmetryLabel([axes.alpha()]))))
         bitstrings = []
         for det in wf.get_active_determinants():
             a, b = det.to_binary_strings(num_orbitals)
@@ -380,7 +381,7 @@ class TestBinaryEncodingWithQPE:
         assert extra_ancilla > 0, "This test requires a case with ancilla overflow"
 
         # Create a 12-qubit Hamiltonian matching the system size
-        qubit_hamiltonian = QubitHamiltonian(
+        qubit_hamiltonian = QubitOperator(
             pauli_strings=["Z" + "I" * (num_system_qubits - 1), "I" * (num_system_qubits - 1) + "Z"],
             coefficients=np.array([0.5, 0.25]),
         )
@@ -427,7 +428,7 @@ class TestBinaryEncodingWithQPE:
         extra_ancilla = state_prep_total_qubits - num_system_qubits
         assert extra_ancilla > 0, "This test requires a case with ancilla overflow"
 
-        qubit_hamiltonian = QubitHamiltonian(
+        qubit_hamiltonian = QubitOperator(
             pauli_strings=["Z" + "I" * (num_system_qubits - 1), "I" * (num_system_qubits - 1) + "Z"],
             coefficients=np.array([0.5, 0.25]),
         )
@@ -522,8 +523,8 @@ class TestBinaryEncodingWithQPE:
         extra_ancilla = state_prep_qubits - n
         assert extra_ancilla > 0, f"Expected ancilla overflow but state prep uses only {state_prep_qubits} qubits"
 
-        # QubitHamiltonian
-        qubit_hamiltonian = QubitHamiltonian(pauli_strings=pauli_strings, coefficients=coefficients_arr)
+        # Qubit Hamiltonian
+        qubit_hamiltonian = QubitOperator(pauli_strings=pauli_strings, coefficients=coefficients_arr)
 
         # Run iterative QPE
         num_bits = 8
@@ -543,20 +544,10 @@ class TestBinaryEncodingWithQPE:
 
         result = iqpe.run(state_preparation=state_prep_circuit, qubit_hamiltonian=qubit_hamiltonian)
 
-        # Resolve phase ambiguity and verify energy
-        phase_candidates = [result.phase_fraction % 1.0, (1.0 - result.phase_fraction) % 1.0]
-        energies = []
-        for p in phase_candidates:
-            angle = (p % 1.0) * (2 * np.pi)
-            if angle > np.pi:
-                angle -= 2 * np.pi
-            energies.append(angle / evolution_time)
-        resolved_energy = energies[int(np.argmin([abs(e - gs_energy) for e in energies]))]
-
         # Energy resolution with num_bits: 2*pi / (t * 2^num_bits)
         energy_resolution = 2 * np.pi / (evolution_time * 2**num_bits)
-        assert abs(resolved_energy - gs_energy) < energy_resolution, (
-            f"QPE energy {resolved_energy:.6f} deviates from ground energy {gs_energy:.6f} "
+        assert abs(result.raw_energy - gs_energy) < energy_resolution, (
+            f"QPE energy {result.raw_energy:.6f} deviates from ground energy {gs_energy:.6f} "
             f"by more than the {num_bits}-bit resolution ({energy_resolution:.4f}). "
             f"State prep used {state_prep_qubits} qubits ({extra_ancilla} ancilla)."
         )

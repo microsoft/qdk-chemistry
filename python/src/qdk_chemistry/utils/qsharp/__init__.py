@@ -36,7 +36,7 @@ _thread_local = threading.local()
 
 
 def create_qsharp_context(
-    target_profile: TargetProfile = TargetProfile.Base,
+    target_profile: TargetProfile = TargetProfile.Adaptive_RIF,
     target_name: str | None = None,
     language_features: list[str] | None = None,
     qdk_config: dict[str, int | float | str | bool] | None = None,
@@ -50,7 +50,7 @@ def create_qsharp_context(
     :func:`set_qsharp_context` if the chemistry builders should use it too.
 
     :param target_profile: Target profile the Q# interpreter compiles for. Defaults to
-        ``TargetProfile.Base``.
+        ``TargetProfile.Adaptive_RIF``.
     :param target_name: Optional target machine name used to infer a compatible profile.
     :param language_features: Optional list of experimental Q# language feature flags.
     :param qdk_config: Optional configuration values exposed to Q# code via

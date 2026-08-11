@@ -12,6 +12,8 @@ namespace QDKChemistry.Utils.BinaryEncoding {
     import Std.Math.Ceiling;
     import Std.Math.Lg;
     import Std.Measurement.MResetX;
+    import QDKChemistry.Utils.StatePreparation.StatePreparation;
+    import QDKChemistry.Utils.StatePreparation.StatePreparationParams;
 
     /// A single gate produced by the matrix compression pipeline.
     ///
@@ -309,35 +311,39 @@ namespace QDKChemistry.Utils.BinaryEncoding {
         }
     }
 
-    /// Composes a dense preparation operation with binary-encoding expansion.
-    /// The denseOp is applied to the subregister specified by embeddingMap,
+    /// Composes the dense preparation with binary-encoding expansion.
+    /// The dense preparation is applied to the subregister specified by embeddingMap,
     /// then binary-encoding and GF2+X expansion operations are applied.
+    ///
+    /// The dense preparation is taken as *parameters* rather than as a callable: a callable
+    /// that captures another callable cannot be resolved statically by the adaptive-profile
+    /// code generator, which makes the composition unusable as a QPE `statePrep` argument.
     operation ComposeBinaryEncoding(
-        denseOp : Qubit[] => Unit,
+        denseParams : StatePreparationParams,
         embeddingMap : Int[],
         binaryEncodingOps : MatrixCompressionOp[],
         gaussianEliminationOps : MatrixCompressionOp[],
         ancillaPool : Int[],
         qs : Qubit[],
     ) : Unit {
-        denseOp(Subarray(embeddingMap, qs));
+        StatePreparation(denseParams, Subarray(embeddingMap, qs));
         ApplyExpansion(binaryEncodingOps, gaussianEliminationOps, qs, ancillaPool);
     }
 
     /// Returns a callable that applies binary-encoding composition.
     function MakeComposeBinaryEncodingOp(
-        denseOp : Qubit[] => Unit,
+        denseParams : StatePreparationParams,
         embeddingMap : Int[],
         binaryEncodingOps : MatrixCompressionOp[],
         gaussianEliminationOps : MatrixCompressionOp[],
         ancillaPool : Int[],
     ) : Qubit[] => Unit {
-        ComposeBinaryEncoding(denseOp, embeddingMap, binaryEncodingOps, gaussianEliminationOps, ancillaPool, _)
+        ComposeBinaryEncoding(denseParams, embeddingMap, binaryEncodingOps, gaussianEliminationOps, ancillaPool, _)
     }
 
     /// Circuit entry point for binary-encoding composition.
     operation MakeComposeBinaryEncodingCircuit(
-        denseOp : Qubit[] => Unit,
+        denseParams : StatePreparationParams,
         embeddingMap : Int[],
         binaryEncodingOps : MatrixCompressionOp[],
         gaussianEliminationOps : MatrixCompressionOp[],
@@ -345,6 +351,6 @@ namespace QDKChemistry.Utils.BinaryEncoding {
         ancillaPool : Int[],
     ) : Unit {
         use qs = Qubit[numQubits];
-        ComposeBinaryEncoding(denseOp, embeddingMap, binaryEncodingOps, gaussianEliminationOps, ancillaPool, qs);
+        ComposeBinaryEncoding(denseParams, embeddingMap, binaryEncodingOps, gaussianEliminationOps, ancillaPool, qs);
     }
 }

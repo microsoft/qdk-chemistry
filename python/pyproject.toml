@@ -35,7 +35,7 @@ dependencies = [
   "scipy>=1.7.0",
   "matplotlib>=3.10.0",
   "ruamel-yaml>=0.18.10",
-  "qdk[jupyter]==1.29.1",
+  "qdk[jupyter]>=1.30.0",
   "pybind11-stubgen>=2.5.1",
   "h5py>=3.0.0",
 ]
