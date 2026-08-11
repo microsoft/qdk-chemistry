@@ -5,9 +5,9 @@ pipelines:
     retail:
       binary:
         binskim:
-          lastModifiedDate: 2026-01-24
+          lastModifiedDate: 2026-08-11
         spotbugs:
-          lastModifiedDate: 2026-01-24
+          lastModifiedDate: 2026-08-11
       source:
         psscriptanalyzer:
-          lastModifiedDate: 2026-07-03
+          lastModifiedDate: 2026-08-11
