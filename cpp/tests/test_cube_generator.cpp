@@ -5,9 +5,11 @@
 #include <gtest/gtest.h>
 
 #include <Eigen/Dense>
+#include <cmath>
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <numbers>
 #include <qdk/chemistry/cube/cube_generator.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
@@ -33,6 +35,16 @@ std::shared_ptr<BasisSet> make_hydrogen_basis(
   std::vector<Shell> shells;
   shells.emplace_back(0, OrbitalType::S, exponents, coefficients);
   return std::make_shared<BasisSet>("test", shells, structure);
+}
+
+std::shared_ptr<BasisSet> make_hydrogen_p_basis() {
+  auto structure =
+      std::make_shared<Structure>(std::vector<Eigen::Vector3d>{{0.0, 0.0, 0.0}},
+                                  std::vector<Element>{Element::H});
+  std::vector<Shell> shells;
+  shells.emplace_back(0, OrbitalType::P, std::vector<double>{1.0},
+                      std::vector<double>{1.0});
+  return std::make_shared<BasisSet>("test-p", shells, structure);
 }
 
 }  // namespace
@@ -84,6 +96,27 @@ TEST(CubeGeneratorTest, EvaluatesHydrogenOrbitalAndDensity) {
   ASSERT_EQ(density.size(), 1);
   EXPECT_GT(orbital[0], 0.0);
   EXPECT_NEAR(density[0], orbital[0] * orbital[0], 1e-12);
+}
+
+TEST(CubeGeneratorTest, EvaluatesNormalizedHydrogenPOrbitals) {
+  CubeGenerator generator(make_hydrogen_p_basis());
+  CubeGrid grid;
+  grid.origin = {0.25, -0.5, 0.75};
+  grid.spacing = {1.0, 1.0, 1.0};
+  grid.nx = grid.ny = grid.nz = 1;
+
+  const double r_squared = grid.origin.squaredNorm();
+  const double normalization = 2.0 * std::pow(2.0 / std::numbers::pi, 0.75);
+  const double radial = normalization * std::exp(-r_squared);
+
+  for (Eigen::Index component = 0; component < 3; ++component) {
+    Eigen::VectorXd coefficients = Eigen::VectorXd::Zero(3);
+    coefficients[component] = 1.0;
+    const auto orbital = generator.orbital(coefficients, "", grid);
+
+    ASSERT_EQ(orbital.size(), 1);
+    EXPECT_NEAR(orbital[0], grid.origin[component] * radial, 1e-12);
+  }
 }
 
 TEST(CubeGeneratorTest, RejectsInvalidInputs) {
