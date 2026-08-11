@@ -51,17 +51,7 @@ class QsharpFactoryData:
 
 
 class Circuit(DataClass):
-    """Data class for a quantum circuit.
-
-    Attributes:
-        num_qubits: Width of the flat register ``qsharp_op`` expects, or None when the
-            producer did not declare one. Circuit mappers that lay their register out as
-            ``[system | ancilla]`` set it so a caller can address the ancillas — for example
-            to reflect about them — without knowing which mapper built the circuit. Ancillas
-            counted here are part of the caller-visible register; scratch qubits a circuit
-            allocates internally with a Q# ``use`` block are not.
-
-    """
+    """Data class for a quantum circuit."""
 
     # Class attribute for filename validation
     _data_type_name = "circuit"
