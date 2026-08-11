@@ -87,6 +87,25 @@ def ozone_wf(test_data_files_path) -> Wavefunction:
     return Wavefunction.from_hdf5_file(str(test_data_files_path / "ozone_sparse_ci_wavefunction.wavefunction.h5"))
 
 
+def _assert_uses_binary_encoding(circuit: Circuit) -> None:
+    """Assert the circuit was built by the binary-encoding composition, not the dense fallback.
+
+    Without this the suite cannot distinguish a working binary encoding from a silent
+    fallback to the plain sparse-isometry path in :meth:`_run_binary_encoding`.
+
+    Args:
+        circuit: Circuit returned by the sparse isometry state preparation.
+
+    """
+    factory = circuit._qsharp_factory
+    assert factory is not None, "Binary encoding must produce a Q# circuit, not a QASM fallback."
+    program = getattr(factory.program, "__name__", "")
+    assert program == "QDKChemistry.Utils.BinaryEncoding.MakeComposeBinaryEncodingCircuit", (
+        f"Expected the binary-encoding composition but the circuit was built by '{program}'."
+    )
+    assert factory.parameter["binaryEncodingOps"], "Binary-encoding op sequence must not be empty."
+
+
 class TestSparseIsometryBinaryEncoding:
     """Tests for the sparse isometry binary encoding state preparation."""
 
@@ -96,6 +115,7 @@ class TestSparseIsometryBinaryEncoding:
         circuit = binary_encoding_prep.run(ozone_wf)
         assert isinstance(circuit, Circuit)
         assert circuit.encoding == "jordan-wigner"
+        _assert_uses_binary_encoding(circuit)
 
         result = circuit.estimate()
         assert isinstance(result, EstimatorResult)
@@ -123,6 +143,7 @@ class TestSparseIsometryBinaryEncoding:
         circuit = binary_encoding_prep.run(ozone_wf)
         expected_sv = create_statevector_from_wavefunction(ozone_wf, normalize=True)
         n_system = int(np.log2(len(expected_sv)))
+        _assert_uses_binary_encoding(circuit)
 
         qc = circuit.get_qiskit_circuit()
         sim_data = np.array(Statevector.from_instruction(qc))
@@ -159,6 +180,7 @@ class TestSparseIsometryBinaryEncoding:
         circuit = binary_encoding_prep.run(wf)
         assert isinstance(circuit, Circuit)
         assert circuit.encoding == "jordan-wigner"
+        _assert_uses_binary_encoding(circuit)
 
         # Derive qubit counts from the matrix.
         # Dense register qubits are system qubits (via rowMap); the extra
@@ -183,6 +205,7 @@ class TestSparseIsometryBinaryEncoding:
         prep = create("state_prep", "sparse_isometry", binary_encoding=True, include_negative_controls=False)
         circuit = prep.run(ozone_wf)
         assert isinstance(circuit, Circuit)
+        _assert_uses_binary_encoding(circuit)
         lc = circuit.estimate()["logicalCounts"]
         assert lc["numQubits"] == 10  # 10 system qubits; pool covers the 1 ancilla
         assert lc["tCount"] == 7
@@ -266,6 +289,7 @@ class TestSparseIsometryBinaryEncoding:
         circuit = create("state_prep", "sparse_isometry", binary_encoding=True).run(wf)
         expected_sv = create_statevector_from_wavefunction(wf, normalize=True)
         n_system = 2 * n_orbitals
+        _assert_uses_binary_encoding(circuit)
 
         qc = circuit.get_qiskit_circuit()
         sim_data = np.array(Statevector.from_instruction(qc))
@@ -314,6 +338,10 @@ class TestSparseIsometryBinaryEncoding:
         assert isinstance(circuit, Circuit)
         assert circuit.encoding == "jordan-wigner"
 
+        # The fallback must not go through the binary-encoding composition.
+        factory_program = getattr(circuit._qsharp_factory.program, "__name__", "")
+        assert factory_program == "QDKChemistry.Utils.StatePreparation.MakeComposeSparseIsometryCircuit"
+
         lc = circuit.estimate()["logicalCounts"]
         # No binary-encoding SELECT/SELECT_AND ops in the fallback path.
         assert lc["cczCount"] == 0
@@ -358,6 +386,54 @@ class TestSparseIsometryBinaryEncoding:
         )
 
 
+class TestMeasurementBasedUncompute:
+    """Tests for binary encoding with measurement-based AND uncomputation.
+
+    This path replaces Toffoli uncomputation with a measurement plus a classically
+    controlled correction, so the circuit carries mid-circuit measurement and
+    feedforward and can only be simulated by a shot-based simulator.
+    """
+
+    def test_trades_toffolis_for_measurements(self, ozone_wf):
+        """measurement_based_uncompute=True lowers the CCZ count and introduces measurements."""
+        toffoli_circuit = create("state_prep", "sparse_isometry", binary_encoding=True).run(ozone_wf)
+        measured_circuit = create(
+            "state_prep", "sparse_isometry", binary_encoding=True, measurement_based_uncompute=True
+        ).run(ozone_wf)
+        _assert_uses_binary_encoding(measured_circuit)
+
+        toffoli_counts = toffoli_circuit.estimate()["logicalCounts"]
+        measured_counts = measured_circuit.estimate()["logicalCounts"]
+        assert toffoli_counts["measurementCount"] == 0
+        assert measured_counts["measurementCount"] > 0
+        assert measured_counts["cczCount"] < toffoli_counts["cczCount"]
+
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+    @pytest.mark.parametrize("seed_simulator", [1, 7, 13, 21])
+    def test_statevector_independent_of_measurement_outcome(self, ozone_wf, seed_simulator):
+        """The prepared state must be the target state whichever way the mid-circuit measurements fall."""
+        aer = pytest.importorskip("qiskit_aer")
+
+        from qdk_chemistry.plugins.qiskit.conversion import create_statevector_from_wavefunction  # noqa: PLC0415
+
+        circuit = create("state_prep", "sparse_isometry", binary_encoding=True, measurement_based_uncompute=True).run(
+            ozone_wf
+        )
+        expected_sv = create_statevector_from_wavefunction(ozone_wf, normalize=True)
+        n_system = int(np.log2(len(expected_sv)))
+
+        qc = circuit.get_qiskit_circuit().copy()
+        # Mid-circuit measurement rules out Statevector.from_instruction, so run a shot on Aer.
+        qc.save_statevector()
+        result = aer.AerSimulator(method="statevector").run(qc, shots=1, seed_simulator=seed_simulator).result()
+
+        system_sv = np.asarray(result.get_statevector())[: 2**n_system]
+        overlap = np.abs(np.vdot(expected_sv, system_sv))
+        assert np.isclose(
+            overlap, 1.0, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+        )
+
+
 class TestBinaryEncodingWithQPE:
     """Tests for binary encoding state preparation integrated with QPE circuit builders."""
 
@@ -374,6 +450,7 @@ class TestBinaryEncodingWithQPE:
 
         # Build binary encoding state prep — requires ancilla beyond the pool
         state_prep_circuit = create("state_prep", "sparse_isometry", binary_encoding=True).run(wf)
+        _assert_uses_binary_encoding(state_prep_circuit)
         sp_lc = state_prep_circuit.estimate()["logicalCounts"]
         num_system_qubits = 2 * 6  # 12 system qubits
         state_prep_total_qubits = sp_lc["numQubits"]
@@ -422,6 +499,7 @@ class TestBinaryEncodingWithQPE:
         wf = create_random_wavefunction(n_electrons=6, n_orbitals=6, n_dets=20, seed=42)
 
         state_prep_circuit = create("state_prep", "sparse_isometry", binary_encoding=True).run(wf)
+        _assert_uses_binary_encoding(state_prep_circuit)
         sp_lc = state_prep_circuit.estimate()["logicalCounts"]
         num_system_qubits = 12
         state_prep_total_qubits = sp_lc["numQubits"]
@@ -518,6 +596,7 @@ class TestBinaryEncodingWithQPE:
 
         # Binary encoding state prep — must require ancilla
         state_prep_circuit = create("state_prep", "sparse_isometry", binary_encoding=True).run(wf)
+        _assert_uses_binary_encoding(state_prep_circuit)
         sp_lc = state_prep_circuit.estimate()["logicalCounts"]
         state_prep_qubits = sp_lc["numQubits"]
         extra_ancilla = state_prep_qubits - n
