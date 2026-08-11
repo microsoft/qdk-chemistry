@@ -253,9 +253,21 @@ double FactorizedHamiltonianContainer::get_lambda_eff() const {
 }
 
 Eigen::MatrixXd FactorizedHamiltonianContainer::get_h1_majorana() const {
-  // Majorana one-body shift (Eq. 38):
-  //   h1'_{pq} = h1_{pq} + Σ_r h2'_{pqrr}
-  //              - Σ_{rc} wB^{rc} Σ_{b∈[B]} w_b^{rc} u^r_{b,p} u^r_{b,q}
+  // Majorana one-body shift (Eq. 38). Writing the rank-r copy-c leaf as
+  //   M^{rc}_{pq} = Σ_{b∈[B]} w_b^{rc} u^r_{b,p} u^r_{b,q},
+  // the three accumulated corrections are
+  //   h1'_{pq} = h1_{pq} - ½ Σ_{rc} (M^{rc} M^{rc})_{pq}   (a) normal-ordering
+  //                      + Σ_{rc} tr(M^{rc}) M^{rc}_{pq}   (b)
+  //                      - Σ_{rc} wB^{rc} M^{rc}_{pq}      (c)
+  //
+  // Term (a) has no counterpart in Eq. 38 as printed, because the paper writes
+  // the two-body term as a plain product of E operators while this container
+  // stores h2 = (pq|rs) normal-ordered, i.e.
+  //   H = E_core + Σ h1_{pq} E_pq + ½ Σ h2_{pqrs} (E_pq E_rs - δ_qr E_ps).
+  // Unpacking that -½ δ_qr E_ps piece leaves the one-body remainder
+  // -½ Σ_s h2_{pssq} = -½ Σ_{rc} (M^{rc} M^{rc})_{pq}. Dropping it would make
+  // h1' -- and hence Λ -- silently wrong. See also the docstring in
+  // factorized.hpp, which lists all three terms.
   size_t norb = get_num_orbitals();
   size_t R = get_num_ranks();
   size_t B = get_num_bases();

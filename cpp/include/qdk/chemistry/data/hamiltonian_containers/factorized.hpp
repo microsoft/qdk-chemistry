@@ -154,9 +154,20 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
 
   /**
    * @brief Compute the adjusted Majorana one-body matrix (Eq. 38).
-   * h'(1)_{pq} = h1_{pq} - ½ Σ_{rs} h2_{prrs→pq}
-   *              + Σ_{rs} h2_{pqrr}
-   *              - Σ_{rc,b} WB^{rc} W^{rc}_b U^r_{bp} U^r_{bq}
+   *
+   * Writing the rank-r copy-c leaf as
+   *   M^{rc}_{pq} = Σ_{b∈[B]} W^{rc}_b U^r_{bp} U^r_{bq},
+   * this accumulates three corrections:
+   *   h'(1)_{pq} = h1_{pq} - ½ Σ_{rc} (M^{rc} M^{rc})_{pq}
+   *                        + Σ_{rc} tr(M^{rc}) M^{rc}_{pq}
+   *                        - Σ_{rc} WB^{rc} M^{rc}_{pq}
+   *
+   * The leading -½ (M M) term has no counterpart in Eq. 38 as printed: the paper
+   * writes the two-body operator as a plain product while this container stores
+   * h2 = (pq|rs) normal-ordered, and unpacking that difference leaves exactly
+   * -½ Σ_s h2_{pssq}. It is required, not optional -- see the derivation in the
+   * implementation.
+   *
    * @return The [N,N] matrix, contracted directly from the factors.
    */
   Eigen::MatrixXd get_h1_majorana() const;
@@ -165,6 +176,11 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    * @brief Reconstruct the approximate two-body integrals.
    * h2_{pqrs} = Σ_{r,c} (Σ_b U^r_{bp} U^r_{bq} W^r_{bc})
    *                      (Σ_{b'} U^r_{b'r} U^r_{b's} W^r_{b'c})
+   *
+   * Note this is built purely from (U, W): the identity weight WB is deliberately
+   * absent, matching Eq. 26. WB enters only get_h1_majorana() and get_lambda(),
+   * so it is a gauge parameter for the two-body tensor rather than unused data.
+   *
    * @return A flat N^4 vector in [p,q,r,s] order.
    */
   Eigen::VectorXd reconstruct_two_body_integrals() const;
