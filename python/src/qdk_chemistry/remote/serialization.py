@@ -363,7 +363,7 @@ def get_serialized_file_names(entry: dict[str, Any]) -> list[str]:
     raise TypeError(f"Unknown type tag: {type_tag}")
 
 
-def serialize_inputs(  # noqa: PLR0917
+def serialize_inputs(
     directory: str | Path,
     args: tuple,
     kwargs: dict,
