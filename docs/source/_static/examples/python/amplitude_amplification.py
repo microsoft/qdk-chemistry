@@ -21,7 +21,7 @@ amplitude_amplification = create("amplitude_amplification", "qdk_base", rounds=2
 import math
 
 import numpy as np
-from qdk_chemistry.algorithms import create, phase_marking_oracle
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -70,26 +70,35 @@ state_prep_oracle = builder.run(
 )[0]
 
 # 4. Mark the phase bins holding the target eigenvalue. QPE writes the phase phi of
-# the eigenvalue exp(2 pi i phi) into bin round(phi * 2**num_bits), so the half-open
-# window (8, 9) accepts bin 8 alone, that is phi = 0.5.
-target_phase_bins = (8, 9)
-good_state_oracle = phase_marking_oracle(state_prep_oracle, target_phase_bins)
+# the eigenvalue exp(2 pi i phi) into bin round(phi * 2**num_bits). The target
+# eigenvector |11> has energy E = -pi/4 - pi/4 = -lambda, and the walk maps it to
+# phi = arccos(E / lambda) / 2 pi = 0.5, that is bin 0.5 * 16 = 8. So the half-open
+# window (8, 9) accepts bin 8 alone.
+good_state_oracle = create(
+    "good_state_oracle", "qdk_phase_marking", target_phase_bins=(8, 9)
+).run(state_prep_oracle)
 
-# The same window can be named by energy instead. The walk maps E to
-# phi = arccos(E / lambda) / 2 pi, with lambda the L1 norm of the Hamiltonian, and
-# marks both signs of that phase. Here it selects bin 8 again.
-good_state_oracle = phase_marking_oracle(
-    state_prep_oracle,
-    target_energy_range=(-np.inf, -0.99 * qubit_hamiltonian.schatten_norm),
-    qubit_hamiltonian=qubit_hamiltonian,
-)
+# The same target can be named by energy instead, which avoids doing that conversion by
+# hand. Both signs of the phase are marked, because the walk has eigenvalues
+# exp(+-i arccos(E / lambda)). Here bin 8 is its own mirror, so this is the same oracle:
+#
+#     good_state_oracle = create(
+#         "good_state_oracle",
+#         "qdk_phase_marking",
+#         target_energy_range=(-np.inf, -0.99 * qubit_hamiltonian.schatten_norm),
+#     ).run(state_prep_oracle, qubit_hamiltonian=qubit_hamiltonian)
 
-# 5. Amplify, then execute
+# 5. Amplify, then execute. The overlap is a = 0.3**2 = 0.09, so
+# arcsin(sqrt(a)) = 0.3047 and 2 rounds put (2k+1) arcsin(sqrt(a)) at 1.523, just under
+# pi/2: the probability of landing in bin 8 rises from 0.09 to sin^2(1.523) = 0.998.
+# A third round would overshoot back down to 0.79.
 amplitude_amplification = create("amplitude_amplification", "qdk_base", rounds=2)
 circuit = amplitude_amplification.run(state_prep_oracle, good_state_oracle)
 
 executor = create("circuit_executor", "qdk_sparse_state_simulator")
 shots = 400
+# Keys are big-endian over the whole register, so the phase register is the last
+# num_bits characters: almost every shot reads "1000", the binary form of bin 8.
 counts = executor.run(circuit, shots=shots).bitstring_counts
 
 # end-cell-run

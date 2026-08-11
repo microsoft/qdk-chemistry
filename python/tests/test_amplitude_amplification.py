@@ -14,10 +14,10 @@ import pytest
 from qdk import qsharp
 
 from qdk_chemistry.algorithms import available, create
-from qdk_chemistry.algorithms.amplitude_amplification import (
-    AmplitudeAmplification,
+from qdk_chemistry.algorithms.amplitude_amplification import AmplitudeAmplification
+from qdk_chemistry.algorithms.good_state_oracle import (
+    PhaseMarkingOracle,
     _phase_bins_from_energy_range,
-    phase_marking_oracle,
 )
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
@@ -111,7 +111,7 @@ def _amplified_qpe_circuit(
         mapper=mapper,
         unitary=unitary,
     )
-    good_state_oracle = phase_marking_oracle(state_prep_oracle, accepted_range)
+    good_state_oracle = create("good_state_oracle", target_phase_bins=accepted_range).run(state_prep_oracle)
 
     algorithm = create("amplitude_amplification", **settings)
     circuit = algorithm.run(state_prep_oracle, good_state_oracle)
@@ -157,6 +157,38 @@ def test_amplitude_amplification_is_registered():
 def test_rounds_setting_defaults_to_one():
     algorithm = create("amplitude_amplification")
     assert algorithm.settings().get("rounds") == 1
+
+
+def test_good_state_oracle_is_registered():
+    assert available("good_state_oracle") == ["qdk_phase_marking"]
+    default = create("good_state_oracle")
+    assert default.name() == "qdk_phase_marking"
+    assert default.type_name() == "good_state_oracle"
+    assert isinstance(default, PhaseMarkingOracle)
+
+
+def test_good_state_oracle_target_settings_default_to_unset():
+    """Neither target is chosen by default, so a caller has to name one explicitly."""
+    algorithm = create("good_state_oracle")
+    assert list(algorithm.settings().get("target_phase_bins")) == []
+    assert list(algorithm.settings().get("target_energy_range")) == []
+
+
+def test_good_state_oracle_rejects_a_malformed_target():
+    """Both targets are two-element intervals, so any other length is refused."""
+    qpe_circuit, _, _ = _qpe_preparation(_diagonal_hamiltonian(), _guiding_state(0.3, 3), num_bits=4)
+    with pytest.raises(ValueError, match="exactly two"):
+        create("good_state_oracle", target_phase_bins=(1, 2, 3)).run(qpe_circuit)
+    with pytest.raises(ValueError, match="exactly two"):
+        create("good_state_oracle", target_energy_range=(-1.0,)).run(
+            qpe_circuit, qubit_hamiltonian=_diagonal_hamiltonian()
+        )
+
+
+def test_good_state_oracle_rejects_a_circuit_that_is_not_qpe():
+    """The oracle reads its register layout off the QPE circuit, so it refuses anything else."""
+    with pytest.raises(ValueError, match="standard QPE circuit"):
+        create("good_state_oracle", target_phase_bins=(0, 1)).run(_all_ones_marking_oracle())
 
 
 def test_amplified_qpe_circuit():
@@ -250,19 +282,20 @@ def test_marking_oracle_circuit_is_executable():
     """The oracle circuit runs on its own: it marks the all-zeros register when bin 0 is accepted."""
     executor = create("circuit_executor", "qdk_sparse_state_simulator")
     qpe_circuit, _, _ = _qpe_preparation(_diagonal_hamiltonian(), _guiding_state(0.3, 3), num_bits=3)
-    assert executor.run(phase_marking_oracle(qpe_circuit, (0, 1)), shots=20).bitstring_counts == {"1": 20}
-    assert executor.run(phase_marking_oracle(qpe_circuit, (1, 8)), shots=20).bitstring_counts == {"0": 20}
+    marks_bin_zero = create("good_state_oracle", target_phase_bins=(0, 1)).run(qpe_circuit)
+    marks_the_rest = create("good_state_oracle", target_phase_bins=(1, 8)).run(qpe_circuit)
+    assert executor.run(marks_bin_zero, shots=20).bitstring_counts == {"1": 20}
+    assert executor.run(marks_the_rest, shots=20).bitstring_counts == {"0": 20}
 
 
 def test_energy_window_selects_the_same_bins_as_the_hand_computed_window():
     """An energy window around -lambda reproduces the hand-computed bin 8 of 16."""
     hamiltonian = _diagonal_hamiltonian()
     qpe_circuit, _, _ = _qpe_preparation(hamiltonian, _guiding_state(0.3, 3), num_bits=4)
-    oracle = phase_marking_oracle(
-        qpe_circuit,
+    oracle = create(
+        "good_state_oracle",
         target_energy_range=(-math.inf, -0.99 * hamiltonian.schatten_norm),
-        qubit_hamiltonian=hamiltonian,
-    )
+    ).run(qpe_circuit, qubit_hamiltonian=hamiltonian)
     parameters = oracle._qsharp_factory.parameter
     assert (parameters["lowerBounds"], parameters["upperBounds"]) == ([8], [9])
 
@@ -274,11 +307,10 @@ def test_energy_window_marks_both_walk_branches():
     # |01> has energy 0.3 - 0.5 = -0.2, away from +-lambda, so the two branches are distinct bins.
     energy = float(coefficients[0] - coefficients[1])
     qpe_circuit, _, _ = _qpe_preparation(hamiltonian, _guiding_state(1.0, 1), num_bits=4)
-    oracle = phase_marking_oracle(
-        qpe_circuit,
+    oracle = create(
+        "good_state_oracle",
         target_energy_range=(energy - 0.02, energy + 0.02),
-        qubit_hamiltonian=hamiltonian,
-    )
+    ).run(qpe_circuit, qubit_hamiltonian=hamiltonian)
     parameters = oracle._qsharp_factory.parameter
     marked = {
         phase_bin
@@ -296,13 +328,17 @@ def test_energy_window_rejects_an_ambiguous_or_incomplete_request():
     hamiltonian = _diagonal_hamiltonian()
     qpe_circuit, _, _ = _qpe_preparation(hamiltonian, _guiding_state(0.3, 3), num_bits=4)
     with pytest.raises(ValueError, match="exactly one"):
-        phase_marking_oracle(qpe_circuit)
+        create("good_state_oracle").run(qpe_circuit)
     with pytest.raises(ValueError, match="exactly one"):
-        phase_marking_oracle(qpe_circuit, (8, 9), target_energy_range=(-2.0, -1.0), qubit_hamiltonian=hamiltonian)
+        create(
+            "good_state_oracle",
+            target_phase_bins=(8, 9),
+            target_energy_range=(-2.0, -1.0),
+        ).run(qpe_circuit, qubit_hamiltonian=hamiltonian)
     with pytest.raises(ValueError, match="qubit_hamiltonian"):
-        phase_marking_oracle(qpe_circuit, target_energy_range=(-2.0, -1.0))
+        create("good_state_oracle", target_energy_range=(-2.0, -1.0)).run(qpe_circuit)
     with pytest.raises(ValueError, match="low < high"):
-        phase_marking_oracle(qpe_circuit, target_energy_range=(-1.0, -2.0), qubit_hamiltonian=hamiltonian)
+        create("good_state_oracle", target_energy_range=(-1.0, -2.0)).run(qpe_circuit, qubit_hamiltonian=hamiltonian)
 
 
 @pytest.mark.parametrize(
@@ -348,11 +384,10 @@ def test_energy_window_at_the_top_of_the_band_builds_a_runnable_oracle():
     """Mirroring bin 0 names bin 2^n, which the phase register cannot hold, so it must be dropped."""
     hamiltonian = _diagonal_hamiltonian()
     qpe_circuit, _, _ = _qpe_preparation(hamiltonian, _guiding_state(0.3, 3), num_bits=4)
-    oracle = phase_marking_oracle(
-        qpe_circuit,
+    oracle = create(
+        "good_state_oracle",
         target_energy_range=(0.99 * hamiltonian.schatten_norm, math.inf),
-        qubit_hamiltonian=hamiltonian,
-    )
+    ).run(qpe_circuit, qubit_hamiltonian=hamiltonian)
     parameters = oracle._qsharp_factory.parameter
     assert (parameters["lowerBounds"], parameters["upperBounds"]) == ([0], [1])
 

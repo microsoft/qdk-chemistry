@@ -21,7 +21,7 @@ from qdk_chemistry.algorithms.active_space_selector import (
     QdkOccupationActiveSpaceSelector,
     QdkValenceActiveSpaceSelector,
 )
-from qdk_chemistry.algorithms.amplitude_amplification import AmplitudeAmplification, phase_marking_oracle
+from qdk_chemistry.algorithms.amplitude_amplification import AmplitudeAmplification
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.controlled_circuit_mapper.base import ControlledCircuitMapper
 from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator, QdkMP2Calculator
@@ -29,6 +29,7 @@ from qdk_chemistry.algorithms.effective_hamiltonian_constructor import Effective
 from qdk_chemistry.algorithms.expectation_estimator.expectation_estimator import ExpectationEstimator
 from qdk_chemistry.algorithms.expectation_estimator.qdk import QdkExpectationEstimator
 from qdk_chemistry.algorithms.geometry_optimization import GeometryOptimizer, GeometryOptimizerSettings
+from qdk_chemistry.algorithms.good_state_oracle import PhaseMarkingOracle
 from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTest
 from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
@@ -87,6 +88,7 @@ __all__ = [
     "NuclearDerivativeCalculator",
     "OrbitalLocalizer",
     "PhaseEstimation",
+    "PhaseMarkingOracle",
     "ProjectedMultiConfigurationCalculator",
     "QdkAutocasActiveSpaceSelector",
     "QdkAutocasEosActiveSpaceSelector",
@@ -118,7 +120,6 @@ __all__ = [
     "available",
     "create",
     "inspect_settings",
-    "phase_marking_oracle",
     "print_settings",
     "register",
     "show_default",

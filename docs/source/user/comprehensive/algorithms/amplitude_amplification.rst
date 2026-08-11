@@ -44,9 +44,10 @@ own measurement instead. See below for an example of amplifying a measurement-fr
 Amplitude amplified QPE
 -----------------------
 
-Build a measurement-free QPE circuit, mark the target phase bin, and amplify.
-:func:`~qdk_chemistry.algorithms.amplitude_amplification.phase_marking_oracle` reads the
-register layout from the QPE circuit, so only the target bins have to be given:
+Build a measurement-free QPE circuit, mark the target phase bin, and amplify. The
+:class:`~qdk_chemistry.algorithms.good_state_oracle.PhaseMarkingOracle` algorithm
+(``good_state_oracle`` / ``qdk_phase_marking``) reads the register layout from the QPE
+circuit, so only the target has to be given:
 
 .. tab:: Python API
 
@@ -68,6 +69,8 @@ amplifying an initial state preparation directly. See Lin and Tong,
 Settings
 --------
 
+``amplitude_amplification`` / ``qdk_base``:
+
 .. list-table::
    :header-rows: 1
    :widths: 25 15 60
@@ -78,6 +81,23 @@ Settings
    * - ``rounds``
      - ``int``
      - Number of Grover iterates (default 1). Must be non-negative.
+
+``good_state_oracle`` / ``qdk_phase_marking``. Exactly one of the two must be set:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``target_phase_bins``
+     - ``vector<int>``
+     - Half-open ``(low, high)`` window of QPE phase bins to mark.
+   * - ``target_energy_range``
+     - ``vector<double>``
+     - Half-open ``(low, high)`` energy window, converted to phase bins. Requires
+       ``qubit_hamiltonian`` on ``run`` and a qubitization-walk QPE circuit.
 
 Further Reading
 ---------------

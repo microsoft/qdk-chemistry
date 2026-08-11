@@ -723,6 +723,7 @@ def _register_python_factories():
         ControlledCircuitMapperFactory,
     )
     from qdk_chemistry.algorithms.expectation_estimator import ExpectationEstimatorFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.good_state_oracle import GoodStateOracleFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.hadamard_test import HadamardTestFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.hadamard_test.circuit_builder import (  # noqa: PLC0415
         HadamardTestCircuitBuilderFactory,
@@ -759,6 +760,7 @@ def _register_python_factories():
     register_factory(HadamardTestCircuitBuilderFactory())
     register_factory(PropagatorFactory())
     register_factory(AmplitudeAmplificationFactory())
+    register_factory(GoodStateOracleFactory())
 
 
 _ = _register_cpp_factories()
@@ -823,6 +825,7 @@ def _register_python_algorithms():
         ControlledPSPMapper,
     )
     from qdk_chemistry.algorithms.expectation_estimator.qdk import QdkExpectationEstimator  # noqa: PLC0415
+    from qdk_chemistry.algorithms.good_state_oracle import PhaseMarkingOracle  # noqa: PLC0415
     from qdk_chemistry.algorithms.hadamard_test.circuit_builder.qdk_builder import (  # noqa: PLC0415
         QdkHadamardTestCircuitBuilder,
     )
@@ -894,6 +897,7 @@ def _register_python_algorithms():
     register(lambda: QdkHadamardTestCircuitBuilder())
     register(lambda: StandardPhaseEstimation())
     register(lambda: AmplitudeAmplification())
+    register(lambda: PhaseMarkingOracle())
 
 
 _register_python_algorithms()
