@@ -115,13 +115,14 @@ TEST_F(FactorizedHamiltonianTest, Properties) {
   EXPECT_NEAR(gapped.get_lambda_eff(), 1.3527749258468684, 1e-12);
 }
 
-// The identity weight wB is a *gauge* parameter: paper Eq. 26 builds the two-body
-// tensor purely from (u, w), so moving wB must leave it bit-identical -- while Eq. 38
-// and Lambda must both respond, which is what makes wB a knob rather than dead data.
+// The identity weight wB is a *gauge* parameter: paper Eq. 26 builds the
+// two-body tensor purely from (u, w), so moving wB must leave it bit-identical
+// -- while Eq. 38 and Lambda must both respond, which is what makes wB a knob
+// rather than dead data.
 //
-// This pins the two halves against each other. Folding wB into the reconstruction
-// (a tempting "fix" when reading Eq. 26 next to Eq. 38) breaks the first half;
-// dropping it from get_h1_majorana breaks the second.
+// This pins the two halves against each other. Folding wB into the
+// reconstruction (a tempting "fix" when reading Eq. 26 next to Eq. 38) breaks
+// the first half; dropping it from get_h1_majorana breaks the second.
 TEST_F(FactorizedHamiltonianTest, IdentityWeightIsGaugeForTwoBodyOnly) {
   auto reference = make_container();
   const Eigen::VectorXd h2_ref = reference->reconstruct_two_body_integrals();
@@ -153,15 +154,17 @@ TEST_F(FactorizedHamiltonianTest, IdentityWeightIsGaugeForTwoBodyOnly) {
   }
 }
 
-// Eq. 38 as printed lists two corrections; get_h1_majorana applies three. The extra
-// -1/2 (M M)_pq converts the stored normal-ordered h2 = (pq|rs) to the paper's
-// plain-product convention, so it is required rather than optional.
+// Eq. 38 as printed lists two corrections; get_h1_majorana applies three. The
+// extra -1/2 (M M)_pq converts the stored normal-ordered h2 = (pq|rs) to the
+// paper's plain-product convention, so it is required rather than optional.
 //
-// Note the base fixture has tr(M) == wB == 0.2, which makes terms (b) and (c) cancel
-// and leaves the golden-value test above unable to tell them apart. Perturbing wB
-// here breaks that degeneracy so all three terms are exercised independently.
+// Note the base fixture has tr(M) == wB == 0.2, which makes terms (b) and (c)
+// cancel and leaves the golden-value test above unable to tell them apart.
+// Perturbing wB here breaks that degeneracy so all three terms are exercised
+// independently.
 TEST_F(FactorizedHamiltonianTest, MajoranaOneBodyCarriesNormalOrderingTerm) {
-  // M_{pq} = sum_b w_b u_{b,p} u_{b,q}  (the fixture has a single rank and copy).
+  // M_{pq} = sum_b w_b u_{b,p} u_{b,q}  (the fixture has a single rank and
+  // copy).
   Eigen::MatrixXd m = Eigen::MatrixXd::Zero(N, N);
   for (size_t b = 0; b < B; ++b) {
     Eigen::VectorXd ub(N);
@@ -175,14 +178,14 @@ TEST_F(FactorizedHamiltonianTest, MajoranaOneBodyCarriesNormalOrderingTerm) {
   for (double wb_value : wb_values) {
     Eigen::MatrixXd wb_alt(R, C);
     wb_alt(0, 0) = wb_value;
-    FactorizedHamiltonianContainer container(core_energy, u, w, wb_alt, one_body,
-                                             inactive_fock, orbitals, bliss_shift,
-                                             energy_gap);
+    FactorizedHamiltonianContainer container(core_energy, u, w, wb_alt,
+                                             one_body, inactive_fock, orbitals,
+                                             bliss_shift, energy_gap);
 
     Eigen::MatrixXd expected = one_body;
-    expected -= 0.5 * (m * m);   // (a) normal-ordering remainder
-    expected += m.trace() * m;   // (b)
-    expected -= wb_value * m;    // (c)
+    expected -= 0.5 * (m * m);  // (a) normal-ordering remainder
+    expected += m.trace() * m;  // (b)
+    expected -= wb_value * m;   // (c)
     EXPECT_TRUE(container.get_h1_majorana().isApprox(expected, 1e-12))
         << "three-term Eq. 38 model failed at wB=" << wb_value;
 

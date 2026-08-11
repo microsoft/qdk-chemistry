@@ -162,11 +162,11 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    *                        + Σ_{rc} tr(M^{rc}) M^{rc}_{pq}
    *                        - Σ_{rc} WB^{rc} M^{rc}_{pq}
    *
-   * The leading -½ (M M) term has no counterpart in Eq. 38 as printed: the paper
-   * writes the two-body operator as a plain product while this container stores
-   * h2 = (pq|rs) normal-ordered, and unpacking that difference leaves exactly
-   * -½ Σ_s h2_{pssq}. It is required, not optional -- see the derivation in the
-   * implementation.
+   * The leading -½ (M M) term has no counterpart in Eq. 38 as printed: the
+   * paper writes the two-body operator as a plain product while this container
+   * stores h2 = (pq|rs) normal-ordered, and unpacking that difference leaves
+   * exactly -½ Σ_s h2_{pssq}. It is required, not optional -- see the
+   * derivation in the implementation.
    *
    * @return The [N,N] matrix, contracted directly from the factors.
    */
@@ -177,9 +177,10 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    * h2_{pqrs} = Σ_{r,c} (Σ_b U^r_{bp} U^r_{bq} W^r_{bc})
    *                      (Σ_{b'} U^r_{b'r} U^r_{b's} W^r_{b'c})
    *
-   * Note this is built purely from (U, W): the identity weight WB is deliberately
-   * absent, matching Eq. 26. WB enters only get_h1_majorana() and get_lambda(),
-   * so it is a gauge parameter for the two-body tensor rather than unused data.
+   * Note this is built purely from (U, W): the identity weight WB is
+   * deliberately absent, matching Eq. 26. WB enters only get_h1_majorana() and
+   * get_lambda(), so it is a gauge parameter for the two-body tensor rather
+   * than unused data.
    *
    * @return A flat N^4 vector in [p,q,r,s] order.
    */
