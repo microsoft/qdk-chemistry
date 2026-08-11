@@ -16,6 +16,7 @@ from qdk_chemistry.data.base import DataClass as _PythonDataClass
 
 _DATACLASS_REGISTRY: dict[str, type[_CoreDataClass]] = {}
 _REGISTRY_LOCK = RLock()
+_DISCOVERY_COMPLETE = False
 
 
 def _declared_type_name(dataclass_type: type[_CoreDataClass]) -> str:
@@ -49,6 +50,12 @@ def register_dataclass(dataclass_type: type[_CoreDataClass]) -> type[_CoreDataCl
     if not isinstance(dataclass_type, type) or not issubclass(dataclass_type, _CoreDataClass):
         raise TypeError("registered data classes must derive from qdk_chemistry.data.DataClass")
 
+    _discover_imported_dataclasses(excluded_type=dataclass_type)
+    return _register_dataclass(dataclass_type)
+
+
+def _register_dataclass(dataclass_type: type[_CoreDataClass]) -> type[_CoreDataClass]:
+    """Register a validated DataClass without triggering discovery."""
     type_name = _declared_type_name(dataclass_type)
     with _REGISTRY_LOCK:
         registered_type = _DATACLASS_REGISTRY.get(type_name)
@@ -61,21 +68,33 @@ def register_dataclass(dataclass_type: type[_CoreDataClass]) -> type[_CoreDataCl
     return dataclass_type
 
 
-def _discover_imported_dataclasses() -> None:
+def _discover_imported_dataclasses(*, excluded_type: type[_CoreDataClass] | None = None) -> None:
     """Register canonical DataClass types that are already imported."""
-    import qdk_chemistry.data  # noqa: PLC0415
-    import qdk_chemistry.data.symmetry  # noqa: F401, PLC0415
+    global _DISCOVERY_COMPLETE  # noqa: PLW0603
 
-    stack = list(_PythonDataClass.__subclasses__()) + list(_CoreDataClass.__subclasses__())
-    seen: set[int] = set()
-    while stack:
-        dataclass_type = stack.pop()
-        if id(dataclass_type) in seen:
-            continue
-        seen.add(id(dataclass_type))
-        if dataclass_type is not _PythonDataClass and declares_data_type_name(dataclass_type):
-            register_dataclass(dataclass_type)
-        stack.extend(dataclass_type.__subclasses__())
+    with _REGISTRY_LOCK:
+        if _DISCOVERY_COMPLETE:
+            return
+
+        import qdk_chemistry.data  # noqa: PLC0415
+        import qdk_chemistry.data.symmetry  # noqa: F401, PLC0415
+
+        stack = list(_PythonDataClass.__subclasses__()) + list(_CoreDataClass.__subclasses__())
+        seen: set[int] = set()
+        while stack:
+            dataclass_type = stack.pop()
+            if id(dataclass_type) in seen:
+                continue
+            seen.add(id(dataclass_type))
+            if (
+                dataclass_type is not _PythonDataClass
+                and dataclass_type is not excluded_type
+                and dataclass_type.__module__.startswith("qdk_chemistry.")
+                and declares_data_type_name(dataclass_type)
+            ):
+                _register_dataclass(dataclass_type)
+            stack.extend(dataclass_type.__subclasses__())
+        _DISCOVERY_COMPLETE = True
 
 
 def get_dataclass_type(type_name: str) -> type[_CoreDataClass] | None:

@@ -30,9 +30,10 @@ requiring application code to import the plugin package directly.
          def register(self, registrar: PluginRegistrar) -> None:
               registrar.register_algorithm(lambda: CustomAlgorithm())
 
-Bundled integrations
---------------------
-QDK/Chemistry also includes integrations for:
+Optional integration packages
+-----------------------------
+Separately distributed integration packages extend the
+``qdk_chemistry.plugins`` namespace with modules such as:
 
 * :mod:`qdk_chemistry.plugins.pyscf` for electronic-structure algorithms;
 * :mod:`qdk_chemistry.plugins.qiskit` for circuit construction, mapping, and execution;
@@ -40,9 +41,9 @@ QDK/Chemistry also includes integrations for:
 * :mod:`qdk_chemistry.plugins.networkx` for graph-coloring term grouping; and
 * :mod:`qdk_chemistry.plugins.geometric` for molecular geometry optimization.
 
-Bundled integrations are loaded automatically when their optional dependencies
-are available. Their implementations can then be created through the standard
-algorithm registry, for example ``create("scf_solver", "pyscf")``.
+Install the corresponding optional package before importing one of these
+modules. Its implementations can then be created through the standard algorithm
+registry, for example ``create("scf_solver", "pyscf")``.
 """
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.

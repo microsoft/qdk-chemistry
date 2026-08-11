@@ -57,6 +57,25 @@ def test_registration_explains_missing_plugin_type_name():
         register_dataclass(PluginDataWithoutTypeName)
 
 
+def test_registration_rejects_builtin_wire_type_before_discovery(monkeypatch):
+    """Plugin registration cannot claim a built-in loader's wire type."""
+    monkeypatch.setattr(dataclass_registry, "_DATACLASS_REGISTRY", {})
+    monkeypatch.setattr(dataclass_registry, "_DISCOVERY_COMPLETE", False)
+
+    class PluginSettings(DataClass):
+        """Plugin class claiming the Settings wire type."""
+
+        @staticmethod
+        def data_type_name():
+            """Return the colliding wire type."""
+            return Settings.data_type_name()
+
+    with pytest.raises(DuplicateRegistrationError, match="already registered"):
+        register_dataclass(PluginSettings)
+
+    assert get_dataclass_type("settings") is Settings
+
+
 def test_registration_rejects_duplicate_wire_type(monkeypatch):
     """Two plugin classes cannot silently claim the same serialized identifier."""
     monkeypatch.setattr(dataclass_registry, "_DATACLASS_REGISTRY", {})
