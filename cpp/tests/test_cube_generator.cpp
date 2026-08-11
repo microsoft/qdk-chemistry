@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <Eigen/Dense>
+#include <cstdint>
 #include <limits>
 #include <memory>
 #include <qdk/chemistry/cube/cube_generator.hpp>
@@ -55,6 +56,13 @@ TEST(CubeGridTest, RejectsInvalidDimensionsAndOverflow) {
   grid.ny = 2;
   grid.nz = 1;
   EXPECT_THROW(grid.num_points(), std::overflow_error);
+
+  if constexpr (std::numeric_limits<std::size_t>::max() >
+                static_cast<std::size_t>(std::numeric_limits<int64_t>::max())) {
+    grid.nx = static_cast<std::size_t>(std::numeric_limits<int64_t>::max());
+    grid.ny = 2;
+    EXPECT_THROW(grid.num_points(), std::overflow_error);
+  }
 }
 
 TEST(CubeGeneratorTest, EvaluatesHydrogenOrbitalAndDensity) {

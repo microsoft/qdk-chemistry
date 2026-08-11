@@ -51,9 +51,10 @@ CubeGrid CubeGrid::from_basis_set(const data::BasisSet& basis_set,
 std::size_t CubeGrid::num_points() const {
   if (nx == 0 || ny == 0 || nz == 0)
     throw std::invalid_argument("CubeGrid: dimensions must be positive.");
-  if (nx > std::numeric_limits<std::size_t>::max() / ny ||
-      nx * ny > std::numeric_limits<std::size_t>::max() / nz)
-    throw std::overflow_error("CubeGrid: point count overflows size_t.");
+  constexpr auto max =
+      static_cast<std::size_t>(std::numeric_limits<int64_t>::max());
+  if (nx > max / ny || nx * ny > max / nz)
+    throw std::overflow_error("CubeGrid: point count exceeds gauXC's limit.");
   return nx * ny * nz;
 }
 
@@ -116,10 +117,6 @@ GauXC::Molecule to_gauxc_mol(const data::Structure& st) {
 
 GauXC::CubeGrid to_gauxc_grid(const CubeGrid& g) {
   g.num_points();
-  constexpr auto max =
-      static_cast<std::size_t>(std::numeric_limits<int64_t>::max());
-  if (g.nx > max || g.ny > max || g.nz > max)
-    throw std::overflow_error("CubeGrid: dimension exceeds gauXC's limit.");
   return {{g.origin[0], g.origin[1], g.origin[2]},
           {g.spacing[0], g.spacing[1], g.spacing[2]},
           int64_t(g.nx),
