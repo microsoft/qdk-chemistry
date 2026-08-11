@@ -270,14 +270,6 @@ def _energy_from_phase(phase_fraction: float) -> float:
     return angle / T_TIME
 
 
-def _resolve_energy(raw_energy: float, reference: float) -> tuple[list[float], float]:
-    period = 2 * np.pi / T_TIME
-    candidates = sorted(
-        {s * raw_energy + period * k for k in range(-2, 3) for s in (1, -1)}
-    )
-    return candidates, min(candidates, key=lambda e: abs(e - reference))
-
-
 result = QpeResult.from_phase_fraction(
     method="iterative_exact",
     phase_fraction=phase_fraction,
@@ -286,19 +278,14 @@ result = QpeResult.from_phase_fraction(
     bits_msb_first=bits[::-1],
 )
 
-raw_energy = result.raw_energy
-candidate_energies, resolved_energy = _resolve_energy(raw_energy, casci_energy)
-estimated_total_energy = resolved_energy + core_energy
+estimated_electronic_energy = result.raw_energy
+estimated_total_energy = estimated_electronic_energy + core_energy
 
 Logger.info(f"Measured bits (MSB → LSB): {list(result.bits_msb_first or [])}")
 Logger.info(
     f"Phase fraction φ (measured): {result.phase_fraction:.6f} (angle = {result.phase_angle:.6f} rad)"
 )
-Logger.info(f"Raw energy_from_phase output: {raw_energy:+.8f} Hartree")
-Logger.info("Candidate energies (alias checks):")
-for energy in candidate_energies:
-    Logger.info(f"  E = {energy:+.8f} Hartree")
-Logger.info(f"Estimated electronic energy: {resolved_energy:.8f} Hartree")
+Logger.info(f"Estimated electronic energy: {estimated_electronic_energy:.8f} Hartree")
 Logger.info(f"Estimated total energy: {estimated_total_energy:.8f} Hartree")
 Logger.info(f"Reference total energy (CASCI): {casci_energy:.8f} Hartree")
 iterative_energy_error = estimated_total_energy - casci_energy
