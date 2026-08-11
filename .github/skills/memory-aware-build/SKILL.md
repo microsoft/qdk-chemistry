@@ -12,7 +12,7 @@ job. Limit build parallelism by both the available memory and the CPU count.
 2. Reserve 5 GB of available RAM for each compile job.
 3. Set the job count to the smaller of:
    - the logical CPU count;
-   - `floor(available RAM in GB / 8)`.
+   - `floor(available RAM in GB / 5)`.
 4. Always use at least one job. If available memory cannot be determined, use
    one job.
 5. Export the result as `CMAKE_BUILD_PARALLEL_LEVEL` before invoking a build,
