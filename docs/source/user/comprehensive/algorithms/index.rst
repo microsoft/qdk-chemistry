@@ -11,6 +11,7 @@ All algorithms follow a :doc:`factory pattern <factory_pattern>` design, allowin
    factory_pattern
    settings
    active_space
+   effective_hamiltonian_constructor
    expectation_estimator
    hamiltonian_constructor
    localizer
@@ -55,6 +56,9 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
    * - :doc:`HamiltonianConstructor <hamiltonian_constructor>`
      - Molecular Hamiltonian construction
      - Orbitals → Hamiltonian
+   * - :doc:`EffectiveHamiltonianConstructor <effective_hamiltonian_constructor>`
+     - Hamiltonian downfolding into a target space
+     - Wavefunction + Hamiltonian + target indices → Hamiltonian
    * - :doc:`MultiConfigurationCalculator <mc_calculator>`
      - Many-body wavefunction calculations
      - Hamiltonian → Wavefunction
