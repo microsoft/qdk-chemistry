@@ -211,6 +211,15 @@ reference basis. ROHF uses the spin-traced density and common spin-free
 orbital energies, preserving spin symmetry while the active solve selects the
 desired spin sector.
 
+``fold_above_two_body`` is enabled by default. The transformation generates
+three-body terms that a Hamiltonian cannot hold; folding normal-orders them
+against the reference density and keeps what falls to two-body, instead of
+discarding them outright. Discarding is the larger error whenever the kept
+space holds more than two electrons, but folding costs several times the kernel
+time, so the setting exists for cases where that matters. It is ignored when the
+kept space holds at most two electrons, where a three-body operator has no
+matrix elements to contribute.
+
 The active regularization, minimum denominator, maximum raw intruder amplitude,
 and semicanonicalization status are logged when construction completes. A
 warning is also logged when the raw amplitude exceeds one, where the

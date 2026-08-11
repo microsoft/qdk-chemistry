@@ -152,6 +152,10 @@ Hamiltonian's inactive orbitals must be the reference core orbitals outside the 
      - bool
      - ``True``
      - Diagonalize the generalized Fock matrix within each orbital-role block.
+   * - ``fold_above_two_body``
+     - bool
+     - ``True``
+     - Fold the three-body terms the transformation generates onto the reference density instead of discarding them. Ignored when :math:`P` holds at most two electrons.
    * - ``max_folded_occupation_deviation``
      - float
      - ``0.5``
@@ -201,20 +205,113 @@ one, where the perturbation series stops contracting, also produces a warning. T
 parameter is a policy default rather than an accuracy guarantee, so compare regularization
 choices when the logged values indicate sensitivity.
 
-This implementation truncates the transformed Hamiltonian to at most two-body operators and
-uses diagonal generalized-Fock denominators. The truncation is not a uniformly small
-correction: :math:`\tfrac{1}{2}[S,H_{\mathrm{OD}}]` contains three-body terms that the output
-Hamiltonian cannot represent, so the emitted operator reproduces the exact second-order Van
-Vleck operator only while :math:`P` holds at most two electrons -- a three-body operator has no
-matrix elements below three electrons. From three electrons on the discarded term contributes,
-and it grows with the electron count in :math:`P`. This is a property of the kept space, not of
-how many orbitals are folded: folding a single valence virtual of water in a minimal basis into
-a six-electron kept space costs about 0.2 :math:`E_h`, where that orbital is worth
-:math:`-0.02\ E_h` exactly and :math:`-0.06\ E_h` at untruncated second order, but the
-truncated operator returns :math:`+0.14\ E_h`. Nothing in the intruder diagnostics detects
-this, since it is a truncation error rather than a small denominator. Treat downfolded results
-for active spaces holding more than two electrons as qualitative unless you can check them
-against a larger calculation.
+This implementation emits at most two-body operators and uses diagonal
+generalized-Fock denominators. :math:`\tfrac{1}{2}[S,H_{\mathrm{OD}}]` also generates three-body
+terms, which a Hamiltonian cannot hold. Discarding them outright is not a small correction: a
+three-body operator has no matrix elements below three electrons, so it would be harmless only
+while :math:`P` holds at most two, and its cost grows with the electron count in :math:`P`.
+Folding a single valence virtual of water in a minimal basis into a six-electron kept space
+that way costs about 0.2 :math:`E_h`, more than the orbital is worth and of the opposite sign.
+
+Instead of discarding them, the terms above two-body are folded onto the reference: each is
+normal-ordered against the reference one-particle density :math:`\gamma` and whatever falls to
+two-body is kept, so only the reference-normal-ordered residual is lost rather than the whole
+term. Nothing here requires :math:`\gamma` to describe a single determinant, so open-shell,
+natural-orbital and correlated active-space references are all handled; what is neglected is
+the two-body density cumulant.
+
+What folding buys is a *bounded* error rather than a uniformly smaller one. Discarding is
+erratic -- sometimes accidentally near-exact, sometimes catastrophic, with nothing in the
+inputs to say which -- while folding lands in a narrow band. Measured over 64 cases spanning
+ten molecules, two basis sets, closed- and open-shell references, active spaces from 4 to 8
+electrons, and one to three folded virtuals, against full CI in the same window:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 28 24 24 24
+
+   * - Error vs full CI
+     - median
+     - mean
+     - worst
+   * - Discarding
+     - 0.244
+     - 0.499
+     - 2.687
+   * - Folding
+     - 0.005
+     - 0.006
+     - 0.016
+
+The gap widens as more orbitals are folded, which is the direction of practical interest.
+Folding more orbitals generates more of the discarded terms, so discarding degrades sharply
+while folding stays flat:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 16 16 23 23
+
+   * - Folded virtuals
+     - Cases
+     - Folding loses
+     - Median, discarding
+     - Median, folding
+   * - 1
+     - 34
+     - 5
+     - 0.087
+     - 0.005
+   * - 2
+     - 19
+     - 2
+     - 0.359
+     - 0.005
+   * - 3
+     - 11
+     - 0
+     - 1.264
+     - 0.005
+
+Open-shell references behave at least as well as closed-shell ones: of 11 ROHF cases folding
+won 10 and lost none, by factors of 14 to 125. The spin-traced density gives each singly
+occupied orbital half an electron per spin, which keeps the emitted operator spin-free.
+
+Folding is nevertheless **not** a strict improvement. It lost in 7 of the 64 cases, all with a
+single folded virtual, all in multiply bonded systems (N2, CO) where the discarded terms are
+small or cancel so their reference contractions move a nearly exact answer away from full CI.
+The largest such loss was 0.011 :math:`E_h`. Correlation strength does not predict the
+direction, so there is no useful criterion to gate on, and no substitute for checking against
+a larger calculation when the answer matters.
+
+The benefit also grows with the electron count in :math:`P`. In a separate sweep over 86
+cases, folding won 17 of 18 at eight active electrons and 8 of 9 at ten, while at four
+electrons it was an even split -- three-body operators simply matter more as :math:`P` fills.
+
+Folding also removes a spurious sensitivity to the regularizer. Discarded three-body terms
+used to leave flow and bare denominators disagreeing by 0.4 :math:`E_h` on the equilibrium
+case, which looked like an intruder problem and was not; folded, they agree to about 0.002
+:math:`E_h`.
+
+Two consequences follow. The emitted operator now depends on the reference density, so its
+accuracy degrades as the active-space solution moves away from that reference. And the
+occupations are read after semicanonicalization, since that rotation mixes occupied and empty
+orbitals within the kept space.
+
+Folding is not free, and its cost depends on the reference. Reaching two-body means
+enumerating contractions that the two-body truncation would otherwise let the projection skip,
+and the enumeration prunes a branch as soon as a reference propagator vanishes. A determinant
+reference therefore costs about six to seven times the kernel time, while a correlated
+reference, whose density is dense after semicanonicalization, costs roughly sixteen to
+twenty-three times. Folding does not change the asymptotic scaling, which stays near
+:math:`O(N_{\mathrm{active}}^5)` either way; it is a constant multiplier.
+
+It is therefore controlled by ``fold_above_two_body``, on by default because discarding is the
+larger error. A kept space holding at most two electrons skips the cost automatically, since
+the discarded terms have no matrix elements to contribute there.
+
+Dense four-center integrals require :math:`O(N^4)` storage, and semicanonicalizing a
+noncanonical window costs :math:`O(N^5)`. The retained commutator also grows steeply with the
+size of :math:`P`. Use it for modest dense windows rather than windows of hundreds of orbitals.
 
 Dense four-center integrals require :math:`O(N^4)` storage, and semicanonicalizing a
 noncanonical window costs :math:`O(N^5)`. The retained commutator also grows steeply with the
