@@ -338,6 +338,9 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
   // 1-RDM survives into the denominators.
   Eigen::MatrixXd fock =
       kern::generalized_fock_matrix(h1a, g_aaaa, density, norb);
+  // The fold reads occupations in the basis it runs in, so the density follows
+  // the rotation instead of being dropped here.
+  Eigen::MatrixXd folded_density = density;
   Eigen::MatrixXd semicanonical_transform =
       Eigen::MatrixXd::Identity(norb, norb);
   bool semicanonical_applied = false;
@@ -352,9 +355,8 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
     if (semicanonical_applied) {
       h1a = kern::rotate_one_body(h1a, semicanonical_transform);
       g_aaaa = kern::rotate_two_body(g_aaaa, semicanonical_transform, norb);
-      // Rotating the Fock is equivalent to rebuilding it from the rotated
-      // density, so the density itself is not needed past this point.
       fock = kern::rotate_one_body(fock, semicanonical_transform);
+      folded_density = kern::rotate_one_body(density, semicanonical_transform);
     }
   }
 
@@ -365,6 +367,30 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
   const auto f = kern::spin_orbital_one_body(h1a, h1a, norb);
   const auto part = kern::make_partition(norb, active_spatial, inactive_spatial,
                                          virtual_spatial);
+
+  // Terms above two-body cannot be emitted, and discarding them throws away
+  // their reference contractions, which dominate. `folded_density` lets the
+  // kernel fold them onto the reference instead; it is read in the
+  // semicanonical basis, so it had to follow the rotation above. Below three
+  // active electrons a three-body operator has no matrix elements at all, so
+  // folding would only add reference-specific terms at several times the cost.
+  const bool fold_pays = split.active_electrons > 2;
+  const bool fold_requested = _settings->get<bool>("fold_above_two_body");
+  const bool fold = fold_requested && fold_pays;
+  bool idempotent_kept_space = true;
+  constexpr double idempotency_tolerance = 1e-6;
+  for (std::size_t i = 0; i < active_spatial.size() && idempotent_kept_space;
+       ++i) {
+    const int p = active_spatial[i];
+    for (std::size_t j = 0; j < active_spatial.size(); ++j)
+      if (i != j && std::abs(folded_density(p, active_spatial[j])) >
+                        idempotency_tolerance)
+        idempotent_kept_space = false;
+    const double n = folded_density(p, p);
+    if (std::abs(n) > idempotency_tolerance &&
+        std::abs(n - 2.0) > idempotency_tolerance)
+      idempotent_kept_space = false;
+  }
 
   kern::RegularizerOptions reg;
   // The settings bounds admit zero, which the amplitude diagnostic divides by.
@@ -387,7 +413,9 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
                                       ? "imaginary shift"
                                       : "none";
 
-  const auto down = kern::downfold_blocked(f, blk, eps, part, reg, e_core);
+  const auto down =
+      kern::downfold_blocked(f, blk, eps, part, reg, e_core, {},
+                             fold ? folded_density : Eigen::MatrixXd());
 
   // Warn on the RAW amplitude: the regularizer damps the operator, so a
   // regularized amplitude would hide the very channels it compensates for.
@@ -397,9 +425,15 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
   constexpr double intruder_warn_amplitude = 1.0;
   QDK_LOGGER().info(
       "SW-PT2 downfold complete: regularization={}, minimum denominator={:.3g} "
-      "Eh, maximum raw amplitude={:.3g}, semicanonical rotation applied={}",
+      "Eh, maximum raw amplitude={:.3g}, semicanonical rotation applied={}, "
+      "above two-body={}",
       regularizer, down.min_denominator, down.max_amplitude,
-      semicanonical_applied);
+      semicanonical_applied,
+      !fold ? (fold_requested ? "not folded (kept space holds at most two "
+                                "electrons)"
+                              : "discarded (fold_above_two_body is off)")
+      : idempotent_kept_space ? "folded onto a determinant reference"
+                              : "folded onto a correlated reference");
   if (down.max_amplitude > intruder_warn_amplitude) {
     if (regularizer == "none")
       QDK_LOGGER().warn(

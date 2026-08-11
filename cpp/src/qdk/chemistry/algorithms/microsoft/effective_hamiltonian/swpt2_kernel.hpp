@@ -170,12 +170,18 @@ struct ActiveDownfoldResult {
 ///
 /// `f` is the spin-orbital one-body from `spin_orbital_one_body`; `e_core` is
 /// the scalar core energy.
-ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
-                                      const SpinBlockedTwoBody& blk,
-                                      const Eigen::VectorXd& eps,
-                                      const SpinOrbitalPartition& part,
-                                      const RegularizerOptions& reg,
-                                      double e_core);
+///
+/// `occupied_so` lists the active spin-orbitals occupied in the reference
+/// determinant. When given, terms above two-body are folded onto that
+/// reference rather than discarded, which is what makes the emitted operator
+/// usable for kept spaces holding more than two electrons. Leave it empty to
+/// discard them.
+ActiveDownfoldResult downfold_blocked(
+    const Eigen::MatrixXd& f, const SpinBlockedTwoBody& blk,
+    const Eigen::VectorXd& eps, const SpinOrbitalPartition& part,
+    const RegularizerOptions& reg, double e_core,
+    const std::vector<int>& occupied_so = {},
+    const Eigen::MatrixXd& reference_density = {});
 
 /// Relabel the compact `ActiveDownfoldResult` active block to compact spatial
 /// chemist integrals for a qdk CanonicalFourCenter Hamiltonian.

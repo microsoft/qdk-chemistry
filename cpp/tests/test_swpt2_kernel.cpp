@@ -787,13 +787,74 @@ TEST(Swpt2KernelTest, ProductionMatchesOracleForWiderKeptSpaces) {
 }
 
 // ---------------------------------------------------------------------------
+// The general-density fold must reduce to the particle-hole construction when
+// the reference density is idempotent, since the two are then the same
+// expansion. This is the sharpest available check on the general path: it needs
+// no new reference data, and any sign or convention slip in the contraction
+// enumeration breaks it.
+// ---------------------------------------------------------------------------
+TEST(Swpt2KernelTest, GeneralDensityFoldMatchesParticleHoleForADeterminant) {
+  const std::vector<int> active{0, 1, 2, 3};
+  const std::vector<int> virtuals{4};
+  const int norb = 5;
+  const std::vector<int> occupied_so{0, 1, 2, 3};
+
+  Eigen::MatrixXd h1 = Eigen::MatrixXd::Zero(norb, norb);
+  Eigen::VectorXd eps(2 * norb);
+  std::mt19937 generator(0xC0FFEEu + norb);
+  std::uniform_real_distribution<double> coupling(-0.09, 0.09);
+  for (int o = 0; o < norb; ++o) {
+    const double energy = -1.0 + 0.55 * o;
+    h1(o, o) = energy;
+    eps(2 * o) = eps(2 * o + 1) = energy;
+  }
+  for (int p = 0; p < norb; ++p)
+    for (int q = p + 1; q < norb; ++q)
+      h1(p, q) = h1(q, p) = coupling(generator);
+  Eigen::VectorXd g = Eigen::VectorXd::Zero(norb * norb * norb * norb);
+  for (int p = 0; p < norb; ++p)
+    for (int q = p; q < norb; ++q)
+      for (int r = 0; r < norb; ++r)
+        for (int s = r; s < norb; ++s)
+          set_sym_eri(g, p, q, r, s, norb, coupling(generator));
+
+  // Same determinant, expressed as an idempotent spin-traced density.
+  Eigen::MatrixXd reference_density = Eigen::MatrixXd::Zero(norb, norb);
+  reference_density(0, 0) = reference_density(1, 1) = 2.0;
+
+  const double core_energy = 0.17;
+  const auto part = sw::make_partition(norb, active, {}, virtuals);
+  const sw::RegularizerOptions reg;
+  const auto one_body = sw::spin_orbital_one_body(h1, h1, norb);
+  const auto blocked = sw::build_two_body_blocked(g, norb);
+
+  const auto particle_hole = sw::downfold_blocked(
+      one_body, blocked, eps, part, reg, core_energy, occupied_so);
+  const auto general = sw::downfold_blocked(one_body, blocked, eps, part, reg,
+                                            core_energy, {}, reference_density);
+
+  EXPECT_NEAR(general.e, particle_hole.e, 1e-12);
+  ASSERT_EQ(general.f_active.rows(), particle_hole.f_active.rows());
+  EXPECT_LT((general.f_active - particle_hole.f_active).cwiseAbs().maxCoeff(),
+            1e-12);
+  ASSERT_EQ(general.v_abab.size(), particle_hole.v_abab.size());
+  EXPECT_LT((general.v_abab - particle_hole.v_abab).cwiseAbs().maxCoeff(),
+            1e-12);
+
+  // Guard against the comparison passing because neither path did anything.
+  const auto discarded =
+      sw::downfold_blocked(one_body, blocked, eps, part, reg, core_energy);
+  EXPECT_GT((general.v_abab - discarded.v_abab).cwiseAbs().maxCoeff(), 1e-6);
+}
+
+// ---------------------------------------------------------------------------
 // Pin where the two-body truncation starts to bite. H_eff is truncated to at
 // most two-body, so it reproduces the exact second-order Van Vleck operator
 // only in sectors that cannot resolve a three-body operator, i.e. with at most
 // two active electrons. From three electrons on the discarded three-body term
-// contributes and the mismatch is physical, not a defect: it is the size of the
-// approximation. This test documents the onset so a future change that retains
-// higher-rank terms shows up here.
+// contributes and the mismatch is the size of the approximation. This pins the
+// onset for the discarding path, which is what `downfold_blocked` does when no
+// reference occupations are supplied; pass them to fold the terms instead.
 // ---------------------------------------------------------------------------
 TEST(Swpt2KernelTest, TwoBodyTruncationIsExactUpToTwoActiveElectrons) {
   const std::vector<int> active{0, 1, 2, 3};
@@ -866,6 +927,225 @@ TEST(Swpt2KernelTest, TwoBodyTruncationIsExactUpToTwoActiveElectrons) {
   // The three-body term the truncation discards first contributes here.
   EXPECT_GT(sector_error(3), 1e-6);
   EXPECT_GT(sector_error(6), sector_error(3));
+}
+
+// ---------------------------------------------------------------------------
+// Folding the discarded terms onto the reference determinant instead of
+// dropping them. Compare ground-state energies per electron-number sector --
+// what a downstream CI solver actually sees -- against the exact second-order
+// Van Vleck operator.
+// ---------------------------------------------------------------------------
+TEST(Swpt2KernelTest, FoldingAboveTwoBodyBeatsDiscarding) {
+  const std::vector<int> active{0, 1, 2, 3};
+  const std::vector<int> virtuals{4};
+  const int norb = 5;
+  // Reference determinant: active spatial 0 and 1 doubly occupied -> 4
+  // electrons.
+  const std::vector<int> occupied_so{0, 1, 2, 3};
+
+  Eigen::MatrixXd h1 = Eigen::MatrixXd::Zero(norb, norb);
+  Eigen::VectorXd eps(2 * norb);
+  std::mt19937 generator(0xC0FFEEu + norb);
+  std::uniform_real_distribution<double> coupling(-0.09, 0.09);
+  for (int o = 0; o < norb; ++o) {
+    const double energy = -1.0 + 0.55 * o;
+    h1(o, o) = energy;
+    eps(2 * o) = eps(2 * o + 1) = energy;
+  }
+  for (int p = 0; p < norb; ++p)
+    for (int q = p + 1; q < norb; ++q)
+      h1(p, q) = h1(q, p) = coupling(generator);
+  Eigen::VectorXd g = Eigen::VectorXd::Zero(norb * norb * norb * norb);
+  for (int p = 0; p < norb; ++p)
+    for (int q = p; q < norb; ++q)
+      for (int r = 0; r < norb; ++r)
+        for (int s = r; s < norb; ++s)
+          set_sym_eri(g, p, q, r, s, norb, coupling(generator));
+
+  const double core_energy = 0.17;
+  const auto part = sw::make_partition(norb, active, {}, virtuals);
+  const sw::RegularizerOptions reg;
+  const MatrixSwParts reference =
+      build_matrix_sw_parts(h1, g, eps, part, core_energy, reg);
+  const Eigen::MatrixXd reference_effective =
+      reference.block_diagonal +
+      0.5 * (reference.generator * reference.off_diagonal -
+             reference.off_diagonal * reference.generator);
+
+  const auto expand_active = [&](std::uint64_t compact) {
+    std::uint64_t full = 0;
+    for (std::size_t a = 0; a < active.size(); ++a)
+      for (int spin = 0; spin < 2; ++spin)
+        if (compact & (std::uint64_t{1} << (2 * a + spin)))
+          full |= std::uint64_t{1} << (2 * active[a] + spin);
+    return static_cast<int>(full);
+  };
+
+  const auto production_for = [&](const std::vector<int>& occ) {
+    return spatial_chemist_matrix(sw::to_spatial_chemist(
+        sw::downfold_blocked(sw::spin_orbital_one_body(h1, h1, norb),
+                             sw::build_two_body_blocked(g, norb), eps, part,
+                             reg, core_energy, occ),
+        part));
+  };
+  const auto production_for_density = [&](const Eigen::MatrixXd& gamma) {
+    return spatial_chemist_matrix(sw::to_spatial_chemist(
+        sw::downfold_blocked(sw::spin_orbital_one_body(h1, h1, norb),
+                             sw::build_two_body_blocked(g, norb), eps, part,
+                             reg, core_energy, {}, gamma),
+        part));
+  };
+  const Eigen::MatrixXd dropped = production_for({});
+  const Eigen::MatrixXd folded = production_for(occupied_so);
+  // A correlated reference carrying the same four electrons, but spread over
+  // the kept space instead of sitting in two doubly occupied orbitals.
+  Eigen::MatrixXd fractional = Eigen::MatrixXd::Zero(norb, norb);
+  fractional(0, 0) = 1.80;
+  fractional(1, 1) = 1.60;
+  fractional(2, 2) = 0.40;
+  fractional(3, 3) = 0.20;
+  const Eigen::MatrixXd folded_fractional = production_for_density(fractional);
+  // Worst case for neglecting the two-body cumulant: a maximally open-shell
+  // density, every kept orbital half filled.
+  Eigen::MatrixXd strongly_correlated = Eigen::MatrixXd::Zero(norb, norb);
+  for (int o : active) strongly_correlated(o, o) = 1.0;
+  const Eigen::MatrixXd folded_strong =
+      production_for_density(strongly_correlated);
+
+  const auto sector_states = [&](int electrons) {
+    std::vector<std::uint64_t> states;
+    for (std::uint64_t occupation = 0; occupation < 256; ++occupation)
+      if (__builtin_popcountll(occupation) == electrons)
+        states.push_back(occupation);
+    return states;
+  };
+  // Lowest eigenvalue in a sector: what a downstream CI solver actually sees.
+  const auto ground_state = [&](const Eigen::MatrixXd& production,
+                                int electrons, bool exact) {
+    const auto states = sector_states(electrons);
+    const auto dimension = static_cast<Eigen::Index>(states.size());
+    Eigen::MatrixXd block(dimension, dimension);
+    for (Eigen::Index bra = 0; bra < dimension; ++bra)
+      for (Eigen::Index ket = 0; ket < dimension; ++ket)
+        block(bra, ket) = exact
+                              ? reference_effective(expand_active(states[bra]),
+                                                    expand_active(states[ket]))
+                              : production(static_cast<int>(states[bra]),
+                                           static_cast<int>(states[ket]));
+    return Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd>(block).eigenvalues()(
+        0);
+  };
+
+  for (int electrons = 1; electrons <= 6; ++electrons) {
+    const double exact = ground_state(dropped, electrons, true);
+    const double drop_error = ground_state(dropped, electrons, false) - exact;
+    const double fold_error = ground_state(folded, electrons, false) - exact;
+    const double fractional_error =
+        ground_state(folded_fractional, electrons, false) - exact;
+    const double strong_error =
+        ground_state(folded_strong, electrons, false) - exact;
+    std::printf(
+        "  %d electrons: drop %+.3e  fold %+.3e  fractional %+.3e  strong "
+        "%+.3e\n",
+        electrons, drop_error, fold_error, fractional_error, strong_error);
+    // Below three electrons the discarded term cannot contribute, so folding
+    // only adds reference-specific contractions and is expected to be worse.
+    if (electrons >= 3)
+      EXPECT_LT(std::abs(fold_error), 0.5 * std::abs(drop_error))
+          << "folding must beat discarding at " << electrons << " electrons";
+  }
+
+  // How far from a determinant can the reference be before folding stops
+  // paying? Interpolate occupations (2-d, 2-d, d, d) from a determinant (d=0)
+  // to half filled (d=1), and evaluate at the electron count the density
+  // carries -- the count a downstream solve is given. Folding degrades
+  // smoothly to break-even as the neglected two-body cumulant grows, but never
+  // does worse than discarding. Sectors that do not match the reference are a
+  // different question and are not covered here.
+  for (double d = 0.0; d <= 1.001; d += 0.25) {
+    Eigen::MatrixXd gamma = Eigen::MatrixXd::Zero(norb, norb);
+    gamma(0, 0) = gamma(1, 1) = 2.0 - d;
+    gamma(2, 2) = gamma(3, 3) = d;
+    const Eigen::MatrixXd swept = production_for_density(gamma);
+    const double exact = ground_state(dropped, 4, true);
+    const double drop_error = std::abs(ground_state(dropped, 4, false) - exact);
+    const double fold_error = std::abs(ground_state(swept, 4, false) - exact);
+    EXPECT_LE(fold_error, drop_error * 1.02)
+        << "folding lost to discarding at idempotency parameter " << d;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// An open-shell reference reaches the fold as a spin-traced density, so each
+// singly occupied orbital contributes half an electron per spin. That keeps the
+// emitted operator spin-free, which is required: the two-body channel stores
+// only the opposite-spin block. Check it directly -- a spin-free operator
+// cannot distinguish Sz, so every (na, nb) sector must be degenerate with
+// (nb, na).
+// ---------------------------------------------------------------------------
+TEST(Swpt2KernelTest, OpenShellFoldStaysSpinFree) {
+  const std::vector<int> active{0, 1, 2, 3};
+  const std::vector<int> virtuals{4};
+  const int norb = 5;
+
+  Eigen::MatrixXd h1 = Eigen::MatrixXd::Zero(norb, norb);
+  Eigen::VectorXd eps(2 * norb);
+  std::mt19937 generator(0xC0FFEEu + norb);
+  std::uniform_real_distribution<double> coupling(-0.09, 0.09);
+  for (int o = 0; o < norb; ++o) {
+    const double energy = -1.0 + 0.55 * o;
+    h1(o, o) = energy;
+    eps(2 * o) = eps(2 * o + 1) = energy;
+  }
+  for (int p = 0; p < norb; ++p)
+    for (int q = p + 1; q < norb; ++q)
+      h1(p, q) = h1(q, p) = coupling(generator);
+  Eigen::VectorXd g = Eigen::VectorXd::Zero(norb * norb * norb * norb);
+  for (int p = 0; p < norb; ++p)
+    for (int q = p; q < norb; ++q)
+      for (int r = 0; r < norb; ++r)
+        for (int s = r; s < norb; ++s)
+          set_sym_eri(g, p, q, r, s, norb, coupling(generator));
+
+  // Restricted open-shell: one doubly occupied, two singly occupied.
+  Eigen::MatrixXd open_shell = Eigen::MatrixXd::Zero(norb, norb);
+  open_shell(0, 0) = 2.0;
+  open_shell(1, 1) = 1.0;
+  open_shell(2, 2) = 1.0;
+
+  const auto part = sw::make_partition(norb, active, {}, virtuals);
+  const sw::RegularizerOptions reg;
+  const Eigen::MatrixXd production =
+      spatial_chemist_matrix(sw::to_spatial_chemist(
+          sw::downfold_blocked(sw::spin_orbital_one_body(h1, h1, norb),
+                               sw::build_two_body_blocked(g, norb), eps, part,
+                               reg, 0.17, {}, open_shell),
+          part));
+
+  const auto ground_state = [&](int alpha_electrons, int beta_electrons) {
+    std::vector<std::uint64_t> states;
+    for (std::uint64_t occupation = 0; occupation < 256; ++occupation) {
+      int alpha = 0, beta = 0;
+      for (int spin_orbital = 0; spin_orbital < 8; ++spin_orbital)
+        if (occupation & (std::uint64_t{1} << spin_orbital))
+          ((spin_orbital % 2 == 0) ? alpha : beta)++;
+      if (alpha == alpha_electrons && beta == beta_electrons)
+        states.push_back(occupation);
+    }
+    const auto dimension = static_cast<Eigen::Index>(states.size());
+    Eigen::MatrixXd block(dimension, dimension);
+    for (Eigen::Index bra = 0; bra < dimension; ++bra)
+      for (Eigen::Index ket = 0; ket < dimension; ++ket)
+        block(bra, ket) = production(static_cast<int>(states[bra]),
+                                     static_cast<int>(states[ket]));
+    return Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd>(block).eigenvalues()(
+        0);
+  };
+
+  for (const auto& [alpha, beta] :
+       std::vector<std::pair<int, int>>{{3, 1}, {3, 2}, {4, 2}, {4, 1}})
+    EXPECT_NEAR(ground_state(alpha, beta), ground_state(beta, alpha), 1e-10)
+        << "Sz dependence at (" << alpha << ", " << beta << ")";
 }
 
 // ---------------------------------------------------------------------------

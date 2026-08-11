@@ -163,13 +163,20 @@ namespace {
 struct RetainedOperator {
   using Operator = std::pair<int, int>;  // (spin-orbital, 1=cre / 0=ann)
 
-  explicit RetainedOperator(const std::vector<int>& active_so)
+  RetainedOperator(const std::vector<int>& active_so,
+                   const std::vector<int>& occupied_so = {},
+                   const Eigen::MatrixXd& reference_density = {})
       : so2c(active_so.empty() ? 0 : active_so.back() + 1, -1),
+        occupied(so2c.size(), 0),
+        density(reference_density),
         one_body(Eigen::MatrixXd::Zero(active_so.size(), active_so.size())),
         two_body(Eigen::VectorXd::Zero(n4(active_so.size() / 2))) {
     for (int compact = 0; compact < static_cast<int>(active_so.size());
          ++compact)
       so2c[active_so[compact]] = compact;
+    for (int orbital : occupied_so) occupied[orbital] = 1;
+    has_density = density.size() > 0;
+    folds_above_two_body = !occupied_so.empty() || has_density;
   }
 
   void add(const Operator* term, int size, double coeff) {
@@ -187,10 +194,24 @@ struct RetainedOperator {
     }
   }
 
+  bool is_occupied(int orbital) const { return occupied[orbital] != 0; }
+
   double scalar = 0.0;
+  bool folds_above_two_body = false;
+  bool has_density = false;
   std::vector<int> so2c;
+  std::vector<char> occupied;
+  Eigen::MatrixXd density;  // spin-traced, over window spatial orbitals
   Eigen::MatrixXd one_body;
   Eigen::VectorXd two_body;
+
+  /// Reference propagator <a^dag_P a_Q> for spin-orbitals P, Q. The reference
+  /// is spin-restricted, so the spin-traced density splits evenly and opposite
+  /// spins do not contract.
+  double gamma(int P, int Q) const {
+    if (((P ^ Q) & 1) != 0) return 0.0;
+    return 0.5 * density(P >> 1, Q >> 1);
+  }
 
  private:
   int compact(int orbital) const { return so2c[orbital]; }
@@ -203,8 +224,90 @@ struct RetainedOperator {
   }
 };
 
-void normalize_retained(std::array<RetainedOperator::Operator, 8> ops, int n,
-                        double coeff, RetainedOperator& out) {
+// Walk every nonempty set of disjoint (creation, annihilation) contractions,
+// carrying the accumulated propagator product and sign and visiting the
+// uncontracted remainder. Pairs whose propagator vanishes are pruned during the
+// walk rather than after it, which is what keeps a diagonal reference density
+// cheap. Terms arrive canonically ordered -- creations first -- so every
+// annihilation sits to the right of every creation and removing a pair
+// preserves the order.
+template <class Visit>
+void walk_contractions(const std::array<RetainedOperator::Operator, 8>& ops,
+                       int n, const RetainedOperator& out, int position,
+                       std::array<char, 8>& removed, int depth, double weight,
+                       const Visit& visit) {
+  if (position >= n) {
+    if (depth == 0) return;
+    std::array<RetainedOperator::Operator, 8> remainder{};
+    int size = 0;
+    for (int i = 0; i < n; ++i)
+      if (!removed[i]) remainder[size++] = ops[i];
+    visit(remainder, size, weight);
+    return;
+  }
+  if (ops[position].second != 1 || removed[position]) {
+    walk_contractions(ops, n, out, position + 1, removed, depth, weight, visit);
+    return;
+  }
+  walk_contractions(ops, n, out, position + 1, removed, depth, weight, visit);
+  for (int j = position + 1; j < n; ++j) {
+    if (ops[j].second != 0 || removed[j]) continue;
+    const double propagator = out.gamma(ops[position].first, ops[j].first);
+    if (propagator == 0.0) continue;
+    int crossings = 0;
+    for (int between = position + 1; between < j; ++between)
+      if (!removed[between]) ++crossings;
+    removed[position] = removed[j] = 1;
+    walk_contractions(ops, n, out, position + 1, removed, depth + 1,
+                      (crossings % 2 != 0 ? -weight : weight) * propagator,
+                      visit);
+    removed[position] = removed[j] = 0;
+  }
+}
+
+// Reference-normal-ordered {A}, expressed back in vacuum-ordered strings. This
+// is the Wick identity A = sum_S eps(S) prod(gamma) {A_S} solved for {A}, so
+// the recursion is well founded: every term drops two operators.
+template <class Sink>
+void omega_normal(const std::array<RetainedOperator::Operator, 8>& ops, int n,
+                  double coeff, const RetainedOperator& out, const Sink& sink) {
+  sink(ops, n, coeff);
+  std::array<char, 8> removed{};
+  walk_contractions(
+      ops, n, out, 0, removed, 0, 1.0,
+      [&](const std::array<RetainedOperator::Operator, 8>& remainder, int size,
+          double weight) {
+        omega_normal(remainder, size, -coeff * weight, out, sink);
+      });
+}
+
+// A term above two-body cannot be emitted, and discarding it throws away its
+// reference contractions, which dominate. Keep everything except the
+// reference-normal-ordered residual: A - {A} = sum over nonempty contraction
+// sets. Unlike the particle-hole construction this needs no idempotency, so it
+// covers correlated and fractionally occupied references.
+void fold_general(const std::array<RetainedOperator::Operator, 8>& ops, int n,
+                  double coeff, RetainedOperator& out) {
+  std::array<char, 8> removed{};
+  walk_contractions(
+      ops, n, out, 0, removed, 0, 1.0,
+      [&](const std::array<RetainedOperator::Operator, 8>& remainder, int size,
+          double weight) {
+        omega_normal(
+            remainder, size, coeff * weight, out,
+            [&out](const std::array<RetainedOperator::Operator, 8>& term,
+                   int emitted_size, double value) {
+              // Anything still above two-body is the residual.
+              if (emitted_size <= 4) out.add(term.data(), emitted_size, value);
+            });
+      });
+}
+
+// Vacuum normal ordering. `sink` receives every fully ordered term, including
+// those above two-body, and decides what to do with them.
+template <class Sink>
+void normalize_terms(std::array<RetainedOperator::Operator, 8> ops, int n,
+                     double coeff, const Sink& sink) {
   for (int i = 0; i + 1 < n; ++i) {
     const int ai = ops[i].first, aa = ops[i].second;
     const int bi = ops[i + 1].first, ba = ops[i + 1].second;
@@ -212,18 +315,60 @@ void normalize_retained(std::array<RetainedOperator::Operator, 8> ops, int n,
     if (wrong) {
       auto swapped = ops;
       std::swap(swapped[i], swapped[i + 1]);
-      normalize_retained(swapped, n, -coeff, out);
+      normalize_terms(swapped, n, -coeff, sink);
       if (aa != ba && ai == bi) {
         auto contracted = ops;
         std::move(contracted.begin() + i + 2, contracted.begin() + n,
                   contracted.begin() + i);
-        normalize_retained(contracted, n - 2, coeff, out);
+        normalize_terms(contracted, n - 2, coeff, sink);
       }
       return;
     }
     if (aa == ba && ai == bi) return;
   }
-  if (n <= 4) out.add(ops.data(), n, coeff);
+  sink(ops, n, coeff);
+}
+
+// A term above two-body cannot be emitted, but dropping it outright discards
+// its reference contractions, which dominate. Exchange creation/annihilation
+// roles on the reference-occupied spin-orbitals, normal-order against that
+// vacuum, and keep whatever falls to two-body; only the
+// reference-normal-ordered residual is lost. Exact for a determinant reference,
+// so the contractions must come from integer occupations.
+void fold_above_two_body(const std::array<RetainedOperator::Operator, 8>& ops,
+                         int n, double coeff, RetainedOperator& out) {
+  const auto exchange = [&out](std::array<RetainedOperator::Operator, 8> term,
+                               int size) {
+    for (int i = 0; i < size; ++i)
+      if (out.is_occupied(term[i].first)) term[i].second = 1 - term[i].second;
+    return term;
+  };
+  const auto emit = [&out](
+                        const std::array<RetainedOperator::Operator, 8>& term,
+                        int size, double weight) {
+    if (size <= 4) out.add(term.data(), size, weight);
+  };
+  normalize_terms(exchange(ops, n), n, coeff,
+                  [&](const std::array<RetainedOperator::Operator, 8>& term,
+                      int size, double weight) {
+                    if (size > 4)
+                      return;  // the residual this approximation drops
+                    normalize_terms(exchange(term, size), size, weight, emit);
+                  });
+}
+
+void normalize_retained(std::array<RetainedOperator::Operator, 8> ops, int n,
+                        double coeff, RetainedOperator& out) {
+  normalize_terms(ops, n, coeff,
+                  [&out](const std::array<RetainedOperator::Operator, 8>& term,
+                         int size, double weight) {
+                    if (size <= 4)
+                      out.add(term.data(), size, weight);
+                    else if (out.has_density)
+                      fold_general(term, size, weight, out);
+                    else if (out.folds_above_two_body)
+                      fold_above_two_body(term, size, weight, out);
+                  });
 }
 
 template <std::size_t N>
@@ -481,14 +626,28 @@ void project_remaining(const Eigen::MatrixXd& A1, A2Get A2get,
       }
       // Above two-body rank only an A-annihilator / B-creator coincidence
       // survives normal ordering, so without one the whole matching is dropped.
+      // That holds only while terms above two-body are discarded; when they are
+      // folded onto the reference instead, every matching contributes.
       std::vector<int> a_annihilators, b_creators;
       for (int slot : ext_a)
         if (!is_cre[slot]) a_annihilators.push_back(slot);
       for (int slot : ext_b)
         if (is_cre[slot]) b_creators.push_back(slot);
-      const bool needs_coincidence = ext.size() > 4;
+      const bool needs_coincidence =
+          ext.size() > 4 && !out.folds_above_two_body;
       if (needs_coincidence && (a_annihilators.empty() || b_creators.empty()))
         continue;
+      // Folding relaxes that gate but not entirely: reaching two-body still
+      // costs one creation and one annihilation per contraction, so a matching
+      // without enough of either cannot contribute.
+      if (out.folds_above_two_body && ext.size() > 4) {
+        int creations = 0;
+        for (int slot : ext)
+          if (is_cre[slot]) ++creations;
+        const int annihilations = static_cast<int>(ext.size()) - creations;
+        const int required = (static_cast<int>(ext.size()) - 4) / 2;
+        if (creations < required || annihilations < required) continue;
+      }
       std::vector<int> order;
       for (const auto& pair : match) {
         order.push_back(pair.first);
@@ -696,12 +855,12 @@ Eigen::MatrixXd spin_orbital_one_body(const Eigen::MatrixXd& h1a,
   return f;
 }
 
-ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
-                                      const SpinBlockedTwoBody& blk,
-                                      const Eigen::VectorXd& eps,
-                                      const SpinOrbitalPartition& part,
-                                      const RegularizerOptions& reg,
-                                      double e_core) {
+ActiveDownfoldResult downfold_blocked(
+    const Eigen::MatrixXd& f, const SpinBlockedTwoBody& blk,
+    const Eigen::VectorXd& eps, const SpinOrbitalPartition& part,
+    const RegularizerOptions& reg, double e_core,
+    const std::vector<int>& occupied_so,
+    const Eigen::MatrixXd& reference_density) {
   const int n_so = part.n_so;
 
   std::vector<int> active_so;
@@ -815,7 +974,7 @@ ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
                       active_so[2 * s + 1]);
 
   // projected 1/2 [S, V] = 1/2 (project(S*V) - project(V*S)), on the fly.
-  RetainedOperator comm(active_so);
+  RetainedOperator comm(active_so, occupied_so, reference_density);
   project_two_cross_line(s2_at, od_v_at, part, +0.5, comm);
   project_two_cross_line(od_v_at, s2_at, part, -0.5, comm);
   project_remaining(s1, s2_at, od_f, od_v_at, part, +0.5, comm);
