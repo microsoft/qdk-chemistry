@@ -12,7 +12,6 @@ All algorithms follow a :doc:`factory pattern <factory_pattern>` design, allowin
    settings
    active_space
    effective_hamiltonian_constructor
-   effective_hamiltonian
    expectation_estimator
    hamiltonian_constructor
    localizer
