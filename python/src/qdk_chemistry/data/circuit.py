@@ -82,7 +82,10 @@ class Circuit(DataClass):
                 Valid values include "jordan-wigner", "bravyi-kitaev", "parity", or None.
                 Defaults to None.
             num_qubits: The width of the register ``qsharp_op`` acts on, when the producer
-                knows it. Defaults to None. See :attr:`num_qubits`.
+                knows it. Circuit mappers that lay their register out as ``[system | ancilla]``
+                set it so a caller can address the ancillas without knowing which mapper built
+                the circuit. Scratch qubits a circuit allocates internally are not counted.
+                Defaults to None.
 
         Notes:
             At least one representation (qasm, qir, qsharp, or qsharp_factory) must be provided.
