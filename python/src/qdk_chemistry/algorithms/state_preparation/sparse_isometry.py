@@ -38,7 +38,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from qdk_chemistry.algorithms.state_preparation.state_preparation import StatePreparation, StatePreparationSettings
+from qdk_chemistry.algorithms.state_preparation.state_preparation import StatePreparation
 from qdk_chemistry.data import (
     AlgorithmRef,
     BasisSet,
@@ -46,6 +46,7 @@ from qdk_chemistry.data import (
     Configuration,
     Orbitals,
     OrbitalType,
+    Settings,
     Shell,
     StateVectorContainer,
     Wavefunction,
@@ -61,11 +62,11 @@ __all__: list[str] = ["SparseIsometryStatePreparationSettings"]
 _QSHARP_DENSE_PREP_PROGRAM = "QDKChemistry.Utils.StatePreparation.MakeStatePreparationCircuit"
 
 
-class SparseIsometryStatePreparationSettings(StatePreparationSettings):
+class SparseIsometryStatePreparationSettings(Settings):
     """Settings for SparseIsometryStatePreparation."""
 
     def __init__(self):
-        """Initialize the StatePreparationSettings."""
+        """Initialize the SparseIsometryStatePreparationSettings."""
         super().__init__()
         self._set_default(
             "dense_state_prep",
@@ -401,10 +402,11 @@ class SparseIsometryStatePreparation(StatePreparation):
         full_qc.compose(dense_qc, qubits=embedding_map, inplace=True)
         apply_matrix_compression_ops(full_qc, expansion_ops)
 
-        # Transpile using the dense prep algorithm's settings to decompose
-        if dense_algo.settings().get("transpile"):
-            basis_gates = dense_algo.settings().get("basis_gates")
-            opt_level = dense_algo.settings().get("transpile_optimization_level")
+        # Transpilation is configured on the nested dense prep, which need not declare these settings.
+        dense_settings = dense_algo.settings()
+        if dense_settings.has("transpile") and dense_settings.get("transpile"):
+            basis_gates = dense_settings.get("basis_gates")
+            opt_level = dense_settings.get("transpile_optimization_level")
             full_qc = transpile(full_qc, basis_gates=basis_gates, optimization_level=opt_level)
 
         return Circuit(qasm=qasm3.dumps(full_qc), encoding="jordan-wigner")
@@ -473,11 +475,12 @@ class SparseIsometryStatePreparation(StatePreparation):
         apply_matrix_compression_ops(full_qc, binary_encoding_ops)
         apply_matrix_compression_ops(full_qc, gaussian_elimination_ops)
 
-        # Transpile using the dense prep algorithm's settings to decompose
-        # multi-controlled gates (e.g. MCX) whose QASM3 export has a Qiskit bug.
-        if dense_algo.settings().get("transpile"):
-            basis_gates = dense_algo.settings().get("basis_gates")
-            opt_level = dense_algo.settings().get("transpile_optimization_level")
+        # Transpilation is configured on the nested dense prep, which need not declare these settings.
+        # Needed to decompose multi-controlled gates (e.g. MCX) whose QASM3 export has a Qiskit bug.
+        dense_settings = dense_algo.settings()
+        if dense_settings.has("transpile") and dense_settings.get("transpile"):
+            basis_gates = dense_settings.get("basis_gates")
+            opt_level = dense_settings.get("transpile_optimization_level")
             full_qc = transpile(full_qc, basis_gates=basis_gates, optimization_level=opt_level)
 
         return Circuit(qasm=qasm3.dumps(full_qc), encoding="jordan-wigner")

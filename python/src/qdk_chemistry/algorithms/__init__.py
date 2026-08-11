@@ -142,7 +142,6 @@ _REGISTRY_EXPORTS = frozenset(
 _DEPRECATED_ALIASES = {
     "EnergyEstimator": "ExpectationEstimator",
     "QdkEnergyEstimator": "QdkExpectationEstimator",
-    "SparseIsometryGF2XStatePreparation": "SparseIsometryStatePreparation",
 }
 
 _registry_module: ModuleType | None = None

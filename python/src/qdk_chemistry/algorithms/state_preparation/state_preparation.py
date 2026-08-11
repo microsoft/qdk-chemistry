@@ -9,20 +9,9 @@ import warnings
 from typing import ClassVar
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
-from qdk_chemistry.data import Circuit, Settings, Wavefunction
+from qdk_chemistry.data import Circuit, Wavefunction
 
 __all__: list[str] = []
-
-
-class StatePreparationSettings(Settings):
-    """Settings for state preparation algorithms."""
-
-    def __init__(self):
-        """Initialize the StatePreparationSettings."""
-        super().__init__()
-        self._set_default("basis_gates", "vector<string>", ["x", "y", "z", "cx", "cz", "id", "h", "s", "sdg", "rz"])
-        self._set_default("transpile", "bool", True)
-        self._set_default("transpile_optimization_level", "int", 0)
 
 
 class StatePreparation(Algorithm):

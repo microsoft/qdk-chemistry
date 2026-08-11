@@ -10,8 +10,8 @@ from qiskit.compiler import transpile
 from qiskit.quantum_info import Statevector
 from qiskit.transpiler import PassManager
 
-from qdk_chemistry.algorithms.state_preparation import StatePreparation, StatePreparationSettings
-from qdk_chemistry.data import Circuit, Wavefunction
+from qdk_chemistry.algorithms.state_preparation import StatePreparation
+from qdk_chemistry.data import Circuit, Settings, Wavefunction
 from qdk_chemistry.plugins.qiskit._interop.transpiler import (
     MergeZBasisRotations,
     RemoveZBasisOnZeroState,
@@ -20,7 +20,18 @@ from qdk_chemistry.plugins.qiskit._interop.transpiler import (
 from qdk_chemistry.plugins.qiskit.conversion import create_statevector_from_wavefunction
 from qdk_chemistry.utils import Logger
 
-__all__ = ["RegularIsometryStatePreparation"]
+__all__ = ["RegularIsometryStatePreparation", "RegularIsometryStatePreparationSettings"]
+
+
+class RegularIsometryStatePreparationSettings(Settings):
+    """Settings for RegularIsometryStatePreparation."""
+
+    def __init__(self):
+        """Initialize the RegularIsometryStatePreparationSettings."""
+        super().__init__()
+        self._set_default("basis_gates", "vector<string>", ["x", "y", "z", "cx", "cz", "id", "h", "s", "sdg", "rz"])
+        self._set_default("transpile", "bool", True)
+        self._set_default("transpile_optimization_level", "int", 0)
 
 
 class RegularIsometryStatePreparation(StatePreparation):
@@ -34,7 +45,7 @@ class RegularIsometryStatePreparation(StatePreparation):
         """Initialize the RegularIsometryStatePreparation."""
         Logger.trace_entering()
         super().__init__()
-        self._settings = StatePreparationSettings()
+        self._settings = RegularIsometryStatePreparationSettings()
 
     def _run_impl(self, wavefunction: Wavefunction) -> Circuit:
         """Create a quantum circuit that prepares the state using regular isometry.

@@ -22,7 +22,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry import algorithms
-from qdk_chemistry.algorithms import ExpectationEstimator, QdkExpectationEstimator
+from qdk_chemistry.algorithms import ExpectationEstimator, QdkExpectationEstimator, state_preparation
 from qdk_chemistry.algorithms.state_preparation import SparseIsometryStatePreparation
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian, QubitOperator
 
@@ -167,20 +167,22 @@ class TestSparseIsometryGF2XDeprecation:
     """
 
     def test_sparse_isometry_gf2x_alias_resolves_to_sparse_isometry(self):
-        """``algorithms.SparseIsometryGF2XStatePreparation`` is the renamed class."""
+        """``state_preparation.SparseIsometryGF2XStatePreparation`` is the renamed class."""
         with pytest.warns(DeprecationWarning, match="SparseIsometryGF2XStatePreparation"):
-            alias = algorithms.SparseIsometryGF2XStatePreparation
+            alias = state_preparation.SparseIsometryGF2XStatePreparation
         assert alias is SparseIsometryStatePreparation
 
     def test_sparse_isometry_gf2x_alias_import_warns(self):
         """Importing the old class name emits a ``DeprecationWarning``."""
         with pytest.warns(DeprecationWarning, match="SparseIsometryGF2XStatePreparation"):
-            from qdk_chemistry.algorithms import SparseIsometryGF2XStatePreparation  # noqa: PLC0415
+            from qdk_chemistry.algorithms.state_preparation import (  # noqa: PLC0415
+                SparseIsometryGF2XStatePreparation,
+            )
         assert SparseIsometryGF2XStatePreparation is SparseIsometryStatePreparation
 
     def test_class_alias_is_listed_by_dir(self):
         """``dir()`` advertises the deprecated alias so tooling can discover it."""
-        assert "SparseIsometryGF2XStatePreparation" in dir(algorithms)
+        assert "SparseIsometryGF2XStatePreparation" in dir(state_preparation)
 
     def test_deprecated_algorithm_name_warns_and_resolves(self):
         """``create("state_prep", "sparse_isometry_gf2x")`` warns and builds the renamed algorithm."""
