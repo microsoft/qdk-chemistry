@@ -96,7 +96,7 @@ Construct the effective Hamiltonian acting on the target space ``P``.
 Args:
     reference: Reference wavefunction providing the reference state.
     hamiltonian: Input Hamiltonian built over the whole window :math:`W = P \cup Q`.
-    p_indices: Absolute molecular-orbital indices of the target space ``P``, which must lie within the Hamiltonian's active orbital window.
+    p_indices: Absolute molecular-orbital indices of the target space ``P``, which must lie within the input Hamiltonian's active orbital window.
 
 Returns:
     The effective Hamiltonian acting on ``P``, following the output contract documented on this class.
@@ -124,9 +124,9 @@ implementations may call it from ``_run_impl`` before performing
 method-specific validation or computation.
 
 Args:
-    reference: Reference wavefunction whose active orbital space must be a subset of the Hamiltonian's active orbital window.
+    reference: Reference wavefunction whose active orbital space must be a subset of the input Hamiltonian's active orbital window.
     hamiltonian: Input Hamiltonian defining the outer orbital window.
-    p_indices: Target P-space as absolute molecular-orbital indices, which must be a subset of the Hamiltonian's active orbital window.
+    p_indices: Target P-space as absolute molecular-orbital indices, which must be a subset of the input Hamiltonian's active orbital window.
 
 Raises:
     ValueError: If an input is null, the orbital bases or spin restrictions are incompatible, or the spaces do not satisfy :math:`P \subseteq W_H` and :math:`W_{\mathrm{ref}} \subseteq W_H`.
@@ -166,7 +166,7 @@ Compute a deterministic content hash for a run with these inputs.
 Args:
     reference: Reference wavefunction providing the reference state.
     hamiltonian: Input Hamiltonian built over the whole window :math:`W = P \cup Q`.
-    p_indices: Target ``P`` indices within the Hamiltonian's active orbital window.
+    p_indices: Target ``P`` indices within the input Hamiltonian's active orbital window.
 
 Returns:
     str: 16-character hex content hash.
