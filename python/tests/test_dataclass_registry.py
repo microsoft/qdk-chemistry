@@ -53,7 +53,7 @@ def test_registration_explains_missing_plugin_type_name():
     class PluginDataWithoutTypeName(DataClass):
         pass
 
-    with pytest.raises(TypeError, match="static data_type_name.*register the DataClass in a plugin"):
+    with pytest.raises(TypeError, match=r"static data_type_name.*register the DataClass in a plugin"):
         register_dataclass(PluginDataWithoutTypeName)
 
 

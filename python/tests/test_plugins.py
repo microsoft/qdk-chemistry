@@ -9,9 +9,18 @@ from unittest.mock import MagicMock, call
 
 import pytest
 
+import qdk_chemistry
 from qdk_chemistry import plugins
 from qdk_chemistry._core import DuplicateRegistrationError as CoreDuplicateRegistrationError
 from qdk_chemistry.plugins import ChemistryPlugin, DuplicateRegistrationError, PluginRegistrar, QdkChemistryPlugin
+
+_BUNDLED_PLUGIN_AUTOLOAD_CASES = (
+    ("pyscf", "QDK_CHEMISTRY_DISABLE_PYSCF_AUTOLOAD"),
+    ("qiskit", "QDK_CHEMISTRY_DISABLE_QISKIT_AUTOLOAD"),
+    ("openfermion", "QDK_CHEMISTRY_DISABLE_OPENFERMION_AUTOLOAD"),
+    ("networkx", "QDK_CHEMISTRY_DISABLE_NETWORKX_AUTOLOAD"),
+    ("geometric", "QDK_CHEMISTRY_DISABLE_GEOMETRIC_AUTOLOAD"),
+)
 
 
 class _EntryPoint:
@@ -89,6 +98,56 @@ def test_unified_plugin_entry_points_load_independently(monkeypatch):
 
     assert len(loaded) == 1
     assert isinstance(loaded[0], PluginRegistrar)
+
+
+def test_unified_plugins_load_before_bundled_integrations(monkeypatch):
+    """Unified entry points register before bundled integrations."""
+    calls = []
+    monkeypatch.setattr(plugins, "_load_plugins", lambda: calls.append("unified"))
+    monkeypatch.setattr(qdk_chemistry, "_load_bundled_plugin", lambda *args: calls.append(args[0]))
+
+    qdk_chemistry._import_plugins()
+
+    assert calls == ["unified", *(plugin_name for plugin_name, _ in _BUNDLED_PLUGIN_AUTOLOAD_CASES)]
+
+
+@pytest.mark.parametrize(("plugin_name", "disable_env_var"), _BUNDLED_PLUGIN_AUTOLOAD_CASES)
+def test_bundled_plugin_autoload_can_be_disabled(monkeypatch, plugin_name, disable_env_var):
+    """Each bundled plugin can be excluded before its module is imported."""
+    import_module = MagicMock()
+    monkeypatch.setenv(disable_env_var, "TrUe")
+    monkeypatch.setattr(qdk_chemistry.importlib, "import_module", import_module)
+
+    qdk_chemistry._load_bundled_plugin(plugin_name, disable_env_var)
+
+    import_module.assert_not_called()
+
+
+def test_bundled_plugin_duplicate_warns_with_disable_hint_and_propagates(monkeypatch):
+    """A bundled plugin collision identifies its opt-out and propagates."""
+    plugin = MagicMock()
+    plugin.load.side_effect = DuplicateRegistrationError("name is already registered")
+    monkeypatch.delenv("QDK_CHEMISTRY_DISABLE_QISKIT_AUTOLOAD", raising=False)
+    monkeypatch.setattr(qdk_chemistry.importlib, "import_module", MagicMock(return_value=plugin))
+
+    with (
+        pytest.warns(
+            UserWarning,
+            match=r"duplicate registration.*QDK_CHEMISTRY_DISABLE_QISKIT_AUTOLOAD=1",
+        ),
+        pytest.raises(DuplicateRegistrationError, match="name is already registered"),
+    ):
+        qdk_chemistry._load_bundled_plugin("qiskit", "QDK_CHEMISTRY_DISABLE_QISKIT_AUTOLOAD")
+
+
+def test_bundled_plugin_unexpected_error_propagates(monkeypatch):
+    """Automatic loading does not hide errors unrelated to registration collisions."""
+    plugin = MagicMock()
+    plugin.load.side_effect = RuntimeError("unexpected failure")
+    monkeypatch.setattr(qdk_chemistry.importlib, "import_module", MagicMock(return_value=plugin))
+
+    with pytest.raises(RuntimeError, match="unexpected failure"):
+        qdk_chemistry._load_bundled_plugin("qiskit", "QDK_CHEMISTRY_DISABLE_QISKIT_AUTOLOAD")
 
 
 def test_plugin_entry_point_must_resolve_to_plugin_class(monkeypatch):
