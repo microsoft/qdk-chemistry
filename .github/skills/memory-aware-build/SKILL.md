@@ -5,11 +5,11 @@ description: Compile QDK Chemistry with memory-aware parallelism. Use this skill
 
 # Memory-aware builds
 
-QDK Chemistry compilation can require up to 8 GB of RAM per concurrent compile
+QDK Chemistry compilation can require up to 5 GB of RAM per concurrent compile
 job. Limit build parallelism by both the available memory and the CPU count.
 
 1. Determine the number of logical CPUs and the available RAM.
-2. Reserve 8 GB of available RAM for each compile job.
+2. Reserve 5 GB of available RAM for each compile job.
 3. Set the job count to the smaller of:
    - the logical CPU count;
    - `floor(available RAM in GB / 8)`.
@@ -19,20 +19,20 @@ job. Limit build parallelism by both the available memory and the CPU count.
    including builds started indirectly by `pip`.
 
 For example, a machine with 32 GB of available RAM and 16 logical CPUs should
-compile with at most four jobs:
+compile with at most six jobs:
 
 ```bash
-export CMAKE_BUILD_PARALLEL_LEVEL=4
+export CMAKE_BUILD_PARALLEL_LEVEL=6
 cmake --build cpp/build
 ```
 
 For a Python package build, apply the same limit:
 
 ```bash
-CMAKE_BUILD_PARALLEL_LEVEL=4 python -m pip install ./python
+CMAKE_BUILD_PARALLEL_LEVEL=6 python -m pip install ./python
 ```
 
 If a build is killed or reports an out-of-memory error, reduce
 `CMAKE_BUILD_PARALLEL_LEVEL` further, preferably by half, and retry. Never
-increase parallelism beyond the 8 GB-per-job memory limit merely to use all
+increase parallelism beyond the 5 GB-per-job memory limit merely to use all
 available CPU cores.
