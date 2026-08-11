@@ -9,7 +9,6 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
-#include <numbers>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/utils/cube_generator.hpp>
@@ -106,7 +105,7 @@ TEST(CubeGeneratorTest, EvaluatesNormalizedHydrogenPOrbitals) {
   grid.nx = grid.ny = grid.nz = 1;
 
   const double r_squared = grid.origin.squaredNorm();
-  const double normalization = 2.0 * std::pow(2.0 / std::numbers::pi, 0.75);
+  const double normalization = 2.0 * std::pow(2.0 / std::acos(-1.0), 0.75);
   const double radial = normalization * std::exp(-r_squared);
 
   for (Eigen::Index component = 0; component < 3; ++component) {
