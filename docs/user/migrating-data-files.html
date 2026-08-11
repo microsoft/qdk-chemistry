@@ -6,18 +6,18 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Migrating data files between serialization versions &mdash; qdk-chemistry 2.0.0 documentation</title>
+  <title>Migrating data files between serialization versions &mdash; qdk-chemistry 2.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=ac0f520b" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=78acbc13" />
 
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../_static/documentation_options.js?v=20623aea"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../_static/tabs.js?v=3ee01567"></script>
@@ -26,7 +26,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Python API" href="../api/python_api.html" />
+    <link rel="next" title="Tutorials" href="../tutorials/index.html" />
     <link rel="prev" title="Plugins" href="comprehensive/plugins.html" /> 
 </head>
 
@@ -62,6 +62,10 @@
 <li class="toctree-l2"><a class="reference internal" href="#supported-formats">Supported formats</a></li>
 </ul>
 </li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/index.html">Tutorials</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -103,11 +107,11 @@
   <section id="migrating-data-files-between-serialization-versions">
 <h1>Migrating data files between serialization versions<a class="headerlink" href="#migrating-data-files-between-serialization-versions" title="Link to this heading"></a></h1>
 <p>Each QDK/Chemistry data class versions its on-disk serialization schema
-independently. A deserializer (<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Orbitals.from_file" title="qdk_chemistry.data.Orbitals.from_file"><code class="xref py py-meth docutils literal notranslate"><span class="pre">from_file()</span></code></a>,
-<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian.from_file" title="qdk_chemistry.data.Hamiltonian.from_file"><code class="xref py py-meth docutils literal notranslate"><span class="pre">from_file()</span></code></a>,
-<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction.from_file" title="qdk_chemistry.data.Wavefunction.from_file"><code class="xref py py-meth docutils literal notranslate"><span class="pre">from_file()</span></code></a>, and their <code class="docutils literal notranslate"><span class="pre">from_json</span></code> /
-<code class="docutils literal notranslate"><span class="pre">from_hdf5</span></code> counterparts) accepts <strong>only</strong> the serialization version the
-installed library was built against. Loading a file written against an older
+independently. Deserializers for <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><code class="xref py py-class docutils literal notranslate"><span class="pre">Orbitals</span></code></a>,
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a>,
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a>, and
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QpeResult" title="qdk_chemistry.data.QpeResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">QpeResult</span></code></a> accept <strong>only</strong> the serialization version
+the installed library was built against. Loading a file written against an older
 version of that class’s schema raises an error that points back here.</p>
 <p>The <code class="docutils literal notranslate"><span class="pre">qdk_chemistry.migrate</span></code> converter upgrades such a file to the serialization
 version the installed library accepts. It migrates each data class point-for-point
@@ -121,7 +125,7 @@ single file:</p>
 </pre></div>
 </div>
 <p>The data type is taken from the <code class="docutils literal notranslate"><span class="pre">name.type.ext</span></code> filename convention
-(<code class="docutils literal notranslate"><span class="pre">orbitals</span></code> / <code class="docutils literal notranslate"><span class="pre">hamiltonian</span></code> / <code class="docutils literal notranslate"><span class="pre">wavefunction</span></code> / <code class="docutils literal notranslate"><span class="pre">ansatz</span></code>) and the
+(<code class="docutils literal notranslate"><span class="pre">orbitals</span></code> / <code class="docutils literal notranslate"><span class="pre">hamiltonian</span></code> / <code class="docutils literal notranslate"><span class="pre">wavefunction</span></code> / <code class="docutils literal notranslate"><span class="pre">ansatz</span></code> / <code class="docutils literal notranslate"><span class="pre">qpe_result</span></code>) and the
 serialization format from the file extension (<code class="docutils literal notranslate"><span class="pre">.json</span></code> or <code class="docutils literal notranslate"><span class="pre">.h5</span></code> / <code class="docutils literal notranslate"><span class="pre">.hdf5</span></code>).
 The input and output formats may differ, so the same command also converts between
 JSON and HDF5:</p>
@@ -157,10 +161,19 @@ state-vector container; the MP2 and coupled-cluster containers upgrade to the
 amplitude container.</p></li>
 <li><p><a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Ansatz" title="qdk_chemistry.data.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">Ansatz</span></code></a> — the embedded Hamiltonian and
 Wavefunction are each migrated through their own serialization-version chains.</p></li>
+<li><p><a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QpeResult" title="qdk_chemistry.data.QpeResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">QpeResult</span></code></a> — the result fields are preserved while
+the obsolete evolution-time field is removed.</p></li>
 </ul>
 <p>Data classes whose serialization schema has not changed (for example
 <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a>, <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.BasisSet" title="qdk_chemistry.data.BasisSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">BasisSet</span></code></a>, and
-the qubit-level classes) load directly without conversion.</p>
+the remaining qubit-level classes) load directly without conversion.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The converter does not support v1 <code class="docutils literal notranslate"><span class="pre">TimeEvolutionUnitary</span></code> files because they
+do not contain the scale required by the current
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.UnitaryRepresentation" title="qdk_chemistry.data.UnitaryRepresentation"><code class="xref py py-class docutils literal notranslate"><span class="pre">UnitaryRepresentation</span></code></a> schema; regenerate these
+objects with v2.</p>
+</div>
 </section>
 <section id="cholesky-hamiltonians">
 <h2>Cholesky Hamiltonians<a class="headerlink" href="#cholesky-hamiltonians" title="Link to this heading"></a></h2>
@@ -192,7 +205,7 @@ raise a <code class="docutils literal notranslate"><span class="pre">migrate.Mig
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="comprehensive/plugins.html" class="btn btn-neutral float-left" title="Plugins" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="../api/python_api.html" class="btn btn-neutral float-right" title="Python API" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="../tutorials/index.html" class="btn btn-neutral float-right" title="Tutorials" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

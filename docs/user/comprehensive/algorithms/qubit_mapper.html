@@ -6,18 +6,18 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Qubit mapping &mdash; qdk-chemistry 2.0.0 documentation</title>
+  <title>Qubit mapping &mdash; qdk-chemistry 2.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=78acbc13" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -61,6 +61,7 @@
 <li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory pattern</a></li>
 <li class="toctree-l3"><a class="reference internal" href="settings.html">Settings</a></li>
 <li class="toctree-l3"><a class="reference internal" href="active_space.html">Active space selection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="effective_hamiltonian_constructor.html">Effective Hamiltonian construction</a></li>
 <li class="toctree-l3"><a class="reference internal" href="expectation_estimator.html">Energy estimation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">Hamiltonian construction</a></li>
 <li class="toctree-l3"><a class="reference internal" href="localizer.html">Orbital localization</a></li>
@@ -81,6 +82,7 @@
 <li class="toctree-l3"><a class="reference internal" href="hadamard_test.html">Hadamard test</a></li>
 <li class="toctree-l3"><a class="reference internal" href="phase_estimation.html">Phase estimation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="qpe_circuit_builder.html">Phase estimation circuit builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="amplitude_amplification.html">Amplitude amplification</a></li>
 <li class="toctree-l3"><a class="reference internal" href="evolution_circuit_builder.html">Evolution circuit builder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian_unitary_builder.html">Hamiltonian Unitary Builder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled circuit mapper</a></li>
@@ -96,6 +98,10 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/index.html">Tutorials</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -159,28 +165,28 @@ the QubitOperator.</p>
 The choice of encoding can affect circuit depth and measurement requirements on quantum hardware.
 Not every implementation supports all encodings — see <a class="reference internal" href="#available-implementations">Available implementations</a> for details.</p>
 <dl class="simple" id="encoding-jordan-wigner">
-<dt>Jordan-Wigner <span class="bibtex-citation" id="id1">[<a class="reference internal" href="../../../references.html#id13" title="P. Jordan and E. Wigner. Über das Paulische Äquivalenzverbot. Zeitschrift für Physik, 47:631-651, 1928. doi:10.1007/BF01331938.">JW28</a>]</span></dt><dd><p>Encodes each fermionic mode in a single qubit whose state directly represents the orbital occupation.
+<dt>Jordan-Wigner <span class="bibtex-citation" id="id1">[<a class="reference internal" href="../../../references.html#id16" title="P. Jordan and E. Wigner. Über das Paulische Äquivalenzverbot. Zeitschrift für Physik, 47:631-651, 1928. doi:10.1007/BF01331938.">JW28</a>]</span></dt><dd><p>Encodes each fermionic mode in a single qubit whose state directly represents the orbital occupation.
 Fermionic antisymmetry is enforced through a Z-string on all lower-indexed qubits.</p>
 </dd>
 </dl>
 <dl class="simple" id="encoding-bravyi-kitaev">
-<dt>Bravyi-Kitaev <span class="bibtex-citation" id="id2">[<a class="reference internal" href="../../../references.html#id14" title="Jacob T. Seeley, Martin J. Richard, and Peter J. Love. The Bravyi-Kitaev transformation for quantum computation of electronic structure. The Journal of Chemical Physics, 137(22):224109, 2012. doi:10.1063/1.4768229.">SRL12</a>]</span></dt><dd><p>Distributes both occupation and parity information across qubits using a binary-tree (Fenwick tree) structure, reducing the average Pauli-string weight to O(log n).</p>
+<dt>Bravyi-Kitaev <span class="bibtex-citation" id="id2">[<a class="reference internal" href="../../../references.html#id17" title="Jacob T. Seeley, Martin J. Richard, and Peter J. Love. The Bravyi-Kitaev transformation for quantum computation of electronic structure. The Journal of Chemical Physics, 137(22):224109, 2012. doi:10.1063/1.4768229.">SRL12</a>]</span></dt><dd><p>Distributes both occupation and parity information across qubits using a binary-tree (Fenwick tree) structure, reducing the average Pauli-string weight to O(log n).</p>
 </dd>
 </dl>
 <dl class="simple" id="encoding-parity">
-<dt>Parity <span class="bibtex-citation" id="id3">[<a class="reference internal" href="../../../references.html#id14" title="Jacob T. Seeley, Martin J. Richard, and Peter J. Love. The Bravyi-Kitaev transformation for quantum computation of electronic structure. The Journal of Chemical Physics, 137(22):224109, 2012. doi:10.1063/1.4768229.">SRL12</a>]</span></dt><dd><p>Encodes qubits with cumulative electron-number parities of the orbitals.</p>
+<dt>Parity <span class="bibtex-citation" id="id3">[<a class="reference internal" href="../../../references.html#id17" title="Jacob T. Seeley, Martin J. Richard, and Peter J. Love. The Bravyi-Kitaev transformation for quantum computation of electronic structure. The Journal of Chemical Physics, 137(22):224109, 2012. doi:10.1063/1.4768229.">SRL12</a>]</span></dt><dd><p>Encodes qubits with cumulative electron-number parities of the orbitals.</p>
 </dd>
 </dl>
 <dl class="simple" id="encoding-scbk">
-<dt>Symmetry-conserving Bravyi-Kitaev <span class="bibtex-citation" id="id4">[<a class="reference internal" href="../../../references.html#id16" title="Sergey Bravyi, Jay M. Gambetta, Antonio Mezzacapo, and Kristan Temme. Tapering off qubits to simulate fermionic Hamiltonians. arXiv preprint arXiv:1701.08213, 2017. doi:10.48550/arXiv.1701.08213.">BGMT17</a>]</span></dt><dd><p>Exploits particle-number and spin-parity symmetries to reduce the qubit count by 2. Use <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.MajoranaMapping.symmetry_conserving_bravyi_kitaev" title="qdk_chemistry.data.MajoranaMapping.symmetry_conserving_bravyi_kitaev"><code class="xref py py-meth docutils literal notranslate"><span class="pre">symmetry_conserving_bravyi_kitaev()</span></code></a> with a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Symmetries" title="qdk_chemistry.data.Symmetries"><code class="xref py py-class docutils literal notranslate"><span class="pre">Symmetries</span></code></a> object.</p>
+<dt>Symmetry-conserving Bravyi-Kitaev <span class="bibtex-citation" id="id4">[<a class="reference internal" href="../../../references.html#id19" title="Sergey Bravyi, Jay M. Gambetta, Antonio Mezzacapo, and Kristan Temme. Tapering off qubits to simulate fermionic Hamiltonians. arXiv preprint arXiv:1701.08213, 2017. doi:10.48550/arXiv.1701.08213.">BGMT17</a>]</span></dt><dd><p>Exploits particle-number and spin-parity symmetries to reduce the qubit count by 2. Use <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.MajoranaMapping.symmetry_conserving_bravyi_kitaev" title="qdk_chemistry.data.MajoranaMapping.symmetry_conserving_bravyi_kitaev"><code class="xref py py-meth docutils literal notranslate"><span class="pre">symmetry_conserving_bravyi_kitaev()</span></code></a> with a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Symmetries" title="qdk_chemistry.data.Symmetries"><code class="xref py py-class docutils literal notranslate"><span class="pre">Symmetries</span></code></a> object.</p>
 </dd>
 </dl>
 <dl class="simple" id="encoding-bk-tree">
-<dt>Bravyi-Kitaev tree <span class="bibtex-citation" id="id5">[<a class="reference internal" href="../../../references.html#id18" title="Vojtěch Havlíček, Marcos Corcoles, Kristan Temme, Aram W. Harrow, Abhinav Kandala, Jerry M. Chow, and Jay M. Gambetta. Operator locality in the quantum simulation of fermionic models. Physical Review A, 95(3):032332, 2017. doi:10.1103/PhysRevA.95.032332.">HavlivcekCT+17</a>]</span></dt><dd><p>A tree-based variant of the Bravyi-Kitaev transformation that uses a different qubit indexing strategy.</p>
+<dt>Bravyi-Kitaev tree <span class="bibtex-citation" id="id5">[<a class="reference internal" href="../../../references.html#id21" title="Vojtěch Havlíček, Marcos Corcoles, Kristan Temme, Aram W. Harrow, Abhinav Kandala, Jerry M. Chow, and Jay M. Gambetta. Operator locality in the quantum simulation of fermionic models. Physical Review A, 95(3):032332, 2017. doi:10.1103/PhysRevA.95.032332.">HavlivcekCT+17</a>]</span></dt><dd><p>A tree-based variant of the Bravyi-Kitaev transformation that uses a different qubit indexing strategy.</p>
 </dd>
 </dl>
 <dl class="simple" id="encoding-verstraete-cirac">
-<dt>Verstraete-Cirac <span class="bibtex-citation" id="id6">[<a class="reference internal" href="../../../references.html#id60" title="F. Verstraete and J. I. Cirac. Mapping local Hamiltonians of fermions onto local Hamiltonians of spins. Journal of Statistical Mechanics: Theory and Experiment, 2005(09):P09012, 2005. doi:10.1088/1742-5468/2005/09/P09012.">VC05</a>]</span></dt><dd><p>An auxiliary qubit encoding that eliminates non-local Z-strings by locally tracking parity. It operates on any connected <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.LatticeGraph" title="qdk_chemistry.data.LatticeGraph"><code class="xref py py-class docutils literal notranslate"><span class="pre">LatticeGraph</span></code></a>; an optional Hamiltonian-path reordering (<code class="docutils literal notranslate"><span class="pre">dfs_ordering=True</span></code> on the lattice factories) minimizes the number of auxiliary qubits and stabilizers. Use <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.MajoranaMapping.verstraete_cirac" title="qdk_chemistry.data.MajoranaMapping.verstraete_cirac"><code class="xref py py-meth docutils literal notranslate"><span class="pre">verstraete_cirac()</span></code></a> with a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.LatticeGraph" title="qdk_chemistry.data.LatticeGraph"><code class="xref py py-class docutils literal notranslate"><span class="pre">LatticeGraph</span></code></a>.</p>
+<dt>Verstraete-Cirac <span class="bibtex-citation" id="id6">[<a class="reference internal" href="../../../references.html#id63" title="F. Verstraete and J. I. Cirac. Mapping local Hamiltonians of fermions onto local Hamiltonians of spins. Journal of Statistical Mechanics: Theory and Experiment, 2005(09):P09012, 2005. doi:10.1088/1742-5468/2005/09/P09012.">VC05</a>]</span></dt><dd><p>An auxiliary qubit encoding that eliminates non-local Z-strings by locally tracking parity. It operates on any connected <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.LatticeGraph" title="qdk_chemistry.data.LatticeGraph"><code class="xref py py-class docutils literal notranslate"><span class="pre">LatticeGraph</span></code></a>; an optional Hamiltonian-path reordering (<code class="docutils literal notranslate"><span class="pre">dfs_ordering=True</span></code> on the lattice factories) minimizes the number of auxiliary qubits and stabilizers. Use <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.MajoranaMapping.verstraete_cirac" title="qdk_chemistry.data.MajoranaMapping.verstraete_cirac"><code class="xref py py-meth docutils literal notranslate"><span class="pre">verstraete_cirac()</span></code></a> with a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.LatticeGraph" title="qdk_chemistry.data.LatticeGraph"><code class="xref py py-class docutils literal notranslate"><span class="pre">LatticeGraph</span></code></a>.</p>
 </dd>
 </dl>
 </section>

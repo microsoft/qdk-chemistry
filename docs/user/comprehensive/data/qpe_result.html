@@ -6,18 +6,18 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QpeResult &mdash; qdk-chemistry 2.0.0 documentation</title>
+  <title>QpeResult &mdash; qdk-chemistry 2.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=78acbc13" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -91,6 +91,10 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/index.html">Tutorials</a></li>
+</ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
@@ -144,7 +148,7 @@ mapping the measured phase to the Hamiltonian eigenvalue. Each unitary container
 <p>When QPE acts on <span class="math notranslate nohighlight">\(U = e^{-iHt}\)</span>, the eigenvalues are <span class="math notranslate nohighlight">\(e^{-iEt}\)</span> and the energy is recovered via
 <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.html#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer.eigenvalue_from_phase" title="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer.eigenvalue_from_phase"><code class="xref py py-meth docutils literal notranslate"><span class="pre">eigenvalue_from_phase()</span></code></a>:</p>
 <div class="math notranslate nohighlight">
-\[E = \frac{2\pi\varphi'}{t}\]</div>
+\[E = -\frac{2\pi\varphi'}{t}\]</div>
 <p>where <span class="math notranslate nohighlight">\(\varphi' \in (-1/2, 1/2]\)</span> is the measured phase fraction wrapped from <span class="math notranslate nohighlight">\([0, 1)\)</span> into <span class="math notranslate nohighlight">\((-1/2, 1/2]\)</span>.</p>
 <p><strong>Qubitization</strong></p>
 <p>When QPE acts on the qubitization walk operator <span class="math notranslate nohighlight">\(W\)</span>, the eigenvalues are <span class="math notranslate nohighlight">\(e^{\pm i \arccos(E/\lambda)}\)</span> and the energy is recovered via

@@ -6,18 +6,18 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Phase estimation &mdash; qdk-chemistry 2.0.0 documentation</title>
+  <title>Phase estimation &mdash; qdk-chemistry 2.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=78acbc13" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -61,6 +61,7 @@
 <li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory pattern</a></li>
 <li class="toctree-l3"><a class="reference internal" href="settings.html">Settings</a></li>
 <li class="toctree-l3"><a class="reference internal" href="active_space.html">Active space selection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="effective_hamiltonian_constructor.html">Effective Hamiltonian construction</a></li>
 <li class="toctree-l3"><a class="reference internal" href="expectation_estimator.html">Energy estimation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">Hamiltonian construction</a></li>
 <li class="toctree-l3"><a class="reference internal" href="localizer.html">Orbital localization</a></li>
@@ -82,6 +83,7 @@
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="qpe_circuit_builder.html">Phase estimation circuit builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="amplitude_amplification.html">Amplitude amplification</a></li>
 <li class="toctree-l3"><a class="reference internal" href="evolution_circuit_builder.html">Evolution circuit builder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian_unitary_builder.html">Hamiltonian Unitary Builder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled circuit mapper</a></li>
@@ -97,6 +99,10 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/index.html">Tutorials</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -147,16 +153,16 @@ Following QDK/Chemistry’s <a class="reference internal" href="../design/index.
 Given a unitary <span class="math notranslate nohighlight">\(U\)</span> and an initial state <span class="math notranslate nohighlight">\(|\psi\rangle\)</span> that has significant overlap with an eigenstate of <span class="math notranslate nohighlight">\(U\)</span>, <a class="reference internal" href="../../../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a> measures the eigenphase <span class="math notranslate nohighlight">\(\varphi\)</span> such that <span class="math notranslate nohighlight">\(U|\psi\rangle = e^{2\pi i \varphi}|\psi\rangle\)</span>.</p>
 <p>QDK/Chemistry supports two types of unitaries for QPE:</p>
 <ul class="simple">
-<li><p><strong>Time evolution</strong> — <span class="math notranslate nohighlight">\(U = e^{-iHt}\)</span> constructed via <a class="reference internal" href="hamiltonian_unitary_builder.html#trotter-builder"><span class="std std-ref">Trotter-Suzuki decomposition</span></a>. Energy is recovered as <span class="math notranslate nohighlight">\(E = \theta / t\)</span> where <span class="math notranslate nohighlight">\(\theta = 2\pi\varphi\)</span> is mapped to <span class="math notranslate nohighlight">\((-\pi, \pi]\)</span>.</p></li>
+<li><p><strong>Time evolution</strong> — <span class="math notranslate nohighlight">\(U = e^{-iHt}\)</span> constructed via <a class="reference internal" href="hamiltonian_unitary_builder.html#trotter-builder"><span class="std std-ref">Trotter-Suzuki decomposition</span></a>. Energy is recovered as <span class="math notranslate nohighlight">\(E = -\theta / t\)</span> where <span class="math notranslate nohighlight">\(\theta = 2\pi\varphi\)</span> is mapped to <span class="math notranslate nohighlight">\((-\pi, \pi]\)</span>.</p></li>
 <li><p><strong>Qubitization</strong> — The walk operator <span class="math notranslate nohighlight">\(W\)</span> constructed via <a class="reference internal" href="hamiltonian_unitary_builder.html#lcu-builder"><span class="std std-ref">LCU block encoding</span></a>. Energy is recovered as <span class="math notranslate nohighlight">\(E = \lambda \cos(\theta)\)</span> where <span class="math notranslate nohighlight">\(\lambda\)</span> is the L1 norm of the Hamiltonian.</p></li>
 </ul>
 <p>The QPE algorithm itself is agnostic to how the unitary is constructed — the choice of unitary builder determines the phase-to-energy mapping used in post-processing.</p>
 <p>QDK/Chemistry provides two <a class="reference internal" href="../../../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a> approaches, each suited to different hardware constraints:</p>
 <dl class="simple">
-<dt>Iterative Quantum Phase Estimation (<a class="reference internal" href="../../../glossary.html#term-IQPE"><span class="xref std std-term">IQPE</span></a>)</dt><dd><p>Kitaev’s single-ancilla algorithm <span class="bibtex-citation" id="id1">[<a class="reference internal" href="../../../references.html#id20" title="A. Y. Kitaev. Quantum measurements and the Abelian stabilizer problem. arXiv, 1995. URL: https://arxiv.org/abs/quant-ph/9511026.">Kit95</a>]</span> that extracts phase bits one at a time, from most significant to least significant, using adaptive feedback corrections between iterations.
+<dt>Iterative Quantum Phase Estimation (<a class="reference internal" href="../../../glossary.html#term-IQPE"><span class="xref std std-term">IQPE</span></a>)</dt><dd><p>Kitaev’s single-ancilla algorithm <span class="bibtex-citation" id="id1">[<a class="reference internal" href="../../../references.html#id23" title="A. Y. Kitaev. Quantum measurements and the Abelian stabilizer problem. arXiv, 1995. URL: https://arxiv.org/abs/quant-ph/9511026.">Kit95</a>]</span> that extracts phase bits one at a time, from most significant to least significant, using adaptive feedback corrections between iterations.
 This approach minimizes ancilla requirements and is particularly suited to near-term hardware.</p>
 </dd>
-<dt>Standard QFT-based Quantum Phase Estimation</dt><dd><p>The textbook multi-ancilla approach <span class="bibtex-citation" id="id2">[<a class="reference internal" href="../../../references.html#id22" title="Michael A. Nielsen and Isaac L. Chuang. The quantum Fourier transform and its applications, chapter 5.2. Cambridge University Press, Cambridge, UK, 2010. doi:10.1017/CBO9780511976667.">NC10</a>]</span> that uses a register of <span class="math notranslate nohighlight">\(n\)</span> ancilla qubits and an inverse Quantum Fourier Transform to extract all phase bits simultaneously.
+<dt>Standard QFT-based Quantum Phase Estimation</dt><dd><p>The textbook multi-ancilla approach <span class="bibtex-citation" id="id2">[<a class="reference internal" href="../../../references.html#id25" title="Michael A. Nielsen and Isaac L. Chuang. The quantum Fourier transform and its applications, chapter 5.2. Cambridge University Press, Cambridge, UK, 2010. doi:10.1017/CBO9780511976667.">NC10</a>]</span> that uses a register of <span class="math notranslate nohighlight">\(n\)</span> ancilla qubits and an inverse Quantum Fourier Transform to extract all phase bits simultaneously.
 This approach achieves all precision bits in a single circuit execution but requires more ancilla qubits and longer circuit depth.</p>
 </dd>
 </dl>
@@ -362,7 +368,7 @@ You can discover available implementations programmatically:</p>
 <section id="iterative-phase-estimation-iqpe">
 <span id="iqpe-algorithm"></span><h3>Iterative phase estimation (IQPE)<a class="headerlink" href="#iterative-phase-estimation-iqpe" title="Link to this heading"></a></h3>
 <p class="rubric">Factory name: <code class="docutils literal notranslate"><span class="pre">&quot;qdk_iterative&quot;</span></code></p>
-<p>Kitaev’s iterative algorithm <span class="bibtex-citation" id="id3">[<a class="reference internal" href="../../../references.html#id20" title="A. Y. Kitaev. Quantum measurements and the Abelian stabilizer problem. arXiv, 1995. URL: https://arxiv.org/abs/quant-ph/9511026.">Kit95</a>]</span> uses a single ancilla qubit to extract phase bits sequentially, from the most significant bit (MSB) to the least significant bit (LSB).
+<p>Kitaev’s iterative algorithm <span class="bibtex-citation" id="id3">[<a class="reference internal" href="../../../references.html#id23" title="A. Y. Kitaev. Quantum measurements and the Abelian stabilizer problem. arXiv, 1995. URL: https://arxiv.org/abs/quant-ph/9511026.">Kit95</a>]</span> uses a single ancilla qubit to extract phase bits sequentially, from the most significant bit (MSB) to the least significant bit (LSB).
 At each iteration <span class="math notranslate nohighlight">\(k\)</span> (from <span class="math notranslate nohighlight">\(0\)</span> to <span class="math notranslate nohighlight">\(n-1\)</span>, where <span class="math notranslate nohighlight">\(n\)</span> is the total number of bits):</p>
 <ol class="arabic simple">
 <li><p>Prepare the ancilla in <span class="math notranslate nohighlight">\(|+\rangle\)</span></p></li>
@@ -408,7 +414,7 @@ Each bit is determined by a majority vote over multiple circuit executions (cont
 <section id="standard-qft-based-phase-estimation">
 <span id="standard-qpe-algorithm"></span><h3>Standard QFT-based phase estimation<a class="headerlink" href="#standard-qft-based-phase-estimation" title="Link to this heading"></a></h3>
 <p class="rubric">Factory name: <code class="docutils literal notranslate"><span class="pre">&quot;qdk_standard&quot;</span></code></p>
-<p>The standard <a class="reference internal" href="../../../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a> algorithm <span class="bibtex-citation" id="id4">[<a class="reference internal" href="../../../references.html#id22" title="Michael A. Nielsen and Isaac L. Chuang. The quantum Fourier transform and its applications, chapter 5.2. Cambridge University Press, Cambridge, UK, 2010. doi:10.1017/CBO9780511976667.">NC10</a>]</span> uses a register of <span class="math notranslate nohighlight">\(n\)</span> ancilla qubits to extract all phase bits simultaneously.
+<p>The standard <a class="reference internal" href="../../../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a> algorithm <span class="bibtex-citation" id="id4">[<a class="reference internal" href="../../../references.html#id25" title="Michael A. Nielsen and Isaac L. Chuang. The quantum Fourier transform and its applications, chapter 5.2. Cambridge University Press, Cambridge, UK, 2010. doi:10.1017/CBO9780511976667.">NC10</a>]</span> uses a register of <span class="math notranslate nohighlight">\(n\)</span> ancilla qubits to extract all phase bits simultaneously.
 The circuit structure consists of:</p>
 <ol class="arabic simple">
 <li><p>Initialize <span class="math notranslate nohighlight">\(n\)</span> ancilla qubits in <span class="math notranslate nohighlight">\(|+\rangle\)</span></p></li>

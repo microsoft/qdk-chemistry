@@ -5,18 +5,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.data.circuit &mdash; qdk-chemistry 2.0.0 documentation</title>
+  <title>qdk_chemistry.data.circuit &mdash; qdk-chemistry 2.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=78acbc13" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -52,6 +52,10 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/index.html">Tutorials</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -256,7 +260,8 @@
                 <span class="n">Logger</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;Both QIR and QASM representations are available. Return QIR.&quot;</span><span class="p">)</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">qir</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_qsharp_factory</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">qir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">compiled_qir</span> <span class="o">=</span> <span class="n">qsharp</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_qsharp_factory</span><span class="o">.</span><span class="n">program</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_qsharp_factory</span><span class="o">.</span><span class="n">parameter</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+            <span class="n">context</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_qsharp_factory</span><span class="o">.</span><span class="n">program</span><span class="p">,</span> <span class="s2">&quot;_qdk_context&quot;</span><span class="p">,</span> <span class="n">qsharp</span><span class="p">)</span>
+            <span class="n">compiled_qir</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_qsharp_factory</span><span class="o">.</span><span class="n">program</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_qsharp_factory</span><span class="o">.</span><span class="n">parameter</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
             <span class="c1"># Cache the compiled qir if qir is not already set</span>
             <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;qir&quot;</span><span class="p">,</span> <span class="n">compiled_qir</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">compiled_qir</span>
@@ -291,7 +296,8 @@
                 <span class="n">Logger</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;Both Q# and QASM representations are available. Return Q# circuit.&quot;</span><span class="p">)</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">qsharp</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_qsharp_factory</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">qsharp</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">qsharp</span><span class="o">.</span><span class="n">circuit</span><span class="p">(</span>
+            <span class="n">context</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_qsharp_factory</span><span class="o">.</span><span class="n">program</span><span class="p">,</span> <span class="s2">&quot;_qdk_context&quot;</span><span class="p">,</span> <span class="n">qsharp</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">context</span><span class="o">.</span><span class="n">circuit</span><span class="p">(</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_qsharp_factory</span><span class="o">.</span><span class="n">program</span><span class="p">,</span>
                 <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_qsharp_factory</span><span class="o">.</span><span class="n">parameter</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span>
                 <span class="n">prune_classical_qubits</span><span class="o">=</span><span class="n">prune_classical_qubits</span><span class="p">,</span>
@@ -318,11 +324,13 @@
 
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_qsharp_factory</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">qsharp</span><span class="o">.</span><span class="n">estimate</span><span class="p">(</span>
+            <span class="n">context</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_qsharp_factory</span><span class="o">.</span><span class="n">program</span><span class="p">,</span> <span class="s2">&quot;_qdk_context&quot;</span><span class="p">,</span> <span class="n">qsharp</span><span class="p">)</span>
+            <span class="n">logical_counts</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">logical_counts</span><span class="p">(</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_qsharp_factory</span><span class="o">.</span><span class="n">program</span><span class="p">,</span>
-                <span class="n">params</span><span class="p">,</span>
                 <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_qsharp_factory</span><span class="o">.</span><span class="n">parameter</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span>
             <span class="p">)</span>
+            <span class="k">return</span> <span class="n">logical_counts</span><span class="o">.</span><span class="n">estimate</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">qasm</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">openqasm_estimate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">qasm</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
 

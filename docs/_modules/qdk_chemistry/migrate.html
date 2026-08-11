@@ -5,18 +5,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.migrate &mdash; qdk-chemistry 2.0.0 documentation</title>
+  <title>qdk_chemistry.migrate &mdash; qdk-chemistry 2.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=ac0f520b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=78acbc13" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../_static/documentation_options.js?v=20623aea"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -52,6 +52,10 @@
 <li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/index.html">Tutorials</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -108,7 +112,7 @@
 <span class="sd">    migrate.convert_file(&quot;old.hamiltonian.json&quot;, &quot;new.hamiltonian.h5&quot;)</span>
 
 <span class="sd">The data type is taken from the ``name.type.ext`` filename convention</span>
-<span class="sd">(``orbitals`` / ``hamiltonian`` / ``wavefunction`` / ``ansatz``) and the</span>
+<span class="sd">(``orbitals`` / ``hamiltonian`` / ``wavefunction`` / ``ansatz`` / ``qpe_result``) and the</span>
 <span class="sd">serialization format from the file extension (``.json`` or ``.h5`` / ``.hdf5``).</span>
 <span class="sd">Input and output formats may differ.</span>
 
@@ -117,8 +121,9 @@
 <span class="sd">source version to a ``(next_version, transform)`` pair, and the chain is followed</span>
 <span class="sd">until it reaches the version the installed library accepts. To support a future</span>
 <span class="sd">serialization-version bump for a data class, register the next step in that type&#39;s</span>
-<span class="sd">``STEPS`` table (``_orbitals``/``_hamiltonian``/``_wavefunction``); the migrated</span>
-<span class="sd">document is validated against the live deserializer, so a missing step fails loudly.</span>
+<span class="sd">``STEPS`` table (``_orbitals``/``_hamiltonian``/``_wavefunction``/``_qpe_result``);</span>
+<span class="sd">the migrated document is validated against the live deserializer, so a missing step</span>
+<span class="sd">fails loudly.</span>
 
 <span class="sd">This module lives outside the data classes so that no legacy-schema knowledge</span>
 <span class="sd">leaks into the core serialization.</span>
@@ -136,9 +141,9 @@
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">h5py</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Ansatz</span><span class="p">,</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">Orbitals</span><span class="p">,</span> <span class="n">Wavefunction</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Ansatz</span><span class="p">,</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">Orbitals</span><span class="p">,</span> <span class="n">QpeResult</span><span class="p">,</span> <span class="n">Wavefunction</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">_ansatz</span><span class="p">,</span> <span class="n">_hamiltonian</span><span class="p">,</span> <span class="n">_io</span><span class="p">,</span> <span class="n">_orbitals</span><span class="p">,</span> <span class="n">_wavefunction</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">_ansatz</span><span class="p">,</span> <span class="n">_hamiltonian</span><span class="p">,</span> <span class="n">_io</span><span class="p">,</span> <span class="n">_orbitals</span><span class="p">,</span> <span class="n">_qpe_result</span><span class="p">,</span> <span class="n">_wavefunction</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;MigrationError&quot;</span><span class="p">,</span> <span class="s2">&quot;convert_file&quot;</span><span class="p">]</span>
 
@@ -170,6 +175,7 @@
     <span class="s2">&quot;hamiltonian&quot;</span><span class="p">:</span> <span class="n">_hamiltonian</span><span class="p">,</span>
     <span class="s2">&quot;wavefunction&quot;</span><span class="p">:</span> <span class="n">_wavefunction</span><span class="p">,</span>
     <span class="s2">&quot;ansatz&quot;</span><span class="p">:</span> <span class="n">_ansatz</span><span class="p">,</span>
+    <span class="s2">&quot;qpe_result&quot;</span><span class="p">:</span> <span class="n">_qpe_result</span><span class="p">,</span>
 <span class="p">}</span>
 
 <span class="n">_CLASSES</span> <span class="o">=</span> <span class="p">{</span>
@@ -177,6 +183,7 @@
     <span class="s2">&quot;hamiltonian&quot;</span><span class="p">:</span> <span class="n">Hamiltonian</span><span class="p">,</span>
     <span class="s2">&quot;wavefunction&quot;</span><span class="p">:</span> <span class="n">Wavefunction</span><span class="p">,</span>
     <span class="s2">&quot;ansatz&quot;</span><span class="p">:</span> <span class="n">Ansatz</span><span class="p">,</span>
+    <span class="s2">&quot;qpe_result&quot;</span><span class="p">:</span> <span class="n">QpeResult</span><span class="p">,</span>
 <span class="p">}</span>
 
 
@@ -227,8 +234,9 @@
         <span class="k">raise</span> <span class="n">MigrationError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to migrate &#39;</span><span class="si">{</span><span class="n">src_path</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">error</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">error</span>
 
     <span class="k">try</span><span class="p">:</span>
-        <span class="n">obj</span> <span class="o">=</span> <span class="n">_CLASSES</span><span class="p">[</span><span class="n">data_type</span><span class="p">]</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">new_json</span><span class="p">))</span>
-    <span class="k">except</span> <span class="ne">RuntimeError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+        <span class="n">json_input</span> <span class="o">=</span> <span class="n">new_json</span> <span class="k">if</span> <span class="n">data_type</span> <span class="o">==</span> <span class="s2">&quot;qpe_result&quot;</span> <span class="k">else</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">new_json</span><span class="p">)</span>
+        <span class="n">obj</span> <span class="o">=</span> <span class="n">_CLASSES</span><span class="p">[</span><span class="n">data_type</span><span class="p">]</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">json_input</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">RuntimeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
         <span class="k">raise</span> <span class="n">MigrationError</span><span class="p">(</span>
             <span class="sa">f</span><span class="s2">&quot;The installed qdk-chemistry rejected the migrated </span><span class="si">{</span><span class="n">data_type</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">error</span><span class="si">}</span><span class="s2">). If the &quot;</span>
             <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">data_type</span><span class="si">}</span><span class="s2"> serialization schema changed, register the next step in </span><span class="si">{</span><span class="n">module</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">.STEPS.&quot;</span>

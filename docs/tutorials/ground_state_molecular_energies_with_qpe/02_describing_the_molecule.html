@@ -1,0 +1,384 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Describing the molecule &mdash; qdk-chemistry 2.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=78acbc13" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Choosing the active space" href="03_choosing_the_active_space.html" />
+    <link rel="prev" title="Energy and accuracy" href="01_energy_and_accuracy.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Tutorials</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Ground-state molecular energies with quantum phase estimation</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="index.html#quantum-chemistry-background">Quantum chemistry background</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#why-quantum-computing">Why quantum computing?</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#why-stretched-nitrogen">Why stretched nitrogen?</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#tutorial-scope-and-structure">Tutorial scope and structure</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="index.html#cumulative-assignment">Cumulative assignment</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="00_before_you_begin.html">Before you begin</a></li>
+<li class="toctree-l4"><a class="reference internal" href="lab_notebook.html">Set up your lab notebook</a></li>
+<li class="toctree-l4"><a class="reference internal" href="01_energy_and_accuracy.html">Energy and accuracy</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Describing the molecule</a></li>
+<li class="toctree-l4"><a class="reference internal" href="03_choosing_the_active_space.html">Choosing the active space</a></li>
+<li class="toctree-l4"><a class="reference internal" href="04_putting_the_problem_on_qubits.html">Mapping the problem to qubits</a></li>
+<li class="toctree-l4"><a class="reference internal" href="05_preparing_the_trial_state.html">Preparing the trial state</a></li>
+<li class="toctree-l4"><a class="reference internal" href="06_iterative_phase_estimation.html">Iterative quantum phase estimation</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Tutorials</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Ground-state molecular energies with quantum phase estimation</a></li>
+      <li class="breadcrumb-item active">Describing the molecule</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/ground_state_molecular_energies_with_qpe/02_describing_the_molecule.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="describing-the-molecule">
+<h1>Describing the molecule<a class="headerlink" href="#describing-the-molecule" title="Link to this heading"></a></h1>
+<div class="chapter-focus admonition">
+<p class="admonition-title">Chapter focus</p>
+<p>How do we specify a molecular system and construct the starting wavefunction for the correlated calculation?</p>
+</div>
+<section id="learning-objectives">
+<h2>Learning objectives<a class="headerlink" href="#learning-objectives" title="Link to this heading"></a></h2>
+<p>After completing this chapter, you will be able to:</p>
+<ul class="simple">
+<li><p>Specify a molecule by its geometry, charge, and spin multiplicity.</p></li>
+<li><p>Explain the role of a finite atomic-orbital basis set.</p></li>
+<li><p>Describe the Hartree–Fock approximation and the Slater-determinant form of its wavefunction.</p></li>
+<li><p>Generate a Hartree–Fock wavefunction with the built-in <a class="reference internal" href="../../glossary.html#term-QDK"><span class="xref std std-term">QDK</span></a>/Chemistry self-consistent field solver.</p></li>
+<li><p>Interpret an energy change caused by changing the basis set.</p></li>
+</ul>
+<div class="lab-notebook-assignment admonition">
+<p class="admonition-title">Lab notebook assignment</p>
+<p>Complete <a class="reference internal" href="lab_notebook.html#lab-notebook-molecule"><span class="std std-ref">Molecular input and mean-field calculation</span></a> in the lab notebook as you work through this chapter.
+Record the molecular inputs and both Hartree–Fock energies before calculating their difference.
+Interpret the difference as basis-set sensitivity rather than as the total error of either energy.</p>
+</div>
+</section>
+<section id="example-download">
+<h2>Example download<a class="headerlink" href="#example-download" title="Link to this heading"></a></h2>
+<p>Download <a class="reference download internal" download="" href="../../_downloads/7849ec8a9760e394647cf4ceeebb67f5/tutorial_describe_n2.py"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_describe_n2.py</span></code></a> and save it in your tutorial working directory.
+Open the file in Visual Studio Code and review the complete script, including imports and setup code omitted from the excerpts below.
+The sections below explain the inputs and calculations in this complete executable file before you run it.</p>
+</section>
+<section id="the-molecular-system">
+<span id="tutorial-molecular-system"></span><h2>The molecular system<a class="headerlink" href="#the-molecular-system" title="Link to this heading"></a></h2>
+<p>An electronic-structure calculation requires the identities and positions of the nuclei, the number of electrons, and the target spin state.
+This chapter specifies those inputs for the stretched N<sub>2</sub> molecule introduced on the <a class="reference internal" href="index.html"><span class="doc">tutorial landing page</span></a>.</p>
+<p>The molecular geometry contains two nitrogen atoms separated by <span class="math notranslate nohighlight">\(1.85\ \text{Å}\)</span>, compared with the <a class="reference external" href="https://webbook.nist.gov/cgi/cbook.cgi?ID=C7727379&amp;Mask=1000">equilibrium bond length</a> of <span class="math notranslate nohighlight">\(1.097685\ \text{Å}\)</span>.
+The molecule is neutral, so its net charge is zero and it has 14 electrons.
+<a class="reference external" href="https://en.wikipedia.org/wiki/Multiplicity_(chemistry)">Spin multiplicity</a> is defined as <span class="math notranslate nohighlight">\(2S+1\)</span>, where <span class="math notranslate nohighlight">\(S\)</span> is the total electron spin produced by combining the spins of all electrons.
+Paired electrons contribute no net spin, whereas unpaired electrons can produce <span class="math notranslate nohighlight">\(S&gt;0\)</span>.
+A multiplicity of one, two, or three is called a singlet, doublet, or triplet, respectively.
+The labels <span class="math notranslate nohighlight">\(\alpha\)</span> and <span class="math notranslate nohighlight">\(\beta\)</span> denote spin projections <span class="math notranslate nohighlight">\(+\tfrac{1}{2}\)</span> (spin up) and <span class="math notranslate nohighlight">\(-\tfrac{1}{2}\)</span> (spin down), respectively.
+<a class="reference internal" href="../../glossary.html#term-QDK"><span class="xref std std-term">QDK</span></a>/Chemistry uses the molecular charge and spin multiplicity to determine the numbers of <span class="math notranslate nohighlight">\(\alpha\)</span> and <span class="math notranslate nohighlight">\(\beta\)</span> electrons in the calculation.
+For the target N<sub>2</sub> singlet, <span class="math notranslate nohighlight">\(S=0\)</span>, so the multiplicity is one and the calculation contains seven <span class="math notranslate nohighlight">\(\alpha\)</span> and seven <span class="math notranslate nohighlight">\(\beta\)</span> electrons.</p>
+<p><a class="reference internal" href="../../glossary.html#term-QDK"><span class="xref std std-term">QDK</span></a>/Chemistry represents a molecular geometry with a <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a> object.
+This example constructs the <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a> object from a string in <a class="reference external" href="https://en.wikipedia.org/wiki/XYZ_file_format">XYZ file format</a>, which contains an atom count, a comment line, and one element symbol with three Cartesian coordinates for each atom:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="s2">2</span>
+<span class="s2">Stretched N2 molecule for the ground-state QPE tutorial</span>
+<span class="s2">N    0.000000    0.000000    0.000000</span>
+<span class="s2">N    0.000000    0.000000    1.850000</span>
+<span class="s2">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="c1"># The 1.85-Angstrom bond is substantially longer than the 1.097685-Angstrom</span>
+<span class="c1"># equilibrium distance, increasing multiconfigurational character.</span>
+<span class="c1"># The target is neutral N2 in its singlet ground state, where all electrons are</span>
+<span class="c1"># paired and the spin multiplicity 2S + 1 equals one.</span>
+<span class="n">charge</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="n">spin_multiplicity</span> <span class="o">=</span> <span class="mi">1</span>
+</pre></div>
+</div>
+<p>The <a class="reference internal" href="../../glossary.html#term-XYZ"><span class="xref std std-term">XYZ</span></a> format used by <a class="reference internal" href="../../glossary.html#term-QDK"><span class="xref std std-term">QDK</span></a>/Chemistry interprets coordinates in ångström units.
+However, this format does not specify molecular charge or spin multiplicity, so the example records these values separately.</p>
+</section>
+<section id="the-mean-field-wavefunction">
+<span id="tutorial-hartree-fock-wavefunction"></span><h2>The mean-field wavefunction<a class="headerlink" href="#the-mean-field-wavefunction" title="Link to this heading"></a></h2>
+<p>The <a class="reference external" href="https://en.wikipedia.org/wiki/Hartree%E2%80%93Fock_method">Hartree–Fock method</a> approximates the many-electron wavefunction with one <a class="reference external" href="https://en.wikipedia.org/wiki/Slater_determinant">Slater determinant</a>.
+As introduced in the <a class="reference internal" href="index.html#tutorial-orbitals-and-determinants"><span class="std std-ref">tutorial overview</span></a>, each occupied spin orbital combines a spatial molecular orbital with an <span class="math notranslate nohighlight">\(\alpha\)</span> or <span class="math notranslate nohighlight">\(\beta\)</span> spin function.
+Let <span class="math notranslate nohighlight">\(\psi_p(x)\)</span> denote occupied spin orbital <span class="math notranslate nohighlight">\(p\)</span>, where <span class="math notranslate nohighlight">\(x=(\mathbf{r},\sigma)\)</span> contains a spatial coordinate <span class="math notranslate nohighlight">\(\mathbf{r}\)</span> and a spin label <span class="math notranslate nohighlight">\(\sigma\in\{\alpha,\beta\}\)</span>.
+For an <span class="math notranslate nohighlight">\(N\)</span>-electron Hartree–Fock state, the occupied spin orbitals form the Slater determinant</p>
+<div class="math notranslate nohighlight">
+\[\Phi_{\mathrm{HF}}(x_1,\ldots,x_N)
+=\frac{1}{\sqrt{N!}}
+\det\!\left[\psi_p(x_q)\right]_{q,p=1}^{N}.\]</div>
+<p>Here <span class="math notranslate nohighlight">\(\det\)</span> denotes the determinant of the matrix whose row <span class="math notranslate nohighlight">\(q\)</span> evaluates every occupied spin orbital at electron coordinate <span class="math notranslate nohighlight">\(x_q\)</span>.
+The factor <span class="math notranslate nohighlight">\(1/\sqrt{N!}\)</span> normalizes the wavefunction when the occupied spin orbitals are orthonormal.
+Exchanging two electron coordinates swaps two matrix rows and changes the sign of <span class="math notranslate nohighlight">\(\Phi_{\mathrm{HF}}\)</span>, enforcing fermionic antisymmetry.
+This determinant is an <em>approximate</em> many-electron wavefunction.
+Each electron interacts with the average field generated by the other electrons rather than with their instantaneous correlated motion.
+This mean-field treatment makes Hartree–Fock computationally tractable because it avoids representing all possible electron configurations.
+The determinant accounts for exchange, an effect of wavefunction antisymmetry that reduces the probability of finding same-spin electrons together, but it omits electron correlation.</p>
+<p>The Hartree–Fock energy is the fixed-geometry total energy evaluated with the optimized Hartree–Fock determinant:</p>
+<div class="math notranslate nohighlight">
+\[E_{\mathrm{HF}}
+= \langle \Phi_{\mathrm{HF}} \vert \hat{H}_{\mathrm{electronic}} \vert \Phi_{\mathrm{HF}} \rangle
++ E_{\mathrm{nuclear}},\]</div>
+<p>where <span class="math notranslate nohighlight">\(\Phi_{\mathrm{HF}}\)</span> is the optimized determinant and <span class="math notranslate nohighlight">\(E_{\mathrm{nuclear}}\)</span> is the repulsion among the fixed nuclei.
+This energy remains approximate because the determinant cannot represent electron correlation.</p>
+</section>
+<section id="finite-basis-orbital-representation">
+<span id="tutorial-molecular-orbitals"></span><h2>Finite-basis orbital representation<a class="headerlink" href="#finite-basis-orbital-representation" title="Link to this heading"></a></h2>
+<p>The Hartree–Fock wavefunction <span class="math notranslate nohighlight">\(\Phi_{\mathrm{HF}}\)</span> is a determinant constructed from occupied spin orbitals.
+Each spin orbital combines a spatial molecular orbital with an <span class="math notranslate nohighlight">\(\alpha\)</span> or <span class="math notranslate nohighlight">\(\beta\)</span> spin function.
+The molecular orbitals are functions of position that provide the spatial parts of these spin orbitals.
+Changing the occupied molecular orbitals changes the Hartree–Fock determinant and its many-electron wavefunction.
+Because the Hartree–Fock determinant is built from one-electron functions, optimizing the many-electron wavefunction reduces to optimizing these molecular orbitals.
+Their spatial shapes and occupations also help identify bonding and antibonding interactions, and the optimized orbitals provide the starting representation for later multi-configurational calculations.</p>
+<details class="quiz-question admonition">
+<summary class="admonition-title">What is a molecular orbital, and why is it useful?</summary>
+<p>A molecular orbital is a one-electron spatial function used to construct the spin orbitals in a Hartree–Fock determinant.
+Molecular orbitals make the approximate many-electron wavefunction computationally tractable, help interpret bonding and occupations, and provide the starting representation for later multi-configurational calculations.</p>
+</details>
+<p>Electronic-structure calculations expand each molecular orbital <span class="math notranslate nohighlight">\(\phi_p\)</span> in a finite collection of known basis functions <span class="math notranslate nohighlight">\(\{\chi_\mu\}\)</span>:</p>
+<div class="math notranslate nohighlight">
+\[\phi_p(\mathbf{r}) = \sum_\mu c_{\mu p}\chi_\mu(\mathbf{r}).\]</div>
+<p>The index <span class="math notranslate nohighlight">\(p\)</span> labels a molecular orbital, and <span class="math notranslate nohighlight">\(\mu\)</span> labels a basis function.
+The coefficients <span class="math notranslate nohighlight">\(c_{\mu p}\)</span> determine molecular orbital <span class="math notranslate nohighlight">\(p\)</span>, and the self-consistent field calculation optimizes these coefficients.
+The collection of basis functions is called a <a class="reference external" href="https://en.wikipedia.org/wiki/Basis_set_(chemistry)">basis set</a>.</p>
+<p>The following isosurfaces illustrate this construction for stretched N<sub>2</sub>.
+Blue and orange distinguish opposite signs of each spatial function; they do not represent positive and negative charge.
+The purple spheres mark the nitrogen nuclei.</p>
+<figure class="align-center" id="id2">
+<a class="reference internal image-reference" href="../../_images/tutorial_qpe_atomic_basis_functions.png"><img alt="Three panels show cc-pVDZ basis-function isosurfaces centered on one of two nitrogen nuclei. From left to right, they are a spherical 2s function, a two-lobed 2p-y function, and a 3d-z-squared function with two axial lobes and a ring. Blue and orange surfaces mark opposite signs of each spatial function, not opposite electric charges." src="../../_images/tutorial_qpe_atomic_basis_functions.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-text">Selected <code class="docutils literal notranslate"><span class="pre">cc-pvdz</span></code> atomic basis functions (left to right): <span class="math notranslate nohighlight">\(2s\)</span>, <span class="math notranslate nohighlight">\(2p_y\)</span>, and <span class="math notranslate nohighlight">\(3d_{z^2}\)</span>.</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>Combining atom-centered basis functions with different coefficients produces molecular orbitals that can extend across both nuclei:</p>
+<figure class="align-center" id="id3">
+<a class="reference internal image-reference" href="../../_images/tutorial_qpe_example_molecular_orbitals.png"><img alt="Three panels show example molecular-orbital isosurfaces formed from the atom-centered basis functions. Each orbital has lobes extending across both nitrogen nuclei. Blue and orange surfaces mark opposite signs of the spatial orbital, not opposite electric charges." src="../../_images/tutorial_qpe_example_molecular_orbitals.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-text">Example molecular orbitals formed from linear combinations of atom-centered basis functions.</span><a class="headerlink" href="#id3" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>A finite basis restricts the shapes available to the molecular orbitals and therefore introduces another approximation in the electronic description of the system.
+Adding suitable basis functions gives the orbitals more flexibility, but it also increases computational cost.</p>
+<p>This chapter compares the correlation-consistent polarized valence double-zeta basis set, <code class="docutils literal notranslate"><span class="pre">cc-pvdz</span></code>, with the related triple-zeta basis set, <code class="docutils literal notranslate"><span class="pre">cc-pvtz</span></code> <span class="bibtex-citation" id="id1">[<a class="reference internal" href="../../references.html#id6" title="Thom H. Dunning, Jr. Gaussian basis sets for use in correlated molecular calculations. I. The atoms boron through neon and hydrogen. The Journal of Chemical Physics, 90(2):1007-1023, 1989. doi:10.1063/1.456153.">Dun89</a>]</span>.
+Here, double-zeta and triple-zeta mean that two or three radial functions, respectively, describe each valence atomic orbital.
+The larger basis gives the orbitals more radial flexibility but increases computational cost; both basis sets include polarization functions.</p>
+<p>This comparison does not determine the exact basis-set error.
+It measures how much the Hartree–Fock energy changes with basis size while the geometry, method, and basis-set family remain fixed.</p>
+<figure class="align-center" id="id4">
+<span id="tutorial-wavefunction-hierarchy"></span><div class="graphviz"><img src="../../_images/graphviz-337ddaa53dcec46c59d1fd7c3a17cdce466228e4.png" alt="Flow from one-electron functions to many-electron wavefunctions. Nucleus-centered basis functions combine into spatial molecular orbitals; pairing a spatial orbital with alpha or beta spin gives a spin orbital. Choosing occupied spin orbitals defines an electron configuration, and its antisymmetric state is a Slater determinant. Hartree--Fock uses one optimized determinant, while a multiconfigurational wavefunction combines several determinants with coefficients." class="graphviz" /></div>
+<figcaption>
+<p><span class="caption-text">Basis functions build molecular orbitals with spin; occupied orbitals define determinants, which form one-determinant or multiconfigurational many-electron wavefunctions.</span><a class="headerlink" href="#id4" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<details class="quiz-question admonition">
+<summary class="admonition-title">Which basis set gives a lower energy and why?</summary>
+<p>The <code class="docutils literal notranslate"><span class="pre">cc-pvtz</span></code> calculation gives the lower energy.
+This result is consistent with its additional radial flexibility, which provides a more flexible representation of the molecular orbitals.
+The atomic elements and coordinates, molecular net charge, spin multiplicity, and Hartree–Fock method remain fixed, so the observed difference measures basis-set sensitivity.</p>
+</details>
+</section>
+<section id="self-consistent-wavefunction-optimization">
+<h2>Self-consistent wavefunction optimization<a class="headerlink" href="#self-consistent-wavefunction-optimization" title="Link to this heading"></a></h2>
+<p>The occupied molecular orbitals determine the average distribution of the electrons in the Hartree–Fock determinant.
+This distribution generates the effective field that represents the average interaction of each electron with the others, as described above.
+Solving the one-electron equations in that field produces new molecular orbitals and therefore a new electron distribution and field.
+The <a class="reference external" href="https://en.wikipedia.org/wiki/Self-consistent_field">self-consistent field</a> (<a class="reference internal" href="../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a>) procedure resolves this dependence iteratively:</p>
+<ol class="arabic simple">
+<li><p>Begin with an initial set of molecular orbitals.</p></li>
+<li><p>Construct the effective one-electron operator generated by those orbitals.</p></li>
+<li><p>Solve for an updated set of orbitals.</p></li>
+<li><p>Repeat until the energy and orbitals satisfy the convergence criteria.</p></li>
+</ol>
+<p>The <a class="reference internal" href="../../glossary.html#term-QDK"><span class="xref std std-term">QDK</span></a>/Chemistry <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ScfSolver" title="qdk_chemistry.algorithms.ScfSolver"><code class="xref py py-class docutils literal notranslate"><span class="pre">ScfSolver</span></code></a> returns the converged fixed-geometry total energy and a wavefunction containing the self-consistent molecular orbitals.
+These orbitals provide the starting point for the multi-configurational calculations introduced in <a class="reference internal" href="03_choosing_the_active_space.html"><span class="doc">Choosing the active space</span></a>.</p>
+<details class="quiz-question admonition">
+<summary class="admonition-title">Why does a Hartree–Fock calculation require an iterative <a class="reference internal" href="../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> procedure?</summary>
+<p>The molecular orbitals determine the mean field experienced by each electron, while that mean field determines the molecular orbitals.
+<a class="reference internal" href="../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> iterations update the orbitals and field until they are mutually consistent.</p>
+</details>
+</section>
+<section id="running-the-calculation">
+<h2>Running the calculation<a class="headerlink" href="#running-the-calculation" title="Link to this heading"></a></h2>
+<p>With the Python environment from <a class="reference internal" href="00_before_you_begin.html"><span class="doc">Before you begin</span></a> active, run the complete script from the Visual Studio Code integrated terminal:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">python tutorial_describe_n2.py</span>
+</pre></div>
+</div>
+<p>The following code runs the built-in <a class="reference internal" href="../../glossary.html#term-QDK"><span class="xref std std-term">QDK</span></a>/Chemistry Hartree–Fock solver once for each basis set.
+The primary result is the <code class="docutils literal notranslate"><span class="pre">cc-pvdz</span></code> wavefunction, whose self-consistent molecular orbitals serve as the starting point for the multi-configurational calculation in <a class="reference internal" href="03_choosing_the_active_space.html"><span class="doc">Choosing the active space</span></a>.
+The <code class="docutils literal notranslate"><span class="pre">cc-pvdz</span></code> and <code class="docutils literal notranslate"><span class="pre">cc-pvtz</span></code> Hartree–Fock energies support the basis-set sensitivity exercise that follows.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Correlation-consistent double- and triple-zeta bases form a controlled sequence:</span>
+<span class="c1"># cc-pVTZ adds radial/angular flexibility beyond cc-pVDZ at higher cost.</span>
+<span class="n">basis_sets</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;cc-pvdz&quot;</span><span class="p">,</span> <span class="s2">&quot;cc-pvtz&quot;</span><span class="p">)</span>
+<span class="c1"># Store each result under its basis-set name so the values from the shared loop</span>
+<span class="c1"># can be compared afterward without repeating either calculation.</span>
+<span class="n">energies</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="n">wavefunctions</span> <span class="o">=</span> <span class="p">{}</span>
+
+<span class="c1"># Change only the basis set so the energy difference measures basis-set sensitivity.</span>
+<span class="k">for</span> <span class="n">basis_set</span> <span class="ow">in</span> <span class="n">basis_sets</span><span class="p">:</span>
+    <span class="n">solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk&quot;</span><span class="p">)</span>
+    <span class="c1"># basis_or_guess accepts either a basis name or a reusable orbital guess.</span>
+    <span class="c1"># Supplying a string asks the solver to build that basis from the structure.</span>
+    <span class="c1"># run() returns the converged total energy and its Hartree--Fock wavefunction.</span>
+    <span class="n">energy</span><span class="p">,</span> <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+        <span class="n">structure</span><span class="p">,</span>
+        <span class="n">charge</span><span class="o">=</span><span class="n">charge</span><span class="p">,</span>
+        <span class="n">spin_multiplicity</span><span class="o">=</span><span class="n">spin_multiplicity</span><span class="p">,</span>
+        <span class="n">basis_or_guess</span><span class="o">=</span><span class="n">basis_set</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">energies</span><span class="p">[</span><span class="n">basis_set</span><span class="p">]</span> <span class="o">=</span> <span class="n">energy</span>
+    <span class="n">wavefunctions</span><span class="p">[</span><span class="n">basis_set</span><span class="p">]</span> <span class="o">=</span> <span class="n">wavefunction</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">basis_set</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">energy</span><span class="si">:</span><span class="s2">.12f</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>
+
+<span class="c1"># Record the continued workflow&#39;s orbital count. The active-space workflow later</span>
+<span class="c1"># selects a subset, and each retained spatial orbital contributes two spin modes.</span>
+<span class="n">num_cc_pvdz_orbitals</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">wavefunctions</span><span class="p">[</span><span class="s2">&quot;cc-pvdz&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;cc-pvdz wavefunction: </span><span class="si">{</span><span class="n">num_cc_pvdz_orbitals</span><span class="si">}</span><span class="s2"> molecular orbitals&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Run the complete script and record both fixed-geometry total energies and the number of <code class="docutils literal notranslate"><span class="pre">cc-pvdz</span></code> molecular orbitals in the lab notebook.
+The reported energies include both the electronic energy and the repulsion among the fixed nuclei.</p>
+<details class="quiz-question admonition">
+<summary class="admonition-title">What should you observe after running the Hartree–Fock calculations?</summary>
+<p>The script should report one negative total energy for each basis set and the number of molecular orbitals in the <code class="docutils literal notranslate"><span class="pre">cc-pvdz</span></code> wavefunction.
+The <code class="docutils literal notranslate"><span class="pre">cc-pvtz</span></code> energy should be lower than the <code class="docutils literal notranslate"><span class="pre">cc-pvdz</span></code> energy because the larger basis gives the Hartree–Fock orbitals more flexibility in describing the mean-field wavefunction.</p>
+</details>
+<p>The absolute difference between the two energies is the observed basis-set sensitivity.
+It does not establish the exact error of either energy because both calculations use finite basis sets.
+Therefore, do not compare this basis-set sensitivity with the <span class="math notranslate nohighlight">\(1\ \mathrm{m}E_{\mathrm{h}}\)</span> teaching target from <a class="reference internal" href="01_energy_and_accuracy.html"><span class="doc">Energy and accuracy</span></a>.</p>
+<p>For the rest of this tutorial, we use <code class="docutils literal notranslate"><span class="pre">cc-pvdz</span></code> because it includes polarization functions while keeping the correlated examples small enough to run quickly; this is a teaching-model cost choice, not a claim that <code class="docutils literal notranslate"><span class="pre">cc-pvdz</span></code> is universally preferable.
+The <code class="docutils literal notranslate"><span class="pre">cc-pvtz</span></code> calculation is used only for the controlled basis-set comparison in this chapter, avoiding its greater cost in every later stage.
+Bond stretching can increase static correlation and weaken a one-determinant description.
+<a class="reference internal" href="03_choosing_the_active_space.html"><span class="doc">Choosing the active space</span></a> next evaluates this effect for the selected N<sub>2</sub> geometry and identifies which electrons and orbitals must be treated in a multi-configurational wavefunction.</p>
+</section>
+<section id="further-reading">
+<h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../user/comprehensive/data/structure.html"><span class="doc">Molecular structures</span></a></p></li>
+<li><p><a class="reference internal" href="../../user/comprehensive/data/basis_set.html"><span class="doc">Basis sets</span></a></p></li>
+<li><p><a class="reference internal" href="../../user/comprehensive/basis_functionals.html"><span class="doc">Available basis sets</span></a></p></li>
+<li><p><a class="reference internal" href="../../user/comprehensive/algorithms/scf_solver.html"><span class="doc">Self-consistent field calculations</span></a></p></li>
+<li><p><a class="reference internal" href="../../user/comprehensive/data/orbitals.html"><span class="doc">Molecular orbitals</span></a></p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="01_energy_and_accuracy.html" class="btn btn-neutral float-left" title="Energy and accuracy" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="03_choosing_the_active_space.html" class="btn btn-neutral float-right" title="Choosing the active space" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

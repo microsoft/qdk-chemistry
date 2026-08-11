@@ -6,18 +6,18 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Active space selection &mdash; qdk-chemistry 2.0.0 documentation</title>
+  <title>Active space selection &mdash; qdk-chemistry 2.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=78acbc13" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -27,7 +27,7 @@
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="Energy estimation" href="expectation_estimator.html" />
+    <link rel="next" title="Effective Hamiltonian construction" href="effective_hamiltonian_constructor.html" />
     <link rel="prev" title="Settings" href="settings.html" /> 
 </head>
 
@@ -68,6 +68,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#further-reading">Further reading</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="effective_hamiltonian_constructor.html">Effective Hamiltonian construction</a></li>
 <li class="toctree-l3"><a class="reference internal" href="expectation_estimator.html">Energy estimation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">Hamiltonian construction</a></li>
 <li class="toctree-l3"><a class="reference internal" href="localizer.html">Orbital localization</a></li>
@@ -81,6 +82,7 @@
 <li class="toctree-l3"><a class="reference internal" href="hadamard_test.html">Hadamard test</a></li>
 <li class="toctree-l3"><a class="reference internal" href="phase_estimation.html">Phase estimation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="qpe_circuit_builder.html">Phase estimation circuit builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="amplitude_amplification.html">Amplitude amplification</a></li>
 <li class="toctree-l3"><a class="reference internal" href="evolution_circuit_builder.html">Evolution circuit builder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian_unitary_builder.html">Hamiltonian Unitary Builder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled circuit mapper</a></li>
@@ -96,6 +98,10 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/index.html">Tutorials</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -303,7 +309,7 @@ You can discover available implementations programmatically:</p>
 </div>
 </div>
 <section id="qdk-valence">
-<h3>QDK Valence<a class="headerlink" href="#qdk-valence" title="Link to this heading"></a></h3>
+<span id="qdk-valence-active-space"></span><h3>QDK Valence<a class="headerlink" href="#qdk-valence" title="Link to this heading"></a></h3>
 <p class="rubric">Factory name: <code class="docutils literal notranslate"><span class="pre">&quot;qdk_valence&quot;</span></code> (default)</p>
 <p>Manual valence-based selection where users specify the number of active electrons and orbitals.
 Selects orbitals near the <a class="reference internal" href="../../../glossary.html#term-HOMO"><span class="xref std std-term">HOMO</span></a>-<a class="reference internal" href="../../../glossary.html#term-LUMO"><span class="xref std std-term">LUMO</span></a> gap.</p>
@@ -415,9 +421,9 @@ Orbital entropies are computed from the one- and two-electron reduced density ma
 </table>
 </section>
 <section id="qdk-autocas-eos">
-<h3>QDK autoCAS EOS<a class="headerlink" href="#qdk-autocas-eos" title="Link to this heading"></a></h3>
+<span id="id1"></span><h3>QDK autoCAS EOS<a class="headerlink" href="#qdk-autocas-eos" title="Link to this heading"></a></h3>
 <p class="rubric">Factory name: <code class="docutils literal notranslate"><span class="pre">&quot;qdk_autocas_eos&quot;</span></code></p>
-<p>Entropy-based selection using consecutive entropy differences to identify plateau boundaries.
+<p>Enhanced orbital selection (EOS) is a variant of the autoCAS algorithm that uses consecutive entropy differences to identify plateau boundaries.
 See <a class="reference internal" href="#autocas-algorithm-details"><span class="std std-ref">autoCAS Algorithm</span></a> below for a detailed description.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -458,22 +464,22 @@ Orbital entropies are computed from the one- and two-electron reduced density ma
 </tbody>
 </table>
 <section id="autocas-algorithm-details">
-<span id="id1"></span><h4>autoCAS Algorithm<a class="headerlink" href="#autocas-algorithm-details" title="Link to this heading"></a></h4>
+<span id="id2"></span><h4>autoCAS Algorithm<a class="headerlink" href="#autocas-algorithm-details" title="Link to this heading"></a></h4>
 <p>Selecting an appropriate active space is one of the most challenging aspects of multi-configuration calculations.
 Traditional approaches rely on chemical intuition and trial-and-error, which can be unreliable for complex systems.
-The autoCAS algorithm <span class="bibtex-citation" id="id2">[<a class="reference internal" href="../../../references.html#id31" title="Christopher J. Stein and Markus Reiher. Automated selection of active orbital spaces. Journal of Chemical Theory and Computation, 12(4):1760-1771, 2016. URL: https://arxiv.org/abs/1602.03835, doi:10.1021/acs.jctc.6b00156.">SR16</a>, <a class="reference internal" href="../../../references.html#id32" title="Christopher J. Stein and Markus Reiher. autoCAS: a program for fully automated multiconfigurational calculations. Journal of Computational Chemistry, 40(25):2216-2226, 2019. URL: https://arxiv.org/abs/1904.00097, doi:10.1002/jcc.25869.">SR19</a>]</span> provides a systematic, black-box approach to active space selection.</p>
+The autoCAS algorithm <span class="bibtex-citation" id="id3">[<a class="reference internal" href="../../../references.html#id34" title="Christopher J. Stein and Markus Reiher. Automated selection of active orbital spaces. Journal of Chemical Theory and Computation, 12(4):1760-1771, 2016. URL: https://arxiv.org/abs/1602.03835, doi:10.1021/acs.jctc.6b00156.">SR16</a>, <a class="reference internal" href="../../../references.html#id35" title="Christopher J. Stein and Markus Reiher. autoCAS: a program for fully automated multiconfigurational calculations. Journal of Computational Chemistry, 40(25):2216-2226, 2019. URL: https://arxiv.org/abs/1904.00097, doi:10.1002/jcc.25869.">SR19</a>]</span> provides a systematic, black-box approach to active space selection.</p>
 <p>autoCAS leverages concepts from quantum information theory to quantify orbital correlation.
 The key insight is that strongly correlated orbitals are highly <em>entangled</em> with the rest of the electronic system.
 This entanglement can be measured using the single-orbital entropy <span class="math notranslate nohighlight">\(s_i^{(1)}\)</span>, which quantifies how much information about orbital <span class="math notranslate nohighlight">\(i\)</span> is “shared” with all other orbitals.</p>
-<p>Single orbital entropies can be calculated for many-body systems given access to (approximate) one- and two-particle reduced density matrices (<a class="reference internal" href="../../../glossary.html#term-RDM"><span class="xref std std-term">RDM</span></a>) <span class="bibtex-citation" id="id3">[<a class="reference internal" href="../../../references.html#id7" title="Katharina Boguslawski and Paweł Tecmer. Orbital entanglement in quantum chemistry. International Journal of Quantum Chemistry, 115(19):1289-1295, 2015. doi:10.1002/qua.24832.">BT15</a>]</span>, which are easily accessible in QDK/Chemistry through multi-configuration wavefunction data structures. As such, single orbital entropies are computed by default when RDMs are requested in <a class="reference internal" href="mc_calculator.html"><span class="doc">multi-configuration calculations</span></a>. The QDK/Chemistry implementation of autoCAS is agnostic to the underlying wavefunction method, as long as the required RDMs are available, thus allowing for comparisons across different multi-configuration approaches.</p>
+<p>Single orbital entropies can be calculated for many-body systems given access to (approximate) one- and two-particle reduced density matrices (<a class="reference internal" href="../../../glossary.html#term-RDM"><span class="xref std std-term">RDM</span></a>) <span class="bibtex-citation" id="id4">[<a class="reference internal" href="../../../references.html#id10" title="Katharina Boguslawski and Paweł Tecmer. Orbital entanglement in quantum chemistry. International Journal of Quantum Chemistry, 115(19):1289-1295, 2015. doi:10.1002/qua.24832.">BT15</a>]</span>, which are easily accessible in QDK/Chemistry through multi-configuration wavefunction data structures. As such, single orbital entropies are computed by default when RDMs are requested in <a class="reference internal" href="mc_calculator.html"><span class="doc">multi-configuration calculations</span></a>. The QDK/Chemistry implementation of autoCAS is agnostic to the underlying wavefunction method, as long as the required RDMs are available, thus allowing for comparisons across different multi-configuration approaches.</p>
 <p class="rubric">QDK/Chemistry autoCAS Variants</p>
 <p>QDK/Chemistry provides two entropy-based selection methods:</p>
 <dl class="simple">
-<dt>autoCAS (Histogram-Based Plateau Detection)</dt><dd><p>As described in the original autoCAS protocol <span class="bibtex-citation" id="id4">[<a class="reference internal" href="../../../references.html#id31" title="Christopher J. Stein and Markus Reiher. Automated selection of active orbital spaces. Journal of Chemical Theory and Computation, 12(4):1760-1771, 2016. URL: https://arxiv.org/abs/1602.03835, doi:10.1021/acs.jctc.6b00156.">SR16</a>, <a class="reference internal" href="../../../references.html#id32" title="Christopher J. Stein and Markus Reiher. autoCAS: a program for fully automated multiconfigurational calculations. Journal of Computational Chemistry, 40(25):2216-2226, 2019. URL: https://arxiv.org/abs/1904.00097, doi:10.1002/jcc.25869.">SR19</a>]</span>, this method discretizes the entropy distribution into histogram bins and identifies plateaus—contiguous regions where the count of orbitals above each entropy threshold remains constant.
+<dt>autoCAS (Histogram-Based Plateau Detection)</dt><dd><p>As described in the original autoCAS protocol <span class="bibtex-citation" id="id5">[<a class="reference internal" href="../../../references.html#id34" title="Christopher J. Stein and Markus Reiher. Automated selection of active orbital spaces. Journal of Chemical Theory and Computation, 12(4):1760-1771, 2016. URL: https://arxiv.org/abs/1602.03835, doi:10.1021/acs.jctc.6b00156.">SR16</a>, <a class="reference internal" href="../../../references.html#id35" title="Christopher J. Stein and Markus Reiher. autoCAS: a program for fully automated multiconfigurational calculations. Journal of Computational Chemistry, 40(25):2216-2226, 2019. URL: https://arxiv.org/abs/1904.00097, doi:10.1002/jcc.25869.">SR19</a>]</span>, this method discretizes the entropy distribution into histogram bins and identifies plateaus—contiguous regions where the count of orbitals above each entropy threshold remains constant.
 This approach is robust for systems with clear entropy gaps but requires tuning of <code class="docutils literal notranslate"><span class="pre">num_bins</span></code> and <code class="docutils literal notranslate"><span class="pre">min_plateau_size</span></code> parameters.
 If none of the entropies exceed the <code class="docutils literal notranslate"><span class="pre">entropy_threshold</span></code>, the system is considered single configurational and all orbitals are excluded from the active space.</p>
 </dd>
-<dt>autoCAS-EOS (Entropy Difference Detection)</dt><dd><p>Uses a direct approach that examines consecutive differences in the sorted entropy values. When the difference between adjacent entropies exceeds <code class="docutils literal notranslate"><span class="pre">diff_threshold</span></code> and the entropy is above <code class="docutils literal notranslate"><span class="pre">entropy_threshold</span></code>, a plateau boundary is identified.</p>
+<dt>autoCAS-EOS (Entropy Difference Detection)</dt><dd><p>The enhanced orbital selection (EOS) extension to the autoCAS protocol uses a direct approach that examines consecutive differences in the sorted entropy values. When the difference between adjacent entropies exceeds <code class="docutils literal notranslate"><span class="pre">diff_threshold</span></code> and the entropy is above <code class="docutils literal notranslate"><span class="pre">entropy_threshold</span></code>, a plateau boundary is identified.</p>
 </dd>
 </dl>
 <p>Both methods sort orbitals by decreasing entropy and select the largest identified group of strongly correlated orbitals for the active space.</p>
@@ -583,7 +589,7 @@ The resulting entropies are typically sufficient to identify strongly correlated
 <p class="rubric">Factory name: <code class="docutils literal notranslate"><span class="pre">&quot;pyscf_avas&quot;</span></code></p>
 <p>The PySCF plugin provides access to the Automated Valence Active Space (<a class="reference internal" href="../../../glossary.html#term-AVAS"><span class="xref std std-term">AVAS</span></a>) method from <a class="reference external" href="https://pyscf.org/">PySCF</a>.
 <a class="reference internal" href="../../../glossary.html#term-AVAS"><span class="xref std std-term">AVAS</span></a> selects active orbitals by projecting molecular orbitals onto a target atomic orbital basis.
-See the original <a class="reference internal" href="../../../glossary.html#term-AVAS"><span class="xref std std-term">AVAS</span></a> publication <span class="bibtex-citation" id="id5">[<a class="reference internal" href="../../../references.html#id5" title="Elvira R. Sayfutyarova, Qiming Sun, Garnet Kin-Lic Chan, and Gerald Knizia. Automated construction of molecular active spaces from atomic valence orbitals. Journal of Chemical Theory and Computation, 13(9):4063-4078, 2017. URL: https://arxiv.org/abs/1701.07862, doi:10.1021/acs.jctc.7b00128.">SSCK17</a>]</span> for details.</p>
+See the original <a class="reference internal" href="../../../glossary.html#term-AVAS"><span class="xref std std-term">AVAS</span></a> publication <span class="bibtex-citation" id="id6">[<a class="reference internal" href="../../../references.html#id8" title="Elvira R. Sayfutyarova, Qiming Sun, Garnet Kin-Lic Chan, and Gerald Knizia. Automated construction of molecular active spaces from atomic valence orbitals. Journal of Chemical Theory and Computation, 13(9):4063-4078, 2017. URL: https://arxiv.org/abs/1701.07862, doi:10.1021/acs.jctc.7b00128.">SSCK17</a>]</span> for details.</p>
 <p class="rubric">Settings</p>
 <table class="docutils align-default">
 <colgroup>
@@ -655,7 +661,7 @@ See the original <a class="reference internal" href="../../../glossary.html#term
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="settings.html" class="btn btn-neutral float-left" title="Settings" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="expectation_estimator.html" class="btn btn-neutral float-right" title="Energy estimation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="effective_hamiltonian_constructor.html" class="btn btn-neutral float-right" title="Effective Hamiltonian construction" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

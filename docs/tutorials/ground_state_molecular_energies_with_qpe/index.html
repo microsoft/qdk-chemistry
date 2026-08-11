@@ -1,0 +1,388 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ground-state molecular energies with quantum phase estimation &mdash; qdk-chemistry 2.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=78acbc13" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Before you begin" href="00_before_you_begin.html" />
+    <link rel="prev" title="Tutorials" href="../index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Tutorials</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Ground-state molecular energies with quantum phase estimation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#quantum-chemistry-background">Quantum chemistry background</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#why-quantum-computing">Why quantum computing?</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#why-stretched-nitrogen">Why stretched nitrogen?</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tutorial-scope-and-structure">Tutorial scope and structure</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#cumulative-assignment">Cumulative assignment</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="00_before_you_begin.html">Before you begin</a></li>
+<li class="toctree-l4"><a class="reference internal" href="lab_notebook.html">Set up your lab notebook</a></li>
+<li class="toctree-l4"><a class="reference internal" href="01_energy_and_accuracy.html">Energy and accuracy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="02_describing_the_molecule.html">Describing the molecule</a></li>
+<li class="toctree-l4"><a class="reference internal" href="03_choosing_the_active_space.html">Choosing the active space</a></li>
+<li class="toctree-l4"><a class="reference internal" href="04_putting_the_problem_on_qubits.html">Mapping the problem to qubits</a></li>
+<li class="toctree-l4"><a class="reference internal" href="05_preparing_the_trial_state.html">Preparing the trial state</a></li>
+<li class="toctree-l4"><a class="reference internal" href="06_iterative_phase_estimation.html">Iterative quantum phase estimation</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Tutorials</a></li>
+      <li class="breadcrumb-item active">Ground-state molecular energies with quantum phase estimation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/ground_state_molecular_energies_with_qpe/index.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="ground-state-molecular-energies-with-quantum-phase-estimation">
+<h1>Ground-state molecular energies with quantum phase estimation<a class="headerlink" href="#ground-state-molecular-energies-with-quantum-phase-estimation" title="Link to this heading"></a></h1>
+<p>This tutorial uses <a class="reference external" href="https://en.wikipedia.org/wiki/Quantum_phase_estimation_algorithm">quantum phase estimation</a> (<a class="reference internal" href="../../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a>) and the <a class="reference external" href="https://github.com/microsoft/qdk-chemistry">Quantum Development Kit Chemistry library</a>, called <a class="reference internal" href="../../glossary.html#term-QDK"><span class="xref std std-term">QDK</span></a>/Chemistry in this documentation, to estimate the ground-state electronic energy of a stretched nitrogen molecule, N<sub>2</sub>.
+It is intended for advanced undergraduate and early-stage graduate students who have introductory knowledge of quantum computing and chemistry.
+<a class="reference internal" href="00_before_you_begin.html"><span class="doc">Before you begin</span></a> describes the prerequisites, software environment, and cumulative lab notebook assignment.</p>
+<figure class="align-center" id="id3">
+<span id="tutorial-qpe-workflow"></span><div class="graphviz"><img src="../../_images/graphviz-6b4cd39774d5b5011e1542e4aa8faa8379da9dd9.png" alt="Six-stage workflow. Define the energy target and matching classical reference; describe stretched nitrogen and select its correlated active space; map that model to qubits and prepare a trial state; estimate the active energy with IQPE; then add the core energy and compare the reconstructed total with the matching CASCI reference." class="graphviz" /></div>
+<figcaption>
+<p><span class="caption-text">The tutorial builds a compact classical molecular model, maps it to qubits, estimates the energy with IQPE, and checks the reconstructed total against the matching CASCI reference.</span><a class="headerlink" href="#id3" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<section id="quantum-chemistry-background">
+<h2>Quantum chemistry background<a class="headerlink" href="#quantum-chemistry-background" title="Link to this heading"></a></h2>
+<p><a class="reference external" href="https://en.wikipedia.org/wiki/Quantum_chemistry#Electronic_structure">Electronic structure theory</a> applies quantum mechanics to the electrons in atoms and molecules.
+For a system whose Hamiltonian does not depend explicitly on time, its stationary electronic states satisfy the <a class="reference external" href="https://en.wikipedia.org/wiki/Schr%C3%B6dinger_equation#Time-independent_equation">time-independent Schrödinger equation</a>:</p>
+<div class="math notranslate nohighlight">
+\[\hat{H} \vert\Psi\rangle = E \vert\Psi\rangle.\]</div>
+<p>Here, <span class="math notranslate nohighlight">\(\vert\Psi\rangle\)</span> is the <a class="reference external" href="https://en.wikipedia.org/wiki/Wave_function">wavefunction</a> of a stationary electronic state, and <span class="math notranslate nohighlight">\(E\)</span> is its energy.
+The possible solutions include the ground state, which has the lowest energy, and excited states with higher energies.
+This tutorial seeks an approximate solution for the ground-state energy of stretched N<sub>2</sub>.</p>
+<p>This tutorial uses the <a class="reference external" href="https://en.wikipedia.org/wiki/Born%E2%80%93Oppenheimer_approximation">Born–Oppenheimer approximation</a>, which holds the nuclei at fixed positions while solving for the electronic structure.
+At a chosen molecular geometry, the electronic Hamiltonian includes the electron kinetic energy, electron–nucleus attraction, and electron–electron repulsion.
+The repulsion among the fixed nuclei contributes separately to the total energy.
+<a class="reference internal" href="04_putting_the_problem_on_qubits.html"><span class="doc">Mapping the problem to qubits</span></a> develops the selected active-space form of this Hamiltonian and explains how it is mapped to qubits.
+<a class="reference internal" href="01_energy_and_accuracy.html"><span class="doc">Energy and accuracy</span></a> defines the target energy and the different error comparisons used in the tutorial.
+<a class="reference internal" href="02_describing_the_molecule.html"><span class="doc">Describing the molecule</span></a> then specifies the molecular geometry and compares the initial fixed-geometry Hartree–Fock total energies from two related basis sets.</p>
+<p id="tutorial-orbitals-and-determinants">One useful representation starts with molecular orbitals, which describe the spatial part of one-electron states across the molecule.
+In the spin basis used in this tutorial, the two possible <a class="reference external" href="https://en.wikipedia.org/wiki/Spin_(physics)#Spin_projection_quantum_number_and_multiplicity">spin projections</a> are labeled <span class="math notranslate nohighlight">\(\alpha\)</span> and <span class="math notranslate nohighlight">\(\beta\)</span>.
+A spin orbital combines one spatial molecular orbital with either the <span class="math notranslate nohighlight">\(\alpha\)</span> or <span class="math notranslate nohighlight">\(\beta\)</span> spin function.
+Each spin orbital can be occupied by at most one electron.
+Each spatial orbital therefore corresponds to two spin orbitals and can accommodate at most two electrons, one with each spin projection.
+An <a class="reference external" href="https://en.wikipedia.org/wiki/Electron_configuration">electron configuration</a> specifies which spin orbitals are occupied.
+A <a class="reference external" href="https://en.wikipedia.org/wiki/Slater_determinant">Slater determinant</a> constructs a valid many-electron wavefunction for one configuration and enforces the <a class="reference external" href="https://en.wikipedia.org/wiki/Pauli_exclusion_principle">Pauli exclusion principle</a>.
+Electron–electron interactions can couple different electron configurations, so a molecular state can require a combination of many Slater determinants.
+The <a class="reference external" href="https://en.wikipedia.org/wiki/Hartree%E2%80%93Fock_method">Hartree–Fock method</a> retains one optimized determinant as a tractable starting approximation, whereas active-space methods retain multiple determinants while restricting which orbital occupations can vary.
+The <a class="reference internal" href="02_describing_the_molecule.html#tutorial-wavefunction-hierarchy"><span class="std std-ref">wavefunction hierarchy in Describing the molecule</span></a> summarizes how basis functions, orbitals, determinants, and many-electron wavefunctions relate.</p>
+<p>When several configurations contribute substantially, the ground-state wavefunction combines their Slater determinants.
+A coefficient for each determinant specifies its contribution to the wavefunction.
+This need for several important configurations is called <a class="reference external" href="https://en.wikipedia.org/wiki/Electronic_correlation">static correlation</a>, and the resulting wavefunction is called multi-configurational.
+The number of possible configurations grows rapidly with the number of electrons and orbitals.
+An <a class="reference external" href="https://en.wikipedia.org/wiki/Complete_active_space">active space</a> specifies a set of orbitals and a number of electrons whose distribution among those orbitals can vary across determinants in the multi-configurational wavefunction <span class="bibtex-citation" id="id1">[<a class="reference internal" href="../../references.html#id34" title="Christopher J. Stein and Markus Reiher. Automated selection of active orbital spaces. Journal of Chemical Theory and Computation, 12(4):1760-1771, 2016. URL: https://arxiv.org/abs/1602.03835, doi:10.1021/acs.jctc.6b00156.">SR16</a>, <a class="reference internal" href="../../references.html#id35" title="Christopher J. Stein and Markus Reiher. autoCAS: a program for fully automated multiconfigurational calculations. Journal of Computational Chemistry, 40(25):2216-2226, 2019. URL: https://arxiv.org/abs/1904.00097, doi:10.1002/jcc.25869.">SR19</a>]</span>.
+The remaining orbital occupations are fixed, and their energy contributions are tracked separately.
+The active space therefore controls a central tradeoff in this tutorial: a larger space can describe more correlation, but it also produces a larger calculation and eventually requires more qubits.
+<a class="reference internal" href="03_choosing_the_active_space.html"><span class="doc">Choosing the active space</span></a> develops the correlated molecular model and selects the determinants that can contribute to its wavefunction.</p>
+</section>
+<section id="why-quantum-computing">
+<h2>Why quantum computing?<a class="headerlink" href="#why-quantum-computing" title="Link to this heading"></a></h2>
+<p>The difficulty of a correlated calculation is not only the cost of evaluating one determinant.
+The calculation must represent and combine many possible determinants.
+For <span class="math notranslate nohighlight">\(N\)</span> active electrons distributed among <span class="math notranslate nohighlight">\(M\)</span> active spin orbitals, the determinant basis contains</p>
+<div class="math notranslate nohighlight">
+\[N_{\mathrm{det}} = \binom{M}{N}\]</div>
+<p>states before applying additional spin or molecular symmetries.
+Fixing separate <span class="math notranslate nohighlight">\(\alpha\)</span> and <span class="math notranslate nohighlight">\(\beta\)</span> electron counts reduces this dimension to the sector-specific count derived in <a class="reference internal" href="03_choosing_the_active_space.html"><span class="doc">Choosing the active space</span></a>, but does not remove the exponential growth.
+At a fixed ratio of electrons to orbitals, this number grows exponentially with <span class="math notranslate nohighlight">\(M\)</span>.
+<a class="reference external" href="https://en.wikipedia.org/wiki/Full_configuration_interaction">Full configuration interaction</a> combines all allowed determinants in a chosen orbital space and therefore becomes impractical as that orbital space grows.
+Approximate classical methods can reach larger spaces by retaining or compressing selected information, but their accuracy depends on preserving the correlations that matter.
+When many configurations contribute substantially, omitted correlations can cause significant errors in the calculated energy.</p>
+<p id="tutorial-occupation-encoding">The determinant count <span class="math notranslate nohighlight">\(N_{\mathrm{det}}\)</span> is also the number of coefficients needed to store a general full configuration-interaction wavefunction explicitly on a classical computer.
+An occupation-number encoding assigns one qubit to each spin orbital to record whether that orbital is unoccupied or occupied.
+Once prepared, the qubit register carries amplitudes for a superposition of these <span class="math notranslate nohighlight">\(N_{\mathrm{det}}\)</span> occupation patterns.
+Entanglement links occupations across spin orbitals, so the joint quantum state represents configuration mixing without an explicit classical coefficient vector.
+Preparing that state may still require classically supplied amplitudes and substantial resources.</p>
+<p id="tutorial-compute-register">A quantum register is a group of qubits treated as one part of a computation because they serve the same role.
+The occupation-encoding qubits form the compute register, which stores the encoded fermionic state and is acted on by the qubit Hamiltonian.
+<a class="reference external" href="https://en.wikipedia.org/wiki/Ancilla_bit">Ancilla qubits</a> are additional qubits used for tasks such as control, temporary workspace, or readout; they do not represent additional spin orbitals and are counted separately.
+<a class="reference internal" href="04_putting_the_problem_on_qubits.html"><span class="doc">Mapping the problem to qubits</span></a> maps the selected electronic Hamiltonian to a qubit Hamiltonian and determines the size of this register.
+During Hamiltonian time evolution, each energy eigenstate acquires a phase determined by its energy.
+<a class="reference internal" href="../../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a> estimates this phase and converts it to an energy eigenvalue <span class="bibtex-citation" id="id2">[<a class="reference internal" href="../../references.html#id5" title="Alán Aspuru-Guzik, Anthony D. Dutoi, Peter J. Love, and Martin Head-Gordon. Simulated quantum computation of molecular energies. Science, 309(5741):1704-1707, 2005. doi:10.1126/science.1113479.">AGDLHG05</a>, <a class="reference internal" href="../../references.html#id7" title="Vera von Burg, Guang Hao Low, Thomas Häner, Damian S. Steiger, Markus Reiher, Martin Roetteler, and Matthias Troyer. Quantum computing enhanced computational catalysis. Physical Review Research, 3(3):033055, 2021. doi:10.1103/PhysRevResearch.3.033055.">vBLHaner+21</a>]</span>.
+This representation does not make the calculation automatically efficient.
+Preparing a useful state, implementing time evolution, correcting errors, and repeating measurements can all require substantial resources.</p>
+<p>Before running <a class="reference internal" href="../../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a>, a state-preparation circuit loads an approximate wavefunction, called the trial state, onto the quantum register.
+The trial state can be expressed as a combination of the eigenstates of the qubit Hamiltonian.
+<a class="reference internal" href="../../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a> can return the energy of any eigenstate represented in that combination; it does not independently find or prepare the ground state.</p>
+<p id="tutorial-trial-state-fidelity">Let <span class="math notranslate nohighlight">\(\vert\Psi_0\rangle\)</span> denote the exact ground state of the active-space Hamiltonian and <span class="math notranslate nohighlight">\(\vert\Psi_{\mathrm{trial}}\rangle\)</span> denote the prepared trial state.
+Their squared overlap is the ground-state fidelity</p>
+<div class="math notranslate nohighlight">
+\[F = \left\vert \langle\Psi_0 \vert \Psi_{\mathrm{trial}}\rangle \right\vert^2.\]</div>
+<p>Fidelity measures the weight of the ground state in the trial state.
+In an ideal coherent phase-estimation measurement that uses one prepared system state to produce one complete phase result, <span class="math notranslate nohighlight">\(F\)</span> is the probability of sampling the ground-state eigenphase.
+The iterative implementation used by this tutorial instead prepares a new system state for each circuit that estimates one bit of the phase, so fidelity influences its bit statistics but does not by itself determine a complete-run success probability or trial count.
+For this classically tractable teaching example, the classical active-space calculation supplies the important determinants and coefficients used to construct the trial state and later validate the quantum result.
+<a class="reference internal" href="05_preparing_the_trial_state.html"><span class="doc">Preparing the trial state</span></a> develops overlap and fidelity, and <a class="reference internal" href="06_iterative_phase_estimation.html"><span class="doc">Iterative quantum phase estimation</span></a> explains how the energy is measured.</p>
+</section>
+<section id="why-stretched-nitrogen">
+<h2>Why stretched nitrogen?<a class="headerlink" href="#why-stretched-nitrogen" title="Link to this heading"></a></h2>
+<p>In <a class="reference external" href="https://en.wikipedia.org/wiki/Molecular_orbital_theory">molecular orbital theory</a>, occupying a bonding orbital stabilizes a bond, whereas occupying the corresponding antibonding orbital opposes that stabilization.
+Near the <a class="reference external" href="https://webbook.nist.gov/cgi/cbook.cgi?ID=C7727379&amp;Mask=1000">equilibrium bond length</a> of <span class="math notranslate nohighlight">\(1.097685\ \text{Å}\)</span> for N<sub>2</sub>, moving electrons from bonding to antibonding orbitals is energetically unfavorable, so one electron configuration dominates the ground-state wavefunction.
+Bond stretching can make configurations with different occupations of the bonding and antibonding orbitals comparable in importance, increasing the multiconfigurational character of the ground state.
+The selected stretched N<sub>2</sub> geometry is chosen to make this effect visible.
+Later chapters quantify it through orbital entropies and determinant weights.</p>
+</section>
+<section id="tutorial-scope-and-structure">
+<h2>Tutorial scope and structure<a class="headerlink" href="#tutorial-scope-and-structure" title="Link to this heading"></a></h2>
+<p>The tutorial deliberately selects a compact active-space model that can be solved exactly on a classical computer, allowing each quantum stage to be checked against a classical reference.
+The circuits are executed on a classical simulator to validate the workflow.
+Complete active space configuration interaction (<a class="reference internal" href="../../glossary.html#term-CASCI"><span class="xref std std-term">CASCI</span></a>) performs full configuration interaction within the selected active space rather than across all orbitals in the molecular model.
+The final quantum calculation is compared with the <a class="reference internal" href="../../glossary.html#term-CASCI"><span class="xref std std-term">CASCI</span></a> energy of the same selected active-space Hamiltonian.
+The tutorial uses one <a class="reference external" href="https://en.wikipedia.org/wiki/Hartree">millihartree</a> (<span class="math notranslate nohighlight">\(1\ \mathrm{m}E_{\mathrm{h}}\)</span>) as a teaching target for this algorithmic comparison; however, meeting that target does not establish agreement with experiment or remove basis-set and active-space errors.</p>
+<p>Each required chapter:</p>
+<ul class="simple">
+<li><p>introduces one stage of the calculation;</p></li>
+<li><p>provides a testable Python example where appropriate; and</p></li>
+<li><p>ends with questions and a lab notebook assignment.</p></li>
+</ul>
+<p>The required chapters follow the stages in the <a class="reference internal" href="#tutorial-qpe-workflow"><span class="std std-ref">workflow diagram</span></a>:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="01_energy_and_accuracy.html"><span class="doc">Define the target energy and accuracy comparison</span></a>.</p></li>
+<li><p><a class="reference internal" href="02_describing_the_molecule.html"><span class="doc">Construct the molecular system and Hartree–Fock starting wavefunction</span></a>.</p></li>
+<li><p><a class="reference internal" href="03_choosing_the_active_space.html"><span class="doc">Select a correlated active-space model</span></a>.</p></li>
+<li><p><a class="reference internal" href="04_putting_the_problem_on_qubits.html"><span class="doc">Map the active-space Hamiltonian to qubits</span></a>.</p></li>
+<li><p><a class="reference internal" href="05_preparing_the_trial_state.html"><span class="doc">Prepare a trial state</span></a>.</p></li>
+<li><p><a class="reference internal" href="06_iterative_phase_estimation.html"><span class="doc">Estimate the energy with IQPE and compare it with the matching classical reference</span></a>.</p></li>
+</ul>
+<p>The final circuit simulation is the only intentionally long required example and reports progress after each complete run.</p>
+</section>
+<section id="cumulative-assignment">
+<h2>Cumulative assignment<a class="headerlink" href="#cumulative-assignment" title="Link to this heading"></a></h2>
+<p>Download <a class="reference download internal" download="" href="../../_downloads/0ada2c1495d8875367d6a67e0170774c/ground_state_qpe_lab_notebook_template.md"><code class="xref download docutils literal notranslate"><span class="pre">the</span> <span class="pre">blank</span> <span class="pre">Markdown</span> <span class="pre">lab</span> <span class="pre">notebook</span></code></a> and maintain a working copy throughout the tutorial.
+This is a note-taking document, not a Jupyter notebook.
+The <a class="reference internal" href="lab_notebook.html"><span class="doc">lab notebook setup and field guide</span></a> explains how to use it.
+Each required chapter asks you to record the inputs, decisions, results, and interpretations needed to reproduce the final calculation.
+The lab notebook turns the chapter learning objectives into evidence that you can inspect and explain.
+At the end, use the completed lab notebook to explain the final energy estimate and the limitations that remain.</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="00_before_you_begin.html">Before you begin</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="00_before_you_begin.html#audience-and-prerequisites">Audience and prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="00_before_you_begin.html#computer-requirements">Computer requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="00_before_you_begin.html#required-software">Required software</a></li>
+<li class="toctree-l2"><a class="reference internal" href="00_before_you_begin.html#python-environment-setup">Python environment setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="00_before_you_begin.html#setup-check">Setup check</a></li>
+<li class="toctree-l2"><a class="reference internal" href="00_before_you_begin.html#how-to-use-the-tutorial">How to use the tutorial</a></li>
+<li class="toctree-l2"><a class="reference internal" href="00_before_you_begin.html#further-reading">Further reading</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="lab_notebook.html">Set up your lab notebook</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="lab_notebook.html#how-to-use-the-lab-notebook">How to use the lab notebook</a></li>
+<li class="toctree-l2"><a class="reference internal" href="lab_notebook.html#template-field-guide">Template field guide</a></li>
+<li class="toctree-l2"><a class="reference internal" href="lab_notebook.html#setup-and-provenance">Setup and provenance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="lab_notebook.html#calculation-goal-and-reference-plan">Calculation goal and reference plan</a></li>
+<li class="toctree-l2"><a class="reference internal" href="lab_notebook.html#molecular-input-and-mean-field-calculation">Molecular input and mean-field calculation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="lab_notebook.html#active-space-model">Active-space model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="lab_notebook.html#qubit-representation">Qubit representation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="lab_notebook.html#trial-state">Trial state</a></li>
+<li class="toctree-l2"><a class="reference internal" href="lab_notebook.html#phase-estimation-calculation">Phase-estimation calculation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="lab_notebook.html#conclusion">Conclusion</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="01_energy_and_accuracy.html">Energy and accuracy</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="01_energy_and_accuracy.html#learning-objectives">Learning objectives</a></li>
+<li class="toctree-l2"><a class="reference internal" href="01_energy_and_accuracy.html#the-energy-reported-in-this-tutorial">The energy reported in this tutorial</a></li>
+<li class="toctree-l2"><a class="reference internal" href="01_energy_and_accuracy.html#energy-differences-require-context">Energy differences require context</a></li>
+<li class="toctree-l2"><a class="reference internal" href="01_energy_and_accuracy.html#why-energy-accuracy-matters">Why energy accuracy matters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="01_energy_and_accuracy.html#accuracy-precision-and-other-definitions">Accuracy, precision, and other definitions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="01_energy_and_accuracy.html#the-teaching-target">The teaching target</a></li>
+<li class="toctree-l2"><a class="reference internal" href="01_energy_and_accuracy.html#where-approximations-enter">Where approximations enter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="01_energy_and_accuracy.html#further-reading">Further reading</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="02_describing_the_molecule.html">Describing the molecule</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="02_describing_the_molecule.html#learning-objectives">Learning objectives</a></li>
+<li class="toctree-l2"><a class="reference internal" href="02_describing_the_molecule.html#example-download">Example download</a></li>
+<li class="toctree-l2"><a class="reference internal" href="02_describing_the_molecule.html#the-molecular-system">The molecular system</a></li>
+<li class="toctree-l2"><a class="reference internal" href="02_describing_the_molecule.html#the-mean-field-wavefunction">The mean-field wavefunction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="02_describing_the_molecule.html#finite-basis-orbital-representation">Finite-basis orbital representation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="02_describing_the_molecule.html#self-consistent-wavefunction-optimization">Self-consistent wavefunction optimization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="02_describing_the_molecule.html#running-the-calculation">Running the calculation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="02_describing_the_molecule.html#further-reading">Further reading</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="03_choosing_the_active_space.html">Choosing the active space</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="03_choosing_the_active_space.html#learning-objectives">Learning objectives</a></li>
+<li class="toctree-l2"><a class="reference internal" href="03_choosing_the_active_space.html#example-download">Example download</a></li>
+<li class="toctree-l2"><a class="reference internal" href="03_choosing_the_active_space.html#the-limits-of-one-determinant">The limits of one determinant</a></li>
+<li class="toctree-l2"><a class="reference internal" href="03_choosing_the_active_space.html#the-active-space">The active space</a></li>
+<li class="toctree-l2"><a class="reference internal" href="03_choosing_the_active_space.html#a-correlated-active-space-wavefunction">A correlated active-space wavefunction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="03_choosing_the_active_space.html#natural-orbital-transformation">Natural-orbital transformation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="03_choosing_the_active_space.html#active-space-refinement-with-orbital-entropies">Active-space refinement with orbital entropies</a></li>
+<li class="toctree-l2"><a class="reference internal" href="03_choosing_the_active_space.html#the-algorithmic-reference">The algorithmic reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="03_choosing_the_active_space.html#the-active-space-choice">The active-space choice</a></li>
+<li class="toctree-l2"><a class="reference internal" href="03_choosing_the_active_space.html#running-the-calculation">Running the calculation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="03_choosing_the_active_space.html#candidate-orbital-visualization">Candidate-orbital visualization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="03_choosing_the_active_space.html#further-reading">Further reading</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="04_putting_the_problem_on_qubits.html">Mapping the problem to qubits</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="04_putting_the_problem_on_qubits.html#learning-objectives">Learning objectives</a></li>
+<li class="toctree-l2"><a class="reference internal" href="04_putting_the_problem_on_qubits.html#example-download">Example download</a></li>
+<li class="toctree-l2"><a class="reference internal" href="04_putting_the_problem_on_qubits.html#the-active-space-hamiltonian">The active-space Hamiltonian</a></li>
+<li class="toctree-l2"><a class="reference internal" href="04_putting_the_problem_on_qubits.html#why-orbital-occupations-are-not-enough">Why orbital occupations are not enough</a></li>
+<li class="toctree-l2"><a class="reference internal" href="04_putting_the_problem_on_qubits.html#the-jordan-wigner-transformation">The Jordan–Wigner transformation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="04_putting_the_problem_on_qubits.html#qubits-for-the-encoded-fermionic-state">Qubits for the encoded fermionic state</a></li>
+<li class="toctree-l2"><a class="reference internal" href="04_putting_the_problem_on_qubits.html#qubit-hamiltonian-in-pauli-form">Qubit Hamiltonian in Pauli form</a></li>
+<li class="toctree-l2"><a class="reference internal" href="04_putting_the_problem_on_qubits.html#core-energy-bookkeeping">Core-energy bookkeeping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="04_putting_the_problem_on_qubits.html#running-the-mapping">Running the mapping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="04_putting_the_problem_on_qubits.html#further-reading">Further reading</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="05_preparing_the_trial_state.html">Preparing the trial state</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="05_preparing_the_trial_state.html#learning-objectives">Learning objectives</a></li>
+<li class="toctree-l2"><a class="reference internal" href="05_preparing_the_trial_state.html#example-download">Example download</a></li>
+<li class="toctree-l2"><a class="reference internal" href="05_preparing_the_trial_state.html#connection-to-the-selected-space-workflow">Connection to the selected-space workflow</a></li>
+<li class="toctree-l2"><a class="reference internal" href="05_preparing_the_trial_state.html#why-phase-estimation-needs-a-trial-state">Why phase estimation needs a trial state</a></li>
+<li class="toctree-l2"><a class="reference internal" href="05_preparing_the_trial_state.html#ground-state-fidelity">Ground-state fidelity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="05_preparing_the_trial_state.html#a-sparse-trial-wavefunction">A sparse trial wavefunction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="05_preparing_the_trial_state.html#the-trial-state-preparation-logical-circuit">The trial state preparation logical circuit</a></li>
+<li class="toctree-l2"><a class="reference internal" href="05_preparing_the_trial_state.html#trial-state-quality-and-preparation-cost">Trial-state quality and preparation cost</a></li>
+<li class="toctree-l2"><a class="reference internal" href="05_preparing_the_trial_state.html#running-the-preparation">Running the preparation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="05_preparing_the_trial_state.html#further-reading">Further reading</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="06_iterative_phase_estimation.html">Iterative quantum phase estimation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="06_iterative_phase_estimation.html#learning-objectives">Learning objectives</a></li>
+<li class="toctree-l2"><a class="reference internal" href="06_iterative_phase_estimation.html#example-download">Example download</a></li>
+<li class="toctree-l2"><a class="reference internal" href="06_iterative_phase_estimation.html#prerequisite-concepts">Prerequisite concepts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="06_iterative_phase_estimation.html#energy-to-phase-encoding">Energy-to-phase encoding</a></li>
+<li class="toctree-l2"><a class="reference internal" href="06_iterative_phase_estimation.html#qubit-measurement-and-shots">Qubit measurement and shots</a></li>
+<li class="toctree-l2"><a class="reference internal" href="06_iterative_phase_estimation.html#one-phase-bit-at-a-time">One phase bit at a time</a></li>
+<li class="toctree-l2"><a class="reference internal" href="06_iterative_phase_estimation.html#numerical-controls">Numerical controls</a></li>
+<li class="toctree-l2"><a class="reference internal" href="06_iterative_phase_estimation.html#iqpe-circuit-visualization">IQPE circuit visualization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="06_iterative_phase_estimation.html#iterative-phase-estimation">Iterative phase estimation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="06_iterative_phase_estimation.html#repeated-complete-runs">Repeated complete runs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="06_iterative_phase_estimation.html#molecular-energy-reconstruction">Molecular energy reconstruction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="06_iterative_phase_estimation.html#the-complete-workflow">The complete workflow</a></li>
+<li class="toctree-l2"><a class="reference internal" href="06_iterative_phase_estimation.html#knowledge-check">Knowledge check</a></li>
+<li class="toctree-l2"><a class="reference internal" href="06_iterative_phase_estimation.html#what-you-accomplished">What you accomplished</a></li>
+<li class="toctree-l2"><a class="reference internal" href="06_iterative_phase_estimation.html#further-reading">Further reading</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../index.html" class="btn btn-neutral float-left" title="Tutorials" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="00_before_you_begin.html" class="btn btn-neutral float-right" title="Before you begin" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

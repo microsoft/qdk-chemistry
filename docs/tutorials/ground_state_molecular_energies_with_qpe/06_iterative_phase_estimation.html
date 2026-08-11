@@ -1,0 +1,658 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Iterative quantum phase estimation &mdash; qdk-chemistry 2.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=78acbc13" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Python API" href="../../api/python_api.html" />
+    <link rel="prev" title="Preparing the trial state" href="05_preparing_the_trial_state.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Tutorials</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Ground-state molecular energies with quantum phase estimation</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="index.html#quantum-chemistry-background">Quantum chemistry background</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#why-quantum-computing">Why quantum computing?</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#why-stretched-nitrogen">Why stretched nitrogen?</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#tutorial-scope-and-structure">Tutorial scope and structure</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="index.html#cumulative-assignment">Cumulative assignment</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="00_before_you_begin.html">Before you begin</a></li>
+<li class="toctree-l4"><a class="reference internal" href="lab_notebook.html">Set up your lab notebook</a></li>
+<li class="toctree-l4"><a class="reference internal" href="01_energy_and_accuracy.html">Energy and accuracy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="02_describing_the_molecule.html">Describing the molecule</a></li>
+<li class="toctree-l4"><a class="reference internal" href="03_choosing_the_active_space.html">Choosing the active space</a></li>
+<li class="toctree-l4"><a class="reference internal" href="04_putting_the_problem_on_qubits.html">Mapping the problem to qubits</a></li>
+<li class="toctree-l4"><a class="reference internal" href="05_preparing_the_trial_state.html">Preparing the trial state</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Iterative quantum phase estimation</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Tutorials</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Ground-state molecular energies with quantum phase estimation</a></li>
+      <li class="breadcrumb-item active">Iterative quantum phase estimation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/ground_state_molecular_energies_with_qpe/06_iterative_phase_estimation.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="iterative-quantum-phase-estimation">
+<h1>Iterative quantum phase estimation<a class="headerlink" href="#iterative-quantum-phase-estimation" title="Link to this heading"></a></h1>
+<div class="chapter-focus admonition">
+<p class="admonition-title">Chapter focus</p>
+<p>How do we extract the molecular ground-state energy from the prepared quantum state?</p>
+</div>
+<section id="learning-objectives">
+<h2>Learning objectives<a class="headerlink" href="#learning-objectives" title="Link to this heading"></a></h2>
+<p>After completing this chapter, you will be able to:</p>
+<ul class="simple">
+<li><p>Relate a Hamiltonian eigenvalue to a time-evolution eigenphase.</p></li>
+<li><p>Describe how <a class="reference internal" href="../../glossary.html#term-IQPE"><span class="xref std std-term">IQPE</span></a> measures phase bits.</p></li>
+<li><p>Explain the roles of the compute register and readout ancilla.</p></li>
+<li><p>Relate phase bits, shots per bit, and repeated complete runs to the energy estimate.</p></li>
+<li><p>Run <a class="reference internal" href="../../glossary.html#term-IQPE"><span class="xref std std-term">IQPE</span></a> with native <a class="reference internal" href="../../glossary.html#term-QDK"><span class="xref std std-term">QDK</span></a>/Chemistry tools.</p></li>
+<li><p>Reconstruct the total molecular energy and evaluate its error.</p></li>
+</ul>
+<div class="lab-notebook-assignment admonition">
+<p class="admonition-title">Lab notebook assignment</p>
+<p>Complete <a class="reference internal" href="lab_notebook.html#lab-notebook-phase-estimation"><span class="std std-ref">Phase-estimation calculation</span></a> and <a class="reference internal" href="lab_notebook.html#lab-notebook-conclusion"><span class="std std-ref">Conclusion</span></a>.
+Record the algorithm settings before starting the final simulation and record the measured values after it finishes.
+Use the completed lab notebook to explain whether the result meets the teaching target and which chemistry and algorithm limitations remain.</p>
+</div>
+</section>
+<section id="example-download">
+<h2>Example download<a class="headerlink" href="#example-download" title="Link to this heading"></a></h2>
+<p>Download <a class="reference download internal" download="" href="../../_downloads/20b7627703046d12f0d70b891d27646c/tutorial_run_iqpe.py"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_run_iqpe.py</span></code></a> and save it in the tutorial working directory alongside <a class="reference download internal" download="" href="../../_downloads/2f07e2323e1906c3922876467343a044/tutorial_orbital_coordinates.py"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_orbital_coordinates.py</span></code></a>, <a class="reference download internal" download="" href="../../_downloads/1a2f7bdf060308bbc54b67c9f1cf67d1/tutorial_choose_active_space.py"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_choose_active_space.py</span></code></a>, <a class="reference download internal" download="" href="../../_downloads/106a739e0f553cfc05fb84c9f1e2e7bc/tutorial_map_n2_to_qubits.py"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_map_n2_to_qubits.py</span></code></a>, and <a class="reference download internal" download="" href="../../_downloads/4d1e3a028feb8de74d109fe3e231917d/tutorial_prepare_trial_state.py"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_prepare_trial_state.py</span></code></a>.
+Also download <a class="reference download internal" download="" href="../../_downloads/38a0f691a2aed1b711fdc1987c5a0105/tutorial_visualize_iqpe_circuit.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_visualize_iqpe_circuit.ipynb</span></code></a> to the same directory.
+Open the files in Visual Studio Code and review the complete <a class="reference internal" href="../../glossary.html#term-IQPE"><span class="xref std std-term">IQPE</span></a> script, including imports, data classes, and helper functions omitted from the excerpts below.
+The script imports the mapping and trial-state workflows from previous chapters so every stage uses the same selected Hamiltonian and four-determinant trial state.
+The Jupyter notebook constructs and renders the shortest iteration circuit without executing the simulator.</p>
+</section>
+<section id="prerequisite-concepts">
+<h2>Prerequisite concepts<a class="headerlink" href="#prerequisite-concepts" title="Link to this heading"></a></h2>
+<p>An <a class="reference internal" href="../../glossary.html#term-IQPE"><span class="xref std std-term">IQPE</span></a> calculation requires four kinds of information:</p>
+<dl class="simple">
+<dt><a class="reference internal" href="04_putting_the_problem_on_qubits.html#tutorial-qubit-hamiltonian"><span class="std std-ref">Qubit Hamiltonian</span></a></dt><dd><p>A Hermitian operator whose eigenvalue is sought, represented on the compute register.</p>
+</dd>
+<dt><a class="reference internal" href="05_preparing_the_trial_state.html#tutorial-trial-state-definition"><span class="std std-ref">Trial state</span></a></dt><dd><p>A normalized state with nonzero weight on the target Hamiltonian eigenstate.</p>
+</dd>
+<dt><a class="reference internal" href="#tutorial-energy-to-phase-encoding"><span class="std std-ref">Time-evolution implementation</span></a></dt><dd><p>A logical circuit approximating <span class="math notranslate nohighlight">\(e^{-i\hat Ht}\)</span> and controlled powers of that unitary.</p>
+</dd>
+<dt><a class="reference internal" href="#tutorial-iqpe-numerical-controls"><span class="std std-ref">Numerical and sampling controls</span></a></dt><dd><p>An evolution time, number of phase bits, shots per bit, and number of complete runs.</p>
+</dd>
+</dl>
+<p>The previous chapters supplied the qubit Hamiltonian and trial state for the selected molecular problem.
+They also recorded the core energy needed to reconstruct the molecular total and the classical <a class="reference internal" href="../../glossary.html#term-CASCI"><span class="xref std std-term">CASCI</span></a> reference used to validate the final estimate; those two quantities are bookkeeping and validation data rather than inputs to the phase-estimation circuit.</p>
+<p>The compute register stores the encoded active-space wavefunction.
+This chapter adds one readout ancilla, a qubit used to extract phase information without representing another spin orbital.
+The <a class="reference external" href="https://en.wikipedia.org/wiki/Quantum_phase_estimation_algorithm">quantum phase estimation overview</a> provides an optional refresher on the basic controlled-unitary circuit model.</p>
+</section>
+<section id="energy-to-phase-encoding">
+<span id="tutorial-energy-to-phase-encoding"></span><h2>Energy-to-phase encoding<a class="headerlink" href="#energy-to-phase-encoding" title="Link to this heading"></a></h2>
+<p>Let <span class="math notranslate nohighlight">\(\vert\Psi_j\rangle\)</span> be an eigenstate of the qubit Hamiltonian with active-space energy <span class="math notranslate nohighlight">\(E_j\)</span>:</p>
+<div class="math notranslate nohighlight">
+\[\hat H_{\mathrm{qubit}}\vert\Psi_j\rangle
+= E_j\vert\Psi_j\rangle.\]</div>
+<p>In atomic units, the evolution time <span class="math notranslate nohighlight">\(t\)</span> is expressed in inverse Hartree, <span class="math notranslate nohighlight">\(E_{\mathrm{h}}^{-1}\)</span>, so the product <span class="math notranslate nohighlight">\(E_jt\)</span> is dimensionless.
+The time-evolution unitary is</p>
+<div class="math notranslate nohighlight">
+\[U(t)=e^{-i\hat H_{\mathrm{qubit}}t}.\]</div>
+<p>Because every power of the Hamiltonian acting on <span class="math notranslate nohighlight">\(\vert\Psi_j\rangle\)</span> contributes the corresponding power of <span class="math notranslate nohighlight">\(E_j\)</span>, the exponential acts on that eigenstate as</p>
+<div class="math notranslate nohighlight">
+\[U(t)\vert\Psi_j\rangle
+=e^{-i\hat H_{\mathrm{qubit}}t}\vert\Psi_j\rangle
+=e^{-iE_jt}\vert\Psi_j\rangle.\]</div>
+<p>The physical eigenphase in the exponential is therefore <span class="math notranslate nohighlight">\(-E_jt\)</span> modulo <span class="math notranslate nohighlight">\(2\pi\)</span>.
+The phase fraction reported by <a class="reference internal" href="../../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a> is</p>
+<div class="math notranslate nohighlight">
+\[\varphi_j
+=\left(\frac{-E_jt}{2\pi}\right)\bmod 1.\]</div>
+<p>The QDK/Chemistry result object handles the modulo wrapping automatically.
+It converts the measured phase fraction to a signed angle <span class="math notranslate nohighlight">\(\alpha\in(-\pi,\pi]\)</span> and returns <span class="math notranslate nohighlight">\(-\alpha/t\)</span>.
+The tutorial script uses this value directly rather than manually applying a sign conversion.
+To avoid aliasing, the active-space Hamiltonian energy eigenvalue <span class="math notranslate nohighlight">\(E_j\)</span> being estimated must lie in the signed interval <span class="math notranslate nohighlight">\([-\pi/t,\pi/t)\)</span>; energies outside that interval can produce the same measured phase.
+The two boundary energies differ by one complete phase turn and therefore represent the same measured phase; QDK/Chemistry assigns that boundary to <span class="math notranslate nohighlight">\(-\pi/t\)</span>.</p>
+<p>The next figure shows how to read this wrapping convention.
+Follow the upper axis from <span class="math notranslate nohighlight">\(\varphi=0\)</span> toward <span class="math notranslate nohighlight">\(\varphi=1\)</span>.
+From zero through one half, the signed angle is nonnegative, so <span class="math notranslate nohighlight">\(E=-\alpha/t\)</span> runs from zero down to <span class="math notranslate nohighlight">\(-\pi/t\)</span> along the green branch.
+Immediately above one half, the signed angle wraps from <span class="math notranslate nohighlight">\(+\pi\)</span> to just above <span class="math notranslate nohighlight">\(-\pi\)</span>; the corresponding energy jumps to just below <span class="math notranslate nohighlight">\(+\pi/t\)</span> and then returns toward zero along the purple branch.
+At <span class="math notranslate nohighlight">\(\varphi=1/2\)</span>, the lower filled point includes <span class="math notranslate nohighlight">\(-\pi/t\)</span>, while the upper open point excludes the equivalent <span class="math notranslate nohighlight">\(+\pi/t\)</span> representation.</p>
+<figure class="align-center" id="id1">
+<a class="reference internal image-reference" href="../../_images/tutorial_qpe_phase_wrapping.png"><img alt="Signed reconstructed energy plotted against phase fraction from zero to one. Phase fractions from zero through one half map from zero down to minus pi over t. Immediately above one half, the signed branch wraps to just below plus pi over t and returns toward zero as the phase approaches one. A neutral dashed guide connects the included minus pi over t point and excluded plus pi over t point at phase one half. A red bracket beside the plot spans their energy difference of two pi over t. Phase one wraps to phase zero." src="../../_images/tutorial_qpe_phase_wrapping.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-text">QDK/Chemistry converts the wrapped phase fraction to one signed energy branch. The neutral dashed guide marks the shared phase <span class="math notranslate nohighlight">\(\varphi=1/2\)</span>; the red bracket spans the <span class="math notranslate nohighlight">\(2\pi/t\)</span> energy difference between its included and excluded boundary representations. Energies separated by that amount alias to the same reported phase.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>With <span class="math notranslate nohighlight">\(m\)</span> measured phase bits, the representable fractions are multiples of <span class="math notranslate nohighlight">\(2^{-m}\)</span>, so adjacent energy-grid points are separated by</p>
+<div class="math notranslate nohighlight">
+\[\Delta E_{\mathrm{grid}}=\frac{2\pi}{t2^m}.\]</div>
+<p>With <span class="math notranslate nohighlight">\(m\)</span> measured phase bits, the largest controlled power is <span class="math notranslate nohighlight">\(U^{2^{m-1}}\)</span>.
+Increasing <span class="math notranslate nohighlight">\(m\)</span> from six to ten therefore raises the largest power from <span class="math notranslate nohighlight">\(U^{32}\)</span> to <span class="math notranslate nohighlight">\(U^{512}\)</span>, increasing the size and runtime cost of the largest iteration circuit by a factor of sixteen for this repeated-power strategy.
+This tutorial uses six bits to keep the simulation tractable; that choice does not by itself provide <span class="math notranslate nohighlight">\(\mathrm{m}E_{\mathrm{h}}\)</span> resolution.</p>
+<p>The evolution time is computed from quantities already produced by the classically tractable example chosen for this tutorial.
+If we write the mapped Hamiltonian as <span class="math notranslate nohighlight">\(\hat H_{\mathrm{qubit}}=\sum_\ell h_\ell P_\ell\)</span> and define</p>
+<div class="math notranslate nohighlight">
+\[\lambda=\sum_\ell\lvert h_\ell\rvert.\]</div>
+<p>The QDK/Chemistry application programming interface (<a class="reference internal" href="../../glossary.html#term-API"><span class="xref std std-term">API</span></a>) exposes this coefficient 1-norm as <code class="docutils literal notranslate"><span class="pre">qubit_hamiltonian.schatten_norm</span></code>; the tutorial script uses it to choose the evolution time and reports it in the pre-simulation settings.
+For this Hamiltonian, the reported value is <span class="math notranslate nohighlight">\(\lambda=19.610172748837\ E_{\mathrm{h}}\)</span>.
+Because <span class="math notranslate nohighlight">\(\lambda\)</span> bounds the magnitudes of the Hamiltonian eigenvalues, the initial choice</p>
+<div class="math notranslate nohighlight">
+\[t_{\mathrm{bound}}=\frac{\pi}{\lambda}
+=0.160202191680\ E_{\mathrm{h}}^{-1}\]</div>
+<p>keeps the spectrum within the signed, unaliased phase interval.
+The script reports this value as the <code class="docutils literal notranslate"><span class="pre">Initial</span> <span class="pre">unaliased</span> <span class="pre">time</span> <span class="pre">bound</span></code> in its pre-simulation settings.
+Using the active-space reference from <a class="reference internal" href="04_putting_the_problem_on_qubits.html"><span class="doc">Mapping the problem to qubits</span></a>, <span class="math notranslate nohighlight">\(E_{\mathrm{ref}}=-9.653276065987\ E_{\mathrm{h}}\)</span>, this initial time gives the implementation phase fraction</p>
+<div class="math notranslate nohighlight">
+\[\varphi_{\mathrm{bound}}
+=\left(\frac{-t_{\mathrm{bound}}E_{\mathrm{ref}}}{2\pi}\right)\bmod 1
+\approx0.246129297014.\]</div>
+<p>The script reports this value as the <code class="docutils literal notranslate"><span class="pre">Reference</span> <span class="pre">phase</span> <span class="pre">at</span> <span class="pre">initial</span> <span class="pre">time</span> <span class="pre">bound</span></code>.
+The nearest six-bit fraction is <span class="math notranslate nohighlight">\(16/64=0.25\)</span>, represented by <code class="docutils literal notranslate"><span class="pre">010000</span></code>.
+Its signed angle is <span class="math notranslate nohighlight">\(2\pi(16/64)=+\pi/2\)</span>.
+Finally, we can choose the evolution time so that this grid point reconstructs an energy <span class="math notranslate nohighlight">\(\delta=0.001\ E_{\mathrm{h}}\)</span> above the known reference:</p>
+<div class="math notranslate nohighlight">
+\[t
+=\frac{-\pi/2}{E_{\mathrm{ref}}+\delta}
+=0.162738437655\ E_{\mathrm{h}}^{-1}.\]</div>
+<p>The script reports this adjusted value as the <code class="docutils literal notranslate"><span class="pre">Selected</span> <span class="pre">evolution</span> <span class="pre">time</span></code>.
+Using this time, the reference phase fraction is approximately <span class="math notranslate nohighlight">\(0.250025901\)</span>, only about <span class="math notranslate nohighlight">\(2.59\times10^{-5}\)</span> above the selected grid point.
+The grid point therefore reconstructs an active energy exactly <span class="math notranslate nohighlight">\(1\ \mathrm{m}E_{\mathrm{h}}\)</span> above the classical reference to the displayed precision.</p>
+<p>The table below compares the selected point with its neighboring six-bit grid energies and the known reference.
+The rows are ordered by energy rather than by grid index, so the more negative <span class="math notranslate nohighlight">\(k=17\)</span> energy appears before <span class="math notranslate nohighlight">\(k=16\)</span>.
+The reference row has no grid index or bitstring because the reference does not lie exactly on the six-bit grid.</p>
+<table class="docutils align-center" id="id2">
+<caption><span class="caption-text">Six-bit active-energy grid near the reference. Here <span class="math notranslate nohighlight">\(k\)</span> is the integer grid index, so <span class="math notranslate nohighlight">\(\varphi_k=k/2^6=k/64\)</span>; its six-bit binary representation is the measured bitstring.</span><a class="headerlink" href="#id2" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 30.8%" />
+<col style="width: 30.8%" />
+<col style="width: 38.5%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Grid point</p></th>
+<th class="head"><p>Bitstring</p></th>
+<th class="head"><p>Active energy (<span class="math notranslate nohighlight">\(E_{\mathrm{h}}\)</span>)</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><span class="math notranslate nohighlight">\(k=17\)</span></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">010001</span></code></p></td>
+<td><p><span class="math notranslate nohighlight">\(-10.255543320111\)</span></p></td>
+</tr>
+<tr class="row-odd"><td><p>Known reference (not a grid point)</p></td>
+<td><p>Not applicable</p></td>
+<td><p><span class="math notranslate nohighlight">\(-9.653276065987\)</span></p></td>
+</tr>
+<tr class="row-even"><td><p><span class="math notranslate nohighlight">\(k=16\)</span> (selected)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">010000</span></code></p></td>
+<td><p><span class="math notranslate nohighlight">\(-9.652276065987\)</span></p></td>
+</tr>
+<tr class="row-odd"><td><p><span class="math notranslate nohighlight">\(k=15\)</span></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">001111</span></code></p></td>
+<td><p><span class="math notranslate nohighlight">\(-9.049008811863\)</span></p></td>
+</tr>
+</tbody>
+</table>
+<p>The neighboring grid energies differ by approximately <span class="math notranslate nohighlight">\(0.6033\ E_{\mathrm{h}}\)</span>.
+By contrast, selected grid point <span class="math notranslate nohighlight">\(k=16\)</span> is only <span class="math notranslate nohighlight">\(0.001\ E_{\mathrm{h}}\)</span> above the known reference.
+This small offset is possible because the evolution time was tuned using that reference; it is not the general resolution of the six-bit grid.</p>
+<p><strong>Please note</strong>:  this use of the already known classical energy is circular.
+It is useful for this tutorial, but it is not a generally available strategy when the target energy is unknown.
+For the chosen <span class="math notranslate nohighlight">\(t\)</span>, adjacent energies represented by the six-bit phase grid differ by approximately <span class="math notranslate nohighlight">\(0.6033\ E_{\mathrm{h}}\)</span>, not <span class="math notranslate nohighlight">\(0.001\ E_{\mathrm{h}}\)</span>.
+The smaller value, <span class="math notranslate nohighlight">\(0.001\ E_{\mathrm{h}}\)</span> or <span class="math notranslate nohighlight">\(1\ \mathrm{m}E_{\mathrm{h}}\)</span>, is the accuracy target adopted for this tutorial.
+The question below asks why one grid point can nevertheless reconstruct this particular reference energy within that target.</p>
+<details class="quiz-question admonition">
+<summary class="admonition-title">Why does six-bit phase estimation meet a <span class="math notranslate nohighlight">\(1\ \mathrm{m}E_{\mathrm{h}}\)</span> target here even though adjacent grid points are much farther apart?</summary>
+<p>The classically known reference energy was used to tune the evolution time so the target lies almost exactly on one six-bit grid point.
+Six bits do not provide <span class="math notranslate nohighlight">\(\mathrm{m}E_{\mathrm{h}}\)</span> resolution for arbitrary energies with this evolution time.</p>
+</details>
+</section>
+<section id="qubit-measurement-and-shots">
+<span id="tutorial-qubit-measurement"></span><h2>Qubit measurement and shots<a class="headerlink" href="#qubit-measurement-and-shots" title="Link to this heading"></a></h2>
+<p>Immediately before measurement, the readout ancilla has a state</p>
+<div class="math notranslate nohighlight">
+\[\vert q\rangle
+=\gamma_0\vert0\rangle+\gamma_1\vert1\rangle,
+\qquad
+|\gamma_0|^2+|\gamma_1|^2=1.\]</div>
+<p>The coefficients <span class="math notranslate nohighlight">\(\gamma_0\)</span> and <span class="math notranslate nohighlight">\(\gamma_1\)</span> are complex probability amplitudes.
+They play the same mathematical role as the determinant coefficients <span class="math notranslate nohighlight">\(c_I\)</span> and eigenstate amplitudes <span class="math notranslate nohighlight">\(a_j\)</span> introduced earlier, but here they describe the two computational-basis states of one qubit.</p>
+<p>Measuring this qubit in the computational basis returns one classical bit.
+The probability of measuring zero is <span class="math notranslate nohighlight">\(|\gamma_0|^2\)</span>, and the probability of measuring one is <span class="math notranslate nohighlight">\(|\gamma_1|^2\)</span>.
+One preparation, circuit execution, and measurement is called a <em>shot</em>.</p>
+<p>A single shot samples one outcome; it does not reveal the probabilities themselves.
+Repeating the same circuit from a freshly prepared state produces counts whose relative frequencies estimate the probabilities.
+For example, 70 zero outcomes among 100 shots estimate the probability of zero as <span class="math notranslate nohighlight">\(0.70\)</span>.</p>
+<p>In this <a class="reference internal" href="../../glossary.html#term-IQPE"><span class="xref std std-term">IQPE</span></a> implementation, phase kickback, feedback, and the final H gate make the readout-ancilla probabilities depend on the phase bit being measured.
+The circuit uses an odd number of shots and selects the majority outcome as that iteration’s bit.
+It then uses this classical bit to set the feedback rotation for the next iteration.</p>
+<p>The loop executes iteration <span class="math notranslate nohighlight">\(k=0\)</span> first.
+This iteration applies the largest controlled power and estimates the least-significant phase bit.
+Later iterations proceed toward the most-significant bit.</p>
+</section>
+<section id="one-phase-bit-at-a-time">
+<span id="tutorial-phase-bits"></span><h2>One phase bit at a time<a class="headerlink" href="#one-phase-bit-at-a-time" title="Link to this heading"></a></h2>
+<p>Standard phase estimation uses several readout ancillas and an inverse quantum Fourier transform to obtain a complete phase in one coherent circuit.
+The QDK/Chemistry iterative implementation (<a class="reference internal" href="../../glossary.html#term-IQPE"><span class="xref std std-term">IQPE</span></a>) instead reuses a single readout ancilla across a sequence of independently executed circuits.
+This reduces each circuit’s logical-qubit requirement, both on quantum hardware and in this tutorial’s classical simulator, at the cost of repeated state preparation and circuit execution.
+This qubit-resource tradeoff is why the tutorial uses <a class="reference internal" href="../../glossary.html#term-IQPE"><span class="xref std std-term">IQPE</span></a>.</p>
+<p>For iterations over <span class="math notranslate nohighlight">\(k=0,1,\ldots,m-1\)</span>, the circuit builder uses the controlled power</p>
+<div class="math notranslate nohighlight">
+\[U^{2^{m-k-1}}.\]</div>
+<p>With <span class="math notranslate nohighlight">\(m=6\)</span>, the six iteration circuits therefore apply powers <span class="math notranslate nohighlight">\(32,16,8,4,2,1\)</span>.
+QDK/Chemistry reverses the measurements from execution order when it constructs the conventional most-significant-bit-first result.
+For an input eigenstate, the first H gate prepares the readout ancilla in <span class="math notranslate nohighlight">\((\vert0\rangle+\vert1\rangle)/\sqrt{2}\)</span>.
+The feedback rotation applies a corrective phase determined by earlier iterations.
+The controlled power then produces <em>phase kickback</em>: the <span class="math notranslate nohighlight">\(\vert1\rangle\)</span> branch acquires the eigenphase of <span class="math notranslate nohighlight">\(U^{2^{m-k-1}}\)</span>, while the <span class="math notranslate nohighlight">\(\vert0\rangle\)</span> branch does not.
+Together, the feedback and kickback phases cancel the contribution already determined by earlier iterations.
+After the second H gate, the remaining relative phase changes the probabilities of measuring zero or one, revealing the next phase bit.</p>
+<p>If iteration <span class="math notranslate nohighlight">\(k\)</span> selects bit <span class="math notranslate nohighlight">\(b_k\)</span>, QDK/Chemistry updates its accumulated feedback angle according to</p>
+<div class="math notranslate nohighlight">
+\[\Phi_{k+1}=\frac{\Phi_k}{2}+\frac{\pi b_k}{2},
+\qquad \Phi_0=0.\]</div>
+<p>After the last iteration, the reported phase fraction is <span class="math notranslate nohighlight">\(\Phi_m/\pi\)</span>.
+The following figure summarizes one iteration, from fresh register preparation through repeated shots, majority voting, and the feedback update for the next phase bit.</p>
+<figure class="align-center" id="id3">
+<div class="graphviz"><img src="../../_images/graphviz-02b98a2969744bd277ec81ed85bf5cc15e19daa7.png" alt="Flow through one IQPE iteration. In parallel, freshly prepare the molecular trial state on the compute register and a Hadamard superposition on a new readout ancilla. Rotate the ancilla using feedback from earlier measured bits, then use it to control this iteration's time-evolution power on the compute register. Apply a final Hadamard gate and measure the ancilla for one shot. Repeat with fresh registers for an odd number of shots; their majority selects phase bit b sub k. Use that bit to update the classical feedback angle and continue to iteration k plus 1." class="graphviz" /></div>
+<figcaption>
+<p><span class="caption-text">One <a class="reference internal" href="../../glossary.html#term-IQPE"><span class="xref std std-term">IQPE</span></a> iteration estimates phase bit <span class="math notranslate nohighlight">\(b_k\)</span>. Every shot freshly prepares the trial state and readout ancilla; the majority outcome updates <span class="math notranslate nohighlight">\(\Phi_{k+1}=\Phi_k/2+\pi b_k/2\)</span> for the next controlled power.</span><a class="headerlink" href="#id3" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>After all iterations, the feedback accumulator determines the final phase fraction.</p>
+<p>Each iteration circuit contains twelve compute qubits and one readout ancilla, for thirteen logical qubits in the simulated circuit.
+The readout ancilla does not represent an additional molecular spin orbital.</p>
+<details class="quiz-question admonition">
+<summary class="admonition-title">Why is trial-state preparation included in every IQPE iteration circuit?</summary>
+<p>Each phase bit is measured by executing a separate circuit, and every shot begins with newly allocated qubits in the all-zero state.
+The state-preparation logical circuit must therefore reload the trial state before each controlled evolution.</p>
+</details>
+<p>The script configures the native iterative circuit builder and first-order Trotter unitary through nested <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.AlgorithmRef" title="qdk_chemistry.data.AlgorithmRef"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlgorithmRef</span></code></a> objects:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">iqpe_circuit_builder_reference</span><span class="p">(</span>
+    <span class="n">evolution_time_hartree_inverse</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">num_phase_bits</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">DEFAULT_NUM_PHASE_BITS</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AlgorithmRef</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Describe native IQPE with repeated first-order Trotter evolution.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        evolution_time_hartree_inverse: Base simulated time in inverse Hartree.</span>
+<span class="sd">        num_phase_bits: Iteration count and number of reported binary phase places.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A nested algorithm reference selecting the native iterative builder,</span>
+<span class="sd">        Pauli-sequence controlled-circuit mapping, one first-order Trotter</span>
+<span class="sd">        division, and repeated base-unitary powers.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">AlgorithmRef</span><span class="p">(</span>
+        <span class="s2">&quot;qpe_circuit_builder&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;qdk_iterative&quot;</span><span class="p">,</span>
+        <span class="n">num_bits</span><span class="o">=</span><span class="n">num_phase_bits</span><span class="p">,</span>
+        <span class="n">controlled_circuit_mapper</span><span class="o">=</span><span class="n">AlgorithmRef</span><span class="p">(</span>
+            <span class="s2">&quot;controlled_circuit_mapper&quot;</span><span class="p">,</span> <span class="s2">&quot;pauli_sequence&quot;</span>
+        <span class="p">),</span>
+        <span class="n">unitary_builder</span><span class="o">=</span><span class="n">AlgorithmRef</span><span class="p">(</span>
+            <span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;trotter&quot;</span><span class="p">,</span>
+            <span class="n">time</span><span class="o">=</span><span class="n">evolution_time_hartree_inverse</span><span class="p">,</span>
+            <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+            <span class="n">num_divisions</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+            <span class="n">power_strategy</span><span class="o">=</span><span class="s2">&quot;repeat&quot;</span><span class="p">,</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="numerical-controls">
+<span id="tutorial-iqpe-numerical-controls"></span><h2>Numerical controls<a class="headerlink" href="#numerical-controls" title="Link to this heading"></a></h2>
+<p>Five controls determine the approximation and sampling behavior of this workflow:</p>
+<dl>
+<dt><a class="reference internal" href="#tutorial-energy-to-phase-encoding"><span class="std std-ref">Evolution time</span></a></dt><dd><p>The value <span class="math notranslate nohighlight">\(t\)</span> sets the signed energy interval and spacing of the phase grid, as described above.
+Here it is tuned with the known classical reference to produce a <span class="math notranslate nohighlight">\(1\ \mathrm{m}E_{\mathrm{h}}\)</span> grid error.</p>
+</dd>
+<dt><a class="reference internal" href="../../user/comprehensive/algorithms/hamiltonian_unitary_builder.html"><span class="doc">Hamiltonian simulation</span></a></dt><dd><p>The qubit Hamiltonian is a sum of Pauli terms that generally do not commute.
+A first-order <a class="reference external" href="https://en.wikipedia.org/wiki/Lie_product_formula">Trotter product formula</a> approximates evolution under that sum by applying the exponential of each Pauli term in sequence.
+For <span class="math notranslate nohighlight">\(\hat H=\sum_\ell h_\ell P_\ell\)</span>, using <span class="math notranslate nohighlight">\(r\)</span> Trotter divisions gives</p>
+<div class="math notranslate nohighlight">
+\[e^{-i\hat Ht}
+\approx
+\left[\prod_\ell e^{-ih_\ell P_\ell t/r}\right]^r.\]</div>
+<p>One division (<span class="math notranslate nohighlight">\(r=1\)</span>) is used for each base evolution in this tutorial.
+Increasing <span class="math notranslate nohighlight">\(r\)</span> shortens each simulated time step and generally reduces product-formula error, but repeats the Pauli-term sequence more times and increases circuit cost.
+The repeated-power strategy implemented by QDK/Chemistry constructs each controlled power <span class="math notranslate nohighlight">\(U^{2^{m-k-1}}\)</span> by repeating that same approximate base unitary, preserving one consistent approximation across the IQPE iterations.</p>
+</dd>
+<dt><a class="reference internal" href="#tutorial-phase-bits"><span class="std std-ref">Phase bits</span></a></dt><dd><p>Six bits produce six iteration circuits and <span class="math notranslate nohighlight">\(2^6=64\)</span> representable phase fractions.
+Increasing this count refines the grid but causes the largest controlled power, circuit size, and simulator runtime to grow exponentially for the repeated-power strategy.</p>
+</dd>
+<dt><a class="reference internal" href="#tutorial-qubit-measurement"><span class="std std-ref">Shots per bit</span></a></dt><dd><p>Each iteration circuit is executed three times.
+The odd shot count prevents a tied bit vote, but finite sampling can still select the less probable bit.</p>
+</dd>
+<dt><a class="reference internal" href="#tutorial-complete-iqpe-run"><span class="std std-ref">Complete runs</span></a></dt><dd><p>The full six-bit procedure is repeated twenty times with simulator seeds 42 through 61.
+Each complete run returns one reconstructed bitstring and energy, and the final estimate uses the most frequent complete bitstring.</p>
+</dd>
+</dl>
+<p>The default workflow therefore executes <span class="math notranslate nohighlight">\(6\times3\times20=360\)</span> iteration-circuit shots.
+Phase-grid error, Trotter error, and sampling variation have different causes and should not be combined with basis-set or active-space model error.</p>
+<details class="quiz-question admonition">
+<summary class="admonition-title">Which control changes energy-grid spacing without changing the molecular Hamiltonian?</summary>
+<p>The number of phase bits changes how finely the phase interval is discretized.
+The evolution time also rescales the grid in energy units, but it simultaneously changes the unaliased energy interval and the simulated evolution.</p>
+</details>
+</section>
+<section id="iqpe-circuit-visualization">
+<h2>IQPE circuit visualization<a class="headerlink" href="#iqpe-circuit-visualization" title="Link to this heading"></a></h2>
+<p>Before running the simulator, open <a class="reference download internal" download="" href="../../_downloads/38a0f691a2aed1b711fdc1987c5a0105/tutorial_visualize_iqpe_circuit.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_visualize_iqpe_circuit.ipynb</span></code></a> in Visual Studio Code.
+Choose <strong>Select Kernel</strong>, select <strong>Python Environments</strong>, and choose the <code class="docutils literal notranslate"><span class="pre">.venv</span></code> environment created in <a class="reference internal" href="00_before_you_begin.html"><span class="doc">Before you begin</span></a>.
+Then select <strong>Run All</strong> to construct the six iteration circuits and render the shortest, power-one circuit.
+The Jupyter notebook does not execute a quantum simulation.</p>
+<p>The rendered circuit is still long because it contains the four-determinant state preparation and controlled first-order Trotter evolution for a 247-term Hamiltonian.
+Before opening the answers below, trace the operations on each wire to infer its role and compare the dimensions reported for all six iteration circuits.
+Record the evidence you used in the Jupyter notebook’s interpretation task.</p>
+<figure class="align-center" id="id4">
+<a class="reference internal image-reference" href="../../_images/tutorial_qpe_power_one_circuit_overview.png"><img alt="Overview of the power-one IQPE circuit on thirteen wires. The top wire is the readout ancilla and receives an H gate, an Rz feedback rotation labeled zero, the controlled Pauli-evolution block, a final H gate, and measurement and reset. The remaining twelve wires form the compute register. State-preparation blocks act on the compute wires that require preparation operations, the controlled Pauli-evolution block spans the ancilla and compute register, and reset operations return the compute wires to zero after evolution." src="../../_images/tutorial_qpe_power_one_circuit_overview.png" style="width: 60%;" />
+</a>
+<figcaption>
+<p><span class="caption-text">Overview of the rendered power-one iteration circuit. Dashed outlines mark the nested <code class="docutils literal notranslate"><span class="pre">MakeIQPECircuit</span></code> and <code class="docutils literal notranslate"><span class="pre">RunIQPE</span></code> Q# operations; the solid boxes show their principal composite operations.</span><a class="headerlink" href="#id4" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>The top wire, <span class="math notranslate nohighlight">\(\lvert\psi_0\rangle\)</span>, is readout ancilla q0.
+Its first H gate creates a superposition, and the <code class="docutils literal notranslate"><span class="pre">Rz(0.0000)</span></code> block applies the phase-feedback rotation.
+This static preview constructs all six circuits with the builder’s initial feedback angle of zero, so the displayed rotation is zero.
+During an actual IQPE run, each iteration circuit is rebuilt using the accumulated feedback from earlier measured bits; the power-one iteration can therefore have a nonzero feedback rotation.</p>
+<p>The lower wires, <span class="math notranslate nohighlight">\(\lvert\psi_1\rangle\)</span> through <span class="math notranslate nohighlight">\(\lvert\psi_{12}\rangle\)</span>, are compute-register qubits q1–q12.
+The <code class="docutils literal notranslate"><span class="pre">StatePreparation</span></code> blocks load the four-determinant trial state on the subsets of compute wires that require preparation operations; blank wires remain part of the compute register.
+The <code class="docutils literal notranslate"><span class="pre">RepControlledPauliExp</span></code> block is the power-one controlled first-order Trotter evolution.
+The ancilla controls this block, and the resulting phase kickback places the Hamiltonian eigenphase on the ancilla’s relative phase.
+The final H gate converts that relative phase into measurement probabilities, the measurement produces one shot outcome, and the blue reset operations return the allocated qubits to <span class="math notranslate nohighlight">\(\lvert0\rangle\)</span>.</p>
+<details class="quiz-question admonition">
+<summary class="admonition-title">How can you identify the readout ancilla in the rendered circuit?</summary>
+<p>The q0 wire receives the H gates and feedback rotation, controls the Hamiltonian evolution, and is measured to obtain the phase bit.
+The other twelve wires hold the prepared molecular state and form the compute register.</p>
+</details>
+<details class="quiz-question admonition">
+<summary class="admonition-title">Why do all six iteration circuits have the same width but different lengths?</summary>
+<p>Every iteration uses the same twelve-qubit compute register and one readout ancilla, so each circuit has thirteen logical qubits.
+Different controlled powers repeat the approximate time-evolution unitary different numbers of times, changing the logical gate count rather than the register size.</p>
+</details>
+</section>
+<section id="iterative-phase-estimation">
+<span id="tutorial-complete-iqpe-run"></span><h2>Iterative phase estimation<a class="headerlink" href="#iterative-phase-estimation" title="Link to this heading"></a></h2>
+<p>The script prepares the mapped Hamiltonian and four-determinant trial state, applies the reference-guided evolution-time choice, and constructs all six iteration circuits before starting any simulation.
+This separation lets you inspect settings and circuit counts without accidentally repeating the expensive calculation.</p>
+<p>The shortest iteration circuit uses controlled <span class="math notranslate nohighlight">\(U\)</span> rather than a higher repeated power.
+It still contains the state-preparation operations, twelve-wire compute register, one-wire readout ancilla, feedback rotation, controlled Trotter evolution, and ancilla measurement shared by every iteration.
+The companion Jupyter notebook introduced below renders this circuit without simulating it.</p>
+<p>One complete IQPE run then invokes the native phase-estimation algorithm with one simulator seed:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">run_complete_iqpe</span><span class="p">(</span><span class="n">problem</span><span class="p">:</span> <span class="n">IqpeProblem</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IqpeRun</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Execute one complete bitwise IQPE run with a reproducible simulator seed.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        problem: Shared Hamiltonian, trial state, phase controls, and builder setup.</span>
+<span class="sd">        seed: Full-state simulator seed controlling all finite-shot measurements.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Canonical bitstring, reconstructed active/total energies, reference error,</span>
+<span class="sd">        and simulator runtime for one complete phase estimate.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">iqpe</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
+        <span class="s2">&quot;phase_estimation&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;qdk_iterative&quot;</span><span class="p">,</span>
+        <span class="n">shots_per_bit</span><span class="o">=</span><span class="n">problem</span><span class="o">.</span><span class="n">shots_per_bit</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">iqpe</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;qpe_circuit_builder&quot;</span><span class="p">,</span> <span class="n">problem</span><span class="o">.</span><span class="n">circuit_builder_reference</span><span class="p">)</span>
+    <span class="n">iqpe</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
+        <span class="s2">&quot;circuit_executor&quot;</span><span class="p">,</span>
+        <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;circuit_executor&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_full_state_simulator&quot;</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">),</span>
+    <span class="p">)</span>
+
+    <span class="n">start</span> <span class="o">=</span> <span class="n">perf_counter</span><span class="p">()</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">iqpe</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+        <span class="n">state_preparation</span><span class="o">=</span><span class="n">problem</span><span class="o">.</span><span class="n">trial_state</span><span class="o">.</span><span class="n">circuit</span><span class="p">,</span>
+        <span class="n">qubit_hamiltonian</span><span class="o">=</span><span class="n">problem</span><span class="o">.</span><span class="n">mapping</span><span class="o">.</span><span class="n">qubit_hamiltonian</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">runtime_seconds</span> <span class="o">=</span> <span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span>
+
+    <span class="c1"># IQPE measures bits in implementation iteration order. Reconstruct the grid</span>
+    <span class="c1"># integer from the final phase fraction, then format conventional MSB-first</span>
+    <span class="c1"># binary so bitstring positions have their familiar place values.</span>
+    <span class="n">grid_size</span> <span class="o">=</span> <span class="mi">2</span><span class="o">**</span><span class="n">problem</span><span class="o">.</span><span class="n">num_phase_bits</span>
+    <span class="n">grid_index</span> <span class="o">=</span> <span class="nb">round</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">phase_fraction</span> <span class="o">*</span> <span class="n">grid_size</span><span class="p">)</span> <span class="o">%</span> <span class="n">grid_size</span>
+    <span class="n">bitstring</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">grid_index</span><span class="si">:</span><span class="s2">0</span><span class="si">{</span><span class="n">problem</span><span class="o">.</span><span class="n">num_phase_bits</span><span class="si">}</span><span class="s2">b</span><span class="si">}</span><span class="s2">&quot;</span>
+
+    <span class="c1"># Phase estimation returns the active qubit-Hamiltonian eigenvalue. Add the</span>
+    <span class="c1"># nuclear/frozen-orbital core term omitted during mapping, then compare with</span>
+    <span class="c1"># CASCI for exactly the same selected Hamiltonian.</span>
+    <span class="n">total_energy</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">raw_energy</span> <span class="o">+</span> <span class="n">problem</span><span class="o">.</span><span class="n">mapping</span><span class="o">.</span><span class="n">core_energy</span>
+    <span class="n">energy_error</span> <span class="o">=</span> <span class="n">total_energy</span> <span class="o">-</span> <span class="n">problem</span><span class="o">.</span><span class="n">mapping</span><span class="o">.</span><span class="n">active_space_result</span><span class="o">.</span><span class="n">refined_energy</span>
+    <span class="k">return</span> <span class="n">IqpeRun</span><span class="p">(</span>
+        <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span>
+        <span class="n">bitstring</span><span class="o">=</span><span class="n">bitstring</span><span class="p">,</span>
+        <span class="n">phase_fraction</span><span class="o">=</span><span class="n">result</span><span class="o">.</span><span class="n">phase_fraction</span><span class="p">,</span>
+        <span class="n">active_energy_hartree</span><span class="o">=</span><span class="n">result</span><span class="o">.</span><span class="n">raw_energy</span><span class="p">,</span>
+        <span class="n">total_energy_hartree</span><span class="o">=</span><span class="n">total_energy</span><span class="p">,</span>
+        <span class="n">error_hartree</span><span class="o">=</span><span class="n">energy_error</span><span class="p">,</span>
+        <span class="n">runtime_seconds</span><span class="o">=</span><span class="n">runtime_seconds</span><span class="p">,</span>
+    <span class="p">)</span>
+</pre></div>
+</div>
+<p>Each iteration contributes one measured phase bit to the complete IQPE result.</p>
+<details class="quiz-question admonition">
+<summary class="admonition-title">How does IQPE use the result from each iteration to construct the final bitstring and phase fraction?</summary>
+<p>The majority measurement for one iteration selects a phase bit, which updates the classical phase feedback used by the next iteration.
+After all six iterations, the feedback calculation combines the measured bits into one phase fraction.
+The script writes that fraction as a conventional six-bit string, with the most significant bit first.</p>
+</details>
+</section>
+<section id="repeated-complete-runs">
+<h2>Repeated complete runs<a class="headerlink" href="#repeated-complete-runs" title="Link to this heading"></a></h2>
+<p>One complete run can differ from another because every phase bit is selected from a finite number of simulator shots and the trial state contains several Hamiltonian eigenstates.
+The workflow therefore repeats the complete six-bit procedure with twenty deterministic simulator seeds.</p>
+<p>The final aggregation rule selects the most frequent complete bitstring, or <em>mode</em>.
+This differs from the majority vote used inside one complete run: a per-bit majority chooses one bit from three shots, whereas the complete-run mode chooses one reconstructed bitstring from twenty runs.
+If several bitstrings tie for the highest count, the script reports that no unique mode exists instead of silently choosing one.</p>
+<details class="quiz-question admonition">
+<summary class="admonition-title">Why should the final aggregation use complete bitstrings rather than vote on each bit across complete runs?</summary>
+<p>Each complete bitstring represents one phase-grid point and its corresponding energy.
+Voting independently on bits could assemble a bitstring that was never produced by any complete run and would discard the observed joint distribution.</p>
+</details>
+</section>
+<section id="molecular-energy-reconstruction">
+<h2>Molecular energy reconstruction<a class="headerlink" href="#molecular-energy-reconstruction" title="Link to this heading"></a></h2>
+<p>After the repeated complete runs, the script selects the bitstring observed most often.
+Interpret this bitstring as a binary integer <span class="math notranslate nohighlight">\(b\)</span>.
+If the calculation measures <span class="math notranslate nohighlight">\(m\)</span> phase bits, convert <span class="math notranslate nohighlight">\(b\)</span> to the phase fraction</p>
+<div class="math notranslate nohighlight">
+\[\varphi=\frac{b}{2^m}.\]</div>
+<p>QDK/Chemistry converts <span class="math notranslate nohighlight">\(2\pi\varphi\)</span> to its equivalent signed angle <span class="math notranslate nohighlight">\(\alpha\)</span> between <span class="math notranslate nohighlight">\(-\pi\)</span> and <span class="math notranslate nohighlight">\(\pi\)</span>.
+Negating that angle and dividing by the evolution time maps the measured phase to the active-space energy:</p>
+<div class="math notranslate nohighlight">
+\[E_{\mathrm{active}}^{\mathrm{IQPE}}=\frac{-\alpha}{t}.\]</div>
+<p>This estimates an eigenvalue of the qubit Hamiltonian, not yet the selected-space molecular total.
+Finite phase resolution, sampling, and product-formula time evolution all contribute error.
+As <a class="reference internal" href="04_putting_the_problem_on_qubits.html"><span class="doc">Mapping the problem to qubits</span></a> explains, the mapper does not include the core energy in the qubit Hamiltonian.
+The core energy contains the nuclear repulsion and the constant contribution from frozen inactive orbitals.
+Because these contributions are not measured by phase estimation, the script adds them classically:</p>
+<div class="math notranslate nohighlight">
+\[E_{\mathrm{total}}^{\mathrm{IQPE}}
+=E_{\mathrm{active}}^{\mathrm{IQPE}}+E_{\mathrm{core}}.\]</div>
+<p>Finally, compare this reconstructed total with the <a class="reference internal" href="../../glossary.html#term-CASCI"><span class="xref std std-term">CASCI</span></a> energy of the same selected-space Hamiltonian:</p>
+<div class="math notranslate nohighlight">
+\[\Delta E_{\mathrm{algorithm}}
+=E_{\mathrm{total}}^{\mathrm{IQPE}}-E_{\mathrm{CASCI}}.\]</div>
+<p>The workflow meets the teaching target when <span class="math notranslate nohighlight">\(\lvert\Delta E_{\mathrm{algorithm}}\rvert\leq1\ \mathrm{m}E_{\mathrm{h}}\)</span>.
+This comparison evaluates the configured quantum algorithm against its classical reference; it does not measure basis-set or active-space model error.</p>
+<details class="quiz-question admonition">
+<summary class="admonition-title">Which energy comparison determines whether the IQPE workflow meets the teaching target?</summary>
+<p>Compare the reconstructed IQPE total energy with the <a class="reference internal" href="../../glossary.html#term-CASCI"><span class="xref std std-term">CASCI</span></a> energy of the same selected active-space Hamiltonian.
+Comparing with experiment or a larger orbital space would mix algorithmic error with model error.</p>
+</details>
+</section>
+<section id="the-complete-workflow">
+<h2>The complete workflow<a class="headerlink" href="#the-complete-workflow" title="Link to this heading"></a></h2>
+<p>With the Python environment from <a class="reference internal" href="00_before_you_begin.html"><span class="doc">Before you begin</span></a> active, run the script from the Visual Studio Code integrated terminal:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">python tutorial_run_iqpe.py</span>
+</pre></div>
+</div>
+<p>The script prints its settings before simulation and reports progress for every complete run, including the seed, bitstring, total energy, error, and elapsed time.
+A successful run completes all twenty runs and prints the complete-run bitstring counts, most frequent bitstring, component energies, reconstructed total, reference energy, and signed error.</p>
+<details class="quiz-question admonition">
+<summary class="admonition-title">What bitstring distribution and energy estimate did the script produce?</summary>
+<p>The bitstring <code class="docutils literal notranslate"><span class="pre">010000</span></code> appeared 19 times and <code class="docutils literal notranslate"><span class="pre">001111</span></code> appeared once, so <code class="docutils literal notranslate"><span class="pre">010000</span></code> was the most frequent result.
+It produced an active-space energy of <span class="math notranslate nohighlight">\(-9.652276065987\ E_{\mathrm{h}}\)</span> and a reconstructed total of <span class="math notranslate nohighlight">\(-108.770051792909\ E_{\mathrm{h}}\)</span> after adding the core energy.</p>
+</details>
+<details class="quiz-question admonition">
+<summary class="admonition-title">Does the result meet the teaching target, and what does that establish?</summary>
+<p>The reconstructed total is <span class="math notranslate nohighlight">\(+1\ \mathrm{m}E_{\mathrm{h}}\)</span> above the selected-space <a class="reference internal" href="../../glossary.html#term-CASCI"><span class="xref std std-term">CASCI</span></a> reference, meeting the teaching target at its boundary.
+That offset was deliberately set by the reference-guided phase-grid alignment, while Trotter approximation and finite sampling can still affect which bitstring is selected.
+This classical simulation of the quantum calculation therefore validates this configured teaching workflow; it does not remove molecular-model error or establish agreement with experiment.</p>
+</details>
+<p>Record all settings, bitstring counts, energies, error, and observed runtime in the <a class="reference internal" href="lab_notebook.html#lab-notebook-phase-estimation"><span class="std std-ref">phase-estimation section of the lab notebook</span></a>.
+Then complete the <a class="reference internal" href="lab_notebook.html#lab-notebook-conclusion"><span class="std std-ref">conclusion</span></a> by separating basis-set, active-space, and quantum-algorithm limitations.</p>
+</section>
+<section id="knowledge-check">
+<h2>Knowledge check<a class="headerlink" href="#knowledge-check" title="Link to this heading"></a></h2>
+<details class="quiz-question admonition">
+<summary class="admonition-title">What changes if the number of phase bits increases while the repeated-power strategy remains fixed?</summary>
+<p>The phase grid becomes finer, but an additional iteration circuit is required and the largest controlled-unitary power doubles.
+For repeated-power Trotter evolution, that larger power increases circuit size and simulator runtime substantially.</p>
+</details>
+<details class="quiz-question admonition">
+<summary class="admonition-title">Would increasing shots per bit make the phase grid finer?</summary>
+<p>No.
+More shots can make each bit majority more stable, but grid spacing is controlled by the evolution time and number of phase bits.</p>
+</details>
+</section>
+<section id="what-you-accomplished">
+<h2>What you accomplished<a class="headerlink" href="#what-you-accomplished" title="Link to this heading"></a></h2>
+<p>You completed an end-to-end molecular-energy workflow: defining stretched N<sub>2</sub> in an orbital basis, selecting an active space, mapping its Hamiltonian to qubits, preparing a multiconfigurational trial state, simulating iterative phase estimation, and reconstructing the molecular total energy by adding the core energy.</p>
+<p>The final comparison shows that this configured <a class="reference internal" href="../../glossary.html#term-IQPE"><span class="xref std std-term">IQPE</span></a> workflow reproduces the matching selected-space <a class="reference internal" href="../../glossary.html#term-CASCI"><span class="xref std std-term">CASCI</span></a> reference within the tutorial’s <span class="math notranslate nohighlight">\(1\ \mathrm{m}E_{\mathrm{h}}\)</span> target.</p>
+<p>Your lab notebook records where those choices enter and what evidence supports the result.
+A useful next investigation would change one layer at a time: enlarge the molecular model, choose a different trial state, or vary the phase-estimation controls, then identify which accuracy and cost measures respond.</p>
+</section>
+<section id="further-reading">
+<h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../user/comprehensive/algorithms/phase_estimation.html"><span class="doc">Phase estimation</span></a></p></li>
+<li><p><a class="reference internal" href="../../user/comprehensive/algorithms/qpe_circuit_builder.html"><span class="doc">Phase-estimation circuit builders</span></a></p></li>
+<li><p><a class="reference internal" href="../../user/comprehensive/algorithms/hamiltonian_unitary_builder.html"><span class="doc">Hamiltonian unitary builders</span></a></p></li>
+<li><p><a class="reference internal" href="../../user/comprehensive/algorithms/circuit_executor.html"><span class="doc">Circuit execution</span></a></p></li>
+<li><p><a class="reference internal" href="../../user/comprehensive/data/qpe_result.html"><span class="doc">Phase-estimation results</span></a></p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="05_preparing_the_trial_state.html" class="btn btn-neutral float-left" title="Preparing the trial state" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../../api/python_api.html" class="btn btn-neutral float-right" title="Python API" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

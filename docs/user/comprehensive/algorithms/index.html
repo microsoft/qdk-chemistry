@@ -6,18 +6,18 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Algorithm classes &mdash; qdk-chemistry 2.0.0 documentation</title>
+  <title>Algorithm classes &mdash; qdk-chemistry 2.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=78acbc13" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -60,6 +60,7 @@
 <li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory pattern</a></li>
 <li class="toctree-l3"><a class="reference internal" href="settings.html">Settings</a></li>
 <li class="toctree-l3"><a class="reference internal" href="active_space.html">Active space selection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="effective_hamiltonian_constructor.html">Effective Hamiltonian construction</a></li>
 <li class="toctree-l3"><a class="reference internal" href="expectation_estimator.html">Energy estimation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">Hamiltonian construction</a></li>
 <li class="toctree-l3"><a class="reference internal" href="localizer.html">Orbital localization</a></li>
@@ -73,6 +74,7 @@
 <li class="toctree-l3"><a class="reference internal" href="hadamard_test.html">Hadamard test</a></li>
 <li class="toctree-l3"><a class="reference internal" href="phase_estimation.html">Phase estimation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="qpe_circuit_builder.html">Phase estimation circuit builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="amplitude_amplification.html">Amplitude amplification</a></li>
 <li class="toctree-l3"><a class="reference internal" href="evolution_circuit_builder.html">Evolution circuit builder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian_unitary_builder.html">Hamiltonian Unitary Builder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled circuit mapper</a></li>
@@ -88,6 +90,10 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/index.html">Tutorials</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -137,6 +143,7 @@ All algorithms follow a <a class="reference internal" href="factory_pattern.html
 <li class="toctree-l1"><a class="reference internal" href="factory_pattern.html">Factory pattern</a></li>
 <li class="toctree-l1"><a class="reference internal" href="settings.html">Settings</a></li>
 <li class="toctree-l1"><a class="reference internal" href="active_space.html">Active space selection</a></li>
+<li class="toctree-l1"><a class="reference internal" href="effective_hamiltonian_constructor.html">Effective Hamiltonian construction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="expectation_estimator.html">Energy estimation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="hamiltonian_constructor.html">Hamiltonian construction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="localizer.html">Orbital localization</a></li>
@@ -150,6 +157,7 @@ All algorithms follow a <a class="reference internal" href="factory_pattern.html
 <li class="toctree-l1"><a class="reference internal" href="hadamard_test.html">Hadamard test</a></li>
 <li class="toctree-l1"><a class="reference internal" href="phase_estimation.html">Phase estimation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="qpe_circuit_builder.html">Phase estimation circuit builder</a></li>
+<li class="toctree-l1"><a class="reference internal" href="amplitude_amplification.html">Amplitude amplification</a></li>
 <li class="toctree-l1"><a class="reference internal" href="evolution_circuit_builder.html">Evolution circuit builder</a></li>
 <li class="toctree-l1"><a class="reference internal" href="hamiltonian_unitary_builder.html">Hamiltonian Unitary Builder</a></li>
 <li class="toctree-l1"><a class="reference internal" href="circuit_mapper.html">Controlled circuit mapper</a></li>
@@ -188,59 +196,63 @@ All algorithms follow a <a class="reference internal" href="factory_pattern.html
 <td><p>Molecular Hamiltonian construction</p></td>
 <td><p>Orbitals → Hamiltonian</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="mc_calculator.html"><span class="doc">MultiConfigurationCalculator</span></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="effective_hamiltonian_constructor.html"><span class="doc">EffectiveHamiltonianConstructor</span></a></p></td>
+<td><p>Hamiltonian downfolding into a target space</p></td>
+<td><p>Wavefunction + Hamiltonian + target indices → Hamiltonian</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="mc_calculator.html"><span class="doc">MultiConfigurationCalculator</span></a></p></td>
 <td><p>Many-body wavefunction calculations</p></td>
 <td><p>Hamiltonian → Wavefunction</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="pmc.html"><span class="doc">ProjectedMultiConfigurationCalculator</span></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="pmc.html"><span class="doc">ProjectedMultiConfigurationCalculator</span></a></p></td>
 <td><p>Projected many-body wavefunction calculations</p></td>
 <td><p>Hamiltonian → Wavefunction</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="mcscf.html"><span class="doc">MultiConfigurationScf</span></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="mcscf.html"><span class="doc">MultiConfigurationScf</span></a></p></td>
 <td><p>Coupled <cite>Orbital</cite>-<cite>Wavefunction</cite> calculations.</p></td>
 <td><p>Orbitals → Wavefunction</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="qubit_mapper.html"><span class="doc">QubitMapper</span></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="qubit_mapper.html"><span class="doc">QubitMapper</span></a></p></td>
 <td><p>Fermion-to-qubit mapping</p></td>
 <td><p>Hamiltonian → QubitOperator</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="state_preparation.html"><span class="doc">StatePreparation</span></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="state_preparation.html"><span class="doc">StatePreparation</span></a></p></td>
 <td><p>Quantum state preparation</p></td>
 <td><p>Wavefunction → Circuit</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="hadamard_test.html"><span class="doc">HadamardTest</span></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="hadamard_test.html"><span class="doc">HadamardTest</span></a></p></td>
 <td><p>Controlled-unitary overlap estimation</p></td>
 <td><p>Circuit + UnitaryRepresentation → CircuitExecutorData</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="expectation_estimator.html"><span class="doc">ExpectationEstimator</span></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="expectation_estimator.html"><span class="doc">ExpectationEstimator</span></a></p></td>
 <td><p>Quantum energy expectation values</p></td>
 <td><p>Circuit + QubitOperator → Energy</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="stability_checker.html"><span class="doc">StabilityChecker</span></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="stability_checker.html"><span class="doc">StabilityChecker</span></a></p></td>
 <td><p><a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> stability analysis</p></td>
 <td><p>Orbitals → Stability</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="phase_estimation.html"><span class="doc">PhaseEstimation</span></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="phase_estimation.html"><span class="doc">PhaseEstimation</span></a></p></td>
 <td><p>Quantum phase estimation</p></td>
 <td><p>Circuit + QubitOperator → QpeResult</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="qpe_circuit_builder.html"><span class="doc">QpeCircuitBuilder</span></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="qpe_circuit_builder.html"><span class="doc">QpeCircuitBuilder</span></a></p></td>
 <td><p>Phase estimation circuit composition</p></td>
 <td><p>Circuit + QubitOperator → Circuit list</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="evolution_circuit_builder.html"><span class="doc">EvolutionCircuitBuilder</span></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="evolution_circuit_builder.html"><span class="doc">EvolutionCircuitBuilder</span></a></p></td>
 <td><p>Time-evolution circuit composition</p></td>
 <td><p>TimeDependentQubitHamiltonian + Circuit → Circuit</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="hamiltonian_unitary_builder.html"><span class="doc">HamiltonianUnitaryBuilder</span></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="hamiltonian_unitary_builder.html"><span class="doc">HamiltonianUnitaryBuilder</span></a></p></td>
 <td><p>Hamiltonian simulation unitaries</p></td>
 <td><p>QubitOperator → UnitaryRepresentation</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="circuit_mapper.html"><span class="doc">ControlledCircuitMapper</span></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="circuit_mapper.html"><span class="doc">ControlledCircuitMapper</span></a></p></td>
 <td><p>Controlled-unitary circuit synthesis</p></td>
 <td><p>UnitaryRepresentation → Circuit</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="circuit_executor.html"><span class="doc">CircuitExecutor</span></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="circuit_executor.html"><span class="doc">CircuitExecutor</span></a></p></td>
 <td><p>Quantum circuit execution</p></td>
 <td><p>Circuit → CircuitExecutorData</p></td>
 </tr>

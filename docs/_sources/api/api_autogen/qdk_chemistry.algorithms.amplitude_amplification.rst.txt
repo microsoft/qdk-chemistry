@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.amplitude\_amplification module
+=========================================================
+
+.. automodule:: qdk_chemistry.algorithms.amplitude_amplification
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

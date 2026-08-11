@@ -1,0 +1,400 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Preparing the trial state &mdash; qdk-chemistry 2.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=78acbc13" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Iterative quantum phase estimation" href="06_iterative_phase_estimation.html" />
+    <link rel="prev" title="Mapping the problem to qubits" href="04_putting_the_problem_on_qubits.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Tutorials</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Ground-state molecular energies with quantum phase estimation</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="index.html#quantum-chemistry-background">Quantum chemistry background</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#why-quantum-computing">Why quantum computing?</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#why-stretched-nitrogen">Why stretched nitrogen?</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#tutorial-scope-and-structure">Tutorial scope and structure</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="index.html#cumulative-assignment">Cumulative assignment</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="00_before_you_begin.html">Before you begin</a></li>
+<li class="toctree-l4"><a class="reference internal" href="lab_notebook.html">Set up your lab notebook</a></li>
+<li class="toctree-l4"><a class="reference internal" href="01_energy_and_accuracy.html">Energy and accuracy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="02_describing_the_molecule.html">Describing the molecule</a></li>
+<li class="toctree-l4"><a class="reference internal" href="03_choosing_the_active_space.html">Choosing the active space</a></li>
+<li class="toctree-l4"><a class="reference internal" href="04_putting_the_problem_on_qubits.html">Mapping the problem to qubits</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Preparing the trial state</a></li>
+<li class="toctree-l4"><a class="reference internal" href="06_iterative_phase_estimation.html">Iterative quantum phase estimation</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Tutorials</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Ground-state molecular energies with quantum phase estimation</a></li>
+      <li class="breadcrumb-item active">Preparing the trial state</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/ground_state_molecular_energies_with_qpe/05_preparing_the_trial_state.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="preparing-the-trial-state">
+<h1>Preparing the trial state<a class="headerlink" href="#preparing-the-trial-state" title="Link to this heading"></a></h1>
+<div class="chapter-focus admonition">
+<p class="admonition-title">Chapter focus</p>
+<p>How do we prepare a state that lets phase estimation return the ground-state energy reliably?</p>
+</div>
+<section id="learning-objectives">
+<h2>Learning objectives<a class="headerlink" href="#learning-objectives" title="Link to this heading"></a></h2>
+<p>After completing this chapter, you will be able to:</p>
+<ul class="simple">
+<li><p>Explain why phase estimation requires an input state.</p></li>
+<li><p>Define state overlap and fidelity.</p></li>
+<li><p>Explain how ground-state fidelity measures target-state weight and influences phase-estimation outcomes.</p></li>
+<li><p>Construct a sparse trial wavefunction from important determinants.</p></li>
+<li><p>Generate a state-preparation logical circuit with the QDK/Chemistry sparse-isometry implementation.</p></li>
+<li><p>Distinguish trial-state quality from state-preparation logical circuit cost.</p></li>
+</ul>
+<div class="lab-notebook-assignment admonition">
+<p class="admonition-title">Lab notebook assignment</p>
+<p>Complete <a class="reference internal" href="lab_notebook.html#lab-notebook-trial-state"><span class="std std-ref">Trial state</span></a>.
+Record trial-state fidelity and state-preparation logical circuit statistics as separate quantities.
+Explain how determinant truncation changes the ground-state weight, its influence on phase-estimation outcomes, and the cost of preparing the trial state.</p>
+</div>
+</section>
+<section id="example-download">
+<h2>Example download<a class="headerlink" href="#example-download" title="Link to this heading"></a></h2>
+<p>Download <a class="reference download internal" download="" href="../../_downloads/4d1e3a028feb8de74d109fe3e231917d/tutorial_prepare_trial_state.py"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_prepare_trial_state.py</span></code></a> and <a class="reference download internal" download="" href="../../_downloads/a13acb484019084c5c91cc66bf9fa153/tutorial_prepare_trial_state.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_prepare_trial_state.ipynb</span></code></a>, and save both files in the tutorial working directory that contains <code class="docutils literal notranslate"><span class="pre">tutorial_choose_active_space.py</span></code> and <code class="docutils literal notranslate"><span class="pre">tutorial_orbital_coordinates.py</span></code>.
+Open the files in Visual Studio Code and review the complete trial-state script, including imports and helper functions omitted from the excerpts below.
+The script imports the tested active-space workflow so that this chapter uses the same selected Hamiltonian and <a class="reference internal" href="../../glossary.html#term-CASCI"><span class="xref std std-term">CASCI</span></a> reference.
+The Jupyter notebook runs that workflow, renders the one-, two-, and four-determinant logical circuits, and validates their reported structure and gate statistics.</p>
+</section>
+<section id="connection-to-the-selected-space-workflow">
+<h2>Connection to the selected-space workflow<a class="headerlink" href="#connection-to-the-selected-space-workflow" title="Link to this heading"></a></h2>
+<p>The <a class="reference internal" href="03_choosing_the_active_space.html#tutorial-selected-space-reference"><span class="std std-ref">selected-space CASCI calculation</span></a> produced a normalized ground-state wavefunction spanning the <span class="math notranslate nohighlight">\((n_\alpha,n_\beta)=(3,3)\)</span> determinant sector introduced in <a class="reference internal" href="04_putting_the_problem_on_qubits.html"><span class="doc">Mapping the problem to qubits</span></a>.
+Each determinant represents one pattern of occupations among the selected active spin orbitals, and its coefficient is the corresponding amplitude in the wavefunction.
+The <a class="reference internal" href="index.html#tutorial-occupation-encoding"><span class="std std-ref">Jordan–Wigner encoding</span></a> represents the same occupation patterns on the compute register sized in <a class="reference internal" href="04_putting_the_problem_on_qubits.html"><span class="doc">Mapping the problem to qubits</span></a>.</p>
+</section>
+<section id="why-phase-estimation-needs-a-trial-state">
+<span id="tutorial-trial-state-definition"></span><h2>Why phase estimation needs a trial state<a class="headerlink" href="#why-phase-estimation-needs-a-trial-state" title="Link to this heading"></a></h2>
+<p>Quantum phase estimation (<a class="reference internal" href="../../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a>) estimates an eigenphase of a unitary operator.
+For molecular energies, that unitary represents evolution under the Hamiltonian: each Hamiltonian eigenstate is also an eigenstate of the time-evolution operator, and its phase depends on its energy.
+The phase-to-energy relationship and the <a class="reference internal" href="../../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a> logical circuit are developed in the next chapter.
+For now, the important point is that the compute register must contain a chosen quantum state before phase estimation can begin.</p>
+<p>A state-preparation logical circuit initializes the compute register in this chosen normalized quantum state.
+Here, <em>logical</em> means gates in the generated algorithmic circuit before error-correction code synthesis and hardware mapping.
+This input is the trial state.
+It is an approximation intended to contain a substantial contribution from the target ground state; <a class="reference internal" href="../../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a> cannot begin from an unspecified state or create the ground state by searching through all possible wavefunctions.</p>
+<p>The trial state can be written as a linear combination of the eigenstates <span class="math notranslate nohighlight">\(\{\vert\Psi_j\rangle\}\)</span> of the active-space Hamiltonian:</p>
+<div class="math notranslate nohighlight">
+\[\vert\Psi_{\mathrm{trial}}\rangle
+= \sum_j a_j\vert\Psi_j\rangle,
+\qquad
+\sum_j \left\vert a_j\right\vert^2=1.\]</div>
+<p>To isolate the effect of the input state, first assume that the requested trial state is prepared exactly, time evolution is exact, and phase readout has enough resolution to distinguish the relevant eigenphases.
+Under these assumptions, an input eigenstate <span class="math notranslate nohighlight">\(\vert\Psi_j\rangle\)</span> produces the phase corresponding to <span class="math notranslate nohighlight">\(E_j\)</span>.
+For a trial state containing several eigenstates, a textbook coherent phase-estimation measurement samples the energy <span class="math notranslate nohighlight">\(E_j\)</span> with probability <span class="math notranslate nohighlight">\(\left\vert a_j\right\vert^2\)</span> <span class="bibtex-citation" id="id1">[<a class="reference internal" href="../../references.html#id7" title="Vera von Burg, Guang Hao Low, Thomas Häner, Damian S. Steiger, Markus Reiher, Martin Roetteler, and Matthias Troyer. Quantum computing enhanced computational catalysis. Physical Review Research, 3(3):033055, 2021. doi:10.1103/PhysRevResearch.3.033055.">vBLHaner+21</a>]</span>.
+This probability statement assumes that one prepared system state produces one complete phase result.</p>
+<details class="quiz-question admonition">
+<summary class="admonition-title">Why can phase estimation return an excited-state energy even when the ground-state energy is the target?</summary>
+<p>A trial state can contain both ground- and excited-state eigenvectors.
+Under the assumptions above, phase estimation returns each represented eigenvalue with probability equal to the squared magnitude of that eigenstate’s amplitude in the trial state.</p>
+</details>
+</section>
+<section id="ground-state-fidelity">
+<h2>Ground-state fidelity<a class="headerlink" href="#ground-state-fidelity" title="Link to this heading"></a></h2>
+<p>As <a class="reference internal" href="index.html#tutorial-trial-state-fidelity"><span class="std std-ref">introduced in the tutorial overview</span></a>, the ground-state fidelity is the squared overlap</p>
+<div class="math notranslate nohighlight">
+\[F
+= \left\vert
+    \langle\Psi_0\vert\Psi_{\mathrm{trial}}\rangle
+  \right\vert^2.\]</div>
+<p>Both states are normalized, so <span class="math notranslate nohighlight">\(0\leq F\leq 1\)</span>.
+The fidelity <span class="math notranslate nohighlight">\(F\)</span> is the weight of the target ground state in the trial-state eigenstate expansion.
+For the textbook coherent measurement described above, it is also the probability of sampling the ground-state eigenphase.</p>
+<p>The QDK/Chemistry iterative quantum phase estimation (<a class="reference internal" href="../../glossary.html#term-IQPE"><span class="xref std std-term">IQPE</span></a>) implementation used later performs a different sampling procedure.
+Each <em>phase bit</em> is one binary digit of the estimated phase fraction.
+The implementation builds a separate circuit for each phase bit, and every circuit execution freshly prepares the trial state.
+Each phase bit is selected by a majority vote over a specified number of circuit executions, then used as feedback for the next bit.
+The final bit string therefore combines bitwise decisions from many state preparations rather than recording one eigenstate sample.</p>
+<p>Fidelity remains a useful trial-state quality measure because it controls the ground-state contribution to those bit statistics.
+However, it is not by itself the probability that one complete implemented <a class="reference internal" href="../../glossary.html#term-IQPE"><span class="xref std std-term">IQPE</span></a> run returns the ground-state energy, so it does not determine a trial count.
+The complete result also depends on the other eigenstate weights and phases, the number of phase bits, shots per bit, phase feedback, and the Hamiltonian-simulation approximation.
+The next chapter develops this bitwise sampling procedure and evaluates repeated complete <a class="reference internal" href="../../glossary.html#term-IQPE"><span class="xref std std-term">IQPE</span></a> runs.</p>
+<p>Imperfect logical state preparation can also change the state actually loaded.
+Residual logical faults after error correction can introduce further errors on a fault-tolerant machine, but they are not modeled by this tutorial’s simulator.
+These effects should be evaluated separately from the fidelity of the intended trial state.</p>
+</section>
+<section id="a-sparse-trial-wavefunction">
+<h2>A sparse trial wavefunction<a class="headerlink" href="#a-sparse-trial-wavefunction" title="Link to this heading"></a></h2>
+<p>The selected-space <a class="reference internal" href="../../glossary.html#term-CASCI"><span class="xref std std-term">CASCI</span></a> wavefunction is classically tractable in this teaching example, so it provides a controlled reference for comparing trial states.
+The script ranks its determinants by coefficient magnitude and retains the largest one, two, or four.
+These determinant counts are examples rather than restrictions of the projected calculation or state-preparation method.
+To compare other choices, change <code class="docutils literal notranslate"><span class="pre">determinant_counts</span></code> in the Jupyter notebook and rerun its cells.
+In a larger problem where exact <a class="reference internal" href="../../glossary.html#term-CASCI"><span class="xref std std-term">CASCI</span></a> is unavailable, an approximate classical method must supply the candidate determinants and amplitudes for the trial state.</p>
+<p>The script first prints the leading terms in the selected-space wavefunction.
+Each occupation string contains one symbol for each selected active spatial orbital: <code class="docutils literal notranslate"><span class="pre">2</span></code> means doubly occupied, <code class="docutils literal notranslate"><span class="pre">u</span></code> means occupied by one <span class="math notranslate nohighlight">\(\alpha\)</span> electron, <code class="docutils literal notranslate"><span class="pre">d</span></code> means occupied by one <span class="math notranslate nohighlight">\(\beta\)</span> electron, and <code class="docutils literal notranslate"><span class="pre">0</span></code> means unoccupied.
+The amplitude is the signed coefficient <span class="math notranslate nohighlight">\(c_I\)</span> in <span class="math notranslate nohighlight">\(\vert\Psi_0\rangle=\sum_I c_I\vert\Phi_I\rangle\)</span>, while the weight <span class="math notranslate nohighlight">\(\left\vert c_I\right\vert^2\)</span> is that determinant’s contribution to the squared norm.
+The cumulative weight shows how much of the norm is captured by the listed determinants.
+The script computes these quantities directly from the leading <a class="reference internal" href="../../glossary.html#term-CASCI"><span class="xref std std-term">CASCI</span></a> coefficients.</p>
+<p>Simply discarding coefficients and renormalizing would not optimize the wavefunction within the retained determinant space because the full-space amplitudes are not generally the amplitudes that minimize energy after determinants are removed.
+A projected multi-configuration (<a class="reference internal" href="../../glossary.html#term-PMC"><span class="xref std std-term">PMC</span></a>) calculation is a configuration-interaction calculation restricted to a user-specified set of determinants.
+The QDK/Chemistry <a class="reference internal" href="../../glossary.html#term-PMC"><span class="xref std std-term">PMC</span></a> calculator instead constructs the Hamiltonian matrix in the retained determinant space and solves its eigenvalue problem for the lowest-energy normalized eigenvector.
+The resulting projected wavefunction has zero amplitude on every omitted determinant.
+When using the projected wavefunction as a trial state, its overlap with the complete selected-space <a class="reference internal" href="../../glossary.html#term-CASCI"><span class="xref std std-term">CASCI</span></a> wavefunction therefore quantifies how much fidelity is retained after determinant truncation.</p>
+<p>Under the <a class="reference internal" href="index.html#tutorial-occupation-encoding"><span class="std std-ref">Jordan–Wigner encoding</span></a>, each retained determinant becomes one computational-basis state of the compute register.
+The trial wavefunction is therefore</p>
+<div class="math notranslate nohighlight">
+\[\vert\Psi_{\mathrm{trial}}\rangle
+=\sum_{I=1}^{K}\widetilde{c}_I\vert b_I\rangle,\]</div>
+<p>where <span class="math notranslate nohighlight">\(\vert b_I\rangle\)</span> is the occupation bitstring for retained determinant <span class="math notranslate nohighlight">\(\Phi_I\)</span>, and <span class="math notranslate nohighlight">\(\widetilde{c}_I\)</span> is its reoptimized amplitude.</p>
+<p>The script constructs each projected trial state, forms the reference and trial coefficient vectors for the same retained determinants, and evaluates their squared inner product directly:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># The leading reference determinants define the trial-state support;</span>
+<span class="c1"># PMC then reoptimizes their amplitudes within that restricted space.</span>
+<span class="n">top_determinants</span> <span class="o">=</span> <span class="n">leading_determinants</span><span class="p">(</span>
+    <span class="n">reference_wavefunction</span><span class="p">,</span> <span class="n">num_determinants</span>
+<span class="p">)</span>
+<span class="n">projected_calculator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
+    <span class="s2">&quot;projected_multi_configuration_calculator&quot;</span><span class="p">,</span> <span class="s2">&quot;macis_pmc&quot;</span>
+<span class="p">)</span>
+<span class="n">_</span><span class="p">,</span> <span class="n">trial_wavefunction</span> <span class="o">=</span> <span class="n">projected_calculator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">active_hamiltonian</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">top_determinants</span><span class="p">)</span>
+<span class="p">)</span>
+<span class="n">retained_determinants</span> <span class="o">=</span> <span class="n">trial_wavefunction</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">()</span>
+
+<span class="c1"># Read both vectors in PMC determinant order. Without this alignment,</span>
+<span class="c1"># np.vdot() could multiply coefficients belonging to different determinants.</span>
+<span class="n">reference_coefficients</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+    <span class="p">[</span>
+        <span class="n">reference_wavefunction</span><span class="o">.</span><span class="n">get_coefficient</span><span class="p">(</span><span class="n">determinant</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">determinant</span> <span class="ow">in</span> <span class="n">retained_determinants</span>
+    <span class="p">]</span>
+<span class="p">)</span>
+<span class="n">trial_coefficients</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+    <span class="p">[</span>
+        <span class="n">trial_wavefunction</span><span class="o">.</span><span class="n">get_coefficient</span><span class="p">(</span><span class="n">determinant</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">determinant</span> <span class="ow">in</span> <span class="n">retained_determinants</span>
+    <span class="p">]</span>
+<span class="p">)</span>
+
+<span class="c1"># The trial vector is normalized on the retained support. The reference</span>
+<span class="c1"># entries keep their full-state normalization, so their restricted norm</span>
+<span class="c1"># records weight omitted by truncation.</span>
+<span class="n">fidelity</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">vdot</span><span class="p">(</span><span class="n">reference_coefficients</span><span class="p">,</span> <span class="n">trial_coefficients</span><span class="p">))</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
+</pre></div>
+</div>
+<details class="quiz-question admonition">
+<summary class="admonition-title">Why must fidelity be calculated separately from the PMC energy?</summary>
+<p>The <a class="reference internal" href="../../glossary.html#term-PMC"><span class="xref std std-term">PMC</span></a> calculation chooses the lowest-energy wavefunction within the retained determinant space, but it does not directly maximize overlap with the complete selected-space ground state.
+Energy and overlap measure different properties, so the script evaluates fidelity explicitly.</p>
+</details>
+</section>
+<section id="the-trial-state-preparation-logical-circuit">
+<h2>The trial state preparation logical circuit<a class="headerlink" href="#the-trial-state-preparation-logical-circuit" title="Link to this heading"></a></h2>
+<p>The QDK/Chemistry sparse-isometry implementation converts the retained determinants into a binary matrix whose rows represent qubits and whose columns represent occupied-or-unoccupied patterns.
+The method uses binary row operations to reduce the determinant patterns while recording controlled-NOT (CNOT) and X operations, prepares the reduced set of amplitudes, and reverses the recorded operations to expand the state across the compute register, in an optimized version of approaches introduced by Malvetti et al. <span class="bibtex-citation" id="id2">[<a class="reference internal" href="../../references.html#id13" title="Emanuel Malvetti, Raban Iten, and Roger Colbeck. Quantum circuits for sparse isometries. Quantum, 5:412, 2021. URL: http://arxiv.org/abs/2006.00016, doi:10.22331/q-2021-06-21-412.">MIC21</a>]</span>.
+Students do not need to reproduce this synthesis by hand; it is implemented natively in QDK/Chemistry.
+The important input is the normalized sparse wavefunction and the output is a logical circuit that prepares its amplitudes on the corresponding occupation states.</p>
+<p>Some compute-register wires may have no gates in the state-preparation circuit.
+The register begins in the all-zero occupation state, so a wire needs no preparation operation when the selected sparse wavefunction does not require that occupation bit to change or become entangled.
+This does not make the qubit unnecessary: every compute qubit represents an active spin orbital on which the mapped active-space Hamiltonian acts.
+The later controlled time evolution in <a class="reference internal" href="../../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a> therefore requires the complete compute register and can couple the prepared determinant support to other configurations in the same sector.
+Removing a gate-free preparation wire would change the Hamiltonian representation and the molecular problem, rather than merely simplify state preparation.</p>
+<p>Before answering the next question, download and open <a class="reference download internal" download="" href="../../_downloads/a13acb484019084c5c91cc66bf9fa153/tutorial_prepare_trial_state.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_prepare_trial_state.ipynb</span></code></a> in Visual Studio Code.
+Save it in the tutorial working directory alongside <code class="docutils literal notranslate"><span class="pre">tutorial_prepare_trial_state.py</span></code>, <code class="docutils literal notranslate"><span class="pre">tutorial_choose_active_space.py</span></code>, and <code class="docutils literal notranslate"><span class="pre">tutorial_orbital_coordinates.py</span></code>.
+Choose <strong>Select Kernel</strong>, select <strong>Python Environments</strong>, and choose the <code class="docutils literal notranslate"><span class="pre">.venv</span></code> environment created in <a class="reference internal" href="00_before_you_begin.html"><span class="doc">Before you begin</span></a>.
+Then select <strong>Run All</strong> to execute the shared trial-state workflow and render the one-, two-, and four-determinant logical circuits.
+Compare the gate types and circuit structure before revealing the answer below.</p>
+<figure class="align-center" id="id3">
+<a class="reference internal image-reference" href="../../_images/tutorial_qpe_state_preparation_comparison.png"><img alt="Side-by-side logical state-preparation circuits on twelve compute qubits. The one-determinant circuit on the left contains six X gates that prepare one occupation bit string. The two-determinant circuit on the right contains rotations and controlled operations that prepare a coherent superposition of two occupation bit strings." src="../../_images/tutorial_qpe_state_preparation_comparison.png" style="width: 100%;" />
+</a>
+<figcaption>
+<p><span class="caption-text">Generated logical state-preparation circuits for the one-determinant trial state (left) and two-determinant trial state (right). Both use the same twelve-qubit compute register; the additional operations prepare multiple amplitudes rather than additional spin orbitals.</span><a class="headerlink" href="#id3" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<details class="quiz-question admonition">
+<summary class="admonition-title">Why does one-determinant state preparation look so different from multi-determinant preparation?</summary>
+<p>One determinant is one occupation bit string and therefore one computational-basis state.
+Starting from the all-zero state, X gates only need to flip the qubits representing occupied spin orbitals.
+A multi-determinant wavefunction is instead a coherent superposition of distinct occupation bit strings.
+Because X gates can only map one basis state to another, rotations are needed to create amplitudes, phase operations establish relative signs or phases, and entangling gates correlate occupation changes across qubits.
+The exact gate sequence depends on the synthesis method, but the distinction between preparing one basis state and preparing a coherent superposition is general.</p>
+</details>
+<p>To measure the generated logical-circuit cost, the script traverses the decomposed <a class="reference internal" href="00_before_you_begin.html#tutorial-qsharp"><span class="std std-ref">Q# circuit representation</span></a>, counts displayed gate records that have no nested child operations, and identifies controlled X gates as CNOT gates.
+The script creates the QDK/Chemistry sparse-isometry implementation and inspects the generated Q# logical circuit.
+The factory key <a class="reference internal" href="../../user/comprehensive/algorithms/state_preparation.html#sparse-isometry-gf2x"><span class="std std-ref">sparse_isometry_gf2x</span></a> is the implementation’s current API identifier using a helper function to count gates:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">state_preparation</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;state_prep&quot;</span><span class="p">,</span> <span class="s2">&quot;sparse_isometry_gf2x&quot;</span><span class="p">)</span>
+<span class="n">circuit</span> <span class="o">=</span> <span class="n">state_preparation</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">trial_wavefunction</span><span class="p">)</span>
+<span class="n">num_compute_qubits</span><span class="p">,</span> <span class="n">num_logical_gates</span><span class="p">,</span> <span class="n">logical_gate_counts</span> <span class="o">=</span> <span class="n">circuit_statistics</span><span class="p">(</span>
+    <span class="n">circuit</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>The reported <em>preparation logical gate count</em> is the number of these childless gate records in the generated Q# logical-circuit representation after the state-preparation operation has been decomposed.
+This software-level logical gate count is not logical-circuit depth, a fault-tolerant resource estimate, or a physical-resource estimate.
+It can change if the state-preparation or circuit-decomposition implementation changes; error correction affects downstream fault-tolerant and physical costs instead.</p>
+</section>
+<section id="trial-state-quality-and-preparation-cost">
+<h2>Trial-state quality and preparation cost<a class="headerlink" href="#trial-state-quality-and-preparation-cost" title="Link to this heading"></a></h2>
+<p>Trial-state truncation introduces a separate cost–quality tradeoff within the selected active space.
+Retaining more determinants can improve fidelity with the selected-space ground state, but preparing more nonzero amplitudes generally requires more logical gates.
+The relevant question is therefore how much fidelity is gained for each increase in state-preparation cost.</p>
+<p>All three trial states describe the same selected active spin-orbital space, so they use the same compute register size.
+Changing the number of retained determinants changes amplitudes and logical-circuit structure, not the number of spin orbitals represented.</p>
+<details class="quiz-question admonition">
+<summary class="admonition-title">Does retaining more determinants require more compute qubits?</summary>
+<p>No.
+Each trial state represents the same selected active spin-orbital space, so the compute-register size is unchanged.
+The number of retained determinants affects state-preparation operations rather than the compute-register size.</p>
+</details>
+</section>
+<section id="running-the-preparation">
+<h2>Running the preparation<a class="headerlink" href="#running-the-preparation" title="Link to this heading"></a></h2>
+<p>With the Python environment from <a class="reference internal" href="00_before_you_begin.html"><span class="doc">Before you begin</span></a> active, run the complete script from the Visual Studio Code integrated terminal:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">python tutorial_prepare_trial_state.py</span>
+</pre></div>
+</div>
+<details class="quiz-question admonition">
+<summary class="admonition-title">How do fidelity and preparation cost change as determinants are retained?</summary>
+<p>The one-, two-, and four-determinant fidelities are approximately <span class="math notranslate nohighlight">\(0.4825\)</span>, <span class="math notranslate nohighlight">\(0.5864\)</span>, and <span class="math notranslate nohighlight">\(0.7324\)</span>, respectively.
+Their generated logical circuits have preparation logical gate counts of 6, 14, and 30, respectively, while every logical circuit uses twelve compute qubits.
+From one to two determinants, fidelity increases by approximately <span class="math notranslate nohighlight">\(0.104\)</span> while the gate count increases by eight.
+From two to four determinants, fidelity increases by approximately <span class="math notranslate nohighlight">\(0.146\)</span> while the gate count increases by sixteen.
+For these three generated circuits, the second expansion provides less fidelity gain per additional preparation gate than the first.</p>
+</details>
+<details class="quiz-question admonition">
+<summary class="admonition-title">What does the single-determinant fidelity reveal about multireference character?</summary>
+<p>Its fidelity is approximately <span class="math notranslate nohighlight">\(0.4825\)</span>, equal to the weight of the leading <code class="docutils literal notranslate"><span class="pre">222000</span></code> determinant.
+No single determinant therefore carries a majority of the selected-space ground-state weight at this geometry.
+The substantial weight distributed among additional determinants provides direct evidence of multireference character in the selected active-space orbital representation.</p>
+</details>
+<p>Record the leading reference determinants and all three determinant counts, fidelities, compute-qubit counts, preparation logical gate counts, and logical gate-family counts in the <a class="reference internal" href="lab_notebook.html#lab-notebook-trial-state"><span class="std std-ref">trial-state section of the lab notebook</span></a>.
+Explain what the leading determinant weight reveals about multireference character, and distinguish the fidelity improvement from the increased logical-circuit cost.
+The final <a class="reference internal" href="../../glossary.html#term-IQPE"><span class="xref std std-term">IQPE</span></a> calculation uses the four-determinant trial state.
+In the lab notebook, use your measured fidelities and preparation logical gate counts to evaluate this choice and describe what would be gained or lost by using one of the smaller trial states instead.</p>
+</section>
+<section id="further-reading">
+<h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../user/comprehensive/algorithms/state_preparation.html"><span class="doc">State preparation</span></a></p></li>
+<li><p><a class="reference internal" href="../../user/comprehensive/algorithms/pmc.html"><span class="doc">Projected multi-configuration calculations</span></a></p></li>
+<li><p><a class="reference internal" href="../../user/comprehensive/data/wavefunction.html"><span class="doc">Wavefunctions</span></a></p></li>
+<li><p><a class="reference internal" href="../../user/comprehensive/data/circuit.html"><span class="doc">Quantum circuits</span></a></p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="04_putting_the_problem_on_qubits.html" class="btn btn-neutral float-left" title="Mapping the problem to qubits" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="06_iterative_phase_estimation.html" class="btn btn-neutral float-right" title="Iterative quantum phase estimation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

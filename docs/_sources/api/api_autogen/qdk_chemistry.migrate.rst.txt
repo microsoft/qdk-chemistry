@@ -18,6 +18,7 @@ Submodules
    qdk_chemistry.migrate._hamiltonian
    qdk_chemistry.migrate._io
    qdk_chemistry.migrate._orbitals
+   qdk_chemistry.migrate._qpe_result
    qdk_chemistry.migrate._sbt
    qdk_chemistry.migrate._sparse
    qdk_chemistry.migrate._wavefunction

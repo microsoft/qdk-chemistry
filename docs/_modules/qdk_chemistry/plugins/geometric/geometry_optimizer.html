@@ -1,0 +1,469 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.plugins.geometric.geometry_optimizer &mdash; qdk-chemistry 2.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=78acbc13" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/index.html">Tutorials</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../geometric.html">qdk_chemistry.plugins.geometric</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.plugins.geometric.geometry_optimizer</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.plugins.geometric.geometry_optimizer</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;geomeTRIC-backed geometry optimizer.&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">contextlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">contextmanager</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tempfile</span><span class="w"> </span><span class="kn">import</span> <span class="n">TemporaryDirectory</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">threading</span><span class="w"> </span><span class="kn">import</span> <span class="n">RLock</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">TypeAlias</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">geometric.engine</span><span class="w"> </span><span class="kn">import</span> <span class="n">Engine</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">geometric.nifty</span><span class="w"> </span><span class="kn">import</span> <span class="n">bohr2ang</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">GeometryOptimizer</span><span class="p">,</span> <span class="n">GeometryOptimizerSettings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">BasisSet</span><span class="p">,</span> <span class="n">Orbitals</span><span class="p">,</span> <span class="n">Structure</span><span class="p">,</span> <span class="n">Wavefunction</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Iterator</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">geometric.molecule</span><span class="w"> </span><span class="kn">import</span> <span class="n">Molecule</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">NuclearDerivativeCalculator</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">NuclearHessian</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;GEOMETRIC_OPTIMIZER_ALGORITHMS&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;GeometricOptimizer&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;GeometricOptimizerSettings&quot;</span><span class="p">,</span>
+<span class="p">]</span>
+
+
+<span class="n">GEOMETRIC_OPTIMIZER_ALGORITHMS</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;tric&quot;</span><span class="p">,</span> <span class="s2">&quot;tric-p&quot;</span><span class="p">,</span> <span class="s2">&quot;dlc&quot;</span><span class="p">,</span> <span class="s2">&quot;hdlc&quot;</span><span class="p">,</span> <span class="s2">&quot;prim&quot;</span><span class="p">,</span> <span class="s2">&quot;cart&quot;</span><span class="p">)</span>
+
+<span class="n">_GeometryOptimizationInput</span><span class="p">:</span> <span class="n">TypeAlias</span> <span class="o">=</span> <span class="n">Orbitals</span> <span class="o">|</span> <span class="n">BasisSet</span> <span class="o">|</span> <span class="n">Wavefunction</span> <span class="o">|</span> <span class="nb">str</span>
+<span class="n">_GEOMETRIC_LOGGING_LOCK</span> <span class="o">=</span> <span class="n">RLock</span><span class="p">()</span>
+
+
+<div class="viewcode-block" id="GeometricOptimizerSettings">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.geometric.geometry_optimizer.html#qdk_chemistry.plugins.geometric.geometry_optimizer.GeometricOptimizerSettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">GeometricOptimizerSettings</span><span class="p">(</span><span class="n">GeometryOptimizerSettings</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings for the geomeTRIC geometry optimizer.</span>
+
+<span class="sd">    By default, geomeTRIC requires the energy, RMS and maximum gradient,</span>
+<span class="sd">    and RMS and maximum displacement criteria to be satisfied together.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="GeometricOptimizerSettings.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.geometric.geometry_optimizer.html#qdk_chemistry.plugins.geometric.geometry_optimizer.GeometricOptimizerSettings.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize geomeTRIC optimizer defaults.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;transition_state&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;Run transition-state optimization instead of minimization.&quot;</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;optimizer&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;string&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;tric&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;geomeTRIC optimizer algorithm.&quot;</span><span class="p">,</span>
+            <span class="n">limit</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">GEOMETRIC_OPTIMIZER_ALGORITHMS</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;convergence_energy&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;double&quot;</span><span class="p">,</span>
+            <span class="mf">1.0e-6</span><span class="p">,</span>
+            <span class="s2">&quot;Energy-change threshold in Hartree required for convergence.&quot;</span><span class="p">,</span>
+            <span class="n">limit</span><span class="o">=</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;convergence_rms_gradient&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;double&quot;</span><span class="p">,</span>
+            <span class="mf">3.0e-4</span><span class="p">,</span>
+            <span class="s2">&quot;RMS gradient threshold in Hartree/Bohr required for convergence.&quot;</span><span class="p">,</span>
+            <span class="n">limit</span><span class="o">=</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;convergence_max_gradient&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;double&quot;</span><span class="p">,</span>
+            <span class="mf">4.5e-4</span><span class="p">,</span>
+            <span class="s2">&quot;Maximum gradient threshold in Hartree/Bohr required for convergence.&quot;</span><span class="p">,</span>
+            <span class="n">limit</span><span class="o">=</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;convergence_rms_displacement&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;double&quot;</span><span class="p">,</span>
+            <span class="mf">1.2e-3</span><span class="p">,</span>
+            <span class="s2">&quot;RMS displacement threshold in Angstrom required for convergence.&quot;</span><span class="p">,</span>
+            <span class="n">limit</span><span class="o">=</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;convergence_max_displacement&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;double&quot;</span><span class="p">,</span>
+            <span class="mf">1.8e-3</span><span class="p">,</span>
+            <span class="s2">&quot;Maximum displacement threshold in Angstrom required for convergence.&quot;</span><span class="p">,</span>
+            <span class="n">limit</span><span class="o">=</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;print_level&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;geomeTRIC output verbosity level.&quot;</span><span class="p">)</span></div>
+</div>
+
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">_QdkDerivativeEngine</span><span class="p">(</span><span class="n">Engine</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;geomeTRIC engine that evaluates QDK/Chemistry nuclear derivatives.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">structure</span><span class="p">:</span> <span class="n">Structure</span><span class="p">,</span>
+        <span class="n">charge</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">spin_multiplicity</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">optimizer_input</span><span class="p">:</span> <span class="n">_GeometryOptimizationInput</span><span class="p">,</span>
+        <span class="n">n_inactive_orbitals</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">derivative_calculator</span><span class="p">:</span> <span class="n">NuclearDerivativeCalculator</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">molecule</span><span class="p">:</span> <span class="n">Molecule</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">molecule</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_structure</span> <span class="o">=</span> <span class="n">structure</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_charge</span> <span class="o">=</span> <span class="n">charge</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_spin_multiplicity</span> <span class="o">=</span> <span class="n">spin_multiplicity</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_optimizer_input</span> <span class="o">=</span> <span class="n">optimizer_input</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_n_inactive_orbitals</span> <span class="o">=</span> <span class="n">n_inactive_orbitals</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_derivative_calculator</span> <span class="o">=</span> <span class="n">derivative_calculator</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_last_energy</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_last_structure</span> <span class="o">=</span> <span class="n">structure</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_last_wavefunction</span><span class="p">:</span> <span class="n">Wavefunction</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_structure_from_bohr_coordinates</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">coordinates</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Structure</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a QDK/Chemistry structure from Bohr coordinates.&quot;&quot;&quot;</span>
+        <span class="n">matrix</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">coordinates</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">Structure</span><span class="p">(</span>
+            <span class="n">matrix</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_structure</span><span class="o">.</span><span class="n">get_elements</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_structure</span><span class="o">.</span><span class="n">get_masses</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_structure</span><span class="o">.</span><span class="n">get_nuclear_charges</span><span class="p">()</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">last_coordinates</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the most recently evaluated coordinates.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_last_structure</span><span class="o">.</span><span class="n">get_coordinates</span><span class="p">(),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">cached_result</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">coordinates</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Wavefunction</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the cached energy and wavefunction when coordinates match.&quot;&quot;&quot;</span>
+        <span class="n">matrix</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">coordinates</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_energy</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span><span class="n">matrix</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">last_coordinates</span><span class="p">(),</span> <span class="n">rtol</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1.0e-12</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_energy</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_wavefunction</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">calc_new</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">coordinates</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">dirname</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="nb">float</span><span class="p">]:</span>  <span class="c1"># noqa: ARG002</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Evaluate energy and gradients for geomeTRIC.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_derivative_calculator</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;A nuclear derivative calculator is required to evaluate coordinates&quot;</span><span class="p">)</span>
+        <span class="n">structure</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_structure_from_bohr_coordinates</span><span class="p">(</span><span class="n">coordinates</span><span class="p">)</span>
+        <span class="n">energy</span><span class="p">,</span> <span class="n">gradients</span><span class="p">,</span> <span class="n">_hessian</span><span class="p">,</span> <span class="n">wavefunction</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_derivative_calculator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+            <span class="n">structure</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_charge</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_spin_multiplicity</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_optimizer_input</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_n_inactive_orbitals</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_last_energy</span> <span class="o">=</span> <span class="n">energy</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_last_structure</span> <span class="o">=</span> <span class="n">structure</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_last_wavefunction</span> <span class="o">=</span> <span class="n">wavefunction</span>
+        <span class="n">gradient</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">gradients</span><span class="o">.</span><span class="n">get_values</span><span class="p">(),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;energy&quot;</span><span class="p">:</span> <span class="n">energy</span><span class="p">,</span> <span class="s2">&quot;gradient&quot;</span><span class="p">:</span> <span class="n">gradient</span><span class="p">}</span>
+
+
+<div class="viewcode-block" id="GeometricOptimizer">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.geometric.geometry_optimizer.html#qdk_chemistry.plugins.geometric.geometry_optimizer.GeometricOptimizer">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">GeometricOptimizer</span><span class="p">(</span><span class="n">GeometryOptimizer</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Geometry optimizer implemented with the geomeTRIC Python library.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="GeometricOptimizer.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.geometric.geometry_optimizer.html#qdk_chemistry.plugins.geometric.geometry_optimizer.GeometricOptimizer.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the geomeTRIC optimizer.&quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">GeometricOptimizerSettings</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="GeometricOptimizer.name">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.geometric.geometry_optimizer.html#qdk_chemistry.plugins.geometric.geometry_optimizer.GeometricOptimizer.name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the implementation name.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;geometric&quot;</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">structure</span><span class="p">:</span> <span class="n">Structure</span><span class="p">,</span>
+        <span class="n">charge</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">spin_multiplicity</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">optimizer_input</span><span class="p">:</span> <span class="n">_GeometryOptimizationInput</span><span class="p">,</span>
+        <span class="n">n_inactive_orbitals</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Structure</span><span class="p">,</span> <span class="n">NuclearHessian</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">Wavefunction</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Optimize a molecular structure using geomeTRIC.&quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">geometric.molecule</span><span class="w"> </span><span class="kn">import</span> <span class="n">Molecule</span>  <span class="c1"># noqa: PLC0415</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">geometric.optimize</span><span class="w"> </span><span class="kn">import</span> <span class="n">run_optimizer</span>  <span class="c1"># noqa: PLC0415</span>
+
+        <span class="n">molecule</span> <span class="o">=</span> <span class="n">Molecule</span><span class="p">()</span>
+        <span class="n">molecule</span><span class="o">.</span><span class="n">elem</span> <span class="o">=</span> <span class="n">structure</span><span class="o">.</span><span class="n">get_atomic_symbols</span><span class="p">()</span>
+        <span class="n">molecule</span><span class="o">.</span><span class="n">xyzs</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">structure</span><span class="o">.</span><span class="n">get_coordinates</span><span class="p">(),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span> <span class="o">*</span> <span class="n">bohr2ang</span><span class="p">]</span>
+
+        <span class="n">derivative_calculator</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_nested</span><span class="p">(</span><span class="s2">&quot;derivative_calculator&quot;</span><span class="p">)</span>
+        <span class="n">derivative_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;compute_hessian&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="n">engine</span> <span class="o">=</span> <span class="n">_QdkDerivativeEngine</span><span class="p">(</span>
+            <span class="n">structure</span><span class="p">,</span>
+            <span class="n">charge</span><span class="p">,</span>
+            <span class="n">spin_multiplicity</span><span class="p">,</span>
+            <span class="n">optimizer_input</span><span class="p">,</span>
+            <span class="n">n_inactive_orbitals</span><span class="p">,</span>
+            <span class="n">derivative_calculator</span><span class="p">,</span>
+            <span class="n">molecule</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">params</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_geometric_options</span><span class="p">()</span>
+        <span class="n">params</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">&quot;customengine&quot;</span><span class="p">:</span> <span class="n">engine</span><span class="p">,</span> <span class="s2">&quot;input&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">})</span>
+
+        <span class="k">with</span> <span class="n">TemporaryDirectory</span><span class="p">(</span><span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;qdk-chemistry-geometric-&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">tmpdir</span><span class="p">:</span>
+            <span class="n">prefix</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">)</span> <span class="o">/</span> <span class="s2">&quot;qdk-chemistry&quot;</span>
+            <span class="k">with</span> <span class="n">_preserve_root_logging</span><span class="p">():</span>
+                <span class="n">result</span> <span class="o">=</span> <span class="n">run_optimizer</span><span class="p">(</span><span class="o">**</span><span class="n">params</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">prefix</span><span class="p">),</span> <span class="n">dirname</span><span class="o">=</span><span class="n">tmpdir</span><span class="p">)</span>
+
+        <span class="n">optimized_coordinates</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">_extract_coordinates</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">engine</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+        <span class="n">optimized_structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span>
+            <span class="n">optimized_coordinates</span><span class="p">,</span> <span class="n">structure</span><span class="o">.</span><span class="n">get_elements</span><span class="p">(),</span> <span class="n">structure</span><span class="o">.</span><span class="n">get_masses</span><span class="p">(),</span> <span class="n">structure</span><span class="o">.</span><span class="n">get_nuclear_charges</span><span class="p">()</span>
+        <span class="p">)</span>
+
+        <span class="n">cached_result</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">cached_result</span><span class="p">(</span><span class="n">optimized_coordinates</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="p">[</span><span class="s2">&quot;compute_hessian&quot;</span><span class="p">]</span> <span class="ow">and</span> <span class="n">cached_result</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">final_energy</span><span class="p">,</span> <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">cached_result</span>
+            <span class="k">return</span> <span class="n">final_energy</span><span class="p">,</span> <span class="n">optimized_structure</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">wavefunction</span>
+
+        <span class="n">final_calculator</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_nested</span><span class="p">(</span><span class="s2">&quot;derivative_calculator&quot;</span><span class="p">)</span>
+        <span class="n">final_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;compute_hessian&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="p">[</span><span class="s2">&quot;compute_hessian&quot;</span><span class="p">])</span>
+        <span class="n">final_energy</span><span class="p">,</span> <span class="n">_gradients</span><span class="p">,</span> <span class="n">hessian</span><span class="p">,</span> <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">final_calculator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+            <span class="n">optimized_structure</span><span class="p">,</span>
+            <span class="n">charge</span><span class="p">,</span>
+            <span class="n">spin_multiplicity</span><span class="p">,</span>
+            <span class="n">optimizer_input</span><span class="p">,</span>
+            <span class="n">n_inactive_orbitals</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="p">[</span><span class="s2">&quot;compute_hessian&quot;</span><span class="p">]:</span>
+            <span class="n">hessian</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">return</span> <span class="n">final_energy</span><span class="p">,</span> <span class="n">optimized_structure</span><span class="p">,</span> <span class="n">hessian</span><span class="p">,</span> <span class="n">wavefunction</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_geometric_options</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;transition&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="p">[</span><span class="s2">&quot;transition_state&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;coordsys&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="p">[</span><span class="s2">&quot;optimizer&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;maxiter&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="p">[</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;convergence_energy&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="p">[</span><span class="s2">&quot;convergence_energy&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;convergence_grms&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="p">[</span><span class="s2">&quot;convergence_rms_gradient&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;convergence_gmax&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="p">[</span><span class="s2">&quot;convergence_max_gradient&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;convergence_drms&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="p">[</span><span class="s2">&quot;convergence_rms_displacement&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;convergence_dmax&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="p">[</span><span class="s2">&quot;convergence_max_displacement&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;verbose&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="p">[</span><span class="s2">&quot;print_level&quot;</span><span class="p">],</span>
+        <span class="p">}</span></div>
+
+
+
+<span class="nd">@contextmanager</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_preserve_root_logging</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="kc">None</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Restore root logging after geomeTRIC replaces its configuration.&quot;&quot;&quot;</span>
+    <span class="k">with</span> <span class="n">_GEOMETRIC_LOGGING_LOCK</span><span class="p">:</span>
+        <span class="n">root_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">()</span>
+        <span class="n">original_handlers</span> <span class="o">=</span> <span class="n">root_logger</span><span class="o">.</span><span class="n">handlers</span><span class="p">[:]</span>
+        <span class="n">original_level</span> <span class="o">=</span> <span class="n">root_logger</span><span class="o">.</span><span class="n">level</span>
+
+        <span class="c1"># fileConfig closes every handler registered with logging, including</span>
+        <span class="c1"># handlers that belong to the host application.</span>
+        <span class="n">handler_list</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">logging</span><span class="p">,</span> <span class="s2">&quot;_handlerList&quot;</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="n">logging_lock</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">logging</span><span class="p">,</span> <span class="s2">&quot;_lock&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">logging_lock</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">contextlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">nullcontext</span>  <span class="c1"># noqa: PLC0415</span>
+
+            <span class="n">logging_lock</span> <span class="o">=</span> <span class="n">nullcontext</span><span class="p">()</span>
+
+        <span class="n">original_handler_refs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">original_handler_ids</span> <span class="o">=</span> <span class="p">{</span><span class="nb">id</span><span class="p">(</span><span class="n">handler</span><span class="p">)</span> <span class="k">for</span> <span class="n">handler</span> <span class="ow">in</span> <span class="n">original_handlers</span><span class="p">}</span>
+        <span class="k">with</span> <span class="n">logging_lock</span><span class="p">:</span>
+            <span class="n">original_handler_refs</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="n">handler_ref</span>
+                <span class="k">for</span> <span class="n">handler_ref</span> <span class="ow">in</span> <span class="n">handler_list</span>
+                <span class="k">if</span> <span class="n">handler_ref</span><span class="p">()</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">id</span><span class="p">(</span><span class="n">handler_ref</span><span class="p">())</span> <span class="ow">in</span> <span class="n">original_handler_ids</span>
+            <span class="p">]</span>
+            <span class="n">handler_list</span><span class="p">[:]</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="n">handler_ref</span>
+                <span class="k">for</span> <span class="n">handler_ref</span> <span class="ow">in</span> <span class="n">handler_list</span>
+                <span class="k">if</span> <span class="n">handler_ref</span><span class="p">()</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">id</span><span class="p">(</span><span class="n">handler_ref</span><span class="p">())</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">original_handler_ids</span>
+            <span class="p">]</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">yield</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="n">geometric_handlers</span> <span class="o">=</span> <span class="n">root_logger</span><span class="o">.</span><span class="n">handlers</span><span class="p">[:]</span>
+            <span class="k">for</span> <span class="n">handler</span> <span class="ow">in</span> <span class="n">geometric_handlers</span><span class="p">:</span>
+                <span class="n">root_logger</span><span class="o">.</span><span class="n">removeHandler</span><span class="p">(</span><span class="n">handler</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">handler</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">original_handlers</span><span class="p">:</span>
+                    <span class="n">handler</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">handler</span> <span class="ow">in</span> <span class="n">original_handlers</span><span class="p">:</span>
+                <span class="n">root_logger</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">handler</span><span class="p">)</span>
+            <span class="n">root_logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">original_level</span><span class="p">)</span>
+
+            <span class="k">with</span> <span class="n">logging_lock</span><span class="p">:</span>
+                <span class="n">registered_handler_ids</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="nb">id</span><span class="p">(</span><span class="n">handler_ref</span><span class="p">())</span> <span class="k">for</span> <span class="n">handler_ref</span> <span class="ow">in</span> <span class="n">handler_list</span> <span class="k">if</span> <span class="n">handler_ref</span><span class="p">()</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="p">}</span>
+                <span class="n">handler_list</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                    <span class="n">handler_ref</span>
+                    <span class="k">for</span> <span class="n">handler_ref</span> <span class="ow">in</span> <span class="n">original_handler_refs</span>
+                    <span class="k">if</span> <span class="n">handler_ref</span><span class="p">()</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">id</span><span class="p">(</span><span class="n">handler_ref</span><span class="p">())</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">registered_handler_ids</span>
+                <span class="p">)</span>
+                <span class="k">for</span> <span class="n">handler</span> <span class="ow">in</span> <span class="n">original_handlers</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">handler</span><span class="o">.</span><span class="n">name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="c1"># Trigger re-registration of named handlers in logging&#39;s global handler registry.</span>
+                        <span class="n">handler</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">handler</span><span class="o">.</span><span class="n">name</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_extract_coordinates</span><span class="p">(</span><span class="n">result</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">engine</span><span class="p">:</span> <span class="n">_QdkDerivativeEngine</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Extract final coordinates from geomeTRIC in Bohr.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">result</span> <span class="o">/</span> <span class="n">bohr2ang</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="s2">&quot;xyzs&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">result</span><span class="o">.</span><span class="n">xyzs</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">xyzs</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span> <span class="o">/</span> <span class="n">bohr2ang</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;coords&quot;</span><span class="p">,</span> <span class="s2">&quot;coordinates&quot;</span><span class="p">,</span> <span class="s2">&quot;xyz&quot;</span><span class="p">,</span> <span class="s2">&quot;xyzs&quot;</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;xyzs&quot;</span> <span class="ow">and</span> <span class="n">value</span><span class="p">:</span>
+                    <span class="n">value</span> <span class="o">=</span> <span class="n">value</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span> <span class="o">/</span> <span class="n">bohr2ang</span>
+    <span class="k">if</span> <span class="n">engine</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;geomeTRIC result did not contain final coordinates, and no engine was provided&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">engine</span><span class="o">.</span><span class="n">last_coordinates</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

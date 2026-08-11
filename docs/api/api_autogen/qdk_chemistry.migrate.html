@@ -6,18 +6,18 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.migrate package &mdash; qdk-chemistry 2.0.0 documentation</title>
+  <title>qdk_chemistry.migrate package &mdash; qdk-chemistry 2.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=ac0f520b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=78acbc13" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../_static/documentation_options.js?v=20623aea"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -53,6 +53,10 @@
 <li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/index.html">Tutorials</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -108,7 +112,7 @@ error; use this module to upgrade such a file to the version the library accepts
 </pre></div>
 </div>
 <p>The data type is taken from the <code class="docutils literal notranslate"><span class="pre">name.type.ext</span></code> filename convention
-(<code class="docutils literal notranslate"><span class="pre">orbitals</span></code> / <code class="docutils literal notranslate"><span class="pre">hamiltonian</span></code> / <code class="docutils literal notranslate"><span class="pre">wavefunction</span></code> / <code class="docutils literal notranslate"><span class="pre">ansatz</span></code>) and the
+(<code class="docutils literal notranslate"><span class="pre">orbitals</span></code> / <code class="docutils literal notranslate"><span class="pre">hamiltonian</span></code> / <code class="docutils literal notranslate"><span class="pre">wavefunction</span></code> / <code class="docutils literal notranslate"><span class="pre">ansatz</span></code> / <code class="docutils literal notranslate"><span class="pre">qpe_result</span></code>) and the
 serialization format from the file extension (<code class="docutils literal notranslate"><span class="pre">.json</span></code> or <code class="docutils literal notranslate"><span class="pre">.h5</span></code> / <code class="docutils literal notranslate"><span class="pre">.hdf5</span></code>).
 Input and output formats may differ.</p>
 <p>Migration is keyed point-by-point on each data class’s serialization version, not
@@ -116,8 +120,9 @@ on a library release: every migratable type exposes a <code class="docutils lite
 source version to a <code class="docutils literal notranslate"><span class="pre">(next_version,</span> <span class="pre">transform)</span></code> pair, and the chain is followed
 until it reaches the version the installed library accepts. To support a future
 serialization-version bump for a data class, register the next step in that type’s
-<code class="docutils literal notranslate"><span class="pre">STEPS</span></code> table (<code class="docutils literal notranslate"><span class="pre">_orbitals</span></code>/<code class="docutils literal notranslate"><span class="pre">_hamiltonian</span></code>/<code class="docutils literal notranslate"><span class="pre">_wavefunction</span></code>); the migrated
-document is validated against the live deserializer, so a missing step fails loudly.</p>
+<code class="docutils literal notranslate"><span class="pre">STEPS</span></code> table (<code class="docutils literal notranslate"><span class="pre">_orbitals</span></code>/<code class="docutils literal notranslate"><span class="pre">_hamiltonian</span></code>/<code class="docutils literal notranslate"><span class="pre">_wavefunction</span></code>/<code class="docutils literal notranslate"><span class="pre">_qpe_result</span></code>);
+the migrated document is validated against the live deserializer, so a missing step
+fails loudly.</p>
 <p>This module lives outside the data classes so that no legacy-schema knowledge
 leaks into the core serialization.</p>
 <dl class="py exception">
@@ -250,6 +255,12 @@ leaks into the core serialization.</p>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.from_json_doc"><code class="docutils literal notranslate"><span class="pre">from_json_doc()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.from_hdf5_group"><code class="docutils literal notranslate"><span class="pre">from_hdf5_group()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._orbitals.html#qdk_chemistry.migrate._orbitals.to_new_json"><code class="docutils literal notranslate"><span class="pre">to_new_json()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.migrate._qpe_result.html">qdk_chemistry.migrate._qpe_result module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._qpe_result.html#qdk_chemistry.migrate._qpe_result.from_json_doc"><code class="docutils literal notranslate"><span class="pre">from_json_doc()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._qpe_result.html#qdk_chemistry.migrate._qpe_result.from_hdf5_file"><code class="docutils literal notranslate"><span class="pre">from_hdf5_file()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.migrate._qpe_result.html#qdk_chemistry.migrate._qpe_result.to_new_json"><code class="docutils literal notranslate"><span class="pre">to_new_json()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.migrate._sbt.html">qdk_chemistry.migrate._sbt module</a><ul>

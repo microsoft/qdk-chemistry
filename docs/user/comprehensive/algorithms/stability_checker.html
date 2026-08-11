@@ -6,18 +6,18 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Stability analysis &mdash; qdk-chemistry 2.0.0 documentation</title>
+  <title>Stability analysis &mdash; qdk-chemistry 2.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=78acbc13" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -60,6 +60,7 @@
 <li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory pattern</a></li>
 <li class="toctree-l3"><a class="reference internal" href="settings.html">Settings</a></li>
 <li class="toctree-l3"><a class="reference internal" href="active_space.html">Active space selection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="effective_hamiltonian_constructor.html">Effective Hamiltonian construction</a></li>
 <li class="toctree-l3"><a class="reference internal" href="expectation_estimator.html">Energy estimation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">Hamiltonian construction</a></li>
 <li class="toctree-l3"><a class="reference internal" href="localizer.html">Orbital localization</a></li>
@@ -82,6 +83,7 @@
 <li class="toctree-l3"><a class="reference internal" href="hadamard_test.html">Hadamard test</a></li>
 <li class="toctree-l3"><a class="reference internal" href="phase_estimation.html">Phase estimation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="qpe_circuit_builder.html">Phase estimation circuit builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="amplitude_amplification.html">Amplitude amplification</a></li>
 <li class="toctree-l3"><a class="reference internal" href="evolution_circuit_builder.html">Evolution circuit builder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian_unitary_builder.html">Hamiltonian Unitary Builder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled circuit mapper</a></li>
@@ -97,6 +99,10 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/index.html">Tutorials</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -146,7 +152,7 @@ Its primary purpose is to identify directions in orbital space where the energy 
 This iterative stability analysis of checking stability, rotating orbitals, and re-running <a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> continues until a stable minimum is reached.</p>
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
-<p>Stability analysis <span class="bibtex-citation" id="id1">[<a class="reference internal" href="../../../references.html#id40" title="H. B. Schlegel and J. J. W. McDouall. Do you have SCF stability and convergence problems?, pages 167–185. Springer Netherlands, Dordrecht, 1991. URL: https://doi.org/10.1007/978-94-011-3262-6_2, doi:10.1007/978-94-011-3262-6_2.">SM91</a>]</span> examines the second-order response of the wavefunction energy to orbital rotations.
+<p>Stability analysis <span class="bibtex-citation" id="id1">[<a class="reference internal" href="../../../references.html#id43" title="H. B. Schlegel and J. J. W. McDouall. Do you have SCF stability and convergence problems?, pages 167–185. Springer Netherlands, Dordrecht, 1991. URL: https://doi.org/10.1007/978-94-011-3262-6_2, doi:10.1007/978-94-011-3262-6_2.">SM91</a>]</span> examines the second-order response of the wavefunction energy to orbital rotations.
 Mathematically, this involves computing the eigenvalues of the electronic Hessian matrix.
 A stable wavefunction should have all positive (or non-negative) eigenvalues, indicating that the energy cannot be lowered by any orbital rotation.
 Negative eigenvalues signal instabilities and identify directions in which the energy can decrease.</p>
@@ -717,7 +723,7 @@ This eigenvector can be used with the <a class="reference internal" href="../../
 <li><p>The above examples can be downloaded as a complete <a class="reference external" href="../../../_static/examples/python/stability_checker_workflow.py">Python</a> script or <a class="reference external" href="../../../_static/examples/cpp/stability_checker_workflow.cpp">C++</a> source file.</p></li>
 <li><p><a class="reference internal" href="settings.html"><span class="doc">Settings</span></a>: Configuration settings for algorithms</p></li>
 <li><p><a class="reference internal" href="factory_pattern.html"><span class="doc">Factory Pattern</span></a>: Understanding algorithm creation</p></li>
-<li><p><span class="bibtex-citation" id="id3">[<a class="reference internal" href="../../../references.html#id40" title="H. B. Schlegel and J. J. W. McDouall. Do you have SCF stability and convergence problems?, pages 167–185. Springer Netherlands, Dordrecht, 1991. URL: https://doi.org/10.1007/978-94-011-3262-6_2, doi:10.1007/978-94-011-3262-6_2.">SM91</a>]</span>: Original reference for stability analysis in quantum chemistry</p></li>
+<li><p><span class="bibtex-citation" id="id3">[<a class="reference internal" href="../../../references.html#id43" title="H. B. Schlegel and J. J. W. McDouall. Do you have SCF stability and convergence problems?, pages 167–185. Springer Netherlands, Dordrecht, 1991. URL: https://doi.org/10.1007/978-94-011-3262-6_2, doi:10.1007/978-94-011-3262-6_2.">SM91</a>]</span>: Original reference for stability analysis in quantum chemistry</p></li>
 </ul>
 </section>
 </section>

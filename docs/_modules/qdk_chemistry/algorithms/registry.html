@@ -5,18 +5,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.algorithms.registry &mdash; qdk-chemistry 2.0.0 documentation</title>
+  <title>qdk_chemistry.algorithms.registry &mdash; qdk-chemistry 2.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=78acbc13" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -52,6 +52,10 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/index.html">Tutorials</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -323,7 +327,9 @@
 <span class="c1"># Deprecated algorithm-type keys mapped to their current names. Accessing a</span>
 <span class="c1"># deprecated key still works but emits a DeprecationWarning.</span>
 <span class="n">_DEPRECATED_TYPE_ALIASES</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;controlled_evolution_circuit_mapper&quot;</span><span class="p">:</span> <span class="s2">&quot;controlled_circuit_mapper&quot;</span><span class="p">,</span>
     <span class="s2">&quot;energy_estimator&quot;</span><span class="p">:</span> <span class="s2">&quot;expectation_estimator&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;time_evolution_builder&quot;</span><span class="p">:</span> <span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span>
 <span class="p">}</span>
 
 
@@ -797,6 +803,8 @@
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry._core._algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
         <span class="n">ActiveSpaceSelectorFactory</span><span class="p">,</span>
         <span class="n">DynamicalCorrelationCalculatorFactory</span><span class="p">,</span>
+        <span class="n">EffectiveHamiltonianConstructorFactory</span><span class="p">,</span>
+        <span class="n">GeometryOptimizerFactory</span><span class="p">,</span>
         <span class="n">HamiltonianConstructorFactory</span><span class="p">,</span>
         <span class="n">LocalizerFactory</span><span class="p">,</span>
         <span class="n">MultiConfigurationCalculatorFactory</span><span class="p">,</span>
@@ -808,6 +816,7 @@
     <span class="p">)</span>
 
     <span class="n">register_factory</span><span class="p">(</span><span class="n">ActiveSpaceSelectorFactory</span><span class="p">)</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">EffectiveHamiltonianConstructorFactory</span><span class="p">)</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">HamiltonianConstructorFactory</span><span class="p">)</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">LocalizerFactory</span><span class="p">)</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">MultiConfigurationCalculatorFactory</span><span class="p">)</span>
@@ -815,6 +824,7 @@
     <span class="n">register_factory</span><span class="p">(</span><span class="n">NuclearDerivativeCalculatorFactory</span><span class="p">)</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">ProjectedMultiConfigurationCalculatorFactory</span><span class="p">)</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">DynamicalCorrelationCalculatorFactory</span><span class="p">)</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">GeometryOptimizerFactory</span><span class="p">)</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">ScfSolverFactory</span><span class="p">)</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">StabilityCheckerFactory</span><span class="p">)</span>
 
@@ -830,6 +840,7 @@
 <span class="sd">    This function is automatically called during module import and should not</span>
 <span class="sd">    be called by users.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.amplitude_amplification</span><span class="w"> </span><span class="kn">import</span> <span class="n">AmplitudeAmplificationFactory</span>  <span class="c1"># noqa: PLC0415</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.circuit_executor</span><span class="w"> </span><span class="kn">import</span> <span class="n">CircuitExecutorFactory</span>  <span class="c1"># noqa: PLC0415</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.circuit_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">CircuitMapperFactory</span>  <span class="c1"># noqa: PLC0415</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.controlled_circuit_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
@@ -871,6 +882,7 @@
     <span class="n">register_factory</span><span class="p">(</span><span class="n">HadamardTestFactory</span><span class="p">())</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">HadamardTestCircuitBuilderFactory</span><span class="p">())</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">PropagatorFactory</span><span class="p">())</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">AmplitudeAmplificationFactory</span><span class="p">())</span>
 
 
 <span class="n">_</span> <span class="o">=</span> <span class="n">_register_cpp_factories</span><span class="p">()</span>
@@ -922,6 +934,9 @@
 <span class="sd">    This function is automatically called during module import and should not</span>
 <span class="sd">    be called by users.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.amplitude_amplification</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
+        <span class="n">AmplitudeAmplification</span><span class="p">,</span>
+    <span class="p">)</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.circuit_executor.qdk</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
         <span class="n">QdkFullStateSimulator</span><span class="p">,</span>
         <span class="n">QdkSparseStateSimulator</span><span class="p">,</span>
@@ -1002,6 +1017,7 @@
     <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">HadamardTest</span><span class="p">())</span>
     <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">QdkHadamardTestCircuitBuilder</span><span class="p">())</span>
     <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">StandardPhaseEstimation</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">AmplitudeAmplification</span><span class="p">())</span>
 
 
 <span class="n">_register_python_algorithms</span><span class="p">()</span>

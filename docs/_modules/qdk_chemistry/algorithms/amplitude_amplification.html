@@ -1,0 +1,443 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.algorithms.amplitude_amplification &mdash; qdk-chemistry 2.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=78acbc13" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/index.html">Tutorials</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.algorithms.amplitude_amplification</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.algorithms.amplitude_amplification</h1><div class="highlight"><pre>
+<span></span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;QDK/Chemistry amplitude amplification.&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">operator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">Algorithm</span><span class="p">,</span> <span class="n">AlgorithmFactory</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Circuit</span><span class="p">,</span> <span class="n">QubitOperator</span><span class="p">,</span> <span class="n">Settings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.circuit</span><span class="w"> </span><span class="kn">import</span> <span class="n">QsharpFactoryData</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.qsharp</span><span class="w"> </span><span class="kn">import</span> <span class="n">QSHARP_UTILS</span>
+
+<span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;AmplitudeAmplification&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;AmplitudeAmplificationFactory&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;AmplitudeAmplificationSettings&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;phase_marking_oracle&quot;</span><span class="p">,</span>
+<span class="p">]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_merge_bin_ranges</span><span class="p">(</span><span class="n">ranges</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Merge half-open bin ranges into a sorted, pairwise-disjoint list, dropping empty ones.&quot;&quot;&quot;</span>
+    <span class="n">merged</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">start</span><span class="p">,</span> <span class="n">stop</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">bin_range</span> <span class="k">for</span> <span class="n">bin_range</span> <span class="ow">in</span> <span class="n">ranges</span> <span class="k">if</span> <span class="n">bin_range</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">bin_range</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+        <span class="k">if</span> <span class="n">merged</span> <span class="ow">and</span> <span class="n">start</span> <span class="o">&lt;=</span> <span class="n">merged</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]:</span>
+            <span class="n">merged</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">merged</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="nb">max</span><span class="p">(</span><span class="n">merged</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span> <span class="n">stop</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">merged</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">start</span><span class="p">,</span> <span class="n">stop</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">merged</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_phase_bins_from_energy_range</span><span class="p">(</span>
+    <span class="n">target_energy_range</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span>
+    <span class="n">normalization</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="n">num_phase_qubits</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Convert an energy window into the phase bins a qubitization walk maps it to.</span>
+
+<span class="sd">    A qubitization walk on a block encoding of :math:`H/\lambda` has eigenvalues</span>
+<span class="sd">    :math:`e^{\pm i\arccos(E/\lambda)}`, the inverse of</span>
+<span class="sd">    :meth:`~qdk_chemistry.data.unitary_representation.containers.quantum_walk.QuantumWalkContainer.eigenvalue_from_phase`.</span>
+<span class="sd">    Both signs occur, so one energy lands in two mirrored bins and both must be marked.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">low_energy</span><span class="p">,</span> <span class="n">high_energy</span> <span class="o">=</span> <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">bound</span><span class="p">)</span> <span class="k">for</span> <span class="n">bound</span> <span class="ow">in</span> <span class="n">target_energy_range</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">)</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;target_energy_range must be a (low, high) tuple of floats.&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">error</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">low_energy</span> <span class="o">&lt;</span> <span class="n">high_energy</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;target_energy_range must satisfy low &lt; high. Got </span><span class="si">{</span><span class="n">target_energy_range</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">normalization</span> <span class="o">&gt;</span> <span class="mf">0.0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;normalization must be positive. Got </span><span class="si">{</span><span class="n">normalization</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+
+    <span class="c1"># arccos is decreasing, so the higher energy gives the lower phase.</span>
+    <span class="n">lower_phase</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">acos</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="n">high_energy</span> <span class="o">/</span> <span class="n">normalization</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.0</span><span class="p">),</span> <span class="mf">1.0</span><span class="p">))</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">math</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span>
+    <span class="n">upper_phase</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">acos</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="n">low_energy</span> <span class="o">/</span> <span class="n">normalization</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.0</span><span class="p">),</span> <span class="mf">1.0</span><span class="p">))</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">math</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span>
+
+    <span class="n">phase_bin_count</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">num_phase_qubits</span>
+    <span class="n">start</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">lower_phase</span> <span class="o">*</span> <span class="n">phase_bin_count</span><span class="p">),</span> <span class="n">phase_bin_count</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">stop</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">upper_phase</span> <span class="o">*</span> <span class="n">phase_bin_count</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">phase_bin_count</span><span class="p">)</span>
+    <span class="c1"># The mirrored branch sits at bin -&gt; phase_bin_count - bin.</span>
+    <span class="n">mirrored</span> <span class="o">=</span> <span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="n">phase_bin_count</span> <span class="o">-</span> <span class="n">stop</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="nb">min</span><span class="p">(</span><span class="n">phase_bin_count</span> <span class="o">-</span> <span class="n">start</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">phase_bin_count</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">_merge_bin_ranges</span><span class="p">([(</span><span class="n">start</span><span class="p">,</span> <span class="n">stop</span><span class="p">),</span> <span class="n">mirrored</span><span class="p">])</span>
+
+
+<div class="viewcode-block" id="phase_marking_oracle">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.amplitude_amplification.html#qdk_chemistry.algorithms.amplitude_amplification.phase_marking_oracle">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">phase_marking_oracle</span><span class="p">(</span>
+    <span class="n">qpe_circuit</span><span class="p">:</span> <span class="n">Circuit</span><span class="p">,</span>
+    <span class="n">target_phase_bins</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">target_energy_range</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">QubitOperator</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Circuit</span><span class="p">:</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Build a good state oracle marking a range of phase bins of a QPE circuit.</span>
+
+<span class="sd">    A QPE circuit with :math:`n` phase qubits writes the phase :math:`\varphi` of the</span>
+<span class="sd">    eigenvalue :math:`e^{2\pi i\varphi}` into the bin :math:`\lfloor 2^n\varphi\rceil`, so a</span>
+<span class="sd">    target eigenvalue is selected by the bin its phase falls in. Bins are marked over the</span>
+<span class="sd">    half-open interval ``(start, stop)``.</span>
+
+<span class="sd">    The target can be given as an energy window instead, which only makes sense for a QPE</span>
+<span class="sd">    circuit built on a qubitization walk: its eigenvalues are</span>
+<span class="sd">    :math:`e^{\pm i\arccos(E/\lambda)}`, where :math:`\lambda` is the L1 norm of the</span>
+<span class="sd">    Hamiltonian, so the window is converted with :math:`\varphi = \arccos(E/\lambda)/2\pi`.</span>
+<span class="sd">    Both signs occur, so an energy is marked in two mirrored bins. Any other encoding, a</span>
+<span class="sd">    Trotter step for instance, follows a different law and has to use ``target_phase_bins``.</span>
+<span class="sd">    Energy bounds are clipped to the representable range :math:`[-\lambda, \lambda]`, so</span>
+<span class="sd">    passing an infinite bound gives a one-sided threshold.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        qpe_circuit: The measurement-free QPE circuit whose phase register is marked.</span>
+<span class="sd">        target_phase_bins: Half-open phase-bin interval ``(start, stop)`` to mark.</span>
+<span class="sd">        target_energy_range: Half-open energy window ``(low, high)``, an alternative to ``target_phase_bins``.</span>
+<span class="sd">        qubit_hamiltonian: The Hamiltonian the QPE circuit estimates, supplying :math:`\lambda`.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A circuit for use as the ``good_state_oracle`` of :class:`AmplitudeAmplification`.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If the target range is invalid or the circuit is not a standard QPE circuit.</span>
+<span class="sd">        TypeError: If the range endpoints are not the expected type.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">factory</span> <span class="o">=</span> <span class="n">qpe_circuit</span><span class="o">.</span><span class="n">_qsharp_factory</span>  <span class="c1"># noqa: SLF001</span>
+    <span class="n">parameters</span> <span class="o">=</span> <span class="n">factory</span><span class="o">.</span><span class="n">parameter</span> <span class="k">if</span> <span class="n">factory</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">parameters</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="p">{</span><span class="s2">&quot;numBits&quot;</span><span class="p">,</span> <span class="s2">&quot;systems&quot;</span><span class="p">,</span> <span class="s2">&quot;numAncillaQubits&quot;</span><span class="p">}</span> <span class="o">&lt;=</span> <span class="n">parameters</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;qpe_circuit must be a standard QPE circuit built by the qdk_standard builder.&quot;</span><span class="p">)</span>
+
+    <span class="n">num_phase_qubits</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;numBits&quot;</span><span class="p">]</span>
+    <span class="n">num_system_qubits</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;systems&quot;</span><span class="p">])</span>
+    <span class="n">num_ancilla_qubits</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;numAncillaQubits&quot;</span><span class="p">]</span>
+    <span class="n">phase_bin_count</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">num_phase_qubits</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">target_phase_bins</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span> <span class="o">==</span> <span class="p">(</span><span class="n">target_energy_range</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Pass exactly one of target_phase_bins or target_energy_range.&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">target_energy_range</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">qubit_hamiltonian</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;target_energy_range requires qubit_hamiltonian to supply the L1 norm.&quot;</span><span class="p">)</span>
+        <span class="n">bin_ranges</span> <span class="o">=</span> <span class="n">_phase_bins_from_energy_range</span><span class="p">(</span>
+            <span class="n">target_energy_range</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">schatten_norm</span><span class="p">,</span> <span class="n">num_phase_qubits</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">start</span><span class="p">,</span> <span class="n">stop</span> <span class="o">=</span> <span class="n">target_phase_bins</span>  <span class="c1"># type: ignore[misc]</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">)</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;target_phase_bins must be a (start, stop) tuple.&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">error</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">lower_bound</span> <span class="o">=</span> <span class="n">operator</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">start</span><span class="p">)</span>
+            <span class="n">upper_bound</span> <span class="o">=</span> <span class="n">operator</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">stop</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">TypeError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;target_phase_bins endpoints must be integers.&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">error</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">lower_bound</span> <span class="o">&lt;</span> <span class="n">upper_bound</span> <span class="o">&lt;=</span> <span class="n">phase_bin_count</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;target_phase_bins must satisfy 0 &lt;= start &lt; stop &lt;= </span><span class="si">{</span><span class="n">phase_bin_count</span><span class="si">}</span><span class="s2">. Got </span><span class="si">{</span><span class="n">target_phase_bins</span><span class="si">}</span><span class="s2">.&quot;</span>
+            <span class="p">)</span>
+        <span class="n">bin_ranges</span> <span class="o">=</span> <span class="p">[(</span><span class="n">lower_bound</span><span class="p">,</span> <span class="n">upper_bound</span><span class="p">)]</span>
+
+    <span class="n">ancilla_indices</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">num_system_qubits</span><span class="p">,</span> <span class="n">num_system_qubits</span> <span class="o">+</span> <span class="n">num_ancilla_qubits</span><span class="p">))</span>
+    <span class="n">lower_bounds</span> <span class="o">=</span> <span class="p">[</span><span class="n">start</span> <span class="k">for</span> <span class="n">start</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">bin_ranges</span><span class="p">]</span>
+    <span class="n">upper_bounds</span> <span class="o">=</span> <span class="p">[</span><span class="n">stop</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">stop</span> <span class="ow">in</span> <span class="n">bin_ranges</span><span class="p">]</span>
+    <span class="n">parameters</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;numPhaseQubits&quot;</span><span class="p">:</span> <span class="n">num_phase_qubits</span><span class="p">,</span>
+        <span class="s2">&quot;signalAncillaIndices&quot;</span><span class="p">:</span> <span class="n">ancilla_indices</span><span class="p">,</span>
+        <span class="s2">&quot;lowerBounds&quot;</span><span class="p">:</span> <span class="n">lower_bounds</span><span class="p">,</span>
+        <span class="s2">&quot;upperBounds&quot;</span><span class="p">:</span> <span class="n">upper_bounds</span><span class="p">,</span>
+        <span class="s2">&quot;numQubits&quot;</span><span class="p">:</span> <span class="n">num_phase_qubits</span> <span class="o">+</span> <span class="n">num_system_qubits</span> <span class="o">+</span> <span class="n">num_ancilla_qubits</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="n">amplification</span> <span class="o">=</span> <span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">AmplitudeAmplification</span>
+    <span class="n">operation</span> <span class="o">=</span> <span class="n">amplification</span><span class="o">.</span><span class="n">MarkTargetStateOp</span><span class="p">(</span><span class="n">num_phase_qubits</span><span class="p">,</span> <span class="n">ancilla_indices</span><span class="p">,</span> <span class="n">lower_bounds</span><span class="p">,</span> <span class="n">upper_bounds</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">Circuit</span><span class="p">(</span>
+        <span class="n">qsharp_factory</span><span class="o">=</span><span class="n">QsharpFactoryData</span><span class="p">(</span><span class="n">program</span><span class="o">=</span><span class="n">amplification</span><span class="o">.</span><span class="n">MakeMarkedPhaseCircuit</span><span class="p">,</span> <span class="n">parameter</span><span class="o">=</span><span class="n">parameters</span><span class="p">),</span>
+        <span class="n">qsharp_op</span><span class="o">=</span><span class="n">operation</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="AmplitudeAmplificationSettings">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.amplitude_amplification.html#qdk_chemistry.algorithms.amplitude_amplification.AmplitudeAmplificationSettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">AmplitudeAmplificationSettings</span><span class="p">(</span><span class="n">Settings</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Settings for amplitude amplification.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="AmplitudeAmplificationSettings.__init__">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.amplitude_amplification.html#qdk_chemistry.algorithms.amplitude_amplification.AmplitudeAmplificationSettings.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the settings for amplitude amplification.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;rounds&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;int&quot;</span><span class="p">,</span>
+            <span class="mi">1</span><span class="p">,</span>
+            <span class="s2">&quot;Number of Grover amplitude amplification rounds.&quot;</span><span class="p">,</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="AmplitudeAmplification">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.amplitude_amplification.html#qdk_chemistry.algorithms.amplitude_amplification.AmplitudeAmplification">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">AmplitudeAmplification</span><span class="p">(</span><span class="n">Algorithm</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Build an amplitude-amplified circuit.</span>
+
+<span class="sd">    Amplitude amplification raises the probability of measuring a state in a chosen</span>
+<span class="sd">    &quot;good&quot; subspace. Given a state preparation :math:`U` with</span>
+<span class="sd">    :math:`|\psi\rangle = U|0\rangle` and an oracle that flips a flag qubit on the good</span>
+<span class="sd">    subspace, one round applies the Grover iterate</span>
+<span class="sd">    :math:`Q = -(2|\psi\rangle\langle\psi| - I)(I - 2\Pi_G)`, a rotation by</span>
+<span class="sd">    :math:`2\vartheta` in the plane spanned by the good and bad components. If the good</span>
+<span class="sd">    subspace initially carries probability :math:`a = \sin^2\vartheta`, then after</span>
+<span class="sd">    :math:`k` rounds it carries</span>
+
+<span class="sd">    .. math::</span>
+
+<span class="sd">        p_k = \sin^2\!\big((2k+1)\arcsin\sqrt{a}\big),</span>
+
+<span class="sd">    so :math:`O(1/\sqrt{a})` rounds suffice where direct sampling would need</span>
+<span class="sd">    :math:`O(1/a)` shots. More rounds are not always better: past the first maximum near</span>
+<span class="sd">    :math:`k \approx \pi/(4\arcsin\sqrt{a})` the success probability falls again, so pick</span>
+<span class="sd">    ``rounds`` from an estimate of :math:`a`.</span>
+
+<span class="sd">    Reference: L. Lin, *Lecture Notes on Quantum Algorithms for Scientific Computation*,</span>
+<span class="sd">    arXiv:2201.08309, Chapter 2.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="AmplitudeAmplification.__init__">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.amplitude_amplification.html#qdk_chemistry.algorithms.amplitude_amplification.AmplitudeAmplification.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize amplitude amplification.&quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">AmplitudeAmplificationSettings</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="AmplitudeAmplification.type_name">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.amplitude_amplification.html#qdk_chemistry.algorithms.amplitude_amplification.AmplitudeAmplification.type_name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the algorithm type name as amplitude_amplification.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;amplitude_amplification&quot;</span></div>
+
+
+<div class="viewcode-block" id="AmplitudeAmplification.name">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.amplitude_amplification.html#qdk_chemistry.algorithms.amplitude_amplification.AmplitudeAmplification.name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the algorithm name as qdk_base.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;qdk_base&quot;</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">state_prep_oracle</span><span class="p">:</span> <span class="n">Circuit</span><span class="p">,</span>
+        <span class="n">good_state_oracle</span><span class="p">:</span> <span class="n">Circuit</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Circuit</span><span class="p">:</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Build an amplitude-amplified circuit.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state_prep_oracle: Prepares the initial state. Must carry an adjointable Q# operation.</span>
+<span class="sd">            good_state_oracle: Flips a flag qubit on the good subspace. Must carry an adjointable Q# operation.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            The amplified circuit, measuring the whole register. Its ``qsharp_op`` is the same</span>
+<span class="sd">            amplification without measurement, for callers that append their own.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If either circuit carries no adjointable Q# operation.</span>
+<span class="sd">            ValueError: If the ``rounds`` setting is negative.</span>
+<span class="sd">            RuntimeError: If the state preparation cannot be resource estimated for its width.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="n">operation</span> <span class="o">=</span> <span class="n">state_prep_oracle</span><span class="o">.</span><span class="n">_qsharp_op</span>  <span class="c1"># noqa: SLF001</span>
+        <span class="k">if</span> <span class="n">operation</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Amplitude amplification requires a state prep oracle qsharp operation.&quot;</span><span class="p">)</span>
+        <span class="n">good_state_operation</span> <span class="o">=</span> <span class="n">good_state_oracle</span><span class="o">.</span><span class="n">_qsharp_op</span>  <span class="c1"># noqa: SLF001</span>
+        <span class="k">if</span> <span class="n">good_state_operation</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Amplitude amplification requires a good state oracle qsharp operation.&quot;</span><span class="p">)</span>
+
+        <span class="c1"># A Q# callable carries no arity, so the register width is taken from a resource</span>
+        <span class="c1"># estimate of the state preparation.</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">num_qubits</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">state_prep_oracle</span><span class="o">.</span><span class="n">estimate</span><span class="p">()</span><span class="o">.</span><span class="n">logical_counts</span><span class="p">[</span><span class="s2">&quot;numQubits&quot;</span><span class="p">])</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="s2">&quot;Could not read the register width from a resource estimate of the state prep oracle.&quot;</span>
+            <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">error</span>
+
+        <span class="n">rounds</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;rounds&quot;</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">rounds</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;rounds must be nonnegative. Got </span><span class="si">{</span><span class="n">rounds</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+        <span class="n">amplification</span> <span class="o">=</span> <span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">AmplitudeAmplification</span>
+        <span class="n">parameters</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;statePrepOracle&quot;</span><span class="p">:</span> <span class="n">operation</span><span class="p">,</span>
+            <span class="s2">&quot;goodStateOracle&quot;</span><span class="p">:</span> <span class="n">good_state_operation</span><span class="p">,</span>
+            <span class="s2">&quot;rounds&quot;</span><span class="p">:</span> <span class="n">rounds</span><span class="p">,</span>
+            <span class="s2">&quot;numQubits&quot;</span><span class="p">:</span> <span class="n">num_qubits</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Amplified circuit uses </span><span class="si">{</span><span class="mi">2</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">rounds</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2"> state preparations.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Circuit</span><span class="p">(</span>
+            <span class="n">qsharp_factory</span><span class="o">=</span><span class="n">QsharpFactoryData</span><span class="p">(</span><span class="n">program</span><span class="o">=</span><span class="n">amplification</span><span class="o">.</span><span class="n">MakeAmplifiedCircuit</span><span class="p">,</span> <span class="n">parameter</span><span class="o">=</span><span class="n">parameters</span><span class="p">),</span>
+            <span class="n">qsharp_op</span><span class="o">=</span><span class="n">amplification</span><span class="o">.</span><span class="n">MakeAmplifiedStateOp</span><span class="p">(</span><span class="n">operation</span><span class="p">,</span> <span class="n">good_state_operation</span><span class="p">,</span> <span class="n">rounds</span><span class="p">),</span>
+        <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="AmplitudeAmplificationFactory">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.amplitude_amplification.html#qdk_chemistry.algorithms.amplitude_amplification.AmplitudeAmplificationFactory">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">AmplitudeAmplificationFactory</span><span class="p">(</span><span class="n">AlgorithmFactory</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Factory class for creating AmplitudeAmplification instances.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="AmplitudeAmplificationFactory.__init__">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.amplitude_amplification.html#qdk_chemistry.algorithms.amplitude_amplification.AmplitudeAmplificationFactory.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the AmplitudeAmplificationFactory.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="AmplitudeAmplificationFactory.algorithm_type_name">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.amplitude_amplification.html#qdk_chemistry.algorithms.amplitude_amplification.AmplitudeAmplificationFactory.algorithm_type_name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">algorithm_type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the algorithm type name as amplitude_amplification.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;amplitude_amplification&quot;</span></div>
+
+
+<div class="viewcode-block" id="AmplitudeAmplificationFactory.default_algorithm_name">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.amplitude_amplification.html#qdk_chemistry.algorithms.amplitude_amplification.AmplitudeAmplificationFactory.default_algorithm_name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">default_algorithm_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return qdk_base as the default algorithm name.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;qdk_base&quot;</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

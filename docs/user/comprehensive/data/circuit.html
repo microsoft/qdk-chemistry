@@ -6,18 +6,18 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Circuit &mdash; qdk-chemistry 2.0.0 documentation</title>
+  <title>Circuit &mdash; qdk-chemistry 2.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=78acbc13" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -72,6 +72,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#worked-example">Worked example</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#q-factory-harness">Q# factory harness</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#shared-q-context">Shared Q# context</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#conversion-methods">Conversion methods</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#properties">Properties</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#serialization">Serialization</a></li>
@@ -90,6 +91,10 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/index.html">Tutorials</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -286,6 +291,124 @@ These are Python-native values — lists, ints, floats, nested dicts, or even ot
 </div>
 <p>This pattern is what enables end-to-end Q# composition: because the factory stores Q# callables rather than serialized gate sequences, multi-stage circuits compose natively in the Q# runtime without intermediate format conversions.</p>
 </section>
+<section id="shared-q-context">
+<span id="shared-qsharp-context"></span><h2>Shared Q# context<a class="headerlink" href="#shared-q-context" title="Link to this heading"></a></h2>
+<p>QDK enforces that Q# operations composed together belong to the <strong>same</strong> <code class="docutils literal notranslate"><span class="pre">qdk.Context</span></code>.
+Composing a callable from one context into a program owned by another raises <code class="docutils literal notranslate"><span class="pre">QSharpError</span></code>.</p>
+<p>Three scenarios cover how users interact with this:</p>
+<p><strong>Using QDK/Chemistry algorithms only.</strong>
+You never touch the Q# context. Every circuit the library builds is created against one internal
+shared context, so everything composes automatically.</p>
+<p><strong>Bringing your own Q# operation.</strong>
+When you define your own Q# program (for example, a custom <code class="docutils literal notranslate"><span class="pre">BellState</span></code> state preparation) and want
+to compose it with a chemistry builder such as QPE, it must be built against that same shared
+context. Obtain the context with <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.utils.qsharp.html#qdk_chemistry.utils.qsharp.get_qsharp_context" title="qdk_chemistry.utils.qsharp.get_qsharp_context"><code class="xref py py-func docutils literal notranslate"><span class="pre">get_qsharp_context()</span></code></a>, define your
+operation on it, and pass the resulting callable to the builder.</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">AlgorithmRef</span><span class="p">,</span> <span class="n">Circuit</span><span class="p">,</span> <span class="n">QubitOperator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.circuit</span><span class="w"> </span><span class="kn">import</span> <span class="n">QsharpFactoryData</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.qsharp</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_qsharp_context</span>
+
+<span class="c1"># get_qsharp_context() returns the context QDK/Chemistry uses internally. Define your</span>
+<span class="c1"># own Q# operation against it so it composes with the chemistry builders.</span>
+<span class="n">context</span> <span class="o">=</span> <span class="n">get_qsharp_context</span><span class="p">()</span>
+<span class="n">context</span><span class="o">.</span><span class="n">eval</span><span class="p">(</span>
+    <span class="s2">&quot;operation BellState(qs : Qubit[]) : Unit is Adj + Ctl { H(qs[0]); CNOT(qs[0], qs[1]); }&quot;</span>
+<span class="p">)</span>
+<span class="n">bell_state</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">eval</span><span class="p">(</span><span class="s2">&quot;BellState&quot;</span><span class="p">)</span>
+<span class="n">custom_state_prep</span> <span class="o">=</span> <span class="n">Circuit</span><span class="p">(</span>
+    <span class="n">qsharp_op</span><span class="o">=</span><span class="n">bell_state</span><span class="p">,</span>
+    <span class="n">qsharp_factory</span><span class="o">=</span><span class="n">QsharpFactoryData</span><span class="p">(</span><span class="n">program</span><span class="o">=</span><span class="n">bell_state</span><span class="p">,</span> <span class="n">parameter</span><span class="o">=</span><span class="p">{}),</span>
+<span class="p">)</span>
+
+<span class="c1"># Feed the user-defined state prep straight into the standard QPE builder.</span>
+<span class="n">builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qpe_circuit_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_standard&quot;</span><span class="p">,</span> <span class="n">num_bits</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">builder</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
+    <span class="s2">&quot;controlled_circuit_mapper&quot;</span><span class="p">,</span>
+    <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;controlled_circuit_mapper&quot;</span><span class="p">,</span> <span class="s2">&quot;pauli_sequence&quot;</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="n">builder</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
+    <span class="s2">&quot;unitary_builder&quot;</span><span class="p">,</span> <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;trotter&quot;</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+<span class="p">)</span>
+<span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">QubitOperator</span><span class="p">(</span><span class="n">pauli_strings</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;XX&quot;</span><span class="p">,</span> <span class="s2">&quot;ZZ&quot;</span><span class="p">],</span> <span class="n">coefficients</span><span class="o">=</span><span class="p">[</span><span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">])</span>
+<span class="n">qpe_circuit</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">state_preparation</span><span class="o">=</span><span class="n">custom_state_prep</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="o">=</span><span class="n">hamiltonian</span>
+<span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">qpe_circuit</span><span class="o">.</span><span class="n">get_qsharp_circuit</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p><strong>Bringing your own Q# context.</strong>
+If you want to change the target profile — or any other <code class="docutils literal notranslate"><span class="pre">qdk.Context</span></code> option — build a context with
+<a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.utils.qsharp.html#qdk_chemistry.utils.qsharp.create_qsharp_context" title="qdk_chemistry.utils.qsharp.create_qsharp_context"><code class="xref py py-func docutils literal notranslate"><span class="pre">create_qsharp_context()</span></code></a> (it keeps the chemistry utilities loaded on
+the project root), then make the library use it: <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.utils.qsharp.html#qdk_chemistry.utils.qsharp.set_qsharp_context" title="qdk_chemistry.utils.qsharp.set_qsharp_context"><code class="xref py py-func docutils literal notranslate"><span class="pre">set_qsharp_context()</span></code></a>
+installs it process-wide (pass <code class="docutils literal notranslate"><span class="pre">None</span></code> to restore the default), while
+<a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.utils.qsharp.html#qdk_chemistry.utils.qsharp.use_qsharp_context" title="qdk_chemistry.utils.qsharp.use_qsharp_context"><code class="xref py py-func docutils literal notranslate"><span class="pre">use_qsharp_context()</span></code></a> switches to it temporarily on the current
+thread and restores it automatically on exit.</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk</span><span class="w"> </span><span class="kn">import</span> <span class="n">TargetProfile</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.qsharp</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">create_qsharp_context</span><span class="p">,</span>
+    <span class="n">get_qsharp_context</span><span class="p">,</span>
+    <span class="n">use_qsharp_context</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># create_qsharp_context forwards target_profile (and any other qdk.Context kwargs)</span>
+<span class="c1"># while keeping the Q# chemistry utilities loaded on the project root.</span>
+<span class="n">custom_context</span> <span class="o">=</span> <span class="n">create_qsharp_context</span><span class="p">(</span><span class="n">target_profile</span><span class="o">=</span><span class="n">TargetProfile</span><span class="o">.</span><span class="n">Adaptive_RIF</span><span class="p">)</span>
+
+<span class="c1"># use_qsharp_context temporarily makes it the shared context on this thread, so the</span>
+<span class="c1"># chemistry utilities and your own operations both resolve against it inside the block.</span>
+<span class="k">with</span> <span class="n">use_qsharp_context</span><span class="p">(</span><span class="n">custom_context</span><span class="p">):</span>
+    <span class="n">context</span> <span class="o">=</span> <span class="n">get_qsharp_context</span><span class="p">()</span>  <span class="c1"># -&gt; custom_context</span>
+    <span class="n">context</span><span class="o">.</span><span class="n">eval</span><span class="p">(</span>
+        <span class="s2">&quot;operation BellState(qs : Qubit[]) : Unit is Adj + Ctl { H(qs[0]); CNOT(qs[0], qs[1]); }&quot;</span>
+    <span class="p">)</span>
+    <span class="n">bell_state</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">eval</span><span class="p">(</span><span class="s2">&quot;BellState&quot;</span><span class="p">)</span>
+    <span class="n">custom_state_prep</span> <span class="o">=</span> <span class="n">Circuit</span><span class="p">(</span>
+        <span class="n">qsharp_op</span><span class="o">=</span><span class="n">bell_state</span><span class="p">,</span>
+        <span class="n">qsharp_factory</span><span class="o">=</span><span class="n">QsharpFactoryData</span><span class="p">(</span><span class="n">program</span><span class="o">=</span><span class="n">bell_state</span><span class="p">,</span> <span class="n">parameter</span><span class="o">=</span><span class="p">{}),</span>
+    <span class="p">)</span>
+    <span class="n">builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qpe_circuit_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_standard&quot;</span><span class="p">,</span> <span class="n">num_bits</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">builder</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
+        <span class="s2">&quot;controlled_circuit_mapper&quot;</span><span class="p">,</span>
+        <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;controlled_circuit_mapper&quot;</span><span class="p">,</span> <span class="s2">&quot;pauli_sequence&quot;</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">builder</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
+        <span class="s2">&quot;unitary_builder&quot;</span><span class="p">,</span>
+        <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;trotter&quot;</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">QubitOperator</span><span class="p">(</span><span class="n">pauli_strings</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;XX&quot;</span><span class="p">,</span> <span class="s2">&quot;ZZ&quot;</span><span class="p">],</span> <span class="n">coefficients</span><span class="o">=</span><span class="p">[</span><span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">])</span>
+    <span class="n">qpe_circuit</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+        <span class="n">state_preparation</span><span class="o">=</span><span class="n">custom_state_prep</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="o">=</span><span class="n">hamiltonian</span>
+    <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">qpe_circuit</span><span class="o">.</span><span class="n">get_qsharp_circuit</span><span class="p">()</span>
+
+<span class="c1"># For a permanent, process-wide switch use set_qsharp_context(custom_context) instead,</span>
+<span class="c1"># and set_qsharp_context(None) to restore the default.</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>The four helpers in <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.utils.qsharp.html#module-qdk_chemistry.utils.qsharp" title="qdk_chemistry.utils.qsharp"><code class="xref py py-mod docutils literal notranslate"><span class="pre">qdk_chemistry.utils.qsharp</span></code></a> that manage this are:</p>
+<dl class="simple">
+<dt><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.utils.qsharp.html#qdk_chemistry.utils.qsharp.get_qsharp_context" title="qdk_chemistry.utils.qsharp.get_qsharp_context"><code class="xref py py-func docutils literal notranslate"><span class="pre">get_qsharp_context()</span></code></a></dt><dd><p>Returns the shared context that owns <code class="docutils literal notranslate"><span class="pre">QSHARP_UTILS</span></code>. Build your own operations against it so they
+compose with the chemistry builders.</p>
+</dd>
+<dt><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.utils.qsharp.html#qdk_chemistry.utils.qsharp.create_qsharp_context" title="qdk_chemistry.utils.qsharp.create_qsharp_context"><code class="xref py py-func docutils literal notranslate"><span class="pre">create_qsharp_context()</span></code></a></dt><dd><p>Creates a fresh context preloaded with the chemistry utilities. Forwards <code class="docutils literal notranslate"><span class="pre">target_profile</span></code> and any
+other <code class="docutils literal notranslate"><span class="pre">qdk.Context</span></code> keyword arguments; use it when you need a non-default configuration.</p>
+</dd>
+<dt><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.utils.qsharp.html#qdk_chemistry.utils.qsharp.set_qsharp_context" title="qdk_chemistry.utils.qsharp.set_qsharp_context"><code class="xref py py-func docutils literal notranslate"><span class="pre">set_qsharp_context()</span></code></a></dt><dd><p>Installs a caller-supplied context process-wide. Pass <code class="docutils literal notranslate"><span class="pre">None</span></code> to reset to the default context.</p>
+</dd>
+<dt><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.utils.qsharp.html#qdk_chemistry.utils.qsharp.use_qsharp_context" title="qdk_chemistry.utils.qsharp.use_qsharp_context"><code class="xref py py-func docutils literal notranslate"><span class="pre">use_qsharp_context()</span></code></a></dt><dd><p>A context manager that overrides the active context for the current thread only and restores it
+on exit.</p>
+</dd>
+</dl>
+</section>
 <section id="conversion-methods">
 <h2>Conversion methods<a class="headerlink" href="#conversion-methods" title="Link to this heading"></a></h2>
 <p>Each method returns the circuit in the requested format, converting from whatever representation is available:</p>
@@ -320,7 +443,7 @@ These are Python-native values — lists, ints, floats, nested dicts, or even ot
 <section id="example-convert-state-preparation-circuits-to-different-formats">
 <h3>Example: Convert state preparation circuits to different formats<a class="headerlink" href="#example-convert-state-preparation-circuits-to-different-formats" title="Link to this heading"></a></h3>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">Python API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--4-input--1" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Circuit</span><span class="p">,</span> <span class="n">Structure</span>
@@ -401,7 +524,7 @@ These are Python-native values — lists, ints, floats, nested dicts, or even ot
 <h2>Serialization<a class="headerlink" href="#serialization" title="Link to this heading"></a></h2>
 <p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit" title="qdk_chemistry.data.Circuit"><code class="xref py py-class docutils literal notranslate"><span class="pre">Circuit</span></code></a> supports the same <a class="reference internal" href="serialization.html"><span class="doc">serialization</span></a> formats as other QDK/Chemistry data classes:</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--1">Python API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--5-input--1" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Save to JSON</span>
 <span class="n">circuit</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;example_circuit.circuit.json&quot;</span><span class="p">)</span>
 

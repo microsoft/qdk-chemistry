@@ -1,0 +1,282 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Energy and accuracy &mdash; qdk-chemistry 2.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=78acbc13" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Describing the molecule" href="02_describing_the_molecule.html" />
+    <link rel="prev" title="Set up your lab notebook" href="lab_notebook.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Tutorials</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Ground-state molecular energies with quantum phase estimation</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="index.html#quantum-chemistry-background">Quantum chemistry background</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#why-quantum-computing">Why quantum computing?</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#why-stretched-nitrogen">Why stretched nitrogen?</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#tutorial-scope-and-structure">Tutorial scope and structure</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="index.html#cumulative-assignment">Cumulative assignment</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="00_before_you_begin.html">Before you begin</a></li>
+<li class="toctree-l4"><a class="reference internal" href="lab_notebook.html">Set up your lab notebook</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Energy and accuracy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="02_describing_the_molecule.html">Describing the molecule</a></li>
+<li class="toctree-l4"><a class="reference internal" href="03_choosing_the_active_space.html">Choosing the active space</a></li>
+<li class="toctree-l4"><a class="reference internal" href="04_putting_the_problem_on_qubits.html">Mapping the problem to qubits</a></li>
+<li class="toctree-l4"><a class="reference internal" href="05_preparing_the_trial_state.html">Preparing the trial state</a></li>
+<li class="toctree-l4"><a class="reference internal" href="06_iterative_phase_estimation.html">Iterative quantum phase estimation</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Tutorials</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Ground-state molecular energies with quantum phase estimation</a></li>
+      <li class="breadcrumb-item active">Energy and accuracy</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/ground_state_molecular_energies_with_qpe/01_energy_and_accuracy.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="energy-and-accuracy">
+<h1>Energy and accuracy<a class="headerlink" href="#energy-and-accuracy" title="Link to this heading"></a></h1>
+<div class="chapter-focus admonition">
+<p class="admonition-title">Chapter focus</p>
+<p>What energy will we calculate, and how accurate must the result be?</p>
+</div>
+<section id="learning-objectives">
+<h2>Learning objectives<a class="headerlink" href="#learning-objectives" title="Link to this heading"></a></h2>
+<p>After completing this chapter, you will be able to:</p>
+<ul class="simple">
+<li><p>Identify the electronic and nuclear contributions to the fixed-geometry ground-state energy reported in this tutorial.</p></li>
+<li><p>Explain why small energy errors can cause large errors in predicted equilibria and rates.</p></li>
+<li><p>Explain why each energy comparison requires a clearly defined reference.</p></li>
+<li><p>Identify the main approximations that affect the final energy estimate.</p></li>
+</ul>
+<div class="lab-notebook-assignment admonition">
+<p class="admonition-title">Lab notebook assignment</p>
+<p>Complete the <a class="reference internal" href="lab_notebook.html#lab-notebook-goal"><span class="std std-ref">Calculation goal and reference plan</span></a> section of the lab notebook.
+Record the molecular system, target quantity, <span class="math notranslate nohighlight">\(1\ \mathrm{m}E_{\mathrm{h}}\)</span> teaching target, and reference used to evaluate that target.
+For each comparison field, state what changes, what remains fixed, and what the resulting difference will measure; later chapters add the numerical values.
+This entry defines the criteria you will use to interpret every later result.</p>
+</div>
+</section>
+<section id="the-energy-reported-in-this-tutorial">
+<h2>The energy reported in this tutorial<a class="headerlink" href="#the-energy-reported-in-this-tutorial" title="Link to this heading"></a></h2>
+<p>The <a class="reference internal" href="index.html"><span class="doc">tutorial introduction</span></a> introduced the ground-state eigenvalue of the electronic Hamiltonian for fixed nuclear positions.
+The quantity ultimately reported by this tutorial is the corresponding fixed-geometry total energy,</p>
+<div class="math notranslate nohighlight">
+\[E_{\mathrm{total}}(\mathbf{R})
+= E_{\mathrm{electronic}}(\mathbf{R})
++ E_{\mathrm{nuclear}}(\mathbf{R}),\]</div>
+<p>where <span class="math notranslate nohighlight">\(\mathbf{R}\)</span> denotes the fixed nuclear coordinates.
+The electronic contribution includes the electron kinetic energy, electron–nucleus attraction, and electron–electron repulsion.
+The nuclear contribution is the repulsion among the fixed nuclei.
+<a class="reference internal" href="04_putting_the_problem_on_qubits.html"><span class="doc">Mapping the problem to qubits</span></a> explains how these contributions are tracked when the molecular Hamiltonian is represented on qubits.</p>
+<details class="quiz-question admonition">
+<summary class="admonition-title">Which contributions make up the fixed-geometry total energy reported by this tutorial?</summary>
+<p>The fixed-geometry total energy is the sum of the electronic energy and the repulsion energy among the fixed nuclei.</p>
+</details>
+<p><a class="reference internal" href="../../glossary.html#term-QDK"><span class="xref std std-term">QDK</span></a>/Chemistry reports molecular energies in <a class="reference external" href="https://en.wikipedia.org/wiki/Hartree">hartree</a>, with symbol <span class="math notranslate nohighlight">\(E_{\mathrm{h}}\)</span>.
+One millihartree, written <span class="math notranslate nohighlight">\(1\ \mathrm{m}E_{\mathrm{h}}\)</span>, is <span class="math notranslate nohighlight">\(10^{-3}\ E_{\mathrm{h}}\)</span>, approximately <span class="math notranslate nohighlight">\(2.6255\ \mathrm{kJ\,mol^{-1}}\)</span> using the 2022 <a class="reference internal" href="../../glossary.html#term-CODATA"><span class="xref std std-term">CODATA</span></a> constants <span class="bibtex-citation" id="id1">[<a class="reference internal" href="../../references.html#id37" title="Peter J. Mohr, David B. Newell, and Barry N. Taylor. CODATA recommended values of the fundamental physical constants: 2022. Reviews of Modern Physics, 97:025002, 2025. URL: https://tsapps.nist.gov/publication/get_pdf.cfm?pub_id=958143, doi:10.1103/RevModPhys.97.025002.">MNT25</a>]</span>.</p>
+</section>
+<section id="energy-differences-require-context">
+<h2>Energy differences require context<a class="headerlink" href="#energy-differences-require-context" title="Link to this heading"></a></h2>
+<p>A basis set is a finite collection of mathematical functions used to represent molecular orbitals in a calculation.
+<a class="reference internal" href="02_describing_the_molecule.html"><span class="doc">Describing the molecule</span></a> explains how basis sets are constructed and used.
+Chemically meaningful questions usually compare energies calculated under a consistent set of choices, including geometry, basis set, and electronic-structure method.
+Examples include the energy difference between two molecular geometries, the reaction energy between products and reactants, and the barrier between a reactant and a transition state.
+In a chemical reaction, starting species called reactants transform into resulting species called products.
+A transition state is a high-energy molecular arrangement along this transformation; its energy relative to the reactants defines the reaction barrier.
+Changing the model or numerical method between the two calculations can make the difference difficult to interpret.
+If several choices change at once, their effects are combined in one number, so the difference cannot be attributed to a particular geometry, basis set, or method.</p>
+</section>
+<section id="why-energy-accuracy-matters">
+<h2>Why energy accuracy matters<a class="headerlink" href="#why-energy-accuracy-matters" title="Link to this heading"></a></h2>
+<p>Accurate electronic energies are necessary inputs to predictions of chemical equilibria and reaction rates, but they are not sufficient by themselves.
+At constant temperature and pressure, these predictions depend on <a class="reference external" href="https://en.wikipedia.org/wiki/Gibbs_free_energy">Gibbs free-energy</a> differences that also include <a class="reference external" href="https://en.wikipedia.org/wiki/Zero-point_energy">zero-point energy</a>, thermal, entropic, and environmental contributions.
+This tutorial calculates only the fixed-geometry electronic and nuclear components of the energy; it does not calculate a free energy.</p>
+<details class="quiz-question admonition">
+<summary class="admonition-title">Why does an accurate electronic energy not, by itself, determine an equilibrium constant or rate?</summary>
+<p>Electronic and nuclear energies are only some of the contributions to a free energy.
+Zero-point, thermal, entropic, and environmental contributions can also affect an equilibrium constant or reaction rate.</p>
+</details>
+<p>When an electronic-and-nuclear energy difference contributes to a free-energy difference, any uncanceled error in that component also contributes to the free-energy error.
+The dimensionless <a class="reference external" href="https://en.wikipedia.org/wiki/Equilibrium_constant">equilibrium constant</a> <span class="math notranslate nohighlight">\(K\)</span> is related to the standard reaction Gibbs free energy <span class="math notranslate nohighlight">\(\Delta G^\circ\)</span> by</p>
+<div class="math notranslate nohighlight">
+\[K \propto \exp\left(-\frac{\Delta G^\circ}{RT}\right),\]</div>
+<p>where <span class="math notranslate nohighlight">\(R\)</span> is the molar gas constant and <span class="math notranslate nohighlight">\(T\)</span> is the absolute temperature.
+Similarly, the <a class="reference external" href="https://en.wikipedia.org/wiki/Eyring_equation">Eyring equation</a> relates a rate constant <span class="math notranslate nohighlight">\(k\)</span> to the activation Gibbs free energy <span class="math notranslate nohighlight">\(\Delta G^\ddagger\)</span>:</p>
+<div class="math notranslate nohighlight">
+\[k \propto \exp\left(-\frac{\Delta G^\ddagger}{RT}\right).\]</div>
+<p>Because both relations are exponential, a small free-energy error can substantially change the predicted equilibrium constant or rate.
+At <span class="math notranslate nohighlight">\(298.15\ \mathrm{K}\)</span>, a <span class="math notranslate nohighlight">\(1\ \mathrm{m}E_{\mathrm{h}}\)</span> error can change the prediction by a factor of approximately <span class="math notranslate nohighlight">\(2.88\)</span> if all other contributions are exact.
+An error of approximately <span class="math notranslate nohighlight">\(2.17\ \mathrm{m}E_{\mathrm{h}}\)</span> produces a factor of ten.</p>
+<details class="quiz-question admonition">
+<summary class="admonition-title">Why can a small free-energy error cause a large error in a predicted equilibrium constant or reaction rate?</summary>
+<p>Equilibrium constants and reaction rates depend exponentially on reaction and activation free-energy differences.
+A small error in a free-energy difference can therefore multiply the predicted equilibrium constant or rate by a large factor.</p>
+</details>
+</section>
+<section id="accuracy-precision-and-other-definitions">
+<h2>Accuracy, precision, and other definitions<a class="headerlink" href="#accuracy-precision-and-other-definitions" title="Link to this heading"></a></h2>
+<p>An energy estimate is accurate only in relation to a stated reference value for the same quantity.</p>
+<dl class="simple">
+<dt>Accuracy</dt><dd><p>Closeness to the reference.</p>
+</dd>
+<dt>Precision</dt><dd><p>The spread among repeated estimates under the same conditions.</p>
+</dd>
+<dt>Resolution</dt><dd><p>The smallest energy interval that the chosen numerical representation can distinguish.</p>
+</dd>
+<dt>Uncertainty</dt><dd><p>The range of values plausibly consistent with the available information.</p>
+</dd>
+</dl>
+<p>A calculation can be precise but inaccurate, or have fine resolution without a small uncertainty.</p>
+</section>
+<section id="the-teaching-target">
+<h2>The teaching target<a class="headerlink" href="#the-teaching-target" title="Link to this heading"></a></h2>
+<p>This tutorial uses <span class="math notranslate nohighlight">\(1\ \mathrm{m}E_{\mathrm{h}}\)</span> as a teaching target for the absolute difference between the final <a class="reference internal" href="../../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a> total energy and a classical reference energy for the same Hamiltonian.
+This target concerns accuracy relative to the selected-space classical reference; resolution, precision, and uncertainty describe separate properties of the calculation.
+Meeting this target shows that the quantum algorithm reproduced its classical reference to the requested tolerance.
+It does not show that the molecular model agrees with experiment, nor does it remove errors from the geometry, basis set, electronic-structure model, or omitted free-energy contributions.</p>
+</section>
+<section id="where-approximations-enter">
+<h2>Where approximations enter<a class="headerlink" href="#where-approximations-enter" title="Link to this heading"></a></h2>
+<p>Different stages introduce different approximations or uncertainties.
+For example:</p>
+<ul class="simple">
+<li><p>The fixed molecular geometry and Born–Oppenheimer approximation define the physical model considered by the tutorial.</p></li>
+<li><p>A finite basis set restricts the one-electron functions used to describe the molecule.</p></li>
+<li><p>Hartree–Fock limits the wavefunction to one determinant, while the selected active-space model fixes occupations outside the active orbitals. These restrictions introduce model error relative to full configuration interaction (<a class="reference internal" href="../../glossary.html#term-FCI"><span class="xref std std-term">FCI</span></a>) in the same finite orbital basis.</p></li>
+<li><p>Hamiltonian time evolution is approximated when the quantum circuit is constructed.</p></li>
+<li><p>Finite phase resolution and measurement sampling limit the reported <a class="reference internal" href="../../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a> estimate.</p></li>
+</ul>
+<p>Each approximation is introduced where it first enters the calculation, and the corresponding comparison is recorded before proceeding.</p>
+</section>
+<section id="further-reading">
+<h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference external" href="https://en.wikipedia.org/wiki/Equilibrium_constant">Equilibrium constants</a></p></li>
+<li><p><a class="reference external" href="https://en.wikipedia.org/wiki/Eyring_equation">Eyring equation</a></p></li>
+<li><p><a class="reference external" href="https://en.wikipedia.org/wiki/Hartree">Hartree energy</a></p></li>
+<li><p><a class="reference internal" href="../../user/features.html"><span class="doc">Features and methods</span></a></p></li>
+<li><p><a class="reference internal" href="../../user/quickstart.html"><span class="doc">Quickstart</span></a></p></li>
+<li><p><a class="reference internal" href="../../references.html"><span class="doc">References</span></a></p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="lab_notebook.html" class="btn btn-neutral float-left" title="Set up your lab notebook" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="02_describing_the_molecule.html" class="btn btn-neutral float-right" title="Describing the molecule" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

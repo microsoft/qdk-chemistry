@@ -1,0 +1,283 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>What’s New in Version 2.1 &mdash; qdk-chemistry 2.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=78acbc13" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../_static/tabs.js?v=3ee01567"></script>
+      <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../_static/copybutton.js?v=f281be69"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="What’s New in Version 2.0" href="v2.0.0.html" />
+    <link rel="prev" title="Release Notes" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/index.html">Tutorials</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Release Notes</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">What’s New in Version 2.1</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#highlights">Highlights</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#geometry-optimization">Geometry Optimization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#q-context-management">Q# Context Management</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#bug-fixes">Bug Fixes</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#time-evolution-phase-convention">Time-evolution phase convention</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#other-fixes">Other fixes</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#infrastructure-and-packaging">Infrastructure and Packaging</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="v2.0.0.html">What’s New in Version 2.0</a></li>
+<li class="toctree-l2"><a class="reference internal" href="v1.1.0.html">What’s New in Version 1.1</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Release Notes</a></li>
+      <li class="breadcrumb-item active">What’s New in Version 2.1</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/release-notes/v2.1.0.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="what-s-new-in-version-2-1">
+<span id="release-v2-1-0"></span><h1>What’s New in Version 2.1<a class="headerlink" href="#what-s-new-in-version-2-1" title="Link to this heading"></a></h1>
+<p>Version 2.1 adds geometry optimization as a first-class algorithm type, isolates the
+vendored Q# utilities in a dedicated context so that importing QDK/Chemistry no longer
+mutates global interpreter state, and corrects the phase-to-energy convention used when
+phase estimation runs on a time-evolution unitary.</p>
+<p>There are no breaking API changes relative to <a class="reference internal" href="v2.0.0.html#release-v2-0-0"><span class="std std-ref">2.0</span></a>, but the
+phase-convention fix changes the <em>numerical</em> results of time-evolution
+<a class="reference internal" href="../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a>; see <a class="reference internal" href="#v2-1-phase-convention"><span class="std std-ref">Time-evolution phase convention</span></a>.</p>
+<nav class="contents local" id="on-this-page">
+<p class="topic-title">On this page</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#highlights" id="id1">Highlights</a></p></li>
+<li><p><a class="reference internal" href="#geometry-optimization" id="id2">Geometry Optimization</a></p></li>
+<li><p><a class="reference internal" href="#q-context-management" id="id3">Q# Context Management</a></p></li>
+<li><p><a class="reference internal" href="#bug-fixes" id="id4">Bug Fixes</a></p></li>
+<li><p><a class="reference internal" href="#infrastructure-and-packaging" id="id5">Infrastructure and Packaging</a></p></li>
+</ul>
+</nav>
+<section id="highlights">
+<h2><a class="toc-backref" href="#id1" role="doc-backlink">Highlights</a><a class="headerlink" href="#highlights" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Geometry optimization.</strong> A new <code class="docutils literal notranslate"><span class="pre">geometry_optimizer</span></code> algorithm type relaxes molecular structures on top of the nuclear derivative calculators introduced in 2.0, with a geomeTRIC-backed implementation shipped as an optional plugin.</p></li>
+<li><p><strong>Isolated Q# context.</strong> The vendored Q# utilities load into a private <code class="docutils literal notranslate"><span class="pre">qdk.Context</span></code> instead of the global <code class="docutils literal notranslate"><span class="pre">qsharp</span></code> interpreter, and four helpers in <a class="reference internal" href="../api/api_autogen/qdk_chemistry.utils.qsharp.html#module-qdk_chemistry.utils.qsharp" title="qdk_chemistry.utils.qsharp"><code class="xref py py-mod docutils literal notranslate"><span class="pre">qdk_chemistry.utils.qsharp</span></code></a> expose that context for user-defined Q# operations.</p></li>
+<li><p><strong>Corrected time-evolution phase convention.</strong> Energies recovered from <span class="math notranslate nohighlight">\(U = e^{-iHt}\)</span> now use <span class="math notranslate nohighlight">\(E = -\theta / t\)</span>, and the <code class="docutils literal notranslate"><span class="pre">bits_msb_first</span></code> field of <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QpeResult" title="qdk_chemistry.data.QpeResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">QpeResult</span></code></a> from iterative <a class="reference internal" href="../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a> is genuinely most-significant-bit first.</p></li>
+<li><p><strong>Python 3.14 Qiskit support.</strong> The <code class="docutils literal notranslate"><span class="pre">qiskit-extras</span></code> extra now installs on Python 3.14.</p></li>
+</ul>
+</section>
+<section id="geometry-optimization">
+<h2><a class="toc-backref" href="#id2" role="doc-backlink">Geometry Optimization</a><a class="headerlink" href="#geometry-optimization" title="Link to this heading"></a></h2>
+<p>Version 2.0 added nuclear gradients and finite-difference Hessians, but left the
+optimization loop to the caller. Version 2.1 closes that gap with a
+<code class="docutils literal notranslate"><span class="pre">geometry_optimizer</span></code> <a class="reference internal" href="../user/comprehensive/algorithms/index.html"><span class="doc">algorithm type</span></a>
+that drives a nuclear derivative calculator to a stationary point.</p>
+<p>Optimizers follow the usual factory and settings conventions and are created by name:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Structure coordinates are in Bohr</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+
+<span class="n">optimizer</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;geometry_optimizer&quot;</span><span class="p">,</span> <span class="s2">&quot;geometric&quot;</span><span class="p">,</span> <span class="n">max_iterations</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The energy and gradient engine is itself an algorithm reference, so any registered
+nuclear derivative calculator can drive the optimization:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">derivative_ref</span> <span class="o">=</span> <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;nuclear_derivative_calculator&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_finite_difference&quot;</span><span class="p">)</span>
+<span class="n">derivative_ref</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;finite_difference_step&quot;</span><span class="p">,</span> <span class="mf">1.0e-2</span><span class="p">)</span>
+<span class="n">optimizer</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;derivative_calculator&quot;</span><span class="p">,</span> <span class="n">derivative_ref</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Shared settings on <code class="docutils literal notranslate"><span class="pre">GeometryOptimizerSettings</span></code> are <code class="docutils literal notranslate"><span class="pre">derivative_calculator</span></code>,
+<code class="docutils literal notranslate"><span class="pre">max_iterations</span></code> (default 300), and <code class="docutils literal notranslate"><span class="pre">compute_hessian</span></code> (default <code class="docutils literal notranslate"><span class="pre">False</span></code>; when
+<code class="docutils literal notranslate"><span class="pre">True</span></code>, a Hessian is evaluated at the converged geometry and returned).</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">energy</span><span class="p">,</span> <span class="n">optimized_structure</span><span class="p">,</span> <span class="n">hessian</span><span class="p">,</span> <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">optimizer</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="nb">input</span><span class="o">=</span><span class="s2">&quot;sto-3g&quot;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">run()</span></code> takes an initial <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a>, the charge and spin
+multiplicity, and an <code class="docutils literal notranslate"><span class="pre">input</span></code> that is either a basis-set name, a
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.BasisSet" title="qdk_chemistry.data.BasisSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">BasisSet</span></code></a>, an <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><code class="xref py py-class docutils literal notranslate"><span class="pre">Orbitals</span></code></a>, or a
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a>. It returns the converged energy, the optimized
+structure, an optional <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.NuclearHessian" title="qdk_chemistry.data.NuclearHessian"><code class="xref py py-class docutils literal notranslate"><span class="pre">NuclearHessian</span></code></a>, and the optional
+converged wavefunction. The optional trailing <code class="docutils literal notranslate"><span class="pre">n_inactive_orbitals</span></code> argument excludes
+doubly occupied orbitals from the active space used by the derivative calculator.</p>
+<p class="rubric">geomeTRIC plugin</p>
+<p>The bundled <code class="docutils literal notranslate"><span class="pre">&quot;geometric&quot;</span></code> implementation wraps
+<a class="reference external" href="https://github.com/leeping/geomeTRIC">geomeTRIC</a> and is enabled automatically when the
+package is installed:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;qdk-chemistry[plugins]&#39;</span>
+</pre></div>
+</div>
+<p>It adds transition-state search (<code class="docutils literal notranslate"><span class="pre">transition_state</span></code>), a choice of coordinate system
+(<code class="docutils literal notranslate"><span class="pre">optimizer</span></code>, one of <code class="docutils literal notranslate"><span class="pre">tric</span></code>, <code class="docutils literal notranslate"><span class="pre">tric-p</span></code>, <code class="docutils literal notranslate"><span class="pre">dlc</span></code>, <code class="docutils literal notranslate"><span class="pre">hdlc</span></code>, <code class="docutils literal notranslate"><span class="pre">prim</span></code>, <code class="docutils literal notranslate"><span class="pre">cart</span></code>), the
+five geomeTRIC convergence thresholds (<code class="docutils literal notranslate"><span class="pre">convergence_energy</span></code>,
+<code class="docutils literal notranslate"><span class="pre">convergence_rms_gradient</span></code>, <code class="docutils literal notranslate"><span class="pre">convergence_max_gradient</span></code>,
+<code class="docutils literal notranslate"><span class="pre">convergence_rms_displacement</span></code>, <code class="docutils literal notranslate"><span class="pre">convergence_max_displacement</span></code>), and
+<code class="docutils literal notranslate"><span class="pre">print_level</span></code>. As with geomeTRIC itself, all five convergence criteria must be
+satisfied together.</p>
+</section>
+<section id="q-context-management">
+<h2><a class="toc-backref" href="#id3" role="doc-backlink">Q# Context Management</a><a class="headerlink" href="#q-context-management" title="Link to this heading"></a></h2>
+<p>Previously, importing <code class="docutils literal notranslate"><span class="pre">qdk_chemistry</span></code> initialized the process-global Q# interpreter and
+forced its target profile to <code class="docutils literal notranslate"><span class="pre">Base</span></code>, which silently invalidated Q# code the caller had
+already imported. The vendored utilities now load into a dedicated <code class="docutils literal notranslate"><span class="pre">qdk.Context</span></code> owned
+by the library, and importing <code class="docutils literal notranslate"><span class="pre">qdk_chemistry</span></code> leaves the caller’s global <code class="docutils literal notranslate"><span class="pre">qsharp</span></code>
+state untouched.</p>
+<p>QDK requires that composed Q# callables belong to the same context, so
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.utils.qsharp.html#module-qdk_chemistry.utils.qsharp" title="qdk_chemistry.utils.qsharp"><code class="xref py py-mod docutils literal notranslate"><span class="pre">qdk_chemistry.utils.qsharp</span></code></a> exposes that context directly:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../api/api_autogen/qdk_chemistry.utils.qsharp.html#qdk_chemistry.utils.qsharp.get_qsharp_context" title="qdk_chemistry.utils.qsharp.get_qsharp_context"><code class="xref py py-func docutils literal notranslate"><span class="pre">get_qsharp_context()</span></code></a> returns the shared context; define your own Q# operations against it so they compose with the chemistry circuit builders.</p></li>
+<li><p><a class="reference internal" href="../api/api_autogen/qdk_chemistry.utils.qsharp.html#qdk_chemistry.utils.qsharp.create_qsharp_context" title="qdk_chemistry.utils.qsharp.create_qsharp_context"><code class="xref py py-func docutils literal notranslate"><span class="pre">create_qsharp_context()</span></code></a> builds a fresh context preloaded with the chemistry utilities, forwarding <code class="docutils literal notranslate"><span class="pre">target_profile</span></code> and other <code class="docutils literal notranslate"><span class="pre">qdk.Context</span></code> options.</p></li>
+<li><p><a class="reference internal" href="../api/api_autogen/qdk_chemistry.utils.qsharp.html#qdk_chemistry.utils.qsharp.set_qsharp_context" title="qdk_chemistry.utils.qsharp.set_qsharp_context"><code class="xref py py-func docutils literal notranslate"><span class="pre">set_qsharp_context()</span></code></a> installs a caller-supplied context process-wide (pass <code class="docutils literal notranslate"><span class="pre">None</span></code> to restore the default).</p></li>
+<li><p><a class="reference internal" href="../api/api_autogen/qdk_chemistry.utils.qsharp.html#qdk_chemistry.utils.qsharp.use_qsharp_context" title="qdk_chemistry.utils.qsharp.use_qsharp_context"><code class="xref py py-func docutils literal notranslate"><span class="pre">use_qsharp_context()</span></code></a> is a context manager that overrides the active context on the current thread only.</p></li>
+</ul>
+<p>See <a class="reference internal" href="../user/comprehensive/data/circuit.html#shared-qsharp-context"><span class="std std-ref">Shared Q# context</span></a> for worked examples of bringing your own Q# operation or
+your own context.</p>
+</section>
+<section id="bug-fixes">
+<h2><a class="toc-backref" href="#id4" role="doc-backlink">Bug Fixes</a><a class="headerlink" href="#bug-fixes" title="Link to this heading"></a></h2>
+<section id="time-evolution-phase-convention">
+<span id="v2-1-phase-convention"></span><h3>Time-evolution phase convention<a class="headerlink" href="#time-evolution-phase-convention" title="Link to this heading"></a></h3>
+<p>For <span class="math notranslate nohighlight">\(U(t) = e^{-iHt}\)</span> an eigenstate of energy <span class="math notranslate nohighlight">\(E\)</span> accumulates phase
+<span class="math notranslate nohighlight">\(e^{-iEt}\)</span>, so phase estimation measures
+<span class="math notranslate nohighlight">\(\varphi = (-Et / 2\pi) \bmod 1\)</span>. <code class="docutils literal notranslate"><span class="pre">PauliProductFormulaContainer.eigenvalue_from_phase</span></code>
+previously inverted this as <span class="math notranslate nohighlight">\(E = \theta / t\)</span>, dropping the sign. It now returns
+<span class="math notranslate nohighlight">\(E = -\theta / t\)</span>.</p>
+<p>This affects any phase estimation run — standard or iterative — whose unitary comes from a
+product-formula builder; qubitization-based runs, which recover
+<span class="math notranslate nohighlight">\(E = \lambda\cos(\theta)\)</span>, are unchanged. Energies previously reported for
+time-evolution <a class="reference internal" href="../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a> have the wrong sign and should be recomputed.</p>
+<p>Two related iterative <a class="reference internal" href="../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a> defects are fixed alongside it:</p>
+<ul class="simple">
+<li><p>The feedback phase applied to each iteration circuit is now negated to match the same convention.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">bits_msb_first</span></code> field of <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QpeResult" title="qdk_chemistry.data.QpeResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">QpeResult</span></code></a> is now reversed before being stored. Kitaev’s iteration extracts bits least-significant first, so the field previously held them in the opposite order to its name.</p></li>
+</ul>
+</section>
+<section id="other-fixes">
+<h3>Other fixes<a class="headerlink" href="#other-fixes" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">QpeResult</span></code> files are now understood by <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">qdk_chemistry.migrate</span></code>, which drops the obsolete evolution-time field while preserving the result. The <code class="docutils literal notranslate"><span class="pre">qpe_result</span></code> type tag participates in the <code class="docutils literal notranslate"><span class="pre">name.type.ext</span></code> filename convention. See <a class="reference internal" href="../user/migrating-data-files.html"><span class="doc">Migrating data files between serialization versions</span></a>.</p></li>
+<li><p>The migration converter rejects v1 <code class="docutils literal notranslate"><span class="pre">TimeEvolutionUnitary</span></code> files explicitly: they do not carry the scale required by the current <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.UnitaryRepresentation" title="qdk_chemistry.data.UnitaryRepresentation"><code class="xref py py-class docutils literal notranslate"><span class="pre">UnitaryRepresentation</span></code></a> schema and must be regenerated.</p></li>
+<li><p>The geomeTRIC plugin restores the host application’s root logging handlers and level after geomeTRIC reconfigures logging.</p></li>
+<li><p>Fixed a flaky cube-file generation test.</p></li>
+</ul>
+</section>
+</section>
+<section id="infrastructure-and-packaging">
+<h2><a class="toc-backref" href="#id5" role="doc-backlink">Infrastructure and Packaging</a><a class="headerlink" href="#infrastructure-and-packaging" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Python 3.14 Qiskit support.</strong> <code class="docutils literal notranslate"><span class="pre">qiskit-extras</span></code> now installs on Python 3.14. <code class="docutils literal notranslate"><span class="pre">qiskit-aer</span></code> is omitted on Linux ARM64 (aarch64) for that version only, because no cp314 manylinux aarch64 wheel is published yet; all other platforms install the full set.</p></li>
+<li><p><strong>New</strong> <code class="docutils literal notranslate"><span class="pre">plugins</span></code> <strong>dependency.</strong> <code class="docutils literal notranslate"><span class="pre">geometric&gt;=1.0</span></code> joins PySCF in the <code class="docutils literal notranslate"><span class="pre">plugins</span></code> extra.</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Release Notes" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="v2.0.0.html" class="btn btn-neutral float-right" title="What’s New in Version 2.0" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

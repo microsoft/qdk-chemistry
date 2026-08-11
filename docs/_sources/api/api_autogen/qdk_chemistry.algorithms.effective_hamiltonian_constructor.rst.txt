@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.effective\_hamiltonian\_constructor module
+====================================================================
+
+.. automodule:: qdk_chemistry.algorithms.effective_hamiltonian_constructor
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

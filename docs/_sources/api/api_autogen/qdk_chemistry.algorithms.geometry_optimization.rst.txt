@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.geometry\_optimization module
+=======================================================
+
+.. automodule:: qdk_chemistry.algorithms.geometry_optimization
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

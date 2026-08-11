@@ -1,0 +1,253 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.utils.qsharp &mdash; qdk-chemistry 2.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=78acbc13" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/index.html">Tutorials</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.utils.qsharp</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.utils.qsharp</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;QDK/Chemistry Q# Utilities Module.&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">threading</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Iterator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">contextlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">contextmanager</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">qdk</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk</span><span class="w"> </span><span class="kn">import</span> <span class="n">TargetProfile</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;QSHARP_UTILS&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;create_qsharp_context&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;get_qsharp_context&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;set_qsharp_context&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;use_qsharp_context&quot;</span><span class="p">,</span>
+<span class="p">]</span>
+
+<span class="n">_PROJECT_ROOT</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span><span class="p">)</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">_SharedContext</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Lock-guarded holder for the process-wide shared Q# context.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">RLock</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">:</span> <span class="n">qdk</span><span class="o">.</span><span class="n">Context</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+
+<span class="n">_shared</span> <span class="o">=</span> <span class="n">_SharedContext</span><span class="p">()</span>
+<span class="n">_thread_local</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">local</span><span class="p">()</span>
+
+
+<div class="viewcode-block" id="create_qsharp_context">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.qsharp.html#qdk_chemistry.utils.qsharp.create_qsharp_context">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_qsharp_context</span><span class="p">(</span>
+    <span class="n">target_profile</span><span class="p">:</span> <span class="n">TargetProfile</span> <span class="o">=</span> <span class="n">TargetProfile</span><span class="o">.</span><span class="n">Base</span><span class="p">,</span>
+    <span class="n">target_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">language_features</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">qdk_config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bool</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">qdk</span><span class="o">.</span><span class="n">Context</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create a new, isolated ``qdk.Context`` preloaded with the Q# chemistry utilities.</span>
+
+<span class="sd">    Every call returns a *fresh* context with its own Q# interpreter. Most users never</span>
+<span class="sd">    need this — the library maintains one shared context (see :func:`get_qsharp_context`).</span>
+<span class="sd">    Reach for this only when you need a context configured differently from the default</span>
+<span class="sd">    (for example a non-default ``target_profile``); then register it with</span>
+<span class="sd">    :func:`set_qsharp_context` if the chemistry builders should use it too.</span>
+
+<span class="sd">    :param target_profile: Target profile the Q# interpreter compiles for. Defaults to</span>
+<span class="sd">        ``TargetProfile.Base``.</span>
+<span class="sd">    :param target_name: Optional target machine name used to infer a compatible profile.</span>
+<span class="sd">    :param language_features: Optional list of experimental Q# language feature flags.</span>
+<span class="sd">    :param qdk_config: Optional configuration values exposed to Q# code via</span>
+<span class="sd">        ``Std.Core.ConfigValue`` (values must be ``int``, ``float``, ``str``, or ``bool``).</span>
+
+<span class="sd">    ``project_root`` is intentionally not exposed: it is fixed to the vendored Q# utility</span>
+<span class="sd">    project so the chemistry utilities are always available on the returned context.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">kwargs</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">if</span> <span class="n">target_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;target_name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">target_name</span>
+    <span class="k">if</span> <span class="n">language_features</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;language_features&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">language_features</span>
+    <span class="k">if</span> <span class="n">qdk_config</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;qdk_config&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">qdk_config</span>
+    <span class="k">return</span> <span class="n">qdk</span><span class="o">.</span><span class="n">Context</span><span class="p">(</span><span class="n">project_root</span><span class="o">=</span><span class="n">_PROJECT_ROOT</span><span class="p">,</span> <span class="n">target_profile</span><span class="o">=</span><span class="n">target_profile</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="get_qsharp_context">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.qsharp.html#qdk_chemistry.utils.qsharp.get_qsharp_context">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_qsharp_context</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">qdk</span><span class="o">.</span><span class="n">Context</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the shared ``qdk.Context`` that QDK/Chemistry uses for all Q# composition.</span>
+
+<span class="sd">    Call it when you want to define your *own* Q# operation (e.g. a custom state</span>
+<span class="sd">    preparation) and compose it with a chemistry builder. The context is created lazily</span>
+<span class="sd">    on first use and access is thread-safe.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">override</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">_thread_local</span><span class="p">,</span> <span class="s2">&quot;context&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">override</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">override</span>
+
+    <span class="k">with</span> <span class="n">_shared</span><span class="o">.</span><span class="n">lock</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">_shared</span><span class="o">.</span><span class="n">context</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">_shared</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="n">create_qsharp_context</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">_shared</span><span class="o">.</span><span class="n">context</span></div>
+
+
+
+<div class="viewcode-block" id="set_qsharp_context">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.qsharp.html#qdk_chemistry.utils.qsharp.set_qsharp_context">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">set_qsharp_context</span><span class="p">(</span><span class="n">context</span><span class="p">:</span> <span class="n">qdk</span><span class="o">.</span><span class="n">Context</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Replace the process-wide shared Q# context (pass ``None`` to reset to the default).&quot;&quot;&quot;</span>
+    <span class="k">with</span> <span class="n">_shared</span><span class="o">.</span><span class="n">lock</span><span class="p">:</span>
+        <span class="n">_shared</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="n">context</span></div>
+
+
+
+<div class="viewcode-block" id="use_qsharp_context">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.qsharp.html#qdk_chemistry.utils.qsharp.use_qsharp_context">[docs]</a>
+<span class="nd">@contextmanager</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">use_qsharp_context</span><span class="p">(</span><span class="n">context</span><span class="p">:</span> <span class="n">qdk</span><span class="o">.</span><span class="n">Context</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">qdk</span><span class="o">.</span><span class="n">Context</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Temporarily use *context* as the shared Q# context on the current thread.&quot;&quot;&quot;</span>
+    <span class="n">previous</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">_thread_local</span><span class="p">,</span> <span class="s2">&quot;context&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">_thread_local</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="n">context</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">yield</span> <span class="n">context</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="n">_thread_local</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="n">previous</span></div>
+
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">_QSharpUtilsProxy</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Resolve the chemistry Q# utilities against the active shared context.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__getattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Resolve *name* on the utilities namespace of the active context.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">get_qsharp_context</span><span class="p">()</span><span class="o">.</span><span class="n">code</span><span class="o">.</span><span class="n">QDKChemistry</span><span class="o">.</span><span class="n">Utils</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+
+
+<span class="n">QSHARP_UTILS</span> <span class="o">=</span> <span class="n">_QSharpUtilsProxy</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -6,18 +6,18 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Plugins &mdash; qdk-chemistry 2.0.0 documentation</title>
+  <title>Plugins &mdash; qdk-chemistry 2.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=ac0f520b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=78acbc13" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../_static/documentation_options.js?v=20623aea"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -77,6 +77,10 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/index.html">Tutorials</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
@@ -240,6 +244,7 @@ We refer the reader to the <a class="reference internal" href="algorithms/factor
 <li><p><a class="reference external" href="https://pyscf.org/">PySCF</a> — Python-based quantum chemistry</p></li>
 <li><p><a class="reference external" href="https://www.ibm.com/quantum/qiskit">Qiskit</a> — Quantum algorithm primitives</p></li>
 <li><p><a class="reference external" href="https://quantumai.google/openfermion">OpenFermion</a> — Quantum algorithm primitives</p></li>
+<li><p><a class="reference external" href="https://github.com/leeping/geomeTRIC">geomeTRIC</a> — Molecular geometry optimization</p></li>
 </ul>
 <p>These plugins are enabled automatically when the corresponding package is installed.</p>
 <section id="qiskit-plugin-details">
@@ -263,7 +268,9 @@ When Qiskit is installed, the plugin will load and register the available algori
 </div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>The <code class="docutils literal notranslate"><span class="pre">qiskit-extras</span></code> extra is not currently supported on Python 3.14.</p>
+<p>On Python 3.14, <code class="docutils literal notranslate"><span class="pre">qiskit-aer</span></code> is omitted from <code class="docutils literal notranslate"><span class="pre">qiskit-extras</span></code> on Linux ARM64
+(aarch64), because Qiskit does not yet publish a Python 3.14 wheel for that
+platform. All other platforms install the full set.</p>
 </div>
 <p><strong>Checking what is loaded:</strong></p>
 <p>To determine which Qiskit components are available in your environment, you can check the following module-level variables:</p>
@@ -524,15 +531,15 @@ Registration is typically performed during module initialization:</p>
 <section id="defining-a-new-algorithm-type">
 <span id="custom-algorithm-types"></span><h3>Defining a new algorithm type<a class="headerlink" href="#defining-a-new-algorithm-type" title="Link to this heading"></a></h3>
 <p>When the required functionality does not correspond to an existing algorithm category, a new algorithm type can be defined.
-This section demonstrates the complete process using a geometry optimizer as an example.</p>
+This section demonstrates the complete process using a molecular descriptor calculator as an example.</p>
 <p class="rubric">Interface design</p>
 <p>The first step is to specify the algorithm’s interface:</p>
 <dl class="simple">
 <dt>Input type</dt><dd><p>The data the algorithm operates on (e.g., <code class="docutils literal notranslate"><span class="pre">Structure</span></code>)</p>
 </dd>
-<dt>Output type</dt><dd><p>The data the algorithm produces (e.g., optimized <code class="docutils literal notranslate"><span class="pre">Structure</span></code>)</p>
+<dt>Output type</dt><dd><p>The data the algorithm produces (e.g., a floating-point molecular descriptor)</p>
 </dd>
-<dt>Configuration</dt><dd><p>Required settings (e.g., convergence thresholds, iteration limits)</p>
+<dt>Configuration</dt><dd><p>Required settings (e.g., whether to normalize the descriptor)</p>
 </dd>
 </dl>
 <p class="rubric">Settings class definition</p>
@@ -542,33 +549,22 @@ This section demonstrates the complete process using a geometry optimizer as an 
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Settings</span>
 
 
-<span class="k">class</span><span class="w"> </span><span class="nc">GeometryOptimizerSettings</span><span class="p">(</span><span class="n">Settings</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings for geometry optimization algorithms.&quot;&quot;&quot;</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">MolecularDescriptorSettings</span><span class="p">(</span><span class="n">Settings</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings for molecular descriptor algorithms.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
-            <span class="s2">&quot;max_steps&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;Maximum optimization steps&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">10000</span><span class="p">)</span>
-        <span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
-            <span class="s2">&quot;convergence_threshold&quot;</span><span class="p">,</span> <span class="s2">&quot;double&quot;</span><span class="p">,</span> <span class="mf">1e-5</span><span class="p">,</span> <span class="s2">&quot;Gradient convergence threshold&quot;</span>
-        <span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;step_size&quot;</span><span class="p">,</span> <span class="s2">&quot;double&quot;</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="s2">&quot;Initial optimization step size&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;normalize&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;Normalize the descriptor&quot;</span><span class="p">)</span>
 
 
 </pre></div>
 </div>
 </div>
 <input class="tab-input" id="tab-set--5-input--2" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--2">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">GeometryOptimizerSettings</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">Settings</span><span class="w"> </span><span class="p">{</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">MolecularDescriptorSettings</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">Settings</span><span class="w"> </span><span class="p">{</span>
 <span class="w"> </span><span class="k">public</span><span class="o">:</span>
-<span class="w">  </span><span class="n">GeometryOptimizerSettings</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="n">set_default</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="p">(</span>
-<span class="w">        </span><span class="s">&quot;max_steps&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Maximum optimization steps&quot;</span><span class="p">,</span>
-<span class="w">        </span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">BoundConstraint</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="p">{</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">10000</span><span class="p">});</span>
-<span class="w">    </span><span class="n">set_default</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;convergence_threshold&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">1e-5</span><span class="p">,</span>
-<span class="w">                        </span><span class="s">&quot;Gradient convergence threshold&quot;</span><span class="p">);</span>
-<span class="w">    </span><span class="n">set_default</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;step_size&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">0.1</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Initial optimization step size&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="n">MolecularDescriptorSettings</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">set_default</span><span class="o">&lt;</span><span class="kt">bool</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;normalize&quot;</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Normalize the descriptor&quot;</span><span class="p">);</span>
 <span class="w">  </span><span class="p">}</span>
 <span class="p">};</span>
 </pre></div>
@@ -582,25 +578,27 @@ This section demonstrates the complete process using a geometry optimizer as an 
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">Algorithm</span>
 
 
-<span class="k">class</span><span class="w"> </span><span class="nc">GeometryOptimizer</span><span class="p">(</span><span class="n">Algorithm</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract base class for geometry optimization algorithms.&quot;&quot;&quot;</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">MolecularDescriptorCalculator</span><span class="p">(</span><span class="n">Algorithm</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract base class for molecular descriptor algorithms.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">return</span> <span class="s2">&quot;geometry_optimizer&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;molecular_descriptor_calculator&quot;</span>
 
 
 </pre></div>
 </div>
 </div>
 <input class="tab-input" id="tab-set--6-input--2" name="tab-set--6" type="radio" /><label class="tab-label" for="tab-set--6-input--2">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">GeometryOptimizer</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">MolecularDescriptorCalculator</span>
 <span class="w">    </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">algorithms</span><span class="o">::</span><span class="n">Algorithm</span><span class="o">&lt;</span>
-<span class="w">          </span><span class="n">GeometryOptimizer</span><span class="p">,</span>
-<span class="w">          </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">Structure</span><span class="o">&gt;</span><span class="p">,</span><span class="w">  </span><span class="c1">// Return type</span>
+<span class="w">          </span><span class="n">MolecularDescriptorCalculator</span><span class="p">,</span>
+<span class="w">          </span><span class="kt">double</span><span class="p">,</span><span class="w">                                            </span><span class="c1">// Return type</span>
 <span class="w">          </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">Structure</span><span class="o">&gt;&gt;</span><span class="w">  </span><span class="c1">// Input type</span>
 <span class="p">{</span>
 <span class="w"> </span><span class="k">public</span><span class="o">:</span>
-<span class="w">  </span><span class="k">static</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">type_name</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="s">&quot;geometry_optimizer&quot;</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">type_name</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">final</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="s">&quot;molecular_descriptor_calculator&quot;</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
 <span class="p">};</span>
 </pre></div>
 </div>
@@ -613,22 +611,29 @@ This section demonstrates the complete process using a geometry optimizer as an 
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">AlgorithmFactory</span>
 
 
-<span class="k">class</span><span class="w"> </span><span class="nc">GeometryOptimizerFactory</span><span class="p">(</span><span class="n">AlgorithmFactory</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Factory for creating geometry optimizer instances.&quot;&quot;&quot;</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">MolecularDescriptorCalculatorFactory</span><span class="p">(</span><span class="n">AlgorithmFactory</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Factory for creating molecular descriptor calculators.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">algorithm_type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">return</span> <span class="s2">&quot;geometry_optimizer&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;molecular_descriptor_calculator&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">default_algorithm_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">return</span> <span class="s2">&quot;bfgs&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;nuclear_charge&quot;</span>
 
 
 </pre></div>
 </div>
 </div>
 <input class="tab-input" id="tab-set--7-input--2" name="tab-set--7" type="radio" /><label class="tab-label" for="tab-set--7-input--2">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// The Algorithm base class template provides factory functionality</span>
-<span class="c1">// automatically.</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">MolecularDescriptorCalculatorFactory</span>
+<span class="w">    </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">algorithms</span><span class="o">::</span><span class="n">AlgorithmFactory</span><span class="o">&lt;</span>
+<span class="w">          </span><span class="n">MolecularDescriptorCalculator</span><span class="p">,</span><span class="w"> </span><span class="n">MolecularDescriptorCalculatorFactory</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">static</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="nf">algorithm_type_name</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="s">&quot;molecular_descriptor_calculator&quot;</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="k">static</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="nf">default_algorithm_name</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="s">&quot;nuclear_charge&quot;</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<span class="p">};</span>
 </pre></div>
 </div>
 </div>
@@ -640,44 +645,45 @@ This section demonstrates the complete process using a geometry optimizer as an 
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
 
 
-<span class="k">class</span><span class="w"> </span><span class="nc">BfgsOptimizer</span><span class="p">(</span><span class="n">GeometryOptimizer</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;BFGS quasi-Newton geometry optimizer.&quot;&quot;&quot;</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">NuclearChargeDescriptor</span><span class="p">(</span><span class="n">MolecularDescriptorCalculator</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculator for a nuclear-charge molecular descriptor.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">GeometryOptimizerSettings</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">MolecularDescriptorSettings</span><span class="p">()</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">return</span> <span class="s2">&quot;bfgs&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;nuclear_charge&quot;</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">structure</span><span class="p">:</span> <span class="n">Structure</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Structure</span><span class="p">:</span>
-        <span class="c1"># max_steps = self.settings().get(&quot;max_steps&quot;)</span>
-        <span class="c1"># threshold = self.settings().get(&quot;convergence_threshold&quot;)</span>
-
-        <span class="c1"># BFGS optimization implementation</span>
-        <span class="c1"># Placeholder for optimized structure</span>
-        <span class="n">optimized_structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">()</span>
-        <span class="k">return</span> <span class="n">optimized_structure</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">structure</span><span class="p">:</span> <span class="n">Structure</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="n">descriptor</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">structure</span><span class="o">.</span><span class="n">get_nuclear_charges</span><span class="p">()))</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;normalize&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">structure</span><span class="o">.</span><span class="n">get_num_atoms</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">descriptor</span> <span class="o">/=</span> <span class="n">structure</span><span class="o">.</span><span class="n">get_num_atoms</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">descriptor</span>
 
 
 </pre></div>
 </div>
 </div>
 <input class="tab-input" id="tab-set--8-input--2" name="tab-set--8" type="radio" /><label class="tab-label" for="tab-set--8-input--2">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">BfgsOptimizer</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">GeometryOptimizer</span><span class="w"> </span><span class="p">{</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">NuclearChargeDescriptor</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">MolecularDescriptorCalculator</span><span class="w"> </span><span class="p">{</span>
 <span class="w"> </span><span class="k">public</span><span class="o">:</span>
-<span class="w">  </span><span class="n">BfgsOptimizer</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">_settings</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">GeometryOptimizerSettings</span><span class="o">&gt;</span><span class="p">();</span><span class="w"> </span><span class="p">}</span>
+<span class="w">  </span><span class="n">NuclearChargeDescriptor</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">_settings</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">MolecularDescriptorSettings</span><span class="o">&gt;</span><span class="p">();</span>
+<span class="w">  </span><span class="p">}</span>
 
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">name</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">override</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="s">&quot;bfgs&quot;</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">name</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">override</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="s">&quot;nuclear_charge&quot;</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
 
 <span class="w"> </span><span class="k">protected</span><span class="o">:</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">Structure</span><span class="o">&gt;</span><span class="w"> </span><span class="n">_run_impl</span><span class="p">(</span>
-<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">Structure</span><span class="o">&gt;</span><span class="w"> </span><span class="n">structure</span><span class="p">)</span><span class="w"> </span><span class="k">override</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">max_steps</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_settings</span><span class="o">-&gt;</span><span class="n">get</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;max_steps&quot;</span><span class="p">);</span>
-<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">threshold</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_settings</span><span class="o">-&gt;</span><span class="n">get</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;convergence_threshold&quot;</span><span class="p">);</span>
-
-<span class="w">    </span><span class="c1">// BFGS optimization implementation</span>
-<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">optimized_structure</span><span class="p">;</span>
+<span class="w">  </span><span class="kt">double</span><span class="w"> </span><span class="n">_run_impl</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">Structure</span><span class="o">&gt;</span><span class="w"> </span><span class="n">structure</span><span class="p">)</span>
+<span class="w">      </span><span class="k">const</span><span class="w"> </span><span class="k">override</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">charges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">structure</span><span class="o">-&gt;</span><span class="n">get_nuclear_charges</span><span class="p">();</span>
+<span class="w">    </span><span class="kt">double</span><span class="w"> </span><span class="n">descriptor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">double</span><span class="w"> </span><span class="n">charge</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">charges</span><span class="p">)</span><span class="w"> </span><span class="n">descriptor</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">charge</span><span class="p">;</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">_settings</span><span class="o">-&gt;</span><span class="n">get</span><span class="o">&lt;</span><span class="kt">bool</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;normalize&quot;</span><span class="p">)</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">structure</span><span class="o">-&gt;</span><span class="n">get_num_atoms</span><span class="p">()</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="n">descriptor</span><span class="w"> </span><span class="o">/=</span><span class="w"> </span><span class="k">static_cast</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="n">structure</span><span class="o">-&gt;</span><span class="n">get_num_atoms</span><span class="p">());</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">descriptor</span><span class="p">;</span>
 <span class="w">  </span><span class="p">}</span>
 <span class="p">};</span>
 </pre></div>
@@ -685,21 +691,21 @@ This section demonstrates the complete process using a geometry optimizer as an 
 </div>
 </div>
 <p>Additional implementations follow the same pattern:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">SteepestDescentOptimizer</span><span class="p">(</span><span class="n">GeometryOptimizer</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Steepest descent geometry optimizer.&quot;&quot;&quot;</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">MassDescriptor</span><span class="p">(</span><span class="n">MolecularDescriptorCalculator</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculator for a molecular-mass descriptor.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">GeometryOptimizerSettings</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">MolecularDescriptorSettings</span><span class="p">()</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">return</span> <span class="s2">&quot;steepest_descent&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;mass&quot;</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">structure</span><span class="p">:</span> <span class="n">Structure</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Structure</span><span class="p">:</span>
-        <span class="c1"># Steepest descent implementation</span>
-        <span class="c1"># Placeholder for optimized structure</span>
-        <span class="n">optimized_structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">()</span>
-        <span class="k">return</span> <span class="n">optimized_structure</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">structure</span><span class="p">:</span> <span class="n">Structure</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="n">descriptor</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">structure</span><span class="o">.</span><span class="n">get_masses</span><span class="p">()))</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;normalize&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">structure</span><span class="o">.</span><span class="n">get_num_atoms</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">descriptor</span> <span class="o">/=</span> <span class="n">structure</span><span class="o">.</span><span class="n">get_num_atoms</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">descriptor</span>
 
 
 </pre></div>
@@ -711,19 +717,20 @@ This section demonstrates the complete process using a geometry optimizer as an 
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">algorithms</span>
 
 <span class="c1"># Register the factory</span>
-<span class="n">algorithms</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">register_factory</span><span class="p">(</span><span class="n">GeometryOptimizerFactory</span><span class="p">())</span>
+<span class="n">algorithms</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">register_factory</span><span class="p">(</span><span class="n">MolecularDescriptorCalculatorFactory</span><span class="p">())</span>
 
 <span class="c1"># Register implementations</span>
-<span class="n">algorithms</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">BfgsOptimizer</span><span class="p">())</span>
-<span class="n">algorithms</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">SteepestDescentOptimizer</span><span class="p">())</span>
+<span class="n">algorithms</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">NuclearChargeDescriptor</span><span class="p">())</span>
+<span class="n">algorithms</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">MassDescriptor</span><span class="p">())</span>
 </pre></div>
 </div>
 </div>
 <input class="tab-input" id="tab-set--9-input--2" name="tab-set--9" type="radio" /><label class="tab-label" for="tab-set--9-input--2">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// During library initialization</span>
-<span class="k">static</span><span class="w"> </span><span class="k">auto</span><span class="w"> </span><span class="n">factory_reg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">register_factory</span><span class="o">&lt;</span><span class="n">GeometryOptimizer</span><span class="o">&gt;</span><span class="p">();</span>
-<span class="k">static</span><span class="w"> </span><span class="k">auto</span><span class="w"> </span><span class="n">bfgs_reg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">GeometryOptimizer</span><span class="o">::</span><span class="n">register_implementation</span><span class="p">(</span>
-<span class="w">    </span><span class="p">[]()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">BfgsOptimizer</span><span class="o">&gt;</span><span class="p">();</span><span class="w"> </span><span class="p">});</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">static</span><span class="w"> </span><span class="k">auto</span><span class="w"> </span><span class="n">descriptor_registration</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[]()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="n">MolecularDescriptorCalculatorFactory</span><span class="o">::</span><span class="n">register_instance</span><span class="p">(</span>
+<span class="w">      </span><span class="p">[]()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">NuclearChargeDescriptor</span><span class="o">&gt;</span><span class="p">();</span><span class="w"> </span><span class="p">});</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<span class="p">}();</span>
 </pre></div>
 </div>
 </div>
@@ -733,15 +740,14 @@ This section demonstrates the complete process using a geometry optimizer as an 
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">available</span><span class="p">,</span> <span class="n">create</span>
 
 <span class="c1"># List available implementations</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;geometry_optimizer&quot;</span><span class="p">))</span>  <span class="c1"># [&#39;bfgs&#39;, &#39;steepest_descent&#39;]</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;molecular_descriptor_calculator&quot;</span><span class="p">))</span>  <span class="c1"># [&#39;mass&#39;, &#39;nuclear_charge&#39;]</span>
 
 <span class="c1"># Instantiate and configure</span>
-<span class="n">optimizer</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;geometry_optimizer&quot;</span><span class="p">,</span> <span class="s2">&quot;bfgs&quot;</span><span class="p">)</span>
-<span class="n">optimizer</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;max_steps&quot;</span><span class="p">,</span> <span class="mi">200</span><span class="p">)</span>
-<span class="n">optimizer</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">,</span> <span class="mf">1e-6</span><span class="p">)</span>
+<span class="n">calculator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;molecular_descriptor_calculator&quot;</span><span class="p">,</span> <span class="s2">&quot;nuclear_charge&quot;</span><span class="p">)</span>
+<span class="n">calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;normalize&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
 
 <span class="c1"># Execute</span>
-<span class="c1"># optimized_structure = optimizer.run(initial_structure)</span>
+<span class="c1"># descriptor = calculator.run(molecule)</span>
 </pre></div>
 </div>
 <p>For additional information on the factory pattern and settings system, refer to the

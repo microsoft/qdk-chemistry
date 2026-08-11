@@ -1,0 +1,447 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mapping the problem to qubits &mdash; qdk-chemistry 2.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=78acbc13" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Preparing the trial state" href="05_preparing_the_trial_state.html" />
+    <link rel="prev" title="Choosing the active space" href="03_choosing_the_active_space.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Tutorials</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Ground-state molecular energies with quantum phase estimation</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="index.html#quantum-chemistry-background">Quantum chemistry background</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#why-quantum-computing">Why quantum computing?</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#why-stretched-nitrogen">Why stretched nitrogen?</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#tutorial-scope-and-structure">Tutorial scope and structure</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="index.html#cumulative-assignment">Cumulative assignment</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="00_before_you_begin.html">Before you begin</a></li>
+<li class="toctree-l4"><a class="reference internal" href="lab_notebook.html">Set up your lab notebook</a></li>
+<li class="toctree-l4"><a class="reference internal" href="01_energy_and_accuracy.html">Energy and accuracy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="02_describing_the_molecule.html">Describing the molecule</a></li>
+<li class="toctree-l4"><a class="reference internal" href="03_choosing_the_active_space.html">Choosing the active space</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">Mapping the problem to qubits</a></li>
+<li class="toctree-l4"><a class="reference internal" href="05_preparing_the_trial_state.html">Preparing the trial state</a></li>
+<li class="toctree-l4"><a class="reference internal" href="06_iterative_phase_estimation.html">Iterative quantum phase estimation</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Tutorials</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Ground-state molecular energies with quantum phase estimation</a></li>
+      <li class="breadcrumb-item active">Mapping the problem to qubits</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/tutorials/ground_state_molecular_energies_with_qpe/04_putting_the_problem_on_qubits.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="mapping-the-problem-to-qubits">
+<h1>Mapping the problem to qubits<a class="headerlink" href="#mapping-the-problem-to-qubits" title="Link to this heading"></a></h1>
+<div class="chapter-focus admonition">
+<p class="admonition-title">Chapter focus</p>
+<p>How does the active-space electronic problem become a qubit problem?</p>
+</div>
+<section id="learning-objectives">
+<h2>Learning objectives<a class="headerlink" href="#learning-objectives" title="Link to this heading"></a></h2>
+<p>After completing this chapter, you will be able to:</p>
+<ul class="simple">
+<li><p>Identify the terms in the active-space electronic Hamiltonian.</p></li>
+<li><p>Explain why fermionic operators require an encoding on qubits.</p></li>
+<li><p>Describe how the Jordan–Wigner transformation preserves fermionic signs.</p></li>
+<li><p>Construct a qubit Hamiltonian with native <a class="reference internal" href="../../glossary.html#term-QDK"><span class="xref std std-term">QDK</span></a>/Chemistry tools.</p></li>
+<li><p>Determine how many qubits encode the selected active-space fermionic state.</p></li>
+<li><p>Explain why the core energy must be added to a qubit-Hamiltonian result.</p></li>
+</ul>
+<div class="lab-notebook-assignment admonition">
+<p class="admonition-title">Lab notebook assignment</p>
+<p>Complete <a class="reference internal" href="lab_notebook.html#lab-notebook-qubits"><span class="std std-ref">Qubit representation</span></a>.
+Calculate the number of qubits needed to encode the selected active-space fermionic state before verifying it with code.
+Record the core energy separately and identify every quantity excluded from this qubit count.</p>
+</div>
+</section>
+<section id="example-download">
+<h2>Example download<a class="headerlink" href="#example-download" title="Link to this heading"></a></h2>
+<p>Download <a class="reference download internal" download="" href="../../_downloads/106a739e0f553cfc05fb84c9f1e2e7bc/tutorial_map_n2_to_qubits.py"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_map_n2_to_qubits.py</span></code></a> and save it in the tutorial working directory that contains <code class="docutils literal notranslate"><span class="pre">tutorial_choose_active_space.py</span></code> and <code class="docutils literal notranslate"><span class="pre">tutorial_orbital_coordinates.py</span></code> from <a class="reference internal" href="03_choosing_the_active_space.html"><span class="doc">Choosing the active space</span></a>.
+Open all three files in Visual Studio Code and review the complete mapping script, including imports and setup code omitted from the excerpts below.
+The script imports the tested <a class="reference internal" href="03_choosing_the_active_space.html"><span class="doc">Choosing the active space</span></a> workflow so that both lessons use the same selected active space.</p>
+</section>
+<section id="the-active-space-hamiltonian">
+<h2>The active-space Hamiltonian<a class="headerlink" href="#the-active-space-hamiltonian" title="Link to this heading"></a></h2>
+<p><a class="reference internal" href="03_choosing_the_active_space.html#tutorial-active-space-definition"><span class="std std-ref">Choosing the active space</span></a> partitioned the <a class="reference external" href="https://en.wikipedia.org/wiki/Molecular_orbital_theory">molecular orbitals</a> into inactive, active, and virtual spaces.
+As introduced in <a class="reference internal" href="index.html#tutorial-orbitals-and-determinants"><span class="std std-ref">Orbitals and determinants</span></a>, each <a class="reference external" href="https://en.wikipedia.org/wiki/Spin_orbital">spin orbital</a> combines a spatial orbital with an <span class="math notranslate nohighlight">\(\alpha\)</span> or <span class="math notranslate nohighlight">\(\beta\)</span> spin function.
+Occupations may vary among the active spin orbitals in the correlated <a class="reference external" href="https://en.wikipedia.org/wiki/Wave_function">wavefunction</a>, while inactive spatial orbitals remain doubly occupied and virtual spatial orbitals remain empty.
+The active-space Hamiltonian acts only on the active spin orbitals; interactions with frozen inactive orbitals contribute to its effective one-electron terms and to the separately calculated <em>core energy</em>, a scalar containing the nuclear repulsion and constant frozen-orbital contributions.
+Written in <a class="reference external" href="https://en.wikipedia.org/wiki/Second_quantization">second quantization</a>, this Hamiltonian uses operators that change orbital occupations.
+The <a class="reference external" href="https://en.wikipedia.org/wiki/Creation_and_annihilation_operators">creation operator</a> <span class="math notranslate nohighlight">\(\hat{a}_p^\dagger\)</span> adds an electron to spin orbital <span class="math notranslate nohighlight">\(p\)</span>, while the <a class="reference external" href="https://en.wikipedia.org/wiki/Creation_and_annihilation_operators">annihilation operator</a> <span class="math notranslate nohighlight">\(\hat{a}_p\)</span> removes one.
+The Hamiltonian contains one-electron and two-electron terms:</p>
+<div class="math notranslate nohighlight">
+\[\hat{H}_{\mathrm{active}}
+= \sum_{pq} h_{pq}\,\hat{a}_p^\dagger \hat{a}_q
++ \frac{1}{2}\sum_{pqrs} g_{pqrs}\,
+  \hat{a}_p^\dagger \hat{a}_q^\dagger \hat{a}_s \hat{a}_r.\]</div>
+<p>The indices <span class="math notranslate nohighlight">\(p,q,r,s\)</span> label active spin orbitals, or equivalently fermionic modes.
+The coefficients <span class="math notranslate nohighlight">\(h_{pq}\)</span> describe one-electron effects, including kinetic energy, attraction to the nuclei, and the effective interaction with frozen inactive electrons.
+The coefficients <span class="math notranslate nohighlight">\(g_{pqrs}\)</span> describe electron–electron repulsion among the active spin orbitals.</p>
+<p>The creation and annihilation operators automatically produce zero when creation acts on an already occupied spin orbital or annihilation acts on an unoccupied one.
+Together, these operators connect the <a class="reference external" href="https://en.wikipedia.org/wiki/Slater_determinant">Slater determinants</a> introduced in <a class="reference internal" href="index.html#tutorial-orbitals-and-determinants"><span class="std std-ref">Orbitals and determinants</span></a> that can contribute to the active-space wavefunction.</p>
+<p>The mapping script reconstructs this selected active-space Hamiltonian from the orbitals produced by <a class="reference internal" href="03_choosing_the_active_space.html"><span class="doc">Choosing the active space</span></a>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">selected_orbitals</span> <span class="o">=</span> <span class="n">active_space_result</span><span class="o">.</span><span class="n">refined_orbitals</span>
+<span class="n">hamiltonian_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk&quot;</span><span class="p">)</span>
+<span class="n">active_hamiltonian</span> <span class="o">=</span> <span class="n">hamiltonian_constructor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">selected_orbitals</span><span class="p">)</span>
+
+<span class="c1"># Nuclear repulsion and frozen inactive-orbital contributions stay outside</span>
+<span class="c1"># the mapped active Hamiltonian as one separately stored scalar.</span>
+<span class="n">core_energy</span> <span class="o">=</span> <span class="n">active_hamiltonian</span><span class="o">.</span><span class="n">get_core_energy</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="why-orbital-occupations-are-not-enough">
+<h2>Why orbital occupations are not enough<a class="headerlink" href="#why-orbital-occupations-are-not-enough" title="Link to this heading"></a></h2>
+<p>The operator products in the active-space Hamiltonian act on Slater determinants.
+For example, in the one-electron term <span class="math notranslate nohighlight">\(\hat{a}_p^\dagger\hat{a}_q\)</span>, the rightmost operator first removes an electron from spin orbital <span class="math notranslate nohighlight">\(q\)</span>, and then the leftmost operator places it in spin orbital <span class="math notranslate nohighlight">\(p\)</span>.
+The two-electron terms describe corresponding changes involving two electrons.
+The orbital occupations determine whether such a change is allowed.
+When it is allowed, restoring the resulting determinant to the chosen standard orbital order can introduce a minus sign.</p>
+<p>Both this ordering sign and the <a class="reference internal" href="02_describing_the_molecule.html#tutorial-hartree-fock-wavefunction"><span class="std std-ref">exchange effect discussed in Describing the molecule</span></a> follow from the antisymmetry of fermionic wavefunctions.
+Applying the Hamiltonian’s operators in a different order can therefore change the sign of the resulting contribution.
+These signs are already part of the electronic-structure problem; mapping the Hamiltonian to qubits must preserve them.</p>
+<p>As the <a class="reference internal" href="index.html#tutorial-occupation-encoding"><span class="std std-ref">tutorial introduction explains</span></a>, a qubit can store whether one spin orbital is unoccupied or occupied.
+That records the orbital occupations, but operations acting on different qubits commute and therefore do not automatically reproduce fermionic signs.
+Simply replacing each creation or annihilation operator with an operation on its corresponding qubit would change the Hamiltonian’s matrix elements.
+A fermion-to-qubit mapping must represent both the occupations and the signs caused by fermionic operator ordering.</p>
+<p class="rubric">Optional: the sign rule in symbols</p>
+<p>The <a class="reference external" href="https://en.wikipedia.org/wiki/Canonical_anticommutation_relation">anticommutation relations</a> summarize this sign rule compactly.
+With the anticommutator defined as <span class="math notranslate nohighlight">\(\{\hat{A},\hat{B}\}=\hat{A}\hat{B}+\hat{B}\hat{A}\)</span>, fermionic creation and annihilation operators satisfy</p>
+<div class="math notranslate nohighlight">
+\[\{\hat{a}_p,\hat{a}_q\}=0,
+\qquad
+\{\hat{a}_p,\hat{a}_q^\dagger\}=\delta_{pq},\]</div>
+<p>For different spin orbitals, the zero on the right means that exchanging the order of two operators changes the sign of the result.
+You will not need to manipulate these relations by hand; the Jordan–Wigner transformation enforces them through the parity strings introduced next.</p>
+</section>
+<section id="the-jordan-wigner-transformation">
+<h2>The Jordan–Wigner transformation<a class="headerlink" href="#the-jordan-wigner-transformation" title="Link to this heading"></a></h2>
+<p>The <a class="reference external" href="https://en.wikipedia.org/wiki/Jordan%E2%80%93Wigner_transformation">Jordan–Wigner transformation</a> <span class="bibtex-citation" id="id1">[<a class="reference internal" href="../../references.html#id16" title="P. Jordan and E. Wigner. Über das Paulische Äquivalenzverbot. Zeitschrift für Physik, 47:631-651, 1928. doi:10.1007/BF01331938.">JW28</a>]</span> assigns each fermionic mode to one qubit.
+In this molecular problem, each fermionic mode is one active spin orbital.
+To keep the two kinds of labels distinct, let <span class="math notranslate nohighlight">\(\ell_p\)</span> denote the qubit assigned to fermionic mode <span class="math notranslate nohighlight">\(p\)</span>; its numerical qubit index is <span class="math notranslate nohighlight">\(p\)</span>.</p>
+<div class="math notranslate nohighlight">
+\[\vert 0\rangle_{\ell_p} \longleftrightarrow \text{mode }p\text{ unoccupied},
+\qquad
+\vert 1\rangle_{\ell_p} \longleftrightarrow \text{mode }p\text{ occupied}.\]</div>
+<p>The occupation operator becomes</p>
+<div class="math notranslate nohighlight">
+\[\hat{n}_p=\hat{a}_p^\dagger\hat{a}_p=\frac{I_{\ell_p}-Z_{\ell_p}}{2}.\]</div>
+<p>The creation and annihilation operators become</p>
+<div class="math notranslate nohighlight">
+\[\hat{a}_p^\dagger
+= \frac{1}{2}\left(\prod_{j=0}^{p-1}Z_{\ell_j}\right)(X_{\ell_p}-iY_{\ell_p}),
+\qquad
+\hat{a}_p
+= \frac{1}{2}\left(\prod_{j=0}^{p-1}Z_{\ell_j}\right)(X_{\ell_p}+iY_{\ell_p}).\]</div>
+<p>The <a class="reference external" href="https://en.wikipedia.org/wiki/Pauli_matrices">Pauli operators</a> <span class="math notranslate nohighlight">\(X_{\ell_p}\)</span>, <span class="math notranslate nohighlight">\(Y_{\ell_p}\)</span>, and <span class="math notranslate nohighlight">\(Z_{\ell_p}\)</span> act on qubit <span class="math notranslate nohighlight">\(\ell_p\)</span>.
+The combinations <span class="math notranslate nohighlight">\((X_{\ell_p}-iY_{\ell_p})/2\)</span> and <span class="math notranslate nohighlight">\((X_{\ell_p}+iY_{\ell_p})/2\)</span> raise <span class="math notranslate nohighlight">\(\vert 0\rangle_{\ell_p}\)</span> to <span class="math notranslate nohighlight">\(\vert 1\rangle_{\ell_p}\)</span> and lower <span class="math notranslate nohighlight">\(\vert 1\rangle_{\ell_p}\)</span> to <span class="math notranslate nohighlight">\(\vert 0\rangle_{\ell_p}\)</span>, respectively.
+Within the product, <span class="math notranslate nohighlight">\(j\)</span> indexes the lower fermionic modes and <span class="math notranslate nohighlight">\(Z_{\ell_j}\)</span> acts on the qubit assigned to mode <span class="math notranslate nohighlight">\(j\)</span>.
+The product of <span class="math notranslate nohighlight">\(Z\)</span> operators records the parity of occupied lower-indexed modes.
+Each occupied lower-indexed mode contributes an eigenvalue of <span class="math notranslate nohighlight">\(-1\)</span>, so the product is negative when an odd number of those modes is occupied.
+Acting on mode <span class="math notranslate nohighlight">\(p\)</span> crosses the occupied lower-indexed modes in the chosen fermionic ordering, with each crossing contributing a minus sign.
+The parity string supplies their combined sign, so the mapped operators satisfy the fermionic anticommutation relations.</p>
+<figure class="align-center" id="id2">
+<div class="graphviz"><img src="../../_images/graphviz-2bc1512c26e48434e5f02e1ebae4a3be7f9907bd.png" alt="Worked Jordan--Wigner mapping for target active spin orbital p equals 3, also called fermionic mode 3. Modes 0, 1, and 2 map to qubits ell 0, ell 1, and ell 2 and contribute the parity string Z ell 0 times Z ell 1 times Z ell 2. Its eigenvalue is negative when an odd number of those lower modes is occupied. Target qubit ell 3 carries the X minus iY creation action or X plus iY annihilation action. Multiplying target action by parity string preserves the fermionic ordering sign." class="graphviz" /></div>
+<figcaption>
+<p><span class="caption-text">A fermionic mode is one active spin orbital. For target spin orbital <span class="math notranslate nohighlight">\(p=3\)</span>, the qubits assigned to preceding spin orbitals supply the parity string <span class="math notranslate nohighlight">\(Z_{\ell_0}Z_{\ell_1}Z_{\ell_2}\)</span>, while qubit <span class="math notranslate nohighlight">\(\ell_3\)</span> changes the target occupation. The same pattern extends to any target <span class="math notranslate nohighlight">\(p\)</span>.</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>Because the parity strings depend on mode ordering, the ordering must be specified: <a class="reference internal" href="../../glossary.html#term-QDK"><span class="xref std std-term">QDK</span></a>/Chemistry places all active <span class="math notranslate nohighlight">\(\alpha\)</span> modes before all active <span class="math notranslate nohighlight">\(\beta\)</span> modes, a convention called <em>blocked ordering</em>.</p>
+<details class="quiz-question admonition">
+<summary class="admonition-title">Why does Jordan–Wigner need a string of Pauli Z operators?</summary>
+<p>The <span class="math notranslate nohighlight">\(Z\)</span> string records the parity of lower-indexed fermionic modes.
+Its sign ensures that encoded creation and annihilation operators anticommute even though operators on different qubits commute.</p>
+</details>
+</section>
+<section id="qubits-for-the-encoded-fermionic-state">
+<h2>Qubits for the encoded fermionic state<a class="headerlink" href="#qubits-for-the-encoded-fermionic-state" title="Link to this heading"></a></h2>
+<p>The <a class="reference internal" href="index.html#tutorial-compute-register"><span class="std std-ref">compute register introduced in the tutorial overview</span></a> stores the encoded active-space fermionic state.
+A qubit in this register is a <em>compute-register qubit</em>, shortened below to <em>compute qubit</em>.
+Every spatial orbital corresponds to one <span class="math notranslate nohighlight">\(\alpha\)</span> spin orbital and one <span class="math notranslate nohighlight">\(\beta\)</span> spin orbital.
+For <span class="math notranslate nohighlight">\(n_o\)</span> active spatial orbitals, Jordan–Wigner therefore requires</p>
+<div class="math notranslate nohighlight">
+\[n_{\mathrm{spin}}=2n_o,
+\qquad
+n_{\mathrm{compute}}=n_{\mathrm{spin}}.\]</div>
+<p>Calculate the compute-register count from the active space selected in <a class="reference internal" href="03_choosing_the_active_space.html"><span class="doc">Choosing the active space</span></a> before running the script:</p>
+<p>Because this restricted calculation has matching <span class="math notranslate nohighlight">\(\alpha\)</span> and <span class="math notranslate nohighlight">\(\beta\)</span> active spaces, the code reads the <span class="math notranslate nohighlight">\(\alpha\)</span>-channel entries directly, one for each active spatial orbital.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Count one spin channel to obtain spatial orbitals, then include both spins.</span>
+<span class="n">alpha_channel</span> <span class="o">=</span> <span class="n">SymmetryLabel</span><span class="p">([</span><span class="n">axes</span><span class="o">.</span><span class="n">alpha</span><span class="p">()])</span>
+<span class="n">num_active_spatial_orbitals</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span>
+    <span class="n">selected_orbitals</span><span class="o">.</span><span class="n">active_indices</span><span class="p">()</span><span class="o">.</span><span class="n">indices</span><span class="p">(</span><span class="n">alpha_channel</span><span class="p">)</span>
+<span class="p">)</span>
+<span class="n">num_active_spin_orbitals</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">num_active_spatial_orbitals</span>
+</pre></div>
+</div>
+<p>Its size does not include phase-estimation ancillas, temporary workspace qubits, error-correction overhead, or physical qubits.
+Those additional resources depend on later algorithm and hardware choices rather than on the Jordan–Wigner occupation encoding alone.</p>
+<details class="quiz-question admonition">
+<summary class="admonition-title">How many compute qubits does the selected active space require?</summary>
+<p>The selected space contains six active spatial orbitals and therefore twelve active spin orbitals.
+Jordan–Wigner uses one qubit per spin orbital, so the compute register contains twelve qubits.</p>
+</details>
+<p>Record your predicted compute-register qubit count and the excluded qubit categories in the <a class="reference internal" href="lab_notebook.html#lab-notebook-qubits"><span class="std std-ref">qubit-representation section of the lab notebook</span></a> before continuing.
+You will verify the count when you run the mapping script.</p>
+<details class="quiz-question admonition">
+<summary class="admonition-title">How does adding one active spatial orbital change the compute-qubit count?</summary>
+<p>Each added spatial orbital contributes one <span class="math notranslate nohighlight">\(\alpha\)</span> and one <span class="math notranslate nohighlight">\(\beta\)</span> spin orbital.
+Jordan–Wigner therefore requires two additional compute qubits.
+This change does not include algorithm ancillas or error-correction overhead.</p>
+</details>
+</section>
+<section id="qubit-hamiltonian-in-pauli-form">
+<span id="tutorial-qubit-hamiltonian"></span><h2>Qubit Hamiltonian in Pauli form<a class="headerlink" href="#qubit-hamiltonian-in-pauli-form" title="Link to this heading"></a></h2>
+<p>Substituting the Jordan–Wigner expressions into <span class="math notranslate nohighlight">\(\hat{H}_{\mathrm{active}}\)</span> produces a weighted sum of Pauli strings:</p>
+<div class="math notranslate nohighlight">
+\[\hat{H}_{\mathrm{qubit}}=\sum_k c_k P_k,\]</div>
+<p>where coefficient <span class="math notranslate nohighlight">\(c_k\)</span> multiplies a tensor product <span class="math notranslate nohighlight">\(P_k\)</span> of <span class="math notranslate nohighlight">\(I\)</span>, <span class="math notranslate nohighlight">\(X\)</span>, <span class="math notranslate nohighlight">\(Y\)</span>, and <span class="math notranslate nohighlight">\(Z\)</span> operators.
+The index <span class="math notranslate nohighlight">\(k\)</span> labels Pauli terms, not spin orbitals or qubits.
+The number of Pauli terms describes the size of this operator representation; it is not a logical gate count or a physical-resource estimate.
+The exact count also depends on the mapper’s numerical thresholds because terms with sufficiently small coefficients are omitted.</p>
+<p>The script creates a Jordan–Wigner mapping for the active spin orbitals and passes it to the native <a class="reference internal" href="../../glossary.html#term-QDK"><span class="xref std std-term">QDK</span></a>/Chemistry mapper:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">mapping</span> <span class="o">=</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">jordan_wigner</span><span class="p">(</span><span class="n">num_modes</span><span class="o">=</span><span class="n">num_active_spin_orbitals</span><span class="p">)</span>
+<span class="n">qubit_mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
+    <span class="s2">&quot;qubit_mapper&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;qdk&quot;</span><span class="p">,</span>
+    <span class="n">threshold</span><span class="o">=</span><span class="mf">1e-10</span><span class="p">,</span>
+    <span class="n">integral_threshold</span><span class="o">=</span><span class="mf">1e-14</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">qubit_hamiltonian</span> <span class="o">=</span> <span class="n">qubit_mapper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">active_hamiltonian</span><span class="p">,</span> <span class="n">mapping</span><span class="p">)</span>
+
+<span class="c1"># The mapper returns a weighted Pauli sum whose string length is the</span>
+<span class="c1"># compute-register size.</span>
+<span class="n">num_compute_qubits</span> <span class="o">=</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">num_qubits</span>
+<span class="n">num_pauli_terms</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">pauli_strings</span><span class="p">)</span>
+<span class="n">print_representative_pauli_terms</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The Pauli terms fall into families that connect back to the determinant picture:</p>
+<dl class="simple" id="tutorial-all-identity-term">
+<dt>All-identity term</dt><dd><p>Acts in the same way on every occupation-basis state and therefore contributes a constant shift to every eigenvalue of the active Hamiltonian.
+This mapped constant is distinct from the core energy stored outside the qubit Hamiltonian.</p>
+</dd>
+<dt><span class="math notranslate nohighlight">\(I\)</span>- and <span class="math notranslate nohighlight">\(Z\)</span>-only terms</dt><dd><p>Are diagonal in the occupation-number basis because each determinant is an eigenstate of every <span class="math notranslate nohighlight">\(Z\)</span> operator.
+Their signs depend on which spin orbitals are occupied, so together they contribute occupation-dependent one-electron and electron-interaction energies to the diagonal matrix element of each determinant.</p>
+</dd>
+<dt>Terms containing <span class="math notranslate nohighlight">\(X\)</span> or <span class="math notranslate nohighlight">\(Y\)</span></dt><dd><p>Are off-diagonal in the occupation-number basis and connect basis states with different orbital occupations, corresponding to couplings among Slater determinants.
+A complete mapped hopping or excitation operator generally contains a coordinated sum of several Pauli strings, so one displayed string should not be interpreted as an entire chemical excitation by itself.</p>
+</dd>
+</dl>
+<p>Printing every Pauli term would obscure these patterns, so the complete script displays the all-identity term, three of the largest <span class="math notranslate nohighlight">\(I\)</span>- and <span class="math notranslate nohighlight">\(Z\)</span>-only terms, and four of the largest terms containing <span class="math notranslate nohighlight">\(X\)</span> or <span class="math notranslate nohighlight">\(Y\)</span>.
+The preview writes, for example, <code class="docutils literal notranslate"><span class="pre">X(qubit</span> <span class="pre">1)</span> <span class="pre">X(qubit</span> <span class="pre">2)</span> <span class="pre">X(qubit</span> <span class="pre">5)</span> <span class="pre">X(qubit</span> <span class="pre">6)</span></code> for a tensor product that applies <span class="math notranslate nohighlight">\(X\)</span> to qubits 1, 2, 5, and 6 and applies <span class="math notranslate nohighlight">\(I\)</span> to every unlisted qubit.</p>
+</section>
+<section id="core-energy-bookkeeping">
+<h2>Core-energy bookkeeping<a class="headerlink" href="#core-energy-bookkeeping" title="Link to this heading"></a></h2>
+<p>The <a class="reference internal" href="03_choosing_the_active_space.html#tutorial-selected-space-reference"><span class="std std-ref">selected-space energy from Choosing the active space</span></a> contains a constant contribution in addition to the active Hamiltonian:</p>
+<div class="math notranslate nohighlight">
+\[E_{\mathrm{total}}
+= E_{\mathrm{core}}
++ \langle\Psi_{\mathrm{active}}\vert
+  \hat{H}_{\mathrm{active}}
+  \vert\Psi_{\mathrm{active}}\rangle.\]</div>
+<p><a class="reference internal" href="../../glossary.html#term-QDK"><span class="xref std std-term">QDK</span></a>/Chemistry stores nuclear repulsion and the constant contribution from frozen inactive orbitals in <span class="math notranslate nohighlight">\(E_{\mathrm{core}}\)</span>.
+The qubit mapper transforms <span class="math notranslate nohighlight">\(\hat{H}_{\mathrm{active}}\)</span> but does not include <span class="math notranslate nohighlight">\(E_{\mathrm{core}}\)</span> in the returned qubit operator.
+This scalar must therefore be added to the measured active-space eigenvalue to reconstruct the selected-space total energy.</p>
+<details class="quiz-question admonition">
+<summary class="admonition-title">Why must the core energy be added to the energy from the qubit Hamiltonian?</summary>
+<p>The qubit mapper encodes only the active fermionic Hamiltonian.
+Nuclear repulsion and constant frozen-orbital contributions are stored separately in the core energy, so adding that scalar reconstructs the selected-space total energy.</p>
+</details>
+<p>The fixed-electron-number sector in this teaching example is small enough to validate the mapping by exact matrix diagonalization.</p>
+<p id="tutorial-fixed-electron-number-subspace">A <em>fixed-electron-number subspace</em> contains only the occupation-basis states with specified numbers <span class="math notranslate nohighlight">\(n_\alpha\)</span> and <span class="math notranslate nohighlight">\(n_\beta\)</span> of active <span class="math notranslate nohighlight">\(\alpha\)</span> and <span class="math notranslate nohighlight">\(\beta\)</span> electrons.
+The script restricts <span class="math notranslate nohighlight">\(\hat{H}_{\mathrm{qubit}}\)</span> to the fixed-electron-number subspace with the same electron counts as the <a class="reference internal" href="../../glossary.html#term-CASCI"><span class="xref std std-term">CASCI</span></a> calculation.
+Before running the script, use the <a class="reference internal" href="03_choosing_the_active_space.html#tutorial-determinant-count"><span class="std std-ref">determinant-count formula from the active-space calculation</span></a> to calculate the number of occupation-basis states in this subspace as <span class="math notranslate nohighlight">\(\binom{n_o}{n_\alpha}\binom{n_o}{n_\beta}\)</span>, and record your prediction in the <a class="reference internal" href="lab_notebook.html#lab-notebook-qubits"><span class="std std-ref">qubit-representation section of the lab notebook</span></a>.
+In the integer label for an occupation-basis state, bit <span class="math notranslate nohighlight">\(p\)</span> records the occupation of mode <span class="math notranslate nohighlight">\(p\)</span>, with qubit 0 as the least-significant bit.
+Blocked ordering therefore places the <span class="math notranslate nohighlight">\(n_o\)</span> active <span class="math notranslate nohighlight">\(\alpha\)</span> occupations in the lowest bits and the <span class="math notranslate nohighlight">\(n_o\)</span> active <span class="math notranslate nohighlight">\(\beta\)</span> occupations in the next bits; the mask in the code isolates the <span class="math notranslate nohighlight">\(\alpha\)</span> occupations so the two electron counts can be checked separately.
+The lowest eigenvalue in this subspace is obtained directly from the mapped qubit Hamiltonian:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">num_alpha</span><span class="p">,</span> <span class="n">num_beta</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">active_space_result</span><span class="o">.</span><span class="n">refined_wavefunction</span><span class="o">.</span><span class="n">get_active_num_electrons</span><span class="p">()</span>
+<span class="p">)</span>
+
+<span class="c1"># QDK/Chemistry&#39;s blocked fermion ordering stores alpha occupations in the</span>
+<span class="c1"># low bits and beta occupations in the high bits. Shifting 1 left and</span>
+<span class="c1"># subtracting 1 creates a mask with one low bit per alpha spin orbital.</span>
+<span class="n">alpha_mask</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">num_active_spatial_orbitals</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+<span class="c1"># Enumerate all compute-register bit strings, then keep only states with the</span>
+<span class="c1"># required numbers of set alpha and beta occupation bits.</span>
+<span class="n">fixed_electron_basis_indices</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">state</span>
+    <span class="k">for</span> <span class="n">state</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">num_compute_qubits</span><span class="p">)</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">state</span> <span class="o">&amp;</span> <span class="n">alpha_mask</span><span class="p">)</span><span class="o">.</span><span class="n">bit_count</span><span class="p">()</span> <span class="o">==</span> <span class="n">num_alpha</span>
+    <span class="ow">and</span> <span class="p">(</span><span class="n">state</span> <span class="o">&gt;&gt;</span> <span class="n">num_active_spatial_orbitals</span><span class="p">)</span><span class="o">.</span><span class="n">bit_count</span><span class="p">()</span> <span class="o">==</span> <span class="n">num_beta</span>
+<span class="p">]</span>
+
+<span class="c1"># Construct the full operator sparsely, extract the physical sector, and</span>
+<span class="c1"># densify only that compact matrix for exact diagonalization.</span>
+<span class="n">qubit_matrix</span> <span class="o">=</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">to_matrix</span><span class="p">(</span><span class="n">sparse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">fixed_electron_matrix</span> <span class="o">=</span> <span class="n">qubit_matrix</span><span class="p">[</span><span class="n">fixed_electron_basis_indices</span><span class="p">][</span>
+    <span class="p">:,</span> <span class="n">fixed_electron_basis_indices</span>
+<span class="p">]</span><span class="o">.</span><span class="n">toarray</span><span class="p">()</span>
+<span class="n">mapped_active_energy</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">eigvalsh</span><span class="p">(</span><span class="n">fixed_electron_matrix</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
+<span class="n">mapped_total_energy</span> <span class="o">=</span> <span class="n">core_energy</span> <span class="o">+</span> <span class="n">mapped_active_energy</span>
+<span class="n">mapping_energy_difference</span> <span class="o">=</span> <span class="n">mapped_total_energy</span> <span class="o">-</span> <span class="n">active_space_result</span><span class="o">.</span><span class="n">refined_energy</span>
+</pre></div>
+</div>
+<p>Adding <span class="math notranslate nohighlight">\(E_{\mathrm{core}}\)</span> to this mapped active-space eigenvalue gives a total energy that can be compared with the selected-space <a class="reference internal" href="../../glossary.html#term-CASCI"><span class="xref std std-term">CASCI</span></a> reference.
+The script constructs the full qubit matrix sparsely and densifies only the fixed-electron-number sector for exact diagonalization.
+This selected-sector validation is practical for the compact teaching example; it is not a scalable method for solving larger qubit Hamiltonians.</p>
+</section>
+<section id="running-the-mapping">
+<h2>Running the mapping<a class="headerlink" href="#running-the-mapping" title="Link to this heading"></a></h2>
+<p>With the Python environment from <a class="reference internal" href="00_before_you_begin.html"><span class="doc">Before you begin</span></a> active, run the complete script from the Visual Studio Code integrated terminal:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">python tutorial_map_n2_to_qubits.py</span>
+</pre></div>
+</div>
+<details class="quiz-question admonition">
+<summary class="admonition-title">Does the script confirm the size of the fixed-electron-number subspace?</summary>
+<p>The subspace with three active <span class="math notranslate nohighlight">\(\alpha\)</span> and three active <span class="math notranslate nohighlight">\(\beta\)</span> electrons contains <span class="math notranslate nohighlight">\(\binom{6}{3}\binom{6}{3}=400\)</span> occupation-basis states, matching the 400 determinants in the selected active space.</p>
+</details>
+<details class="quiz-question admonition">
+<summary class="admonition-title">What operator size and core energy does the script report?</summary>
+<p>The mapped Hamiltonian contains 247 Pauli terms on twelve compute qubits.
+The separately stored core energy is approximately <span class="math notranslate nohighlight">\(-99.117775726922\)</span> Hartree.
+The script retains Pauli coefficients of magnitude at least <span class="math notranslate nohighlight">\(10^{-10}\)</span> Hartree after constructing the mapping with a tighter integral threshold.</p>
+</details>
+<details class="quiz-question admonition">
+<summary class="admonition-title">Does the mapped qubit Hamiltonian reproduce the selected-space algorithmic reference?</summary>
+<p>Yes.
+The mapped active-space ground-state energy plus the separately stored core energy reproduces the <a class="reference internal" href="03_choosing_the_active_space.html#tutorial-selected-space-reference"><span class="std std-ref">selected-space CASCI reference</span></a> with a validation difference indistinguishable from zero at the displayed precision.
+The script reports the component energies and their full-precision validation difference for the lab notebook.</p>
+</details>
+<p>This agreement validates the Jordan–Wigner mapping and fixed-electron-number subspace construction for this selected Hamiltonian within numerical precision.
+Compare the reported qubit count with your prediction, then complete the <a class="reference internal" href="lab_notebook.html#lab-notebook-qubits"><span class="std std-ref">qubit-representation section of the lab notebook</span></a> with the encoding, confirmed orbital and qubit counts, Pauli-term count, fixed-electron-number subspace, mapped energy, reconstructed total, and comparison with the selected-space reference.</p>
+</section>
+<section id="further-reading">
+<h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../user/comprehensive/algorithms/hamiltonian_constructor.html"><span class="doc">Hamiltonian construction</span></a></p></li>
+<li><p><a class="reference internal" href="../../user/comprehensive/data/hamiltonian.html"><span class="doc">Electronic Hamiltonians</span></a></p></li>
+<li><p><a class="reference internal" href="../../user/comprehensive/algorithms/qubit_mapper.html"><span class="doc">Qubit mapping</span></a></p></li>
+<li><p><a class="reference internal" href="../../user/comprehensive/data/majorana_mapping.html"><span class="doc">Majorana mappings</span></a></p></li>
+<li><p><a class="reference internal" href="../../user/comprehensive/data/pauli_operator.html"><span class="doc">Pauli operators</span></a></p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="03_choosing_the_active_space.html" class="btn btn-neutral float-left" title="Choosing the active space" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="05_preparing_the_trial_state.html" class="btn btn-neutral float-right" title="Preparing the trial state" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
