@@ -161,9 +161,7 @@ TEST(SchriefferWolffPT2Test, SettingsKnobs) {
   EXPECT_DOUBLE_EQ(settings.get<double>("denom_floor"), 1e-8);
   EXPECT_DOUBLE_EQ(settings.get<double>("denom_imaginary_shift"), 0.0);
   EXPECT_DOUBLE_EQ(settings.get<double>("denom_flow"), 1.0);
-  EXPECT_DOUBLE_EQ(settings.get<double>("intruder_warn_amplitude"), 1.0);
   EXPECT_TRUE(settings.get<bool>("semicanonicalize"));
-  EXPECT_DOUBLE_EQ(settings.get<double>("semicanonical_tolerance"), 1e-10);
   EXPECT_DOUBLE_EQ(settings.get<double>("max_folded_occupation_deviation"),
                    0.5);
   EXPECT_ANY_THROW(settings.set("denom_floor", -1.0));

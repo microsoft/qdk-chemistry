@@ -3,6 +3,8 @@
 // license information.
 
 #pragma once
+#include <cmath>
+#include <limits>
 #include <memory>
 #include <qdk/chemistry/algorithms/effective_hamiltonian.hpp>
 #include <qdk/chemistry/data/settings.hpp>
@@ -21,7 +23,41 @@ namespace qdk::chemistry::algorithms::microsoft {
  */
 class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
  public:
-  SchriefferWolffPT2Settings();
+  SchriefferWolffPT2Settings() {
+    set_default(
+        "denom_floor", 1e-8,
+        "Hard cutoff used by unregularized denominators and raw-amplitude "
+        "diagnostics.",
+        data::BoundConstraint<double>{0.0, std::numeric_limits<double>::max()});
+    set_default(
+        "denom_flow", 1.0,
+        "Flow-parameter denominator regularizer, 1/D -> (1-exp(-s*D^2))/D, in "
+        "units of Eh^-2. Set to 0 to disable. Mutually exclusive with "
+        "denom_imaginary_shift; with both disabled the unregularized inverse "
+        "is used, floored by denom_floor. This borrows the DSRG damping form; "
+        "it does not turn the downfold into a full DSRG calculation.",
+        data::BoundConstraint<double>{0.0, std::numeric_limits<double>::max()});
+    set_default(
+        "denom_imaginary_shift", 0.0,
+        "CASPT2-like imaginary level shift, 1/D -> D / (D^2 + shift^2), in "
+        "units of Eh. Set to 0 to disable. Mutually exclusive with denom_flow; "
+        "with both disabled the unregularized inverse is used, floored by "
+        "denom_floor.",
+        data::BoundConstraint<double>{0.0, std::numeric_limits<double>::max()});
+    set_default("semicanonicalize", true,
+                "Diagonalize the generalized Fock independently within the "
+                "inactive, active, and virtual blocks before forming Fock "
+                "denominators.");
+    set_default(
+        "max_folded_occupation_deviation", 0.5,
+        "Largest allowed deviation from an integer reference occupation (0 or "
+        "2) for an orbital folded into the external space. Folded occupations "
+        "are rounded to the nearest of 0 or 2; the total electron count is "
+        "preserved because the active space receives whatever the folded "
+        "orbitals do not take. Must be below 1, so a singly occupied orbital "
+        "is never folded on an arbitrary rounding.",
+        data::BoundConstraint<double>{0.0, std::nextafter(1.0, 0.0)});
+  }
   ~SchriefferWolffPT2Settings() override = default;
 };
 

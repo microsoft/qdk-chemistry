@@ -61,9 +61,7 @@ class TestEffectiveHamiltonianConstructor:
         assert settings.get("denom_floor") == pytest.approx(1e-8)
         assert settings.get("denom_imaginary_shift") == pytest.approx(0.0)
         assert settings.get("denom_flow") == pytest.approx(1.0)
-        assert settings.get("intruder_warn_amplitude") == pytest.approx(1.0)
         assert settings.get("semicanonicalize") is True
-        assert settings.get("semicanonical_tolerance") == pytest.approx(1e-10)
         assert settings.get("max_folded_occupation_deviation") == pytest.approx(0.5)
 
         settings.set("denom_flow", 0.0)

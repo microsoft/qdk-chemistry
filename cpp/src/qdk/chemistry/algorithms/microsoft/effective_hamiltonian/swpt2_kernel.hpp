@@ -107,9 +107,9 @@ struct ActiveHamiltonian {
 };
 
 // ===========================================================================
-// Spin-blocked on-the-fly downfold (PRODUCTION): the path wired into the
-// constructor. Stores the two-body as spatial spin blocks and forms every
-// element on demand, so no dense n_so^4 tensor is ever materialized.
+// Spin-blocked on-the-fly downfold: the path wired into the constructor.
+// Stores the two-body as spatial spin blocks and forms every element on
+// demand, so no dense n_so^4 tensor is ever materialized.
 // ===========================================================================
 
 /// Spin-blocked *spatial* storage of the antisymmetric two-body tensor for a

@@ -633,9 +633,7 @@ void project_remaining(const Eigen::MatrixXd& A1, A2Get A2get,
 }  // namespace
 
 // ===========================================================================
-// Spin-blocked on-the-fly downfold (PRODUCTION): the path wired into the
-// constructor. Stores the two-body as spatial spin blocks and forms every
-// element on demand, so no dense n_so^4 tensor is ever materialized.
+// Spin-blocked on-the-fly downfold.
 // ===========================================================================
 
 SpinBlockedTwoBody build_two_body_blocked(const Eigen::VectorXd& g, int norb) {
@@ -706,8 +704,6 @@ ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
                                       double e_core) {
   const int n_so = part.n_so;
 
-  // Active spin-orbitals (ascending) + full -> compact index map, so the
-  // result is stored over the active space only.
   std::vector<int> active_so;
   for (int o = 0; o < n_so; ++o)
     if (part.is_active[o]) active_so.push_back(o);
@@ -747,10 +743,8 @@ ActiveDownfoldResult downfold_blocked(const Eigen::MatrixXd& f,
         s1(P, Q) = f(P, Q) * regularized_inverse(d, reg);
         track(f(P, Q), d);
       }
-  // Intruder diagnostics over the occupation-changing two-body couplings: a
-  // diagnostics-only scan (nothing is materialized) restricted to the nonzero
-  // spin patterns -- same-spin, or one alpha and one beta per creation and
-  // annihilation pair -- instead of the full (2*norb)^4 spin-orbital grid.
+  // Diagnostics only, materializing nothing. Restricted to the six nonzero
+  // spin patterns rather than the full (2*norb)^4 grid.
   static constexpr int spin_patterns[6][4] = {{0, 0, 0, 0}, {1, 1, 1, 1},
                                               {0, 1, 0, 1}, {0, 1, 1, 0},
                                               {1, 0, 0, 1}, {1, 0, 1, 0}};

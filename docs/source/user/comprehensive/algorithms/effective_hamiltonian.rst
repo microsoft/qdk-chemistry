@@ -124,18 +124,10 @@ Settings
      - float
      - ``1\times10^{-8}``
      - Absolute cutoff in :math:`E_h` used by unregularized denominators.
-   * - ``intruder_warn_amplitude``
-     - float
-     - ``1.0``
-     - Warn when the largest raw generator amplitude exceeds this value.
    * - ``semicanonicalize``
      - bool
      - ``True``
      - Diagonalize the generalized Fock matrix within each orbital-role block.
-   * - ``semicanonical_tolerance``
-     - float
-     - ``1\times10^{-10}``
-     - Skip a role-block rotation below this off-diagonal tolerance.
    * - ``max_folded_occupation_deviation``
      - float
      - ``0.5``
@@ -162,8 +154,9 @@ Diagnostic logging
 The constructor logs the active regularization, minimum denominator, maximum raw
 amplitude, whether a semicanonical rotation was applied, and the derived active
 electron count. Small denominators
-and large raw amplitudes indicate sensitivity to intruder states; amplitudes
-above ``intruder_warn_amplitude`` also produce a warning. The default flow
+and large raw amplitudes indicate sensitivity to intruder states; an amplitude
+above one, where the perturbation series stops contracting, also produces a
+warning. The default flow
 parameter is a policy default, not a universal accuracy guarantee. Compare
 regularization choices for the system being studied when the logged values
 indicate sensitivity.
