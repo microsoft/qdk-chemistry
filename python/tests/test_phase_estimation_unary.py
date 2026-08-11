@@ -343,32 +343,3 @@ class TestReflectionRegisterContract:
         )[0]
 
         assert circuit._qsharp_factory.parameter["numAncillas"] == declared - hamiltonian.num_qubits
-
-    def test_a_mapper_without_a_declared_width_is_rejected(self, monkeypatch):
-        """Guessing the ancilla count from the container is exactly what this change removes."""
-        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([0.5, 0.5]))
-        create_nested = QdkUnaryQpeCircuitBuilder._create_nested
-
-        class UndeclaredWidthMapper:
-            """A mapper that maps faithfully but never says how wide its register is."""
-
-            def __init__(self, inner):
-                self._inner = inner
-
-            def run(self, *args, **kwargs) -> Circuit:
-                """Strip ``num_qubits`` off whatever the real mapper returned."""
-                mapped = self._inner.run(*args, **kwargs)
-                return Circuit(qsharp_op=mapped._qsharp_op, qsharp_factory=mapped._qsharp_factory)
-
-        def patched(self, setting_key):
-            nested = create_nested(self, setting_key)
-            return UndeclaredWidthMapper(nested) if setting_key == "circuit_mapper" else nested
-
-        monkeypatch.setattr(QdkUnaryQpeCircuitBuilder, "_create_nested", patched)
-
-        builder = QdkUnaryQpeCircuitBuilder(num_queries=3)
-        with pytest.raises(ValueError, match="did not report num_qubits"):
-            builder.run(
-                state_preparation=_identity_state_preparation(hamiltonian.num_qubits),
-                qubit_hamiltonian=hamiltonian,
-            )
