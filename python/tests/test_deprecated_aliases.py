@@ -5,7 +5,8 @@ These tests guard the backward-compatibility shims added when
 ``EnergyEstimator`` was renamed to
 :class:`~qdk_chemistry.algorithms.ExpectationEstimator`, and the
 ``"energy_estimator"`` algorithm-type key was renamed to
-``"expectation_estimator"``, and the v1 time-evolution type keys were renamed.
+``"expectation_estimator"``, the v1 time-evolution type keys were renamed, and
+``SparseIsometryGF2X`` state preparation was renamed to ``SparseIsometry``.
 The old names must keep working while emitting a ``DeprecationWarning`` so
 downstream users are not broken immediately.
 """
@@ -15,11 +16,13 @@ downstream users are not broken immediately.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import warnings
+
 import numpy as np
 import pytest
 
 from qdk_chemistry import algorithms
-from qdk_chemistry.algorithms import ExpectationEstimator, QdkExpectationEstimator
+from qdk_chemistry.algorithms import ExpectationEstimator, QdkExpectationEstimator, SparseIsometryStatePreparation
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian, QubitOperator
 
 
@@ -153,3 +156,41 @@ def test_deprecated_time_evolution_type_key_warns_and_resolves(old_type, new_typ
     new = algorithms.create(new_type, algorithm_name)
     assert old.type_name() == new_type
     assert old.name() == new.name()
+
+
+class TestSparseIsometryGF2XDeprecation:
+    """Deprecation of the ``SparseIsometryGF2X`` state preparation names.
+
+    Covers both the deprecated class alias and the deprecated ``"sparse_isometry_gf2x"``
+    algorithm name.
+    """
+
+    def test_sparse_isometry_gf2x_alias_resolves_to_sparse_isometry(self):
+        """``algorithms.SparseIsometryGF2XStatePreparation`` is the renamed class."""
+        with pytest.warns(DeprecationWarning, match="SparseIsometryGF2XStatePreparation"):
+            alias = algorithms.SparseIsometryGF2XStatePreparation
+        assert alias is SparseIsometryStatePreparation
+
+    def test_sparse_isometry_gf2x_alias_import_warns(self):
+        """Importing the old class name emits a ``DeprecationWarning``."""
+        with pytest.warns(DeprecationWarning, match="SparseIsometryGF2XStatePreparation"):
+            from qdk_chemistry.algorithms import SparseIsometryGF2XStatePreparation  # noqa: PLC0415
+        assert SparseIsometryGF2XStatePreparation is SparseIsometryStatePreparation
+
+    def test_class_alias_is_listed_by_dir(self):
+        """``dir()`` advertises the deprecated alias so tooling can discover it."""
+        assert "SparseIsometryGF2XStatePreparation" in dir(algorithms)
+
+    def test_deprecated_algorithm_name_warns_and_resolves(self):
+        """``create("state_prep", "sparse_isometry_gf2x")`` warns and builds the renamed algorithm."""
+        with pytest.warns(DeprecationWarning, match="sparse_isometry_gf2x"):
+            old = algorithms.create("state_prep", "sparse_isometry_gf2x")
+        new = algorithms.create("state_prep", "sparse_isometry")
+        assert type(old) is type(new)
+        assert old.name() == "sparse_isometry"
+
+    def test_current_algorithm_name_does_not_warn(self):
+        """The current name must stay warning-free."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            assert algorithms.create("state_prep", "sparse_isometry").name() == "sparse_isometry"

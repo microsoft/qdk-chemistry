@@ -5,11 +5,11 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import warnings
 from typing import ClassVar
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import Circuit, Settings, Wavefunction
-from qdk_chemistry.utils import Logger
 
 __all__: list[str] = []
 
@@ -99,9 +99,11 @@ class StatePreparationFactory(AlgorithmFactory):
         """
         if name in self._DEPRECATED_ALIASES:
             new_name = self._DEPRECATED_ALIASES[name]
-            Logger.warn(
-                f"The state preparation algorithm '{name}' has been renamed to '{new_name}'. "
-                f"'{name}' is deprecated and will be removed in a future release; please use '{new_name}' instead.",
+            warnings.warn(
+                f"State preparation algorithm '{name}' is deprecated and will be removed in a "
+                f"future release; use '{new_name}' instead.",
+                DeprecationWarning,
+                stacklevel=3,
             )
             name = new_name
         return super().create(name)

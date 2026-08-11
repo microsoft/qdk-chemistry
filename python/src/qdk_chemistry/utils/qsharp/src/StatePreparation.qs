@@ -164,36 +164,40 @@ namespace QDKChemistry.Utils.StatePreparation {
         }
     }
 
-    /// Composes a dense preparation operation with expansion operations.
-    /// The denseOp is applied to the subregister specified by embeddingMap,
+    /// Composes the dense preparation with expansion operations.
+    /// The dense preparation is applied to the subregister specified by embeddingMap,
     /// then expansion operations are applied to the full register.
+    ///
+    /// The dense preparation is taken as *parameters* rather than as a callable: a callable
+    /// that captures another callable cannot be resolved statically by the adaptive-profile
+    /// code generator, which makes the composition unusable as a QPE `statePrep` argument.
     operation ComposeSparseIsometry(
-        denseOp : Qubit[] => Unit,
+        denseParams : StatePreparationParams,
         embeddingMap : Int[],
         expansionOps : MatrixCompressionOp[],
         qs : Qubit[],
     ) : Unit {
-        denseOp(Subarray(embeddingMap, qs));
+        StatePreparation(denseParams, Subarray(embeddingMap, qs));
         ApplyExpansion(expansionOps, qs);
     }
 
     /// Returns a callable that applies sparse isometry composition.
     function MakeComposeSparseIsometryOp(
-        denseOp : Qubit[] => Unit,
+        denseParams : StatePreparationParams,
         embeddingMap : Int[],
         expansionOps : MatrixCompressionOp[],
     ) : Qubit[] => Unit {
-        ComposeSparseIsometry(denseOp, embeddingMap, expansionOps, _)
+        ComposeSparseIsometry(denseParams, embeddingMap, expansionOps, _)
     }
 
     /// Circuit entry point for sparse isometry composition.
     operation MakeComposeSparseIsometryCircuit(
-        denseOp : Qubit[] => Unit,
+        denseParams : StatePreparationParams,
         embeddingMap : Int[],
         expansionOps : MatrixCompressionOp[],
         numQubits : Int,
     ) : Unit {
         use qs = Qubit[numQubits];
-        ComposeSparseIsometry(denseOp, embeddingMap, expansionOps, qs);
+        ComposeSparseIsometry(denseParams, embeddingMap, expansionOps, qs);
     }
 }

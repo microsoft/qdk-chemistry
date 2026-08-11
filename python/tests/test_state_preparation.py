@@ -84,7 +84,8 @@ def test_sparse_isometry_basic(wavefunction_4e4o):
 
 def test_sparse_isometry_backward_compatibility():
     """Test that the sparse isometry StatePreparation algorithm can be created using the deprecated name."""
-    prep_deprecated = create("state_prep", "sparse_isometry_gf2x")
+    with pytest.warns(DeprecationWarning, match="sparse_isometry_gf2x"):
+        prep_deprecated = create("state_prep", "sparse_isometry_gf2x")
     assert isinstance(prep_deprecated, SparseIsometryStatePreparation)
 
     prep = create("state_prep", "sparse_isometry")

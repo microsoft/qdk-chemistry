@@ -58,6 +58,8 @@ from ._binary_encoding_utils import MatrixCompressionOp, MatrixCompressionType, 
 
 __all__: list[str] = ["SparseIsometryStatePreparationSettings"]
 
+_QSHARP_DENSE_PREP_PROGRAM = "QDKChemistry.Utils.StatePreparation.MakeStatePreparationCircuit"
+
 
 class SparseIsometryStatePreparationSettings(StatePreparationSettings):
     """Settings for SparseIsometryStatePreparation."""
@@ -347,28 +349,32 @@ class SparseIsometryStatePreparation(StatePreparation):
             Composed Circuit operating on the full qubit register.
 
         """
-        if dense_circuit._qsharp_op is not None:  # noqa: SLF001
-            return self._compose_qsharp(dense_circuit, expansion_ops, embedding_map, n_qubits)
+        factory = dense_circuit._qsharp_factory  # noqa: SLF001
+        if factory is not None and getattr(factory.program, "__name__", None) == _QSHARP_DENSE_PREP_PROGRAM:
+            # Compose with the dense preparation parameters rather than its callable: a callable capturing
+            # another callable cannot be resolved statically by the adaptive-profile code generator.
+            dense_params = QSHARP_UTILS.StatePreparation.StatePreparationParams(**factory.parameter)
+            return self._compose_qsharp(dense_params, expansion_ops, embedding_map, n_qubits)
         return self._compose_qiskit(dense_circuit, expansion_ops, embedding_map, n_qubits, dense_algo)
 
     def _compose_qsharp(
         self,
-        dense_circuit: Circuit,
+        dense_params,
         expansion_ops: list[MatrixCompressionOp],
         embedding_map: list[int],
         n_qubits: int,
     ) -> Circuit:
-        """Compose via Q# — embed dense op on subregister, then apply expansion."""
+        """Compose via Q# — embed the dense preparation on a subregister, then apply expansion."""
         serialized_ops = [op.to_dict() for op in expansion_ops]
         qsharp_op = QSHARP_UTILS.StatePreparation.MakeComposeSparseIsometryOp(
-            dense_circuit._qsharp_op,  # noqa: SLF001
+            dense_params,
             embedding_map,
             serialized_ops,
         )
         qsharp_factory = QsharpFactoryData(
             program=QSHARP_UTILS.StatePreparation.MakeComposeSparseIsometryCircuit,
             parameter={
-                "denseOp": dense_circuit._qsharp_op,  # noqa: SLF001
+                "denseParams": dense_params,
                 "embeddingMap": embedding_map,
                 "expansionOps": serialized_ops,
                 "numQubits": n_qubits,
@@ -429,8 +435,7 @@ class SparseIsometryStatePreparation(StatePreparation):
 
         """
         factory = dense_circuit._qsharp_factory  # noqa: SLF001
-        dense_prep_program = "QDKChemistry.Utils.StatePreparation.MakeStatePreparationCircuit"
-        if factory is not None and getattr(factory.program, "__name__", None) == dense_prep_program:
+        if factory is not None and getattr(factory.program, "__name__", None) == _QSHARP_DENSE_PREP_PROGRAM:
             # Compose with the dense preparation parameters rather than its callable: a callable capturing
             # another callable cannot be resolved statically by the adaptive-profile code generator.
             dense_params = QSHARP_UTILS.StatePreparation.StatePreparationParams(**factory.parameter)
