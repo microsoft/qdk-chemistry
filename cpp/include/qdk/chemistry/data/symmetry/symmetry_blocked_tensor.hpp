@@ -157,11 +157,12 @@ class SymmetryBlockedTensor
   // ---- DataClass interface ------------------------------------------------
 
   /**
-   * @brief @ref DataClass type identifier.
-   * @return The stable string @c "symmetry_blocked_tensor".
+   * @brief @ref DataClass type identifier for this specialization.
+   * @return A stable identifier of the form @c symmetry_blocked_tensor_r2c.
    */
   std::string get_data_type_name() const override {
-    return "symmetry_blocked_tensor";
+    return "symmetry_blocked_tensor_r" + std::to_string(Rank) +
+           (utils::is_complex_scalar_v<Scalar> ? "c" : "r");
   }
 
   /**

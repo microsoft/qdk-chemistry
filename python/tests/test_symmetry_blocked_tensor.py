@@ -31,6 +31,36 @@ def unrestricted_spin():
     return syms, alpha, beta
 
 
+@pytest.mark.parametrize(
+    ("tensor_type", "rank", "is_complex"),
+    [
+        (sym.SymmetryBlockedTensorRank1, 1, False),
+        (sym.SymmetryBlockedTensorRank1Complex, 1, True),
+        (sym.SymmetryBlockedTensorRank2, 2, False),
+        (sym.SymmetryBlockedTensorRank2Complex, 2, True),
+        (sym.SymmetryBlockedTensorRank3, 3, False),
+        (sym.SymmetryBlockedTensorRank3Complex, 3, True),
+        (sym.SymmetryBlockedTensorRank4, 4, False),
+        (sym.SymmetryBlockedTensorRank4Complex, 4, True),
+    ],
+)
+def test_tensor_specializations_have_distinct_loader_names(
+    unrestricted_spin,
+    tensor_type,
+    rank,
+    is_complex,
+):
+    """Each serialized tensor name identifies one concrete loader."""
+    syms, alpha, beta = unrestricted_spin
+    extents = [{alpha: 1, beta: 1}] * rank
+    labels = (alpha,) * rank
+    scalar = 1.0 + 1.0j if is_complex else 1.0
+    block = np.full((1,) if rank in (1, 4) else (1, 1), scalar)
+    tensor = tensor_type([syms] * rank, extents, [(labels, block)])
+
+    assert tensor.get_data_type_name() == f"symmetry_blocked_tensor_r{rank}{'c' if is_complex else 'r'}"
+
+
 class TestSymmetryBlockedTensorRank2:
     """Tests for the rank-2 (matrix) symmetry-blocked tensor."""
 
