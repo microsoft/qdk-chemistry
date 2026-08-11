@@ -1,17 +1,4 @@
 {
     "author": "Microsoft",
-    "license": "MIT",
-    "files": [
-        "src/BinaryEncoding.qs",
-        "src/CircuitComposition.qs",
-        "src/ControlledPauliExp.qs",
-        "src/HadamardTest.qs",
-        "src/IterativePhaseEstimation.qs",
-        "src/MeasurementBasis.qs",
-        "src/PauliExp.qs",
-        "src/PrepSelPrep.qs",
-        "src/Select.qs",
-        "src/StandardPhaseEstimation.qs",
-        "src/StatePreparation.qs"
-    ]
+    "license": "MIT"
 }

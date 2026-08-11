@@ -5,48 +5,36 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import gc
 import json
 
 import numpy as np
 import pytest
-from qdk import TargetProfile, qsharp
 
 from qdk_chemistry.algorithms import create, registry
 from qdk_chemistry.algorithms.state_preparation.dense_pure_state import DensePureStatePreparation
 from qdk_chemistry.data import Circuit, Configuration, StateVectorContainer, Wavefunction
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_AER
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+from qdk_chemistry.utils.qsharp import create_qsharp_context
 
 from .reference_tolerances import estimator_energy_tolerance, float_comparison_absolute_tolerance
 from .test_helpers import create_test_orbitals
 
 try:
-    from qdk._interpreter import get_config
     from qdk._native import Circuit as QdkCircuitType
 except ImportError:
     from qsharp._native import Circuit as QdkCircuitType
-    from qsharp._qsharp import get_config
 
 
 def _run_state_prep_and_dump(circuit: Circuit) -> np.ndarray:
     """Run a state preparation circuit via Q# eval and return the statevector.
 
-    Reinitializes the Q# interpreter to ensure a clean qubit state,
-    reloads the StatePreparation Q# sources, allocates qubits, applies
-    the state preparation, and captures the statevector via
-    ``qsharp.dump_machine()``.
+    Allocates qubits in the chemistry Q# context, applies the state
+    preparation, and captures the statevector.
 
     Returns:
         The dense statevector as a complex numpy array (Q# big-endian ordering).
 
     """
-    # Re-initialize to clear any stale qubits from prior calls
-    current_profile = get_config().get_target_profile()
-    qsharp.init(target_profile=TargetProfile.from_str(current_profile))
-    # Trigger lazy reload of Q# sources after interpreter reset
-    _ = QSHARP_UTILS.StatePreparation
-
     params = circuit._qsharp_factory.parameter
     row_map_str = str(params["rowMap"])
     sv_str = "[" + ", ".join(f"{v:.16f}" for v in params["stateVector"]) + "]"
@@ -61,11 +49,11 @@ def _run_state_prep_and_dump(circuit: Circuit) -> np.ndarray:
         f" numQubits = {n_qubits} }}"
     )
 
-    qsharp.eval(f"use qs = Qubit[{n_qubits}];")
-    qsharp.eval(f"QDKChemistry.Utils.StatePreparation.StatePreparation({params_expr}, qs);")
+    context = create_qsharp_context()
+    context.eval(f"use qs = Qubit[{n_qubits}];")
+    context.eval(f"QDKChemistry.Utils.StatePreparation.StatePreparation({params_expr}, qs);")
 
-    state = qsharp.dump_machine()
-    return np.array(state.as_dense_state())
+    return np.array(context.dump_machine().as_dense_state())
 
 
 def _build_expected_statevector(
@@ -225,11 +213,6 @@ class TestDensePureStatePreparation:
         """Verify that dense preparation yields the same energy as sparse isometry."""
         from qiskit.quantum_info import SparsePauliOp  # noqa: PLC0415
         from qiskit_aer.primitives import EstimatorV2 as AerEstimator  # noqa: PLC0415
-
-        # Re-init with Base profile required for QIR compilation (get_qiskit_circuit)
-        current_profile = get_config().get_target_profile()
-        qsharp.init(target_profile=TargetProfile.from_str(current_profile))
-        gc.collect()
 
         dense_prep = create("state_prep", "dense_pure_state")
         sparse_prep = create("state_prep", "sparse_isometry")

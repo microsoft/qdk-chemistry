@@ -4,6 +4,7 @@
 # --------------------------------------------------------------------------------------------
 
 import importlib
+import importlib.util
 import os
 import re
 import shutil
@@ -22,6 +23,18 @@ author = "QDK/Chemistry Team"
 # Repo root (docs/source/conf.py -> docs/source -> docs -> repo root)
 _repo_root = Path(__file__).resolve().parent.parent.parent
 
+_tutorial_versions_file = Path(__file__).resolve().parent / "tutorials" / "_versions.py"
+_tutorial_versions_spec = importlib.util.spec_from_file_location(
+    "tutorial_versions", _tutorial_versions_file
+)
+if _tutorial_versions_spec is None or _tutorial_versions_spec.loader is None:
+    raise ImportError(
+        f"Unable to load tutorial versions from {_tutorial_versions_file}"
+    )
+_tutorial_versions = importlib.util.module_from_spec(_tutorial_versions_spec)
+_tutorial_versions_spec.loader.exec_module(_tutorial_versions)
+GROUND_STATE_TUTORIAL_VERSION: str = _tutorial_versions.GROUND_STATE_TUTORIAL_VERSION
+
 # Read version from VERSION file
 _version_file = _repo_root / "VERSION"
 if not _version_file.exists():
@@ -29,6 +42,11 @@ if not _version_file.exists():
         f"VERSION file not found at {_version_file}. Ensure you have a complete checkout of the repository."
     )
 release = _version_file.read_text().strip()
+
+# Expose tutorial compatibility versions to reStructuredText.
+rst_epilog = f"""
+.. |ground-state-tutorial-version| replace:: {GROUND_STATE_TUTORIAL_VERSION}
+"""
 
 # -----------------------------------------------------------------------------
 # Perform initial setup and tests

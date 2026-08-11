@@ -93,7 +93,7 @@ namespace QDKChemistry.Utils.StatePreparation {
     operation PrepareSingleReferenceState(
         params : SingleReferenceParams,
         qs : Qubit[],
-    ) : Unit {
+    ) : Unit is Adj + Ctl {
         let bitLen = Length(params.bitStrings);
         if bitLen != Length(qs) {
             fail "Length of bitStrings must match the number of qubits.";
@@ -126,13 +126,13 @@ namespace QDKChemistry.Utils.StatePreparation {
     /// # Parameters
     /// - `params`: A `SingleReferenceParams` struct containing the parameters for state preparation.
     /// # Returns
-    /// - `Qubit[] => Unit`: A callable that takes an array of qubits and prepares the single reference quantum state on those qubits.
-    function MakePrepareSingleReferenceStateOp(params : SingleReferenceParams) : Qubit[] => Unit {
+    /// - `Qubit[] => Unit is Adj + Ctl`: A callable that takes an array of qubits and prepares the single reference quantum state on those qubits.
+    function MakePrepareSingleReferenceStateOp(params : SingleReferenceParams) : Qubit[] => Unit is Adj + Ctl {
         PrepareSingleReferenceState(params, _)
     }
 
     /// Applies Hadamard to each qubit in the array.
-    operation PrepareHadamardAll(qubits : Qubit[]) : Unit {
+    operation PrepareHadamardAll(qubits : Qubit[]) : Unit is Adj + Ctl {
         for q in qubits {
             H(q);
         }
@@ -140,8 +140,8 @@ namespace QDKChemistry.Utils.StatePreparation {
 
     /// Returns a callable that applies Hadamard to each qubit in the array.
     /// # Returns
-    /// - `Qubit[] => Unit`: A callable that prepares the uniform superposition on the given qubits.
-    function MakePrepareHadamardAllOp() : Qubit[] => Unit {
+    /// - `Qubit[] => Unit is Adj + Ctl`: A callable that prepares the uniform superposition on the given qubits.
+    function MakePrepareHadamardAllOp() : Qubit[] => Unit is Adj + Ctl {
         PrepareHadamardAll(_)
     }
 
