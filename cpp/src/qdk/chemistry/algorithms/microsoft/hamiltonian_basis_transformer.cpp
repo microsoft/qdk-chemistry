@@ -312,12 +312,13 @@ std::shared_ptr<data::Hamiltonian> QdkHamiltonianBasisTransformer::_run_impl(
   }
 #endif
 
+  auto transformed_three_center = restricted_rank3(
+      *target_orbitals, source.three_center(), std::move(transformed_factors));
   auto container = std::make_unique<CholeskyHamiltonianContainer>(
       restricted_rank2(std::move(transformed_one_body)),
-      restricted_rank3(*target_orbitals, source.three_center(),
-                       std::move(transformed_factors)),
-      std::move(target_orbitals), source.get_core_energy(),
-      std::move(transformed_fock), std::nullopt, source.get_type());
+      std::move(transformed_three_center), std::move(target_orbitals),
+      source.get_core_energy(), std::move(transformed_fock), std::nullopt,
+      source.get_type());
   return std::make_shared<data::Hamiltonian>(std::move(container));
 }
 

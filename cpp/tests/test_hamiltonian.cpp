@@ -1291,6 +1291,40 @@ TEST_F(HamiltonianTest, CholeskyBasisTransformer) {
       testing::restricted_index_set(3, changed_active_indices),
       testing::restricted_index_set(3, changed_inactive_indices));
   EXPECT_THROW(transformer->run(source, invalid_target), std::invalid_argument);
+
+  auto unrestricted_orbitals = std::make_shared<Orbitals>(
+      coefficients, coefficients, std::nullopt, std::nullopt,
+      std::make_optional(overlap), basis_set,
+      testing::unrestricted_index_set(3, active_indices, active_indices),
+      testing::unrestricted_index_set(3, inactive_indices, inactive_indices));
+  auto unrestricted_source = std::make_shared<Hamiltonian>(
+      std::make_unique<CholeskyHamiltonianContainer>(
+          one_body, one_body, three_center, three_center, unrestricted_orbitals,
+          1.25, inactive_fock_ao, inactive_fock_ao));
+  EXPECT_THROW(transformer->run(unrestricted_source, target_orbitals),
+               std::invalid_argument);
+
+  auto mismatched_basis =
+      testing::create_random_basis_set(3, "different-basis-transform");
+  ASSERT_NE(basis_set->content_hash(), mismatched_basis->content_hash());
+  invalid_target = std::make_shared<Orbitals>(
+      target_coefficients, std::nullopt, std::make_optional(overlap),
+      mismatched_basis, active_space, inactive_space);
+  EXPECT_THROW(transformer->run(source, invalid_target), std::invalid_argument);
+
+  Eigen::MatrixXd mismatched_overlap = overlap;
+  mismatched_overlap(0, 0) += 0.1;
+  invalid_target = std::make_shared<Orbitals>(
+      target_coefficients, std::nullopt, std::make_optional(mismatched_overlap),
+      basis_set, active_space, inactive_space);
+  EXPECT_THROW(transformer->run(source, invalid_target), std::invalid_argument);
+
+  auto nonorthonormal_coefficients = target_coefficients;
+  nonorthonormal_coefficients.col(active_indices.front()) *= 1.1;
+  invalid_target = std::make_shared<Orbitals>(
+      nonorthonormal_coefficients, std::nullopt, std::make_optional(overlap),
+      basis_set, active_space, inactive_space);
+  EXPECT_THROW(transformer->run(source, invalid_target), std::invalid_argument);
 }
 
 TEST_F(HamiltonianTest, SparseContainerConstructionWithTwoBody) {
