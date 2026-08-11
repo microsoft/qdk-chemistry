@@ -692,6 +692,7 @@ def _register_cpp_factories():
     )
 
     register_factory(ActiveSpaceSelectorFactory)
+    register_factory(EffectiveHamiltonianConstructorFactory)
     register_factory(HamiltonianConstructorFactory)
     register_factory(EffectiveHamiltonianConstructorFactory)
     register_factory(LocalizerFactory)

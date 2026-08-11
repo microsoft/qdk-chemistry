@@ -12,6 +12,7 @@ target_sources(chemistry PRIVATE
     dynamical_correlation_calculator.cpp
     effective_hamiltonian.cpp
     geometry_optimization.cpp
+    effective_hamiltonian.cpp
     scf.cpp
     stability.cpp
 )
