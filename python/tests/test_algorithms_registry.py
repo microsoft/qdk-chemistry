@@ -24,7 +24,8 @@ except ImportError:
 
 # Algorithm types that ship as an interface only, with no registered implementation
 # and therefore an empty default name. Remove entries here as implementations land.
-INTERFACE_ONLY_TYPES = {"effective_hamiltonian_constructor"}
+# `effective_hamiltonian_constructor` left this set when qdk_swpt2 landed.
+INTERFACE_ONLY_TYPES: set[str] = set()
 
 
 class TestRegistryShowDefault:
@@ -83,7 +84,7 @@ class TestRegistryShowDefault:
         # Test for effective Hamiltonian constructor
         default_effective_hamiltonian_constructor = registry.show_default("effective_hamiltonian_constructor")
         assert isinstance(default_effective_hamiltonian_constructor, str)
-        assert default_effective_hamiltonian_constructor == ""
+        assert default_effective_hamiltonian_constructor == "qdk_swpt2"
 
         # Test for multi configuration SCF
         if PYSCF_AVAILABLE:
@@ -304,7 +305,7 @@ class TestRegistryAvailable:
 
         effective_hamiltonian_constructors = registry.available("effective_hamiltonian_constructor")
         assert isinstance(effective_hamiltonian_constructors, list)
-        assert len(effective_hamiltonian_constructors) == 0
+        assert "qdk_swpt2" in effective_hamiltonian_constructors
 
     def test_available_returns_empty_list_for_unknown_type(self):
         """Test that available returns empty list for unknown algorithm type."""
