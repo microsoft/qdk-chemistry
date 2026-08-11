@@ -10,7 +10,6 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -528,12 +527,16 @@ class Hamiltonian : public DataClass,
   bool is_unrestricted() const;
 
   /**
-   * @brief Get the data type name for this class
+   * @brief Get the static data type name for this class.
    * @return "hamiltonian"
    */
-  std::string get_data_type_name() const override {
-    return DATACLASS_TO_SNAKE_CASE(Hamiltonian);
-  }
+  static std::string data_type_name() { return "hamiltonian"; }
+
+  /**
+   * @brief Get the data type name for this instance.
+   * @return "hamiltonian"
+   */
+  std::string get_data_type_name() const override { return data_type_name(); }
 
   /**
    * @brief Get summary string of Hamiltonian information

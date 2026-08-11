@@ -147,12 +147,16 @@ class SymmetryBlockedSparseMap
   // ---- DataClass interface ------------------------------------------------
 
   /**
-   * @brief @ref DataClass type identifier.
+   * @brief Static @ref DataClass type identifier.
    * @return The stable string @c "symmetry_blocked_sparse_map".
    */
-  std::string get_data_type_name() const override {
-    return "symmetry_blocked_sparse_map";
-  }
+  static std::string data_type_name() { return "symmetry_blocked_sparse_map"; }
+
+  /**
+   * @brief @ref DataClass type identifier for this instance.
+   * @return The stable string @c "symmetry_blocked_sparse_map".
+   */
+  std::string get_data_type_name() const override { return data_type_name(); }
 
   /**
    * @brief Single-line summary including rank, number of stored blocks, and

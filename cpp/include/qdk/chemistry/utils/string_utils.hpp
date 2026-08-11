@@ -40,32 +40,4 @@ inline std::string to_snake_case(const char* input) {
   return result;
 }
 
-/**
- * @def DATACLASS_TO_SNAKE_CASE
- * @brief Macro to generate snake_case data type name from a class name
- *
- * This macro converts a PascalCase class name to a snake_case string.
- * The conversion happens once per call site due to the static local variable.
- *
- * @param ClassName The class name in PascalCase (e.g., ConfigurationSet)
- * @return A const char* containing the snake_case version, (e.g.
- * configuration_set)
- *
- * Usage:
- * @code
- * class ConfigurationSet : public DataClass {
- *   std::string get_data_type_name() const override {
- *     return DATACLASS_TO_SNAKE_CASE(ConfigurationSet);
- *   }
- *   // Returns "configuration_set"
- * };
- * @endcode
- */
-#define DATACLASS_TO_SNAKE_CASE(ClassName)                \
-  ([]() -> const char* {                                  \
-    static const std::string result =                     \
-        qdk::chemistry::utils::to_snake_case(#ClassName); \
-    return result.c_str();                                \
-  }())
-
 }  // namespace qdk::chemistry::utils

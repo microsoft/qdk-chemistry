@@ -116,6 +116,9 @@ _setup_resources()
 # Defer plugin imports until after module initialization
 def _import_plugins() -> None:
     """Import pre-packaged plugins after module initialization."""
+    from qdk_chemistry.plugins import _load_plugins  # noqa: PLC0415
+
+    _load_plugins()
     with contextlib.suppress(ImportError):
         import qdk_chemistry.plugins.pyscf as pyscf_plugin  # noqa: PLC0415
 

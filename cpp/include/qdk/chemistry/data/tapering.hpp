@@ -76,10 +76,13 @@ class TaperingSpecification : public DataClass {
                                                           std::size_t n_alpha,
                                                           std::size_t n_beta);
 
-  /// @brief Get the data type name for serialization.
-  std::string get_data_type_name() const override {
-    return "tapering_specification";
-  }
+  /// @brief Get the static data type name for serialization.
+  /// @return "tapering_specification"
+  static std::string data_type_name() { return "tapering_specification"; }
+
+  /// @brief Get the data type name for this instance.
+  /// @return "tapering_specification"
+  std::string get_data_type_name() const override { return data_type_name(); }
 
   /// @brief Get a human-readable summary of the tapering specification.
   std::string get_summary() const override;

@@ -65,6 +65,13 @@ void bind_sbscalar_instance(py::module& m, const char* name) {
            "The scalar value stored for the given symmetry label.")
       .def("num_blocks", &SBS::num_blocks,
            "Total number of stored blocks (including aliases).")
+      .def_static("data_type_name", &SBS::data_type_name, R"(
+    Return the wire-format identifier for symmetry-blocked scalars.
+
+    Returns:
+        str: ``"symmetry_blocked_scalar"``
+
+    )")
       .def("get_data_type_name", &SBS::get_data_type_name)
       .def("get_summary", &SBS::get_summary)
       .def("__repr__", &SBS::get_summary)

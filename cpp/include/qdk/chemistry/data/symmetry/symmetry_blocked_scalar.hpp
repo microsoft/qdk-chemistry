@@ -119,12 +119,16 @@ class SymmetryBlockedScalar : public SymmetryBlocked<1, Scalar> {
   // ---- DataClass interface ------------------------------------------------
 
   /**
-   * @brief @ref DataClass type identifier.
+   * @brief Static @ref DataClass type identifier.
    * @return The stable string @c "symmetry_blocked_scalar".
    */
-  std::string get_data_type_name() const override {
-    return "symmetry_blocked_scalar";
-  }
+  static std::string data_type_name() { return "symmetry_blocked_scalar"; }
+
+  /**
+   * @brief @ref DataClass type identifier for this instance.
+   * @return The stable string @c "symmetry_blocked_scalar".
+   */
+  std::string get_data_type_name() const override { return data_type_name(); }
 
   /**
    * @brief Single-line summary including scalar type and per-block label/value

@@ -9,7 +9,6 @@
 #include <cstdint>
 #include <nlohmann/json_fwd.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -40,7 +39,7 @@ class Configuration : public DataClass {
 
   /**
    * @brief Construct from a spin-½ string representation.
-   * @param str String with alphabet @c '0'/@c 'u'/@c 'd'/@c '2'.
+   * @param str String containing only @c 0, @c u, @c d, and @c 2.
    * @return Configuration with bits_per_mode() == 2.
    * @throws std::invalid_argument If the string contains invalid characters.
    */
@@ -48,7 +47,7 @@ class Configuration : public DataClass {
 
   /**
    * @brief Construct from a bitstring (1 bit per mode).
-   * @param str String with alphabet @c '0'/@c '1'.
+   * @param str String containing only @c 0 and @c 1.
    * @return Configuration with bits_per_mode() == 1.
    * @throws std::invalid_argument If the string contains invalid characters.
    */
@@ -239,12 +238,16 @@ class Configuration : public DataClass {
   size_t get_orbital_capacity() const;
 
   /**
-   * @brief Get the data type name for this class
+   * @brief Get the static data type name for this class.
    * @return "configuration"
    */
-  std::string get_data_type_name() const override {
-    return DATACLASS_TO_SNAKE_CASE(Configuration);
-  }
+  static std::string data_type_name() { return "configuration"; }
+
+  /**
+   * @brief Get the data type name for this instance.
+   * @return "configuration"
+   */
+  std::string get_data_type_name() const override { return data_type_name(); }
 
   /**
    * @brief Check if a specific orbital has an alpha electron (spin-½ only).

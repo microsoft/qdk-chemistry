@@ -16,7 +16,6 @@
 #include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <sstream>
 #include <stdexcept>
 #include <tuple>
@@ -1435,8 +1434,8 @@ void Wavefunction::to_json_file(const std::string& filename) const {
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_write_suffix(
-      filename, DATACLASS_TO_SNAKE_CASE(Wavefunction));
+  DataTypeFilename::validate_write_suffix(filename,
+                                          Wavefunction::data_type_name());
   _to_json_file(filename);
 }
 
@@ -1446,7 +1445,8 @@ std::shared_ptr<Wavefunction> Wavefunction::from_json_file(
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_read_suffix(filename, "wavefunction");
+  DataTypeFilename::validate_read_suffix(filename,
+                                         Wavefunction::data_type_name());
   return _from_json_file(filename);
 }
 
@@ -1529,8 +1529,8 @@ void Wavefunction::to_hdf5_file(const std::string& filename) const {
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_write_suffix(
-      filename, DATACLASS_TO_SNAKE_CASE(Wavefunction));
+  DataTypeFilename::validate_write_suffix(filename,
+                                          Wavefunction::data_type_name());
   _to_hdf5_file(filename);
 }
 
@@ -1540,7 +1540,8 @@ std::shared_ptr<Wavefunction> Wavefunction::from_hdf5_file(
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_read_suffix(filename, "wavefunction");
+  DataTypeFilename::validate_read_suffix(filename,
+                                         Wavefunction::data_type_name());
   return _from_hdf5_file(filename);
 }
 
