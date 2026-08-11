@@ -26,10 +26,6 @@ downfolder = create("effective_hamiltonian_constructor", "qdk_swpt2")
 
 ################################################################################
 # start-cell-configure
-# Replace the default flow regularization by an imaginary level shift
-downfolder.settings().set("denom_flow", 0.0)
-downfolder.settings().set("denom_imaginary_shift", 0.5)
-
 # View available settings
 print(f"Downfolder settings: {downfolder.settings().keys()}")
 # end-cell-configure
@@ -67,9 +63,7 @@ window_hamiltonian = create("hamiltonian_constructor").run(wfn.get_orbitals())
 # Keep the reference active space as P and fold the rest of the window into it
 p_indices = reference.get_orbitals().active_indices()
 
-effective_hamiltonian = create("effective_hamiltonian_constructor", "qdk_swpt2").run(
-    reference, window_hamiltonian, p_indices
-)
+effective_hamiltonian = downfolder.run(reference, window_hamiltonian, p_indices)
 
 alpha = SymmetryLabel([axes.alpha()])
 emitted = effective_hamiltonian.get_orbitals()

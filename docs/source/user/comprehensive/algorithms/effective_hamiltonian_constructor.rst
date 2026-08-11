@@ -202,10 +202,23 @@ parameter is a policy default rather than an accuracy guarantee, so compare regu
 choices when the logged values indicate sensitivity.
 
 This implementation truncates the transformed Hamiltonian to at most two-body operators and
-uses diagonal generalized-Fock denominators. Dense four-center integrals require
-:math:`O(N^4)` storage, and semicanonicalizing a noncanonical window costs :math:`O(N^5)`. The
-retained commutator also grows steeply with the size of :math:`P`. Use it for modest dense
-windows rather than windows of hundreds of orbitals.
+uses diagonal generalized-Fock denominators. The truncation is not a uniformly small
+correction: :math:`\tfrac{1}{2}[S,H_{\mathrm{OD}}]` contains three-body terms that the output
+Hamiltonian cannot represent, so the emitted operator reproduces the exact second-order Van
+Vleck operator only while :math:`P` holds at most two electrons -- a three-body operator has no
+matrix elements below three electrons. From three electrons on the discarded term contributes,
+and it grows with the electron count in :math:`P`. This is a property of the kept space, not of
+how many orbitals are folded: folding a single valence virtual of water in a minimal basis into
+a six-electron kept space costs about 0.2 :math:`E_h`, where that orbital is worth
+:math:`-0.02\ E_h` exactly and :math:`-0.06\ E_h` at untruncated second order, but the
+truncated operator returns :math:`+0.14\ E_h`. Nothing in the intruder diagnostics detects
+this, since it is a truncation error rather than a small denominator. Treat downfolded results
+for active spaces holding more than two electrons as qualitative unless you can check them
+against a larger calculation.
+
+Dense four-center integrals require :math:`O(N^4)` storage, and semicanonicalizing a
+noncanonical window costs :math:`O(N^5)`. The retained commutator also grows steeply with the
+size of :math:`P`. Use it for modest dense windows rather than windows of hundreds of orbitals.
 
 Related classes
 ---------------

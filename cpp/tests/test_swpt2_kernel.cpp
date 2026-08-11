@@ -687,6 +687,188 @@ TEST(Swpt2KernelTest, ProductionMatchesIndependentFockSpaceMatrix) {
 }
 
 // ---------------------------------------------------------------------------
+// Same independent Fock-space oracle, but sweeping the size of the kept space.
+// The oracle above only ever keeps two active spatial orbitals; the retained
+// commutator has more contraction patterns as the kept space grows, so widen
+// the active space to three and four orbitals against a single folded virtual.
+// Production is truncated to two-body, so it can only reproduce the exact
+// Van Vleck operator in sectors with at most two active electrons.
+// ---------------------------------------------------------------------------
+TEST(Swpt2KernelTest, ProductionMatchesOracleForWiderKeptSpaces) {
+  const auto check = [](const std::vector<int>& active,
+                        const std::vector<int>& inactive,
+                        const std::vector<int>& virtuals, int norb) {
+    Eigen::MatrixXd h1 = Eigen::MatrixXd::Zero(norb, norb);
+    Eigen::VectorXd eps(2 * norb);
+    std::mt19937 generator(0xC0FFEEu + norb);
+    std::uniform_real_distribution<double> coupling(-0.09, 0.09);
+
+    for (int o = 0; o < norb; ++o) {
+      const double energy = -1.0 + 0.55 * o;
+      h1(o, o) = energy;
+      eps(2 * o) = eps(2 * o + 1) = energy;
+    }
+    for (int p = 0; p < norb; ++p)
+      for (int q = p + 1; q < norb; ++q)
+        h1(p, q) = h1(q, p) = coupling(generator);
+
+    Eigen::VectorXd g = Eigen::VectorXd::Zero(norb * norb * norb * norb);
+    for (int p = 0; p < norb; ++p)
+      for (int q = p; q < norb; ++q)
+        for (int r = 0; r < norb; ++r)
+          for (int s = r; s < norb; ++s)
+            set_sym_eri(g, p, q, r, s, norb, coupling(generator));
+
+    const double core_energy = 0.17;
+    const auto part = sw::make_partition(norb, active, inactive, virtuals);
+    const auto blocked = sw::build_two_body_blocked(g, norb);
+    const auto one_body = sw::spin_orbital_one_body(h1, h1, norb);
+
+    std::uint64_t external_reference = 0;
+    for (int o : inactive)
+      external_reference |=
+          (std::uint64_t{1} << (2 * o)) | (std::uint64_t{1} << (2 * o + 1));
+    const auto expand_active = [&](std::uint64_t compact) {
+      std::uint64_t full = external_reference;
+      for (std::size_t a = 0; a < active.size(); ++a)
+        for (int spin = 0; spin < 2; ++spin)
+          if (compact & (std::uint64_t{1} << (2 * a + spin)))
+            full |= std::uint64_t{1} << (2 * active[a] + spin);
+      return static_cast<int>(full);
+    };
+
+    sw::RegularizerOptions bare;
+    sw::RegularizerOptions flow;
+    flow.denom_flow = 1.2;
+
+    for (const auto& reg : {bare, flow}) {
+      const MatrixSwParts reference =
+          build_matrix_sw_parts(h1, g, eps, part, core_energy, reg);
+      const Eigen::MatrixXd reference_effective =
+          reference.block_diagonal +
+          0.5 * (reference.generator * reference.off_diagonal -
+                 reference.off_diagonal * reference.generator);
+      const auto downfolded =
+          sw::downfold_blocked(one_body, blocked, eps, part, reg, core_energy);
+      const auto emitted = sw::to_spatial_chemist(downfolded, part);
+      const Eigen::MatrixXd production = spatial_chemist_matrix(emitted);
+
+      const std::uint64_t active_states = std::uint64_t{1}
+                                          << (2 * active.size());
+      double max_error = 0.0;
+      double max_correction = 0.0;
+      for (std::uint64_t bra = 0; bra < active_states; ++bra) {
+        if (__builtin_popcountll(bra) > 2) continue;
+        for (std::uint64_t ket = 0; ket < active_states; ++ket) {
+          if (__builtin_popcountll(ket) > 2) continue;
+          const int full_bra = expand_active(bra);
+          const int full_ket = expand_active(ket);
+          max_error = std::max(
+              max_error, std::abs(reference_effective(full_bra, full_ket) -
+                                  production(static_cast<int>(bra),
+                                             static_cast<int>(ket))));
+          max_correction =
+              std::max(max_correction,
+                       std::abs(reference_effective(full_bra, full_ket) -
+                                reference.block_diagonal(full_bra, full_ket)));
+        }
+      }
+      EXPECT_GT(max_correction, 1e-6);
+      EXPECT_LT(max_error, 1e-10)
+          << "kept " << active.size() << " active orbitals, " << inactive.size()
+          << " folded inactive, " << virtuals.size() << " folded virtual";
+    }
+  };
+
+  check({0, 1}, {}, {2}, 3);
+  check({0, 1, 2}, {}, {3}, 4);
+  check({0, 1, 2, 3}, {}, {4}, 5);
+  check({0, 1, 2}, {3}, {4}, 5);
+}
+
+// ---------------------------------------------------------------------------
+// Pin where the two-body truncation starts to bite. H_eff is truncated to at
+// most two-body, so it reproduces the exact second-order Van Vleck operator
+// only in sectors that cannot resolve a three-body operator, i.e. with at most
+// two active electrons. From three electrons on the discarded three-body term
+// contributes and the mismatch is physical, not a defect: it is the size of the
+// approximation. This test documents the onset so a future change that retains
+// higher-rank terms shows up here.
+// ---------------------------------------------------------------------------
+TEST(Swpt2KernelTest, TwoBodyTruncationIsExactUpToTwoActiveElectrons) {
+  const std::vector<int> active{0, 1, 2, 3};
+  const std::vector<int> virtuals{4};
+  const int norb = 5;
+
+  Eigen::MatrixXd h1 = Eigen::MatrixXd::Zero(norb, norb);
+  Eigen::VectorXd eps(2 * norb);
+  std::mt19937 generator(0xC0FFEEu + norb);
+  std::uniform_real_distribution<double> coupling(-0.09, 0.09);
+  for (int o = 0; o < norb; ++o) {
+    const double energy = -1.0 + 0.55 * o;
+    h1(o, o) = energy;
+    eps(2 * o) = eps(2 * o + 1) = energy;
+  }
+  for (int p = 0; p < norb; ++p)
+    for (int q = p + 1; q < norb; ++q)
+      h1(p, q) = h1(q, p) = coupling(generator);
+  Eigen::VectorXd g = Eigen::VectorXd::Zero(norb * norb * norb * norb);
+  for (int p = 0; p < norb; ++p)
+    for (int q = p; q < norb; ++q)
+      for (int r = 0; r < norb; ++r)
+        for (int s = r; s < norb; ++s)
+          set_sym_eri(g, p, q, r, s, norb, coupling(generator));
+
+  const double core_energy = 0.17;
+  const auto part = sw::make_partition(norb, active, {}, virtuals);
+  const sw::RegularizerOptions reg;
+  const MatrixSwParts reference =
+      build_matrix_sw_parts(h1, g, eps, part, core_energy, reg);
+  const Eigen::MatrixXd reference_effective =
+      reference.block_diagonal +
+      0.5 * (reference.generator * reference.off_diagonal -
+             reference.off_diagonal * reference.generator);
+  const auto downfolded = sw::downfold_blocked(
+      sw::spin_orbital_one_body(h1, h1, norb),
+      sw::build_two_body_blocked(g, norb), eps, part, reg, core_energy);
+  const Eigen::MatrixXd production =
+      spatial_chemist_matrix(sw::to_spatial_chemist(downfolded, part));
+
+  const auto expand_active = [&](std::uint64_t compact) {
+    std::uint64_t full = 0;
+    for (std::size_t a = 0; a < active.size(); ++a)
+      for (int spin = 0; spin < 2; ++spin)
+        if (compact & (std::uint64_t{1} << (2 * a + spin)))
+          full |= std::uint64_t{1} << (2 * active[a] + spin);
+    return static_cast<int>(full);
+  };
+
+  const auto sector_error = [&](int electrons) {
+    double max_error = 0.0;
+    for (std::uint64_t bra = 0; bra < 256; ++bra) {
+      if (__builtin_popcountll(bra) != electrons) continue;
+      for (std::uint64_t ket = 0; ket < 256; ++ket) {
+        if (__builtin_popcountll(ket) != electrons) continue;
+        max_error = std::max(
+            max_error,
+            std::abs(
+                reference_effective(expand_active(bra), expand_active(ket)) -
+                production(static_cast<int>(bra), static_cast<int>(ket))));
+      }
+    }
+    return max_error;
+  };
+
+  for (int electrons = 0; electrons <= 2; ++electrons)
+    EXPECT_LT(sector_error(electrons), 1e-10)
+        << "truncation must be exact for " << electrons << " active electrons";
+
+  // The three-body term the truncation discards first contributes here.
+  EXPECT_GT(sector_error(3), 1e-6);
+  EXPECT_GT(sector_error(6), sector_error(3));
+}
+
+// ---------------------------------------------------------------------------
 // Emission round-trip: spatial chemist -> build_tensors -> downfold with an
 // empty external space (the identity fold) -> to_spatial_chemist must recover
 // the original one-body and (chemist) two-body integrals. This validates the
