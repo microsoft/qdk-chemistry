@@ -236,11 +236,28 @@ TEST(EffectiveHamiltonianConstructorTest, RejectsNonNestedOrbitalSpaces) {
   auto valid_reference = make_wavefunction(valid_wavefunction_orbitals);
   EXPECT_THROW(
       constructor._validate_inputs(valid_reference, hamiltonian,
-                                   testing::restricted_index_set(4, {0})),
-      std::invalid_argument);
-  EXPECT_THROW(
-      constructor._validate_inputs(valid_reference, hamiltonian,
                                    testing::restricted_index_set(5, {1})),
+      std::invalid_argument);
+}
+
+TEST(EffectiveHamiltonianConstructorTest, AllowsPOutsideReferenceActiveSpace) {
+  auto base_orbitals = testing::create_test_orbitals(4, 4);
+  auto hamiltonian_orbitals =
+      testing::with_active_space(base_orbitals, {0, 1, 2}, {3});
+  auto wavefunction_orbitals =
+      testing::with_active_space(base_orbitals, {1, 2}, {0});
+  auto hamiltonian = make_hamiltonian(hamiltonian_orbitals);
+  auto reference = make_wavefunction(wavefunction_orbitals);
+  TestEffectiveHamiltonianConstructor constructor;
+
+  EXPECT_NO_THROW(constructor._validate_inputs(
+      reference, hamiltonian, testing::restricted_index_set(4, {0})));
+  EXPECT_NO_THROW(constructor._validate_inputs(
+      reference, hamiltonian, testing::restricted_index_set(4, {0, 1, 2})));
+  // Still rejected: outside the Hamiltonian window.
+  EXPECT_THROW(
+      constructor._validate_inputs(reference, hamiltonian,
+                                   testing::restricted_index_set(4, {3})),
       std::invalid_argument);
 }
 
