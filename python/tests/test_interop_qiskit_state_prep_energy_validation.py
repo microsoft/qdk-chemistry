@@ -38,9 +38,8 @@ def test_energy_agreement_between_state_prep_methods(wavefunction_4e4o, hamilton
     """
     # Create both state preparation instances
     basis_gates = ["cx", "rz", "ry", "rx", "h", "x", "z"]
-    sparse_prep_gf2x = create(
-        "state_prep", algorithm_name="sparse_isometry", transpile_optimization_level=1, basis_gates=basis_gates
-    )
+    # Energy is invariant under transpilation, so the sparse prep needs no basis configuration.
+    sparse_prep_gf2x = create("state_prep", algorithm_name="sparse_isometry")
     regular_prep = create(
         "state_prep", algorithm_name="qiskit_regular_isometry", transpile_optimization_level=1, basis_gates=basis_gates
     )
@@ -74,12 +73,7 @@ def test_energy_agreement_between_state_prep_methods(wavefunction_4e4o, hamilton
 def test_sparse_isometry_energy_validation(wavefunction_10e6o, hamiltonian_10e6o, ref_energy_10e6o):
     """Test SparseIsometryStatePreparation energy validation for 10e6o F2."""
     # Create SparseIsometryStatePreparation instance for F2 test
-    sparse_prep = create(
-        "state_prep",
-        algorithm_name="sparse_isometry",
-        basis_gates=["cx", "rz", "ry", "rx", "h", "x", "z"],
-        transpile_optimization_level=1,
-    )
+    sparse_prep = create("state_prep", algorithm_name="sparse_isometry")
 
     qiskit_sparse_prep = create(
         "state_prep",
@@ -133,15 +127,15 @@ def test_sparse_isometry_circuit_efficiency(wavefunction_4e4o):
     """
     # Create both state preparation instances
     basis_gates = ["cx", "rz", "ry", "rx", "h", "x", "z"]
-    sparse_prep = create(
-        "state_prep", algorithm_name="sparse_isometry", transpile_optimization_level=1, basis_gates=basis_gates
-    )
+    sparse_prep = create("state_prep", algorithm_name="sparse_isometry")
     regular_prep = create(
         "state_prep", algorithm_name="qiskit_regular_isometry", transpile_optimization_level=1, basis_gates=basis_gates
     )
 
-    # Create circuits using both methods
-    transpiled_sparse_circuit = sparse_prep.run(wavefunction_4e4o).get_qiskit_circuit()
+    # Sparse isometry emits Q# and does not transpile, so bring both to the same basis before comparing.
+    transpiled_sparse_circuit = transpile(
+        sparse_prep.run(wavefunction_4e4o).get_qiskit_circuit(), basis_gates=basis_gates, optimization_level=1
+    )
     transpiled_regular_circuit = regular_prep.run(wavefunction_4e4o).get_qiskit_circuit()
 
     # Compare circuit metrics
