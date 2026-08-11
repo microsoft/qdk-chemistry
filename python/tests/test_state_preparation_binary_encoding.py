@@ -433,6 +433,32 @@ class TestMeasurementBasedUncompute:
             overlap, 1.0, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
         )
 
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+    def test_qiskit_dense_prep_path_prepares_correct_state(self, ozone_wf):
+        """SELECT_AND must stay correct on the Qiskit path, which decomposes it without ancilla."""
+        from qiskit.quantum_info import Statevector  # noqa: PLC0415
+
+        from qdk_chemistry.plugins.qiskit.conversion import create_statevector_from_wavefunction  # noqa: PLC0415
+
+        circuit = create(
+            "state_prep",
+            "sparse_isometry",
+            dense_state_prep=AlgorithmRef("state_prep", "qiskit_regular_isometry"),
+            binary_encoding=True,
+            measurement_based_uncompute=True,
+        ).run(ozone_wf)
+        expected_sv = create_statevector_from_wavefunction(ozone_wf, normalize=True)
+        n_system = int(np.log2(len(expected_sv)))
+
+        qc = circuit.get_qiskit_circuit()
+        # The ancilla-free decomposition leaves nothing to uncompute, so no measurement is emitted.
+        assert qc.count_ops().get("measure", 0) == 0
+        system_sv = np.array(Statevector.from_instruction(qc))[: 2**n_system]
+        overlap = np.abs(np.vdot(expected_sv, system_sv))
+        assert np.isclose(
+            overlap, 1.0, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+        )
+
 
 class TestBinaryEncodingWithQPE:
     """Tests for binary encoding state preparation integrated with QPE circuit builders."""

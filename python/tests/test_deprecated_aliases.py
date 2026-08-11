@@ -22,7 +22,8 @@ import numpy as np
 import pytest
 
 from qdk_chemistry import algorithms
-from qdk_chemistry.algorithms import ExpectationEstimator, QdkExpectationEstimator, SparseIsometryStatePreparation
+from qdk_chemistry.algorithms import ExpectationEstimator, QdkExpectationEstimator
+from qdk_chemistry.algorithms.state_preparation import SparseIsometryStatePreparation
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian, QubitOperator
 
 

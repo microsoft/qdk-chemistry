@@ -172,6 +172,8 @@ def apply_matrix_compression_ops(
             gate = XGate().control(num_controls, ctrl_state=op.control_state)
             circuit.append(gate, [*controls, target])
         elif name in ("SELECT", "SELECT_AND"):
+            # SELECT_AND differs from SELECT only in how Q# uncomputes its helper ancilla;
+            # the ancilla-free decomposition below realizes the same unitary for both.
             _apply_select_to_circuit(circuit, op)
         else:
             raise ValueError(f"Unsupported MatrixCompressionOp: {op.name}")
@@ -186,6 +188,15 @@ def _apply_select_to_circuit(
     Args:
         circuit: Qiskit QuantumCircuit to append gates to.
         op: A SELECT or SELECT_AND MatrixCompressionOp.
+
+    Notes:
+        SELECT and SELECT_AND denote the same address-controlled write and are decomposed
+        identically here. They diverge only in the Q# implementation, where SELECT_AND
+        uncomputes the recursion's helper ancilla by measurement plus a classically
+        controlled correction instead of a Toffoli. That correction restores the same state,
+        so the two agree as unitaries on the address and target qubits. This decomposition
+        allocates no helper ancilla, so there is nothing to uncompute and no measurement is
+        emitted; ``measurement_based_uncompute`` therefore has no effect on Qiskit output.
 
     """
     from qiskit.circuit.library import XGate  # noqa: PLC0415
