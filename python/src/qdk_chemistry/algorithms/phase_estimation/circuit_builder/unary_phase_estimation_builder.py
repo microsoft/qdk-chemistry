@@ -20,6 +20,7 @@ from .base import QpeCircuitBuilder, QpeCircuitBuilderSettings
 __all__: list[str] = [
     "QdkUnaryQpeCircuitBuilder",
     "QdkUnaryQpeCircuitBuilderSettings",
+    "cosine_window_state",
 ]
 
 
