@@ -23,9 +23,14 @@ still runs in environments where the compiled extension module is unavailable.
 # --------------------------------------------------------------------------------------------
 
 import ast
+import difflib
 from pathlib import Path
 
 import pytest
+
+# Two names this close are a rename, not two different methods.  Validated against the
+# tree: on a correct checkout no probed capability has any near variant at all.
+_CONFUSABLE_RATIO = 0.85
 
 _SRC = Path(__file__).parent.parent / "src" / "qdk_chemistry" / "algorithms"
 CIRCUIT_BUILDER_DIR = _SRC / "phase_estimation" / "circuit_builder"
@@ -68,12 +73,13 @@ def _capability_probes() -> list[tuple[Path, int, str]]:
     return probes
 
 
-def _mapper_member_names() -> set[str]:
-    """Every method and class-level attribute defined by any controlled circuit mapper."""
-    names: set[str] = set()
+def _mapper_members_by_class() -> dict[str, set[str]]:
+    """Members of every controlled circuit mapper, keyed by ``file.py::ClassName``."""
+    by_class: dict[str, set[str]] = {}
     for path in sorted(MAPPER_DIR.rglob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for klass in (n for n in ast.walk(tree) if isinstance(n, ast.ClassDef)):
+            names: set[str] = set()
             for member in klass.body:
                 if isinstance(member, ast.FunctionDef | ast.AsyncFunctionDef):
                     names.add(member.name)
@@ -81,7 +87,20 @@ def _mapper_member_names() -> set[str]:
                     names.add(member.target.id)
                 elif isinstance(member, ast.Assign):
                     names.update(t.id for t in member.targets if isinstance(t, ast.Name))
-    return names
+            by_class[f"{path.name}::{klass.name}"] = names
+    return by_class
+
+
+def _mapper_member_names() -> set[str]:
+    """Every method and class-level attribute defined by any controlled circuit mapper."""
+    return set().union(*_mapper_members_by_class().values()) if _mapper_members_by_class() else set()
+
+
+def _near_variants(name: str, candidates: set[str]) -> list[str]:
+    """Names close enough to ``name`` to be a rename of it rather than a distinct method."""
+    return sorted(
+        c for c in candidates if c != name and difflib.SequenceMatcher(None, name, c).ratio() >= _CONFUSABLE_RATIO
+    )
 
 
 def test_capability_probe_directories_exist() -> None:
@@ -116,6 +135,31 @@ def test_probed_capability_is_defined_by_some_mapper(source: Path, lineno: int, 
         f"{MAPPER_DIR.name}/ defines it. The probe is permanently False and the fallback "
         f"branch is taken silently. Closest defined names: "
         f"{sorted(n for n in defined if capability.split('_', maxsplit=1)[0] in n) or sorted(defined)[:5]}"
+    )
+
+
+@pytest.mark.parametrize(
+    "capability",
+    sorted({c for _, _, c in _capability_probes()}),
+)
+def test_no_mapper_partially_renames_a_probed_capability(capability: str) -> None:
+    """No mapper may define a near variant of a probed capability without the capability.
+
+    The previous test only requires *some* mapper to define the literal, so it cannot see
+    a rename applied to one mapper but not the others: the surviving definition keeps it
+    green while the renamed mapper silently stops advertising the capability.  A class
+    holding a close variant and not the real name is that rename.
+    """
+    offenders = {
+        klass: variants
+        for klass, members in _mapper_members_by_class().items()
+        if capability not in members and (variants := _near_variants(capability, members))
+    }
+    assert not offenders, (
+        f'these mapper classes define a near variant of the probed capability "{capability}" '
+        f"but not the capability itself, so hasattr(...) is False for them while other mappers "
+        f"keep this test green: {offenders}. Rename the literal in "
+        f"{CIRCUIT_BUILDER_DIR.name}/ and every mapper together, or not at all."
     )
 
 
