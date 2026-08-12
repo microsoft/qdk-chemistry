@@ -53,6 +53,7 @@ state_preparation = Circuit(
 # gets amplified, so the phase register and its ancillas stay inside the amplified
 # register and every round reflects about the full prepared state.
 num_bits = 4
+walk = AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True)
 builder = create(
     "qpe_circuit_builder",
     "qdk_standard",
@@ -60,33 +61,28 @@ builder = create(
     controlled_circuit_mapper=AlgorithmRef(
         "controlled_circuit_mapper", "prepare_select_prepare"
     ),
-    unitary_builder=AlgorithmRef(
-        "hamiltonian_unitary_builder", "lcu", quantum_walk=True
-    ),
+    unitary_builder=walk,
     measure_phase=False,
 )
 state_prep_oracle = builder.run(
     state_preparation=state_preparation, qubit_hamiltonian=qubit_hamiltonian
 )[0]
+# The same walk, as a unitary representation: this is what the QPE circuit estimates.
+unitary_representation = create(
+    "hamiltonian_unitary_builder", "lcu", quantum_walk=True
+).run(qubit_hamiltonian)
 
-# 4. Mark the phase bins holding the target eigenvalue. QPE writes the phase phi of
-# the eigenvalue exp(2 pi i phi) into bin round(phi * 2**num_bits). The target
-# eigenvector |11> has energy E = -pi/4 - pi/4 = -lambda, and the walk maps it to
-# phi = arccos(E / lambda) / 2 pi = 0.5, that is bin 0.5 * 16 = 8. So the half-open
-# window (8, 9) accepts bin 8 alone.
+# 4. Mark the phase bins holding the target eigenvalue, naming it by energy. The oracle
+# reads the register width and the post-processing equation phases are read with off that
+# unitary, and inverts the equation to turn the energy back into a phase. Here the walk
+# gives E = lambda cos(2 pi phi), so the target eigenvector |11> at E = -pi/4 - pi/4 =
+# -lambda sits at phi = 0.5, that is bin 0.5 * 16 = 8. Both signs of the phase are marked,
+# because the walk has eigenvalues exp(+-i arccos(E / lambda)); here bin 8 is its own mirror.
 good_state_oracle = create(
-    "good_state_oracle", "qdk_phase_marking", target_phase_bins=(8, 9)
-).run(state_prep_oracle)
-
-# The same target can be named by energy instead, which avoids doing that conversion by
-# hand. Both signs of the phase are marked, because the walk has eigenvalues
-# exp(+-i arccos(E / lambda)). Here bin 8 is its own mirror, so this is the same oracle:
-#
-#     good_state_oracle = create(
-#         "good_state_oracle",
-#         "qdk_phase_marking",
-#         target_energy_range=(-np.inf, -0.99 * qubit_hamiltonian.schatten_norm),
-#     ).run(state_prep_oracle, qubit_hamiltonian=qubit_hamiltonian)
+    "subspace_oracle",
+    "qdk_qpe_subspace",
+    target_energy=-qubit_hamiltonian.schatten_norm,
+).run(state_prep_oracle, unitary_representation)
 
 # 5. Amplify, then execute. The overlap is a = 0.3**2 = 0.09, so
 # arcsin(sqrt(a)) = 0.3047 and 2 rounds put (2k+1) arcsin(sqrt(a)) at 1.523, just under

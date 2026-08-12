@@ -1,7 +1,7 @@
 Amplitude amplification
 =======================
 
-The :class:`~qdk_chemistry.algorithms.amplitude_amplification.AmplitudeAmplification`
+The :class:`~qdk_chemistry.algorithms.amplitude_amplification.amplitude_amplification.AmplitudeAmplification`
 algorithm increases the probability of measuring a state in a chosen subspace.
 It takes two :class:`~qdk_chemistry.data.Circuit` objects:
 
@@ -44,10 +44,10 @@ own measurement instead. See below for an example of amplifying a measurement-fr
 Amplitude amplified QPE
 -----------------------
 
-Build a measurement-free QPE circuit, mark the target phase bin, and amplify. The
-:class:`~qdk_chemistry.algorithms.good_state_oracle.PhaseMarkingOracle` algorithm
-(``good_state_oracle`` / ``qdk_phase_marking``) reads the register layout from the QPE
-circuit, so only the target has to be given:
+Build a measurement-free QPE circuit, name the target eigenvalue by energy, and amplify. The
+:class:`~qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.QPESubspaceMarking`
+algorithm (``subspace_oracle`` / ``qdk_qpe_subspace``) reads the register layout from the QPE
+circuit and the phase-to-energy law from the unitary that circuit estimates:
 
 .. tab:: Python API
 
@@ -56,9 +56,17 @@ circuit, so only the target has to be given:
       :start-after: # start-cell-run
       :end-before: # end-cell-run
 
-The target can also be named as an energy window.
-This only applies to a QPE circuit built on a qubitization walk, whose eigenvalues are
-:math:`e^{\pm i\arccos(E/\lambda)}` for :math:`\lambda` the L1 norm of the Hamiltonian.
+``run`` takes the QPE circuit and the
+:class:`~qdk_chemistry.data.UnitaryRepresentation` that circuit estimates. The unitary
+supplies the width of the register it acts on and its
+:meth:`~qdk_chemistry.data.unitary_representation.containers.base.UnitaryContainer.eigenvalue_from_phase`,
+the post-processing equation QPE results are read with. Inverting that equation turns
+``target_energy`` back into a phase, so each encoding is handled by its own law: a
+qubitization walk follows :math:`E = \lambda\cos(2\pi\varphi)` for :math:`\lambda` the L1
+norm of the Hamiltonian, and marks both mirrored bins because both signs of the phase
+occur, while a time evolution follows :math:`E = -\arg/t` and marks one. An energy the
+register cannot resolve exactly takes the nearest bin, and one outside the representable
+band takes the bin at its edge.
 
 Alternatively, the marked phase window can be replaced by a reflection onto the target
 eigenspace built with quantum signal processing on a block encoding of the Hamiltonian,
@@ -82,7 +90,7 @@ Settings
      - ``int``
      - Number of Grover iterates (default 1). Must be non-negative.
 
-``good_state_oracle`` / ``qdk_phase_marking``. Exactly one of the two must be set:
+``subspace_oracle`` / ``qdk_qpe_subspace``:
 
 .. list-table::
    :header-rows: 1
@@ -91,13 +99,10 @@ Settings
    * - Setting
      - Type
      - Description
-   * - ``target_phase_bins``
-     - ``vector<int>``
-     - Half-open ``(low, high)`` window of QPE phase bins to mark.
-   * - ``target_energy_range``
-     - ``vector<double>``
-     - Half-open ``(low, high)`` energy window, converted to phase bins. Requires
-       ``qubit_hamiltonian`` on ``run`` and a qubitization-walk QPE circuit.
+   * - ``target_energy``
+     - ``double``
+     - Energy whose QPE phase bins are marked. Required; it defaults to NaN because there
+       is no meaningful default.
 
 Further Reading
 ---------------
