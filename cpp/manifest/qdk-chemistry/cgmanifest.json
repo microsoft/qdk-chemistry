@@ -74,8 +74,8 @@
         "type": "git",
         "git": {
           "repositoryUrl": "https://github.com/nlohmann/json",
-          "commitHash": "bc889afb4c5bf1c0d8ee29ef35eaaf4c8bef8a5d",
-          "tag": "v3.11.2"
+          "commitHash": "55f93686c01528224f448c19128836e7df245f72",
+          "tag": "v3.12.0"
         }
       },
       "developmentDependency": false
@@ -85,7 +85,7 @@
         "type": "git",
         "git": {
           "repositoryUrl": "https://github.com/catchorg/Catch2",
-          "commitHash": "7f18282fa02e8317ac9f10bf6fd545883a170561",
+          "commitHash": "182c910b4b63ff587a3440e08f84f70497e49a81",
           "tag": "v2.13.10"
         }
       },
@@ -140,8 +140,7 @@
         "type": "git",
         "git": {
           "repositoryUrl": "https://github.com/wavefunction91/ExchCXX.git",
-          "commitHash": "bd50b73e4b7a798ff8cec6f386e633637f4c6d3f",
-          "tag": "v1.0.0"
+          "commitHash": "67be5c6ebe1e5b1a32f2c3fd1c5bf4cbfe48f769"
         }
       },
       "developmentDependency": false
@@ -162,7 +161,7 @@
         "type": "git",
         "git": {
           "repositoryUrl": "https://github.com/wavefunction91/IntegratorXX.git",
-          "commitHash": "1369be58d7a3235dac36d75dd964fef058830622"
+          "commitHash": "619d26ae4ea421ed9b7a6f80eb0783f9da1ecf7a"
         }
       },
       "developmentDependency": false
@@ -172,7 +171,7 @@
         "type": "git",
         "git": {
           "repositoryUrl": "https://github.com/wavefunction91/linalg-cmake-modules.git",
-          "commitHash": "9d2c273a671d6811e9fd432f6a4fa3d915b144b8"
+          "commitHash": "222364df5e7639f371bf2f37ceb0f476301101a1"
         }
       },
       "developmentDependency": true
@@ -193,7 +192,7 @@
         "type": "git",
         "git": {
           "repositoryUrl": "https://github.com/wavefunction91/gauxc.git",
-          "commitHash": "62fea07c9306dbd83dd18b6957358827ac9b3da0"
+          "commitHash": "f05cd68e1fd549cc45a318e6d039f49d044d3e1d"
         }
       },
       "developmentDependency": false

@@ -20,7 +20,7 @@ When QPE acts on :math:`U = e^{-iHt}`, the eigenvalues are :math:`e^{-iEt}` and 
 
 .. math::
 
-   E = \frac{2\pi\varphi'}{t}
+   E = -\frac{2\pi\varphi'}{t}
 
 where :math:`\varphi' \in (-1/2, 1/2]` is the measured phase fraction wrapped from :math:`[0, 1)` into :math:`(-1/2, 1/2]`.
 
@@ -158,7 +158,7 @@ Related classes
 ---------------
 
 - :doc:`PhaseEstimation <../algorithms/phase_estimation>`: Algorithm that produces ``QpeResult`` objects
-- :class:`~qdk_chemistry.data.QubitHamiltonian`: Input qubit Hamiltonian
+- :class:`~qdk_chemistry.data.QubitOperator`: Input qubit Hamiltonian
 - :class:`~qdk_chemistry.data.Wavefunction`: Source wavefunction for state preparation
 
 Further reading

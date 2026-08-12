@@ -55,7 +55,7 @@ The following table summarizes the available data classes in QDK/Chemistry and t
    * - :doc:`Wavefunction <wavefunction>`
      - Electronic state (orbitals + :term:`CI` coefficients)
      - :doc:`MCCalculator <../algorithms/mc_calculator>`
-   * - ``QubitHamiltonian``
+   * - ``QubitOperator``
      - Pauli operator representation
      - :doc:`QubitMapper <../algorithms/qubit_mapper>`
    * - :doc:`Symmetries <symmetries>`
@@ -77,14 +77,14 @@ The following table summarizes the available data classes in QDK/Chemistry and t
      - Quantum circuit (OpenQASM, Q#, QIR, Qiskit)
      - :doc:`StatePreparation <../algorithms/state_preparation>`, User input
 
-QubitHamiltonian and term partitions
+QubitOperator and term partitions
 ------------------------------------
 
-A :class:`~qdk_chemistry.data.QubitHamiltonian` carries an optional :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition` field describing how its Pauli terms are organised into algorithm-relevant subsets.
-The partition is index-based — it stores indices into :attr:`~qdk_chemistry.data.QubitHamiltonian.pauli_strings` — so it serialises cheaply alongside the Hamiltonian.
+A :class:`~qdk_chemistry.data.QubitOperator` carries an optional :attr:`~qdk_chemistry.data.QubitOperator.term_partition` field describing how its Pauli terms are organised into algorithm-relevant subsets.
+The partition is index-based — it stores indices into :attr:`~qdk_chemistry.data.QubitOperator.pauli_strings` — so it serialises cheaply alongside the operator.
 
-The partition is *optional* metadata — ``term_partition is None`` means the partition has not been computed for this Hamiltonian.
-Transformations that change term ordering or qubit support (for example :meth:`~qdk_chemistry.data.QubitHamiltonian.to_interleaved`) reset the partition to ``None`` on the new instance.
+The partition is *optional* metadata — ``term_partition is None`` means the partition has not been computed for this operator.
+Transformations that change term ordering or qubit support (for example :meth:`~qdk_chemistry.data.QubitOperator.to_interleaved`) reset the partition to ``None`` on the new instance.
 
 Algorithms that consume a partition treat its presence as an explicit signal to exploit it — for example, the :doc:`Trotter time-evolution builder <../algorithms/hamiltonian_unitary_builder>` reads ``term_partition`` and uses it for schedule-level Suzuki recursion and reduction.
 
@@ -92,10 +92,10 @@ FlatPartition
 ~~~~~~~~~~~~~
 
 :class:`~qdk_chemistry.data.FlatPartition` stores a single-level grouping: each group is a tuple of term indices.
-It is suitable for algorithms that only need to know which terms belong together, such as qubit-wise commuting measurement grouping in :class:`~qdk_chemistry.algorithms.QdkEnergyEstimator`.
+It is suitable for algorithms that only need to know which terms belong together, such as qubit-wise commuting measurement grouping in :class:`~qdk_chemistry.algorithms.QdkExpectationEstimator`.
 
 The ``groups`` field is a tuple of tuples: ``((idx0, idx1, ...), (idx2, ...), ...)``.
-Each inner tuple lists the indices of terms in :attr:`~qdk_chemistry.data.QubitHamiltonian.pauli_strings` that belong to that group.
+Each inner tuple lists the indices of terms in :attr:`~qdk_chemistry.data.QubitOperator.pauli_strings` that belong to that group.
 
 LayeredPartition
 ~~~~~~~~~~~~~~~~
@@ -107,4 +107,4 @@ The ``groups`` field is a nested tuple: ``(((idx0, idx1), (idx2,)), ...)``.
 The outer level is groups, the middle level is layers within a group, and the innermost level is term indices.
 
 Both classes carry a ``strategy`` label (e.g. ``"geometry_coloring"``, ``"qubit_wise_commuting"``) identifying how the partition was produced.
-They serialise as part of :class:`~qdk_chemistry.data.QubitHamiltonian` in both JSON and HDF5 formats.
+They serialise as part of :class:`~qdk_chemistry.data.QubitOperator` in both JSON and HDF5 formats.

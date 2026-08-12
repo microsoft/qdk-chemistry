@@ -16,7 +16,6 @@
 #include <lapack.hh>
 #include <memory>
 #include <numeric>
-#include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
@@ -41,9 +40,8 @@ namespace qcs = qdk::chemistry::scf;
  * space.
  *
  * This class holds a pointer to an IterativeOrbitalLocalizationScheme for the
- * actual localization work. This allows flexibility to use different
- * localization methods (Pipek-Mezey, Foster-Boys, etc.) for occupied orbitals
- * and valence virtuals in the future.
+ * actual localization work. It currently uses Pipek-Mezey for occupied
+ * orbitals and valence virtuals.
  */
 class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
  public:
@@ -1232,6 +1230,13 @@ std::shared_ptr<data::Wavefunction> VVHVLocalizer::_run_impl(
     const std::vector<size_t>& loc_indices_b) const {
   QDK_LOG_TRACE_ENTERING();
   auto orbitals = wavefunction->get_orbitals();
+
+  detail::warn_if_not_aufbau_determinant_wavefunction(wavefunction, name());
+
+  if (loc_indices_a.empty() && loc_indices_b.empty()) {
+    return detail::new_aufbau_determinant_wavefunction(wavefunction, orbitals);
+  }
+
   // Get electron counts from settings
   auto [n_alpha_electrons, n_beta_electrons] =
       wavefunction->get_total_num_electrons();
@@ -1354,7 +1359,8 @@ std::shared_ptr<data::Wavefunction> VVHVLocalizer::_run_impl(
         ao_overlap,    // Atomic Orbital overlap
         basis_set,     // basis set
         orbitals->active_indices(), orbitals->inactive_indices());
-    return detail::new_wavefunction(wavefunction, new_orbitals);
+    return detail::new_aufbau_determinant_wavefunction(wavefunction,
+                                                       new_orbitals);
   } else {
     // Unrestricted case: UHF - only handle virtual orbitals
     const size_t num_alpha_virtual_orbitals =
@@ -1392,7 +1398,8 @@ std::shared_ptr<data::Wavefunction> VVHVLocalizer::_run_impl(
         ao_overlap,    // Atomic Orbital overlap
         basis_set,     // basis set
         orbitals->active_indices(), orbitals->inactive_indices());
-    return detail::new_wavefunction(wavefunction, new_orbitals);
+    return detail::new_aufbau_determinant_wavefunction(wavefunction,
+                                                       new_orbitals);
   }
 }
 

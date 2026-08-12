@@ -54,6 +54,8 @@ if(NOT lapackpp_FOUND )
     ${_lapackpp_patch}
   )
 
+  # blaspp's option(use_openmp) reads from the CMake cache, not local variables.
+  set(use_openmp ${use_openmp} CACHE BOOL "blaspp: enable OpenMP" FORCE)
   FetchContent_MakeAvailable( blaspp )
   FetchContent_MakeAvailable( lapackpp )
 

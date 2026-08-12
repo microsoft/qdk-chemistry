@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
+from qdk import TargetProfile
 from qdk.openqasm import compile as compile_qasm_to_qir
 
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
@@ -32,7 +33,7 @@ def test_qir_to_qiskit_conversion():
     c[1] = measure q[1];
     """
 
-    qir = compile_qasm_to_qir(qasm_str)
+    qir = compile_qasm_to_qir(qasm_str, target_profile=TargetProfile.Base)
     circuit = qir_ir_to_qiskit(str(qir))
     assert isinstance(circuit, QuantumCircuit)
     assert circuit.num_qubits == 2
@@ -55,7 +56,7 @@ def test_qir_to_qiskit_conversion():
     c[1] = measure q[1];
     c[2] = measure q[2];
     """
-    qir_2 = compile_qasm_to_qir(qasm_str_2)
+    qir_2 = compile_qasm_to_qir(qasm_str_2, target_profile=TargetProfile.Base)
     circuit2 = qir_ir_to_qiskit(str(qir_2))
     assert isinstance(circuit2, QuantumCircuit)
     assert circuit2.num_qubits == 3

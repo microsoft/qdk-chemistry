@@ -34,7 +34,7 @@ Currently available plugin packages:
   stability analysis.
 
 * :mod:`qdk_chemistry.plugins.qiskit`: Qiskit integration providing qubit mapping,
-  circuit execution, energy estimation, and state preparation.
+  circuit execution, expectation-value estimation, and state preparation.
 
 * :mod:`qdk_chemistry.plugins.openfermion`: OpenFermion integration providing qubit mapping,
   operator conversion, and quantum circuit interoperability.

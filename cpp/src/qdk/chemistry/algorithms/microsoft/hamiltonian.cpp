@@ -17,6 +17,8 @@
 #include <qdk/chemistry/scf/eri/eri_multiplexer.h>
 #include <qdk/chemistry/scf/util/int1e.h>
 
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
+
 // QDK/Chemistry data::Hamiltonian headers
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
@@ -97,9 +99,11 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   const size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
 
   // Get alpha and beta active space indices
-  auto active_space_indices = orbitals->get_active_space_indices();
-  auto active_indices_alpha = active_space_indices.first;
-  auto active_indices_beta = active_space_indices.second;
+  const auto active_ai = orbitals->active_indices();
+  auto active_indices_alpha =
+      data::spin_channel_indices(active_ai, data::axes::alpha());
+  auto active_indices_beta =
+      data::spin_channel_indices(active_ai, data::axes::beta());
 
   if (orbitals->is_restricted() && active_indices_alpha.empty()) {
     throw std::runtime_error("Need to specify an active space.");
@@ -284,8 +288,11 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   }
 
   // Get inactive space indices for both alpha and beta
-  auto [inactive_indices_alpha, inactive_indices_beta] =
-      orbitals->get_inactive_space_indices();
+  const auto inactive_ai = orbitals->inactive_indices();
+  auto inactive_indices_alpha =
+      data::spin_channel_indices(inactive_ai, data::axes::alpha());
+  auto inactive_indices_beta =
+      data::spin_channel_indices(inactive_ai, data::axes::beta());
 
   // For restricted calculations, alpha and beta inactive spaces should be
   // identical

@@ -12,12 +12,12 @@ from pathlib import Path
 import numpy as np
 
 from qdk_chemistry.data.estimator_data import MeasurementData
-from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
+from qdk_chemistry.data.qubit_operator import QubitOperator
 
 
 def test_measurement_data_creation():
     """Test basic MeasurementData creation."""
-    ham = QubitHamiltonian(["ZI", "XI"], np.array([1.0, 0.5]))
+    ham = QubitOperator(["ZI", "XI"], np.array([1.0, 0.5]))
 
     data = MeasurementData(
         hamiltonians=[ham],
@@ -32,7 +32,7 @@ def test_measurement_data_creation():
 
 def test_measurement_data_default_values():
     """Test MeasurementData with default values."""
-    ham = QubitHamiltonian(["Z"], np.array([1.0]))
+    ham = QubitOperator(["Z"], np.array([1.0]))
 
     data = MeasurementData(hamiltonians=[ham])
 
@@ -43,8 +43,8 @@ def test_measurement_data_default_values():
 
 def test_measurement_data_json_serialization():
     """Test MeasurementData JSON serialization."""
-    ham1 = QubitHamiltonian(["Z"], np.array([1.0]))
-    ham2 = QubitHamiltonian(["X"], np.array([0.5]))
+    ham1 = QubitOperator(["Z"], np.array([1.0]))
+    ham2 = QubitOperator(["X"], np.array([0.5]))
 
     data = MeasurementData(
         hamiltonians=[ham1, ham2],
@@ -72,7 +72,7 @@ def test_measurement_data_json_serialization():
 
 def test_measurement_data_json_file_io():
     """Test MeasurementData JSON file I/O."""
-    ham = QubitHamiltonian(["ZZ", "IZ"], np.array([1.0, -0.5]))
+    ham = QubitOperator(["ZZ", "IZ"], np.array([1.0, -0.5]))
 
     data = MeasurementData(
         hamiltonians=[ham],
@@ -101,8 +101,8 @@ def test_measurement_data_json_file_io():
 
 def test_measurement_data_hdf5_file_io():
     """Test MeasurementData HDF5 file I/O."""
-    ham1 = QubitHamiltonian(["Z"], np.array([1.0]))
-    ham2 = QubitHamiltonian(["XI", "YI"], np.array([0.5, -0.3]))
+    ham1 = QubitOperator(["Z"], np.array([1.0]))
+    ham2 = QubitOperator(["XI", "YI"], np.array([0.5, -0.3]))
 
     data = MeasurementData(
         hamiltonians=[ham1, ham2],
@@ -137,7 +137,7 @@ def test_measurement_data_hdf5_file_io():
 
 def test_measurement_data_summary():
     """Test MeasurementData summary string."""
-    ham = QubitHamiltonian(["Z"], np.array([1.0]))
+    ham = QubitOperator(["Z"], np.array([1.0]))
 
     data = MeasurementData(
         hamiltonians=[ham, ham, ham],
@@ -154,7 +154,7 @@ def test_measurement_data_summary():
 
 def test_measurement_data_empty_measurements():
     """Test MeasurementData with no measurements collected."""
-    ham = QubitHamiltonian(["Z"], np.array([1.0]))
+    ham = QubitOperator(["Z"], np.array([1.0]))
 
     data = MeasurementData(hamiltonians=[ham])
 
@@ -167,7 +167,7 @@ def test_measurement_data_empty_measurements():
 
 def test_measurement_data_immutability():
     """Test that MeasurementData is immutable after construction."""
-    ham = QubitHamiltonian(["Z"], np.array([1.0]))
+    ham = QubitOperator(["Z"], np.array([1.0]))
     measurement = MeasurementData([ham], [{"0": 50, "1": 50}], [100])
 
     try:

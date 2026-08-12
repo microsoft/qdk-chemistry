@@ -14,7 +14,7 @@ import pytest
 
 from qdk_chemistry.algorithms import registry
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
-from qdk_chemistry.data import QubitHamiltonian
+from qdk_chemistry.data import QubitOperator
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import BlockEncodingContainer, LCUContainer
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
@@ -27,7 +27,7 @@ class TestLCUBuilder:
 
     def test_basic_construction(self):
         """Test that the block encoding builder produces an LCUContainer from a simple Hamiltonian."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XX", "ZZ"],
             coefficients=np.array([0.25, 0.5]),
         )
@@ -45,7 +45,7 @@ class TestLCUBuilder:
     def test_num_select_qubits(self):
         """Test correct computation of select qubit count."""
         # 2 terms -> 1 select qubit
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XX", "ZZ"],
             coefficients=np.array([0.25, 0.5]),
         )
@@ -54,7 +54,7 @@ class TestLCUBuilder:
         assert result.get_container().num_prepare_ancillas == 1
 
         # 3 terms -> 2 select qubits (ceil(log2(3)) = 2)
-        hamiltonian3 = QubitHamiltonian(
+        hamiltonian3 = QubitOperator(
             pauli_strings=["XX", "ZZ", "XZ"],
             coefficients=np.array([0.25, 0.5, 0.1]),
         )
@@ -75,7 +75,7 @@ class TestLCUBuilder:
         amplitudes = [sqrt(0.25/0.75), sqrt(0.5/0.75)].
         """
         coefficients = np.array([0.25, 0.5])
-        hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZZ"], coefficients=coefficients)
+        hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ"], coefficients=coefficients)
         builder = LCUBuilder()
         container = builder.run(hamiltonian).get_container()
 
@@ -93,7 +93,7 @@ class TestLCUBuilder:
     def test_prepare_statevector_three_terms(self):
         """Verify PREPARE wavefunction amplitudes for 3 terms."""
         coefficients = np.array([0.25, -0.5, 0.3])
-        hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZZ", "XZ"], coefficients=coefficients)
+        hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ", "XZ"], coefficients=coefficients)
         builder = LCUBuilder()
         container = builder.run(hamiltonian).get_container()
 
@@ -111,7 +111,7 @@ class TestLCUBuilder:
     def test_select_operations_match_pauli_strings(self):
         """Verify SELECT controlled operations match the input Pauli strings."""
         pauli_strings = ["XI", "IZ", "XZ"]
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=pauli_strings,
             coefficients=np.array([0.3, 0.5, 0.2]),
         )
@@ -125,7 +125,7 @@ class TestLCUBuilder:
     def test_select_phases_match_coefficient_signs(self):
         """Verify SELECT phases encode coefficient signs correctly."""
         coefficients = np.array([0.3, -0.5, 0.2, -0.1])
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XI", "IZ", "XZ", "ZX"],
             coefficients=coefficients,
         )
@@ -137,7 +137,7 @@ class TestLCUBuilder:
 
     def test_quantum_walk_flag(self):
         """Verify quantum_walk setting produces LCUWalkContainer."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XX", "ZZ"],
             coefficients=np.array([0.25, 0.5]),
         )
@@ -152,7 +152,7 @@ class TestLCUBuilder:
 
     def test_rejects_zero_l1_norm(self):
         """Verify LCUBuilder raises ValueError when all coefficients are zero."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XX", "ZZ"],
             coefficients=np.array([0.0, 0.0]),
         )
@@ -166,7 +166,7 @@ class TestLCUContainer:
 
     def test_lcu_container_serialization_roundtrip(self):
         """Test JSON serialization round-trip for LCUContainer."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XX", "ZZ", "XZ"],
             coefficients=np.array([0.25, -0.5, 0.3]),
         )
@@ -188,7 +188,7 @@ class TestLCUContainer:
 
     def test_unitary_representation_serialization_roundtrip(self):
         """Test JSON serialization round-trip via UnitaryRepresentation dispatch."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XX", "ZZ", "XZ"],
             coefficients=np.array([0.25, -0.5, 0.3]),
         )
@@ -211,7 +211,7 @@ class TestLCUContainer:
 
     def test_serialization_preserves_statevector(self):
         """Verify that serialization preserves the PREPARE wavefunction coefficients."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XX", "ZZ", "XZ"],
             coefficients=np.array([0.25, -0.5, 0.3]),
         )
@@ -232,7 +232,7 @@ class TestLCUContainer:
 
     def test_hdf5_serialization_roundtrip(self):
         """Test HDF5 serialization round-trip for LCUContainer."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XX", "ZZ", "XZ"],
             coefficients=np.array([0.25, -0.5, 0.3]),
         )
@@ -267,7 +267,7 @@ class TestLCUContainer:
 
     def test_get_summary(self):
         """Test that get_summary returns a descriptive string."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XX", "ZZ"],
             coefficients=np.array([0.25, 0.5]),
         )
@@ -282,7 +282,7 @@ class TestLCUContainer:
 
     def test_lcu_walk_container_json_roundtrip(self):
         """Test JSON serialization round-trip for LCUWalkContainer."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XX", "ZZ", "XZ"],
             coefficients=np.array([0.25, -0.5, 0.3]),
         )
@@ -307,7 +307,7 @@ class TestLCUContainer:
 
     def test_lcu_walk_container_hdf5_roundtrip(self):
         """Test HDF5 serialization round-trip for LCUWalkContainer."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XX", "ZZ"],
             coefficients=np.array([0.25, 0.5]),
         )
@@ -339,7 +339,7 @@ class TestLCUContainer:
 
     def test_lcu_walk_container_get_summary(self):
         """Test that LCUWalkContainer.get_summary returns a descriptive string."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XX", "ZZ"],
             coefficients=np.array([0.25, 0.5]),
         )
@@ -353,7 +353,7 @@ class TestLCUContainer:
 
     def test_walk_container_scale_equals_schatten_norm(self):
         """LCUWalkContainer scale should equal the Hamiltonian's Schatten (L1) norm."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XX", "ZZ", "XZ"],
             coefficients=np.array([0.25, 0.5, 0.1]),
         )
@@ -369,7 +369,7 @@ class TestLCUContainer:
 
     def test_walk_container_eigenvalue_from_phase(self):
         """LCUWalkContainer eigenvalue_from_phase recovers E = λ·cos(2πφ)."""
-        hamiltonian = QubitHamiltonian(
+        hamiltonian = QubitOperator(
             pauli_strings=["XX", "ZZ"],
             coefficients=np.array([0.25, 0.5]),
         )

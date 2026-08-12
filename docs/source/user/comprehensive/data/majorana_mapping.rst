@@ -127,7 +127,7 @@ Related classes
 ---------------
 
 - :doc:`Hamiltonian <hamiltonian>`: Fermionic Hamiltonian transformed by the mapping
-- :class:`~qdk_chemistry.data.QubitHamiltonian`: Output of qubit mapping using this encoding
+- :class:`~qdk_chemistry.data.QubitOperator`: Output of qubit mapping using this encoding
 - :doc:`PauliOperator <pauli_operator>`: Pauli operator expressions used in the mapping table
 
 Further reading

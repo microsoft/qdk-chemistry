@@ -192,11 +192,11 @@ By identifying and retaining only the dominant configurations (those with the la
 Preparing a qubit representation of the Hamiltonian
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-To execute quantum algorithms on actual quantum hardware, the Fermionic :doc:`Hamiltonian <comprehensive/data/hamiltonian>` must be mapped to a qubit Hamiltonian composed of Pauli operators.
+To execute quantum algorithms on actual quantum hardware, the Fermionic :doc:`Hamiltonian <comprehensive/data/hamiltonian>` must be mapped to a qubit operator composed of Pauli operators.
 QDK/Chemistry supports multiple encoding schemes including the Jordan-Wigner and Bravyi-Kitaev transformations.
-The resulting qubit Hamiltonian is represented as a sum of Pauli strings (tensor products of Pauli :math:`X, Y, Z`, and identity operators), each with an associated coefficient.
+The resulting qubit operator is represented as a sum of Pauli strings (tensor products of Pauli :math:`X, Y, Z`, and identity operators), each with an associated coefficient.
 
-For efficient energy estimation, the qubit Hamiltonian can be optimized in two ways:
+For efficient energy estimation, the qubit operator can be optimized in two ways:
 
 
 1. Filter out terms that have negligible expectation values given the sparse :class:`~qdk_chemistry.data.Wavefunction`, pre-computing their classical contributions.
@@ -241,7 +241,7 @@ See :doc:`comprehensive/algorithms/state_preparation` for more details on the ot
 Estimate the ground state energy by sampling
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The final step combines the state preparation circuit with the measurement circuits derived from the grouped qubit Hamiltonian to estimate the ground state energy.
+The final step combines the state preparation circuit with the measurement circuits derived from the grouped qubit operator to estimate the ground state energy.
 Each measurement circuit appends specific Pauli basis rotations to the state preparation circuit, followed by computational basis measurements.
 The measurement outcomes are repeated many times (shots) to build up statistics for each observable group.
 

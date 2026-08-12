@@ -1136,7 +1136,7 @@ PauliTermAccumulator::multiply_uncached(const SparsePauliWord& word1,
 // Excitation Term Computation
 // ============================================================================
 
-namespace {
+namespace detail {
 
 // Pauli operator type constants
 constexpr std::uint8_t OP_X = 1;
@@ -1313,7 +1313,7 @@ compute_bk_excitation_terms_single(
   return result;
 }
 
-}  // anonymous namespace
+}  // namespace detail
 
 std::unordered_map<
     std::pair<std::uint64_t, std::uint64_t>,
@@ -1335,7 +1335,7 @@ PauliTermAccumulator::compute_all_jw_excitation_terms(
 
   for (std::uint64_t p = 0; p < n_spin_orbitals; ++p) {
     for (std::uint64_t q = 0; q < n_spin_orbitals; ++q) {
-      result[{p, q}] = compute_jw_excitation_terms_single(p, q);
+      result[{p, q}] = detail::compute_jw_excitation_terms_single(p, q);
     }
   }
 
@@ -1376,7 +1376,7 @@ PauliTermAccumulator::compute_all_bk_excitation_terms(
       const auto& update_q = update_sets.at(q);
       const auto& remainder_q = remainder_sets.at(q);
 
-      result[{p, q}] = compute_bk_excitation_terms_single(
+      result[{p, q}] = detail::compute_bk_excitation_terms_single(
           p, q, parity_p, update_p, remainder_p, parity_q, update_q,
           remainder_q);
     }

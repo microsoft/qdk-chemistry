@@ -1,8 +1,8 @@
 Qubit mapping
 =============
 
-The :class:`~qdk_chemistry.algorithms.QubitMapper` algorithm in QDK/Chemistry transforms electronic-structure Hamiltonians into qubit Hamiltonians suitable for quantum computation.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :doc:`Hamiltonian <../data/hamiltonian>` instance as input and produces a :class:`~qdk_chemistry.data.QubitHamiltonian` instance as output.
+The :class:`~qdk_chemistry.algorithms.QubitMapper` algorithm in QDK/Chemistry transforms electronic-structure Hamiltonians into qubit operators suitable for quantum computation.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :doc:`Hamiltonian <../data/hamiltonian>` instance as input and produces a :class:`~qdk_chemistry.data.QubitOperator` instance as output.
 This transformation is essential for executing quantum chemistry algorithms on quantum hardware.
 
 Overview
@@ -10,19 +10,19 @@ Overview
 
 The :class:`~qdk_chemistry.algorithms.QubitMapper` algorithm converts fermionic Hamiltonians into qubit-operator representations composed of Pauli strings.
 This transformation preserves the operator algebra, particle-number constraints, and antisymmetry required by fermionic statistics.
-The resulting qubit Hamiltonian is mathematically equivalent to the original fermionic Hamiltonian but is now in a form that can be executed on quantum hardware or simulated by quantum algorithms.
+The resulting qubit operator is mathematically equivalent to the original fermionic Hamiltonian but is now in a form that can be executed on quantum hardware or simulated by quantum algorithms.
 
 .. note::
 
    **Core energy handling:** The core energy (nuclear repulsion + frozen orbital contributions)
-   from the input Hamiltonian is **not** included in the output QubitHamiltonian. To compute
+   from the input Hamiltonian is **not** included in the output QubitOperator. To compute
    total energies, add ``hamiltonian.get_core_energy()`` to expectation values computed from
-   the QubitHamiltonian.
+   the QubitOperator.
 
 Supported encodings
 ~~~~~~~~~~~~~~~~~~~
 
-Different encoding strategies produce mathematically equivalent qubit Hamiltonians but with different Pauli-string structures.
+Different encoding strategies produce mathematically equivalent qubit operators but with different Pauli-string structures.
 The choice of encoding can affect circuit depth and measurement requirements on quantum hardware.
 Not every implementation supports all encodings — see `Available implementations`_ for details.
 
@@ -65,7 +65,7 @@ Using the QubitMapper
 
 This section demonstrates how to create, configure, and run a qubit mapping.
 The ``run`` method requires a :class:`~qdk_chemistry.data.MajoranaMapping` as its second argument, which specifies the fermion-to-qubit encoding to use.
-It returns a :class:`~qdk_chemistry.data.QubitHamiltonian` object containing the Pauli-string representation.
+It returns a :class:`~qdk_chemistry.data.QubitOperator` object containing the Pauli-string representation.
 
 Input requirements
 ~~~~~~~~~~~~~~~~~~
@@ -88,7 +88,7 @@ MajoranaMapping
 
 .. note::
 
-   Different encoding strategies produce mathematically equivalent qubit Hamiltonians
+   Different encoding strategies produce mathematically equivalent qubit operators
    but with different Pauli-string structures. The choice of encoding can affect circuit
    depth and measurement requirements on quantum hardware.
    See `Supported encodings`_ above for descriptions.
@@ -174,7 +174,7 @@ This distinction has practical consequences:
 
 - **Tapering** is each backend's responsibility.  The base class provides
   a ``_taper_result()`` helper that applies tapering and qubit relabeling
-  to an *already mapped* ``QubitHamiltonian``.  Backends must first run
+  to an *already mapped* ``QubitOperator``.  Backends must first run
   the base transform (typically using ``mapping.without_tapering()``) and
   then call ``_taper_result()`` on the output.  All shipped backends use
   this helper, but third-party backends are free to handle tapering
@@ -195,7 +195,7 @@ The mapping's ``name`` and ``base_encoding`` are used only for metadata on the o
 Supported encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`, :ref:`Bravyi-Kitaev tree <encoding-bk-tree>`, :ref:`Parity <encoding-parity>`, :ref:`SCBK <encoding-scbk>`, :ref:`Verstraete-Cirac <encoding-verstraete-cirac>`, and any custom encoding
 
 The native mapper uses blocked spin-orbital ordering internally (alpha orbitals first, then beta orbitals).
-Use ``QubitHamiltonian.to_interleaved()`` for alternative qubit orderings if needed.
+Use ``QubitOperator.to_interleaved()`` for alternative qubit orderings if needed.
 
 Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
 
@@ -227,7 +227,7 @@ compressed form:
   peak additional memory is a single :math:`N^2`-length row, making this path
   suitable for systems whose dense ERI tensor does not fit in memory.
 
-In all cases the result is a :class:`~qdk_chemistry.data.QubitHamiltonian` that
+In all cases the result is a :class:`~qdk_chemistry.data.QubitOperator` that
 is numerically equivalent — term-by-term, to within ``1e-12`` — to the dense
 :class:`~qdk_chemistry.data.CanonicalFourCenterHamiltonianContainer` path for
 the same integrals. The behaviour of ``run()`` and the shape of the returned
@@ -305,7 +305,7 @@ Related classes
 
 - :doc:`Hamiltonian <../data/hamiltonian>`: Input Hamiltonian for mapping
 - :doc:`MajoranaMapping <../data/majorana_mapping>`: Fermion-to-qubit encoding passed to ``run()``
-- :class:`~qdk_chemistry.data.QubitHamiltonian`: Output qubit operator representation
+- :class:`~qdk_chemistry.data.QubitOperator`: Output qubit operator representation
 - :doc:`Symmetries <../data/symmetries>`: Physical symmetries (e.g., conserved quantum numbers) for :meth:`~qdk_chemistry.data.MajoranaMapping.symmetry_conserving_bravyi_kitaev`
 
 Further reading
@@ -313,6 +313,6 @@ Further reading
 
 - The above examples can be downloaded as a complete `Python <../../../_static/examples/python/qubit_mapper.py>`_ script.
 - :doc:`StatePreparation <state_preparation>`: Prepare quantum circuits from wavefunctions
-- :doc:`EnergyEstimator <energy_estimator>`: Estimate energies using the qubit Hamiltonian
+- :doc:`ExpectationEstimator <expectation_estimator>`: Estimate energies using the qubit operator
 - :doc:`Settings <settings>`: Configuration settings for algorithms
 - :doc:`Factory Pattern <factory_pattern>`: Understanding algorithm creation

@@ -10,6 +10,7 @@
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 
 #include "ut_common.hpp"
@@ -96,6 +97,60 @@ TEST_F(StateVectorContainerTest, BasicProperties) {
   EXPECT_TRUE(
       alpha_total_occ.isApprox(alpha_active_occ, testing::wf_tolerance));
   EXPECT_TRUE(beta_total_occ.isApprox(beta_active_occ, testing::wf_tolerance));
+}
+
+TEST_F(StateVectorContainerTest,
+       SingleDeterminantUsesProvidedOneRdmForOccupations) {
+  auto orbitals = testing::create_test_orbitals(4, 4, true);
+  Eigen::VectorXd coeffs = Eigen::VectorXd::Ones(1);
+  std::vector<Configuration> dets = {
+      Configuration::from_spin_half_string("2200")};
+  Eigen::MatrixXd one_rdm = Eigen::MatrixXd::Zero(4, 4);
+  one_rdm.diagonal() << 1.8, 1.2, 0.8, 0.2;
+
+  StateVectorContainer sv(coeffs, dets, orbitals, one_rdm, std::nullopt);
+
+  auto [alpha_occ, beta_occ] = sv.get_active_orbital_occupations();
+  auto [total_alpha_occ, total_beta_occ] = sv.get_total_orbital_occupations();
+  Eigen::VectorXd expected_occ(4);
+  expected_occ << 0.9, 0.6, 0.4, 0.1;
+  EXPECT_TRUE(alpha_occ.isApprox(expected_occ, testing::wf_tolerance));
+  EXPECT_TRUE(beta_occ.isApprox(expected_occ, testing::wf_tolerance));
+  EXPECT_TRUE(total_alpha_occ.isApprox(expected_occ, testing::wf_tolerance));
+  EXPECT_TRUE(total_beta_occ.isApprox(expected_occ, testing::wf_tolerance));
+  EXPECT_FALSE(sv.has_two_rdm_spin_dependent());
+  EXPECT_FALSE(sv.has_two_rdm_spin_traced());
+  EXPECT_THROW(sv.get_active_two_rdm_spin_dependent(), std::runtime_error);
+  EXPECT_THROW(sv.get_active_two_rdm_spin_traced(), std::runtime_error);
+  EXPECT_THROW(sv.get_single_orbital_entropies(), std::runtime_error);
+}
+
+TEST_F(StateVectorContainerTest,
+       OpenShellSingleDeterminantUsesProvidedSpinRdmsForOccupations) {
+  auto orbitals = testing::create_test_orbitals(4, 4, true);
+  Eigen::VectorXd coeffs = Eigen::VectorXd::Ones(1);
+  std::vector<Configuration> dets = {
+      Configuration::from_spin_half_string("2u00")};
+  Eigen::MatrixXd one_rdm_aa = Eigen::MatrixXd::Zero(4, 4);
+  Eigen::MatrixXd one_rdm_bb = Eigen::MatrixXd::Zero(4, 4);
+  one_rdm_aa.diagonal() << 0.9, 0.6, 0.4, 0.1;
+  one_rdm_bb.diagonal() << 0.6, 0.3, 0.1, 0.0;
+  Eigen::MatrixXd one_rdm = one_rdm_aa + one_rdm_bb;
+
+  StateVectorContainer sv(coeffs, dets, orbitals, one_rdm, one_rdm_aa,
+                          one_rdm_bb,
+                          std::nullopt,  // two_rdm_spin_traced
+                          std::nullopt,  // two_rdm_aaaa
+                          std::nullopt,  // two_rdm_aabb
+                          std::nullopt,  // two_rdm_bbbb
+                          "electrons");
+
+  auto [alpha_occ, beta_occ] = sv.get_active_orbital_occupations();
+  EXPECT_TRUE(alpha_occ.isApprox(one_rdm_aa.diagonal(), testing::wf_tolerance));
+  EXPECT_TRUE(beta_occ.isApprox(one_rdm_bb.diagonal(), testing::wf_tolerance));
+  EXPECT_FALSE(sv.has_two_rdm_spin_dependent());
+  EXPECT_FALSE(sv.has_two_rdm_spin_traced());
+  EXPECT_THROW(sv.get_single_orbital_entropies(), std::runtime_error);
 }
 
 TEST_F(StateVectorContainerTest, EmptyDeterminantsThrows) {
@@ -531,13 +586,15 @@ TEST_F(StateVectorContainerTest, JsonSerializationRDMsOpenShell) {
 
   auto orbitals = wfn_default->get_orbitals();
   auto restricted_orbitals = std::make_shared<Orbitals>(
-      orbitals->get_coefficients().first, orbitals->get_energies().first,
+      orbitals->coefficients()->block({axes::alpha(), axes::alpha()}),
+      orbitals->energies()->block({axes::alpha()}),
       orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
-      testing::restricted_index_set(orbitals->get_num_molecular_orbitals(),
-                                    orbitals->get_active_space_indices().first),
       testing::restricted_index_set(
           orbitals->get_num_molecular_orbitals(),
-          orbitals->get_inactive_space_indices().first));
+          spin_channel_indices(orbitals->active_indices(), axes::alpha())),
+      testing::restricted_index_set(
+          orbitals->get_num_molecular_orbitals(),
+          spin_channel_indices(orbitals->inactive_indices(), axes::alpha())));
 
   auto ham_gen = HamiltonianConstructorFactory::create();
   auto H = ham_gen->run(restricted_orbitals);
@@ -747,13 +804,15 @@ TEST_F(StateVectorContainerTest, Hdf5SerializationRDMsOpenShell) {
 
   auto orbitals = wfn_default->get_orbitals();
   auto restricted_orbitals = std::make_shared<Orbitals>(
-      orbitals->get_coefficients().first, orbitals->get_energies().first,
+      orbitals->coefficients()->block({axes::alpha(), axes::alpha()}),
+      orbitals->energies()->block({axes::alpha()}),
       orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
-      testing::restricted_index_set(orbitals->get_num_molecular_orbitals(),
-                                    orbitals->get_active_space_indices().first),
       testing::restricted_index_set(
           orbitals->get_num_molecular_orbitals(),
-          orbitals->get_inactive_space_indices().first));
+          spin_channel_indices(orbitals->active_indices(), axes::alpha())),
+      testing::restricted_index_set(
+          orbitals->get_num_molecular_orbitals(),
+          spin_channel_indices(orbitals->inactive_indices(), axes::alpha())));
 
   auto ham_gen = HamiltonianConstructorFactory::create();
   auto H = ham_gen->run(restricted_orbitals);
@@ -1172,7 +1231,8 @@ TEST_F(SingleDeterminantTest, ClosedShellReducedDensityMatrices) {
       sd.get_active_two_rdm_spin_dependent();
 
   auto two_rdm_bbaa =
-      detail::transpose_ijkl_klij_vector_variant(two_rdm_aabb, norb);
+      qdk::chemistry::data::detail::transpose_ijkl_klij_vector_variant(
+          two_rdm_aabb, norb);
 
   Eigen::MatrixXd expected_one_rdm = Eigen::MatrixXd::Zero(norb, norb);
   expected_one_rdm(0, 0) = 2.0;
@@ -1195,6 +1255,49 @@ TEST_F(SingleDeterminantTest, ClosedShellReducedDensityMatrices) {
   }
 }
 
+TEST_F(SingleDeterminantTest, NonContinuousClosedShellReducedDensityMatrices) {
+  size_t norb = 4;
+  auto orbitals = testing::create_test_orbitals(norb, norb, true);
+  auto det = Configuration::from_spin_half_string("2020");
+  StateVectorContainer sd(det, orbitals);
+
+  auto one_rdm = std::get<Eigen::MatrixXd>(sd.get_active_one_rdm_spin_traced());
+  auto [one_rdm_aa, one_rdm_bb] = sd.get_active_one_rdm_spin_dependent();
+  auto [alpha_occ, beta_occ] = sd.get_active_orbital_occupations();
+  auto two_rdm = std::get<Eigen::VectorXd>(sd.get_active_two_rdm_spin_traced());
+  auto [two_rdm_aaaa, two_rdm_aabb, two_rdm_bbbb] =
+      sd.get_active_two_rdm_spin_dependent();
+
+  Eigen::MatrixXd expected_one_rdm = Eigen::MatrixXd::Zero(norb, norb);
+  expected_one_rdm(0, 0) = 2.0;
+  expected_one_rdm(2, 2) = 2.0;
+  EXPECT_TRUE(
+      one_rdm.isApprox(expected_one_rdm, testing::numerical_zero_tolerance));
+  EXPECT_TRUE(
+      (std::get<Eigen::MatrixXd>(one_rdm_aa) +
+       std::get<Eigen::MatrixXd>(one_rdm_bb))
+          .isApprox(expected_one_rdm, testing::numerical_zero_tolerance));
+
+  Eigen::VectorXd expected_occ(4);
+  expected_occ << 1.0, 0.0, 1.0, 0.0;
+  EXPECT_TRUE(alpha_occ.isApprox(expected_occ, testing::wf_tolerance));
+  EXPECT_TRUE(beta_occ.isApprox(expected_occ, testing::wf_tolerance));
+
+  size_t index_0011 = norb + 1;
+  size_t index_0022 = 2 * norb + 2;
+  EXPECT_NEAR(two_rdm(index_0011), 0.0, testing::numerical_zero_tolerance);
+  EXPECT_NEAR(two_rdm(index_0022), 4.0, testing::numerical_zero_tolerance);
+
+  auto two_rdm_bbaa =
+      qdk::chemistry::data::detail::transpose_ijkl_klij_vector_variant(
+          two_rdm_aabb, norb);
+  auto sum_two_rdm = std::get<Eigen::VectorXd>(two_rdm_aabb) +
+                     std::get<Eigen::VectorXd>(*two_rdm_bbaa) +
+                     std::get<Eigen::VectorXd>(two_rdm_aaaa) +
+                     std::get<Eigen::VectorXd>(two_rdm_bbbb);
+  EXPECT_TRUE(two_rdm.isApprox(sum_two_rdm, testing::numerical_zero_tolerance));
+}
+
 TEST_F(SingleDeterminantTest, OpenShellReducedDensityMatrices) {
   size_t norb = 4;
   auto orbitals = testing::create_test_orbitals(norb, norb, true);
@@ -1208,7 +1311,8 @@ TEST_F(SingleDeterminantTest, OpenShellReducedDensityMatrices) {
       sd.get_active_two_rdm_spin_dependent();
 
   auto two_rdm_bbaa =
-      detail::transpose_ijkl_klij_vector_variant(two_rdm_aabb, norb);
+      qdk::chemistry::data::detail::transpose_ijkl_klij_vector_variant(
+          two_rdm_aabb, norb);
 
   Eigen::MatrixXd expected_one_rdm = Eigen::MatrixXd::Zero(norb, norb);
   expected_one_rdm(0, 0) = 2.0;
@@ -1245,7 +1349,8 @@ TEST_F(SingleDeterminantTest, NonContinuousDeterminantReducedDensityMatrices) {
       sd.get_active_two_rdm_spin_dependent();
 
   auto two_rdm_bbaa =
-      detail::transpose_ijkl_klij_vector_variant(two_rdm_aabb, norb);
+      qdk::chemistry::data::detail::transpose_ijkl_klij_vector_variant(
+          two_rdm_aabb, norb);
 
   Eigen::MatrixXd expected_one_rdm_aa = Eigen::MatrixXd::Zero(norb, norb);
   Eigen::MatrixXd expected_one_rdm_bb = Eigen::MatrixXd::Zero(norb, norb);

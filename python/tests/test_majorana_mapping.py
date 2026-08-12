@@ -36,12 +36,12 @@ from qdk_chemistry.data import MajoranaMapping
 
 
 def label_to_word(label: str) -> list[tuple[int, int]]:
-    """Convert a QubitHamiltonian label to a sparse Pauli word."""
+    """Convert a QubitOperator label to a sparse Pauli word."""
     return label_to_sparse_pauli_word(label)
 
 
 def word_to_label(word: list[tuple[int, int]], num_qubits: int) -> str:
-    """Convert a sparse Pauli word to a QubitHamiltonian label."""
+    """Convert a sparse Pauli word to a QubitOperator label."""
     return sparse_pauli_word_to_label(word, num_qubits)
 
 
@@ -714,19 +714,19 @@ class TestBilinearOnlySerialization:
         assert data["num_modes"] == mapping.num_modes
 
 
-# ─── Tapered QubitHamiltonian Serialization ─────────────────────────────
+# ─── Tapered QubitOperator Serialization ─────────────────────────────
 
 
 class TestTaperedQubitHamiltonianSerialization:
-    """Round-trip tests for QubitHamiltonian with tapering metadata."""
+    """Round-trip tests for QubitOperator with tapering metadata."""
 
     @staticmethod
     def _make_tapered_qh():
-        """Create a QubitHamiltonian with tapering metadata."""
-        from qdk_chemistry.data import QubitHamiltonian, Symmetries, TaperingSpecification  # noqa: PLC0415
+        """Create a QubitOperator with tapering metadata."""
+        from qdk_chemistry.data import QubitOperator, Symmetries, TaperingSpecification  # noqa: PLC0415
 
         tap = TaperingSpecification.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
-        return QubitHamiltonian(
+        return QubitOperator(
             pauli_strings=["IIIIII", "ZZXXII", "XXYYZZ"],
             coefficients=np.array([0.5, 0.25, -0.1]),
             encoding="symmetry-conserving-bravyi-kitaev",
@@ -734,7 +734,7 @@ class TestTaperedQubitHamiltonianSerialization:
         )
 
     def test_json_roundtrip(self) -> None:
-        """Tapered QubitHamiltonian survives JSON round-trip."""
+        """Tapered QubitOperator survives JSON round-trip."""
         qh = self._make_tapered_qh()
         data = qh.to_json()
         assert "tapering" in data
@@ -746,7 +746,7 @@ class TestTaperedQubitHamiltonianSerialization:
         assert loaded.pauli_strings == qh.pauli_strings
 
     def test_hdf5_roundtrip(self) -> None:
-        """Tapered QubitHamiltonian survives HDF5 round-trip."""
+        """Tapered QubitOperator survives HDF5 round-trip."""
         import numpy as np  # noqa: PLC0415
 
         qh = self._make_tapered_qh()

@@ -99,6 +99,23 @@ if(NOT qdk_FOUND)
     add_subdirectory("${QDK_CPP_DIR}" qdk_build)
 else()
     message(STATUS "Using installed qdk library")
+    # When building against a pre-installed qdk the C++ CMakeLists.txt is not
+    # included, so the qdk_chemistry_resources install rule never fires. Derive
+    # the install root from qdk_DIR (which is <prefix>/lib/cmake/qdk) and
+    # re-register the install rule here so scikit-build-core picks it up.
+    get_filename_component(_qdk_root "${qdk_DIR}" PATH)  # .../lib/cmake
+    get_filename_component(_qdk_root "${_qdk_root}" PATH) # .../lib
+    get_filename_component(_qdk_root "${_qdk_root}" PATH) # install root
+    set(_qdk_resources "${_qdk_root}/share/qdk/chemistry/scf/resources")
+    if(EXISTS "${_qdk_resources}")
+        install(
+            DIRECTORY "${_qdk_resources}"
+            DESTINATION "share/qdk/chemistry/scf"
+            COMPONENT qdk_chemistry_resources
+        )
+    else()
+        message(FATAL_ERROR "QDK resources not found at '${_qdk_resources}' — wheel will be missing share/qdk/chemistry/scf/resources")
+    endif()
 endif()
 
 if(QDK_CHEMISTRY_ENABLE_GPU)
@@ -146,6 +163,8 @@ pybind11_add_module(_core
     src/pybind11/data/configuration_set.cpp
     src/pybind11/data/ansatz.cpp
     src/pybind11/data/stability_result.cpp
+    src/pybind11/data/nuclear_gradients.cpp
+    src/pybind11/data/nuclear_hessian.cpp
     src/pybind11/data/pauli_operator.cpp
     src/pybind11/data/majorana_mapping.cpp
     src/pybind11/data/serialization.cpp
@@ -157,8 +176,11 @@ pybind11_add_module(_core
     src/pybind11/algorithms/mcscf.cpp
     src/pybind11/algorithms/hamiltonian.cpp
     src/pybind11/algorithms/scf.cpp
+    src/pybind11/algorithms/nuclear_derivative.cpp
+    src/pybind11/algorithms/geometry_optimization.cpp
     src/pybind11/algorithms/active_space.cpp
     src/pybind11/algorithms/dynamical_correlation_calculator.cpp
+    src/pybind11/algorithms/effective_hamiltonian.cpp
     src/pybind11/algorithms/davidson_solver.cpp
     src/pybind11/algorithms/syev_solver.cpp
     src/pybind11/utils/logger.cpp

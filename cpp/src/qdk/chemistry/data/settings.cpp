@@ -94,7 +94,9 @@ void Settings::set(const std::string& key, const SettingValue& value) {
   if (std::holds_alternative<AlgorithmRef>(value)) {
     const auto& existing = std::get<AlgorithmRef>(settings_[key]);
     const auto& incoming = std::get<AlgorithmRef>(value);
-    if (incoming.get_algorithm_type() != existing.get_algorithm_type()) {
+    if (incoming.get_algorithm_type() != existing.get_algorithm_type() &&
+        algorithm_ref_type_change_allowed_.find(key) ==
+            algorithm_ref_type_change_allowed_.end()) {
       throw std::invalid_argument(
           "Algorithm type for setting '" + key + "' is fixed to '" +
           existing.get_algorithm_type() + "' and cannot be changed to '" +

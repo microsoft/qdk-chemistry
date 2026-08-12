@@ -8,7 +8,7 @@ Overview
 --------
 
 The :class:`~qdk_chemistry.algorithms.CircuitExecutor` provides a unified interface for running quantum circuits across different backends.
-It is used by algorithms such as :doc:`PhaseEstimation <phase_estimation>` and :doc:`EnergyEstimator <energy_estimator>` to execute measurement circuits, but it can also be used independently for general-purpose circuit execution.
+It is used by algorithms such as :doc:`PhaseEstimation <phase_estimation>` and :doc:`ExpectationEstimator <expectation_estimator>` to execute measurement circuits, but it can also be used independently for general-purpose circuit execution.
 
 The algorithm supports:
 
@@ -196,7 +196,7 @@ Further reading
 
 - The above examples can be downloaded as a complete `Python <../../../_static/examples/python/circuit_executor.py>`_ script.
 - :doc:`PhaseEstimation <phase_estimation>`: Uses CircuitExecutor to run :term:`QPE` circuits
-- :doc:`EnergyEstimator <energy_estimator>`: Uses CircuitExecutor for observable sampling
+- :doc:`ExpectationEstimator <expectation_estimator>`: Uses CircuitExecutor for observable sampling
 - :doc:`Plugins <../plugins>`: Plugin system for external backends
 - :doc:`Settings <settings>`: Configuration settings for algorithms
 - :doc:`Factory Pattern <factory_pattern>`: Understanding algorithm creation

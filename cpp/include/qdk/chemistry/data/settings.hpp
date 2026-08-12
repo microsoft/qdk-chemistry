@@ -17,6 +17,7 @@
 #include <optional>
 #include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -421,7 +422,8 @@ class Settings : public DataClass,
    * @throws SettingTypeMismatch if @p value type does not match the existing
    *         type for @p key
    * @throws std::invalid_argument if an AlgorithmRef's algorithm_type is
-   *         changed, or if a constrained value is out of range / not in the
+   *         changed for a setting that is not marked as a cross-type dispatch
+   *         setting, or if a constrained value is out of range / not in the
    *         allowed set
    */
   void set(const std::string& key, const SettingValue& value);
@@ -924,6 +926,19 @@ class Settings : public DataClass,
 
  protected:
   /**
+   * @brief Allow an AlgorithmRef setting to change algorithm_type.
+   *
+   * Most nested algorithm settings are intentionally fixed to one factory type.
+   * Some settings are dispatch points across factory types and can opt in to
+   * accepting AlgorithmRef values with different algorithm_type fields.
+   *
+   * @param key Existing AlgorithmRef setting key to mark as cross-type.
+   */
+  void allow_algorithm_ref_type_change(const std::string& key) {
+    algorithm_ref_type_change_allowed_.insert(key);
+  }
+
+  /**
    * @brief Set a default value for a setting (only if not already set) -
    * variant version
    *
@@ -1159,6 +1174,7 @@ class Settings : public DataClass,
   std::map<std::string, std::string> descriptions_;
   std::map<std::string, Constraint> limits_;
   std::map<std::string, bool> documented_;
+  std::set<std::string> algorithm_ref_type_change_allowed_;
 
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
 

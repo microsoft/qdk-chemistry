@@ -7,12 +7,17 @@
 
 from __future__ import annotations
 
+import importlib.metadata
 import json
+import logging
 
 import numpy as np
 import pytest
 
-from qdk_chemistry.data import EnergyExpectationResult, MeasurementData, Orbitals, QubitHamiltonian
+import qdk_chemistry.remote.cache as cache_module
+from qdk_chemistry.data import EnergyExpectationResult, MeasurementData, Orbitals, QubitOperator
+from qdk_chemistry.data._spin_channels import spin_channel_matrix
+from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.remote.cache import (
     _CACHES,
     CacheBackend,
@@ -63,6 +68,25 @@ def sample_job():
 def sample_orbitals():
     """Return a small test Orbitals DataClass."""
     return create_test_orbitals(3)
+
+
+def test_plugin_cache_load_failure_is_logged(monkeypatch, caplog):
+    """Plugin discovery remains non-fatal but reports the failure."""
+
+    def fail_entry_points(**_kwargs):
+        raise RuntimeError("plugin discovery failed")
+
+    monkeypatch.setattr(importlib.metadata, "entry_points", fail_entry_points)
+
+    with caplog.at_level(logging.WARNING, logger=cache_module.__name__):
+        cache_module._load_plugin_caches()
+
+    matching = [r for r in caplog.records if r.name == cache_module.__name__]
+    assert matching, f"Expected a warning log from {cache_module.__name__}"
+    record = matching[0]
+    assert record.levelno == logging.WARNING
+    assert record.exc_info is not None
+    assert "Failed to load cache plugins" in record.getMessage()
 
 
 # ── FolderCache: Job metadata ────────────────────────────────────────────────
@@ -172,7 +196,16 @@ class TestFolderCacheData:
         loaded = folder_cache.get_data("orb_hash_1")
         assert loaded is not None
         assert isinstance(loaded, Orbitals)
-        np.testing.assert_array_equal(loaded.get_coefficients(), sample_orbitals.get_coefficients())
+        coefficients = loaded.coefficients()
+        sample_coefficients = sample_orbitals.coefficients()
+        np.testing.assert_array_equal(
+            spin_channel_matrix(coefficients, axes.alpha()),
+            spin_channel_matrix(sample_coefficients, axes.alpha()),
+        )
+        np.testing.assert_array_equal(
+            spin_channel_matrix(coefficients, axes.beta()),
+            spin_channel_matrix(sample_coefficients, axes.beta()),
+        )
 
     def test_put_data_skips_if_exists(self, folder_cache, sample_orbitals, cache_dir):
         """Second put with same hash is a no-op (doesn't overwrite)."""
@@ -305,7 +338,7 @@ class TestFolderCacheData:
             variances_each_term=[np.array([0.001, 0.002])],
         )
         measurement = MeasurementData(
-            hamiltonians=[QubitHamiltonian(["ZI", "XI"], np.array([1.0, 0.5]))],
+            hamiltonians=[QubitOperator(["ZI", "XI"], np.array([1.0, 0.5]))],
             bitstring_counts=[{"0": 50, "1": 50}],
             shots_list=[100],
         )

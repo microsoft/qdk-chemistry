@@ -15,7 +15,7 @@ from scipy.sparse.linalg import eigsh
 
 from qdk_chemistry._core.data import sparse_pauli_word_to_label
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import LatticeGraph, MajoranaMapping, QubitHamiltonian
+from qdk_chemistry.data import LatticeGraph, MajoranaMapping, QubitOperator
 from qdk_chemistry.utils.model_hamiltonians import create_hubbard_hamiltonian, create_huckel_hamiltonian
 
 _RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
@@ -434,6 +434,10 @@ class TestVerstraeteCiracSpectral:
         np.testing.assert_allclose(unique_vc[:2], unique_jw[:2], atol=1e-10)
 
     @pytest.mark.slow
+    @pytest.mark.skipif(
+        not _RUN_SLOW_TESTS,
+        reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
+    )
     def test_spectral_validation_3x2_huckel(self) -> None:
         """Compare eigenvalues of 3x2 Hückel model under VC and JW mappings.
 
@@ -463,7 +467,7 @@ class TestVerstraeteCiracSpectral:
         stabs = []
         for coeff, word in vc_mapping.stabilizers:
             label = sparse_pauli_word_to_label(word, qh_vc.num_qubits)
-            qh_stab = QubitHamiltonian([label], np.array([coeff]))
+            qh_stab = QubitOperator([label], np.array([coeff]))
             stabs.append(qh_stab.to_matrix(sparse=True))
 
         # Project and filter out any unphysical states (out-of-codespace)

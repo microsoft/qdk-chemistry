@@ -7,6 +7,9 @@ Acronym definitions
    AO
       Atomic Orbital.
 
+   API
+      Application Programming Interface.
+
    ASCI
       Adaptive Sampling Configuration Interaction.
 
@@ -15,7 +18,7 @@ Acronym definitions
       Method that projects molecular orbitals onto a target atomic orbital basis to identify valence active orbitals.
 
    BFGS
-      Broyden–Fletcher–Goldfarb–Shanno quasi-Newton optimization algorithm.
+      Broyden-Fletcher-Goldfarb-Shanno quasi-Newton optimization algorithm.
 
    BSE
       Basis Set Exchange, a repository of standardized quantum chemistry basis sets and effective core potentials.
@@ -40,6 +43,9 @@ Acronym definitions
 
    CNOT
       Controlled-NOT two-qubit gate used in quantum circuits.
+
+   CODATA
+      Committee on Data of the International Science Council, which publishes recommended values of fundamental physical constants.
 
    DFT
       Density Functional Theory.
@@ -75,6 +81,10 @@ Acronym definitions
       Iterative Quantum Phase Estimation.
       A variant of QPE using a single ancilla qubit with sequential bit extraction and adaptive feedback.
 
+   LCU
+      Linear Combination of Unitaries.
+      A block-encoding technique that represents an operator as a weighted sum of unitaries using PREPARE and SELECT oracles.
+
    LDA
       Local Density Approximation.
 
@@ -107,6 +117,9 @@ Acronym definitions
    PPP
       Pariser-Parr-Pople.
       Semi-empirical model Hamiltonian that adds intersite Coulomb interactions to the Hubbard model.
+
+   PySCF
+      Python-based Simulations of Chemistry Framework.
 
    QDK
       Quantum Development Kit.
@@ -154,3 +167,6 @@ Acronym definitions
 
    VVHV
       Valence Virtual Hard Virtual.
+
+   XYZ
+      Text file format for molecular geometries represented by element symbols and Cartesian coordinates.
