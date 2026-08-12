@@ -83,6 +83,28 @@ def _capability_probes() -> list[tuple[Path, int, str]]:
     return probes
 
 
+def _unscanned_hasattr_calls() -> list[tuple[Path, int, str]]:
+    """Every two-argument ``hasattr`` under the circuit-builder package that ``_probed_name`` drops.
+
+    ``_probed_name`` recognises a probe only when the target identifier contains ``mapper``
+    and the attribute is a string literal.  Both conditions are ordinary refactors away
+    from being false: binding the mapper to a local named ``impl``, calling through
+    ``self._resolve()``, or moving the capability name into a variable each make a live
+    probe invisible to the scan while leaving it working at runtime.
+    """
+    skipped: list[tuple[Path, int, str]] = []
+    for path in sorted(CIRCUIT_BUILDER_DIR.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+                continue
+            if node.func.id != "hasattr" or len(node.args) != 2:
+                continue
+            if _probed_name(node) is None:
+                skipped.append((path, node.lineno, ast.unparse(node)))
+    return skipped
+
+
 def _mapper_members_by_class() -> dict[str, set[str]]:
     """Members of every controlled circuit mapper, keyed by ``file.py::ClassName``."""
     by_class: dict[str, set[str]] = {}
@@ -125,6 +147,33 @@ def test_at_least_one_capability_probe_is_scanned() -> None:
     assert _capability_probes(), (
         f"no hasattr capability probes found under {CIRCUIT_BUILDER_DIR}; "
         "if the dispatch mechanism changed, delete or rewrite this module"
+    )
+
+
+def test_no_hasattr_call_escapes_the_probe_scanner() -> None:
+    """Guard the *discovery* step: a probe the scan cannot see is a probe it cannot check.
+
+    The test above only fires when the discovered set is empty, so it catches total
+    discovery loss and is blind to partial loss.  That is the same existential quantifier
+    that made the per-probe check blind to partial renames -- ``at least one probe`` hides
+    a lost probe exactly as ``some mapper`` hid a lost definition -- and the fix has to be
+    the same shape: constrain the whole set, not its cardinality.
+
+    Rather than pinning the capability names, which would take a position on the pending
+    ``ancilla``/``ancillary`` spelling this module deliberately stays neutral on, this
+    pins *coverage*: every two-argument ``hasattr`` in the package must be one the scanner
+    recognises.  Renaming a local from ``circuit_mapper`` to ``impl`` then fails here
+    instead of quietly shrinking the parametrised set, and a genuine non-mapper ``hasattr``
+    fails informatively, asking whoever adds it to widen the scanner or scope this check.
+    """
+    skipped = _unscanned_hasattr_calls()
+    assert not skipped, (
+        "these hasattr calls are invisible to the capability scan, so the literals they "
+        "name are unchecked and a rename of the corresponding mapper method would pass "
+        "silently:\n"
+        + "\n".join(f"  {p.name}:{n}  {src}" for p, n, src in skipped)
+        + "\nEither make the probe target mapper-shaped, or widen _probed_name "
+        "(currently requires 'mapper' in the target identifier and a literal attribute)."
     )
 
 
