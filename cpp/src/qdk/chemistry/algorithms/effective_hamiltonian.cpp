@@ -140,10 +140,9 @@ void EffectiveHamiltonianConstructor::_validate_inputs(
         "wavefunction active orbitals must be a subset of the Hamiltonian "
         "active orbitals");
   }
-  if (!is_subset(*p_indices, *wavefunction_orbitals->active_indices())) {
+  if (!is_subset(*p_indices, *hamiltonian_orbitals->active_indices())) {
     throw_incompatible(
-        "P-space indices must be a subset of the wavefunction active "
-        "orbitals");
+        "P-space indices must be a subset of the Hamiltonian active orbitals");
   }
 }
 
