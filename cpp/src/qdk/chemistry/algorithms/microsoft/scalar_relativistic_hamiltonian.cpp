@@ -6,6 +6,7 @@
 
 #include <qdk/chemistry/scf/util/int1e.h>
 
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <functional>
