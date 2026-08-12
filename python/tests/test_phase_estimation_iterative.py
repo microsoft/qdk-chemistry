@@ -549,14 +549,7 @@ def test_iterative_qpe_raises_on_negative_num_bits(two_qubit_phase_problem: Phas
 def test_iterative_qpe_builder_pairs_largest_power_with_first_iteration(
     two_qubit_phase_problem: PhaseEstimationProblem,
 ) -> None:
-    """IQPE iteration 0 applies the largest controlled power, hence measures the LSB (issue #618).
-
-    The LSB-first convention is a statement about which controlled power ``U^{2^k}`` is
-    paired with which iteration index, so it is asserted directly on the circuit builder
-    rather than through a simulator. The complementary half of the convention -- that
-    :attr:`~qdk_chemistry.data.QpeResult.bits_msb_first` reverses the execution order -- is
-    covered by ``test_iterative_phase_estimation_extracts_phase_and_energy``.
-    """
+    """Test for IQPE iteration 0 applies the largest controlled power."""
     problem = two_qubit_phase_problem
     recorded_powers: list[int] = []
 
