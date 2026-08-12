@@ -151,9 +151,11 @@ TEST(SSquaredCAS, N_Quartet) {
   scf_solver->settings().set("method", "hf");
   scf_solver->settings().set("enable_gdm", false);
   auto [E_scf, wfn_scf] = scf_solver->run(n_atom, 0, 4, "sto-3g");
+  ASSERT_TRUE(wfn_scf->get_orbitals()->is_restricted());
   auto orbitals = testing::with_active_space(wfn_scf->get_orbitals(),
                                              std::vector<size_t>{1, 2, 3, 4},
                                              std::vector<size_t>{0});
+  ASSERT_TRUE(orbitals->is_restricted());
   auto wfn = run_cas_with_rdms(n_atom, 0, 4, "sto-3g", 4, 1, orbitals);
   EXPECT_NEAR(wfn->compute_s_squared(), 3.75, testing::rdm_tolerance);
 }
@@ -183,48 +185,10 @@ TEST(SSquaredCAS, StretchedH2_Triplet) {
 // Tests using SCF + SCI (ASCI) with RDMs from MACIS
 // ---------------------------------------------------------------------------
 
-// H atom via SCI: doublet, <S^2> = 0.75
-TEST(SSquaredSCI, H_Doublet) {
-  auto wfn = run_sci_with_rdms(testing::create_hydrogen_structure(), 0, 2,
-                               "sto-3g", 1, 0, 1);
-  EXPECT_NEAR(wfn->compute_s_squared(), 0.75, testing::rdm_tolerance);
-}
-
-// H2 via SCI: singlet, <S^2> = 0
-TEST(SSquaredSCI, H2_Singlet) {
-  std::vector<Eigen::Vector3d> coords = {{0., 0., 0.}, {0., 0., 1.4}};
-  std::vector<std::string> symbols = {"H", "H"};
-  auto h2 = std::make_shared<Structure>(coords, symbols);
-  auto wfn = run_sci_with_rdms(h2, 0, 1, "sto-3g", 1, 1, 5);
-  EXPECT_NEAR(wfn->compute_s_squared(), 0.0, testing::rdm_tolerance);
-}
-
-// Li atom via SCI: doublet, <S^2> = 0.75
-TEST(SSquaredSCI, Li_Doublet) {
-  auto li = testing::create_li_structure();
-  auto wfn = run_sci_with_rdms(li, 0, 2, "sto-3g", 2, 1, 51);
-  EXPECT_NEAR(wfn->compute_s_squared(), 0.75, testing::rdm_tolerance);
-}
-
-// Water via SCI: singlet, <S^2> = 0
-// Full orbital space in sto-3g
-TEST(SSquaredSCI, Water_Singlet) {
+// Truncated SCI in the 441-determinant water/STO-3G space.
+TEST(SSquaredSCI, TruncatedWaterSinglet) {
   auto water = testing::create_water_structure();
-  auto wfn = run_sci_with_rdms(water, 0, 1, "sto-3g", 5, 5, 500);
+  auto wfn = run_sci_with_rdms(water, 0, 1, "sto-3g", 5, 5, 100);
+  ASSERT_EQ(wfn->size(), 100);
   EXPECT_NEAR(wfn->compute_s_squared(), 0.0, testing::rdm_tolerance);
-}
-
-// N atom via SCI: quartet, <S^2> = 3.75
-TEST(SSquaredSCI, N_Quartet) {
-  auto n_atom = testing::create_nitrogen_structure();
-  auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("scf_type", std::string("restricted"));
-  scf_solver->settings().set("method", "hf");
-  scf_solver->settings().set("enable_gdm", false);
-  auto [E_scf, wfn_scf] = scf_solver->run(n_atom, 0, 4, "sto-3g");
-  auto orbitals = testing::with_active_space(wfn_scf->get_orbitals(),
-                                             std::vector<size_t>{1, 2, 3, 4},
-                                             std::vector<size_t>{0});
-  auto wfn = run_sci_with_rdms(n_atom, 0, 4, "sto-3g", 4, 1, 20, orbitals);
-  EXPECT_NEAR(wfn->compute_s_squared(), 3.75, testing::rdm_tolerance);
 }

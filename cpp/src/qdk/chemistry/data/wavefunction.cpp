@@ -705,6 +705,63 @@ Eigen::MatrixXd WavefunctionContainer::get_mutual_information() const {
       "entropies.");
 }
 
+namespace detail {
+struct SSquaredRdmBlocks {
+  const Eigen::MatrixXd& one_aa;
+  const Eigen::MatrixXd& one_bb;
+  const Eigen::VectorXd& two_aaaa;
+  const Eigen::VectorXd& two_aabb;
+  const Eigen::VectorXd& two_bbbb;
+  std::size_t norbs;
+};
+
+SSquaredRdmBlocks s_squared_rdm_blocks(
+    const SymmetryBlockedTensorVariant<2>& one_rdm,
+    const SymmetryBlockedTensorVariant<4>& two_rdm) {
+  if (std::holds_alternative<SymmetryBlockedTensor<2, std::complex<double>>>(
+          one_rdm) ||
+      std::holds_alternative<SymmetryBlockedTensor<4, std::complex<double>>>(
+          two_rdm)) {
+    throw std::runtime_error("Complex <S^2> calculation not yet implemented");
+  }
+
+  const auto& one = std::get<SymmetryBlockedTensor<2, double>>(one_rdm);
+  const auto& two = std::get<SymmetryBlockedTensor<4, double>>(two_rdm);
+  const auto alpha = axes::alpha();
+  const auto beta = axes::beta();
+  const SymmetryBlockedTensor<2, double>::Labels aa{alpha, alpha};
+  const SymmetryBlockedTensor<2, double>::Labels bb{beta, beta};
+  const SymmetryBlockedTensor<4, double>::Labels aaaa{alpha, alpha, alpha,
+                                                      alpha};
+  const SymmetryBlockedTensor<4, double>::Labels aabb{alpha, alpha, beta, beta};
+  const SymmetryBlockedTensor<4, double>::Labels bbbb{beta, beta, beta, beta};
+
+  if (!one.has_block(aa) || !one.has_block(bb) || !two.has_block(aaaa) ||
+      !two.has_block(aabb) || !two.has_block(bbbb)) {
+    throw std::runtime_error(
+        "Computing <S^2> requires the aa and bb 1-RDM blocks and the aaaa, "
+        "aabb, and bbbb 2-RDM blocks");
+  }
+
+  const std::size_t norbs = one.extents()[0].at(alpha);
+  const auto extents_match = [&](const auto& tensor) {
+    return std::all_of(tensor.extents().begin(), tensor.extents().end(),
+                       [&](const auto& extents) {
+                         return extents.at(alpha) == norbs &&
+                                extents.at(beta) == norbs;
+                       });
+  };
+  if (!extents_match(one) || !extents_match(two)) {
+    throw std::runtime_error(
+        "Computing <S^2> requires matching alpha and beta 1-RDM and 2-RDM "
+        "extents");
+  }
+
+  return {one.block(aa),   one.block(bb),   two.block(aaaa),
+          two.block(aabb), two.block(bbbb), norbs};
+}
+}  // namespace detail
+
 double WavefunctionContainer::compute_s_squared() const {
   QDK_LOG_TRACE_ENTERING();
 
@@ -717,69 +774,36 @@ double WavefunctionContainer::compute_s_squared() const {
   // Uses QDK convention: Gamma(p,q,r,s) = <a†_p a†_r a_s a_q>
   // Flat index: p*n^3 + q*n^2 + r*n + s
 
-  if (!has_one_rdm_spin_dependent() || !has_two_rdm_spin_dependent()) {
+  if (get_orbitals()->is_unrestricted()) {
     throw std::runtime_error(
-        "Spin-dependent one- and two-body RDMs must be set to compute <S^2>");
+        "Computing <S^2> for unrestricted orbitals is not supported because "
+        "the alpha and beta molecular orbitals do not share a common spatial "
+        "basis");
   }
 
-  const auto& one_rdm = active_one_rdm();
-  const auto& two_rdm = active_two_rdm();
-
-  if (std::holds_alternative<SymmetryBlockedTensor<2, std::complex<double>>>(
-          one_rdm) ||
-      std::holds_alternative<SymmetryBlockedTensor<4, std::complex<double>>>(
-          two_rdm)) {
-    throw std::runtime_error("Complex <S^2> calculation not yet implemented");
+  const auto rdms =
+      detail::s_squared_rdm_blocks(active_one_rdm(), active_two_rdm());
+  const std::size_t norbs2 = rdms.norbs * rdms.norbs;
+  const std::size_t norbs3 = norbs2 * rdms.norbs;
+  double aaaa_ijji = 0.0;
+  double aabb_ijji = 0.0;
+  double aabb_iijj = 0.0;
+  double bbbb_ijji = 0.0;
+  for (std::size_t i = 0; i < rdms.norbs; ++i) {
+    for (std::size_t j = 0; j < rdms.norbs; ++j) {
+      const auto ijji = static_cast<Eigen::Index>(i * norbs3 + j * norbs2 +
+                                                  j * rdms.norbs + i);
+      const auto iijj = static_cast<Eigen::Index>(i * norbs3 + i * norbs2 +
+                                                  j * rdms.norbs + j);
+      aaaa_ijji += rdms.two_aaaa(ijji);
+      aabb_ijji += rdms.two_aabb(ijji);
+      aabb_iijj += rdms.two_aabb(iijj);
+      bbbb_ijji += rdms.two_bbbb(ijji);
+    }
   }
 
-  const auto& one_sbt = std::get<SymmetryBlockedTensor<2, double>>(one_rdm);
-  const auto& two_sbt = std::get<SymmetryBlockedTensor<4, double>>(two_rdm);
-
-  const Eigen::MatrixXd& one_rdm_aa =
-      one_sbt.block({axes::alpha(), axes::alpha()});
-  const Eigen::MatrixXd& one_rdm_bb =
-      one_sbt.block({axes::beta(), axes::beta()});
-  const Eigen::VectorXd& two_rdm_aaaa = two_sbt.block(
-      {axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()});
-  const Eigen::VectorXd& two_rdm_aabb =
-      two_sbt.block({axes::alpha(), axes::alpha(), axes::beta(), axes::beta()});
-  const Eigen::VectorXd& two_rdm_bbbb =
-      two_sbt.block({axes::beta(), axes::beta(), axes::beta(), axes::beta()});
-
-  int norbs = static_cast<int>(one_rdm_aa.rows());
-  double one_rdm_trace = one_rdm_aa.trace() + one_rdm_bb.trace();
-
-  // sum_{ij} Gamma(i,j,j,i): O(n^2)
-  auto sum_ijji = [norbs](const Eigen::VectorXd& vec) -> double {
-    double sum = 0.0;
-    for (int i = 0; i < norbs; ++i) {
-      for (int j = 0; j < norbs; ++j) {
-        int idx = i * norbs * norbs * norbs + j * norbs * norbs + j * norbs + i;
-        sum += vec[idx];
-      }
-    }
-    return sum;
-  };
-
-  // sum_{ij} Gamma(i,i,j,j): O(n^2)
-  auto sum_iijj = [norbs](const Eigen::VectorXd& vec) -> double {
-    double sum = 0.0;
-    for (int i = 0; i < norbs; ++i) {
-      for (int j = 0; j < norbs; ++j) {
-        int idx = i * norbs * norbs * norbs + i * norbs * norbs + j * norbs + j;
-        sum += vec[idx];
-      }
-    }
-    return sum;
-  };
-
-  double aabb_ijji = sum_ijji(two_rdm_aabb);
-  double aaaa_ijji = sum_ijji(two_rdm_aaaa);
-  double bbbb_ijji = sum_ijji(two_rdm_bbbb);
-  double aabb_iijj = sum_iijj(two_rdm_aabb);
-
-  return 0.75 * one_rdm_trace - aabb_ijji - 0.25 * aaaa_ijji -
-         0.25 * bbbb_ijji - 0.5 * aabb_iijj;
+  return 0.75 * (rdms.one_aa.trace() + rdms.one_bb.trace()) - aabb_ijji -
+         0.25 * (aaaa_ijji + bbbb_ijji) - 0.5 * aabb_iijj;
 }
 
 void WavefunctionContainer::_clear_rdms() const {

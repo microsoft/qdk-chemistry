@@ -925,15 +925,15 @@ Uses the spin-dependent one- and two-particle reduced density matrices (RDMs):
             - 1/2 * sum_{ij} Gamma^{ab}(i,i,j,j)
 
 For a pure spin eigenstate, <S^2> = S(S+1).
+The alpha and beta molecular orbitals must share a common spatial basis, as in
+restricted closed-shell and restricted open-shell calculations.
 
 Returns:
     float: The expectation value <S^2> (real-valued wavefunctions only)
 
 Raises:
-    RuntimeError: If the required spin-resolved active-space RDMs are
-                  unavailable (in particular if the orbitals do not define an MO
-                  spin axis), or if the RDMs are complex-valued (not yet
-                  supported)
+    RuntimeError: If the orbitals are unrestricted, the required spin-resolved active-space RDMs are unavailable or inconsistent, or the RDMs are complex-valued
+
 Examples:
     >>> s_squared = wf.compute_s_squared()
 )");

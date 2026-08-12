@@ -15,6 +15,26 @@
 
 using namespace qdk::chemistry::data;
 
+static Wavefunction wavefunction_with_spin_rdms(
+    const Eigen::VectorXd& coefficients,
+    const Wavefunction::DeterminantVector& determinants,
+    std::shared_ptr<Orbitals> orbitals, const Eigen::MatrixXd& one_rdm_aa,
+    const Eigen::MatrixXd& one_rdm_bb, const Eigen::VectorXd& two_rdm_aaaa,
+    const Eigen::VectorXd& two_rdm_aabb, const Eigen::VectorXd& two_rdm_bbbb) {
+  using Sbt2 = SymmetryBlockedTensor<2, double>;
+  using Sbt4 = SymmetryBlockedTensor<4, double>;
+  auto one_rdm = std::make_shared<const SymmetryBlockedTensorVariant<2>>(
+      std::in_place_type<Sbt2>,
+      make_spin_diagonal_rank2_sbt(one_rdm_aa, one_rdm_bb, false));
+  auto two_rdm = std::make_shared<const SymmetryBlockedTensorVariant<4>>(
+      std::in_place_type<Sbt4>,
+      make_spin_diagonal_rank4_sbt(two_rdm_aaaa, two_rdm_aabb, two_rdm_bbbb,
+                                   false));
+  return Wavefunction(std::make_unique<StateVectorContainer>(
+      coefficients, determinants, std::move(orbitals), nullptr, nullptr,
+      std::move(one_rdm), std::move(two_rdm)));
+}
+
 // Test compute_s_squared for a 2-electron, 2-orbital RHF singlet wavefunction.
 //
 // The state is the single closed-shell determinant |20> (orbital 0 doubly
@@ -120,11 +140,9 @@ TEST(SSquared, TripletMSZero) {
   // Note: We override the RDMs manually here to match the triplet state.
   // StateVectorContainer only auto-generates RDMs for single-determinant
   // expansions, so it won't recompute them from CI coefficients.
-  auto wf = Wavefunction(std::make_unique<StateVectorContainer>(
-      coeffs, dets, orbitals, std::nullopt, std::make_optional(one_rdm_aa),
-      std::make_optional(one_rdm_bb), std::nullopt,
-      std::make_optional(two_rdm_aaaa), std::make_optional(two_rdm_aabb),
-      std::make_optional(two_rdm_bbbb)));
+  auto wf = wavefunction_with_spin_rdms(coeffs, dets, orbitals, one_rdm_aa,
+                                        one_rdm_bb, two_rdm_aaaa, two_rdm_aabb,
+                                        two_rdm_bbbb);
 
   double s_squared = wf.compute_s_squared();
   EXPECT_NEAR(s_squared, 2.0, testing::numerical_zero_tolerance);
@@ -247,11 +265,9 @@ TEST(SSquared, OpenShellSinglet) {
       Configuration::from_spin_half_string("ud"),
       Configuration::from_spin_half_string("du")};
 
-  auto wf = Wavefunction(std::make_unique<StateVectorContainer>(
-      coeffs, dets, orbitals, std::nullopt, std::make_optional(one_rdm_aa),
-      std::make_optional(one_rdm_bb), std::nullopt,
-      std::make_optional(two_rdm_aaaa), std::make_optional(two_rdm_aabb),
-      std::make_optional(two_rdm_bbbb)));
+  auto wf = wavefunction_with_spin_rdms(coeffs, dets, orbitals, one_rdm_aa,
+                                        one_rdm_bb, two_rdm_aaaa, two_rdm_aabb,
+                                        two_rdm_bbbb);
 
   double s_squared = wf.compute_s_squared();
   EXPECT_NEAR(s_squared, 0.0, testing::numerical_zero_tolerance);
@@ -273,13 +289,11 @@ TEST(SSquared, Vacuum) {
   EXPECT_NEAR(s_squared, 0.0, testing::numerical_zero_tolerance);
 }
 
-// Stretched H2 broken-symmetry UHF: textbook spin-contamination example.
-// Single determinant |ud> with α in orbital 0, β in orbital 1 (orthogonal
-// spatial orbitals). This models the dissociation limit where α localizes on
-// atom A and β on atom B. The state is a 50/50 singlet-triplet mixture, and its
-// RDMs are generated automatically from the determinant.
+// Broken-symmetry determinant in a common spatial-orbital basis. The state
+// |ud> is a 50/50 singlet-triplet mixture, and its RDMs are generated
+// automatically from the determinant.
 // Expected <S²> = 1.0
-TEST(SSquared, SpinContaminatedUHF_StretchedH2) {
+TEST(SSquared, SpinContaminatedCommonBasis) {
   const int norbs = 2;
   auto orbitals = testing::create_test_orbitals(4, norbs, true);
 
@@ -288,6 +302,32 @@ TEST(SSquared, SpinContaminatedUHF_StretchedH2) {
 
   double s_squared = wf.compute_s_squared();
   EXPECT_NEAR(s_squared, 1.0, testing::numerical_zero_tolerance);
+}
+
+TEST(SSquared, ThrowsForUnrestrictedOrbitals) {
+  auto orbitals = testing::create_test_orbitals(2, 1, false);
+  auto wf = Wavefunction(std::make_unique<StateVectorContainer>(
+      Configuration::from_spin_half_string("2"), orbitals));
+
+  ASSERT_TRUE(orbitals->is_unrestricted());
+  ASSERT_TRUE(wf.has_one_rdm_spin_dependent());
+  ASSERT_TRUE(wf.has_two_rdm_spin_dependent());
+  EXPECT_THROW(wf.compute_s_squared(), std::runtime_error);
+}
+
+TEST(SSquared, ThrowsForMismatchedRdmExtents) {
+  auto orbitals = testing::create_test_orbitals(2, 1, true);
+  Eigen::VectorXd coefficients = Eigen::VectorXd::Ones(1);
+  Wavefunction::DeterminantVector determinants = {
+      Configuration::from_spin_half_string("2")};
+  Eigen::MatrixXd one_rdm = Eigen::MatrixXd::Ones(1, 1);
+  Eigen::VectorXd two_rdm = Eigen::VectorXd::Zero(16);
+
+  auto wf =
+      wavefunction_with_spin_rdms(coefficients, determinants, orbitals, one_rdm,
+                                  one_rdm, two_rdm, two_rdm, two_rdm);
+
+  EXPECT_THROW(wf.compute_s_squared(), std::runtime_error);
 }
 
 // Test that compute_s_squared throws when RDMs are missing.

@@ -527,11 +527,12 @@ class WavefunctionContainer {
 
   /**
    * @brief Compute the expectation value of the total spin-squared operator
-   * from the RDMs.
+   * from the real, spin-resolved active-space 1- and 2-RDMs.
    *
    * @return The expectation value \f$\langle S^2 \rangle\f$
-   * @throws std::runtime_error if the orbital basis declares no spin (S_z) axis
-   * (spin-blocked active-space RDMs cannot be generated)
+   * @throws std::runtime_error if the orbitals are unrestricted, the required
+   * spin-resolved RDM blocks are unavailable or inconsistent, or the RDMs are
+   * complex-valued.
    */
   double compute_s_squared() const;
 
@@ -1332,14 +1333,7 @@ class Wavefunction : public DataClass,
    */
   virtual Eigen::MatrixXd get_mutual_information() const;
 
-  /**
-   * @brief Compute the expectation value of the total spin-squared operator
-   * from the RDMs.
-   *
-   * @return The expectation value \f$\langle S^2 \rangle\f$
-   * @throws std::runtime_error if the orbital basis declares no spin (S_z) axis
-   * (spin-blocked active-space RDMs cannot be generated)
-   */
+  /** @copydoc WavefunctionContainer::compute_s_squared */
   double compute_s_squared() const;
 
   /**
