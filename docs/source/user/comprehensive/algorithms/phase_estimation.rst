@@ -20,7 +20,7 @@ The QPE algorithm itself is agnostic to how the unitary is constructed — the c
 QDK/Chemistry provides two :term:`QPE` approaches, each suited to different hardware constraints:
 
 Iterative Quantum Phase Estimation (:term:`IQPE`)
-   Kitaev's single-ancilla algorithm :cite:`Kitaev1995` that extracts phase bits one at a time, from most significant to least significant, using adaptive feedback corrections between iterations.
+   Kitaev's single-ancilla algorithm :cite:`Kitaev1995` that extracts phase bits one at a time, from least significant to most significant, using adaptive feedback corrections between iterations.
    This approach minimizes ancilla requirements and is particularly suited to near-term hardware.
 
 Standard QFT-based Quantum Phase Estimation
@@ -145,21 +145,22 @@ Iterative phase estimation (IQPE)
 
 .. rubric:: Factory name: ``"qdk_iterative"``
 
-Kitaev's iterative algorithm :cite:`Kitaev1995` uses a single ancilla qubit to extract phase bits sequentially, from the most significant bit (MSB) to the least significant bit (LSB).
+Kitaev's iterative algorithm :cite:`Kitaev1995` uses a single ancilla qubit to extract phase bits sequentially, from the least significant bit (LSB) to the most significant bit (MSB).
 At each iteration :math:`k` (from :math:`0` to :math:`n-1`, where :math:`n` is the total number of bits):
 
 1. Prepare the ancilla in :math:`|+\rangle`
 2. Apply the controlled evolution :math:`C\text{-}U^{2^{n-k-1}}` between the ancilla and the system register
 3. Apply a phase correction :math:`R_z(-\Phi_k)` based on previously measured bits
-4. Measure the ancilla to determine bit :math:`k`
+4. Measure the ancilla to determine bit :math:`b_k`
 
-The phase feedback is updated using Kitaev's recursion:
+The phase feedback is updated using Kitaev's recursion, starting from :math:`\Phi_0 = 0`:
 
 .. math::
 
-   \Phi_{k} = \frac{\Phi_{k+1}}{2} + \frac{\pi \cdot b_k}{2}
+   \Phi_{k+1} = \frac{\Phi_{k}}{2} + \frac{\pi \cdot b_k}{2}
 
-where :math:`b_k` is the measured bit.
+where :math:`b_k` is the bit measured at iteration :math:`k`.
+
 Each bit is determined by a majority vote over multiple circuit executions (controlled by ``shots_per_bit``).
 
 .. rubric:: Settings
