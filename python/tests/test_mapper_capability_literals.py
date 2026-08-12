@@ -256,10 +256,15 @@ def test_capability_probe_coverage_has_not_shrunk() -> None:
     When the count legitimately drops -- because the merged builder adopts the
     width-carrying-``Circuit`` contract and stops probing at all -- the right response is to
     delete this module, not to lower the number.
+
+    The diagnostic is computed only once the gate has already failed.  It is a hint, and a
+    hint must never be able to fail a check whose gate is satisfied.
     """
     probes = _capability_probes()
+    if len(probes) >= _MIN_CAPABILITY_PROBES:
+        return
     hint = _uncovered_capability_literals()
-    assert len(probes) >= _MIN_CAPABILITY_PROBES, (
+    pytest.fail(
         f"only {len(probes)} capability probe(s) are visible to the scan, expected at least "
         f"{_MIN_CAPABILITY_PROBES}. Every remaining probe is still checked, but a probe that "
         f"vanished from this count is no longer checked at all.\n"
