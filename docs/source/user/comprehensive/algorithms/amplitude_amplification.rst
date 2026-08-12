@@ -45,7 +45,7 @@ The :class:`~qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.QPESu
 algorithm (``qpe_circuit_builder`` / ``qdk_qpe_subspace``) is configured like any other
 :doc:`QpeCircuitBuilder <qpe_circuit_builder>`, plus the energy to mark.
 ``run`` takes ``(state_preparation, qubit_hamiltonian)`` and
-returns a list of :class:`~qdk_chemistry.data.Circuit`, but the state preparation is ignored 
+returns a list of :class:`~qdk_chemistry.data.Circuit`, but the state preparation is ignored
 because the register it is applied to already holds the state to be amplified.
 The returned circuit runs the QPE on the register it is handed, flips a
 flag when the phase lands in a bin whose energy is at least ``target_energy``, then undoes the
