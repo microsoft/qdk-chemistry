@@ -14,6 +14,7 @@
 #include <qdk/chemistry/data/configuration.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
@@ -147,6 +148,26 @@ TEST_F(DuccTest, RejectsDifferentOrbitals) {
       std::invalid_argument);
 }
 
+TEST_F(DuccTest, AcceptsEquivalentOrbitalObjects) {
+  auto equivalent_orbitals = std::make_shared<Orbitals>(*orbitals);
+  auto equivalent_determinant =
+      std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+          Configuration::from_spin_half_string("200"), equivalent_orbitals));
+  Eigen::VectorXd t1(2);
+  t1 << 0.08, -0.03;
+  Eigen::VectorXd t2(4);
+  t2 << 0.04, -0.02, 0.01, 0.03;
+  auto equivalent_reference =
+      std::make_shared<Wavefunction>(std::make_unique<AmplitudeContainer>(
+          equivalent_orbitals, equivalent_determinant,
+          AmplitudeType::CoupledCluster, t1, t2));
+
+  auto constructor = EffectiveHamiltonianConstructorFactory::create("ducc");
+  EXPECT_NO_THROW(
+      constructor->run(equivalent_reference, hamiltonian,
+                       testing::restricted_index_set(kNumOrbitals, {0, 1})));
+}
+
 TEST_F(DuccTest, RejectsHamiltonianWithInactiveFockMatrix) {
   auto active_hamiltonian = std::make_shared<Hamiltonian>(
       std::make_unique<CanonicalFourCenterHamiltonianContainer>(
@@ -178,9 +199,31 @@ TEST_F(DuccTest, RejectsComplexAmplitudes) {
 }
 
 TEST_F(DuccTest, RejectsUnequalSpinPSpaceSizes) {
+  auto unrestricted_orbitals =
+      testing::create_test_orbitals(kNumOrbitals, kNumOrbitals, false);
+  auto unrestricted_determinant =
+      std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+          Configuration::from_spin_half_string("200"), unrestricted_orbitals));
+  Eigen::VectorXd t1(2);
+  t1 << 0.08, -0.03;
+  Eigen::VectorXd t2(4);
+  t2 << 0.04, -0.02, 0.01, 0.03;
+  auto unrestricted_reference =
+      std::make_shared<Wavefunction>(std::make_unique<AmplitudeContainer>(
+          unrestricted_orbitals, unrestricted_determinant,
+          AmplitudeType::CoupledCluster,
+          std::optional<AmplitudeContainer::VectorVariant>{t1},
+          std::optional<AmplitudeContainer::VectorVariant>{t1},
+          std::optional<AmplitudeContainer::VectorVariant>{t2},
+          std::optional<AmplitudeContainer::VectorVariant>{t2},
+          std::optional<AmplitudeContainer::VectorVariant>{t2}));
+  auto unrestricted_hamiltonian = std::make_shared<Hamiltonian>(
+      std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+          one_body, one_body, two_body, two_body, two_body,
+          unrestricted_orbitals, 0.35, Eigen::MatrixXd{}, Eigen::MatrixXd{}));
   auto constructor = EffectiveHamiltonianConstructorFactory::create("ducc");
   EXPECT_THROW(constructor->run(
-                   amplitude_reference, hamiltonian,
+                   unrestricted_reference, unrestricted_hamiltonian,
                    testing::unrestricted_index_set(kNumOrbitals, {0, 1}, {0})),
                std::runtime_error);
 }
@@ -201,6 +244,18 @@ TEST_F(DuccTest, LevelZeroProjectsBareHamiltonianToPSpace) {
   EXPECT_TRUE(one_a.isApprox(expected_one, testing::integral_tolerance));
   EXPECT_TRUE(one_b.isApprox(expected_one, testing::integral_tolerance));
   EXPECT_FALSE(output->is_restricted());
+
+  const auto output_orbitals = output->get_orbitals();
+  EXPECT_EQ(
+      spin_channel_indices(output_orbitals->active_indices(), axes::alpha()),
+      (std::vector<std::size_t>{0, 2}));
+  EXPECT_EQ(
+      spin_channel_indices(output_orbitals->inactive_indices(), axes::alpha()),
+      (std::vector<std::size_t>{}));
+  const auto [virtual_a, virtual_b] =
+      output_orbitals->get_virtual_space_indices();
+  EXPECT_EQ(virtual_a, (std::vector<std::size_t>{1}));
+  EXPECT_EQ(virtual_b, (std::vector<std::size_t>{1}));
 
   const auto [two_aa, two_ab, two_bb] = output->get_two_body_integrals();
   ASSERT_EQ(two_aa.size(), 16);
@@ -226,6 +281,63 @@ TEST_F(DuccTest, LevelZeroProjectsBareHamiltonianToPSpace) {
                       testing::integral_tolerance);
         }
   EXPECT_NEAR(output->get_core_energy(), 0.35, testing::integral_tolerance);
+}
+
+TEST_F(DuccTest, OutputOrbitalsClassifyOccupiedQAsInactive) {
+  const auto output =
+      run_ducc(0, testing::restricted_index_set(kNumOrbitals, {1, 2}));
+  const auto output_orbitals = output->get_orbitals();
+
+  EXPECT_EQ(
+      spin_channel_indices(output_orbitals->active_indices(), axes::alpha()),
+      (std::vector<std::size_t>{1, 2}));
+  EXPECT_EQ(
+      spin_channel_indices(output_orbitals->inactive_indices(), axes::alpha()),
+      (std::vector<std::size_t>{0}));
+  const auto [virtual_a, virtual_b] =
+      output_orbitals->get_virtual_space_indices();
+  EXPECT_TRUE(virtual_a.empty());
+  EXPECT_TRUE(virtual_b.empty());
+}
+
+TEST_F(DuccTest, TreatsPSpaceAsAbsoluteOrbitalIndices) {
+  auto base_orbitals = testing::create_test_orbitals(4, 4, true);
+  auto window_orbitals =
+      testing::with_active_space(base_orbitals, {0, 2, 3}, {});
+  auto window_determinant =
+      std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+          Configuration::from_spin_half_string("200"), window_orbitals));
+  Eigen::VectorXd t1(2);
+  t1 << 0.08, -0.03;
+  Eigen::VectorXd t2(4);
+  t2 << 0.04, -0.02, 0.01, 0.03;
+  auto window_reference =
+      std::make_shared<Wavefunction>(std::make_unique<AmplitudeContainer>(
+          window_orbitals, window_determinant, AmplitudeType::CoupledCluster,
+          t1, t2));
+  auto window_hamiltonian = std::make_shared<Hamiltonian>(
+      std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+          one_body, two_body, window_orbitals, 0.35, Eigen::MatrixXd{}));
+
+  auto constructor = EffectiveHamiltonianConstructorFactory::create("ducc");
+  constructor->settings().set("ducc_level", std::int64_t{0});
+  const auto output =
+      constructor->run(window_reference, window_hamiltonian,
+                       testing::restricted_index_set(4, {0, 3}));
+  const auto [one_a, one_b] = output->get_one_body_integrals();
+  const std::array<std::size_t, 2> local_positions{0, 2};
+  Eigen::MatrixXd expected_one(2, 2);
+  for (std::size_t p = 0; p < local_positions.size(); ++p)
+    for (std::size_t q = 0; q < local_positions.size(); ++q)
+      expected_one(static_cast<Eigen::Index>(p), static_cast<Eigen::Index>(q)) =
+          one_body(static_cast<Eigen::Index>(local_positions[p]),
+                   static_cast<Eigen::Index>(local_positions[q]));
+
+  EXPECT_TRUE(one_a.isApprox(expected_one, testing::integral_tolerance));
+  EXPECT_TRUE(one_b.isApprox(expected_one, testing::integral_tolerance));
+  EXPECT_EQ(spin_channel_indices(output->get_orbitals()->active_indices(),
+                                 axes::alpha()),
+            (std::vector<std::size_t>{0, 3}));
 }
 
 TEST_F(DuccTest, AllActiveSpaceReducesToLevelZero) {

@@ -57,7 +57,25 @@ Input Hamiltonian
    A :class:`~qdk_chemistry.data.Hamiltonian` expressed over the complete orbital window :math:`W`.
 
 Target-space indices
-   A :class:`~qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet` containing the indices of :math:`P` within the active space of :math:`W`.
+   A :class:`~qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet` containing the indices of :math:`P`.
+   These are absolute molecular-orbital indices, drawn from the same index universe as ``Orbitals.active_indices()``, and must lie within the active space of :math:`W`.
+
+Output contract
+~~~~~~~~~~~~~~~
+
+The returned :class:`~qdk_chemistry.data.Hamiltonian` is expressed over :math:`P` and satisfies:
+
+- its orbitals have ``active_indices()`` equal to the requested target-space indices;
+- its orbitals classify fully occupied orbitals of :math:`Q = W \setminus P` as inactive and unoccupied orbitals of :math:`Q` as virtual, while preserving the input Hamiltonian's inactive orbitals;
+- its inactive Fock matrix, when present, is consistent with the output inactive orbitals and may therefore differ from the input Hamiltonian's inactive Fock matrix;
+- the scalar shift from folding in :math:`Q` is added to the constant (zero-body) energy term, and the remaining :math:`Q` contribution is folded into the integrals.
+
+The occupied/virtual partition of :math:`Q` is method dependent and is determined by the concrete implementation from its reference state.
+Classifying an orbital of :math:`Q` as virtual describes its occupation in the output orbital metadata; it does not place that orbital in the effective active space.
+Consumers of an effective Hamiltonian should not attempt to re-correlate :math:`Q`, since its contribution is already folded in.
+
+Input validation is opt-in.
+The ``run`` method does not validate its arguments; each concrete implementation decides whether to check the space contract :math:`P \subseteq W_H` and :math:`W_{\mathrm{ref}} \subseteq W_H` before computing.
 
 The base interface defines no common settings.
 Concrete implementations can expose method-specific configuration through the ``settings()`` object.
