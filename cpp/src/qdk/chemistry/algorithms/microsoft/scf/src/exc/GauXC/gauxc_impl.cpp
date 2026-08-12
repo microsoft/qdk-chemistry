@@ -17,34 +17,37 @@
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 #include <qdk/chemistry/scf/util/gpu/cuda_helper.h>
 #endif
+#include <mutex>
 #include <qdk/chemistry/utils/logger.hpp>
 
-#include <mutex>
+#if !defined(_MSC_VER) || defined(__clang__)
+#include <dlfcn.h>
+#endif
 
 namespace qdk::chemistry::scf::impl {
 
 namespace {
 
-// MSVC's classic front end doesn't support GNU `__attribute__` syntax, so
-// only GCC/Clang get the weak declaration (OpenBLAS is our only BLAS
-// backend, so MSVC can declare these as ordinary, always-linked externs).
-//
-// On Mach-O (macOS), `weak` alone doesn't make the symbol optional at link
-// time like it does on ELF; `weak_import` is Darwin's equivalent.
+// MSVC always links against OpenBLAS, so these can be ordinary, always-
+// linked externs there. Elsewhere the BLAS backend isn't guaranteed to be
+// OpenBLAS (e.g. Accelerate on macOS), and neither ELF `weak` nor Mach-O
+// `weak_import` make a symbol optional when nothing in the link line
+// provides it at all -- so we resolve it at runtime via dlsym instead,
+// which never requires the symbol to exist at link time.
 #if defined(_MSC_VER) && !defined(__clang__)
-#define QDK_OPENBLAS_WEAK_ATTR
-#elif defined(__APPLE__)
-#define QDK_OPENBLAS_WEAK_ATTR __attribute__((weak_import))
-#else
-#define QDK_OPENBLAS_WEAK_ATTR __attribute__((weak))
-#endif
-
 extern "C" {
-void openblas_set_num_threads(int) QDK_OPENBLAS_WEAK_ATTR;
-int openblas_get_num_threads(void) QDK_OPENBLAS_WEAK_ATTR;
+void openblas_set_num_threads(int);
+int openblas_get_num_threads(void);
 }
+#else
+using SetNumThreadsFn = void (*)(int);
+using GetNumThreadsFn = int (*)(void);
 
-#undef QDK_OPENBLAS_WEAK_ATTR
+SetNumThreadsFn openblas_set_num_threads =
+    reinterpret_cast<SetNumThreadsFn>(dlsym(RTLD_DEFAULT, "openblas_set_num_threads"));
+GetNumThreadsFn openblas_get_num_threads =
+    reinterpret_cast<GetNumThreadsFn>(dlsym(RTLD_DEFAULT, "openblas_get_num_threads"));
+#endif
 
 /**
  * @brief RAII guard that forces BLAS to run single-threaded while active,
