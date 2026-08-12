@@ -231,6 +231,26 @@ class TestQubitFlipTermGrouper:
             for j in range(i + 1, len(labels)):
                 assert do_pauli_labels_commute(labels[i], labels[j])
 
+    def test_group_order_is_deterministic_with_the_diagonal_group_first(self):
+        """Group order drives the Trotter sequence, so it must not depend on dict ordering."""
+        qh = QubitOperator(
+            ["IIXI", "IZII", "XIII", "IIXI", "IIII"],
+            np.array([1.0, 2.0, 3.0, 4.0, 5.0]),
+        )
+        out = registry.create("term_grouper", "qubit_flip").run(qh)
+
+        # Diagonal (I/Z-only) terms first, then the remaining groups by first member index.
+        assert out.term_partition.groups == ((1, 4), (0, 3), (2,))
+
+    def test_input_operator_is_not_mutated(self):
+        """The grouper returns a new operator and leaves the input untouched."""
+        qh = QubitOperator(["XX", "YY", "IZ"], np.array([0.5, 0.5, -0.5]))
+        out = registry.create("term_grouper", "qubit_flip").run(qh)
+
+        assert qh.term_partition is None
+        assert out.pauli_strings == qh.pauli_strings
+        assert np.allclose(out.coefficients, qh.coefficients)
+
 
 # ---------------------------------------------------------------------------
 # NetworkX-backed term groupers (requires networkx)

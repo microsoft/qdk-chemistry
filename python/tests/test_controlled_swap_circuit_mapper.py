@@ -38,10 +38,6 @@ if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit.quantum_info import Operator
 
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
 #: Qubit index used as the control in every mapper built by these tests.
 CONTROL_INDEX = 2
 
@@ -72,11 +68,6 @@ END_TO_END_COEFFICIENTS = [0.5, 0.5, -0.5, 0.5]
 END_TO_END_EVOLUTION_TIME = 0.5
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def build_pauli_matrix(pauli_term, num_qubits):
     """Build the dense matrix of a sparse Pauli term (qubit 0 = least significant)."""
     matrix = np.array([[1]], dtype=complex)
@@ -105,11 +96,6 @@ def evolve_vacuum(ordering, time_step):
     vacuum = np.zeros(4, dtype=complex)
     vacuum[0] = 1.0
     return build_product_formula_matrix(terms, num_qubits=2) @ vacuum
-
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture
@@ -372,11 +358,6 @@ class TestPauliVacuumAction:
         """Unknown Pauli axes are rejected."""
         with pytest.raises(ValueError, match="Invalid Pauli axis"):
             pauli_map_zero_state_action({0: "Q"})
-
-
-# ---------------------------------------------------------------------------
-# Why the grouping matters: worked example and end-to-end pipeline
-# ---------------------------------------------------------------------------
 
 
 class TestVacuumLeakageWithoutGrouping:
