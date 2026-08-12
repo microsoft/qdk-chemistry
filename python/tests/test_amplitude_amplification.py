@@ -18,6 +18,7 @@ from qdk_chemistry.algorithms.amplitude_amplification.amplitude_amplification im
 from qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace import QPESubspaceMarking
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import (
     IterativeQpeCircuitBuilder,
+    QpeCircuitBuilder,
     StandardQpeCircuitBuilder,
 )
 from qdk_chemistry.data import (
@@ -169,8 +170,10 @@ def test_subspace_oracle_conforms_to_the_builder_contract():
 def test_subspace_oracle_cannot_stand_in_for_a_phase_estimation_builder():
     """It builds an oracle, not a phase estimation, so a PhaseEstimation must refuse to select it."""
     oracle = create("qpe_circuit_builder", "qdk_qpe_subspace")
-    # Phase estimation dispatches on these two branches of the hierarchy, and the oracle is on
-    # neither, so it is rejected up front instead of silently amplifying nothing.
+    # It implements the builder interface, but derives directly from QpeCircuitBuilder rather
+    # than from either base phase estimation dispatches on, so it is rejected up front instead
+    # of being run as a phase estimation.
+    assert isinstance(oracle, QpeCircuitBuilder)
     assert not isinstance(oracle, StandardQpeCircuitBuilder)
     assert not isinstance(oracle, IterativeQpeCircuitBuilder)
 

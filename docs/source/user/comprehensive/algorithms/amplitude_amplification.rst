@@ -52,9 +52,9 @@ Like every builder of that type, ``run`` takes ``(state_preparation, qubit_hamil
 returns a list of :class:`~qdk_chemistry.data.Circuit`; this one always returns exactly the
 oracle, and ignores the state preparation because the register it is applied to already holds
 the state under test. Because the circuits it builds flag a subspace rather than report a
-phase, it is a
-:class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeSubspaceOracleBuilder`
-rather than a standard or iterative builder, so
+phase, it derives straight from
+:class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilder`
+rather than from the standard or iterative base, so
 :doc:`PhaseEstimation <phase_estimation>` rejects it with a ``TypeError`` instead of running it
 as a phase estimation.
 

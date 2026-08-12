@@ -9,8 +9,8 @@ import math
 from collections.abc import Callable
 
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import (
+    QpeCircuitBuilder,
     QpeCircuitBuilderSettings,
-    QpeSubspaceOracleBuilder,
 )
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
@@ -37,7 +37,7 @@ class QPESubspaceMarkingSettings(QpeCircuitBuilderSettings):
         )
 
 
-class QPESubspaceMarking(QpeSubspaceOracleBuilder):
+class QPESubspaceMarking(QpeCircuitBuilder):
     r"""Build a good state oracle that flags the eigenspace above a target energy.
 
     Configured like a standard QPE circuit builder, plus the energy to mark, but instead of a
@@ -49,11 +49,11 @@ class QPESubspaceMarking(QpeSubspaceOracleBuilder):
     amplify.
 
     ``run`` follows the ``qpe_circuit_builder`` contract and returns a list of circuits, but
-    those circuits are oracles rather than phase estimations. Being a
-    :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeSubspaceOracleBuilder`
-    and not a ``Standard``/``Iterative`` builder is what stops
+    those circuits are oracles rather than phase estimations. It derives straight from
+    :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilder`
+    rather than from the ``Standard``/``Iterative`` bases, which is what stops
     :class:`~qdk_chemistry.algorithms.phase_estimation.base.PhaseEstimation` from selecting
-    it: those algorithms reject anything off their own branch of the hierarchy.
+    it: those algorithms only accept builders from their own branch of the hierarchy.
     """
 
     def __init__(
