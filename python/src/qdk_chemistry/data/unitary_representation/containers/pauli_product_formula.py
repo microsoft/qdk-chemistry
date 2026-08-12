@@ -97,6 +97,38 @@ class PauliProductFormulaContainer(UnitaryContainer):
             angle -= 2 * np.pi
         return float(-angle / self.scale)
 
+    def phase_from_eigenvalue(self, eigenvalue: float) -> float:
+        r"""Recover the phase fraction a Hamiltonian eigenvalue is measured at.
+
+        Closed-form inverse of :meth:`eigenvalue_from_phase`:
+
+        .. math::
+
+            \varphi = \left(\frac{-E t}{2\pi}\right) \bmod 1
+
+        The map is one-to-one, so this is the only phase carrying the eigenvalue.
+
+        Args:
+            eigenvalue: The Hamiltonian eigenvalue :math:`E`.
+
+        Returns:
+            float: The phase fraction in :math:`[0, 1)` QPE measures for it.
+
+        Raises:
+            ValueError: If the evolution time is zero, or if the eigenvalue aliases,
+                that is if :math:`Et` falls outside :math:`[-\pi, \pi)`.
+
+        """
+        if self.scale == 0:
+            raise ValueError("The evolution time must be nonzero to invert a phase.")
+        angle = -eigenvalue * self.scale
+        if not -np.pi < angle <= np.pi:
+            raise ValueError(
+                f"Eigenvalue {eigenvalue} aliases at evolution time {self.scale}: "
+                f"E * t must lie in [-pi, pi) for the phase to be unique."
+            )
+        return float((angle / (2 * np.pi)) % 1.0)
+
     def _hash_update(self, h) -> None:
         """Feed identifying data into the hasher."""
         _hash_str(h, "pauli_product_formula")

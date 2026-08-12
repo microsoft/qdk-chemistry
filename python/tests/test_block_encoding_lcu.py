@@ -367,6 +367,51 @@ class TestLCUContainer:
             atol=float_comparison_absolute_tolerance,
         )
 
+    def test_walk_container_phase_from_eigenvalue(self):
+        """LCUWalkContainer phase_from_eigenvalue inverts E = λ·cos(2πφ) in closed form."""
+        hamiltonian = QubitOperator(
+            pauli_strings=["XX", "ZZ"],
+            coefficients=np.array([0.25, 0.5]),
+        )
+        builder = LCUBuilder(quantum_walk=True)
+        container = builder.run(hamiltonian).get_container()
+        lam = hamiltonian.schatten_norm
+
+        # The band edges sit at the ends of the principal branch.
+        assert np.isclose(container.phase_from_eigenvalue(lam), 0.0, atol=float_comparison_absolute_tolerance)
+        assert np.isclose(container.phase_from_eigenvalue(-lam), 0.5, atol=float_comparison_absolute_tolerance)
+        assert np.isclose(container.phase_from_eigenvalue(0.0), 0.25, atol=float_comparison_absolute_tolerance)
+
+        # Every energy in the band round-trips, and lands on the principal branch.
+        for energy in np.linspace(-lam, lam, 25):
+            phi = container.phase_from_eigenvalue(float(energy))
+            assert 0.0 <= phi <= 0.5
+            assert np.isclose(
+                container.eigenvalue_from_phase(phi),
+                energy,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            # The walk is even about φ = 1/2, so the mirror phase carries it too.
+            assert np.isclose(
+                container.eigenvalue_from_phase(1.0 - phi),
+                energy,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+
+    def test_walk_container_phase_from_eigenvalue_rejects_energies_off_the_band(self):
+        """An energy the walk cannot encode has no phase, so it is refused."""
+        hamiltonian = QubitOperator(
+            pauli_strings=["XX", "ZZ"],
+            coefficients=np.array([0.25, 0.5]),
+        )
+        container = LCUBuilder(quantum_walk=True).run(hamiltonian).get_container()
+        lam = hamiltonian.schatten_norm
+        for energy in (lam * 1.001, -lam * 1.001):
+            with pytest.raises(ValueError, match="outside the band"):
+                container.phase_from_eigenvalue(energy)
+
     def test_walk_container_eigenvalue_from_phase(self):
         """LCUWalkContainer eigenvalue_from_phase recovers E = λ·cos(2πφ)."""
         hamiltonian = QubitOperator(

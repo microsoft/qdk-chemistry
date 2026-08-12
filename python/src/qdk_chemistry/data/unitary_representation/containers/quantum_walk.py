@@ -61,6 +61,41 @@ class QuantumWalkContainer(UnitaryContainer):
         phi = phase_fraction % 1.0
         return float(self.scale * np.cos(2 * np.pi * phi))
 
+    def phase_from_eigenvalue(self, eigenvalue: float) -> float:
+        r"""Recover the phase fraction a Hamiltonian eigenvalue is measured at.
+
+        Closed-form inverse of :meth:`eigenvalue_from_phase`:
+
+        .. math::
+
+            \varphi = \frac{\arccos(E_k / \lambda)}{2\pi}
+
+        :math:`E = \lambda\cos(2\pi\varphi)` is even about :math:`\varphi = 1/2`, so the
+        walk measures each eigenvalue at two phases. This returns the principal one, in
+        :math:`[0, 1/2]`; the other is :math:`1 - \varphi`, save at the band edges
+        :math:`\varphi \in \{0, 1/2\}`, where the two coincide.
+
+        Args:
+            eigenvalue: The Hamiltonian eigenvalue :math:`E_k`.
+
+        Returns:
+            float: The phase fraction in :math:`[0, 1/2]` QPE measures for it.
+
+        Raises:
+            ValueError: If the normalization is not positive, or if the eigenvalue lies
+                outside the band :math:`[-\lambda, \lambda]` the walk can encode.
+
+        """
+        if self.scale <= 0:
+            raise ValueError(f"The walk normalization must be positive to invert a phase. Got {self.scale}.")
+        ratio = eigenvalue / self.scale
+        if not -1.0 <= ratio <= 1.0:
+            raise ValueError(
+                f"Eigenvalue {eigenvalue} lies outside the band "
+                f"[{-self.scale}, {self.scale}] the walk operator encodes."
+            )
+        return float(np.arccos(ratio) / (2 * np.pi))
+
     @property
     @abstractmethod
     def power(self) -> int:

@@ -105,10 +105,12 @@ class QPESubspaceMarking(QpeCircuitBuilder):
         if not math.isfinite(target_energy):
             raise ValueError(f"target_energy must be a finite energy. Got {target_energy}.")
 
-        # Every bin is tested rather than bisecting for the boundaries. Bisection would need
-        # eigenvalue_from_phase to be monotonic on each half of [0, 1), which happens to hold
-        # for the containers in the tree today but is not part of the UnitaryContainer contract;
-        # a container that broke it would yield silently wrong bins, and so a wrong oracle.
+        # Every bin is tested rather than solved for. Containers expose phase_from_eigenvalue,
+        # the closed-form inverse, but it returns only the principal phase: recovering the
+        # accepted set from it also needs the number of branches the law has and which side of
+        # each boundary is accepted, and neither is part of the UnitaryContainer contract. The
+        # walk is even about 1/2 and so has two branches, the product formula one; a container
+        # getting that wrong would yield silently wrong bins, and so a wrong oracle.
         # The scan is O(2**num_phase_qubits), but so is the circuit built from it -- the phase
         # ladder applies U 2**num_phase_qubits - 1 times -- so it is never the binding cost.
         phase_bin_count = 1 << num_phase_qubits
