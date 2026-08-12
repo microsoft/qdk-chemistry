@@ -76,15 +76,9 @@ Once configured, the :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_
 Available Implementations
 -------------------------
 
-QDK/Chemistry provides two primary implementations of :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilder`:
-
-.. note::
-
-   ``"qdk_qpe_subspace"`` is also registered under this type, but it does not derive from
-   either base below: it wraps a phase estimation in a good state oracle for
-   :doc:`AmplitudeAmplification <amplitude_amplification>` rather than building a circuit whose
-   phase is measured. :class:`~qdk_chemistry.algorithms.PhaseEstimation` rejects it, so it is not
-   a substitute for the two implementations below.
+QDK/Chemistry provides two primary implementations of :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilder`,
+which build a circuit whose phase register is measured, plus one specialised implementation
+described in :ref:`qpe-subspace-marking` below.
 
 Iterative Phase Estimation Circuit Builder (IQPE)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -146,6 +140,45 @@ Constructs the textbook multi-ancilla QPE circuit with inverse Quantum Fourier T
    :language: python
    :start-after: start-cell-configure-standard
    :end-before: end-cell-configure-standard
+
+.. _qpe-subspace-marking:
+
+Subspace Marking Circuit Builder
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. rubric:: Class: :class:`~qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.QPESubspaceMarking`
+
+.. rubric:: Factory name: ``"qdk_qpe_subspace"``
+
+Unlike the two implementations above, this one does not build a circuit whose phase register is
+measured. It runs a standard phase estimation on the register it is handed, flips a flag qubit
+when the phase lands in a bin whose energy is at least ``target_energy``, then undoes the phase
+estimation, leaving the register as it was found. The result is a *good state oracle* for
+:doc:`AmplitudeAmplification <amplitude_amplification>`, used to amplify an eigenspace rather
+than to read out an energy.
+
+It derives directly from :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilder`
+so that it is configured like any other builder, but from neither
+:class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.IterativeQpeCircuitBuilder`
+nor :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.StandardQpeCircuitBuilder`.
+:class:`~qdk_chemistry.algorithms.PhaseEstimation` requires one of those two and raises
+``TypeError`` otherwise, so ``"qdk_qpe_subspace"`` cannot be selected where a phase estimation
+circuit is required.
+
+**Additional settings:**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 15 65
+
+   * - Setting
+     - Type
+     - Description
+   * - ``target_energy``
+     - float
+     - Lowest energy the marked subspace may hold. Must be finite. Default: ``nan`` (invalid; user must set).
+
+See :doc:`Amplitude amplification <amplitude_amplification>` for a worked example.
 
 Circuit Composition Details
 ----------------------------

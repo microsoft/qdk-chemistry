@@ -5,8 +5,12 @@ The :class:`~qdk_chemistry.algorithms.amplitude_amplification.amplitude_amplific
 algorithm increases the probability of measuring a state in a chosen subspace.
 It takes two :class:`~qdk_chemistry.data.Circuit` objects:
 
-- ``state_prep_oracle`` prepares the initial state.
-- ``good_state_oracle`` reflects about the good subspace.
+- ``state_prep_oracle`` prepares the initial state from :math:`|0\rangle`.
+- ``good_state_oracle`` *marks* the good subspace: applied to ``(register, flag)`` it flips the
+  flag qubit when the register holds a good state, and leaves the register itself untouched.
+  It is neither a state nor a reflection. The reflection is built from it: the algorithm runs
+  the oracle, applies a :math:`Z` to the flag, then undoes the oracle, which phases the good
+  subspace by :math:`-1`.
 
 The circuit first prepares the initial state. Each round then flags the
 good subspace and reflects. If the initial probability of the marked
@@ -42,8 +46,11 @@ Amplitude amplified QPE
 -----------------------
 
 The :class:`~qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.QPESubspaceMarking`
-algorithm (``qpe_circuit_builder`` / ``qdk_qpe_subspace``) is configured like any other
-:doc:`QpeCircuitBuilder <qpe_circuit_builder>`, plus the energy to mark.
+algorithm (``qpe_circuit_builder`` / ``qdk_qpe_subspace``) builds such a ``good_state_oracle``.
+It is configured like any other
+:doc:`QpeCircuitBuilder <qpe_circuit_builder>`, plus the energy to mark; see
+:ref:`its section there <qpe-subspace-marking>` for the settings and for why it cannot be used
+where a phase estimation circuit is required.
 ``run`` takes ``(state_preparation, qubit_hamiltonian)`` and
 returns a list of :class:`~qdk_chemistry.data.Circuit`, but the state preparation is ignored
 because the register it is applied to already holds the state to be amplified.

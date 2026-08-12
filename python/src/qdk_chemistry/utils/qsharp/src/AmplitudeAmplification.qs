@@ -12,6 +12,7 @@
 namespace QDKChemistry.Utils.AmplitudeAmplification {
 
     import Std.Canon.ApplyToEachCA;
+    import Std.Canon.ApplyControlledOnInt;
     import Std.Arithmetic.ApplyIfGreaterOrEqualL;
     import Std.Arithmetic.ApplyIfLessOrEqualL;
     import Std.Convert.IntAsBigInt;
@@ -23,19 +24,51 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     /// # Summary
     /// Flips `target` when the little-endian `phase` register holds a value in the
     /// half-open interval [`lowerBound`, `upperBound`).
+    ///
+    /// # Description
+    /// The window is validated rather than silently ignored: an empty or out-of-range interval
+    /// would mark no phase at all, which is indistinguishable from a correct oracle that simply
+    /// found no match, and so would surface much later as a failed amplification.
+    ///
+    /// Windows that reach either end of the register are specialised, because a comparison
+    /// against the first or last representable value is vacuously true. A window covering the
+    /// whole register costs a single `X`, one touching either end costs one comparison, and a
+    /// single-bin window is a plain controlled `X`; only an interior window needs the two
+    /// comparisons and two ancillas of the general case.
     operation MarkPhaseRange(
         lowerBound : Int,
         upperBound : Int,
         phase : Qubit[],
         target : Qubit,
     ) : Unit is Adj {
-        use aboveLower = Qubit();
-        use belowUpper = Qubit();
-        within {
-            ApplyIfLessOrEqualL(X, IntAsBigInt(lowerBound), phase, aboveLower);
-            ApplyIfGreaterOrEqualL(X, IntAsBigInt(upperBound - 1), phase, belowUpper);
-        } apply {
-            Controlled X([aboveLower, belowUpper], target);
+        let phaseBinCount = 1 <<< Length(phase);
+        if lowerBound < 0 or upperBound > phaseBinCount {
+            fail $"Phase range [{lowerBound}, {upperBound}) does not fit a {Length(phase)}-qubit register.";
+        }
+        if lowerBound >= upperBound {
+            fail $"Phase range [{lowerBound}, {upperBound}) is empty, so it would mark no phase at all.";
+        }
+
+        if lowerBound == 0 and upperBound == phaseBinCount {
+            // Every value is in range.
+            X(target);
+        } elif upperBound == lowerBound + 1 {
+            ApplyControlledOnInt(lowerBound, X, phase, target);
+        } elif lowerBound == 0 {
+            // phase >= 0 always holds, so only the upper bound has to be tested.
+            ApplyIfGreaterOrEqualL(X, IntAsBigInt(upperBound - 1), phase, target);
+        } elif upperBound == phaseBinCount {
+            // phase <= phaseBinCount - 1 always holds, so only the lower bound has to be tested.
+            ApplyIfLessOrEqualL(X, IntAsBigInt(lowerBound), phase, target);
+        } else {
+            use aboveLower = Qubit();
+            use belowUpper = Qubit();
+            within {
+                ApplyIfLessOrEqualL(X, IntAsBigInt(lowerBound), phase, aboveLower);
+                ApplyIfGreaterOrEqualL(X, IntAsBigInt(upperBound - 1), phase, belowUpper);
+            } apply {
+                Controlled X([aboveLower, belowUpper], target);
+            }
         }
     }
 

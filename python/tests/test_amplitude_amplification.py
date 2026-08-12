@@ -322,6 +322,20 @@ def test_non_finite_energies_are_rejected(target_energy):
         QPESubspaceMarking._marked_phase_bins(target_energy, _walk_eigenvalue_from_phase(), num_phase_qubits=4)
 
 
+@pytest.mark.parametrize(
+    ("target_energy", "message"),
+    [
+        pytest.param(math.nan, "must be set", id="unset"),
+        pytest.param(math.inf, "must be a finite energy", id="infinite"),
+        pytest.param(-math.inf, "must be a finite energy", id="negative-infinite"),
+    ],
+)
+def test_run_rejects_an_unusable_target_energy(target_energy, message):
+    """Both the unset and the non-finite energy are refused before any circuit is built."""
+    with pytest.raises(ValueError, match=message):
+        _subspace_oracle(_diagonal_hamiltonian(), target_energy, num_bits=3)
+
+
 def test_energy_above_the_band_is_rejected():
     """A bound over every bin would mark nothing, leaving the flag dead, so it is refused."""
     with pytest.raises(ValueError, match="No phase bin"):

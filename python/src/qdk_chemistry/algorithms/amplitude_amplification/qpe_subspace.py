@@ -105,6 +105,12 @@ class QPESubspaceMarking(QpeCircuitBuilder):
         if not math.isfinite(target_energy):
             raise ValueError(f"target_energy must be a finite energy. Got {target_energy}.")
 
+        # Every bin is tested rather than bisecting for the boundaries. Bisection would need
+        # eigenvalue_from_phase to be monotonic on each half of [0, 1), which happens to hold
+        # for the containers in the tree today but is not part of the UnitaryContainer contract;
+        # a container that broke it would yield silently wrong bins, and so a wrong oracle.
+        # The scan is O(2**num_phase_qubits), but so is the circuit built from it -- the phase
+        # ladder applies U 2**num_phase_qubits - 1 times -- so it is never the binding cost.
         phase_bin_count = 1 << num_phase_qubits
         ranges: list[tuple[int, int]] = []
         for phase_bin in range(phase_bin_count):
@@ -139,7 +145,8 @@ class QPESubspaceMarking(QpeCircuitBuilder):
             requires; unlike a phase estimation builder, this one always returns exactly one.
 
         Raises:
-            ValueError: If ``num_bits`` or ``target_energy`` is unset or invalid.
+            ValueError: If ``num_bits`` is not positive, if ``target_energy`` is unset or not
+                finite, or if no bin of the phase register holds an energy that high.
             RuntimeError: If the controlled unitaries do not carry Q# operations.
 
         """
@@ -150,6 +157,16 @@ class QPESubspaceMarking(QpeCircuitBuilder):
         target_energy = float(self._settings.get("target_energy"))
         if math.isnan(target_energy):
             raise ValueError("The target_energy setting must be set to the energy of the subspace to mark.")
+        if math.isinf(target_energy):
+            raise ValueError(f"The target_energy setting must be a finite energy. Got {target_energy}.")
+
+        # Resolve the marked bins up front: an energy that no bin of the register can hold then
+        # fails here, rather than after num_bits controlled unitaries have already been built.
+        container = self._create_nested("unitary_builder").run(qubit_hamiltonian).get_container()
+        bin_ranges = self._marked_phase_bins(target_energy, container.eigenvalue_from_phase, num_bits)
+        lower_bounds = [start for start, _ in bin_ranges]
+        upper_bounds = [stop for _, stop in bin_ranges]
+        Logger.info(f"Marking phase bins {bin_ranges} for energy {target_energy}.")
 
         num_system_qubits = qubit_hamiltonian.num_qubits
         controlled_unitaries = []
@@ -173,12 +190,6 @@ class QPESubspaceMarking(QpeCircuitBuilder):
             QSHARP_UTILS.StatePreparation.MakePrepareHadamardAllOp(),
             num_ancilla_qubits,
         )
-
-        container = self._create_nested("unitary_builder").run(qubit_hamiltonian).get_container()
-        bin_ranges = self._marked_phase_bins(target_energy, container.eigenvalue_from_phase, num_bits)
-        lower_bounds = [start for start, _ in bin_ranges]
-        upper_bounds = [stop for _, stop in bin_ranges]
-        Logger.info(f"Marking phase bins {bin_ranges} for energy {target_energy}.")
 
         amplification = QSHARP_UTILS.AmplitudeAmplification
         parameters = {
