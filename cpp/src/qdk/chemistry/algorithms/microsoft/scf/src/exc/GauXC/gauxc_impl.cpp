@@ -43,10 +43,10 @@ int openblas_get_num_threads(void);
 using SetNumThreadsFn = void (*)(int);
 using GetNumThreadsFn = int (*)(void);
 
-SetNumThreadsFn openblas_set_num_threads =
-    reinterpret_cast<SetNumThreadsFn>(dlsym(RTLD_DEFAULT, "openblas_set_num_threads"));
-GetNumThreadsFn openblas_get_num_threads =
-    reinterpret_cast<GetNumThreadsFn>(dlsym(RTLD_DEFAULT, "openblas_get_num_threads"));
+SetNumThreadsFn openblas_set_num_threads = reinterpret_cast<SetNumThreadsFn>(
+    dlsym(RTLD_DEFAULT, "openblas_set_num_threads"));
+GetNumThreadsFn openblas_get_num_threads = reinterpret_cast<GetNumThreadsFn>(
+    dlsym(RTLD_DEFAULT, "openblas_get_num_threads"));
 #endif
 
 /**
