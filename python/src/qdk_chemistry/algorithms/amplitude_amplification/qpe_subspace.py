@@ -8,126 +8,69 @@ r"""QDK/Chemistry subspace oracles marking a QPE phase register."""
 import math
 from collections.abc import Callable
 
-from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
-from qdk_chemistry.data import Circuit, Settings
+from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import (
+    QpeCircuitBuilderSettings,
+    StandardQpeCircuitBuilder,
+)
+from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
-from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 __all__: list[str] = [
     "QPESubspaceMarking",
     "QPESubspaceMarkingSettings",
-    "SubspaceOracleFactory",
 ]
 
 
-def _merge_bin_ranges(ranges: list[tuple[int, int]]) -> list[tuple[int, int]]:
-    """Merge half-open bin ranges into a sorted, pairwise-disjoint list, dropping empty ones."""
-    merged: list[tuple[int, int]] = []
-    for start, stop in sorted(bin_range for bin_range in ranges if bin_range[0] < bin_range[1]):
-        if merged and start <= merged[-1][1]:
-            merged[-1] = (merged[-1][0], max(merged[-1][1], stop))
-        else:
-            merged.append((start, stop))
-    return merged
-
-
-def _nearest_bin_on_branch(
-    target_energy: float,
-    eigenvalue_from_phase: Callable[[float], float],
-    phase_bin_count: int,
-    branch: tuple[int, int],
-) -> int:
-    """Invert a monotone branch of the phase-to-energy map by bisection on the bin index.
-
-    Args:
-        target_energy: The energy to locate.
-        eigenvalue_from_phase: The phase-to-energy map of the unitary the QPE circuit estimates.
-        phase_bin_count: Total number of phase bins, :math:`2^n`.
-        branch: Inclusive ``(first, last)`` bin indices over which the map is monotone.
-
-    Returns:
-        The bin on this branch whose energy is closest to the target. A target outside the
-        energy range the branch spans lands on whichever end of the branch is nearest it.
-
-    """
-
-    def energy_of(phase_bin: int) -> float:
-        return eigenvalue_from_phase(phase_bin / phase_bin_count)
-
-    first, last = branch
-    first_energy, last_energy = energy_of(first), energy_of(last)
-    increasing = last_energy >= first_energy
-    # A branch spans a closed energy interval, so a target beyond an end is nearest that end.
-    low, high = min(first_energy, last_energy), max(first_energy, last_energy)
-    clamped_energy = min(max(target_energy, low), high)
-
-    while last - first > 1:
-        middle = (first + last) // 2
-        if (energy_of(middle) <= clamped_energy) == increasing:
-            first = middle
-        else:
-            last = middle
-    return first if abs(energy_of(first) - target_energy) <= abs(energy_of(last) - target_energy) else last
-
-
-def _phase_bins_from_energy(
+def _marked_phase_bins(
     target_energy: float,
     eigenvalue_from_phase: Callable[[float], float],
     num_phase_qubits: int,
 ) -> list[tuple[int, int]]:
-    r"""Convert a target energy into the phase bins a QPE circuit maps it to.
+    r"""Return the half-open phase-bin ranges whose energy is at most ``target_energy``.
 
-    QPE reports a phase, and each unitary encoding defines its own phase-to-energy law: the
-    block-encoding post-processing equation :math:`E = \lambda\cos(2\pi\varphi)` for a
-    qubitization walk, and :math:`E = -\arg(e^{2\pi i\varphi})/t` for a time evolution. That
-    law is read off the unitary representation and inverted numerically here, so no encoding
-    is hard-coded.
-
-    The law is not injective, but it is monotone on each half of the phase circle, so each
-    half is inverted separately and the halves whose best bin is closest to the target are
-    kept. A walk is symmetric about :math:`\varphi = 1/2`, so an interior energy ties on both
-    halves and both mirrored bins are marked; a time evolution has no such symmetry and
-    marks one. Energies outside the representable band land on the bin at its edge.
+    ``eigenvalue_from_phase`` is the post-processing equation QPE results are read with, so
+    reading it off every bin says which bins hold the marked subspace. Those bins are
+    contiguous apart from the wrap at :math:`\varphi = 1`, hence a list of ranges rather than
+    one: a qubitization walk follows :math:`E = \lambda\cos(2\pi\varphi)` and accepts a single
+    band straddling :math:`\varphi = 1/2`, while a time evolution follows :math:`E = -\arg/t`
+    and can accept a band that wraps.
 
     Args:
-        target_energy: The energy whose eigenspace should be marked.
+        target_energy: The highest energy the marked subspace may hold.
         eigenvalue_from_phase: The phase-to-energy map, taking a phase fraction in ``[0, 1)``.
         num_phase_qubits: Width of the QPE phase register.
 
     Returns:
-        Sorted, pairwise-disjoint half-open bin ranges covering every branch the energy hits.
+        Sorted, pairwise-disjoint half-open bin ranges.
 
     Raises:
-        ValueError: If the energy is not finite or the phase register is empty.
+        ValueError: If the energy is not finite or lies below every bin of the register.
 
     """
     if not math.isfinite(target_energy):
         raise ValueError(f"target_energy must be a finite energy. Got {target_energy}.")
-    if num_phase_qubits < 1:
-        raise ValueError(f"num_phase_qubits must be a positive integer. Got {num_phase_qubits}.")
 
     phase_bin_count = 1 << num_phase_qubits
-    half = phase_bin_count // 2
-    # The map is monotone on each half of the phase circle. The upper half starts one bin past
-    # the midpoint, because a time-evolution phase wraps discontinuously there.
-    branches = [(first, last) for first, last in ((0, half), (half + 1, phase_bin_count - 1)) if first <= last]
+    ranges: list[tuple[int, int]] = []
+    for phase_bin in range(phase_bin_count):
+        if eigenvalue_from_phase(phase_bin / phase_bin_count) > target_energy:
+            continue
+        if ranges and ranges[-1][1] == phase_bin:
+            ranges[-1] = (ranges[-1][0], phase_bin + 1)
+        else:
+            ranges.append((phase_bin, phase_bin + 1))
 
-    bins = [
-        _nearest_bin_on_branch(target_energy, eigenvalue_from_phase, phase_bin_count, branch) for branch in branches
-    ]
-    errors = [abs(eigenvalue_from_phase(phase_bin / phase_bin_count) - target_energy) for phase_bin in bins]
-    # Mirrored bins of a symmetric law tie only up to rounding, so compare within a tolerance.
-    closest = min(errors)
-    tolerance = closest + 1e-9 * max(1.0, abs(target_energy), closest)
-    return _merge_bin_ranges(
-        [(phase_bin, phase_bin + 1) for phase_bin, error in zip(bins, errors, strict=True) if error <= tolerance]
-    )
+    if not ranges:
+        raise ValueError(
+            f"No phase bin of the {phase_bin_count}-bin register holds an energy at most {target_energy}."
+        )
+    return ranges
 
 
-class QPESubspaceMarkingSettings(Settings):
-    r"""Settings for the QPE subspace marking oracle."""
+class QPESubspaceMarkingSettings(QpeCircuitBuilderSettings):
+    r"""Settings for the QPE subspace marking oracle: a QPE circuit builder's, plus the target energy."""
 
     def __init__(self):
         """Initialize the settings for the QPE subspace marking oracle."""
@@ -136,131 +79,124 @@ class QPESubspaceMarkingSettings(Settings):
             "target_energy",
             "double",
             math.nan,
-            "Energy whose QPE phase bins are marked. Required; there is no meaningful default.",
+            "Highest energy the marked subspace may hold. Required; there is no meaningful default.",
         )
 
 
-class QPESubspaceMarking(Algorithm):
-    r"""Build a subspace oracle marking the QPE phase bins that hold a target energy.
+class QPESubspaceMarking(StandardQpeCircuitBuilder):
+    r"""Build a good state oracle that flags the eigenspace below a target energy.
 
-    A QPE circuit with :math:`n` phase qubits writes the phase :math:`\varphi` of the
-    eigenvalue :math:`e^{2\pi i\varphi}` into the bin :math:`\lfloor 2^n\varphi\rceil`, so an
-    eigenspace is selected by the bin its phase falls in. The target is named as an energy,
-    and the phase it corresponds to is recovered from the unitary representation the QPE
-    circuit estimates: its
-    :meth:`~qdk_chemistry.data.unitary_representation.containers.base.UnitaryContainer.eigenvalue_from_phase`
-    is the post-processing equation QPE results are read with, and inverting it turns the
-    energy back into a phase.
+    Configured like a standard QPE circuit builder, plus the energy to mark, but instead of a
+    QPE circuit it returns an oracle: the QPE runs on the register handed to it, a flag qubit
+    is flipped when the phase register lands in a bin whose energy is at most
+    ``target_energy``, then the QPE is undone. The register comes back unchanged, so the
+    oracle serves as the ``good_state_oracle`` of
+    :class:`~qdk_chemistry.algorithms.amplitude_amplification.amplitude_amplification.AmplitudeAmplification`
+    next to a plain state preparation as its ``state_prep_oracle``.
 
-    For a qubitization walk that equation is the block-encoding relation
-    :math:`E = \lambda\cos(2\pi\varphi)`, with :math:`\lambda` the L1 norm of the Hamiltonian,
-    so both signs of the phase occur and one energy is marked in two mirrored bins. A time
-    evolution follows :math:`E = -\arg/t` instead, and the same inversion handles it without
-    special casing. An energy the register cannot resolve exactly takes the nearest bin, and
-    one outside the representable band takes the bin at its edge.
-
-    The circuit it returns is the ``good_state_oracle`` of
-    :class:`~qdk_chemistry.algorithms.amplitude_amplification.amplitude_amplification.AmplitudeAmplification`,
-    and the QPE circuit it reads is that algorithm's ``state_prep_oracle``.
+    Set ``target_energy`` between the eigenvalue to amplify and the next one up. The bins are
+    found by reading
+    :meth:`~qdk_chemistry.data.unitary_representation.containers.base.UnitaryContainer.eigenvalue_from_phase`,
+    the post-processing equation QPE results are read with, off each bin of the register, so
+    any unitary the builder can estimate is handled without special casing.
     """
 
-    def __init__(self):
-        """Initialize the QPE subspace marking oracle."""
-        Logger.trace_entering()
-        super().__init__()
-        self._settings = QPESubspaceMarkingSettings()
+    def __init__(
+        self,
+        num_bits: int = -1,
+        unitary_builder: AlgorithmRef | None = None,
+        controlled_circuit_mapper: AlgorithmRef | None = None,
+        target_energy: float = math.nan,
+    ):
+        """Initialize the QPE subspace marking oracle.
 
-    def type_name(self) -> str:
-        """Return the algorithm type name as subspace_oracle."""
-        return "subspace_oracle"
+        Args:
+            num_bits: The number of phase bits the marked QPE estimates.
+            unitary_builder: Optional algorithm reference for the unitary builder.
+            controlled_circuit_mapper: Optional algorithm reference for the controlled circuit mapper.
+            target_energy: Energy whose phase bins are marked.
+
+        """
+        Logger.trace_entering()
+        super().__init__(num_bits=num_bits)
+        self._settings = QPESubspaceMarkingSettings()
+        self._settings.set("num_bits", num_bits)
+        self._settings.set("target_energy", target_energy)
+        if unitary_builder is not None:
+            self._settings.set("unitary_builder", unitary_builder)
+        if controlled_circuit_mapper is not None:
+            self._settings.set("controlled_circuit_mapper", controlled_circuit_mapper)
 
     def name(self) -> str:
         """Return the algorithm name as qdk_qpe_subspace."""
         return "qdk_qpe_subspace"
 
-    def _run_impl(
+    def _run_impl(  # type: ignore[override]
         self,
-        qpe_circuit: Circuit,
-        unitary_representation: UnitaryRepresentation,
+        qubit_hamiltonian: QubitOperator,
     ) -> Circuit:
-        r"""Build the subspace oracle for a QPE circuit.
+        r"""Build the good state oracle for the QPE of ``qubit_hamiltonian``.
 
         Args:
-            qpe_circuit: The measurement-free QPE circuit whose phase register is marked.
-            unitary_representation: The unitary the QPE circuit estimates. It supplies the width
-                of the register the unitary acts on and the phase-to-energy map that is inverted
-                to locate the target energy.
+            qubit_hamiltonian: The qubit Hamiltonian whose eigenspace is marked.
 
         Returns:
             A circuit for use as the ``good_state_oracle`` of ``AmplitudeAmplification``.
 
         Raises:
-            ValueError: If ``target_energy`` is unset or invalid, if the circuit is not a
-                standard QPE circuit, or if the unitary does not match the circuit's register.
-            TypeError: If ``unitary_representation`` is not a ``UnitaryRepresentation``.
+            ValueError: If ``num_bits`` or ``target_energy`` is unset or invalid.
+            RuntimeError: If the controlled unitaries do not carry Q# operations.
 
         """
         Logger.trace_entering()
-        factory = qpe_circuit._qsharp_factory  # noqa: SLF001
-        parameters = factory.parameter if factory is not None else None
-        if not isinstance(parameters, dict) or not {"numBits", "systems", "numAncillaQubits"} <= parameters.keys():
-            raise ValueError("qpe_circuit must be a standard QPE circuit built by the qdk_standard builder.")
-        if not isinstance(unitary_representation, UnitaryRepresentation):
-            raise TypeError(
-                "The subspace oracle requires the UnitaryRepresentation the QPE circuit estimates. "
-                f"Got {type(unitary_representation)}."
-            )
-
-        num_phase_qubits = parameters["numBits"]
-        num_system_qubits = len(parameters["systems"])
-        # The unitary acts on the system register plus whatever ancillas its encoding needs.
-        num_ancilla_qubits = unitary_representation.get_num_qubits() - num_system_qubits
-        if num_ancilla_qubits != parameters["numAncillaQubits"]:
-            raise ValueError(
-                f"unitary_representation acts on {unitary_representation.get_num_qubits()} qubits, which does not "
-                f"match the {num_system_qubits + parameters['numAncillaQubits']} system and ancilla qubits of the "
-                "QPE circuit."
-            )
-
+        num_bits = self._settings.get("num_bits")
+        if num_bits <= 0:
+            raise ValueError(f"num_bits must be a positive integer. Got {num_bits}.")
         target_energy = float(self._settings.get("target_energy"))
         if math.isnan(target_energy):
             raise ValueError("The target_energy setting must be set to the energy of the subspace to mark.")
-        bin_ranges = _phase_bins_from_energy(
-            target_energy,
-            unitary_representation.get_container().eigenvalue_from_phase,
-            num_phase_qubits,
+
+        num_system_qubits = qubit_hamiltonian.num_qubits
+        controlled_unitaries = []
+        num_ancilla_qubits = 0
+        for bit in range(num_bits):
+            power = 2 ** (num_bits - 1 - bit)
+            circuit, num_ancilla_qubits = self._create_controlled_circuit(qubit_hamiltonian, power=power)
+            controlled_unitaries.append(circuit._qsharp_op)  # noqa: SLF001
+
+        if any(operation is None for operation in controlled_unitaries):
+            raise RuntimeError("Failed to create the subspace oracle: Q# operations are not available.")
+
+        # The register handed to the oracle already holds the state under test, so the QPE
+        # inside it prepares nothing of its own.
+        qpe_operation = QSHARP_UTILS.StandardPhaseEstimation.MakeStandardQPEOp(
+            QSHARP_UTILS.StatePreparation.MakePrepareNothingOp(),
+            controlled_unitaries,
+            num_bits,
+            list(range(num_bits)),
+            [index + num_bits for index in range(num_system_qubits)],
+            QSHARP_UTILS.StatePreparation.MakePrepareHadamardAllOp(),
+            num_ancilla_qubits,
         )
 
-        ancilla_indices = list(range(num_system_qubits, num_system_qubits + num_ancilla_qubits))
+        container = self._create_nested("unitary_builder").run(qubit_hamiltonian).get_container()
+        bin_ranges = _marked_phase_bins(target_energy, container.eigenvalue_from_phase, num_bits)
         lower_bounds = [start for start, _ in bin_ranges]
         upper_bounds = [stop for _, stop in bin_ranges]
-        oracle_parameters = {
-            "numPhaseQubits": num_phase_qubits,
-            "signalAncillaIndices": ancilla_indices,
+        Logger.info(f"Marking phase bins {bin_ranges} for energy {target_energy}.")
+
+        amplification = QSHARP_UTILS.AmplitudeAmplification
+        parameters = {
+            "qpe": qpe_operation,
+            "numPhaseQubits": num_bits,
+            "numSignalAncillas": num_ancilla_qubits,
             "lowerBounds": lower_bounds,
             "upperBounds": upper_bounds,
-            "numQubits": num_phase_qubits + num_system_qubits + num_ancilla_qubits,
+            "numSystemQubits": num_system_qubits,
         }
-        amplification = QSHARP_UTILS.AmplitudeAmplification
-        operation = amplification.MarkTargetStateOp(num_phase_qubits, ancilla_indices, lower_bounds, upper_bounds)
-
         return Circuit(
-            qsharp_factory=QsharpFactoryData(program=amplification.MakeMarkedPhaseCircuit, parameter=oracle_parameters),
-            qsharp_op=operation,
+            qsharp_factory=QsharpFactoryData(program=amplification.MakeMarkedPhaseCircuit, parameter=parameters),
+            qsharp_op=amplification.MarkQPEPhaseOp(
+                qpe_operation, num_bits, num_ancilla_qubits, lower_bounds, upper_bounds
+            ),
         )
-
-
-class SubspaceOracleFactory(AlgorithmFactory):
-    """Factory class for creating subspace oracle instances."""
-
-    def __init__(self):
-        """Initialize the SubspaceOracleFactory."""
-        super().__init__()
-
-    def algorithm_type_name(self) -> str:
-        """Return the algorithm type name as subspace_oracle."""
-        return "subspace_oracle"
-
-    def default_algorithm_name(self) -> str:
-        """Return qdk_qpe_subspace as the default algorithm name."""
-        return "qdk_qpe_subspace"

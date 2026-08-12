@@ -717,7 +717,6 @@ def _register_python_factories():
     be called by users.
     """
     from qdk_chemistry.algorithms.amplitude_amplification import AmplitudeAmplificationFactory  # noqa: PLC0415
-    from qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace import SubspaceOracleFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.circuit_executor import CircuitExecutorFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.circuit_mapper import CircuitMapperFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
@@ -760,7 +759,6 @@ def _register_python_factories():
     register_factory(HadamardTestCircuitBuilderFactory())
     register_factory(PropagatorFactory())
     register_factory(AmplitudeAmplificationFactory())
-    register_factory(SubspaceOracleFactory())
 
 
 _ = _register_cpp_factories()

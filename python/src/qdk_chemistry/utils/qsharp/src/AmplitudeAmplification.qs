@@ -11,137 +11,113 @@
 /// Computation*, arXiv:2201.08309, Chapter 2.
 namespace QDKChemistry.Utils.AmplitudeAmplification {
 
-    import Std.Canon.ApplyControlledOnInt;
     import Std.Canon.ApplyToEachCA;
-    import Std.Arithmetic.*;
-    import Std.Arrays.Subarray;
+    import Std.Arithmetic.ApplyIfGreaterOrEqualL;
+    import Std.Arithmetic.ApplyIfLessOrEqualL;
+    import Std.Convert.IntAsBigInt;
     import Std.Core.Length;
     import Std.Measurement.MResetEachZ;
     import Std.Measurement.MResetZ;
     import QDKChemistry.Utils.PrepSelPrep.Reflect;
 
     /// # Summary
-    /// Flips `target` when the little-endian phase-register value lies in the
+    /// Flips `target` when the little-endian `phase` register holds a value in the
     /// half-open interval [`lowerBound`, `upperBound`).
     operation MarkPhaseRange(
-        numPhaseQubits : Int,
         lowerBound : Int,
         upperBound : Int,
-        register : Qubit[],
+        phase : Qubit[],
         target : Qubit,
     ) : Unit is Adj {
-        let phaseRegister = register[0..numPhaseQubits - 1];
-        let phaseBinCount = 1 <<< numPhaseQubits;
-        if lowerBound == 0 and upperBound == phaseBinCount {
-            X(target);
-        } elif upperBound == lowerBound + 1 {
-            ApplyControlledOnInt(lowerBound, X, phaseRegister, target);
-        } elif lowerBound == 0 {
-            use encodedUpper = Qubit[numPhaseQubits];
-            within {
-                ApplyXorInPlace(upperBound, encodedUpper);
-            } apply {
-                ApplyIfGreaterLE(X, encodedUpper, phaseRegister, target);
-            }
-        } elif upperBound == phaseBinCount {
-            use encodedLower = Qubit[numPhaseQubits];
-            within {
-                ApplyXorInPlace(lowerBound, encodedLower);
-            } apply {
-                ApplyIfGreaterLE(X, encodedLower, phaseRegister, target);
-                X(target);
-            }
-        } else {
-            use encodedLower = Qubit[numPhaseQubits];
-            use encodedUpper = Qubit[numPhaseQubits];
-            use lowerFlag = Qubit();
-            use upperFlag = Qubit();
-            within {
-                ApplyXorInPlace(lowerBound, encodedLower);
-                ApplyXorInPlace(upperBound, encodedUpper);
-                ApplyIfGreaterLE(X, encodedLower, phaseRegister, lowerFlag);
-                X(lowerFlag);
-                ApplyIfGreaterLE(X, encodedUpper, phaseRegister, upperFlag);
-            } apply {
-                Controlled X([lowerFlag, upperFlag], target);
-            }
+        use aboveLower = Qubit();
+        use belowUpper = Qubit();
+        within {
+            ApplyIfLessOrEqualL(X, IntAsBigInt(lowerBound), phase, aboveLower);
+            ApplyIfGreaterOrEqualL(X, IntAsBigInt(upperBound - 1), phase, belowUpper);
+        } apply {
+            Controlled X([aboveLower, belowUpper], target);
         }
     }
 
     /// # Summary
-    /// Flips `target` when the phase-register value lies in any of the half-open
-    /// intervals [`lowerBounds[i]`, `upperBounds[i]`).
+    /// Flips `target` when `phase` lies in one of the half-open intervals
+    /// [`lowerBounds[i]`, `upperBounds[i]`) and every signal ancilla is $|0\rangle$.
     ///
     /// # Description
-    /// The intervals must be pairwise disjoint. Each one flips `target`
-    /// independently, so a value covered twice would be flipped twice and left
-    /// unmarked. Several intervals are needed because a qubitization walk has
-    /// eigenvalues $e^{\pm i \arccos(E/\lambda)}$, which places one energy in two
-    /// mirrored phase bins.
-    operation MarkPhaseRanges(
-        numPhaseQubits : Int,
+    /// The intervals must be pairwise disjoint. Each one flips `inRange` independently, so a
+    /// value covered twice would be flipped twice and left unmarked. More than one interval
+    /// is needed when the accepted energies wrap around $\varphi = 1$.
+    operation MarkAcceptedPhase(
         lowerBounds : Int[],
         upperBounds : Int[],
-        register : Qubit[],
+        phase : Qubit[],
+        signalAncillas : Qubit[],
         target : Qubit,
     ) : Unit is Adj {
-        for index in 0..Length(lowerBounds) - 1 {
-            MarkPhaseRange(numPhaseQubits, lowerBounds[index], upperBounds[index], register, target);
+        use inRange = Qubit();
+        within {
+            for index in 0..Length(lowerBounds) - 1 {
+                MarkPhaseRange(lowerBounds[index], upperBounds[index], phase, inRange);
+            }
+            ApplyToEachCA(X, signalAncillas);
+        } apply {
+            Controlled X(signalAncillas + [inRange], target);
         }
     }
 
     /// # Summary
-    /// Flips `target` when the phase register lies in one of the half-open
-    /// intervals [`lowerBounds[i]`, `upperBounds[i]`) and every signal ancilla is
-    /// $|0\rangle$. Signal-ancilla indices are relative to the register that
-    /// follows the phase qubits.
-    operation MarkAcceptedPhase(
+    /// Flips `target` when phase estimation of `system` lands in one of the accepted phase
+    /// windows. The estimation is undone, so `system` comes back as it was found and this
+    /// works as the good state oracle of an amplification that prepares `system` alone.
+    ///
+    /// # Description
+    /// `qpe` acts on `phase + system + signalAncillas` and must not prepare a state of its
+    /// own, because `system` already holds the one being tested.
+    operation MarkQPEPhase(
+        qpe : Qubit[] => Unit is Adj,
         numPhaseQubits : Int,
-        signalAncillaIndices : Int[],
+        numSignalAncillas : Int,
         lowerBounds : Int[],
         upperBounds : Int[],
-        register : Qubit[],
+        system : Qubit[],
         target : Qubit,
     ) : Unit is Adj {
-        let signalAncillas = Subarray(signalAncillaIndices, register[numPhaseQubits...]);
-        if Length(signalAncillas) == 0 {
-            MarkPhaseRanges(numPhaseQubits, lowerBounds, upperBounds, register, target);
-        } else {
-            use inRange = Qubit();
-            within {
-                MarkPhaseRanges(numPhaseQubits, lowerBounds, upperBounds, register, inRange);
-                ApplyToEachCA(X, signalAncillas);
-            } apply {
-                Controlled X(signalAncillas + [inRange], target);
-            }
+        use phase = Qubit[numPhaseQubits];
+        use signalAncillas = Qubit[numSignalAncillas];
+        within {
+            qpe(phase + system + signalAncillas);
+        } apply {
+            MarkAcceptedPhase(lowerBounds, upperBounds, phase, signalAncillas, target);
         }
     }
 
-    function MarkTargetStateOp(
+    function MarkQPEPhaseOp(
+        qpe : Qubit[] => Unit is Adj,
         numPhaseQubits : Int,
-        signalAncillaIndices : Int[],
+        numSignalAncillas : Int,
         lowerBounds : Int[],
         upperBounds : Int[],
     ) : (Qubit[], Qubit) => Unit is Adj {
-        MarkAcceptedPhase(numPhaseQubits, signalAncillaIndices, lowerBounds, upperBounds, _, _)
+        MarkQPEPhase(qpe, numPhaseQubits, numSignalAncillas, lowerBounds, upperBounds, _, _)
     }
 
     /// # Summary
-    /// Applies the marking oracle to an all-zeros register and measures the flag.
-    /// An entry point so the oracle can be run, drawn and costed on its own;
-    /// `MarkTargetStateOp` returns a callable and cannot be executed directly.
+    /// Applies the oracle to an all-zeros system register and measures the flag. An entry
+    /// point so the oracle can be run, drawn and costed on its own; `MarkQPEPhaseOp` returns
+    /// a callable and cannot be executed directly.
     operation MakeMarkedPhaseCircuit(
+        qpe : Qubit[] => Unit is Adj,
         numPhaseQubits : Int,
-        signalAncillaIndices : Int[],
+        numSignalAncillas : Int,
         lowerBounds : Int[],
         upperBounds : Int[],
-        numQubits : Int,
+        numSystemQubits : Int,
     ) : Result[] {
-        use register = Qubit[numQubits];
+        use system = Qubit[numSystemQubits];
         use flag = Qubit();
-        MarkAcceptedPhase(numPhaseQubits, signalAncillaIndices, lowerBounds, upperBounds, register, flag);
+        MarkQPEPhase(qpe, numPhaseQubits, numSignalAncillas, lowerBounds, upperBounds, system, flag);
         let outcome = MResetZ(flag);
-        ResetAll(register);
+        ResetAll(system);
         return [outcome];
     }
 

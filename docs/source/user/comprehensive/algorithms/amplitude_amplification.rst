@@ -39,15 +39,18 @@ Using amplitude amplification
 ``run`` takes the two oracles and reads the register width from a resource estimate of
 the state preparation. The returned circuit measures the whole register. It also carries
 the same amplification without measurement as a Q# callable, so a caller can append its
-own measurement instead. See below for an example of amplifying a measurement-free QPE circuit.
+own measurement instead. See below for an example of amplifying an eigenstate found by QPE.
 
 Amplitude amplified QPE
 -----------------------
 
-Build a measurement-free QPE circuit, name the target eigenvalue by energy, and amplify. The
-:class:`~qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.QPESubspaceMarking`
-algorithm (``subspace_oracle`` / ``qdk_qpe_subspace``) reads the register layout from the QPE
-circuit and the phase-to-energy law from the unitary that circuit estimates:
+The :class:`~qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.QPESubspaceMarking`
+algorithm (``qpe_circuit_builder`` / ``qdk_qpe_subspace``) is configured like any other
+:doc:`QpeCircuitBuilder <qpe_circuit_builder>`, plus the energy to mark, but returns a good
+state oracle instead of a QPE circuit: it runs the QPE on the register it is handed, flips a
+flag when the phase lands in a bin whose energy is at most ``target_energy``, then undoes the
+QPE. The register is left unchanged, so the amplification only prepares and reflects about
+the trial state:
 
 .. tab:: Python API
 
@@ -56,17 +59,15 @@ circuit and the phase-to-energy law from the unitary that circuit estimates:
       :start-after: # start-cell-run
       :end-before: # end-cell-run
 
-``run`` takes the QPE circuit and the
-:class:`~qdk_chemistry.data.UnitaryRepresentation` that circuit estimates. The unitary
-supplies the width of the register it acts on and its
+Set ``target_energy`` between the eigenvalue to amplify and the next one up. The accepted
+bins come from reading
 :meth:`~qdk_chemistry.data.unitary_representation.containers.base.UnitaryContainer.eigenvalue_from_phase`,
-the post-processing equation QPE results are read with. Inverting that equation turns
-``target_energy`` back into a phase, so each encoding is handled by its own law: a
-qubitization walk follows :math:`E = \lambda\cos(2\pi\varphi)` for :math:`\lambda` the L1
-norm of the Hamiltonian, and marks both mirrored bins because both signs of the phase
-occur, while a time evolution follows :math:`E = -\arg/t` and marks one. An energy the
-register cannot resolve exactly takes the nearest bin, and one outside the representable
-band takes the bin at its edge.
+the post-processing equation QPE results are read with, off each bin of the register, so any
+unitary the builder can estimate is handled without special casing. A qubitization walk
+follows :math:`E = \lambda\cos(2\pi\varphi)` and accepts one band around
+:math:`\varphi = 1/2`; a time evolution follows :math:`E = -\arg/t` and can accept a band
+that wraps at :math:`\varphi = 1`. An energy below every bin is rejected, because it would
+leave the flag dead.
 
 Alternatively, the marked phase window can be replaced by a reflection onto the target
 eigenspace built with quantum signal processing on a block encoding of the Hamiltonian,
@@ -90,7 +91,9 @@ Settings
      - ``int``
      - Number of Grover iterates (default 1). Must be non-negative.
 
-``subspace_oracle`` / ``qdk_qpe_subspace``:
+``qpe_circuit_builder`` / ``qdk_qpe_subspace``: the settings of
+:doc:`QpeCircuitBuilder <qpe_circuit_builder>` (``num_bits``, ``unitary_builder``,
+``controlled_circuit_mapper``), plus:
 
 .. list-table::
    :header-rows: 1
@@ -101,8 +104,8 @@ Settings
      - Description
    * - ``target_energy``
      - ``double``
-     - Energy whose QPE phase bins are marked. Required; it defaults to NaN because there
-       is no meaningful default.
+     - Highest energy the marked subspace may hold. Required; it defaults to NaN because
+       there is no meaningful default.
 
 Further Reading
 ---------------

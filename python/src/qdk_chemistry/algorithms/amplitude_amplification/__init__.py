@@ -17,7 +17,6 @@ from .amplitude_amplification import (
 from .qpe_subspace import (
     QPESubspaceMarking,
     QPESubspaceMarkingSettings,
-    SubspaceOracleFactory,
 )
 
 __all__: list[str] = [
@@ -26,5 +25,4 @@ __all__: list[str] = [
     "AmplitudeAmplificationSettings",
     "QPESubspaceMarking",
     "QPESubspaceMarkingSettings",
-    "SubspaceOracleFactory",
 ]

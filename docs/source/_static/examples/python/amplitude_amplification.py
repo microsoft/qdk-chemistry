@@ -22,9 +22,14 @@ import math
 
 import numpy as np
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
-from qdk_chemistry.data.circuit import QsharpFactoryData
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+from qdk_chemistry.data import (
+    AlgorithmRef,
+    Configuration,
+    ModelOrbitals,
+    QubitOperator,
+    StateVectorContainer,
+    Wavefunction,
+)
 
 # 1. A two-qubit Hamiltonian
 qubit_hamiltonian = QubitOperator(
@@ -32,69 +37,47 @@ qubit_hamiltonian = QubitOperator(
 )
 
 # 2. A guiding state with 0.3 amplitude on the target eigenvector |11>
-state_vector = [0.0, 0.0, 0.0, 0.0]
-state_vector[3] = 0.3
-state_vector[0] = math.sqrt(1.0 - 0.3**2)
-prep_parameters = {
-    "rowMap": [1, 0],
-    "stateVector": state_vector,
-    "expansionOps": [],
-    "numQubits": 2,
-}
-state_preparation = Circuit(
-    qsharp_factory=QsharpFactoryData(
-        program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
-        parameter=prep_parameters,
-    ),
-    qsharp_op=QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(prep_parameters),
+amplitude = 0.3
+guiding_state = Wavefunction(
+    StateVectorContainer(
+        np.array([math.sqrt(1.0 - amplitude**2), amplitude]),
+        [Configuration.from_bitstring("00"), Configuration.from_bitstring("11")],
+        ModelOrbitals(2),
+    )
 )
+state_preparation = create("state_prep", "dense_pure_state").run(guiding_state)
 
-# 3. Build a measurement-free QPE circuit. This whole circuit is the preparation that
-# gets amplified, so the phase register and its ancillas stay inside the amplified
-# register and every round reflects about the full prepared state.
-num_bits = 4
-walk = AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True)
-builder = create(
+# 3. The good state oracle runs a QPE of the Hamiltonian on the prepared register, flips a
+# flag when the phase lands in a bin whose energy is at most the target, then undoes the QPE.
+# It is configured like a QPE circuit builder, plus the energy bound. Put the bound between
+# the eigenvalue to amplify and the next one up: the spectrum here is {-lambda, 0, 0,
+# +lambda}, so -lambda/2 keeps |11> and drops the rest. The bins come from the equation QPE
+# results are read with, here E = lambda cos(2 pi phi), which puts the accepted band at
+# phi in [1/3, 2/3], that is bins 6 through 10 of 16.
+good_state_oracle = create(
     "qpe_circuit_builder",
-    "qdk_standard",
-    num_bits=num_bits,
+    "qdk_qpe_subspace",
+    num_bits=4,
+    unitary_builder=AlgorithmRef(
+        "hamiltonian_unitary_builder", "lcu", quantum_walk=True
+    ),
     controlled_circuit_mapper=AlgorithmRef(
         "controlled_circuit_mapper", "prepare_select_prepare"
     ),
-    unitary_builder=walk,
-    measure_phase=False,
-)
-state_prep_oracle = builder.run(
-    state_preparation=state_preparation, qubit_hamiltonian=qubit_hamiltonian
-)[0]
-# The same walk, as a unitary representation: this is what the QPE circuit estimates.
-unitary_representation = create(
-    "hamiltonian_unitary_builder", "lcu", quantum_walk=True
+    target_energy=-qubit_hamiltonian.schatten_norm / 2,
 ).run(qubit_hamiltonian)
 
-# 4. Mark the phase bins holding the target eigenvalue, naming it by energy. The oracle
-# reads the register width and the post-processing equation phases are read with off that
-# unitary, and inverts the equation to turn the energy back into a phase. Here the walk
-# gives E = lambda cos(2 pi phi), so the target eigenvector |11> at E = -pi/4 - pi/4 =
-# -lambda sits at phi = 0.5, that is bin 0.5 * 16 = 8. Both signs of the phase are marked,
-# because the walk has eigenvalues exp(+-i arccos(E / lambda)); here bin 8 is its own mirror.
-good_state_oracle = create(
-    "subspace_oracle",
-    "qdk_qpe_subspace",
-    target_energy=-qubit_hamiltonian.schatten_norm,
-).run(state_prep_oracle, unitary_representation)
-
-# 5. Amplify, then execute. The overlap is a = 0.3**2 = 0.09, so
-# arcsin(sqrt(a)) = 0.3047 and 2 rounds put (2k+1) arcsin(sqrt(a)) at 1.523, just under
-# pi/2: the probability of landing in bin 8 rises from 0.09 to sin^2(1.523) = 0.998.
-# A third round would overshoot back down to 0.79.
+# 4. Amplify the state preparation against that oracle, then execute. The overlap is
+# a = 0.3**2 = 0.09, so arcsin(sqrt(a)) = 0.3047 and 2 rounds put (2k+1) arcsin(sqrt(a)) at
+# 1.523, just under pi/2: the probability of the target eigenvector rises from 0.09 to
+# sin^2(1.523) = 0.998. A third round would overshoot back down to 0.79.
 amplitude_amplification = create("amplitude_amplification", "qdk_base", rounds=2)
-circuit = amplitude_amplification.run(state_prep_oracle, good_state_oracle)
+circuit = amplitude_amplification.run(state_preparation, good_state_oracle)
 
 executor = create("circuit_executor", "qdk_sparse_state_simulator")
 shots = 400
-# Keys are big-endian over the whole register, so the phase register is the last
-# num_bits characters: almost every shot reads "1000", the binary form of bin 8.
+# Only the two system qubits are measured; the phase register is uncomputed inside the
+# oracle. Almost every shot reads "11".
 counts = executor.run(circuit, shots=shots).bitstring_counts
 
 # end-cell-run

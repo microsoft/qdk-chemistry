@@ -17,7 +17,7 @@ from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.algorithms.amplitude_amplification.amplitude_amplification import AmplitudeAmplification
 from qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace import (
     QPESubspaceMarking,
-    _phase_bins_from_energy,
+    _marked_phase_bins,
 )
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
@@ -83,33 +83,24 @@ def _all_ones_marking_oracle() -> Circuit:
     )
 
 
-def _qpe_preparation(
+def _subspace_oracle(
     qubit_hamiltonian: QubitOperator,
-    state_preparation: Circuit,
+    target_energy: float,
     *,
     num_bits: int = 4,
     mapper: str = "prepare_select_prepare",
     unitary: AlgorithmRef | None = None,
-):
-    """Build a measurement-free QPE circuit, its unitary representation, and its register layout."""
-    unitary = unitary or AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True)
-    builder = create(
+) -> Circuit:
+    """Build the oracle marking the QPE window that holds ``target_energy``."""
+    oracle = create(
         "qpe_circuit_builder",
-        "qdk_standard",
+        "qdk_qpe_subspace",
         num_bits=num_bits,
         controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", mapper),
-        unitary_builder=unitary,
-        measure_phase=False,
+        unitary_builder=unitary or AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True),
+        target_energy=target_energy,
     )
-    preparation = builder.run(state_preparation=state_preparation, qubit_hamiltonian=qubit_hamiltonian)[0]
-    # The oracle reads the phase-to-energy law off the same unitary the builder estimates.
-    unitary_representation = builder._create_nested("unitary_builder").run(qubit_hamiltonian)
-
-    # MakeStandardQPECircuit allocates numBits + Length(systems) + numAncillaQubits qubits.
-    parameters = preparation._qsharp_factory.parameter
-    num_ancilla_qubits = parameters["numAncillaQubits"]
-    num_qubits = parameters["numBits"] + len(parameters["systems"]) + num_ancilla_qubits
-    return preparation, unitary_representation, num_qubits, num_ancilla_qubits
+    return oracle.run(qubit_hamiltonian)
 
 
 def _amplified_qpe_circuit(
@@ -122,22 +113,17 @@ def _amplified_qpe_circuit(
     unitary: AlgorithmRef | None = None,
     **settings,
 ):
-    """Compose a coherent QPE preparation with amplitude amplification."""
-    state_prep_oracle, unitary_representation, num_qubits, num_ancilla_qubits = _qpe_preparation(
+    """Amplify a state preparation against the QPE window holding ``target_energy``."""
+    good_state_oracle = _subspace_oracle(
         qubit_hamiltonian,
-        state_preparation,
+        target_energy,
         num_bits=num_bits,
         mapper=mapper,
         unitary=unitary,
     )
-    good_state_oracle = create("subspace_oracle", target_energy=target_energy).run(
-        state_prep_oracle, unitary_representation
-    )
-    marked = _marked_bin_ranges(good_state_oracle)
-
     algorithm = create("amplitude_amplification", **settings)
-    circuit = algorithm.run(state_prep_oracle, good_state_oracle)
-    return circuit, num_qubits, num_ancilla_qubits, marked
+    circuit = algorithm.run(state_preparation, good_state_oracle)
+    return circuit, _marked_bin_ranges(good_state_oracle)
 
 
 def _marked_bin_ranges(oracle: Circuit) -> list[tuple[int, int]]:
@@ -146,42 +132,9 @@ def _marked_bin_ranges(oracle: Circuit) -> list[tuple[int, int]]:
     return list(zip(parameters["lowerBounds"], parameters["upperBounds"], strict=True))
 
 
-def _accepted_phase_counts(
-    circuit: Circuit,
-    num_bits: int,
-    num_ancilla: int,
-    accepted_ranges: list[tuple[int, int]],
-    shots: int,
-) -> dict[str, int]:
-    """Execute a circuit and count, per phase bitstring, the shots in the good subspace.
-
-    The whole register is measured. The executor reverses the Q# results, so the little-endian
-    phase register lands MSB first at the end of the key and the trailing ancillas land at the front.
-    """
-    executor = create("circuit_executor", "qdk_sparse_state_simulator")
-    counts: dict[str, int] = {}
-    for bitstring, count in executor.run(circuit, shots=shots).bitstring_counts.items():
-        phase_bits, ancilla_bits = bitstring[-num_bits:], bitstring[:num_ancilla]
-        phase_bin = int(phase_bits, 2)
-        if any(bit != "0" for bit in ancilla_bits):
-            continue
-        if not any(lower <= phase_bin < upper for lower, upper in accepted_ranges):
-            continue
-        counts[phase_bits] = counts.get(phase_bits, 0) + count
-    return counts
-
-
-def _dominant_accepted_phase(
-    circuit: Circuit,
-    num_bits: int,
-    num_ancilla: int,
-    accepted_ranges: list[tuple[int, int]],
-    shots: int = 400,
-) -> str:
-    """Execute a circuit and return the most common bitstring from the good subspace."""
-    counts = _accepted_phase_counts(circuit, num_bits, num_ancilla, accepted_ranges, shots)
-    assert counts, f"No shot landed in the accepted window {accepted_ranges}."
-    return max(counts, key=lambda phase: counts[phase])
+def _measure(circuit: Circuit, shots: int = 400) -> dict[str, int]:
+    """Execute a circuit and return its bitstring counts."""
+    return create("circuit_executor", "qdk_sparse_state_simulator").run(circuit, shots=shots).bitstring_counts
 
 
 def test_amplitude_amplification_is_registered():
@@ -198,79 +151,67 @@ def test_rounds_setting_defaults_to_one():
 
 
 def test_subspace_oracle_is_registered():
-    assert available("subspace_oracle") == ["qdk_qpe_subspace"]
-    default = create("subspace_oracle")
-    assert default.name() == "qdk_qpe_subspace"
-    assert default.type_name() == "subspace_oracle"
-    assert isinstance(default, QPESubspaceMarking)
+    assert "qdk_qpe_subspace" in available("qpe_circuit_builder")
+    oracle = create("qpe_circuit_builder", "qdk_qpe_subspace")
+    assert oracle.name() == "qdk_qpe_subspace"
+    assert oracle.type_name() == "qpe_circuit_builder"
+    assert isinstance(oracle, QPESubspaceMarking)
+
+
+def test_subspace_oracle_shares_the_qpe_circuit_builder_settings():
+    """The oracle is configured like the QPE builder it wraps, plus the energy to mark."""
+    algorithm = create("qpe_circuit_builder", "qdk_qpe_subspace")
+    assert math.isnan(algorithm.settings().get("target_energy"))
+    for key in ("num_bits", "unitary_builder", "controlled_circuit_mapper"):
+        assert key in algorithm.settings()
 
 
 def test_subspace_oracle_target_energy_defaults_to_unset():
     """There is no meaningful default energy, so the setting starts as NaN and run refuses it."""
-    algorithm = create("subspace_oracle")
-    assert math.isnan(algorithm.settings().get("target_energy"))
-
-    hamiltonian = _diagonal_hamiltonian()
-    qpe_circuit, unitary_representation, _, _ = _qpe_preparation(hamiltonian, _guiding_state(0.3, 3), num_bits=4)
+    algorithm = create("qpe_circuit_builder", "qdk_qpe_subspace", num_bits=4)
     with pytest.raises(ValueError, match="target_energy"):
-        algorithm.run(qpe_circuit, unitary_representation)
+        algorithm.run(_diagonal_hamiltonian())
 
 
-def test_subspace_oracle_rejects_a_circuit_that_is_not_qpe():
-    """The oracle reads its register layout off the QPE circuit, so it refuses anything else."""
-    hamiltonian = _diagonal_hamiltonian()
-    _, unitary_representation, _, _ = _qpe_preparation(hamiltonian, _guiding_state(0.3, 3), num_bits=4)
-    with pytest.raises(ValueError, match="standard QPE circuit"):
-        create("subspace_oracle", target_energy=-1.0).run(_all_ones_marking_oracle(), unitary_representation)
-
-
-def test_subspace_oracle_requires_a_unitary_representation():
-    """The phase-to-energy law comes from the unitary, so nothing else can stand in for it."""
-    hamiltonian = _diagonal_hamiltonian()
-    qpe_circuit, _, _, _ = _qpe_preparation(hamiltonian, _guiding_state(0.3, 3), num_bits=4)
-    with pytest.raises(TypeError, match="UnitaryRepresentation"):
-        create("subspace_oracle", target_energy=-1.0).run(qpe_circuit, hamiltonian)
-
-
-def test_subspace_oracle_rejects_a_unitary_on_a_different_register():
-    """A unitary of the wrong width would place the block-encoding ancillas at the wrong indices."""
-    hamiltonian = _diagonal_hamiltonian()
-    qpe_circuit, _, _, _ = _qpe_preparation(hamiltonian, _guiding_state(0.3, 3), num_bits=4)
-    # A Trotter step on the same Hamiltonian carries no block-encoding ancillas.
-    mismatched = create("hamiltonian_unitary_builder", "trotter", time=1.0).run(hamiltonian)
-    with pytest.raises(ValueError, match="does not"):
-        create("subspace_oracle", target_energy=-1.0).run(qpe_circuit, mismatched)
+def test_subspace_oracle_requires_a_phase_register():
+    """num_bits sizes the phase register the energy is compared against, so it must be set."""
+    algorithm = create("qpe_circuit_builder", "qdk_qpe_subspace", target_energy=-1.0)
+    with pytest.raises(ValueError, match="num_bits"):
+        algorithm.run(_diagonal_hamiltonian())
 
 
 def test_amplified_qpe_circuit():
     """Check that amplitude amplification can be applied to a QPE circuit."""
-    # The |11> eigenvector has energy -lambda, which the qubitization walk maps
-    # to the phase bin 1/2 -- index 8 of 16, big-endian 0b1000.
+    # The spectrum is {-lambda, 0, 0, +lambda}, so a bound of -lambda/2 keeps only the |11>
+    # eigenvector. The walk law puts that band at phi in [1/3, 2/3], bins 6 through 10 of 16.
     hamiltonian = _diagonal_hamiltonian()
-    circuit, _, num_ancilla, marked = _amplified_qpe_circuit(
+    circuit, marked = _amplified_qpe_circuit(
         hamiltonian,
         _guiding_state(0.3, 3),
-        -hamiltonian.schatten_norm,
+        -hamiltonian.schatten_norm / 2,
         rounds=2,
     )
-    assert marked == [(8, 9)]
-    assert _dominant_accepted_phase(circuit, 4, num_ancilla, marked) == "1000"
+    assert marked == [(6, 11)]
+    counts = _measure(circuit)
+    assert max(counts, key=lambda bitstring: counts[bitstring]) == "11"
 
 
 def test_amplified_qpe_circuit_with_trotter():
     """Check that amplitude amplification can be applied to a QPE circuit with the pauli-sequence mapper."""
-    # e^{-iHt} with t = 1 maps the eigenvalue -pi/2 to the phase 1/4, bin 4 of 16. The
-    # pauli-sequence mapper has no block-encoding ancillas, so nothing is post-selected.
-    circuit, _, num_ancilla, marked = _amplified_qpe_circuit(
+    # e^{-iHt} with t = 1 maps the eigenvalue -pi/2 to the phase 1/4, bin 4 of 16. A bound of
+    # -1.0 sits between it and the next eigenvalue at 0. The pauli-sequence mapper has no
+    # block-encoding ancillas, so nothing is post-selected.
+    circuit, marked = _amplified_qpe_circuit(
         _diagonal_hamiltonian(),
         _guiding_state(0.3, 3),
-        -math.pi / 2,
+        -1.0,
         mapper="pauli_sequence",
         unitary=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=1.0),
         rounds=1,
     )
-    assert marked == [(4, 5)]
-    assert _dominant_accepted_phase(circuit, 4, num_ancilla, marked, shots=200) == "0100"
+    assert marked == [(3, 9)]
+    counts = _measure(circuit, shots=200)
+    assert max(counts, key=lambda bitstring: counts[bitstring]) == "11"
 
 
 def test_amplified_qpe_acceptance_follows_the_round_count():
@@ -279,14 +220,13 @@ def test_amplified_qpe_acceptance_follows_the_round_count():
     shots = 2000
     observed = {}
     for rounds in (0, 1, 2):
-        circuit, _, num_ancilla, marked = _amplified_qpe_circuit(
+        circuit, _ = _amplified_qpe_circuit(
             hamiltonian,
             _guiding_state(0.3, 3),
-            -hamiltonian.schatten_norm,
+            -hamiltonian.schatten_norm / 2,
             rounds=rounds,
         )
-        counts = _accepted_phase_counts(circuit, 4, num_ancilla, marked, shots)
-        observed[rounds] = sum(counts.values()) / shots
+        observed[rounds] = _measure(circuit, shots=shots).get("11", 0) / shots
 
     assert observed[1] > observed[0]
     assert observed[2] > observed[1]
@@ -330,95 +270,63 @@ def test_unestimable_state_prep_reports_a_runtime_error():
 
 
 def test_marking_oracle_circuit_is_executable():
-    """The oracle circuit runs on its own: the top of the band is bin 0, which the all-zeros register holds."""
-    executor = create("circuit_executor", "qdk_sparse_state_simulator")
+    """The oracle circuit runs on its own, over an all-zeros register.
+
+    |00> is the eigenvector at the top of the band, which the walk maps to phase bin 0.
+    """
     hamiltonian = _diagonal_hamiltonian()
-    qpe_circuit, unitary_representation, _, _ = _qpe_preparation(hamiltonian, _guiding_state(0.3, 3), num_bits=3)
-    marks_bin_zero = create("subspace_oracle", target_energy=hamiltonian.schatten_norm).run(
-        qpe_circuit, unitary_representation
-    )
-    marks_bin_four = create("subspace_oracle", target_energy=-hamiltonian.schatten_norm).run(
-        qpe_circuit, unitary_representation
-    )
-    assert _marked_bin_ranges(marks_bin_zero) == [(0, 1)]
-    assert _marked_bin_ranges(marks_bin_four) == [(4, 5)]
-    assert executor.run(marks_bin_zero, shots=20).bitstring_counts == {"1": 20}
-    assert executor.run(marks_bin_four, shots=20).bitstring_counts == {"0": 20}
+    marks_every_bin = _subspace_oracle(hamiltonian, 2 * hamiltonian.schatten_norm, num_bits=3)
+    marks_the_bottom = _subspace_oracle(hamiltonian, -hamiltonian.schatten_norm / 2, num_bits=3)
+    assert _marked_bin_ranges(marks_every_bin) == [(0, 8)]
+    assert _marked_bin_ranges(marks_the_bottom) == [(3, 6)]
+    assert _measure(marks_every_bin, shots=20) == {"1": 20}
+    assert _measure(marks_the_bottom, shots=20) == {"0": 20}
 
 
-def test_target_energy_selects_the_hand_computed_bin():
-    """The energy -lambda reproduces the hand-computed bin 8 of 16."""
-    hamiltonian = _diagonal_hamiltonian()
-    qpe_circuit, unitary_representation, _, _ = _qpe_preparation(hamiltonian, _guiding_state(0.3, 3), num_bits=4)
-    oracle = create("subspace_oracle", target_energy=-hamiltonian.schatten_norm).run(
-        qpe_circuit, unitary_representation
-    )
-    parameters = oracle._qsharp_factory.parameter
-    assert (parameters["lowerBounds"], parameters["upperBounds"]) == ([8], [9])
-
-
-def test_target_energy_marks_both_walk_branches():
-    """A walk has eigenvalues exp(+-i arccos(E/lambda)), so one energy needs two mirrored bins."""
+def test_target_energy_marks_one_band_across_both_walk_branches():
+    """A walk has eigenvalues exp(+-i arccos(E/lambda)), so its accepted band straddles phi = 1/2."""
     coefficients = np.array([0.3, 0.5])
     hamiltonian = QubitOperator(pauli_strings=["ZI", "IZ"], coefficients=coefficients)
-    # |01> has energy 0.3 - 0.5 = -0.2, away from +-lambda, so the two branches are distinct bins.
-    energy = float(coefficients[0] - coefficients[1])
-    qpe_circuit, unitary_representation, _, _ = _qpe_preparation(hamiltonian, _guiding_state(1.0, 1), num_bits=4)
-    oracle = create("subspace_oracle", target_energy=energy).run(qpe_circuit, unitary_representation)
-    # arccos(-0.25) / 2pi = 0.2902 -> bin 4.64, and the mirror at 1 - 0.2902 -> bin 11.36.
-    assert _marked_bin_ranges(oracle) == [(5, 6), (11, 12)]
-
-
-def test_marked_bins_stay_inside_the_phase_register():
-    """Mirroring bin 0 names bin 2^n, which the phase register cannot hold, so it must be dropped."""
-    hamiltonian = _diagonal_hamiltonian()
-    qpe_circuit, unitary_representation, _, _ = _qpe_preparation(hamiltonian, _guiding_state(0.3, 3), num_bits=4)
-    oracle = create("subspace_oracle", target_energy=hamiltonian.schatten_norm).run(qpe_circuit, unitary_representation)
-    parameters = oracle._qsharp_factory.parameter
-    assert (parameters["lowerBounds"], parameters["upperBounds"]) == ([0], [1])
-
-    executor = create("circuit_executor", "qdk_sparse_state_simulator")
-    assert executor.run(oracle, shots=20).bitstring_counts == {"1": 20}
+    # |01> has energy 0.3 - 0.5 = -0.2, so a bound there accepts cos(2 pi phi) <= -0.25,
+    # that is phi in [0.2902, 0.7098] -- bins 5 through 11 of 16.
+    oracle = _subspace_oracle(hamiltonian, float(coefficients[0] - coefficients[1]))
+    assert _marked_bin_ranges(oracle) == [(5, 12)]
 
 
 @pytest.mark.parametrize(
     ("target_energy", "expected_bins"),
     [
-        # E = +lambda is phase 0 and E = -lambda is phase 0.5; both are their own mirror.
-        pytest.param(1.0, [(0, 1)], id="top-of-band"),
+        # E = -lambda is phase 1/2, the only bin at the bottom of the band.
         pytest.param(-1.0, [(8, 9)], id="bottom-of-band"),
-        # Energies outside [-lambda, lambda] clamp onto the edge.
-        pytest.param(2.0, [(0, 1)], id="above-band"),
-        pytest.param(-3.0, [(8, 9)], id="below-band"),
-        pytest.param(0.0, [(4, 5), (12, 13)], id="middle-of-band"),
-        pytest.param(-0.25, [(5, 6), (11, 12)], id="off-centre"),
-        # A bin near an end still mirrors, even though the end itself does not.
-        pytest.param(0.95, [(1, 2), (15, 16)], id="near-top-of-band"),
+        pytest.param(-0.9, [(7, 10)], id="near-bottom-of-band"),
+        pytest.param(-0.5, [(6, 11)], id="lower-half-of-band"),
+        # E = +lambda is phase 0, so a bound at or above it accepts the whole register.
+        pytest.param(1.0, [(0, 16)], id="top-of-band"),
+        pytest.param(2.0, [(0, 16)], id="above-band"),
     ],
 )
-def test_walk_energies_map_onto_representable_bins(target_energy, expected_bins):
-    """The block-encoding law is inverted onto both branches and stays inside the phase register."""
-    bins = _phase_bins_from_energy(target_energy, _walk_eigenvalue_from_phase(), num_phase_qubits=4)
-    assert bins == expected_bins
-    assert all(0 <= start < stop <= 16 for start, stop in bins)
+def test_walk_energies_select_one_band(target_energy, expected_bins):
+    """The walk law is symmetric about phi = 1/2, so its accepted bins form a single band."""
+    assert _marked_phase_bins(target_energy, _walk_eigenvalue_from_phase(), num_phase_qubits=4) == expected_bins
 
 
 @pytest.mark.parametrize(
     ("target_energy", "expected_bins"),
     [
-        pytest.param(0.0, [(0, 1)], id="zero"),
-        pytest.param(-math.pi / 2, [(4, 5)], id="negative"),
-        pytest.param(math.pi / 2, [(12, 13)], id="positive"),
-        # No bin sits between bin 0 at E = 0 and bin 15 at E = 2 pi / 16, so an energy in
-        # that gap takes the nearer of the two rather than falling off the band.
-        pytest.param(0.05, [(0, 1)], id="just-above-zero"),
-        pytest.param(0.35, [(15, 16)], id="just-below-the-last-bin"),
+        pytest.param(-3.0, [(8, 9)], id="bottom-of-band"),
+        pytest.param(-1.5, [(4, 9)], id="lower-half-of-band"),
+        pytest.param(0.0, [(0, 9)], id="zero"),
+        # E = -arg/t jumps from -pi/t to +pi/t across phi = 1/2, so a positive bound accepts
+        # a band that wraps: bins 0 to 8 at E <= 0, plus bins 14 and 15 on the way back down.
+        pytest.param(1.0, [(0, 9), (14, 16)], id="wrapping"),
     ],
 )
 def test_time_evolution_energies_use_their_own_law(target_energy, expected_bins):
-    """A time evolution follows E = -arg/t, and the same inversion handles it without special casing."""
-    bins = _phase_bins_from_energy(target_energy, _evolution_eigenvalue_from_phase(time=1.0), num_phase_qubits=4)
-    assert bins == expected_bins
+    """A time evolution follows E = -arg/t, and the same bin scan handles it without special casing."""
+    assert (
+        _marked_phase_bins(target_energy, _evolution_eigenvalue_from_phase(time=1.0), num_phase_qubits=4)
+        == expected_bins
+    )
 
 
 @pytest.mark.parametrize(
@@ -432,16 +340,23 @@ def test_time_evolution_energies_use_their_own_law(target_energy, expected_bins)
 def test_non_finite_energies_are_rejected(target_energy):
     """An energy that does not name a point on the band is rejected."""
     with pytest.raises(ValueError, match="finite"):
-        _phase_bins_from_energy(target_energy, _walk_eigenvalue_from_phase(), num_phase_qubits=4)
+        _marked_phase_bins(target_energy, _walk_eigenvalue_from_phase(), num_phase_qubits=4)
+
+
+def test_energy_below_the_band_is_rejected():
+    """A bound under every bin would mark nothing, leaving the flag dead, so it is refused."""
+    with pytest.raises(ValueError, match="No phase bin"):
+        _marked_phase_bins(-2.0, _walk_eigenvalue_from_phase(), num_phase_qubits=4)
 
 
 def test_amplified_circuit_exposes_a_measurement_free_operation():
     """The result carries an unmeasured qsharp_op, so a caller can append its own measurement."""
     hamiltonian = _diagonal_hamiltonian()
-    circuit, num_qubits, _, _ = _amplified_qpe_circuit(
+    num_qubits = 2  # the amplified register is the system register alone
+    circuit, _ = _amplified_qpe_circuit(
         hamiltonian,
         _guiding_state(0.3, 3),
-        -hamiltonian.schatten_norm,
+        -hamiltonian.schatten_norm / 2,
         rounds=1,
     )
     assert circuit._qsharp_op is not None
