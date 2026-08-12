@@ -78,7 +78,7 @@ class EffectiveHamiltonianConstructor
    * @param hamiltonian Input Hamiltonian built over the whole window @f$W = P
    * \cup Q@f$.
    * @param p_indices Absolute molecular-orbital indices of the target space P,
-   *        which must lie within the reference wavefunction's active space.
+   *        which must lie within the input Hamiltonian's active orbital window.
    * \endcond
    * @return The effective Hamiltonian acting on the target space P, following
    *         the output contract documented on this class.
@@ -105,22 +105,22 @@ class EffectiveHamiltonianConstructor
 
  protected:
   /**
-   * @brief Validate the common nested-space input contract.
+   * @brief Validate the common input-space contract.
    *
    * Concrete implementations may call this helper before performing
    * method-specific validation or computation. Validation is opt-in; the base
    * @ref run method does not call it automatically.
    *
    * @param reference Reference wavefunction whose active orbital space must be
-   *        a subset of the Hamiltonian's active orbital window.
+   *        a subset of the input Hamiltonian's active orbital window.
    * @param hamiltonian Input Hamiltonian defining the outer orbital window.
    * @param p_indices Target P-space as absolute molecular-orbital indices,
-   *        which must be a subset of the reference wavefunction's active
-   *        orbital space.
+   *        which must be a subset of the input Hamiltonian's active orbital
+   *        window.
    * @throws std::invalid_argument if an input is null, the Hamiltonian and
    *         wavefunction use incompatible orbital bases or spin restrictions,
-   *         or the spaces do not satisfy @f$P \subseteq W_{\mathrm{ref}}
-   * \subseteq W_H@f$.
+   *         or the spaces do not satisfy @f$P \subseteq W_H@f$ and
+   *         @f$W_{\mathrm{ref}} \subseteq W_H@f$.
    */
   void _validate_inputs(
       const std::shared_ptr<data::Wavefunction>& reference,
@@ -139,7 +139,7 @@ class EffectiveHamiltonianConstructor
    * @param hamiltonian Input Hamiltonian built over the whole window @f$W = P
    * \cup Q@f$.
    * @param p_indices Absolute molecular-orbital indices of the target space P,
-   *        which must lie within the reference wavefunction's active space.
+   *        which must lie within the input Hamiltonian's active orbital window.
    * @return The effective Hamiltonian acting on the target space P. It must
    *         satisfy the output contract documented on this class.
    */
