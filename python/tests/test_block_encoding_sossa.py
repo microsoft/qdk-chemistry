@@ -6,7 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import tempfile
-from math import ceil, log2
+from dataclasses import replace
 from pathlib import Path
 
 import h5py
@@ -27,6 +27,7 @@ from qdk_chemistry.data.unitary_representation.containers.sossa import (
     SOSSAInnerPrepare,
     SOSSASelect,
     SOSSAWalkContainer,
+    sossa_register_bits,
 )
 
 from .reference_tolerances import float_comparison_absolute_tolerance
@@ -69,9 +70,9 @@ def _make_sossa_unitary_representation():
     dq_rotation_angles = np.array([[0.3], [0.5]])
     sf_rotation_angles = np.array([[0.1], [0.2], [0.15], [0.25]])
 
-    x_o_dim = num_orbitals + num_ranks * num_copies
-    num_outer_qubits = ceil(log2(x_o_dim)) if x_o_dim > 1 else 1
-    num_inner_qubits = ceil(log2(num_bases + 1)) if num_bases + 1 > 1 else 1
+    _reg_bits = sossa_register_bits(num_orbitals, num_ranks, num_bases, num_copies)
+    num_outer_qubits = _reg_bits["xo_bits"]
+    num_inner_qubits = _reg_bits["b_bits"]
 
     # Build outer prepare Wavefunction
     coeffs_list = []
@@ -189,6 +190,62 @@ class TestSOSSAWalkContainer:
 
         assert restored.get_container_type() == "sossa_walk"
         assert isinstance(restored.get_container(), SOSSAWalkContainer)
+
+    def test_num_qubits_ancilla_excess_is_exactly_the_structural_widths(self):
+        """Pin the identity the generic ancilla fallback depends on.
+
+        ``PhaseEstimationCircuitBuilder`` falls back to
+        ``unitary.get_num_qubits() - qubit_hamiltonian.num_qubits`` when a mapper
+        exposes no ancilla count. That subtraction is only meaningful because both
+        operands carry the same ``2N`` system register, so the difference is exactly
+        the structural ancilla width ``xo + b + free_rider + 2``. If the system terms
+        ever stop cancelling, the fallback silently returns a wrong allocation size.
+        """
+        container = _make_sossa_unitary_representation().get_container()
+        reg_bits = sossa_register_bits(
+            container.num_orbitals, container.num_ranks, container.num_bases, container.num_copies
+        )
+
+        num_system = 2 * container.num_orbitals
+        expected_ancilla = reg_bits["xo_bits"] + reg_bits["b_bits"] + reg_bits["num_free_rider_bits"] + 2
+
+        assert container.num_qubits - num_system == expected_ancilla
+
+    def test_diverging_stored_inner_width_is_rejected(self):
+        """A stored inner width that disagrees with (N, R, B, C) must fail loudly.
+
+        ``num_inner_qubits`` is persisted on the inner PREPARE *and* derivable from
+        ``sossa_register_bits``. Nothing forces a deserialized value to agree with the
+        formula, so version skew could reintroduce a divergence that would otherwise
+        corrupt ``num_qubits`` silently.
+        """
+        container = _make_sossa_unitary_representation().get_container()
+        skewed = replace(
+            container.inner_prepare,
+            num_inner_qubits=container.inner_prepare.num_inner_qubits + 1,
+        )
+
+        with pytest.raises(ValueError, match="num_inner_qubits"):
+            SOSSAWalkContainer(
+                outer_prepare=container.outer_prepare,
+                outer_prepare_probabilities=container.outer_prepare_probabilities,
+                inner_prepare=skewed,
+                select=container.select,
+                num_orbitals=container.num_orbitals,
+                num_ranks=container.num_ranks,
+                num_bases=container.num_bases,
+                num_copies=container.num_copies,
+                normalization=container.normalization,
+            )
+
+    def test_deserializing_a_skewed_inner_width_is_rejected(self):
+        """The same guard must hold on the JSON reload path, not just construction."""
+        container = _make_sossa_unitary_representation().get_container()
+        json_data = container.to_json()
+        json_data["inner_prepare"]["num_inner_qubits"] += 1
+
+        with pytest.raises(ValueError, match="num_inner_qubits"):
+            SOSSAWalkContainer.from_json(json_data)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

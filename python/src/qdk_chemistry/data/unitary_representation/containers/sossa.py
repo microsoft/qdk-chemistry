@@ -216,7 +216,22 @@ class SOSSAWalkContainer(QuantumWalkContainer):
             energy_shift: Energy shift :math:`E_{\text{SOS}} + E_{\text{nuc}}`
                 to add when recovering total energy from the measured phase.
 
+        Raises:
+            ValueError: If ``inner_prepare.num_inner_qubits`` disagrees with the width
+                implied by ``(N, R, B, C)``.
+
         """
+        expected_b_bits = sossa_register_bits(num_orbitals, num_ranks, num_bases, num_copies)["b_bits"]
+        if inner_prepare.num_inner_qubits != expected_b_bits:
+            raise ValueError(
+                f"inner_prepare.num_inner_qubits ({inner_prepare.num_inner_qubits}) disagrees with the "
+                f"width implied by (N, R, B, C) = "
+                f"({num_orbitals}, {num_ranks}, {num_bases}, {num_copies}), which is {expected_b_bits}. "
+                "sossa_register_bits is the single source of truth for these widths, but this one is also "
+                "persisted on the inner PREPARE; a stored value that diverges from it silently corrupts "
+                "num_qubits and every ancilla count derived from it."
+            )
+
         self._power = power
         self.outer_prepare = outer_prepare
         self.outer_prepare_probabilities = outer_prepare_probabilities
@@ -249,7 +264,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         reg_bits = sossa_register_bits(self.num_orbitals, self.num_ranks, self.num_bases, self.num_copies)
         num_outer = reg_bits["xo_bits"]
         # Inner register: logical b bits + free-rider bits; spin register: 2 (spinDQ, spinSF).
-        num_inner = self.inner_prepare.num_inner_qubits + reg_bits["num_free_rider_bits"]
+        num_inner = reg_bits["b_bits"] + reg_bits["num_free_rider_bits"]
         num_ancilla = num_outer + num_inner + 2
         return num_system + num_ancilla
 
