@@ -28,8 +28,13 @@ namespace {
 // MSVC's classic front end doesn't support GNU `__attribute__` syntax, so
 // only GCC/Clang get the weak declaration (OpenBLAS is our only BLAS
 // backend, so MSVC can declare these as ordinary, always-linked externs).
+//
+// On Mach-O (macOS), `weak` alone doesn't make the symbol optional at link
+// time like it does on ELF; `weak_import` is Darwin's equivalent.
 #if defined(_MSC_VER) && !defined(__clang__)
 #define QDK_OPENBLAS_WEAK_ATTR
+#elif defined(__APPLE__)
+#define QDK_OPENBLAS_WEAK_ATTR __attribute__((weak_import))
 #else
 #define QDK_OPENBLAS_WEAK_ATTR __attribute__((weak))
 #endif
