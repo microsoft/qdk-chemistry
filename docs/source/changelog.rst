@@ -10,7 +10,6 @@ Version 2.1.0
 See :ref:`release-v2.1.0` for full details.
 
 - Geometry optimization as a first-class algorithm type (``geometry_optimizer``), with a geomeTRIC-backed implementation driven by the existing nuclear derivative calculators
-- Total-spin expectation values from spin-resolved wavefunction RDMs through ``Wavefunction.compute_s_squared()``
 - Vendored Q# utilities load into a private ``qdk.Context`` instead of the global interpreter, so importing ``qdk_chemistry`` no longer changes the caller's target profile
 - Qiskit extras supported on Python 3.14
 

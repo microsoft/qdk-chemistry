@@ -529,6 +529,19 @@ class WavefunctionContainer {
    * @brief Compute the expectation value of the total spin-squared operator
    * from the real, spin-resolved active-space 1- and 2-RDMs.
    *
+   * Uses the QDK two-particle RDM convention
+   * \f$\Gamma(p,q,r,s)=\langle a_p^\dagger a_r^\dagger a_s a_q\rangle\f$:
+   * \f[
+   * \begin{aligned}
+   * \langle S^2 \rangle ={}& \frac{3}{4}\sum_i
+   *   \left(\gamma^\alpha_{ii}+\gamma^\beta_{ii}\right)
+   *   -\sum_{ij}\Gamma^{\alpha\beta}_{ijji} \\
+   * &-\frac{1}{4}\sum_{ij}\left(\Gamma^{\alpha\alpha}_{ijji}
+   *   +\Gamma^{\beta\beta}_{ijji}\right)
+   *   -\frac{1}{2}\sum_{ij}\Gamma^{\alpha\beta}_{iijj}.
+   * \end{aligned}
+   * \f]
+   *
    * @return The expectation value \f$\langle S^2 \rangle\f$
    * @throws std::runtime_error if the orbitals are unrestricted, the required
    * spin-resolved RDM blocks are unavailable or inconsistent, or the RDMs are

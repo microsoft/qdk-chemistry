@@ -781,8 +781,19 @@ double WavefunctionContainer::compute_s_squared() const {
         "basis");
   }
 
-  const auto rdms =
-      detail::s_squared_rdm_blocks(active_one_rdm(), active_two_rdm());
+  const SymmetryBlockedTensorVariant<2>* one_rdm;
+  const SymmetryBlockedTensorVariant<4>* two_rdm;
+  try {
+    one_rdm = &active_one_rdm();
+    two_rdm = &active_two_rdm();
+  } catch (const std::runtime_error& error) {
+    throw std::runtime_error(
+        "Cannot compute <S^2>: spin-resolved active-space 1- and 2-RDMs are "
+        "required (" +
+        std::string(error.what()) + ")");
+  }
+
+  const auto rdms = detail::s_squared_rdm_blocks(*one_rdm, *two_rdm);
   const std::size_t norbs2 = rdms.norbs * rdms.norbs;
   const std::size_t norbs3 = norbs2 * rdms.norbs;
   double aaaa_ijji = 0.0;

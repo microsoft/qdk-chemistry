@@ -8,12 +8,16 @@
 #include <cmath>
 #include <memory>
 #include <optional>
+#include <qdk/chemistry/algorithms/hamiltonian.hpp>
+#include <qdk/chemistry/algorithms/mc.hpp>
+#include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 
 #include "ut_common.hpp"
 
 using namespace qdk::chemistry::data;
+using namespace qdk::chemistry::algorithms;
 
 static Wavefunction wavefunction_with_spin_rdms(
     const Eigen::VectorXd& coefficients,
@@ -345,5 +349,161 @@ TEST(SSquared, ThrowsWithoutRDMs) {
   auto wf = Wavefunction(
       std::make_unique<StateVectorContainer>(coeffs, dets, orbitals));
 
-  EXPECT_THROW(wf.compute_s_squared(), std::runtime_error);
+  try {
+    (void)wf.compute_s_squared();
+    FAIL() << "Expected missing RDMs to be rejected";
+  } catch (const std::runtime_error& error) {
+    EXPECT_NE(std::string(error.what()).find("Cannot compute <S^2>"),
+              std::string::npos)
+        << error.what();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// SCF + MACIS integration tests
+// ---------------------------------------------------------------------------
+
+static std::shared_ptr<Wavefunction> run_cas_with_rdms(
+    std::shared_ptr<Structure> structure, int charge, int multiplicity,
+    const std::string& basis, int nalpha, int nbeta,
+    std::shared_ptr<Orbitals> custom_orbitals = nullptr) {
+  std::shared_ptr<Orbitals> orbitals;
+  if (custom_orbitals) {
+    orbitals = custom_orbitals;
+  } else {
+    auto scf_solver = ScfSolverFactory::create();
+    scf_solver->settings().set("scf_type", std::string("restricted"));
+    scf_solver->settings().set("method", "hf");
+    scf_solver->settings().set("enable_gdm", false);
+    auto [energy, wavefunction] =
+        scf_solver->run(structure, charge, multiplicity, basis);
+    orbitals = wavefunction->get_orbitals();
+  }
+
+  auto hamiltonian = HamiltonianConstructorFactory::create()->run(orbitals);
+  auto calculator = MultiConfigurationCalculatorFactory::create("macis_cas");
+  calculator->settings().set("calculate_one_rdm", true);
+  calculator->settings().set("calculate_two_rdm", true);
+  return calculator->run(hamiltonian, nalpha, nbeta).second;
+}
+
+static std::shared_ptr<Wavefunction> run_sci_with_rdms(
+    std::shared_ptr<Structure> structure, int charge, int multiplicity,
+    const std::string& basis, int nalpha, int nbeta, int ntdets_max) {
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("scf_type", std::string("restricted"));
+  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("enable_gdm", false);
+  auto [energy, wavefunction] =
+      scf_solver->run(structure, charge, multiplicity, basis);
+  auto hamiltonian = HamiltonianConstructorFactory::create()->run(
+      wavefunction->get_orbitals());
+
+  auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
+  calculator->settings().set("calculate_one_rdm", true);
+  calculator->settings().set("calculate_two_rdm", true);
+  calculator->settings().set("ntdets_max", ntdets_max);
+  calculator->settings().set("max_refine_iter", 0);
+  calculator->settings().set("grow_factor", 2);
+  calculator->settings().set("core_selection_strategy", std::string("fixed"));
+  return calculator->run(hamiltonian, nalpha, nbeta).second;
+}
+
+TEST(SSquaredCAS, H_Doublet) {
+  auto wavefunction = run_cas_with_rdms(testing::create_hydrogen_structure(), 0,
+                                        2, "sto-3g", 1, 0);
+  EXPECT_NEAR(wavefunction->compute_s_squared(), 0.75, testing::rdm_tolerance);
+}
+
+TEST(SSquaredCAS, H2Plus_Doublet) {
+  std::vector<Eigen::Vector3d> coordinates = {{0., 0., 0.}, {0., 0., 1.4}};
+  auto structure = std::make_shared<Structure>(
+      coordinates, std::vector<std::string>{"H", "H"});
+  auto wavefunction = run_cas_with_rdms(structure, 1, 2, "sto-3g", 1, 0);
+  EXPECT_NEAR(wavefunction->compute_s_squared(), 0.75, testing::rdm_tolerance);
+}
+
+TEST(SSquaredCAS, H2_Singlet) {
+  std::vector<Eigen::Vector3d> coordinates = {{0., 0., 0.}, {0., 0., 1.4}};
+  auto structure = std::make_shared<Structure>(
+      coordinates, std::vector<std::string>{"H", "H"});
+  auto wavefunction = run_cas_with_rdms(structure, 0, 1, "sto-3g", 1, 1);
+  EXPECT_NEAR(wavefunction->compute_s_squared(), 0.0, testing::rdm_tolerance);
+}
+
+TEST(SSquaredCAS, Water_Singlet) {
+  auto wavefunction = run_cas_with_rdms(testing::create_water_structure(), 0, 1,
+                                        "sto-3g", 5, 5);
+  EXPECT_NEAR(wavefunction->compute_s_squared(), 0.0, testing::rdm_tolerance);
+}
+
+TEST(SSquaredCAS, Li_Doublet) {
+  auto wavefunction =
+      run_cas_with_rdms(testing::create_li_structure(), 0, 2, "sto-3g", 2, 1);
+  EXPECT_NEAR(wavefunction->compute_s_squared(), 0.75, testing::rdm_tolerance);
+}
+
+TEST(SSquaredCAS, O2_Triplet) {
+  auto structure = testing::create_o2_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("scf_type", std::string("restricted"));
+  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("enable_gdm", false);
+  auto [energy, wavefunction] = scf_solver->run(structure, 0, 3, "sto-3g");
+  auto orbitals = testing::with_active_space(
+      wavefunction->get_orbitals(), std::vector<size_t>{6, 7, 8, 9},
+      std::vector<size_t>{0, 1, 2, 3, 4, 5});
+  auto cas_wavefunction =
+      run_cas_with_rdms(structure, 0, 3, "sto-3g", 3, 1, orbitals);
+  EXPECT_NEAR(cas_wavefunction->compute_s_squared(), 2.0,
+              testing::rdm_tolerance);
+}
+
+TEST(SSquaredCAS, N_Quartet) {
+  auto structure = testing::create_nitrogen_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("scf_type", std::string("restricted"));
+  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("enable_gdm", false);
+  auto [energy, wavefunction] = scf_solver->run(structure, 0, 4, "sto-3g");
+  ASSERT_TRUE(wavefunction->get_orbitals()->is_restricted());
+  auto orbitals = testing::with_active_space(wavefunction->get_orbitals(),
+                                             std::vector<size_t>{1, 2, 3, 4},
+                                             std::vector<size_t>{0});
+  ASSERT_TRUE(orbitals->is_restricted());
+  auto cas_wavefunction =
+      run_cas_with_rdms(structure, 0, 4, "sto-3g", 4, 1, orbitals);
+  EXPECT_NEAR(cas_wavefunction->compute_s_squared(), 3.75,
+              testing::rdm_tolerance);
+}
+
+TEST(SSquaredCAS, StretchedH2_Singlet) {
+  std::vector<Eigen::Vector3d> coordinates = {{0., 0., 0.}, {0., 0., 5.0}};
+  auto structure = std::make_shared<Structure>(
+      coordinates, std::vector<std::string>{"H", "H"});
+  auto wavefunction = run_cas_with_rdms(structure, 0, 1, "sto-3g", 1, 1);
+  EXPECT_NEAR(wavefunction->compute_s_squared(), 0.0, testing::rdm_tolerance);
+}
+
+TEST(SSquaredCAS, StretchedH2_Triplet) {
+  std::vector<Eigen::Vector3d> coordinates = {{0., 0., 0.}, {0., 0., 5.0}};
+  auto structure = std::make_shared<Structure>(
+      coordinates, std::vector<std::string>{"H", "H"});
+  auto wavefunction = run_cas_with_rdms(structure, 0, 3, "sto-3g", 2, 0);
+  EXPECT_NEAR(wavefunction->compute_s_squared(), 2.0, testing::rdm_tolerance);
+}
+
+TEST(SSquaredSCI, TruncatedH3Quartet) {
+  std::vector<Eigen::Vector3d> coordinates = {
+      {0., 0., -1.4}, {0., 0., 0.}, {0., 0., 1.4}};
+  auto structure = std::make_shared<Structure>(
+      coordinates, std::vector<std::string>{"H", "H", "H"});
+  auto wavefunction = run_sci_with_rdms(structure, 0, 4, "6-31g", 3, 0, 5);
+
+  // Three alpha electrons force S=3/2 for every determinant. The 6-orbital
+  // fixed-M_S space has C(6,3)=20 determinants, so this remains spin-pure
+  // while proving that compute_s_squared works on a genuinely selected space.
+  EXPECT_GT(wavefunction->size(), 1);
+  EXPECT_LT(wavefunction->size(), 20);
+  EXPECT_NEAR(wavefunction->compute_s_squared(), 3.75, testing::rdm_tolerance);
 }
