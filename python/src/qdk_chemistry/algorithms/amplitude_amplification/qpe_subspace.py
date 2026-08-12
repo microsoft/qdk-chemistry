@@ -5,6 +5,7 @@ r"""QDK/Chemistry subspace oracles marking a QPE phase register."""
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import contextlib
 import math
 from collections.abc import Callable
 
@@ -83,16 +84,23 @@ class QPESubspaceMarking(QpeCircuitBuilder):
     def _marked_phase_bins(
         target_energy: float,
         eigenvalue_from_phase: Callable[[float], float],
+        phases_from_eigenvalue: Callable[[float], list[float]],
         num_phase_qubits: int,
     ) -> list[tuple[int, int]]:
         r"""Return the half-open phase-bin ranges whose energy is at least ``target_energy``.
 
-        ``eigenvalue_from_phase`` is the post-processing equation QPE results are read with, so
-        reading it off every bin says which bins hold the marked subspace.
+        ``eigenvalue_from_phase`` is the post-processing equation QPE results are read with,
+        so the marked subspace is the bins it reads at or above ``target_energy``.  Rather
+        than read it off every bin, ``phases_from_eigenvalue`` solves for the phases where
+        it crosses ``target_energy``.  Away from those the verdict cannot change, so one
+        bin speaks for the whole run between them and the cost stops growing with the
+        register width.
 
         Args:
             target_energy: The lowest energy the marked subspace may hold.
             eigenvalue_from_phase: The phase-to-energy map, taking a phase fraction in ``[0, 1)``.
+            phases_from_eigenvalue: Its inverse, giving every phase fraction holding an energy,
+                and raising :class:`ValueError` for an energy the encoding cannot represent.
             num_phase_qubits: Width of the QPE phase register.
 
         Returns:
@@ -105,23 +113,53 @@ class QPESubspaceMarking(QpeCircuitBuilder):
         if not math.isfinite(target_energy):
             raise ValueError(f"target_energy must be a finite energy. Got {target_energy}.")
 
-        # Every bin is tested rather than solved for. Containers expose phase_from_eigenvalue,
-        # the closed-form inverse, but it returns only the principal phase: recovering the
-        # accepted set from it also needs the number of branches the law has and which side of
-        # each boundary is accepted, and neither is part of the UnitaryContainer contract. The
-        # walk is even about 1/2 and so has two branches, the product formula one; a container
-        # getting that wrong would yield silently wrong bins, and so a wrong oracle.
-        # The scan is O(2**num_phase_qubits), but so is the circuit built from it -- the phase
-        # ladder applies U 2**num_phase_qubits - 1 times -- so it is never the binding cost.
         phase_bin_count = 1 << num_phase_qubits
+
+        def holds_target(phase_bin: int) -> bool:
+            return eigenvalue_from_phase(phase_bin / phase_bin_count) >= target_energy
+
+        # The phases the verdict can turn on: where the energy crosses the target, and where
+        # the map itself may jump -- 0, where the phase register wraps, and 1/2, where the
+        # principal argument of a phase does. An energy the encoding cannot represent is
+        # never crossed, so it contributes no phase and the sampling below settles the rest.
+        critical_phases = {0.0, 0.5}
+        with contextlib.suppress(ValueError):
+            critical_phases.update(phase % 1.0 for phase in phases_from_eigenvalue(target_energy))
+
+        # A bin holding a critical phase is decided on its own; the runs between them are not.
+        undecided = {
+            (int(phase * phase_bin_count) + offset) % phase_bin_count
+            for phase in critical_phases
+            for offset in (-1, 0, 1)
+        }
+
+        def uniform_run(start: int, stop: int) -> list[tuple[int, int, bool]]:
+            """Verdict for a run of bins holding no critical phase, so a uniform one."""
+            verdicts = {holds_target(phase_bin) for phase_bin in (start, (start + stop) // 2, stop - 1)}
+            if len(verdicts) == 1:
+                return [(start, stop, verdicts.pop())]
+            # Unreachable while the critical phases above are the only ones the map turns on.
+            # Should an encoding ever turn on another, fall back to reading off every bin of
+            # the run rather than let one sample speak wrongly for the rest.
+            return [(phase_bin, phase_bin + 1, holds_target(phase_bin)) for phase_bin in range(start, stop)]
+
+        blocks: list[tuple[int, int, bool]] = []
+        cursor = 0
+        for phase_bin in [*sorted(undecided), phase_bin_count]:
+            if phase_bin > cursor:
+                blocks.extend(uniform_run(cursor, phase_bin))
+            if phase_bin < phase_bin_count:
+                blocks.append((phase_bin, phase_bin + 1, holds_target(phase_bin)))
+            cursor = phase_bin + 1
+
         ranges: list[tuple[int, int]] = []
-        for phase_bin in range(phase_bin_count):
-            if eigenvalue_from_phase(phase_bin / phase_bin_count) < target_energy:
+        for start, stop, marked in blocks:
+            if not marked:
                 continue
-            if ranges and ranges[-1][1] == phase_bin:
-                ranges[-1] = (ranges[-1][0], phase_bin + 1)
+            if ranges and ranges[-1][1] == start:
+                ranges[-1] = (ranges[-1][0], stop)
             else:
-                ranges.append((phase_bin, phase_bin + 1))
+                ranges.append((start, stop))
 
         if not ranges:
             raise ValueError(
@@ -165,7 +203,9 @@ class QPESubspaceMarking(QpeCircuitBuilder):
         # Resolve the marked bins up front: an energy that no bin of the register can hold then
         # fails here, rather than after num_bits controlled unitaries have already been built.
         container = self._create_nested("unitary_builder").run(qubit_hamiltonian).get_container()
-        bin_ranges = self._marked_phase_bins(target_energy, container.eigenvalue_from_phase, num_bits)
+        bin_ranges = self._marked_phase_bins(
+            target_energy, container.eigenvalue_from_phase, container.phases_from_eigenvalue, num_bits
+        )
         lower_bounds = [start for start, _ in bin_ranges]
         upper_bounds = [stop for _, stop in bin_ranges]
         Logger.info(f"Marking phase bins {bin_ranges} for energy {target_energy}.")

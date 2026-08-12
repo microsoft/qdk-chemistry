@@ -359,7 +359,7 @@ class LCUContainer(BlockEncodingContainer):
             "LCUContainer does not define an eigenvalue-phase relationship. Wrap it in an LCUWalkContainer to use QPE."
         )
 
-    def phase_from_eigenvalue(self, eigenvalue: float) -> float:
+    def phases_from_eigenvalue(self, eigenvalue: float) -> list[float]:
         """Not applicable for a raw block encoding.
 
         A plain block encoding does not define an eigenvalue-phase
