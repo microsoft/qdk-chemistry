@@ -20,9 +20,7 @@ from .qpe_subspace import (
 )
 
 __all__: list[str] = [
-    "AmplitudeAmplification",
     "AmplitudeAmplificationFactory",
     "AmplitudeAmplificationSettings",
-    "QPESubspaceMarking",
     "QPESubspaceMarkingSettings",
 ]
