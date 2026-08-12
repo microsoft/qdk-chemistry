@@ -39,7 +39,7 @@ class AmplitudeAmplification(Algorithm):
 
     Amplitude amplification raises the probability of measuring a state in a chosen
     "good" subspace. Given a state preparation :math:`U` with
-    :math:`|\psi\rangle = U|0\rangle` and an oracle that flips a flag qubit on the good
+    :math:`|\psi\rangle = U|0\rangle` and an oracle that reflects about the good
     subspace, one round applies the Grover iterate
     :math:`Q = -(2|\psi\rangle\langle\psi| - I)(I - 2\Pi_G)`, a rotation by
     :math:`2\vartheta` in the plane spanned by the good and bad components. If the good
