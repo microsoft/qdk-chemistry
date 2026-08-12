@@ -15,6 +15,16 @@ work the capability was there to do.
 
 This test is deliberately source-only (``ast`` over files on disk, no imports), so it
 still runs in environments where the compiled extension module is unavailable.
+
+**This module's liveness is tied to the ``hasattr`` dispatch mechanism, and should be
+deleted rather than repaired if that mechanism goes away.**  The probes it scans are the
+only two in the tree, and both live in ``circuit_builder/base.py``.  If the builder is
+ever refactored to obtain the ancilla width from the mapper's returned object instead of
+probing for optional methods, ``_capability_probes()`` becomes empty and
+``test_at_least_one_capability_probe_is_scanned`` fails.  That failure means the mechanism
+was retired, not that something regressed: remove this module.  The alternative -- making
+the emptiness check lenient -- would let the module pass vacuously forever, which is the
+one outcome it exists to prevent.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -128,6 +138,15 @@ def test_probed_capability_is_defined_by_some_mapper(source: Path, lineno: int, 
     A failure here means the probe can never be satisfied, so the dispatch silently
     takes its fallback branch forever.  The usual cause is renaming the method on the
     mapper without updating this string literal.
+
+    The quantifier is deliberate and worth stating, because it bounds the guarantee:
+    this asserts *some* mapper defines the capability, not that any particular one does.
+    The default mapper (``pauli_sequence`` -- ``ControlledPauliSequenceMapper``) defines
+    neither probed capability, so on a default run both probes are legitimately ``False``
+    and both fallbacks fire.  That is polymorphism, not drift.  Consequently this catches
+    literal-vs-method drift across the mapper package, and does **not** catch a specific
+    mapper quietly ceasing to advertise a capability it used to provide -- the partial
+    rename test below is what narrows that gap, and only for close-variant renames.
     """
     defined = _mapper_member_names()
     assert capability in defined, (
