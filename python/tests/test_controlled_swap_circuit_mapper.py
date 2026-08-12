@@ -38,6 +38,80 @@ if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit.quantum_info import Operator
 
 
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+#: Qubit index used as the control in every mapper built by these tests.
+CONTROL_INDEX = 2
+
+#: Single-qubit Pauli matrices, keyed by axis.
+PAULI_MATRICES = {
+    "I": np.eye(2, dtype=complex),
+    "X": np.array([[0, 1], [1, 0]], dtype=complex),
+    "Y": np.array([[0, -1j], [1j, 0]], dtype=complex),
+    "Z": np.array([[1, 0], [0, -1]], dtype=complex),
+}
+
+#: Sparse Pauli terms of the two-mode worked example.
+XX = {0: "X", 1: "X"}
+YY = {0: "Y", 1: "Y"}
+Z0 = {0: "Z"}
+IDENTITY: dict[int, str] = {}
+
+#: Time step at which the interleaved ordering leaks exactly half the vacuum amplitude.
+LEAKING_TIME_STEP = np.pi / 2
+
+#: H = 0.5 (XX + YY) + 0.5 (I - Z0) as ``(pauli_term, coefficient)``, in two orderings.
+GROUPED_ORDERING = [(XX, 0.5), (YY, 0.5), (Z0, -0.5), (IDENTITY, 0.5)]
+INTERLEAVED_ORDERING = [(XX, 0.5), (Z0, -0.5), (YY, 0.5), (IDENTITY, 0.5)]
+
+#: 0.5 (XX + YY) - 0.5 Z0 + 0.5 Z1: number conserving, so H|00> = 0.
+END_TO_END_PAULI_STRINGS = ["XX", "YY", "IZ", "ZI"]
+END_TO_END_COEFFICIENTS = [0.5, 0.5, -0.5, 0.5]
+END_TO_END_EVOLUTION_TIME = 0.5
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def build_pauli_matrix(pauli_term, num_qubits):
+    """Build the dense matrix of a sparse Pauli term (qubit 0 = least significant)."""
+    matrix = np.array([[1]], dtype=complex)
+    for qubit in reversed(range(num_qubits)):
+        matrix = np.kron(matrix, PAULI_MATRICES[pauli_term.get(qubit, "I")])
+    return matrix
+
+
+def build_product_formula_matrix(terms, num_qubits):
+    r"""Multiply out :math:`\prod_j e^{-i\theta_j P_j}` in the order the terms are applied.
+
+    Each factor is evaluated in closed form via :math:`e^{-i\theta P} = \cos\theta\,I - i\sin\theta\,P`,
+    which holds because every Pauli string squares to the identity.
+    """
+    unitary = np.eye(2**num_qubits, dtype=complex)
+    for pauli_term, angle in terms:
+        pauli = build_pauli_matrix(pauli_term, num_qubits)
+        factor = np.cos(angle) * np.eye(2**num_qubits, dtype=complex) - 1j * np.sin(angle) * pauli
+        unitary = factor @ unitary
+    return unitary
+
+
+def evolve_vacuum(ordering, time_step):
+    """Apply one Trotter step of ``(pauli_term, coefficient)`` pairs to |00>."""
+    terms = [(pauli_term, coefficient * time_step) for pauli_term, coefficient in ordering]
+    vacuum = np.zeros(4, dtype=complex)
+    vacuum[0] = 1.0
+    return build_product_formula_matrix(terms, num_qubits=2) @ vacuum
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+
 @pytest.fixture
 def diagonal_ppf_container():
     """Create a diagonal (Z/I-only) PauliProductFormulaContainer for testing.
@@ -64,6 +138,46 @@ def unitary_rep(diagonal_ppf_container):
     return UnitaryRepresentation(container=diagonal_ppf_container)
 
 
+@pytest.fixture
+def cswap_mapper():
+    """Create a CSWAP mapper configured with a single control qubit."""
+    mapper = ControlledSwapPauliSequenceMapper()
+    mapper.settings().set("control_indices", [CONTROL_INDEX])
+    return mapper
+
+
+@pytest.fixture
+def make_two_qubit_rep():
+    """Return a factory turning ``(pauli_term, angle)`` pairs into a UnitaryRepresentation."""
+
+    def _make(terms):
+        step_terms = [ExponentiatedPauliTerm(pauli_term=pauli_term, angle=angle) for pauli_term, angle in terms]
+        return UnitaryRepresentation(container=PauliProductFormulaContainer(step_terms, step_reps=1, num_qubits=2))
+
+    return _make
+
+
+@pytest.fixture
+def make_ordering_rep(make_two_qubit_rep):
+    """Return a factory turning a ``(pauli_term, coefficient)`` ordering into a UnitaryRepresentation."""
+
+    def _make(ordering, time_step=LEAKING_TIME_STEP):
+        return make_two_qubit_rep([(pauli_term, coefficient * time_step) for pauli_term, coefficient in ordering])
+
+    return _make
+
+
+@pytest.fixture
+def qubit_flip_unitary():
+    """Group the end-to-end Hamiltonian with ``qubit_flip`` and Trotterise it."""
+    hamiltonian = QubitOperator(END_TO_END_PAULI_STRINGS, np.array(END_TO_END_COEFFICIENTS))
+    grouped = registry.create("term_grouper", "qubit_flip").run(hamiltonian)
+
+    trotter = registry.create("hamiltonian_unitary_builder", "trotter")
+    trotter.settings().update({"order": 1, "num_divisions": 1, "time": END_TO_END_EVOLUTION_TIME})
+    return trotter.run(grouped)
+
+
 class TestControlledSwapPauliSequenceMapper:
     """Tests for the ControlledSwapPauliSequenceMapper class."""
 
@@ -72,25 +186,21 @@ class TestControlledSwapPauliSequenceMapper:
         mapper = ControlledSwapPauliSequenceMapper()
         assert mapper.name() == "cswap_pauli_sequence"
 
-    def test_basic_mapping(self, unitary_rep):
+    def test_basic_mapping(self, cswap_mapper, unitary_rep):
         """Test basic mapping of unitary to Circuit."""
-        mapper = ControlledSwapPauliSequenceMapper()
-        mapper.settings().set("control_indices", [2])
-
-        circuit = mapper.run(unitary_rep)
+        circuit = cswap_mapper.run(unitary_rep)
 
         assert isinstance(circuit, Circuit)
         assert isinstance(circuit.get_qsharp_circuit(), QdkCircuitType)
 
-    def test_multiple_control_indices_raises(self, unitary_rep):
+    def test_multiple_control_indices_raises(self, cswap_mapper, unitary_rep):
         """Test that supplying more than one control qubit raises a ValueError."""
-        mapper = ControlledSwapPauliSequenceMapper()
-        mapper.settings().set("control_indices", [2, 3])
+        cswap_mapper.settings().set("control_indices", [2, 3])
 
         with pytest.raises(ValueError, match="single control qubit"):
-            mapper.run(unitary_rep)
+            cswap_mapper.run(unitary_rep)
 
-    def test_invalid_container_type_raises(self):
+    def test_invalid_container_type_raises(self, cswap_mapper):
         """Test that an invalid container type raises a ValueError."""
 
         class MockContainer:
@@ -103,14 +213,11 @@ class TestControlledSwapPauliSequenceMapper:
 
         invalid_teu = UnitaryRepresentation(container=MockContainer())
 
-        mapper = ControlledSwapPauliSequenceMapper()
-        mapper.settings().set("control_indices", [2])
-
         with pytest.raises(ValueError, match="not supported"):
-            mapper.run(invalid_teu)
+            cswap_mapper.run(invalid_teu)
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
-    def test_cswap_sandwich_controlled_u_matrix(self, unitary_rep, diagonal_ppf_container):
+    def test_cswap_sandwich_controlled_u_matrix(self, cswap_mapper, unitary_rep, diagonal_ppf_container):
         r"""Validate the CSWAP-sandwich construction as a controlled-U matrix check.
 
         The CSWAP sandwich does not equal :math:`C\text{-}U` on the full
@@ -134,9 +241,7 @@ class TestControlledSwapPauliSequenceMapper:
         amplitude leaks out of the codespace), and compares it to
         :math:`M_{\mathrm{eff}}`.
         """
-        mapper = ControlledSwapPauliSequenceMapper()
-        mapper.settings().set("control_indices", [2])
-        circuit = mapper.run(unitary_rep)
+        circuit = cswap_mapper.run(unitary_rep)
 
         # Qubit layout of the generated circuit: q0, q1 = system; q2 = control;
         # q3, q4 = internally allocated vacuum register.
@@ -186,69 +291,29 @@ class TestControlledSwapPauliSequenceMapper:
 class TestVacuumPreservationValidation:
     """Tests for the vacuum-preservation validation of the input product formula."""
 
-    @staticmethod
-    def _make_rep(terms):
-        """Wrap the given step terms in a two-qubit UnitaryRepresentation."""
-        return UnitaryRepresentation(container=PauliProductFormulaContainer(terms, step_reps=1, num_qubits=2))
-
-    @staticmethod
-    def _make_mapper():
-        """Return a mapper configured with a single control qubit."""
-        mapper = ControlledSwapPauliSequenceMapper()
-        mapper.settings().set("control_indices", [2])
-        return mapper
-
-    def test_grouped_cancellation_partners_are_accepted(self):
+    def test_grouped_cancellation_partners_are_accepted(self, cswap_mapper, make_two_qubit_rep):
         """``XX, YY, Z0`` keeps the partners adjacent and preserves the vacuum."""
         # H = 0.5 (XX + YY) - 0.5 Z0, the JW image of a0^dag a1 + a1^dag a0 + a0^dag a0 up to a constant.
-        terms = [
-            ExponentiatedPauliTerm(pauli_term={0: "X", 1: "X"}, angle=0.5),
-            ExponentiatedPauliTerm(pauli_term={0: "Y", 1: "Y"}, angle=0.5),
-            ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=-0.5),
-        ]
+        terms = [(XX, 0.5), (YY, 0.5), (Z0, -0.5)]
 
-        circuit = self._make_mapper().run(self._make_rep(terms))
+        circuit = cswap_mapper.run(make_two_qubit_rep(terms))
         assert isinstance(circuit, Circuit)
 
-    def test_interleaved_cancellation_partners_raise(self):
+    def test_interleaved_cancellation_partners_raise(self, cswap_mapper, make_two_qubit_rep):
         """``XX, Z0, YY`` splits the partners and leaks the vacuum."""
-        terms = [
-            ExponentiatedPauliTerm(pauli_term={0: "X", 1: "X"}, angle=0.5),
-            ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=-0.5),
-            ExponentiatedPauliTerm(pauli_term={0: "Y", 1: "Y"}, angle=0.5),
-        ]
+        terms = [(XX, 0.5), (Z0, -0.5), (YY, 0.5)]
 
         with pytest.raises(ValueError, match="vacuum-preserving product formula"):
-            self._make_mapper().run(self._make_rep(terms))
+            cswap_mapper.run(make_two_qubit_rep(terms))
 
-    def test_uncancelled_off_diagonal_term_raises(self):
+    def test_uncancelled_off_diagonal_term_raises(self, cswap_mapper, make_two_qubit_rep):
         """A lone off-diagonal rotation rotates the vacuum out of the codespace."""
-        terms = [ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.3)]
-
         with pytest.raises(ValueError, match="vacuum-preserving product formula"):
-            self._make_mapper().run(self._make_rep(terms))
+            cswap_mapper.run(make_two_qubit_rep([({0: "X"}, 0.3)]))
 
-    def test_diagonal_evolution_is_accepted(self, unitary_rep):
+    def test_diagonal_evolution_is_accepted(self, cswap_mapper, unitary_rep):
         """Pure I/Z evolutions never move the vacuum and are always valid."""
-        circuit = self._make_mapper().run(unitary_rep)
-        assert isinstance(circuit, Circuit)
-
-    def test_qubit_flip_grouper_produces_an_accepted_product_formula(self):
-        """Trotterising a qubit_flip-grouped Hamiltonian yields a valid ordering.
-
-        The commuting grouper is free to interleave the ``XX``/``YY`` cancellation
-        partners with the diagonal ``Z`` terms (they all commute here), which leaks
-        the vacuum; the qubit_flip grouper keeps the partners adjacent.
-        """
-        # 0.5 (XX + YY) - 0.5 Z0 + 0.5 Z1: number conserving, so |00> is an eigenstate.
-        hamiltonian = QubitOperator(["XX", "YY", "IZ", "ZI"], np.array([0.5, 0.5, -0.5, 0.5]))
-        grouped = registry.create("term_grouper", "qubit_flip").run(hamiltonian)
-
-        trotter = registry.create("hamiltonian_unitary_builder", "trotter")
-        trotter.settings().update({"order": 1, "num_divisions": 1, "time": 0.5})
-        unitary = trotter.run(grouped)
-
-        circuit = self._make_mapper().run(unitary)
+        circuit = cswap_mapper.run(unitary_rep)
         assert isinstance(circuit, Circuit)
 
 
@@ -257,21 +322,12 @@ class TestVacuumPreservingBlocks:
 
     def test_blocks_are_cut_as_early_as_possible(self):
         """The helper returns the finest valid split."""
-        terms = [
-            ({0: "X", 1: "X"}, 0.5),
-            ({0: "Y", 1: "Y"}, 0.5),
-            ({0: "Z"}, -0.5),
-            ({}, 0.5),
-        ]
+        terms = [(XX, 0.5), (YY, 0.5), (Z0, -0.5), (IDENTITY, 0.5)]
         assert vacuum_preserving_blocks(terms) == [(0, 1), (2,), (3,)]
 
     def test_non_commuting_block_is_rejected(self):
         """A block whose factors anticommute is not equal to the exponential of its sum."""
-        terms = [
-            ({0: "X", 1: "X"}, 0.5),
-            ({0: "Z"}, -0.5),
-            ({0: "Y", 1: "Y"}, 0.5),
-        ]
+        terms = [(XX, 0.5), (Z0, -0.5), (YY, 0.5)]
         assert vacuum_preserving_blocks(terms) is None
 
     def test_trailing_residual_is_rejected(self):
@@ -322,45 +378,6 @@ class TestPauliVacuumAction:
 # Why the grouping matters: worked example and end-to-end pipeline
 # ---------------------------------------------------------------------------
 
-_PAULI_MATRICES = {
-    "I": np.eye(2, dtype=complex),
-    "X": np.array([[0, 1], [1, 0]], dtype=complex),
-    "Y": np.array([[0, -1j], [1j, 0]], dtype=complex),
-    "Z": np.array([[1, 0], [0, -1]], dtype=complex),
-}
-
-
-def _pauli_matrix(pauli_term, num_qubits):
-    """Build the dense matrix of a sparse Pauli term (qubit 0 = least significant)."""
-    matrix = np.array([[1]], dtype=complex)
-    for qubit in reversed(range(num_qubits)):
-        matrix = np.kron(matrix, _PAULI_MATRICES[pauli_term.get(qubit, "I")])
-    return matrix
-
-
-def _product_formula_matrix(terms, num_qubits):
-    r"""Multiply out :math:`\prod_j e^{-i\theta_j P_j}` in the order the terms are applied.
-
-    Each factor is evaluated in closed form via :math:`e^{-i\theta P} = \cos\theta\,I - i\sin\theta\,P`,
-    which holds because every Pauli string squares to the identity.
-    """
-    unitary = np.eye(2**num_qubits, dtype=complex)
-    for pauli_term, angle in terms:
-        pauli = _pauli_matrix(pauli_term, num_qubits)
-        factor = np.cos(angle) * np.eye(2**num_qubits, dtype=complex) - 1j * np.sin(angle) * pauli
-        unitary = factor @ unitary
-    return unitary
-
-
-_XX = {0: "X", 1: "X"}
-_YY = {0: "Y", 1: "Y"}
-_Z0 = {0: "Z"}
-_IDENTITY: dict[int, str] = {}
-
-#: The same Hamiltonian in the two orderings under comparison, as (pauli_term, coefficient).
-_GROUPED_ORDERING = [(_XX, 0.5), (_YY, 0.5), (_Z0, -0.5), (_IDENTITY, 0.5)]
-_INTERLEAVED_ORDERING = [(_XX, 0.5), (_Z0, -0.5), (_YY, 0.5), (_IDENTITY, 0.5)]
-
 
 class TestVacuumLeakageWithoutGrouping:
     r"""Reproduce the worked example motivating the qubit-flip grouper.
@@ -373,15 +390,6 @@ class TestVacuumLeakageWithoutGrouping:
     ``XX``/``YY`` cancellation partners stay adjacent.
     """
 
-    TIME_STEP = np.pi / 2
-
-    def _evolve_vacuum(self, ordering):
-        """Apply one Trotter step of the given ordering to |00> and return the state."""
-        terms = [(pauli_term, coefficient * self.TIME_STEP) for pauli_term, coefficient in ordering]
-        vacuum = np.zeros(4, dtype=complex)
-        vacuum[0] = 1.0
-        return _product_formula_matrix(terms, num_qubits=2) @ vacuum
-
     def test_interleaved_ordering_leaks_half_the_vacuum(self):
         r"""``XX, Z0, YY, I`` sends :math:`|00\rangle` to a superposition with :math:`|11\rangle`.
 
@@ -390,7 +398,7 @@ class TestVacuumLeakageWithoutGrouping:
         the vacuum register with the control, and the final ``ResetAll`` destroys the
         control coherence.
         """
-        state = self._evolve_vacuum(_INTERLEAVED_ORDERING)
+        state = evolve_vacuum(INTERLEAVED_ORDERING, LEAKING_TIME_STEP)
 
         assert np.isclose(state[0], (1 - 1j) / 2)
         assert np.isclose(state[3], (-1 + 1j) / 2)
@@ -398,67 +406,40 @@ class TestVacuumLeakageWithoutGrouping:
 
     def test_grouped_ordering_preserves_the_vacuum(self):
         """``XX, YY, Z0, I`` keeps the partners adjacent and returns |00> exactly."""
-        state = self._evolve_vacuum(_GROUPED_ORDERING)
+        state = evolve_vacuum(GROUPED_ORDERING, LEAKING_TIME_STEP)
 
         expected = np.zeros(4, dtype=complex)
         expected[0] = 1.0
         assert np.allclose(state, expected, atol=float_comparison_absolute_tolerance)
 
-    def test_mapper_rejects_the_leaking_ordering_and_accepts_the_grouped_one(self):
+    def test_mapper_rejects_the_leaking_ordering(self, cswap_mapper, make_ordering_rep):
         """The mapper's validation matches the numerics above."""
-
-        def make_rep(ordering):
-            terms = [
-                ExponentiatedPauliTerm(pauli_term=pauli_term, angle=coefficient * self.TIME_STEP)
-                for pauli_term, coefficient in ordering
-            ]
-            return UnitaryRepresentation(container=PauliProductFormulaContainer(terms, step_reps=1, num_qubits=2))
-
-        def make_mapper():
-            mapper = ControlledSwapPauliSequenceMapper()
-            mapper.settings().set("control_indices", [2])
-            return mapper
-
         with pytest.raises(ValueError, match="vacuum-preserving product formula"):
-            make_mapper().run(make_rep(_INTERLEAVED_ORDERING))
+            cswap_mapper.run(make_ordering_rep(INTERLEAVED_ORDERING))
 
-        assert isinstance(make_mapper().run(make_rep(_GROUPED_ORDERING)), Circuit)
-
-
-#: 0.5 (XX + YY) - 0.5 Z0 + 0.5 Z1, a number-conserving Hamiltonian with H|00> = 0.
-_E2E_PAULI_STRINGS = ["XX", "YY", "IZ", "ZI"]
-_E2E_COEFFICIENTS = [0.5, 0.5, -0.5, 0.5]
+    def test_mapper_accepts_the_grouped_ordering(self, cswap_mapper, make_ordering_rep):
+        """The ordering that preserves the vacuum passes validation."""
+        assert isinstance(cswap_mapper.run(make_ordering_rep(GROUPED_ORDERING)), Circuit)
 
 
 class TestQubitFlipGroupingEndToEnd:
     """End-to-end: group a qubit Hamiltonian, Trotterise it, and control it with CSWAP."""
 
-    EVOLUTION_TIME = 0.5
-
-    def _build_unitary(self, strategy):
-        """Group the Hamiltonian with *strategy* and Trotterise it into a product formula."""
-        hamiltonian = QubitOperator(_E2E_PAULI_STRINGS, np.array(_E2E_COEFFICIENTS))
-        grouped = registry.create("term_grouper", strategy).run(hamiltonian)
-
-        trotter = registry.create("hamiltonian_unitary_builder", "trotter")
-        trotter.settings().update({"order": 1, "num_divisions": 1, "time": self.EVOLUTION_TIME})
-        return trotter.run(grouped)
-
-    def test_grouped_trotter_step_preserves_the_vacuum(self):
+    def test_grouped_trotter_step_preserves_the_vacuum(self, qubit_flip_unitary):
         """The Trotterised product formula fixes |00>, which is what the mapper requires."""
-        container = self._build_unitary("qubit_flip").get_container()
+        container = qubit_flip_unitary.get_container()
         terms = [(term.pauli_term, term.angle) for term in container.step_terms]
 
         vacuum = np.zeros(2**container.num_qubits, dtype=complex)
         vacuum[0] = 1.0
-        evolved = _product_formula_matrix(terms, container.num_qubits) @ vacuum
+        evolved = build_product_formula_matrix(terms, container.num_qubits) @ vacuum
 
         # Only a global phase is allowed; no amplitude may leave the vacuum.
         assert np.isclose(abs(evolved[0]), 1.0, atol=float_comparison_absolute_tolerance)
         assert np.allclose(evolved[1:], 0.0, atol=float_comparison_absolute_tolerance)
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
-    def test_cswap_circuit_from_grouped_hamiltonian_is_a_controlled_unitary(self):
+    def test_cswap_circuit_from_grouped_hamiltonian_is_a_controlled_unitary(self, cswap_mapper, qubit_flip_unitary):
         r"""The CSWAP circuit built from the grouped Hamiltonian is a genuine controlled-:math:`U`.
 
         This is the pipeline a caller actually writes: ``qubit_flip`` grouper ->
@@ -466,12 +447,8 @@ class TestQubitFlipGroupingEndToEnd:
         vacuum codespace block must be unitary (no leakage) and reproduce
         :math:`e^{i\phi_0}|0\rangle\langle0| \otimes I + |1\rangle\langle1| \otimes U`.
         """
-        unitary = self._build_unitary("qubit_flip")
-        container = unitary.get_container()
-
-        mapper = ControlledSwapPauliSequenceMapper()
-        mapper.settings().set("control_indices", [2])
-        circuit = mapper.run(unitary)
+        container = qubit_flip_unitary.get_container()
+        circuit = cswap_mapper.run(qubit_flip_unitary)
 
         # q0, q1 = system; q2 = control; q3, q4 = internally allocated vacuum register.
         qc = circuit.get_qiskit_circuit()
@@ -479,7 +456,7 @@ class TestQubitFlipGroupingEndToEnd:
         block = Operator(qc).data[0:8, 0:8]
 
         terms = [(term.pauli_term, term.angle) for term in container.step_terms]
-        step = _product_formula_matrix(terms, container.num_qubits)
+        step = build_product_formula_matrix(terms, container.num_qubits)
         u = np.linalg.matrix_power(step, container.step_reps)
 
         p_0 = np.array([[1, 0], [0, 0]], dtype=complex)

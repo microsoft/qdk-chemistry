@@ -94,15 +94,6 @@ cswap_mapper = create(
 )
 circuit = cswap_mapper.run(evolution)
 print("Controlled evolution circuit generated via the CSWAP sandwich")
-
-# Feeding the ungrouped Hamiltonian instead is rejected up front:
-ungrouped_evolution = create(
-    "hamiltonian_unitary_builder", "trotter", order=1, time=0.1
-).run(qubit_ham)
-try:
-    cswap_mapper.run(ungrouped_evolution)
-except ValueError as error:
-    print("Rejected as expected:", error)
 # end-cell-cswap
 ################################################################################
 
