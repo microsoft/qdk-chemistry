@@ -81,10 +81,12 @@ def test_plugin_cache_load_failure_is_logged(monkeypatch, caplog):
     with caplog.at_level(logging.WARNING, logger=cache_module.__name__):
         cache_module._load_plugin_caches()
 
-    record = next(record for record in caplog.records if record.name == cache_module.__name__)
+    matching = [r for r in caplog.records if r.name == cache_module.__name__]
+    assert matching, f"Expected a warning log from {cache_module.__name__}"
+    record = matching[0]
     assert record.levelno == logging.WARNING
     assert record.exc_info is not None
-    assert "Failed to load cache plugins" in record.message
+    assert "Failed to load cache plugins" in record.getMessage()
 
 
 # ── FolderCache: Job metadata ────────────────────────────────────────────────
