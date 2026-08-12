@@ -21,6 +21,55 @@
 
 namespace qdk::chemistry::scf::impl {
 
+namespace {
+
+// Weak declarations for OpenBLAS's threading control API. These resolve to
+// the real symbols when linking against OpenBLAS (any variant: pthread,
+// OpenMP, etc.) and remain null (weak, undefined) otherwise, e.g. when
+// linking against a different BLAS implementation (MKL, BLIS, reference
+// BLAS, ...) that does not export them.
+extern "C" {
+void openblas_set_num_threads(int) __attribute__((weak));
+int openblas_get_num_threads(void) __attribute__((weak));
+}
+
+/**
+ * @brief RAII guard that forces BLAS to run single-threaded, restoring the
+ * previous thread count on destruction.
+ *
+ * GauXC's integrators call BLAS (e.g. `dgemm`) from inside their own
+ * OpenMP-parallel grid loop. If BLAS is also multi-threaded, several
+ * already-parallel threads re-enter BLAS's shared thread pool concurrently -
+ * threaded BLAS (OpenBLAS in particular) does not support this and can
+ * silently corrupt results. This guard eliminates that hazard at its source
+ * for every GauXC caller, without affecting GauXC's own outer parallelism.
+ */
+class SingleThreadedBlasGuard {
+ public:
+  SingleThreadedBlasGuard() {
+    if (openblas_set_num_threads && openblas_get_num_threads) {
+      saved_nthreads_ = openblas_get_num_threads();
+      openblas_set_num_threads(1);
+      active_ = true;
+    }
+  }
+
+  ~SingleThreadedBlasGuard() {
+    if (active_) {
+      openblas_set_num_threads(saved_nthreads_);
+    }
+  }
+
+  SingleThreadedBlasGuard(const SingleThreadedBlasGuard&) = delete;
+  SingleThreadedBlasGuard& operator=(const SingleThreadedBlasGuard&) = delete;
+
+ private:
+  bool active_ = false;
+  int saved_nthreads_ = 1;
+};
+
+}  // namespace
+
 // Map string to GauXC preset grid defaults
 std::map<std::string, GauXC::AtomicGridSizeDefault> mg_map = {
     {"FINE", GauXC::AtomicGridSizeDefault::FineGrid},
@@ -294,6 +343,8 @@ void GAUXC::free_device_buffer_async_(cudaStream_t stream) {
 void GAUXC::build_XC(const double* D, double* XC, double* xc_energy) {
   QDK_LOG_TRACE_ENTERING();
 
+  SingleThreadedBlasGuard blas_thread_guard;  // avoid nested BLAS threading
+
   // Allocate a large temporary buffer
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
   allocate_device_buffer_async_(device_buffer_sz_, 0);
@@ -350,6 +401,8 @@ void GAUXC::build_XC(const double* D, double* XC, double* xc_energy) {
 void GAUXC::get_gradients(const double* D, double* dXC) {
   QDK_LOG_TRACE_ENTERING();
 
+  SingleThreadedBlasGuard blas_thread_guard;  // avoid nested BLAS threading
+
   // Allocate a large temporary buffer
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
   allocate_device_buffer_async_(device_buffer_sz_, 0);
@@ -396,6 +449,8 @@ void GAUXC::get_gradients(const double* D, double* dXC) {
 void GAUXC::build_snK(const double* D, double* K) {
   QDK_LOG_TRACE_ENTERING();
 
+  SingleThreadedBlasGuard blas_thread_guard;  // avoid nested BLAS threading
+
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
   allocate_device_buffer_async_(device_buffer_sz_, 0);
 #endif
@@ -428,6 +483,9 @@ void GAUXC::eval_fxc_contraction(const double* D, const double* tD,
   QDK_LOG_TRACE_ENTERING();
 
   AutoTimer __timer("polarizability::  GAUXC::eval_fxc_contraction");
+
+  SingleThreadedBlasGuard blas_thread_guard;  // avoid nested BLAS threading
+
   // Allocate a large temporary buffer
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
   allocate_device_buffer_async_(device_buffer_sz_, 0);
