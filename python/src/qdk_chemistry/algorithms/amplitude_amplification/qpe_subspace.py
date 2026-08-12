@@ -10,7 +10,7 @@ from collections.abc import Callable
 
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import (
     QpeCircuitBuilderSettings,
-    StandardQpeCircuitBuilder,
+    QpeSubspaceOracleBuilder,
 )
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
@@ -37,7 +37,7 @@ class QPESubspaceMarkingSettings(QpeCircuitBuilderSettings):
         )
 
 
-class QPESubspaceMarking(StandardQpeCircuitBuilder):
+class QPESubspaceMarking(QpeSubspaceOracleBuilder):
     r"""Build a good state oracle that flags the eigenspace above a target energy.
 
     Configured like a standard QPE circuit builder, plus the energy to mark, but instead of a
@@ -47,6 +47,13 @@ class QPESubspaceMarking(StandardQpeCircuitBuilder):
 
     The initial state preparation is not used, because the register already holds the state to
     amplify.
+
+    ``run`` follows the ``qpe_circuit_builder`` contract and returns a list of circuits, but
+    those circuits are oracles rather than phase estimations. Being a
+    :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeSubspaceOracleBuilder`
+    and not a ``Standard``/``Iterative`` builder is what stops
+    :class:`~qdk_chemistry.algorithms.phase_estimation.base.PhaseEstimation` from selecting
+    it: those algorithms reject anything off their own branch of the hierarchy.
     """
 
     def __init__(
@@ -123,17 +130,20 @@ class QPESubspaceMarking(StandardQpeCircuitBuilder):
 
     def _run_impl(
         self,
-        state_preparation: Circuit,
+        state_preparation: Circuit,  # noqa: ARG002
         qubit_hamiltonian: QubitOperator,
-    ) -> Circuit:
+    ) -> list[Circuit]:
         r"""Build the good state oracle for the QPE of ``qubit_hamiltonian``.
 
         Args:
-            state_preparation: Unused; the oracle inherits the builder's signature.
+            state_preparation: Unused; the register handed to the oracle already holds the
+                state under test, so the QPE inside it prepares nothing of its own.
             qubit_hamiltonian: The qubit Hamiltonian whose eigenspace is marked.
 
         Returns:
-            A circuit for use as the ``good_state_oracle`` of ``AmplitudeAmplification``.
+            A single-element list holding the circuit to use as the ``good_state_oracle`` of
+            ``AmplitudeAmplification``. The list is what the ``qpe_circuit_builder`` contract
+            requires; unlike a phase estimation builder, this one always returns exactly one.
 
         Raises:
             ValueError: If ``num_bits`` or ``target_energy`` is unset or invalid.
@@ -186,9 +196,11 @@ class QPESubspaceMarking(StandardQpeCircuitBuilder):
             "upperBounds": upper_bounds,
             "numSystemQubits": num_system_qubits,
         }
-        return Circuit(
-            qsharp_factory=QsharpFactoryData(program=amplification.MakeMarkedPhaseCircuit, parameter=parameters),
-            qsharp_op=amplification.MarkQPEPhaseOp(
-                qpe_operation, num_bits, num_ancilla_qubits, lower_bounds, upper_bounds
-            ),
-        )
+        return [
+            Circuit(
+                qsharp_factory=QsharpFactoryData(program=amplification.MakeMarkedPhaseCircuit, parameter=parameters),
+                qsharp_op=amplification.MarkQPEPhaseOp(
+                    qpe_operation, num_bits, num_ancilla_qubits, lower_bounds, upper_bounds
+                ),
+            )
+        ]

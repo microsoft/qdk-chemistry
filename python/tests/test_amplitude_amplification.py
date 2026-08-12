@@ -16,6 +16,10 @@ from qdk import qsharp
 from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.algorithms.amplitude_amplification.amplitude_amplification import AmplitudeAmplification
 from qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace import QPESubspaceMarking
+from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import (
+    IterativeQpeCircuitBuilder,
+    StandardQpeCircuitBuilder,
+)
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
@@ -45,9 +49,7 @@ def _guiding_state(amplitude: float, index: int, num_qubits: int = 2) -> Circuit
     remainder = math.sqrt(max(0.0, 1.0 - amplitude**2))
     other = (index + 1) % (1 << num_qubits)
     # from_bitstring reads bits little-endian, so a basis index is its reversed binary form.
-    configurations = [
-        Configuration.from_bitstring(format(basis, f"0{num_qubits}b")[::-1]) for basis in (index, other)
-    ]
+    configurations = [Configuration.from_bitstring(format(basis, f"0{num_qubits}b")[::-1]) for basis in (index, other)]
     guiding_state = Wavefunction(
         StateVectorContainer(np.array([amplitude, remainder]), configurations, ModelOrbitals(num_qubits))
     )
@@ -86,7 +88,8 @@ def _subspace_oracle(
         target_energy=target_energy,
     )
     # The oracle ignores the state preparation; it takes the register it is applied to as it finds it.
-    return oracle.run(_guiding_state(1.0, 0), qubit_hamiltonian)
+    # It follows the qpe_circuit_builder contract, so it returns a list holding the one oracle.
+    return oracle.run(_guiding_state(1.0, 0), qubit_hamiltonian)[0]
 
 
 def _amplified_qpe_circuit(
@@ -123,6 +126,13 @@ def _measure(circuit: Circuit, shots: int = 400) -> dict[str, int]:
     return create("circuit_executor", "qdk_sparse_state_simulator").run(circuit, shots=shots).bitstring_counts
 
 
+def test_amplitude_amplification_is_registered():
+    default = create("amplitude_amplification")
+    assert default.name() == "qdk_base"
+    assert default.type_name() == "amplitude_amplification"
+    assert isinstance(default, AmplitudeAmplification)
+
+
 def test_subspace_oracle_is_registered():
     assert "qdk_qpe_subspace" in available("qpe_circuit_builder")
     oracle = create("qpe_circuit_builder", "qdk_qpe_subspace")
@@ -137,6 +147,48 @@ def test_subspace_oracle_shares_the_qpe_circuit_builder_settings():
     assert math.isnan(algorithm.settings().get("target_energy"))
     for key in ("num_bits", "unitary_builder", "controlled_circuit_mapper"):
         assert key in algorithm.settings()
+
+
+def test_subspace_oracle_conforms_to_the_builder_contract():
+    """Its run returns a list of circuits, as every qpe_circuit_builder does."""
+    hamiltonian = _diagonal_hamiltonian()
+    oracle = create(
+        "qpe_circuit_builder",
+        "qdk_qpe_subspace",
+        num_bits=3,
+        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "prepare_select_prepare"),
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True),
+        target_energy=hamiltonian.schatten_norm / 2,
+    )
+    circuits = oracle.run(_guiding_state(1.0, 0), hamiltonian)
+    assert isinstance(circuits, list)
+    assert len(circuits) == 1
+    assert all(isinstance(circuit, Circuit) for circuit in circuits)
+
+
+def test_subspace_oracle_cannot_stand_in_for_a_phase_estimation_builder():
+    """It builds an oracle, not a phase estimation, so a PhaseEstimation must refuse to select it."""
+    oracle = create("qpe_circuit_builder", "qdk_qpe_subspace")
+    # Phase estimation dispatches on these two branches of the hierarchy, and the oracle is on
+    # neither, so it is rejected up front instead of silently amplifying nothing.
+    assert not isinstance(oracle, StandardQpeCircuitBuilder)
+    assert not isinstance(oracle, IterativeQpeCircuitBuilder)
+
+    hamiltonian = _diagonal_hamiltonian()
+    qpe = create("phase_estimation", "qdk_standard")
+    qpe.settings().set(
+        "qpe_circuit_builder",
+        AlgorithmRef(
+            "qpe_circuit_builder",
+            "qdk_qpe_subspace",
+            num_bits=3,
+            controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "prepare_select_prepare"),
+            unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True),
+            target_energy=hamiltonian.schatten_norm / 2,
+        ),
+    )
+    with pytest.raises(TypeError, match="Expected qpe_circuit_builder to be an instance of StandardQpeCircuitBuilder"):
+        qpe.run(state_preparation=_guiding_state(1.0, 0), qubit_hamiltonian=hamiltonian)
 
 
 def test_amplified_qpe_circuit():

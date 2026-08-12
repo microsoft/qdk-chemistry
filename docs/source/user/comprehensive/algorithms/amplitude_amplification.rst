@@ -9,7 +9,7 @@ It takes two :class:`~qdk_chemistry.data.Circuit` objects:
 - ``good_state_oracle`` reflects about the good subspace.
 
 The circuit first prepares the initial state. Each round then flags the
-good subspace and reflects. If the initial probability of the marked 
+good subspace and reflects. If the initial probability of the marked
 subspace is :math:`a`, the probability after :math:`k` rounds is
 
 .. math::
@@ -35,7 +35,7 @@ Using amplitude amplification
       :start-after: # start-cell-create
       :end-before: # end-cell-create
 
-``run`` takes the two oracles as :class:`~qdk_chemistry.data.Circuit`. See below for an 
+``run`` takes the two oracles as :class:`~qdk_chemistry.data.Circuit`. See below for an
 example of amplifying an eigenstate found by QPE.
 
 Amplitude amplified QPE
@@ -47,6 +47,16 @@ algorithm (``qpe_circuit_builder`` / ``qdk_qpe_subspace``) is configured like an
 state oracle instead of a QPE circuit: it runs the QPE on the register it is handed, flips a
 flag when the phase lands in a bin whose energy is at least ``target_energy``, then undoes the
 QPE.
+
+Like every builder of that type, ``run`` takes ``(state_preparation, qubit_hamiltonian)`` and
+returns a list of :class:`~qdk_chemistry.data.Circuit`; this one always returns exactly the
+oracle, and ignores the state preparation because the register it is applied to already holds
+the state under test. Because the circuits it builds flag a subspace rather than report a
+phase, it is a
+:class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeSubspaceOracleBuilder`
+rather than a standard or iterative builder, so
+:doc:`PhaseEstimation <phase_estimation>` rejects it with a ``TypeError`` instead of running it
+as a phase estimation.
 
 .. tab:: Python API
 

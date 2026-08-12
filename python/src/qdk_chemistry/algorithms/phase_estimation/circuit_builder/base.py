@@ -20,6 +20,7 @@ __all__: list[str] = [
     "QpeCircuitBuilder",
     "QpeCircuitBuilderFactory",
     "QpeCircuitBuilderSettings",
+    "QpeSubspaceOracleBuilder",
     "StandardQpeCircuitBuilder",
 ]
 
@@ -154,5 +155,18 @@ class StandardQpeCircuitBuilder(QpeCircuitBuilder):
 
     Serves as a type-checking abstraction for implementations of the standard
     (non-iterative) quantum phase estimation algorithm using QFT.
+
+    """
+
+
+class QpeSubspaceOracleBuilder(QpeCircuitBuilder):
+    """Abstract base class for builders that wrap a phase estimation in a subspace oracle.
+
+    Serves as a type-checking abstraction for implementations that build a QPE and use its
+    phase register to flag a subspace, rather than to report a phase. The circuits they
+    return are oracles, so they measure nothing and are not interchangeable with the
+    builders a :class:`~qdk_chemistry.algorithms.phase_estimation.base.PhaseEstimation`
+    consumes. Keeping them off the ``Standard``/``Iterative`` branches of the hierarchy is
+    what makes those algorithms reject them instead of running them by mistake.
 
     """

@@ -78,6 +78,15 @@ Available Implementations
 
 QDK/Chemistry provides two primary implementations of :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilder`:
 
+.. note::
+
+   ``"qdk_qpe_subspace"`` is also registered under this type, but it is a
+   :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeSubspaceOracleBuilder`:
+   it wraps a phase estimation in a good state oracle for
+   :doc:`AmplitudeAmplification <amplitude_amplification>` rather than building a circuit whose
+   phase is measured. :class:`~qdk_chemistry.algorithms.PhaseEstimation` rejects it, so it is not
+   a substitute for the two implementations below.
+
 Iterative Phase Estimation Circuit Builder (IQPE)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

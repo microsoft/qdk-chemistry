@@ -47,8 +47,9 @@ guiding_state = Wavefunction(
 )
 state_preparation = create("state_prep", "dense_pure_state").run(guiding_state)
 
-# 3. To mark the target state, a QPE is run on the prepared register, and a flag 
-# is flipped when the QPE phase lands in the desired range.
+# 3. To mark the target state, a QPE is run on the prepared register, and a flag
+# is flipped when the QPE phase lands in the desired range. Like any qpe_circuit_builder,
+# run returns a list of circuits; this one always holds exactly the oracle.
 good_state_oracle = create(
     "qpe_circuit_builder",
     "qdk_qpe_subspace",
@@ -60,7 +61,7 @@ good_state_oracle = create(
         "controlled_circuit_mapper", "prepare_select_prepare"
     ),
     target_energy=qubit_hamiltonian.schatten_norm / 2,
-).run(state_preparation, qubit_hamiltonian)
+).run(state_preparation, qubit_hamiltonian)[0]
 
 # 4. Amplify the initial state against the qpe subspace marking oracle.
 amplitude_amplification = create("amplitude_amplification", "qdk_base", rounds=2)
