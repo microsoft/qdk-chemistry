@@ -850,6 +850,7 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.term_grouper import (  # noqa: PLC0415
         FullCommutingTermGrouper,
         IdentityTermGrouper,
+        QubitFlipTermGrouper,
         QubitWiseCommutingTermGrouper,
     )
     from qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder import (  # noqa: PLC0415
@@ -865,6 +866,7 @@ def _register_python_algorithms():
     register(lambda: FullCommutingTermGrouper())
     register(lambda: QubitWiseCommutingTermGrouper())
     register(lambda: IdentityTermGrouper())
+    register(lambda: QubitFlipTermGrouper())
     register(lambda: Trotter())
     register(lambda: Zassenhaus())
     register(lambda: QDrift())

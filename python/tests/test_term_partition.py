@@ -24,6 +24,7 @@ from qdk_chemistry.utils.model_hamiltonians import (
     create_ising_hamiltonian,
 )
 from qdk_chemistry.utils.pauli_commutation import do_pauli_labels_commute, do_pauli_labels_qw_commute
+from qdk_chemistry.utils.pauli_qubit_flip import pauli_label_zero_state_action
 
 # ---------------------------------------------------------------------------
 # TermPartition data classes
@@ -124,14 +125,14 @@ class TestTermGrouperRegistry:
     def test_available_strategies(self):
         """Available strategies."""
         names = registry.available("term_grouper")
-        assert {"commuting", "qubit_wise_commuting", "identity"} <= set(names)
+        assert {"commuting", "qubit_wise_commuting", "identity", "qubit_flip"} <= set(names)
 
     def test_default_strategy_is_commuting(self):
         """Default strategy is commuting."""
         grouper = registry.create("term_grouper")
         assert grouper.name() == "commuting"
 
-    @pytest.mark.parametrize("strategy", ["commuting", "qubit_wise_commuting", "identity"])
+    @pytest.mark.parametrize("strategy", ["commuting", "qubit_wise_commuting", "identity", "qubit_flip"])
     def test_returns_new_hamiltonian_with_partition(self, strategy):
         """Returns new hamiltonian with partition."""
         qh = QubitOperator(["XX", "YY", "ZZ"], np.array([1.0, 2.0, 3.0]))
@@ -147,7 +148,7 @@ class TestTermGrouperRegistry:
             ["XIII", "IXII", "IIXI", "IIIX", "ZIII", "IZII"],
             np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]),
         )
-        for strategy in ("commuting", "qubit_wise_commuting", "identity"):
+        for strategy in ("commuting", "qubit_wise_commuting", "identity", "qubit_flip"):
             grouper = registry.create("term_grouper", strategy)
             out = grouper.run(qh)
             indices = out.term_partition.all_indices()
@@ -174,6 +175,61 @@ class TestTermGrouperRegistry:
         qh = QubitOperator(["XX", "YY"], np.array([1.0, 1.0]))
         out = registry.create("term_grouper", "qubit_wise_commuting").run(qh)
         assert out.term_partition.num_groups == 2
+
+
+# ---------------------------------------------------------------------------
+# Qubit-flip term grouper
+# ---------------------------------------------------------------------------
+
+
+class TestQubitFlipTermGrouper:
+    """Tests for the ``qubit_flip`` term grouper."""
+
+    def test_cancellation_partners_are_grouped_together(self):
+        """XX and YY flip the same qubits and must land in the same group."""
+        # 0.5 (XX + YY) + 0.5 (I - Z0) is the JW image of a0^dag a1 + a1^dag a0 + a0^dag a0.
+        qh = QubitOperator(["XX", "YY", "II", "IZ"], np.array([0.5, 0.5, 0.5, -0.5]))
+        out = registry.create("term_grouper", "qubit_flip").run(qh)
+
+        groups = {frozenset(group) for group in out.term_partition.groups}
+        assert frozenset({0, 1}) in groups
+        # Pure I/Z strings are diagonal: they flip no qubits at all.
+        assert frozenset({2, 3}) in groups
+
+    def test_terms_flipping_different_qubits_are_separated(self):
+        """Terms flipping different qubits cannot cancel each other on |0...0>."""
+        qh = QubitOperator(["XIII", "IIXI"], np.array([1.0, 1.0]))
+        out = registry.create("term_grouper", "qubit_flip").run(qh)
+        assert out.term_partition.num_groups == 2
+
+    def test_each_group_annihilates_the_zero_state(self):
+        """Every group of a |0...0>-annihilating operator annihilates it too."""
+        qh = QubitOperator(
+            ["IIXX", "IIYY", "XXXX", "YYXX", "IIII", "IIIZ"],
+            np.array([0.5, 0.5, 0.25, 0.25, 0.5, -0.5]),
+        )
+        out = registry.create("term_grouper", "qubit_flip").run(qh)
+
+        for group in out.term_partition.groups:
+            amplitude = 0j
+            for index in group:
+                _, phase = pauli_label_zero_state_action(out.pauli_strings[index])
+                amplitude += complex(out.coefficients[index]) * phase
+            assert abs(amplitude) < 1e-12
+
+    def test_group_members_pairwise_commute_for_chemistry_terms(self):
+        """Members of a group flip the same qubits, so their Z parts differ evenly."""
+        qh = QubitOperator(
+            ["XXXX", "YYXX", "XXYY", "YYYY", "XYXY", "YXYX"],
+            np.array([0.25, 0.25, 0.25, -0.25, 0.25, 0.25]),
+        )
+        out = registry.create("term_grouper", "qubit_flip").run(qh)
+
+        assert out.term_partition.num_groups == 1
+        labels = out.pauli_strings
+        for i in range(len(labels)):
+            for j in range(i + 1, len(labels)):
+                assert do_pauli_labels_commute(labels[i], labels[j])
 
 
 # ---------------------------------------------------------------------------

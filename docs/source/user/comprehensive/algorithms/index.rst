@@ -106,7 +106,7 @@ Term grouper
 The ``term_grouper`` algorithm type partitions the Pauli terms of a :class:`~qdk_chemistry.data.QubitOperator` into algorithm-relevant subsets and stores the result on :attr:`~qdk_chemistry.data.QubitOperator.term_partition`.
 A grouper consumes a ``QubitOperator`` and returns a *new* ``QubitOperator`` whose ``term_partition`` field is populated; the input is not mutated.
 
-Strategies include full commutation grouping, qubit-wise commutation grouping, and trivial (identity) grouping.
+Strategies include full commutation grouping, qubit-wise commutation grouping, qubit-flip grouping, and trivial (identity) grouping.
 Use ``registry.available("term_grouper")`` to list implementations.
 
 Example::
