@@ -46,6 +46,12 @@ _CONFUSABLE_RATIO = 0.85
 # Both forms dispatch on an optional capability, so both name a literal that can drift.
 _PROBE_ARITIES = {"hasattr": (2,), "getattr": (2, 3)}
 
+# The builder has carried two capability probes since the dispatch was introduced.  This is
+# a floor on how many the scan can still *see*, not an inventory of which ones exist: it
+# names no capability and so takes no position on the pending ``ancilla``/``ancillary``
+# spelling.  See ``test_capability_probe_coverage_has_not_shrunk`` for why it is a count.
+_MIN_CAPABILITY_PROBES = 2
+
 _SRC = Path(__file__).parent.parent / "src" / "qdk_chemistry" / "algorithms"
 CIRCUIT_BUILDER_DIR = _SRC / "phase_estimation" / "circuit_builder"
 MAPPER_DIR = _SRC / "controlled_circuit_mapper"
@@ -133,6 +139,30 @@ def _unscanned_capability_probes() -> list[tuple[Path, int, str]]:
     return skipped
 
 
+def _uncovered_capability_literals() -> list[tuple[Path, int, str]]:
+    """Capability names written as literals that no recognised probe accounts for.
+
+    This is a *diagnostic*, computed only to explain a failure, and is deliberately not
+    asserted on: it keys on nothing but "this string is the name of a mapper method", so a
+    docstring or an unrelated lookup can appear here.  That imprecision is acceptable for a
+    hint and would not be acceptable for a gate.
+    """
+    known = _mapper_member_names()
+    covered = {(path, name) for path, _, name in _capability_probes()}
+    found: list[tuple[Path, int, str]] = []
+    for path in sorted(CIRCUIT_BUILDER_DIR.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Constant)
+                and isinstance(node.value, str)
+                and node.value in known
+                and (path, node.value) not in covered
+            ):
+                found.append((path, node.lineno, node.value))
+    return found
+
+
 def _mapper_members_by_class() -> dict[str, set[str]]:
     """Members of every controlled circuit mapper, keyed by ``file.py::ClassName``."""
     by_class: dict[str, set[str]] = {}
@@ -201,6 +231,48 @@ def test_no_capability_probe_escapes_the_scanner() -> None:
         + "\n".join(f"  {p.name}:{n}  {src}" for p, n, src in skipped)
         + "\nEither make the probe target mapper-shaped with a literal attribute, or widen "
         "_probed_name to recognise this form."
+    )
+
+
+def test_capability_probe_coverage_has_not_shrunk() -> None:
+    """Guard the *enumerator*: a probe written in an unanticipated form is not enumerated.
+
+    The test above detects a dropped probe only among calls the enumerator already yields,
+    and ``_capability_probe_calls`` yields a node only when it is a call to a name in
+    ``_PROBE_ARITIES``.  So detection-by-capability-name is applied exclusively to calls
+    already admitted by detection-by-builtin-name, and any dispatch that is not literally a
+    ``hasattr``/``getattr`` call is invisible to both.  Measured, on the tree as it stands:
+
+    ==========================================  ====================================
+    ``"cap" in dir(circuit_mapper)``            a ``Compare``, never a ``Call``
+    ``_probe = hasattr`` then ``_probe(m, c)``  ``func.id`` is not a known builtin
+    ==========================================  ====================================
+
+    Both leave the dispatch working, silently drop a parametrised case, and pass.
+
+    Enumerating more forms cannot close this -- the next refactor invents the next form.
+    So this asserts a *magnitude* instead: however a probe is written, a probe the scan
+    cannot see is one it does not count.  That also makes the check neutral on naming,
+    unlike pinning the discovered set, which would fail on a complete and correct rename
+    and so cast a vote on the pending ``ancilla``/``ancillary`` decision.
+
+    It is a floor rather than an equality so that adding a capability is not a failure.
+    When the count legitimately drops -- because the merged builder adopts the
+    width-carrying-``Circuit`` contract and stops probing at all -- the right response is to
+    delete this module, not to lower the number.
+    """
+    probes = _capability_probes()
+    hint = _uncovered_capability_literals()
+    assert len(probes) >= _MIN_CAPABILITY_PROBES, (
+        f"only {len(probes)} capability probe(s) are visible to the scan, expected at least "
+        f"{_MIN_CAPABILITY_PROBES}. Every remaining probe is still checked, but a probe that "
+        f"vanished from this count is no longer checked at all.\n"
+        f"  visible: {[(p.name, n, c) for p, n, c in probes]}\n"
+        f"  capability names in {CIRCUIT_BUILDER_DIR.name}/ with no matching probe: "
+        f"{[(p.name, n, c) for p, n, c in hint] or 'none'}\n"
+        "If dispatch was rewritten in another form (a `in dir(...)` membership test, an "
+        "aliased builtin, a helper), teach _capability_probe_calls that form. If optional "
+        "capability dispatch is gone entirely, delete this module rather than lower the floor."
     )
 
 
