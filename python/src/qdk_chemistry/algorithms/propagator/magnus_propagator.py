@@ -2,26 +2,31 @@ r"""Time-averaged propagator with Magnus expansion.
 
 Computes the effective (time-independent) Hamiltonian for a time interval
 :math:`[t_1, t_2]` via the Magnus expansion of the time-ordered
-propagator :math:`U(t_2, t_1) = \exp(\Omega(t_2, t_1))`, where
+propagator.  With :math:`A(t) = -\mathrm{i}H(t)`, the evolution is
+:math:`U(t_2, t_1) = \exp(\Omega(t_2, t_1))`, where
 
 .. math::
 
     \Omega = \Omega_1 + \Omega_2 + \Omega_3 + \cdots
 
-is a series of nested time integrals of :math:`H(t)`.  The leading
-(order-1) term is the time-averaged Hamiltonian
+is a series of nested time integrals of :math:`A(t)`.  The leading
+(order-1) term is
 
 .. math::
 
-    \Omega_1 = \int_{t_1}^{t_2} H(t')\,\mathrm{d}t',
+    \Omega_1 = \int_{t_1}^{t_2} A(t')\,\mathrm{d}t'
+    = -\mathrm{i}\int_{t_1}^{t_2} H(t')\,\mathrm{d}t'
 
 while higher orders add nested-commutator corrections, e.g.
 
 .. math::
 
-    \Omega_2 = -\frac{1}{2}
+    \Omega_2 = \frac{1}{2}
         \int_{t_1}^{t_2}\!\mathrm{d}t'
-        \int_{t_1}^{t'}\!\mathrm{d}t''\,[H(t'), H(t'')],
+        \int_{t_1}^{t'}\!\mathrm{d}t''\,[A(t'), A(t'')]
+    = -\frac{1}{2}
+        \int_{t_1}^{t_2}\!\mathrm{d}t'
+        \int_{t_1}^{t'}\!\mathrm{d}t''\,[H(t'), H(t'')]
 
 and in general the :math:`\Omega_n` follow the recursion
 
@@ -31,7 +36,7 @@ and in general the :math:`\Omega_n` follow the recursion
     = \sum_{k=1}^{n-1} \frac{B_k}{k!}
       \sum_{j_1+\cdots+j_k=n-1}
       \mathrm{ad}_{\Omega_{j_1}} \cdots
-      \mathrm{ad}_{\Omega_{j_k}}(H(t)),
+    \mathrm{ad}_{\Omega_{j_k}}(A(t))
 
 where :math:`B_k` are Bernoulli numbers.
 
@@ -46,7 +51,9 @@ Hamiltonians of the form :math:`H(t) = H_0 + f(t)\,H_1`.  Requesting an
 
 Accuracy
 --------
-The order-1 propagator gives :math:`O(\Delta t^2)` per-step accuracy.
+For sufficiently smooth :math:`H(t)`, truncation after :math:`\Omega_1`
+has :math:`O(\delta t^3)` local error and therefore second-order global
+accuracy over a fixed evolution interval.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -104,11 +111,14 @@ class MagnusPropagator(Propagator):
         \qquad
         \bar f = \frac{1}{\delta t}\int_{t_1}^{t_2} f(t')\,\mathrm{d}t'.
 
-    The propagator returns this
-    :math:`H_\text{eff} = \Omega_1 / \delta t` (the time-averaged exponent
-    divided by :math:`\delta t = t_2 - t_1`) so that a time-stepping
-    integrator that multiplies by :math:`\delta t` recovers the full
-    exponent :math:`\Omega_1`.  This gives :math:`O(\Delta t^2)` per-step accuracy.
+    Since :math:`\Omega_1 = -\mathrm{i}\int_{t_1}^{t_2}H(t')\,\mathrm{d}t'`,
+    the propagator returns the Hermitian effective Hamiltonian
+    :math:`H_\text{eff} = \mathrm{i}\Omega_1 / \delta t`.  A time-stepping
+    integrator then applies
+    :math:`\exp(-\mathrm{i}\,\delta t\,H_\text{eff}) = \exp(\Omega_1)`,
+    where :math:`\delta t = t_2 - t_1`.  For sufficiently smooth
+    :math:`H(t)`, this has :math:`O(\delta t^3)` local error and
+    second-order global accuracy over a fixed evolution interval.
 
     Requesting an ``order`` greater than 1, or passing any other container
     type, raises :class:`NotImplementedError`.
@@ -176,22 +186,24 @@ class MagnusPropagator(Propagator):
 
         .. math::
 
-            \Omega_1 = \int_{t_1}^{t_2} H(t')\,\mathrm{d}t'
-                = \delta t\,H_0
-                + \left(\int_{t_1}^{t_2} f(t')\,\mathrm{d}t'\right) H_1,
+            \Omega_1 = -\mathrm{i}\int_{t_1}^{t_2} H(t')\,\mathrm{d}t'
+                = -\mathrm{i}\left[
+                    \delta t\,H_0
+                    + \left(\int_{t_1}^{t_2} f(t')\,\mathrm{d}t'\right) H_1
+                  \right]
 
         because :math:`H_0` is constant and only the scalar drive
         :math:`f(t)` carries the time dependence.  The drive integral is
         evaluated by numerical quadrature.
 
         The propagator returns
-        :math:`H_\text{eff} = \Omega_1 / \delta t = H_0 + \bar f\,H_1`,
-        the exponent divided by :math:`\delta t = t_2 - t_1`, so that a
-        time-stepping integrator (which multiplies by ``dt``) recovers the
-        full exponent :math:`\Omega_1`.
+        :math:`H_\text{eff} = \mathrm{i}\Omega_1 / \delta t = H_0 + \bar f\,H_1`,
+        where :math:`\delta t = t_2 - t_1`, so that a time-stepping
+        integrator applies the full exponent :math:`\Omega_1`.
 
-        Only the leading-order term is computed; this gives
-        :math:`O(\delta t^2)` per-step accuracy.
+        For sufficiently smooth :math:`H(t)`, retaining only this term has
+        :math:`O(\delta t^3)` local error and second-order global accuracy
+        over a fixed evolution interval.
 
         Partitions from :math:`H_0` and :math:`H_1` are preserved via
         :meth:`~qdk_chemistry.data.QubitOperator.__mul__` and

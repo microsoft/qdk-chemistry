@@ -16,7 +16,8 @@ The time-dependent nature of these systems makes them challenging to simulate di
 
 Step 2 is what a propagator does.  Given an interval :math:`[t_1, t_2]` and a time-dependent Hamiltonian :math:`H(t)`, the propagator returns a time-independent :math:`H_\text{eff}` that best represents the evolution during that interval.
 
-The propagator's output is divided by the step length :math:`\delta t = t_2 - t_1`, so that the downstream unitary builder — which multiplies by :math:`\delta t` — recovers the correct exponent.
+The propagator's output is divided by the step length :math:`\delta t = t_2 - t_1`, so that the downstream unitary builder applies
+:math:`U(t_2, t_1) \approx \exp(-\mathrm{i}\,\delta t\,H_\text{eff})`.
 This convention keeps propagator and builder responsibilities strictly separated.
 
 Typical workflow
@@ -133,7 +134,7 @@ This is the default (and currently only) propagator.  It computes the time-avera
 
 where the drive integral is evaluated by numerical quadrature (``scipy.integrate.quad``).
 
-This is the leading-order term of the Magnus expansion.  This approximation gives :math:`O(\delta t^2)` per-step accuracy.
+This is the leading-order term of the Magnus expansion.  For sufficiently smooth :math:`H(t)`, it has :math:`O(\delta t^3)` local error and second-order global accuracy over a fixed evolution interval.
 
 .. rubric:: Settings
 

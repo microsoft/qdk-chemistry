@@ -76,6 +76,6 @@ for energy_result, measurement_data in results:
 # start-cell-list-implementations
 from qdk_chemistry.algorithms import available
 
-available("hamiltonian_simulation")
+print(available("hamiltonian_simulation"))
 # end-cell-list-implementations
 ################################################################################

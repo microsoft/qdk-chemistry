@@ -44,7 +44,7 @@ print(f"Effective Hamiltonian has {len(h_eff.pauli_strings)} Pauli terms")
 # start-cell-list-implementations
 from qdk_chemistry.algorithms import available
 
-available("propagator")
+print(available("propagator"))
 # end-cell-list-implementations
 ################################################################################
 
