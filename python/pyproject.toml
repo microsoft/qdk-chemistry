@@ -274,6 +274,7 @@ metadata.version.input = "../VERSION"
 [tool.scikit-build.wheel]
 packages = ["src/qdk_chemistry"]
 install-dir = "qdk_chemistry"
+exclude = ["**/.no-stubgen"]
 
 [tool.scikit-build.cmake.define]
 BUILD_SHARED_LIBS = "OFF"
