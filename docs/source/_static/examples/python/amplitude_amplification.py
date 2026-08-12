@@ -48,8 +48,7 @@ guiding_state = Wavefunction(
 state_preparation = create("state_prep", "dense_pure_state").run(guiding_state)
 
 # 3. To mark the target state, a QPE is run on the prepared register, and a flag
-# is flipped when the QPE phase lands in the desired range. Like any qpe_circuit_builder,
-# run returns a list of circuits; this one always holds exactly the oracle.
+# is flipped when the QPE phase lands in the desired range.
 good_state_oracle = create(
     "qpe_circuit_builder",
     "qdk_qpe_subspace",

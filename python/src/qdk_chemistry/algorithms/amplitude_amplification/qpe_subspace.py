@@ -47,13 +47,6 @@ class QPESubspaceMarking(QpeCircuitBuilder):
 
     The initial state preparation is not used, because the register already holds the state to
     amplify.
-
-    ``run`` follows the ``qpe_circuit_builder`` contract and returns a list of circuits, but
-    those circuits are oracles rather than phase estimations. It derives straight from
-    :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilder`
-    rather than from the ``Standard``/``Iterative`` bases, which is what stops
-    :class:`~qdk_chemistry.algorithms.phase_estimation.base.PhaseEstimation` from selecting
-    it: those algorithms only accept builders from their own branch of the hierarchy.
     """
 
     def __init__(

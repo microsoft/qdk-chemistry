@@ -43,20 +43,13 @@ Amplitude amplified QPE
 
 The :class:`~qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.QPESubspaceMarking`
 algorithm (``qpe_circuit_builder`` / ``qdk_qpe_subspace``) is configured like any other
-:doc:`QpeCircuitBuilder <qpe_circuit_builder>`, plus the energy to mark, but returns a good
-state oracle instead of a QPE circuit: it runs the QPE on the register it is handed, flips a
+:doc:`QpeCircuitBuilder <qpe_circuit_builder>`, plus the energy to mark.
+``run`` takes ``(state_preparation, qubit_hamiltonian)`` and
+returns a list of :class:`~qdk_chemistry.data.Circuit`, but the state preparation is ignored 
+because the register it is applied to already holds the state to be amplified.
+The returned circuit runs the QPE on the register it is handed, flips a
 flag when the phase lands in a bin whose energy is at least ``target_energy``, then undoes the
 QPE.
-
-Like every builder of that type, ``run`` takes ``(state_preparation, qubit_hamiltonian)`` and
-returns a list of :class:`~qdk_chemistry.data.Circuit`; this one always returns exactly the
-oracle, and ignores the state preparation because the register it is applied to already holds
-the state under test. Because the circuits it builds flag a subspace rather than report a
-phase, it derives straight from
-:class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilder`
-rather than from the standard or iterative base, so
-:doc:`PhaseEstimation <phase_estimation>` rejects it with a ``TypeError`` instead of running it
-as a phase estimation.
 
 .. tab:: Python API
 
