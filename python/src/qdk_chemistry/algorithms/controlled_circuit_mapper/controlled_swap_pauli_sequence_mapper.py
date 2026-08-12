@@ -206,7 +206,7 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
             pauli_terms.append(base_terms.copy())
             angles.append(term.angle)
 
-        controlled_evo_params = QSHARP_UTILS.ControlledSwapPauliExp.ControlledSwapPauliExpParams(
+        controlled_evo_params = QSHARP_UTILS.ControlledSwapPauliExp.RepControlledSwapPauliExpParams(
             pauliExponents=pauli_terms,
             pauliCoefficients=angles,
             repetitions=unitary_container.step_reps,

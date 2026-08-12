@@ -24,6 +24,11 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
     /// of controlled-`SWAP` gates, allowing the (repeated) evolution to be applied
     /// with uncontrolled gates only.
     ///
+    /// Unlike `ControlledPauliExp`, the `repetitions` loop lives *inside* this
+    /// operation: the sandwich wraps the whole repeated evolution so that only one
+    /// layer of controlled-`SWAP` is paid for regardless of the repetition count.
+    /// The operation is not `Adj + Ctl` because it resets its ancilla register.
+    ///
     /// # Parameters
     /// - `pauliExponents`: An array of arrays of Pauli operators representing the Pauli terms.
     /// - `pauliCoefficients`: An array of doubles representing the coefficients for each Pauli term.
@@ -32,7 +37,7 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
     /// - `systems`: An array of qubits representing the system on which the operation acts.
     /// # Returns
     /// - `Unit`: The operation prepares the controlled time evolution on the allocated qubits.
-    operation ControlledSwapPauliExp(
+    operation RepControlledSwapPauliExp(
         pauliExponents : Pauli[][],
         pauliCoefficients : Double[],
         repetitions : Int,
@@ -46,7 +51,7 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
             }
         } apply {
             for _ in 1..repetitions {
-                if BeginEstimateCaching("Exp", 0) {
+                if BeginEstimateCaching("ControlledSwapPauliExp", 0) {
                     for idx in 0..Length(pauliExponents) - 1 {
                         Exp(pauliExponents[idx], -pauliCoefficients[idx], vacuum);
                     }
@@ -64,7 +69,7 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
     /// - `repetitions`: The number of times to repeat the (uncontrolled) evolution inside the sandwich.
     /// - `control`: The index of the control qubit.
     /// - `systems`: An array of integers representing the indices of the system qubits.
-    struct ControlledSwapPauliExpParams {
+    struct RepControlledSwapPauliExpParams {
         pauliExponents : Pauli[][],
         pauliCoefficients : Double[],
         repetitions : Int,
@@ -89,8 +94,8 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
         control : Int,
         systems : Int[]
     ) : Unit {
-        // Determine the maximum index across `control` and `systems` to size the qubit register
-        // safely, so that non-contiguous indices (e.g. control=2, systems=[3,4]) stay in range.
+        // Size the register from the largest index across `control` and `systems` so that
+        // non-contiguous layouts (e.g. control=2, systems=[3,4]) stay in range.
         mutable maxIndex = control;
         for idx in systems {
             if idx > maxIndex {
@@ -98,9 +103,8 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
             }
         }
 
-        // Allocate enough qubits so that `control` and every index in `systems` are valid.
         use qs = Qubit[maxIndex + 1];
-        ControlledSwapPauliExp(
+        RepControlledSwapPauliExp(
             pauliExponents,
             pauliCoefficients,
             repetitions,
@@ -112,10 +116,10 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
     /// A helper function to create a callable for the repeated CSWAP-sandwich controlled
     /// time evolution for a set of Pauli exponentials.
     /// # Parameters
-    /// - `params`: A `ControlledSwapPauliExpParams` struct containing the parameters for the operation.
+    /// - `params`: A `RepControlledSwapPauliExpParams` struct containing the parameters for the operation.
     /// # Returns
     /// - `(Qubit, Qubit[]) => Unit`: A callable that takes a control qubit and an array of system qubits, and prepares the repeated controlled time evolution on the allocated qubits.
-    function MakeRepControlledSwapPauliExpOp(params : ControlledSwapPauliExpParams) : (Qubit, Qubit[]) => Unit {
-        ControlledSwapPauliExp(params.pauliExponents, params.pauliCoefficients, params.repetitions, _, _)
+    function MakeRepControlledSwapPauliExpOp(params : RepControlledSwapPauliExpParams) : (Qubit, Qubit[]) => Unit {
+        RepControlledSwapPauliExp(params.pauliExponents, params.pauliCoefficients, params.repetitions, _, _)
     }
 }

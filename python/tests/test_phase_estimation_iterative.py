@@ -12,6 +12,9 @@ from dataclasses import dataclass
 import numpy as np
 import pytest
 
+from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder import (
+    QdkIterativeQpeCircuitBuilder,
+)
 from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import IterativePhaseEstimation
 from qdk_chemistry.data import (
     AlgorithmRef,
@@ -624,3 +627,33 @@ def test_iterative_qpe_raises_on_negative_num_bits(two_qubit_phase_problem: Phas
             state_preparation=two_qubit_phase_problem.state_prep,
             qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
         )
+
+
+def test_iterative_qpe_builder_pairs_largest_power_with_first_iteration(
+    two_qubit_phase_problem: PhaseEstimationProblem,
+) -> None:
+    """Test for IQPE iteration 0 applies the largest controlled power."""
+    problem = two_qubit_phase_problem
+    recorded_powers: list[int] = []
+
+    class _PowerRecordingBuilder(QdkIterativeQpeCircuitBuilder):
+        """Records the controlled power requested for each iteration."""
+
+        def _create_controlled_circuit(self, qubit_hamiltonian: QubitOperator, power: int) -> tuple[Circuit, int]:
+            recorded_powers.append(power)
+            return super()._create_controlled_circuit(qubit_hamiltonian, power)
+
+    builder = _PowerRecordingBuilder(
+        num_bits=problem.num_bits,
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=problem.evolution_time),
+        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+    )
+    builder.run(
+        state_preparation=problem.state_prep,
+        qubit_hamiltonian=problem.hamiltonian,
+    )
+
+    # Execution order: largest power first (LSB) down to U^1 last (MSB).
+    assert recorded_powers == [2 ** (problem.num_bits - iteration - 1) for iteration in range(problem.num_bits)]
+    assert recorded_powers[0] == 2 ** (problem.num_bits - 1)
+    assert recorded_powers[-1] == 1
