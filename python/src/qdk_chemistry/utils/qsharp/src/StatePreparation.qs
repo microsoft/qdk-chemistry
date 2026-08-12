@@ -11,6 +11,7 @@ namespace QDKChemistry.Utils.StatePreparation {
     import Std.TableLookup.Select;
     import QDKChemistry.Utils.BinaryEncoding.MatrixCompressionOp;
     import QDKChemistry.Utils.BinaryEncoding.ApplyMatrixCompressionOp;
+    import QDKChemistry.Utils.BinaryEncoding.ApplyAdjointableCompressionOp;
 
 
     /// A struct to hold parameters for state preparation.
@@ -35,7 +36,7 @@ namespace QDKChemistry.Utils.StatePreparation {
     operation StatePreparation(
         params : StatePreparationParams,
         qs : Qubit[],
-    ) : Unit {
+    ) : Unit is Adj + Ctl {
         ApplyDensePreparation(params.rowMap, params.stateVector, qs);
         ApplyExpansion(params.expansionOps, qs);
     }
@@ -46,7 +47,7 @@ namespace QDKChemistry.Utils.StatePreparation {
     /// # Returns
     /// - `Qubit[] => Unit is Adj + Ctl`: A callable that takes an array of qubits and prepares the quantum state on those qubits.
     function MakeStatePreparationOp(params : StatePreparationParams) : Qubit[] => Unit is Adj + Ctl {
-        ApplyDensePreparation(params.rowMap, params.stateVector, _)
+        StatePreparation(params, _)
     }
 
 
@@ -158,9 +159,9 @@ namespace QDKChemistry.Utils.StatePreparation {
     operation ApplyExpansion(
         expansionOps : MatrixCompressionOp[],
         qs : Qubit[],
-    ) : Unit {
+    ) : Unit is Adj + Ctl {
         for gate in expansionOps {
-            ApplyMatrixCompressionOp(gate, qs, []);
+            ApplyAdjointableCompressionOp(gate, qs);
         }
     }
 
