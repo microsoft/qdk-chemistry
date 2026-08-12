@@ -26,7 +26,11 @@ from qdk_chemistry.data import (
 from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix
 from qdk_chemistry.data.symmetry import SymmetryProduct, axes
 
-from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+from .reference_tolerances import (
+    float_comparison_absolute_tolerance,
+    float_comparison_relative_tolerance,
+    scf_energy_tolerance,
+)
 from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals
 
 
@@ -1189,6 +1193,7 @@ def x2c_unrestricted_hamiltonian():
     molecule = Structure(["O", "O"], np.array([[0.0, 0.0, 0.0], [2.3, 0.0, 0.0]]))
     scf_solver = algorithms.create("scf_solver", "qdk")
     scf_solver.settings().set("method", "hf")
+    scf_solver.settings().set("scf_type", "unrestricted")
     _, wavefunction = scf_solver.run(molecule, 0, 3, "cc-pvdz")
     return algorithms.create("hamiltonian_constructor", "qdk_x2c").run(wavefunction.get_orbitals())
 
@@ -1216,8 +1221,8 @@ class TestX2CHamiltonian:
         one_body_alpha, one_body_beta = hamiltonian.get_one_body_integrals()
         # Generated with exact QDK cc-pVDZ shells, QDK's speed of light, and
         # QDK UHF coefficients. The default xuncontract=True is used.
-        np.testing.assert_allclose(np.trace(one_body_alpha), -267.86977556398796, rtol=0.0, atol=1e-8)
-        np.testing.assert_allclose(np.trace(one_body_beta), -267.86977556398790, rtol=0.0, atol=1e-8)
+        np.testing.assert_allclose(np.trace(one_body_alpha), -267.86977556398796, rtol=0.0, atol=scf_energy_tolerance)
+        np.testing.assert_allclose(np.trace(one_body_beta), -267.86977556398790, rtol=0.0, atol=scf_energy_tolerance)
         assert np.linalg.norm(one_body_alpha - one_body_beta) > 1e-6
 
     def test_core_energy_matches_nr(self, x2c_hamiltonian):

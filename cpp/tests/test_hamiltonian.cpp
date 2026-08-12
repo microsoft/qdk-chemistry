@@ -129,6 +129,7 @@ auto run_unrestricted_o2 = [](const std::string& factory_name = "qdk") {
 
   auto scf_factory = ScfSolverFactory::create("qdk");
   scf_factory->settings().set("method", "hf");
+  scf_factory->settings().set("scf_type", "unrestricted");
 
   auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
   auto [uhf_energy, uhf_wavefunction] =
@@ -2723,7 +2724,7 @@ TEST_F(HamiltonianTest, DataTypeName) {
 
 // Helper: run water SCF + build both NR and X2C Hamiltonians
 auto run_water_nr_and_x2c = [](const std::string& basis = "sto-3g",
-                               bool xuncontract = false) {
+                               bool xuncontract = true) {
   std::vector<Eigen::Vector3d> coords = {{0.0, -0.1432247636, 0.0},
                                          {1.6380335020, 1.1363366135, 0.0},
                                          {-1.6380335020, 1.1363366135, 0.0}};
@@ -2919,8 +2920,10 @@ TEST_F(HamiltonianConstructorTest, X2CAbsoluteOneBodyReferences) {
     auto [energy, h_nr, h_x2c, orbitals] =
         run_water_nr_and_x2c("sto-3g", xuncontract);
     auto [one_body_alpha, one_body_beta] = h_x2c->get_one_body_integrals();
-    EXPECT_NEAR(one_body_alpha.trace(), expected_trace, 1e-8);
-    EXPECT_NEAR(one_body_beta.trace(), expected_trace, 1e-8);
+    EXPECT_NEAR(one_body_alpha.trace(), expected_trace,
+                testing::scf_energy_tolerance);
+    EXPECT_NEAR(one_body_beta.trace(), expected_trace,
+                testing::scf_energy_tolerance);
   }
 }
 
@@ -2931,9 +2934,56 @@ TEST_F(HamiltonianConstructorTest, X2CUnrestrictedO2Reference) {
   auto [one_body_alpha, one_body_beta] = h_x2c->get_one_body_integrals();
   // Generated with PySCF using exact QDK cc-pVDZ shells, QDK's speed of light,
   // and QDK UHF orbital coefficients. The default xuncontract=true is used.
-  EXPECT_NEAR(one_body_alpha.trace(), -267.86977556398796, 1e-8);
-  EXPECT_NEAR(one_body_beta.trace(), -267.86977556398790, 1e-8);
+  EXPECT_NEAR(one_body_alpha.trace(), -267.86977556398796,
+              testing::scf_energy_tolerance);
+  EXPECT_NEAR(one_body_beta.trace(), -267.86977556398790,
+              testing::scf_energy_tolerance);
   EXPECT_GT((one_body_alpha - one_body_beta).norm(), 1e-6);
+}
+
+TEST_F(HamiltonianConstructorTest, X2CUnrestrictedSpinChannelProjection) {
+  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d::Zero()};
+  std::vector<std::string> symbols = {"H"};
+  Structure structure(coordinates, symbols);
+  std::vector<Shell> shells;
+  for (double exponent : {1.0, 0.5, 0.2}) {
+    shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{exponent},
+                              std::vector<double>{1.0}));
+  }
+  auto basis_set =
+      std::make_shared<BasisSet>("spin-channel-projection", shells, structure);
+
+  Eigen::MatrixXd identity = Eigen::MatrixXd::Identity(3, 3);
+  auto restricted_orbitals = std::make_shared<Orbitals>(
+      identity, std::nullopt, std::nullopt, basis_set,
+      testing::restricted_index_set(3, {0, 1, 2}),
+      testing::restricted_index_set(3, {}));
+  auto restricted_x2c = HamiltonianConstructorFactory::create("qdk_x2c");
+  restricted_x2c->settings().set("xuncontract", false);
+  auto restricted_hamiltonian = restricted_x2c->run(restricted_orbitals);
+  auto [reference_one_body, reference_beta] =
+      restricted_hamiltonian->get_one_body_integrals();
+
+  Eigen::MatrixXd permutation = Eigen::MatrixXd::Identity(3, 3);
+  permutation.col(0).swap(permutation.col(2));
+  auto unrestricted_orbitals = std::make_shared<Orbitals>(
+      identity, permutation, std::nullopt, std::nullopt, std::nullopt,
+      basis_set, testing::unrestricted_index_set(3, {0, 1, 2}, {0, 1, 2}),
+      testing::unrestricted_index_set(3, {}, {}));
+  auto unrestricted_x2c = HamiltonianConstructorFactory::create("qdk_x2c");
+  unrestricted_x2c->settings().set("xuncontract", false);
+  auto unrestricted_hamiltonian = unrestricted_x2c->run(unrestricted_orbitals);
+  auto [one_body_alpha, one_body_beta] =
+      unrestricted_hamiltonian->get_one_body_integrals();
+
+  const Eigen::MatrixXd expected_beta =
+      permutation.transpose() * reference_one_body * permutation;
+  EXPECT_TRUE(one_body_alpha.isApprox(reference_one_body,
+                                      testing::numerical_zero_tolerance));
+  EXPECT_TRUE(
+      one_body_beta.isApprox(expected_beta, testing::numerical_zero_tolerance));
+  EXPECT_FALSE(one_body_alpha.isApprox(one_body_beta,
+                                       testing::numerical_zero_tolerance));
 }
 
 TEST_F(HamiltonianConstructorTest, X2CRestrictedWater) {
