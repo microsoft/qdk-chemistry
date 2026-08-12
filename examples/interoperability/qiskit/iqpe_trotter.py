@@ -155,11 +155,7 @@ result = iqpe.run(
 
 phase_angle_measured = result.phase_angle
 phase_angle_canonical = result.canonical_phase_angle
-raw_energy = result.raw_energy
-candidate_energies = result.branching
-estimated_electronic_energy = (
-    result.resolved_energy if result.resolved_energy is not None else raw_energy
-)
+estimated_electronic_energy = result.raw_energy
 estimated_total_energy = estimated_electronic_energy + core_energy
 
 Logger.info(f"Measured bits (MSB → LSB): {list(result.bits_msb_first or [])}")
@@ -170,10 +166,6 @@ if not np.isclose(result.phase_fraction, result.canonical_phase_fraction):
     Logger.info(
         f"Canonical phase fraction φ: {result.canonical_phase_fraction:.6f} (angle = {phase_angle_canonical:.6f} rad)",
     )
-Logger.info(f"Raw energy_from_phase output: {raw_energy:+.8f} Hartree")
-Logger.info("Candidate energies (alias checks):")
-for energy in candidate_energies:
-    Logger.info(f"  E = {energy:+.8f} Hartree")
 Logger.info(f"Estimated electronic energy: {estimated_electronic_energy:.8f} Hartree")
 Logger.info(f"Estimated total energy: {estimated_total_energy:.8f} Hartree")
 Logger.info(f"Reference total energy (CASCI): {casci_energy:.8f} Hartree")

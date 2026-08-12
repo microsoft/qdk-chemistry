@@ -7,11 +7,14 @@
 
 from __future__ import annotations
 
+import importlib.metadata
 import json
+import logging
 
 import numpy as np
 import pytest
 
+import qdk_chemistry.remote.cache as cache_module
 from qdk_chemistry.data import EnergyExpectationResult, MeasurementData, Orbitals, QubitOperator
 from qdk_chemistry.data._spin_channels import spin_channel_matrix
 from qdk_chemistry.data.symmetry import axes
@@ -65,6 +68,25 @@ def sample_job():
 def sample_orbitals():
     """Return a small test Orbitals DataClass."""
     return create_test_orbitals(3)
+
+
+def test_plugin_cache_load_failure_is_logged(monkeypatch, caplog):
+    """Plugin discovery remains non-fatal but reports the failure."""
+
+    def fail_entry_points(**_kwargs):
+        raise RuntimeError("plugin discovery failed")
+
+    monkeypatch.setattr(importlib.metadata, "entry_points", fail_entry_points)
+
+    with caplog.at_level(logging.WARNING, logger=cache_module.__name__):
+        cache_module._load_plugin_caches()
+
+    matching = [r for r in caplog.records if r.name == cache_module.__name__]
+    assert matching, f"Expected a warning log from {cache_module.__name__}"
+    record = matching[0]
+    assert record.levelno == logging.WARNING
+    assert record.exc_info is not None
+    assert "Failed to load cache plugins" in record.getMessage()
 
 
 # ── FolderCache: Job metadata ────────────────────────────────────────────────
