@@ -32,9 +32,9 @@ CIRCUIT_BUILDER_DIR = _SRC / "phase_estimation" / "circuit_builder"
 MAPPER_DIR = _SRC / "controlled_circuit_mapper"
 
 
-def _probed_name(node: ast.AST) -> str | None:
+def _probed_name(node: ast.Call) -> str | None:
     """Return the literal attribute name of a mapper ``hasattr`` probe, if this is one."""
-    if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+    if not isinstance(node.func, ast.Name):
         return None
     if node.func.id != "hasattr" or len(node.args) != 2:
         return None
@@ -60,6 +60,8 @@ def _capability_probes() -> list[tuple[Path, int, str]]:
     for path in sorted(CIRCUIT_BUILDER_DIR.rglob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
             name = _probed_name(node)
             if name is not None:
                 probes.append((path, node.lineno, name))
