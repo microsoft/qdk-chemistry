@@ -105,7 +105,7 @@ class EffectiveHamiltonianConstructor
 
  protected:
   /**
-   * @brief Validate the common nested-space input contract.
+   * @brief Validate the common input-space contract.
    *
    * Concrete implementations may call this helper before performing
    * method-specific validation or computation. Validation is opt-in; the base

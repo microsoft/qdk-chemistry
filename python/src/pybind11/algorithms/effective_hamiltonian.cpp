@@ -117,7 +117,7 @@ Returns:
         instance.validate_inputs(reference, hamiltonian, p_indices);
       },
       py::arg("reference"), py::arg("hamiltonian"), py::arg("p_indices"), R"(
-Validate the common nested-space input contract.
+Validate the common input-space contract.
 
 Validation is opt-in: ``run()`` never calls this helper. Concrete
 implementations may call it from ``_run_impl`` before performing
