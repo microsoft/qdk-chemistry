@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from qdk_chemistry.data._hashing import _hash_int, _hash_str
 from qdk_chemistry.data.base import DataClass
 
 if TYPE_CHECKING:
@@ -61,6 +62,12 @@ class Symmetries(DataClass):
         self._n_beta = int(n_beta)
         # Make instance immutable after construction (handled by base class)
         super().__init__()
+
+    def _hash_update(self, h) -> None:
+        """Feed identifying data into the hasher."""
+        _hash_str(h, "symmetries")
+        _hash_int(h, self._n_alpha)
+        _hash_int(h, self._n_beta)
 
     # -- Factory methods -------------------------------------------------------
 

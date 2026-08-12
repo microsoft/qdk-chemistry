@@ -94,7 +94,9 @@ void Settings::set(const std::string& key, const SettingValue& value) {
   if (std::holds_alternative<AlgorithmRef>(value)) {
     const auto& existing = std::get<AlgorithmRef>(settings_[key]);
     const auto& incoming = std::get<AlgorithmRef>(value);
-    if (incoming.get_algorithm_type() != existing.get_algorithm_type()) {
+    if (incoming.get_algorithm_type() != existing.get_algorithm_type() &&
+        algorithm_ref_type_change_allowed_.find(key) ==
+            algorithm_ref_type_change_allowed_.end()) {
       throw std::invalid_argument(
           "Algorithm type for setting '" + key + "' is fixed to '" +
           existing.get_algorithm_type() + "' and cannot be changed to '" +
@@ -1960,6 +1962,68 @@ std::shared_ptr<Settings> Settings::from_hdf5(H5::Group& group) {
   }
 
   return settings;
+}
+
+void Settings::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
+  enum class SettingsValueHashTag : uint8_t {
+    Bool = 0,
+    Int64 = 1,
+    Double = 2,
+    String = 3,
+    Int64Vector = 4,
+    DoubleVector = 5,
+    StringVector = 6,
+    AlgorithmRef = 7,
+  };
+
+  hash_value(ctx, get_data_type_name());
+  // settings_ is a std::map which is already sorted by key
+  hash_value(ctx, static_cast<uint64_t>(settings_.size()));
+  for (const auto& [key, value] : settings_) {
+    hash_value(ctx, key);
+    // Visit the variant and hash each type
+    std::visit(
+        [&ctx](const auto& v) {
+          using T = std::decay_t<decltype(v)>;
+          // Hash an explicit variant alternative tag before the value payload.
+          if constexpr (std::is_same_v<T, bool>) {
+            hash_value(ctx, SettingsValueHashTag::Bool);
+            hash_value(ctx, v);
+          } else if constexpr (std::is_same_v<T, int64_t>) {
+            hash_value(ctx, SettingsValueHashTag::Int64);
+            hash_value(ctx, v);
+          } else if constexpr (std::is_same_v<T, double>) {
+            hash_value(ctx, SettingsValueHashTag::Double);
+            hash_value(ctx, v);
+          } else if constexpr (std::is_same_v<T, std::string>) {
+            hash_value(ctx, SettingsValueHashTag::String);
+            hash_value(ctx, v);
+          } else if constexpr (std::is_same_v<T, std::vector<int64_t>>) {
+            hash_value(ctx, SettingsValueHashTag::Int64Vector);
+            hash_value(ctx, static_cast<uint64_t>(v.size()));
+            for (auto val : v) hash_value(ctx, val);
+          } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            hash_value(ctx, SettingsValueHashTag::DoubleVector);
+            hash_value(ctx, static_cast<uint64_t>(v.size()));
+            for (auto val : v) hash_value(ctx, val);
+          } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            hash_value(ctx, SettingsValueHashTag::StringVector);
+            hash_value(ctx, static_cast<uint64_t>(v.size()));
+            for (const auto& val : v) hash_value(ctx, val);
+          } else if constexpr (std::is_same_v<T, AlgorithmRef>) {
+            hash_value(ctx, SettingsValueHashTag::AlgorithmRef);
+            hash_value(ctx, v.get_algorithm_type());
+            hash_value(ctx, v.get_algorithm_name());
+            if (v.get_settings()) {
+              hash_field_presence(ctx, true);
+              hash_value(ctx, v.get_settings()->content_hash());
+            } else {
+              hash_field_presence(ctx, false);
+            }
+          }
+        },
+        value);
+  }
 }
 
 }  // namespace qdk::chemistry::data

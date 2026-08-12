@@ -2,7 +2,13 @@ auditwheel; sys_platform == 'linux'
 build
 delocate==0.13.0; sys_platform == 'darwin'
 fonttools>=4.61.0
-opentelemetry-api==1.23.0; sys_platform == 'linux'
-opentelemetry-exporter-otlp-proto-grpc==1.23.0; sys_platform == 'linux'
-opentelemetry-sdk==1.23.0; sys_platform == 'linux'
+opentelemetry-api==1.42.1; sys_platform == 'linux'
+opentelemetry-exporter-otlp-proto-grpc==1.42.1; sys_platform == 'linux'
+opentelemetry-sdk==1.42.1; sys_platform == 'linux'
 urllib3>=2.6.0
+# Mirror python/pyproject.toml [build-system].requires so CG sees the wheel's
+# PEP 517 build-time deps in the buildenv pip-report (they otherwise only live
+# inside `python -m build`'s ephemeral isolated env, which CG never inspects).
+numpy>=2.0.0,<2.4.0
+pybind11>=2.13.6
+scikit-build-core>=0.10.0

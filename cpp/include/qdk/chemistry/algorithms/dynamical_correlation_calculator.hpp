@@ -76,7 +76,7 @@ class DynamicalCorrelationCalculator
    *
    * @return The algorithm's name
    */
-  virtual std::string name() const = 0;
+  virtual std::string name() const override = 0;
 
   /**
    * @brief Access the algorithm's type name
@@ -99,7 +99,7 @@ class DynamicalCorrelationCalculator
    * wavefunction, and optionally a bra wavefunction
    */
   virtual DynamicalCorrelationResult _run_impl(
-      std::shared_ptr<data::Ansatz> ansatz) const = 0;
+      std::shared_ptr<data::Ansatz> ansatz) const override = 0;
 };
 
 /**

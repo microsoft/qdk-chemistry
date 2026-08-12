@@ -4,6 +4,7 @@
 # --------------------------------------------------------------------------------------------
 
 import importlib
+import importlib.util
 import os
 import re
 import shutil
@@ -22,6 +23,18 @@ author = "QDK/Chemistry Team"
 # Repo root (docs/source/conf.py -> docs/source -> docs -> repo root)
 _repo_root = Path(__file__).resolve().parent.parent.parent
 
+_tutorial_versions_file = Path(__file__).resolve().parent / "tutorials" / "_versions.py"
+_tutorial_versions_spec = importlib.util.spec_from_file_location(
+    "tutorial_versions", _tutorial_versions_file
+)
+if _tutorial_versions_spec is None or _tutorial_versions_spec.loader is None:
+    raise ImportError(
+        f"Unable to load tutorial versions from {_tutorial_versions_file}"
+    )
+_tutorial_versions = importlib.util.module_from_spec(_tutorial_versions_spec)
+_tutorial_versions_spec.loader.exec_module(_tutorial_versions)
+GROUND_STATE_TUTORIAL_VERSION: str = _tutorial_versions.GROUND_STATE_TUTORIAL_VERSION
+
 # Read version from VERSION file
 _version_file = _repo_root / "VERSION"
 if not _version_file.exists():
@@ -29,6 +42,11 @@ if not _version_file.exists():
         f"VERSION file not found at {_version_file}. Ensure you have a complete checkout of the repository."
     )
 release = _version_file.read_text().strip()
+
+# Expose tutorial compatibility versions to reStructuredText.
+rst_epilog = f"""
+.. |ground-state-tutorial-version| replace:: {GROUND_STATE_TUTORIAL_VERSION}
+"""
 
 # -----------------------------------------------------------------------------
 # Perform initial setup and tests
@@ -111,6 +129,7 @@ autodoc_mock_imports = [  # Configure autodoc to handle C++ extension modules an
     "qiskit",
     "qiskit_nature",
     "qiskit_aer",
+    "qiskit_ibm_runtime",
     "openfermion",
     "cirq",
     "cirq_core",
@@ -185,6 +204,8 @@ nitpick_ignore_regex = [
     # C++20 concepts - Sphinx/Breathe doesn't fully support concept references yet
     (r"cpp:identifier", r"NonBoolIntegral<.*>"),
     (r"cpp:identifier", r"NonBoolIntegralVector<.*>"),
+    (r"cpp:identifier", r"HashComplexScalar<.*>"),
+    (r"cpp:identifier", r"HashSignedIntegral<.*>"),
     (r"cpp:identifier", r"NonIntegralBool"),
     (r"cpp:identifier", r"VariantMember<.*>"),
     (r"cpp:identifier", r"Vector<.*>"),
@@ -202,10 +223,24 @@ nitpick_ignore_regex = [
     (r"py:class", r"cirq.*"),
     (r"py:class", r"qdk_chemistry._core.data.DataClass"),
     (r"py:class", r"qdk_chemistry._core\.data\.PauliOperatorExpression"),
+    (r"py:class", r"qdk_chemistry._core\.data\.MajoranaMapping"),
+    (r"py:class", r"_CoreMajoranaMapping"),
+    (r"py:class", r"^TaperingSpecification$"),
+    (r"py:class", r"qdk_chemistry\.data\.tapering\.TaperingSpecification"),
     (r"py:class", r"qdk::chemistry::data::SumPauliOperatorExpression"),
     (r"py:class", r"qdk::chemistry::algorithms::HamiltonianConstructor"),
     (r"py:class", r"^SumPauliOperatorExpression$"),
     (r"py:class", r"qsharp\..*"),  # qsharp has no intersphinx inventory
+    (r"py:class", r"qdk\..*"),  # qdk has no intersphinx inventory
+    (r"py:class", r"^QdkCircuitType$"),  # internal type alias for qsharp circuit
+    (r"py:class", r"^PlanExpr$"),  # Zassenhaus type aliases
+    (r"py:class", r"^PlanTerm$"),
+    (r"py:class", r"^CommutatorPlan$"),
+    (
+        r"py:class",
+        r"^qdk_chemistry\.utils\.zassenhaus_generation\.(PlanExpr|PlanTerm|CommutatorPlan)$",
+    ),
+    (r"cpp:identifier", r"uint8_t"),  # C standard type, not in Sphinx C++ domain
 ]
 
 # Configure output for to-dos

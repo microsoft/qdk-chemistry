@@ -30,10 +30,10 @@ class TestConfigurationSetBasics:
     def test_configurations(self):
         """Create a list of test configurations."""
         return [
-            Configuration("2200"),  # doubly occupied first two orbitals
-            Configuration("2ud0"),  # mixed occupation
-            Configuration("2du0"),  # mixed occupation (different)
-            Configuration("udud"),  # all singly occupied
+            Configuration.from_spin_half_string("2200"),  # doubly occupied first two orbitals
+            Configuration.from_spin_half_string("2ud0"),  # mixed occupation
+            Configuration.from_spin_half_string("2du0"),  # mixed occupation (different)
+            Configuration.from_spin_half_string("udud"),  # all singly occupied
         ]
 
     @pytest.fixture
@@ -56,7 +56,7 @@ class TestConfigurationSetBasics:
 
     def test_construction_single(self, test_orbitals):
         """Test ConfigurationSet construction with single configuration."""
-        configs = [Configuration("2200")]
+        configs = [Configuration.from_spin_half_string("2200")]
         config_set = ConfigurationSet(configs, test_orbitals)
         assert len(config_set) == 1
         assert not config_set.empty()
@@ -134,7 +134,7 @@ class TestConfigurationSetEquality:
 
     def test_equality_same(self, test_orbitals):
         """Test equality for identical ConfigurationSets."""
-        configs = [Configuration("2200"), Configuration("2ud0")]
+        configs = [Configuration.from_spin_half_string("2200"), Configuration.from_spin_half_string("2ud0")]
         set1 = ConfigurationSet(configs, test_orbitals)
         set2 = ConfigurationSet(configs, test_orbitals)
         # Note: equality checks if orbitals point to the same object
@@ -143,16 +143,16 @@ class TestConfigurationSetEquality:
 
     def test_inequality_different_configs(self, test_orbitals):
         """Test inequality for different configurations."""
-        configs1 = [Configuration("2200")]
-        configs2 = [Configuration("2ud0")]
+        configs1 = [Configuration.from_spin_half_string("2200")]
+        configs2 = [Configuration.from_spin_half_string("2ud0")]
         set1 = ConfigurationSet(configs1, test_orbitals)
         set2 = ConfigurationSet(configs2, test_orbitals)
         assert set1 != set2
 
     def test_inequality_different_size(self, test_orbitals):
         """Test inequality for different sizes."""
-        configs1 = [Configuration("2200")]
-        configs2 = [Configuration("2200"), Configuration("2ud0")]
+        configs1 = [Configuration.from_spin_half_string("2200")]
+        configs2 = [Configuration.from_spin_half_string("2200"), Configuration.from_spin_half_string("2ud0")]
         set1 = ConfigurationSet(configs1, test_orbitals)
         set2 = ConfigurationSet(configs2, test_orbitals)
         assert set1 != set2
@@ -170,9 +170,9 @@ class TestConfigurationSetSerialization:
     def test_configuration_set(self, test_orbitals):
         """Create a test ConfigurationSet."""
         configs = [
-            Configuration("2200"),
-            Configuration("2ud0"),
-            Configuration("udud"),
+            Configuration.from_spin_half_string("2200"),
+            Configuration.from_spin_half_string("2ud0"),
+            Configuration.from_spin_half_string("udud"),
         ]
         return ConfigurationSet(configs, test_orbitals)
 
@@ -276,7 +276,7 @@ class TestConfigurationSetWithOrbitals:
         """Test that orbital information is preserved after serialization."""
         # Create orbitals with specific properties
         orbitals = create_test_orbitals(4)
-        configs = [Configuration("2200"), Configuration("udud")]
+        configs = [Configuration.from_spin_half_string("2200"), Configuration.from_spin_half_string("udud")]
         config_set = ConfigurationSet(configs, orbitals)
 
         # Serialize and deserialize
@@ -296,14 +296,14 @@ class TestConfigurationSetEdgeCases:
 
     def test_construction_with_none_orbitals_raises(self):
         """Test that construction with None orbitals raises an error."""
-        configs = [Configuration("2200")]
+        configs = [Configuration.from_spin_half_string("2200")]
         with pytest.raises((ValueError, TypeError, RuntimeError)):
             ConfigurationSet(configs, None)
 
     def test_copy_constructor(self):
         """Test copy constructor."""
         orbitals = create_test_orbitals(4)
-        configs = [Configuration("2200"), Configuration("2ud0")]
+        configs = [Configuration.from_spin_half_string("2200"), Configuration.from_spin_half_string("2ud0")]
         original = ConfigurationSet(configs, orbitals)
 
         # Copy

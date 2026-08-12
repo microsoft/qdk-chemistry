@@ -15,9 +15,13 @@ Supported QDK backends include:
 # --------------------------------------------------------------------------------------------
 from typing import Literal
 
-import qsharp
-from qsharp._simulation import run_qir
-from qsharp.openqasm import run as sparse_state_run_qasm
+from qdk import qsharp
+from qdk.openqasm import run as sparse_state_run_qasm
+
+try:
+    from qdk.simulation import run_qir
+except ImportError:
+    from qsharp._simulation import run_qir
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.data import Circuit, CircuitExecutorData, QuantumErrorProfile, Settings
@@ -172,8 +176,10 @@ class QdkSparseStateSimulator(CircuitExecutor):
         Logger.trace_entering()
         noise_config = noise.to_qdk_noise_config() if noise is not None else None
         if circuit._qsharp_factory is not None:  # noqa: SLF001
-            raw_results = qsharp.run(
-                circuit._qsharp_factory.program,  # noqa: SLF001
+            program = circuit._qsharp_factory.program  # noqa: SLF001
+            context = getattr(program, "_qdk_context", qsharp)
+            raw_results = context.run(
+                program,
                 shots,
                 *circuit._qsharp_factory.parameter.values(),  # noqa: SLF001
                 noise=noise_config,

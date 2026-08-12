@@ -34,7 +34,7 @@ A :class:`~qdk_chemistry.data.Circuit` wraps a quantum circuit that may be repre
    * - ``qir``
      - A :term:`QIR` (Quantum Intermediate Representation) object for cross-platform compilation.
    * - ``qsharp``
-     - A compiled ``qsharp._native.Circuit`` object for inspection and visualization.
+     - A compiled ``qdk._native.Circuit`` object for inspection and visualization.
    * - ``qsharp_op``
      - A Q# callable — a native Q# operation that can be composed with other Q# operations.
    * - ``qsharp_factory``
@@ -50,7 +50,7 @@ The full constructor signature is:
    Circuit(
        qasm: str | None = None,
        qir: QirInputData | str | None = None,
-       qsharp: qsharp._native.Circuit | None = None,
+       qsharp: qdk._native.Circuit | None = None,
        qsharp_op: Callable | None = None,
        qsharp_factory: QsharpFactoryData | None = None,
        encoding: str | None = None,
@@ -91,6 +91,66 @@ The standard pattern for building a factory is:
 This pattern is what enables end-to-end Q# composition: because the factory stores Q# callables rather than serialized gate sequences, multi-stage circuits compose natively in the Q# runtime without intermediate format conversions.
 
 
+.. _shared-qsharp-context:
+
+Shared Q# context
+-----------------
+
+QDK enforces that Q# operations composed together belong to the **same** ``qdk.Context``.
+Composing a callable from one context into a program owned by another raises ``QSharpError``.
+
+Three scenarios cover how users interact with this:
+
+**Using QDK/Chemistry algorithms only.**
+You never touch the Q# context. Every circuit the library builds is created against one internal
+shared context, so everything composes automatically.
+
+**Bringing your own Q# operation.**
+When you define your own Q# program (for example, a custom ``BellState`` state preparation) and want
+to compose it with a chemistry builder such as QPE, it must be built against that same shared
+context. Obtain the context with :func:`~qdk_chemistry.utils.qsharp.get_qsharp_context`, define your
+operation on it, and pass the resulting callable to the builder.
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/circuit.py
+      :language: python
+      :start-after: # start-cell-byo-operation
+      :end-before: # end-cell-byo-operation
+
+**Bringing your own Q# context.**
+If you want to change the target profile — or any other ``qdk.Context`` option — build a context with
+:func:`~qdk_chemistry.utils.qsharp.create_qsharp_context` (it keeps the chemistry utilities loaded on
+the project root), then make the library use it: :func:`~qdk_chemistry.utils.qsharp.set_qsharp_context`
+installs it process-wide (pass ``None`` to restore the default), while
+:func:`~qdk_chemistry.utils.qsharp.use_qsharp_context` switches to it temporarily on the current
+thread and restores it automatically on exit.
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/circuit.py
+      :language: python
+      :start-after: # start-cell-byo-context
+      :end-before: # end-cell-byo-context
+
+The four helpers in :mod:`qdk_chemistry.utils.qsharp` that manage this are:
+
+:func:`~qdk_chemistry.utils.qsharp.get_qsharp_context`
+   Returns the shared context that owns ``QSHARP_UTILS``. Build your own operations against it so they
+   compose with the chemistry builders.
+
+:func:`~qdk_chemistry.utils.qsharp.create_qsharp_context`
+   Creates a fresh context preloaded with the chemistry utilities. Forwards ``target_profile`` and any
+   other ``qdk.Context`` keyword arguments; use it when you need a non-default configuration.
+
+:func:`~qdk_chemistry.utils.qsharp.set_qsharp_context`
+   Installs a caller-supplied context process-wide. Pass ``None`` to reset to the default context.
+
+:func:`~qdk_chemistry.utils.qsharp.use_qsharp_context`
+   A context manager that overrides the active context for the current thread only and restores it
+   on exit.
+
+
 Conversion methods
 ------------------
 
@@ -103,7 +163,7 @@ Each method returns the circuit in the requested format, converting from whateve
    * - Method
      - Description
    * - :meth:`~qdk_chemistry.data.Circuit.get_qsharp_circuit`
-     - Returns a ``qsharp._native.Circuit`` for inspection. Accepts ``prune_classical_qubits`` to remove unused qubits.
+     - Returns a ``qdk._native.Circuit`` for inspection. Accepts ``prune_classical_qubits`` to remove unused qubits.
    * - :meth:`~qdk_chemistry.data.Circuit.get_qir`
      - Returns the :term:`QIR` representation. Compiles from Q# factory or converts from QASM if needed.
    * - :meth:`~qdk_chemistry.data.Circuit.get_qasm`
@@ -141,7 +201,7 @@ Properties
      - QirInputData | str | None
      - :term:`QIR` representation, if available. Lazily compiled from the Q# factory on first access.
    * - ``qsharp``
-     - qsharp._native.Circuit | None
+     - qdk._native.Circuit | None
      - Compiled Q# circuit object, if available.
    * - ``encoding``
      - str | None
@@ -170,7 +230,7 @@ Related classes
 ---------------
 
 - :class:`~qdk_chemistry.data.CircuitExecutorData`: Measurement results from circuit execution
-- :class:`~qdk_chemistry.data.QubitHamiltonian`: Often paired with a circuit for energy estimation
+- :class:`~qdk_chemistry.data.QubitOperator`: Often paired with a circuit for energy estimation
 
 Further reading
 ---------------

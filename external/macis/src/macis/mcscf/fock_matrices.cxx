@@ -186,7 +186,7 @@ void generalized_fock_matrix_comp_mat1(NumOrbital _norb, NumInactive _ninact,
                                        size_t LDD1, const double* A2RDM,
                                        size_t LDD2, double* F, size_t LDF) {
   const auto norb = _norb.get();
-  const auto ninact = _ninact.get();
+  [[maybe_unused]] const auto ninact = _ninact.get();
   const auto nact = _nact.get();
 
   const size_t norb2 = norb * norb;
@@ -212,8 +212,8 @@ void generalized_fock_matrix_comp_mat2(NumOrbital _norb, NumInactive _ninact,
                                        size_t LDD1, const double* A2RDM,
                                        size_t LDD2, double* F, size_t LDF) {
   const auto norb = _norb.get();
-  const auto ninact = _ninact.get();
-  const auto nact = _nact.get();
+  [[maybe_unused]] const auto ninact = _ninact.get();
+  [[maybe_unused]] const auto nact = _nact.get();
 
   std::vector<double> Fi(norb * norb);
   inactive_fock_matrix(_norb, _ninact, T, LDT, V_full, LDV, Fi.data(), norb);

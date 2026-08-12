@@ -34,19 +34,21 @@ E_scf, wfn_scf = scf_solver.run(
 # 3. Hamiltonian and qubit mapping
 hamiltonian_constructor = create("hamiltonian_constructor")
 hamiltonian = hamiltonian_constructor.run(wfn_scf.get_orbitals())
-qubit_mapper = create("qubit_mapper", encoding="jordan-wigner")
-qubit_ham = qubit_mapper.run(hamiltonian)
+from qdk_chemistry.data import MajoranaMapping
+
+n_spin_orbitals = 2 * hamiltonian.get_orbitals().get_num_molecular_orbitals()
+qubit_mapper = create("qubit_mapper")
+qubit_ham = qubit_mapper.run(
+    hamiltonian, MajoranaMapping.jordan_wigner(n_spin_orbitals)
+)
 
 # 4. Build time evolution unitary
 trotter = create("hamiltonian_unitary_builder", "trotter", order=2, time=0.1)
 evolution = trotter.run(qubit_ham)
 
 # 5. Create a controlled version and map to a circuit
-from qdk_chemistry.data import ControlledUnitary
-
-controlled = ControlledUnitary(evolution, control_indices=[0])
-mapper = create("controlled_circuit_mapper", "pauli_sequence")
-circuit = mapper.run(controlled)
+mapper = create("controlled_circuit_mapper", "pauli_sequence", control_indices=[0])
+circuit = mapper.run(evolution)
 print("Controlled evolution circuit generated")
 # end-cell-run
 ################################################################################

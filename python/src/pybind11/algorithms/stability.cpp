@@ -147,6 +147,9 @@ Returns:
     str: The type name of the algorithm
 )");
 
+  stability_checker.def("hash", &StabilityChecker::hash,
+                        py::arg("wavefunction"));
+
   // Factory class binding - creates StabilityCheckerFactory class with static
   // methods
   bind_algorithm_factory<StabilityCheckerFactory, StabilityChecker,

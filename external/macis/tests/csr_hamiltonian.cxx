@@ -76,8 +76,8 @@ TEMPLATE_TEST_CASE("CSR Hamiltonian", "[ham_gen]",
   size_t ref_n = 12636;
   size_t ref_nnz = 3517816;
 
-  REQUIRE(H.m() == ref_n);
-  REQUIRE(H.nnz() == ref_nnz);
+  REQUIRE(static_cast<size_t>(H.m()) == ref_n);
+  REQUIRE(static_cast<size_t>(H.nnz()) == ref_nnz);
 
   // Read reference data
   std::vector<int32_t> ref_rowptr(H.rowptr().size()),

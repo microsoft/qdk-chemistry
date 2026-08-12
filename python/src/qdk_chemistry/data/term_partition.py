@@ -1,13 +1,13 @@
-"""Term-partition metadata for :class:`~qdk_chemistry.data.QubitHamiltonian`.
+"""Term-partition metadata for :class:`~qdk_chemistry.data.QubitOperator`.
 
 A :class:`TermPartition` records how the Pauli terms of a
-:class:`~qdk_chemistry.data.QubitHamiltonian` are organised into algorithm-
+:class:`~qdk_chemistry.data.QubitOperator` are organised into algorithm-
 relevant subsets.  Concrete subclasses include :class:`FlatPartition`
 (single-level groups) and :class:`LayeredPartition` (group → layer
 hierarchy).
 
 The partition stores **indices** into
-:attr:`~qdk_chemistry.data.QubitHamiltonian.pauli_strings` so that it
+:attr:`~qdk_chemistry.data.QubitOperator.pauli_strings` so that it
 serialises trivially and remains small.
 
 Lifecycle
@@ -16,7 +16,7 @@ Lifecycle
 * The partition is *optional* metadata.  ``term_partition is None`` means the
   partition has not been computed for this Hamiltonian.
 * Transformations that change the term ordering or qubit support
-  (for example :meth:`~qdk_chemistry.data.QubitHamiltonian.to_interleaved`)
+  (for example :meth:`~qdk_chemistry.data.QubitOperator.to_interleaved`)
   must reset the partition to ``None`` on the new Hamiltonian.
 * Algorithms that consume a partition should treat its presence as an explicit
   signal to exploit it (for example, by applying schedule-level Suzuki
@@ -34,6 +34,7 @@ from __future__ import annotations
 import json as _json
 from typing import Any
 
+from qdk_chemistry.data._hashing import _hash_int, _hash_str, _hash_uint
 from qdk_chemistry.data.base import DataClass
 
 __all__ = ["FlatPartition", "LayeredPartition", "TermPartition"]
@@ -135,7 +136,7 @@ class FlatPartition(TermPartition):
     (for example, qubit-wise commuting groups for measurement basis selection).
 
     The ``groups`` field is a tuple of groups; each group is a tuple of term
-    indices into :attr:`~qdk_chemistry.data.QubitHamiltonian.pauli_strings`.
+    indices into :attr:`~qdk_chemistry.data.QubitOperator.pauli_strings`.
 
     Raises:
         TypeError: If ``groups`` is not a sequence of sequences of integers.
@@ -154,6 +155,16 @@ class FlatPartition(TermPartition):
         self.groups: tuple[tuple[int, ...], ...] = tuple(tuple(int(i) for i in group) for group in groups)
         # Freeze after all attributes are set.
         DataClass.__init__(self)
+
+    def _hash_update(self, h) -> None:
+        """Feed identifying data into the hasher."""
+        _hash_str(h, "flat_partition")
+        _hash_str(h, self.strategy)
+        _hash_uint(h, len(self.groups))
+        for group in self.groups:
+            _hash_uint(h, len(group))
+            for idx in group:
+                _hash_int(h, idx)
 
     @property
     def num_groups(self) -> int:
@@ -196,7 +207,7 @@ class LayeredPartition(TermPartition):
 
     The ``groups`` field is a nested tuple ``(group, layer, term_index)``:
     outer = groups, middle = layers within a group, inner = term indices into
-    :attr:`~qdk_chemistry.data.QubitHamiltonian.pauli_strings`.
+    :attr:`~qdk_chemistry.data.QubitOperator.pauli_strings`.
 
     Raises:
         TypeError: If ``groups`` is not the expected nested-sequence shape.
@@ -217,6 +228,18 @@ class LayeredPartition(TermPartition):
         )
         # Freeze after all attributes are set.
         DataClass.__init__(self)
+
+    def _hash_update(self, h) -> None:
+        """Feed identifying data into the hasher."""
+        _hash_str(h, "layered_partition")
+        _hash_str(h, self.strategy)
+        _hash_uint(h, len(self.groups))
+        for group in self.groups:
+            _hash_uint(h, len(group))
+            for layer in group:
+                _hash_uint(h, len(layer))
+                for idx in layer:
+                    _hash_int(h, idx)
 
     @property
     def num_groups(self) -> int:

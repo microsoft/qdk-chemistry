@@ -6,17 +6,16 @@ primary interface for managing quantum chemical data within the QDK/Chemistry fr
 
 Exposed classes are:
 
+- :class:`AmplitudeContainer`: Amplitude-based correlated wavefunction (coupled cluster or MP2).
+- :class:`AmplitudeType`: Enumeration of amplitude expansion types (MP2, CCSD, Unspecified).
 - :class:`Ansatz`: Quantum chemical ansatz combining a Hamiltonian and wavefunction for energy calculations.
 - :class:`AOType`: Enumeration of basis set types (STO-3G, 6-31G, etc.).
 - :class:`BasisSet`: Gaussian basis set definitions for quantum calculations.
 - :class:`CanonicalFourCenterHamiltonianContainer`: Container for four-center two-electron integrals in canonical form.
-- :class:`CasWavefunctionContainer`: Complete Active Space (CAS) wavefunction with CI coefficients and determinants.
 - :class:`CholeskyHamiltonianContainer`: Container for Hamiltonians represented using Cholesky-decomposed integrals.
 - :class:`Circuit`: Quantum circuit information.
 - :class:`Configuration`: Electronic configuration state information.
 - :class:`ConfigurationSet`: Collection of electronic configurations with associated orbital information.
-- :class:`ControlledUnitary`: Controlled unitary.
-- :class:`CoupledClusterContainer`: Container for coupled cluster wavefunction amplitudes and determinants.
 - :class:`DataClass`: Base data class.
 - :class:`ElectronicStructureSettings`: Specialized settings for electronic structure calculations.
 - :class:`Element`: Represents a chemical element with its properties.
@@ -25,25 +24,26 @@ Exposed classes are:
 - :class:`HamiltonianContainer`: Abstract base class for different Hamiltonian storage formats.
 - :class:`HamiltonianType`: Enumeration of Hamiltonian types (Hermitian, NonHermitian).
 - :class:`LatticeGraph`: Lattice graph defining the connectivity and geometry of a model Hamiltonian.
-- :class:`MeasurementData`: Measurement bitstring data and metadata for QubitHamiltonian objects.
+- :class:`MajoranaMapping`: Majorana-to-Pauli mapping data class for fermion-to-qubit encodings.
+- :class:`MeasurementData`: Measurement bitstring data and metadata for QubitOperator objects.
 - :class:`SparseHamiltonianContainer`: Container for lattice model Hamiltonians with sparse internal storage.
 - :class:`ModelOrbitals`: Simple orbital representation for model systems without full basis set information.
-- :class:`MP2Container`: Container for MP2 wavefunction with Hamiltonian reference and optional amplitudes.
+- :class:`NuclearGradients`: Nuclear gradient values associated with a molecular structure.
+- :class:`NuclearHessian`: Nuclear Hessian matrix associated with a molecular structure.
 - :class:`Orbitals`: Molecular orbital information and properties.
 - :class:`OrbitalType`: Enumeration of orbital angular momentum types (s, p, d, f, etc.).
 - :class:`PauliOperator`: Pauli operator (I, X, Y, Z) for quantum operator expressions with arithmetic support.
 - :class:`PauliProductFormulaContainer`: Container for Pauli product formula representation of time evolution unitary.
 - :class:`QpeResult`: Result of quantum phase estimation workflows, including phase, energy, and metadata.
 - :class:`QuantumErrorProfile`: Information about quantum gates and error properties.
-- :class:`QubitHamiltonian`: Molecular electronic Hamiltonians mapped to qubits.
-- :class:`SciWavefunctionContainer`: Selected Configuration Interaction (SCI) wavefunction with CI coefficients.
+- :class:`QubitOperator`: Molecular electronic Hamiltonians mapped to qubits.
 - :class:`Settings`: Configuration settings for quantum chemistry calculations.
 - :class:`SettingValue`: Type-safe variant for storing different setting value types.
 - :class:`Shell`: Individual shell within a basis set.
-- :class:`SlaterDeterminantContainer`: Single Slater determinant wavefunction representation.
 - :class:`StabilityResult`: Result of stability analysis for electronic structure calculations.
+- :class:`StateVectorContainer`: Determinant-expansion wavefunction (single determinant, CAS, or SCI).
 - :class:`Structure`: Molecular structure and geometry information.
-- :class:`Symmetries`: Physical symmetries of an electronic state for symmetry-exploiting algorithms.
+- :class:`Symmetries`: Physical symmetries of an electronic state.
 - :class:`TermPartition`: Index-based partition of Hamiltonian terms.
   See :class:`FlatPartition` and :class:`LayeredPartition`.
 - :class:`UnitaryRepresentation`: Unitary representation.
@@ -64,43 +64,46 @@ Exposed exceptions are:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import warnings
 from contextlib import suppress
 
 from qdk_chemistry._core.data import (
     AlgorithmRef,
+    AmplitudeContainer,
+    AmplitudeType,
     Ansatz,
     AOType,
     BasisSet,
     CanonicalFourCenterHamiltonianContainer,
-    CasWavefunctionContainer,
     CholeskyHamiltonianContainer,
     Configuration,
     ConfigurationSet,
-    CoupledClusterContainer,
     ElectronicStructureSettings,
     Element,
     Hamiltonian,
     HamiltonianContainer,
     HamiltonianType,
     LatticeGraph,
+    MajoranaMapping,
     ModelOrbitals,
-    MP2Container,
+    NuclearGradients,
+    NuclearHessian,
     Orbitals,
     OrbitalType,
     PauliOperator,
     PauliTermAccumulator,
-    SciWavefunctionContainer,
     SettingNotFound,
     Settings,
     SettingsAreLocked,
     SettingTypeMismatch,
     SettingValue,
     Shell,
-    SlaterDeterminantContainer,
     SparseHamiltonianContainer,
     SpinChannel,
     StabilityResult,
+    StateVectorContainer,
     Structure,
+    TaperingSpecification,
     Wavefunction,
     WavefunctionContainer,
     WavefunctionType,
@@ -109,15 +112,19 @@ from qdk_chemistry._core.data import (
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.circuit_executor_data import CircuitExecutorData
-from qdk_chemistry.data.controlled_unitary import ControlledUnitary
-from qdk_chemistry.data.encoding_validation import EncodingMismatchError, validate_encoding_compatibility
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.estimator_data import EnergyExpectationResult, MeasurementData
 from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
-from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
+
+# ``QubitHamiltonian`` is re-exported as a deprecated alias of ``QubitOperator``.
+from qdk_chemistry.data.qubit_operator import QubitHamiltonian, QubitOperator
 from qdk_chemistry.data.symmetries import Symmetries
 from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
+from qdk_chemistry.data.time_dependent_qubit_hamiltonian.base import TimeDependentQubitHamiltonian
+from qdk_chemistry.data.time_dependent_qubit_hamiltonian.containers.base import TimeDependentQubitHamiltonianContainer
+from qdk_chemistry.data.time_dependent_qubit_hamiltonian.containers.driven import DrivenContainer
+from qdk_chemistry.data.time_dependent_qubit_hamiltonian.driven import DrivenQubitHamiltonian
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
@@ -131,21 +138,21 @@ SettingsAreLockedError = SettingsAreLocked
 __all__ = [
     "AOType",
     "AlgorithmRef",
+    "AmplitudeContainer",
+    "AmplitudeType",
     "Ansatz",
     "BasisSet",
     "CanonicalFourCenterHamiltonianContainer",
-    "CasWavefunctionContainer",
     "CholeskyHamiltonianContainer",
     "Circuit",
     "CircuitExecutorData",
     "Configuration",
     "ConfigurationSet",
-    "ControlledUnitary",
-    "CoupledClusterContainer",
     "DataClass",
+    "DrivenContainer",
+    "DrivenQubitHamiltonian",
     "ElectronicStructureSettings",
     "Element",
-    "EncodingMismatchError",
     "EnergyExpectationResult",
     "FermionModeOrder",
     "FlatPartition",
@@ -154,9 +161,11 @@ __all__ = [
     "HamiltonianType",
     "LatticeGraph",
     "LayeredPartition",
-    "MP2Container",
+    "MajoranaMapping",
     "MeasurementData",
     "ModelOrbitals",
+    "NuclearGradients",
+    "NuclearHessian",
     "OrbitalType",
     "Orbitals",
     "PauliOperator",
@@ -165,7 +174,7 @@ __all__ = [
     "QpeResult",
     "QuantumErrorProfile",
     "QubitHamiltonian",
-    "SciWavefunctionContainer",
+    "QubitOperator",
     "SettingNotFound",
     "SettingNotFoundError",
     "SettingTypeMismatch",
@@ -175,18 +184,70 @@ __all__ = [
     "SettingsAreLocked",
     "SettingsAreLockedError",
     "Shell",
-    "SlaterDeterminantContainer",
     "SparseHamiltonianContainer",
     "SpinChannel",
     "StabilityResult",
+    "StateVectorContainer",
     "Structure",
     "Symmetries",
+    "TaperingSpecification",
     "TermPartition",
+    "TimeDependentQubitHamiltonian",
+    "TimeDependentQubitHamiltonianContainer",
     "UnitaryContainer",
     "UnitaryRepresentation",
     "Wavefunction",
     "WavefunctionContainer",
     "WavefunctionType",
     "get_current_ciaaw_version",
-    "validate_encoding_compatibility",
 ]
+
+
+# v1 names removed or renamed in v2.0, kept as deprecated aliases to their v2
+# replacement. The constructor signatures of the v2 replacements may differ from
+# the v1 classes; see the v1 -> v2 migration guide for details. These names are
+# intentionally omitted from ``__all__`` so ``import *`` does not pull them in.
+_DEPRECATED_ALIASES = {
+    "SlaterDeterminantContainer": "StateVectorContainer",
+    "CasWavefunctionContainer": "StateVectorContainer",
+    "SciWavefunctionContainer": "StateVectorContainer",
+    "MP2Container": "AmplitudeContainer",
+    "CoupledClusterContainer": "AmplitudeContainer",
+    "TimeEvolutionUnitary": "UnitaryRepresentation",
+    "TimeEvolutionUnitaryContainer": "UnitaryContainer",
+}
+
+
+def __getattr__(name: str):
+    """Resolve deprecated v1 data-class names removed or renamed in v2.0.
+
+    Args:
+        name: Attribute name requested from the ``qdk_chemistry.data`` module.
+
+    Returns:
+        The v2 replacement object for a deprecated v1 name.
+
+    Raises:
+        AttributeError: If the name is not a known deprecated alias.
+
+    """
+    if name in _DEPRECATED_ALIASES:
+        replacement_name = _DEPRECATED_ALIASES[name]
+        warnings.warn(
+            f"'qdk_chemistry.data.{name}' is deprecated and will be removed in a future release; "
+            f"use '{replacement_name}' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return globals()[replacement_name]
+    if name in ("EncodingMismatchError", "validate_encoding_compatibility"):
+        warnings.warn(
+            f"'qdk_chemistry.data.{name}' is deprecated and will be removed in a future release; "
+            "use the MajoranaMapping fermion-to-qubit workflow instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        from qdk_chemistry.data import encoding_validation  # noqa: PLC0415
+
+        return getattr(encoding_validation, name)
+    raise AttributeError(f"module 'qdk_chemistry.data' has no attribute '{name}'")

@@ -14,7 +14,7 @@
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/orbital_rotation.hpp>
 #include <qdk/chemistry/utils/valence_space.hpp>
 #include <stdexcept>
@@ -45,15 +45,15 @@ class ValenceActiveParametersTest : public ::testing::Test {
 
     water_wavefunction = water_wf;
 
-    Configuration config_truncated(
+    auto config_truncated = Configuration::from_spin_half_string(
         "22222");  // the orbitals of this config needs to be built specifically
     Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(
         water_orbitals->get_num_molecular_orbitals(), 5);
     Orbitals water_orbitals_truncated(coeffs, std::nullopt, std::nullopt,
-                                      basis_set, std::nullopt);
+                                      basis_set);
     std::shared_ptr<Orbitals> water_orbitals_truncated_ptr =
         std::make_shared<Orbitals>(water_orbitals_truncated);
-    auto wfn_container_truncated = std::make_unique<SlaterDeterminantContainer>(
+    auto wfn_container_truncated = std::make_unique<StateVectorContainer>(
         config_truncated, water_orbitals_truncated_ptr);
     water_wavefunction_truncated =
         std::make_shared<Wavefunction>(std::move(wfn_container_truncated));
@@ -79,16 +79,18 @@ class ValenceActiveParametersTest : public ::testing::Test {
     oh_wavefunction = oh_wf;
 
     // Create configuration for 8 electrons (4 doubly occupied orbitals)
-    Configuration config_ohp("222200000");  // 4 doubly occupied orbitals
-    auto ohp_wfn_container = std::make_unique<SlaterDeterminantContainer>(
-        config_ohp, base_orbitals_oh);
+    auto config_ohp = Configuration::from_spin_half_string(
+        "222200000");  // 4 doubly occupied orbitals
+    auto ohp_wfn_container =
+        std::make_unique<StateVectorContainer>(config_ohp, base_orbitals_oh);
     ohp_wavefunction =
         std::make_shared<Wavefunction>(std::move(ohp_wfn_container));
 
     // Create configuration for 10 electrons (5 doubly occupied orbitals)
-    Configuration config_ohn("222220000");  // 4 doubly occupied orbitals
-    auto ohn_wfn_container = std::make_unique<SlaterDeterminantContainer>(
-        config_ohn, base_orbitals_oh);
+    auto config_ohn = Configuration::from_spin_half_string(
+        "222220000");  // 4 doubly occupied orbitals
+    auto ohn_wfn_container =
+        std::make_unique<StateVectorContainer>(config_ohn, base_orbitals_oh);
     ohn_wavefunction =
         std::make_shared<Wavefunction>(std::move(ohn_wfn_container));
   }
@@ -250,9 +252,8 @@ std::shared_ptr<Wavefunction> make_minimal_wavefunction(
   for (size_t i = 0; i < single_count; ++i)
     config_str[pair_count + i] = unpaired;
 
-  return std::make_shared<Wavefunction>(
-      std::make_unique<SlaterDeterminantContainer>(Configuration(config_str),
-                                                   orbitals));
+  return std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+      Configuration::from_spin_half_string(config_str), orbitals));
 }
 
 // Single-atom row: element + spin split + expected sizing for both toggle
@@ -409,9 +410,10 @@ TEST_F(OrbitalRotationTest, IdentityRotationTest) {
       rotate_orbitals(test_orbitals_restricted, rotation_vector,
                       num_alpha_occupied_orbitals, num_beta_occupied_orbitals);
 
-  const auto& original_coeffs =
-      test_orbitals_restricted->get_coefficients_alpha();
-  const auto& rotated_coeffs = rotated_orbitals->get_coefficients_alpha();
+  const auto& original_coeffs = test_orbitals_restricted->coefficients()->block(
+      {axes::alpha(), axes::alpha()});
+  const auto& rotated_coeffs =
+      rotated_orbitals->coefficients()->block({axes::alpha(), axes::alpha()});
 
   // With zero rotation, coefficients should be the same
   EXPECT_TRUE(original_coeffs.isApprox(rotated_coeffs,
@@ -434,9 +436,10 @@ TEST_F(OrbitalRotationTest, UnitaryRotationTest) {
                       num_alpha_occupied_orbitals, num_beta_occupied_orbitals);
 
   const auto& S = test_orbitals_restricted->get_overlap_matrix();
-  const auto& original_coeffs =
-      test_orbitals_restricted->get_coefficients_alpha();
-  const auto& rotated_coeffs = rotated_orbitals->get_coefficients_alpha();
+  const auto& original_coeffs = test_orbitals_restricted->coefficients()->block(
+      {axes::alpha(), axes::alpha()});
+  const auto& rotated_coeffs =
+      rotated_orbitals->coefficients()->block({axes::alpha(), axes::alpha()});
 
   // Compute the transformation matrix U = C_original^T * S * C_rotated
   Eigen::MatrixXd U = original_coeffs.transpose() * S * rotated_coeffs;

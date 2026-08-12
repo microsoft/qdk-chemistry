@@ -55,7 +55,8 @@ if(MACIS_ENABLE_PYTHON)
 endif()
 
 # Tests
+option( MACIS_ENABLE_TESTS "Build MACIS Tests" ON )
 include(CTest)
-if(BUILD_TESTING)
+if(BUILD_TESTING AND MACIS_ENABLE_TESTS)
   add_subdirectory(tests)
 endif()

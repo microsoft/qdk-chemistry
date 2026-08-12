@@ -12,6 +12,7 @@ from qdk_chemistry import algorithms
 from qdk_chemistry.algorithms import (
     ActiveSpaceSelector,
     DynamicalCorrelationCalculator,
+    EffectiveHamiltonianConstructor,
     HamiltonianConstructor,
     MultiConfigurationCalculator,
     MultiConfigurationScf,
@@ -21,23 +22,29 @@ from qdk_chemistry.algorithms import (
     StabilityChecker,
     StatePreparation,
 )
+from qdk_chemistry.algorithms.hashing import run_content_hash
 from qdk_chemistry.data import (
+    AmplitudeContainer,
+    AmplitudeType,
     Ansatz,
     BasisSet,
     CanonicalFourCenterHamiltonianContainer,
-    CasWavefunctionContainer,
     Configuration,
-    CoupledClusterContainer,
     Hamiltonian,
     Orbitals,
     Settings,
-    SlaterDeterminantContainer,
     StabilityResult,
+    StateVectorContainer,
     Structure,
     Wavefunction,
 )
+from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix, spin_channel_vector
+from qdk_chemistry.data.symmetry import (
+    axes,
+    spin_index_set,
+)
 
-from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals
+from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals, create_test_wavefunction
 
 
 class MockLocalizationPy(OrbitalLocalizer):
@@ -102,7 +109,7 @@ class MockMultiConfigurationCalculator(MultiConfigurationCalculator):
 
     def _run_impl(self, hamiltonian, _: int, __: int):
         """A simple test implementation of the calculate method."""
-        sd = SlaterDeterminantContainer(Configuration("20"), hamiltonian.get_orbitals())
+        sd = StateVectorContainer(Configuration.from_spin_half_string("20"), hamiltonian.get_orbitals())
         return 0.0, Wavefunction(sd)
 
     def name(self) -> str:
@@ -126,7 +133,7 @@ class MockProjectedMultiConfigurationCalculator(ProjectedMultiConfigurationCalcu
         if not configurations:
             raise RuntimeError("Empty configuration set")
 
-        sd = SlaterDeterminantContainer(configurations[0], hamiltonian.get_orbitals())
+        sd = StateVectorContainer(configurations[0], hamiltonian.get_orbitals())
         return 0.0, Wavefunction(sd)
 
     def name(self) -> str:
@@ -188,8 +195,8 @@ class MockScfSolver(ScfSolver):
         energies = np.array([0.0, 1.0])
         basis_set = create_test_basis_set(2)
         orbitals = Orbitals(coeffs, energies, None, basis_set)
-        hf_config = Configuration("20")
-        wavefunction = Wavefunction(SlaterDeterminantContainer(hf_config, orbitals))
+        hf_config = Configuration.from_spin_half_string("20")
+        wavefunction = Wavefunction(StateVectorContainer(hf_config, orbitals))
         return 0.0, wavefunction
 
     def name(self) -> str:
@@ -240,17 +247,19 @@ class MockActiveSpaceSelector(ActiveSpaceSelector):
             )
         )
         # Create a new orbitals object with active space data
-        coeffs_data = orbitals.get_coefficients()
-        energies_data = orbitals.get_energies() if orbitals.get_energies() is not None else None
+        coefficients = orbitals.coefficients()
+        coeffs_alpha = spin_channel_matrix(coefficients, axes.alpha())
+        coeffs_beta = spin_channel_matrix(coefficients, axes.beta())
+        energies = orbitals.energies()
+        if energies is not None:
+            energies_alpha = spin_channel_vector(energies, axes.alpha())
+            energies_beta = spin_channel_vector(energies, axes.beta())
+        else:
+            energies_alpha = None
+            energies_beta = None
 
-        # Check if this is unrestricted (returns tuples) or restricted (returns single arrays)
-        if isinstance(coeffs_data, tuple):
-            # Unrestricted case - use alpha/beta constructor
-            coeffs_alpha, coeffs_beta = coeffs_data
-            if energies_data is not None:
-                energies_alpha, energies_beta = energies_data
-            else:
-                energies_alpha, energies_beta = None, None
+        if orbitals.is_unrestricted():
+            nmo = coeffs_alpha.shape[1]
             new_orbitals = Orbitals(
                 coeffs_alpha,
                 coeffs_beta,
@@ -258,18 +267,21 @@ class MockActiveSpaceSelector(ActiveSpaceSelector):
                 energies_beta,
                 None,
                 orbitals.get_basis_set(),
-                [indices, indices, [], []],
+                spin_index_set(nmo, indices, indices, equivalent=False),
+                spin_index_set(nmo, [], [], equivalent=False),
             )
-            return Wavefunction(SlaterDeterminantContainer(wavefunction.get_active_determinants()[0], new_orbitals))
-        # Restricted case - use restricted constructor
+            return Wavefunction(StateVectorContainer(wavefunction.get_active_determinants()[0], new_orbitals))
+
+        nmo = coeffs_alpha.shape[1]
         new_orbitals = Orbitals(
-            coeffs_data,
-            energies_data,
+            coeffs_alpha,
+            energies_alpha,
             None,
             orbitals.get_basis_set(),
-            [indices, []],
+            spin_index_set(nmo, indices, indices),
+            spin_index_set(nmo, [], []),
         )
-        return Wavefunction(SlaterDeterminantContainer(wavefunction.get_active_determinants()[0], new_orbitals))
+        return Wavefunction(StateVectorContainer(wavefunction.get_active_determinants()[0], new_orbitals))
 
     def name(self) -> str:
         """Return the algorithm name."""
@@ -294,9 +306,9 @@ class MockMultiConfigurationScf(MultiConfigurationScf):
         # Simple test implementation - return basic energy and wavefunction
         energy = -1.5  # Mock energy value
         hf_config_str = "20"
-        hf_config = Configuration(hf_config_str)
+        hf_config = Configuration.from_spin_half_string(hf_config_str)
         orbitals = create_test_orbitals(2)
-        wavefunction = Wavefunction(SlaterDeterminantContainer(hf_config, orbitals))
+        wavefunction = Wavefunction(StateVectorContainer(hf_config, orbitals))
         return energy, wavefunction
 
     def name(self) -> str:
@@ -343,12 +355,29 @@ class MockCoupledClusterCalculator(DynamicalCorrelationCalculator):
         # Get reference determinants from the original wavefunction
         original_wavefunction = ansatz.get_wavefunction()
 
-        # Create CoupledClusterContainer with T1 and T2 amplitudes
-        cc_container = CoupledClusterContainer(orbs, original_wavefunction, t1, t2)
+        # Create AmplitudeContainer with T1 and T2 amplitudes
+        cc_container = AmplitudeContainer(orbs, original_wavefunction, AmplitudeType.CoupledCluster, t1, t2)
 
         updated_wavefunction = Wavefunction(cc_container)
 
         return -10.0, updated_wavefunction, None
+
+
+class MockEffectiveHamiltonianConstructor(EffectiveHamiltonianConstructor):
+    """A dummy effective-Hamiltonian constructor for testing purposes."""
+
+    def __init__(self):
+        super().__init__()
+        self._settings = Settings()
+
+    def name(self):
+        """Return the algorithm name."""
+        return "mock_effective_hamiltonian_constructor"
+
+    def _run_impl(self, reference, hamiltonian, p_indices):
+        """Validate the inputs and echo the Hamiltonian for the inheritance test."""
+        self._validate_inputs(reference, hamiltonian, p_indices)
+        return hamiltonian
 
 
 class TestAlgorithmClasses:
@@ -376,10 +405,10 @@ class TestAlgorithmClasses:
     @pytest.fixture
     def test_wavefunction(self, basic_orbitals):
         """Create a test wavefunction."""
-        det1 = Configuration("20")
+        det1 = Configuration.from_spin_half_string("20")
         coeffs = np.array([1.0])  # Single determinant with coefficient 1.0
 
-        container = CasWavefunctionContainer(coeffs, [det1], basic_orbitals)
+        container = StateVectorContainer(coeffs, [det1], basic_orbitals)
         return Wavefunction(container)
 
     @pytest.fixture
@@ -433,7 +462,7 @@ class TestAlgorithmClasses:
 
         # Test calculate method with configurations
         h = create_test_hamiltonian(2)
-        configurations = [Configuration("20"), Configuration("02")]
+        configurations = [Configuration.from_spin_half_string("20"), Configuration.from_spin_half_string("02")]
         energy, result = pmc_calc.run(h, configurations)
         assert isinstance(energy, float)
         assert isinstance(result, Wavefunction)
@@ -449,7 +478,9 @@ class TestAlgorithmClasses:
         assert isinstance(settings, Settings)
 
         # Test prepare_state method
-        wavefunction = Wavefunction(SlaterDeterminantContainer(Configuration("20"), create_test_orbitals(2)))
+        wavefunction = Wavefunction(
+            StateVectorContainer(Configuration.from_spin_half_string("20"), create_test_orbitals(2))
+        )
         circuit = state_prep.run(wavefunction)
         assert isinstance(circuit, str)
         assert circuit == "mock_circuit_representation"
@@ -528,15 +559,13 @@ class TestAlgorithmClasses:
         energies = np.array([0.0, 1.0, 2.0, 3.0])
         orbitals = Orbitals(coeffs, energies, None, create_test_basis_set(4))
 
-        wavefunction = Wavefunction(SlaterDeterminantContainer(Configuration("2200"), orbitals))
+        wavefunction = Wavefunction(StateVectorContainer(Configuration.from_spin_half_string("2200"), orbitals))
 
         selected_wfn = selector.run(wavefunction)
         active_orbitals = selected_wfn.get_orbitals()
         assert isinstance(active_orbitals, Orbitals)
         assert active_orbitals.has_active_space()
-        active_indices_pair = active_orbitals.get_active_space_indices()
-        # For restricted case (which we're using here), the first element has the indices
-        active_indices = active_indices_pair[0]  # alpha indices
+        active_indices = spin_channel_indices(active_orbitals.active_indices(), axes.alpha())
         assert len(active_indices) <= 4  # Should not exceed num_active_orbitals
         assert all(isinstance(idx, int) for idx in active_indices)
 
@@ -612,6 +641,19 @@ class TestAlgorithmClasses:
         assert t2_ab is not None
         assert t2_ab.shape == (1,)
         assert np.isclose(t2_ab[0], 0.005)
+
+    def test_effective_hamiltonian_constructor_inheritance(self):
+        """Test that EffectiveHamiltonianConstructor can be inherited from Python."""
+        constructor = MockEffectiveHamiltonianConstructor()
+        assert isinstance(constructor, EffectiveHamiltonianConstructor)
+
+        assert isinstance(constructor.settings(), Settings)
+
+        reference = create_test_wavefunction()
+        hamiltonian = create_test_hamiltonian(2)
+        p_indices = spin_index_set(2, [0], [0])
+        result = constructor.run(reference, hamiltonian, p_indices)
+        assert isinstance(result, Hamiltonian)
 
     def test_scf_solver_registration(self):
         """Test that SCF solver can be registered and used."""
@@ -841,6 +883,23 @@ class TestAlgorithmClasses:
             settings["list_param"] = [1, 2, 3]
             assert settings["list_param"] == [1, 2, 3]
 
+    def test_run_content_hash_rejects_unsupported_argument_type(self):
+        """Test algorithm hashing rejects non-deterministic unsupported argument types."""
+
+        class UnsupportedArgument:
+            pass
+
+        with pytest.raises(TypeError, match="Unsupported hash argument type"):
+            run_content_hash("test_type", "test_name", Settings(), UnsupportedArgument())
+
+    def test_run_content_hash_disambiguates_argument_types(self):
+        """Test algorithm hashing tags argument types to avoid cache collisions."""
+        values = [None, False, 0, 0.0, "", b"", [], (), {}, np.array([], dtype=np.float64)]
+
+        hashes = [run_content_hash("test_type", "test_name", Settings(), value) for value in values]
+
+        assert len(set(hashes)) == len(values)
+
     def test_abstract_methods_required(self):
         """Test that abstract methods must be implemented."""
         # Note: These classes are not currently implemented as abstract in the C++ bindings
@@ -891,7 +950,7 @@ class TestAlgorithmClasses:
         coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
         basis_set = create_test_basis_set(2)
         orbitals = Orbitals(coeffs, None, None, basis_set)
-        wavefunction = Wavefunction(SlaterDeterminantContainer(Configuration("20"), orbitals))
+        wavefunction = Wavefunction(StateVectorContainer(Configuration.from_spin_half_string("20"), orbitals))
 
         # Test with orbital indices
         result = localizer.run(wavefunction, [0, 1], [0, 1])
@@ -1085,7 +1144,7 @@ class TestAlgorithmClasses:
         coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
         basis_set = create_test_basis_set(2)
         orbitals = Orbitals(coeffs, None, None, basis_set)
-        sd_container = SlaterDeterminantContainer(Configuration("20"), orbitals)
+        sd_container = StateVectorContainer(Configuration.from_spin_half_string("20"), orbitals)
         wavefunction = Wavefunction(sd_container)
 
         # Test run method

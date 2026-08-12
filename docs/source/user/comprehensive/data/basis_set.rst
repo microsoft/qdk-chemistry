@@ -81,19 +81,19 @@ The library supports three methods for loading basis sets:
 .. note::
    If a basis set includes an :term:`ECP` (Effective Core Potential), it will be automatically loaded. ECPs are commonly used to replace core electrons with pseudopotentials, particularly for heavy atoms.
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
-      :language: cpp
-      :start-after: // start-cell-loading
-      :end-before: // end-cell-loading
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/basis_set.py
       :language: python
       :start-after: # start-cell-loading
       :end-before: # end-cell-loading
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
+      :language: cpp
+      :start-after: // start-cell-loading
+      :end-before: // end-cell-loading
 
 .. seealso::
    For a complete list of available basis sets, see the :doc:`Supported Basis Sets <../basis_functionals>` documentation.
@@ -105,19 +105,19 @@ Creating a basis set
    In most cases, you should use the built-in basis set library rather than creating basis sets manually.
    Manual creation is primarily for advanced use cases or when working with custom basis sets not available in the library.
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
-      :language: cpp
-      :start-after: // start-cell-create
-      :end-before: // end-cell-create
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/basis_set.py
       :language: python
       :start-after: # start-cell-create
       :end-before: # end-cell-create
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
+      :language: cpp
+      :start-after: // start-cell-create
+      :end-before: // end-cell-create
 
 Accessing basis set data
 ------------------------
@@ -129,13 +129,6 @@ This ensures that the basis set data remains consistent and prevents accidental 
    If you need to modify a basis set after creation, you should create a new BasisSet object with the desired
    changes rather than trying to modify an existing one.
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
-      :language: cpp
-      :start-after: // start-cell-access
-      :end-before: // end-cell-access
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/basis_set.py
@@ -143,17 +136,17 @@ This ensures that the basis set data remains consistent and prevents accidental 
       :start-after: # start-cell-access
       :end-before: # end-cell-access
 
-Working with shells
--------------------
-
-The ``Shell`` structure contains information about a group of basis functions:
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
       :language: cpp
-      :start-after: // start-cell-shells
-      :end-before: // end-cell-shells
+      :start-after: // start-cell-access
+      :end-before: // end-cell-access
+
+Working with shells
+-------------------
+
+The ``Shell`` structure contains information about a group of basis functions:
 
 .. tab:: Python API
 
@@ -161,6 +154,13 @@ The ``Shell`` structure contains information about a group of basis functions:
       :language: python
       :start-after: # start-cell-shells
       :end-before: # end-cell-shells
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
+      :language: cpp
+      :start-after: // start-cell-shells
+      :end-before: // end-cell-shells
 
 Serialization
 -------------
@@ -230,13 +230,6 @@ HDF5 representation of a :class:`~qdk_chemistry.data.BasisSet` has the following
    └── metadata/           # Group
        └── name            # Attribute: string value of the basis set name
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
-      :language: cpp
-      :start-after: // start-cell-serialization
-      :end-before: // end-cell-serialization
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/basis_set.py
@@ -244,17 +237,17 @@ HDF5 representation of a :class:`~qdk_chemistry.data.BasisSet` has the following
       :start-after: # start-cell-serialization
       :end-before: # end-cell-serialization
 
-Utility functions
------------------
-
-The :class:`~qdk_chemistry.data.BasisSet` class provides several static utility functions:
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
       :language: cpp
-      :start-after: // start-cell-utility-functions
-      :end-before: // end-cell-utility-functions
+      :start-after: // start-cell-serialization
+      :end-before: // end-cell-serialization
+
+Utility functions
+-----------------
+
+The :class:`~qdk_chemistry.data.BasisSet` class provides several static utility functions:
 
 .. tab:: Python API
 
@@ -263,6 +256,13 @@ The :class:`~qdk_chemistry.data.BasisSet` class provides several static utility 
       :start-after: # start-cell-utility-functions
       :end-before: # end-cell-utility-functions
 
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
+      :language: cpp
+      :start-after: // start-cell-utility-functions
+      :end-before: // end-cell-utility-functions
+
 Predefined basis sets
 ---------------------
 
@@ -270,19 +270,19 @@ QDK/Chemistry provides access to a library of standard basis sets commonly used 
 These predefined basis sets can be easily loaded without having to manually specify the basis functions.
 For a complete list of available basis sets and their specifications, see the :doc:`Supported Basis Sets <../basis_functionals>` documentation.
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
-      :language: cpp
-      :start-after: // start-cell-library
-      :end-before: // end-cell-library
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/basis_set.py
       :language: python
       :start-after: # start-cell-library
       :end-before: # end-cell-library
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
+      :language: cpp
+      :start-after: // start-cell-library
+      :end-before: // end-cell-library
 
 .. note::
    The basis set library includes popular basis sets such as :term:`STO`-nG, Pople basis sets (3-21G, 6-31G, etc.), correlation-consistent basis sets (cc-pVDZ, cc-pVTZ, etc.), and more.

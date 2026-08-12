@@ -8,7 +8,7 @@
 from abc import abstractmethod
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
-from qdk_chemistry.data import QubitHamiltonian, Settings
+from qdk_chemistry.data import QubitOperator, Settings
 
 __all__ = ["TermGrouper", "TermGrouperFactory"]
 
@@ -24,13 +24,13 @@ class TermGrouperSettings(Settings):
 class TermGrouper(Algorithm):
     """Abstract base class for algorithms that partition Hamiltonian terms.
 
-    A ``TermGrouper`` consumes a :class:`~qdk_chemistry.data.QubitHamiltonian`
-    and returns a *new* ``QubitHamiltonian`` whose
-    :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition` is populated
+    A ``TermGrouper`` consumes a :class:`~qdk_chemistry.data.QubitOperator`
+    and returns a *new* ``QubitOperator`` whose
+    :attr:`~qdk_chemistry.data.QubitOperator.term_partition` is populated
     with the grouping computed by the strategy.
 
     Subclasses implement ``_run_impl``, which must return a new
-    ``QubitHamiltonian`` (the input must not be mutated).
+    ``QubitOperator`` (the input must not be mutated).
 
     """
 
@@ -44,15 +44,15 @@ class TermGrouper(Algorithm):
         return "term_grouper"
 
     @abstractmethod
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> QubitHamiltonian:
-        """Compute a term partition and return a new ``QubitHamiltonian`` carrying it.
+    def _run_impl(self, qubit_hamiltonian: QubitOperator) -> QubitOperator:
+        """Compute a term partition and return a new ``QubitOperator`` carrying it.
 
         Args:
             qubit_hamiltonian: Hamiltonian whose Pauli terms should be partitioned.
 
         Returns:
-            QubitHamiltonian: A copy of the input with
-            :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition` populated.
+            QubitOperator: A copy of the input with
+            :attr:`~qdk_chemistry.data.QubitOperator.term_partition` populated.
 
         """
 

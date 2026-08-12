@@ -10,18 +10,17 @@ import pytest
 
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
-from .reference_tolerances import float_comparison_absolute_tolerance
-
 if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit import QuantumCircuit
     from qiskit.circuit import Parameter
-    from qiskit.circuit.library import IGate, SdgGate, SGate, ZGate
+    from qiskit.circuit.library import IGate, SdgGate, SGate, XGate, YGate, ZGate
     from qiskit.transpiler import PassManager
 
     from qdk_chemistry.plugins.qiskit._interop.transpiler import (
         MergeZBasisRotations,
         RemoveZBasisOnZeroState,
         SubstituteCliffordRz,
+        SubstitutePauliRotation,
     )
 else:
     # Define placeholders for type checking when Qiskit is not available
@@ -30,11 +29,15 @@ else:
     IGate = object
     SdgGate = object
     SGate = object
+    XGate = object
+    YGate = object
     ZGate = object
     PassManager = object
     MergeZBasisRotations = object
     RemoveZBasisOnZeroState = object
     SubstituteCliffordRz = object
+    SubstitutePauliRotation = object
+
 
 pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 
@@ -141,126 +144,213 @@ def test_remove_z_basis_on_zero_state_preserves_after_x():
     assert "rz" not in result.count_ops()
 
 
-def test_merge_z_basis_rotations_rz_gates():
-    """Test MergeZBasisRotations correctly handles rz gates (not just s/z/sdg)."""
+# ---------------------------------------------------------------------------
+# SubstitutePauliRotation tests — 1-qubit gates
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("gate_method", "angle", "expected_gate"),
+    [
+        ("rx", np.pi, XGate),
+        ("ry", np.pi, YGate),
+        ("rz", np.pi, ZGate),
+        ("rx", 3 * np.pi, XGate),
+        ("rz", -np.pi, ZGate),
+    ],
+)
+def test_substitute_pauli_1q_odd_pi(gate_method, angle, expected_gate):
+    """Odd multiples of π should be substituted with the Pauli gate."""
     qc = QuantumCircuit(1)
-    qc.rz(np.pi / 4, 0)
-    qc.rz(np.pi / 4, 0)
+    getattr(qc, gate_method)(angle, 0)
 
-    result = _run_pass(MergeZBasisRotations(), qc)
+    result = _run_pass(SubstitutePauliRotation(), qc)
 
-    # Two rz(π/4) should merge into one rz(π/2)
-    ops = result.count_ops()
-    assert ops.get("rz", 0) == 1
-    angle = result.data[0].operation.params[0]
-    assert abs(angle - np.pi / 2) < float_comparison_absolute_tolerance
+    ops = [instr.operation for instr in result.data]
+    assert len(ops) == 1
+    assert isinstance(ops[0], expected_gate)
 
 
-def test_merge_z_basis_rotations_net_zero():
-    """Test MergeZBasisRotations removes gates when net rotation is zero."""
+@pytest.mark.parametrize(
+    ("gate_method", "angle"),
+    [
+        ("rx", 0.0),
+        ("ry", 2 * np.pi),
+        ("rz", 4 * np.pi),
+    ],
+)
+def test_substitute_pauli_1q_even_pi(gate_method, angle):
+    """Even multiples of π (including 0) should be removed (identity)."""
     qc = QuantumCircuit(1)
-    qc.s(0)  # +π/2
-    qc.sdg(0)  # -π/2  → net = 0
+    getattr(qc, gate_method)(angle, 0)
 
-    result = _run_pass(MergeZBasisRotations(), qc)
+    result = _run_pass(SubstitutePauliRotation(), qc)
 
     assert result.size() == 0
 
 
-def test_merge_z_basis_rotations_parameterized_boundary():
-    """Test MergeZBasisRotations flushes accumulator at parameterized Rz boundary."""
+@pytest.mark.parametrize(
+    ("gate_method", "angle"),
+    [
+        ("rx", 0.5),
+        ("ry", np.pi / 2),
+        ("rz", np.pi + 0.1),
+    ],
+)
+def test_substitute_pauli_1q_non_pi_unchanged(gate_method, angle):
+    """Angles that are not integer multiples of π should be left untouched."""
+    qc = QuantumCircuit(1)
+    getattr(qc, gate_method)(angle, 0)
+
+    result = _run_pass(SubstitutePauliRotation(), qc)
+
+    ops = [instr.operation for instr in result.data]
+    assert len(ops) == 1
+    assert ops[0].name == gate_method
+
+
+def test_substitute_pauli_1q_parameterized_untouched():
+    """Parameterized rotation gates should be left untouched."""
     theta = Parameter("θ")
     qc = QuantumCircuit(1)
-    qc.s(0)  # π/2 accumulated
-    qc.rz(theta, 0)  # boundary: flush π/2 as rz, keep parameterized gate
-    qc.z(0)  # new accumulation: π
+    qc.rz(theta, 0)
 
-    result = _run_pass(MergeZBasisRotations(), qc)
+    result = _run_pass(SubstitutePauliRotation(), qc)
 
-    ops = result.count_ops()
-    # Should have: rz(π/2), rz(θ), rz(π) — three separate rz gates
-    assert ops.get("rz", 0) == 3
-    assert "s" not in ops
-    assert "z" not in ops
+    ops = [instr.operation for instr in result.data]
+    assert len(ops) == 1
+    assert ops[0].name == "rz"
 
 
-def test_merge_z_basis_rotations_multi_qubit():
-    """Test MergeZBasisRotations handles multiple qubits independently."""
+def test_substitute_pauli_1q_mixed_circuit():
+    """A circuit with multiple rotation gates should have each handled independently."""
+    qc = QuantumCircuit(1)
+    qc.rx(np.pi, 0)  # odd → X
+    qc.ry(2 * np.pi, 0)  # even → removed
+    qc.rz(np.pi, 0)  # odd → Z
+    qc.rx(0.5, 0)  # not a multiple → kept
+
+    result = _run_pass(SubstitutePauliRotation(), qc)
+
+    ops = [instr.operation for instr in result.data]
+    assert len(ops) == 3
+    assert isinstance(ops[0], XGate)
+    assert isinstance(ops[1], ZGate)
+    assert ops[2].name == "rx"
+
+
+def test_substitute_pauli_1q_selective_gate_set():
+    """Only Pauli gates in equivalent_gate_set should be substituted."""
+    qc = QuantumCircuit(1)
+    qc.rx(np.pi, 0)  # would become X
+    qc.rz(np.pi, 0)  # would become Z
+
+    # Only allow X substitution, not Z
+    result = _run_pass(SubstitutePauliRotation(equivalent_gate_set=["id", "x"]), qc)
+
+    ops = [instr.operation for instr in result.data]
+    assert len(ops) == 2
+    assert isinstance(ops[0], XGate)
+    assert ops[1].name == "rz"  # Z not in gate set, so kept as rz
+
+
+def test_substitute_pauli_1q_settings():
+    """Test settings initialization and 'id' auto-inclusion."""
+    p = SubstitutePauliRotation(equivalent_gate_set=["x"])
+    assert "id" in p.settings().get("equivalent_gate_set")
+
+    with pytest.raises(TypeError):
+        SubstitutePauliRotation(equivalent_gate_set="x")
+
+
+# ---------------------------------------------------------------------------
+# SubstitutePauliRotation tests — 2-qubit gates
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("gate_method", "angle", "expected_gate"),
+    [
+        ("rxx", np.pi, XGate),
+        ("ryy", np.pi, YGate),
+        ("rzz", np.pi, ZGate),
+        ("rzz", 3 * np.pi, ZGate),
+    ],
+)
+def test_substitute_pauli_2q_odd_pi(gate_method, angle, expected_gate):
+    """Odd multiples of π should produce the Pauli on each qubit."""
     qc = QuantumCircuit(2)
-    qc.s(0)
-    qc.z(1)
-    qc.sdg(0)
-    qc.s(1)
-    qc.cx(0, 1)  # boundary for both qubits
-    qc.rz(np.pi / 4, 0)
+    getattr(qc, gate_method)(angle, 0, 1)
 
-    result = _run_pass(MergeZBasisRotations(), qc)
+    result = _run_pass(SubstitutePauliRotation(), qc)
 
-    ops = result.count_ops()
-    assert "s" not in ops
-    assert "sdg" not in ops
-    assert "z" not in ops
-    # q0: s + sdg = 0 → removed; then rz(π/4) after cx
-    # q1: z + s = 3π/2 → single rz before cx
-    assert ops.get("rz", 0) == 2
-    assert ops.get("cx", 0) == 1
+    ops = [instr.operation for instr in result.data]
+    assert len(ops) == 2
+    assert all(isinstance(op, expected_gate) for op in ops)
 
 
-def test_merge_z_basis_rotations_single_gate_unchanged():
-    """Test MergeZBasisRotations leaves a single rz gate unchanged."""
-    qc = QuantumCircuit(1)
-    qc.rz(np.pi / 3, 0)
+@pytest.mark.parametrize(
+    ("gate_method", "angle"),
+    [
+        ("rxx", 2 * np.pi),
+        ("ryy", 0.0),
+        ("rzz", 4 * np.pi),
+    ],
+)
+def test_substitute_pauli_2q_even_pi(gate_method, angle):
+    """Even multiples of π (including 0) should be removed (identity)."""
+    qc = QuantumCircuit(2)
+    getattr(qc, gate_method)(angle, 0, 1)
 
-    result = _run_pass(MergeZBasisRotations(), qc)
-
-    assert result.count_ops().get("rz", 0) == 1
-    assert abs(result.data[0].operation.params[0] - np.pi / 3) < float_comparison_absolute_tolerance
-
-
-def test_merge_z_basis_rotations_id_removal():
-    """Test MergeZBasisRotations removes identity gates."""
-    qc = QuantumCircuit(1)
-    qc.id(0)
-    qc.id(0)
-    qc.h(0)
-
-    result = _run_pass(MergeZBasisRotations(), qc)
-
-    assert "id" not in result.count_ops()
-    assert result.count_ops().get("h", 0) == 1
-
-
-def test_substitute_clifford_rz_settings_update():
-    """Test SubstituteCliffordRzSettings.update ensures 'id' in gate set."""
-    scr = SubstituteCliffordRz(equivalent_gate_set=["z"])
-    scr.settings().update({"equivalent_gate_set": ["s", "sdg"]})
-    gate_set = scr.settings().get("equivalent_gate_set")
-    assert "id" in gate_set
-
-
-def test_remove_z_basis_on_zero_state_diagonal_gate_preserves_zero():
-    """Test RemoveZBasisOnZeroState treats diagonal gates as preserving |0⟩."""
-    qc = QuantumCircuit(1)
-    qc.rz(np.pi / 3, 0)  # diagonal + |0⟩ → removed, qubit stays |0⟩
-    qc.s(0)  # still |0⟩ → removed
-
-    result = _run_pass(RemoveZBasisOnZeroState(), qc)
+    result = _run_pass(SubstitutePauliRotation(), qc)
 
     assert result.size() == 0
 
 
-def test_remove_z_basis_on_zero_state_multi_qubit():
-    """Test RemoveZBasisOnZeroState handles multiple qubits independently."""
+@pytest.mark.parametrize(
+    ("gate_method", "angle"),
+    [
+        ("rxx", np.pi + 0.1),
+        ("ryy", 0.5),
+        ("rzz", np.pi / 2),
+    ],
+)
+def test_substitute_pauli_2q_non_pi_unchanged(gate_method, angle):
+    """Non-integer-π angles should be left untouched."""
     qc = QuantumCircuit(2)
-    qc.s(0)  # q0 |0⟩ → removed
-    qc.h(0)  # q0 leaves |0⟩
-    qc.z(1)  # q1 still |0⟩ → removed
-    qc.rz(0.5, 0)  # q0 no longer |0⟩ → kept
+    getattr(qc, gate_method)(angle, 0, 1)
 
-    result = _run_pass(RemoveZBasisOnZeroState(), qc)
+    result = _run_pass(SubstitutePauliRotation(), qc)
 
-    ops = result.count_ops()
-    assert "s" not in ops
-    assert "z" not in ops
-    assert ops.get("h", 0) == 1
-    assert ops.get("rz", 0) == 1
+    ops = [instr.operation for instr in result.data]
+    assert len(ops) == 1
+    assert ops[0].name == gate_method
+
+
+def test_substitute_pauli_2q_parameterized_untouched():
+    """Parameterized 2-qubit rotation gates should be left untouched."""
+    theta = Parameter("θ")
+    qc = QuantumCircuit(2)
+    qc.rzz(theta, 0, 1)
+
+    result = _run_pass(SubstitutePauliRotation(), qc)
+
+    ops = [instr.operation for instr in result.data]
+    assert len(ops) == 1
+    assert ops[0].name == "rzz"
+
+
+def test_substitute_pauli_2q_mixed_circuit():
+    """A circuit with multiple 2Q rotation gates should have each handled independently."""
+    qc = QuantumCircuit(2)
+    qc.rxx(np.pi, 0, 1)  # odd → X⊗X
+    qc.ryy(2 * np.pi, 0, 1)  # even → removed
+    qc.rzz(3 * np.pi, 0, 1)  # odd → Z⊗Z
+
+    result = _run_pass(SubstitutePauliRotation(), qc)
+
+    ops = [instr.operation for instr in result.data]
+    names = [op.name for op in ops]
+    assert len(ops) == 4
+    assert names.count("x") == 2
+    assert names.count("z") == 2

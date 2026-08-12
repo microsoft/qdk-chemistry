@@ -22,6 +22,10 @@ try:
 except ImportError:
     PYSCF_AVAILABLE = False
 
+# Algorithm types that ship as an interface only, with no registered implementation
+# and therefore an empty default name. Remove entries here as implementations land.
+INTERFACE_ONLY_TYPES = {"effective_hamiltonian_constructor"}
+
 
 class TestRegistryShowDefault:
     """Test the show_default function in the registry module."""
@@ -37,6 +41,8 @@ class TestRegistryShowDefault:
         expected_types = [
             "active_space_selector",
             "dynamical_correlation_calculator",
+            "effective_hamiltonian_constructor",
+            "geometry_optimizer",
             "hamiltonian_constructor",
             "orbital_localizer",
             "multi_configuration_calculator",
@@ -44,7 +50,7 @@ class TestRegistryShowDefault:
             "projected_multi_configuration_calculator",
             "scf_solver",
             "stability_checker",
-            "energy_estimator",
+            "expectation_estimator",
             "state_prep",
             "qubit_mapper",
             "circuit_executor",
@@ -57,7 +63,10 @@ class TestRegistryShowDefault:
         for algorithm_type in expected_types:
             assert algorithm_type in defaults, f"Expected algorithm type '{algorithm_type}' not found in defaults"
             assert isinstance(defaults[algorithm_type], str), f"Default for '{algorithm_type}' should be a string"
-            assert len(defaults[algorithm_type]) > 0, f"Default for '{algorithm_type}' should not be empty"
+            if algorithm_type in INTERFACE_ONLY_TYPES:
+                assert defaults[algorithm_type] == "", f"Interface-only '{algorithm_type}' should have an empty default"
+            else:
+                assert len(defaults[algorithm_type]) > 0, f"Default for '{algorithm_type}' should not be empty"
 
     def test_show_default_returns_string_for_specific_type(self):
         """Test that show_default returns a string when called with a specific type."""
@@ -70,6 +79,11 @@ class TestRegistryShowDefault:
         default_hamiltonian_constructor = registry.show_default("hamiltonian_constructor")
         assert isinstance(default_hamiltonian_constructor, str)
         assert default_hamiltonian_constructor == "qdk"
+
+        # Test for effective Hamiltonian constructor
+        default_effective_hamiltonian_constructor = registry.show_default("effective_hamiltonian_constructor")
+        assert isinstance(default_effective_hamiltonian_constructor, str)
+        assert default_effective_hamiltonian_constructor == ""
 
         # Test for multi configuration SCF
         if PYSCF_AVAILABLE:
@@ -92,15 +106,15 @@ class TestRegistryShowDefault:
         assert isinstance(default_circuit_executor, str)
         assert default_circuit_executor == "qdk_sparse_state_simulator"
 
-        # Test for energy estimator
-        default_energy_estimator = registry.show_default("energy_estimator")
-        assert isinstance(default_energy_estimator, str)
-        assert default_energy_estimator == "qdk"
+        # Test for expectation estimator
+        default_expectation_estimator = registry.show_default("expectation_estimator")
+        assert isinstance(default_expectation_estimator, str)
+        assert default_expectation_estimator == "qdk"
 
         # Test for phase estimation
         default_phase_estimation = registry.show_default("phase_estimation")
         assert isinstance(default_phase_estimation, str)
-        assert default_phase_estimation == "iterative"
+        assert default_phase_estimation == "qdk_iterative"
 
         # Test for time evolution builder
         default_unitary_builder = registry.show_default("hamiltonian_unitary_builder")
@@ -125,6 +139,13 @@ class TestRegistryShowDefault:
         for algorithm_type, default_name in defaults.items():
             # Each default should be in the available list for that type
             assert algorithm_type in available, f"Algorithm type '{algorithm_type}' not in available algorithms"
+            if algorithm_type in INTERFACE_ONLY_TYPES:
+                assert not available[algorithm_type], (
+                    f"Interface-only '{algorithm_type}' should have no implementations"
+                )
+                continue
+            if algorithm_type == "geometry_optimizer" and not available[algorithm_type]:
+                continue  # geomeTRIC-backed optimizer is optional
             if default_name == "pyscf" and not PYSCF_AVAILABLE:
                 continue  # Skip check if pyscf is not available
             assert default_name in available[algorithm_type], (
@@ -137,6 +158,10 @@ class TestRegistryShowDefault:
         defaults = registry.show_default()
 
         for algorithm_type, default_name in defaults.items():
+            if algorithm_type in INTERFACE_ONLY_TYPES:
+                continue
+            if algorithm_type == "geometry_optimizer" and default_name not in registry.available(algorithm_type):
+                continue  # geomeTRIC-backed optimizer is optional
             if default_name == "pyscf" and not PYSCF_AVAILABLE:
                 continue  # Skip check if pyscf is not available
             # Should be able to create the default algorithm
@@ -221,6 +246,41 @@ class TestRegistryCreate:
         assert mapper.type_name() == "qubit_mapper"
 
 
+class TestRegistryCachingWarnings:
+    """Test cache fallback warnings emitted by the algorithm wrapper."""
+
+    def test_cache_fallback_warns_when_hash_is_missing(self, tmp_path):
+        """A missing hash method falls back to running the algorithm with a warning."""
+
+        class AlgorithmWithoutHash:
+            def run(self, *args, **kwargs):
+                return args, kwargs
+
+        algorithm = registry._AlgorithmWrapper(AlgorithmWithoutHash())
+
+        with pytest.warns(UserWarning, match="does not expose a compatible hash method"):
+            result = algorithm.run("input", cache=tmp_path, option=True)
+
+        assert result == (("input",), {"option": True})
+
+    def test_cache_fallback_warns_when_hash_signature_rejects_arguments(self, tmp_path):
+        """A hash TypeError falls back to running the algorithm with a warning."""
+
+        class AlgorithmWithNarrowHash:
+            def hash(self):
+                return "hash"
+
+            def run(self, *args, **kwargs):
+                return args, kwargs
+
+        algorithm = registry._AlgorithmWrapper(AlgorithmWithNarrowHash())
+
+        with pytest.warns(UserWarning, match="with the provided arguments"):
+            result = algorithm.run("input", cache=tmp_path, option=True)
+
+        assert result == (("input",), {"option": True})
+
+
 class TestRegistryAvailable:
     """Test the available function in the registry module."""
 
@@ -242,6 +302,10 @@ class TestRegistryAvailable:
         assert len(scf_solvers) > 0
         assert "qdk" in scf_solvers
 
+        effective_hamiltonian_constructors = registry.available("effective_hamiltonian_constructor")
+        assert isinstance(effective_hamiltonian_constructors, list)
+        assert len(effective_hamiltonian_constructors) == 0
+
     def test_available_returns_empty_list_for_unknown_type(self):
         """Test that available returns empty list for unknown algorithm type."""
         result = registry.available("nonexistent_type")
@@ -253,6 +317,11 @@ class TestRegistryAvailable:
         all_algorithms = registry.available()
         for algorithm_type, algorithms in all_algorithms.items():
             assert isinstance(algorithms, list), f"Expected list for {algorithm_type}"
+            if algorithm_type in INTERFACE_ONLY_TYPES:
+                assert not algorithms, f"Interface-only '{algorithm_type}' should have no implementations"
+                continue
+            if algorithm_type == "geometry_optimizer" and not algorithms:
+                continue  # geomeTRIC-backed optimizer is optional
             assert len(algorithms) > 0, f"No algorithms available for {algorithm_type}"
 
     def test_available_algorithms_can_be_created(self):
@@ -356,6 +425,90 @@ class TestRegistryInspectSettings:
             if limits is not None:
                 # Limits can be tuple (for ranges) or list (for allowed values)
                 assert isinstance(limits, tuple | list), f"Unexpected limits type for {name}: {type(limits)}"
+
+
+def _all_registered_pairs() -> list[tuple[str, str]]:
+    """All (algorithm_type, algorithm_name) pairs known to the registry."""
+    pairs: list[tuple[str, str]] = []
+    available = registry.available()
+    assert isinstance(available, dict)
+    for atype, names in available.items():
+        for name in names:
+            pairs.append((atype, name))
+    return pairs
+
+
+_REGISTERED_PAIRS = _all_registered_pairs()
+
+
+@pytest.mark.parametrize(
+    ("algorithm_type", "algorithm_name"),
+    _REGISTERED_PAIRS,
+    ids=[f"{t}/{n}" for t, n in _REGISTERED_PAIRS],
+)
+class TestStringSettingsHaveGuidance:
+    """Every string-typed setting must expose a description or an allowed-values list."""
+
+    def test_string_settings_have_description_or_allowed_values(self, algorithm_type: str, algorithm_name: str):
+        try:
+            info = registry.inspect_settings(algorithm_type, algorithm_name)
+        except (ImportError, RuntimeError) as exc:
+            pytest.skip(f"cannot instantiate {algorithm_type}/{algorithm_name}: {exc}")
+
+        offenders: list[str] = []
+        for sname, ptype, _default, desc, limits in info:
+            if ptype != "str":
+                continue
+            has_desc = isinstance(desc, str) and bool(desc.strip())
+            has_allowed_list = isinstance(limits, list) and len(limits) > 0
+            if not (has_desc or has_allowed_list):
+                offenders.append(f"  {sname!r}: description={desc!r}, limits={limits!r} (type={type(limits).__name__})")
+
+        assert not offenders, (
+            f"String-typed settings in {algorithm_type}/{algorithm_name} must expose either "
+            f"a description or an allowed-values list (was a tuple used instead of a list?):\n" + "\n".join(offenders)
+        )
+
+
+def _string_settings_with_allowed_values() -> list[tuple[str, str, str, list[str]]]:
+    """Collect (algorithm_type, algorithm_name, setting_name, allowed_values) for all string settings with options."""
+    cases: list[tuple[str, str, str, list[str]]] = []
+    for atype, aname in _REGISTERED_PAIRS:
+        try:
+            info = registry.inspect_settings(atype, aname)
+        except (ImportError, RuntimeError):
+            continue
+        for sname, ptype, _default, _desc, limits in info:
+            if ptype == "str" and isinstance(limits, list) and len(limits) > 0:
+                cases.append((atype, aname, sname, limits))
+    return cases
+
+
+_STRING_SETTINGS_WITH_OPTIONS = _string_settings_with_allowed_values()
+
+
+@pytest.mark.parametrize(
+    ("algorithm_type", "algorithm_name", "setting_name", "allowed_values"),
+    _STRING_SETTINGS_WITH_OPTIONS,
+    ids=[f"{t}/{n}.{s}" for t, n, s, _ in _STRING_SETTINGS_WITH_OPTIONS],
+)
+class TestAllowedStringValuesAccepted:
+    """Every advertised string option must be accepted by the algorithm's settings without error."""
+
+    def test_each_allowed_value_can_be_set(
+        self, algorithm_type: str, algorithm_name: str, setting_name: str, allowed_values: list[str]
+    ):
+        try:
+            algo = registry.create(algorithm_type, algorithm_name)
+        except (ImportError, RuntimeError) as exc:
+            pytest.skip(f"cannot instantiate {algorithm_type}/{algorithm_name}: {exc}")
+
+        for value in allowed_values:
+            algo.settings().set(setting_name, value)
+            assert algo.settings().get(setting_name) == value, (
+                f"{algorithm_type}/{algorithm_name}: setting {setting_name!r} to {value!r} "
+                f"did not persist (got {algo.settings().get(setting_name)!r})"
+            )
 
 
 class TestRegistryRegisterUnregister:

@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <numeric>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 
@@ -47,8 +48,8 @@ std::shared_ptr<data::Wavefunction> OccupationActiveSpaceSelector::_run_impl(
         "No candidate active space available in orbitals for occupation-based "
         "selection.");
   }
-  std::vector<size_t> candidate_indices =
-      orbitals->get_active_space_indices().first;
+  std::vector<size_t> candidate_indices = data::spin_channel_indices(
+      orbitals->active_indices(), data::axes::alpha());
 
   // Make sure that the occupation numbers are sorted for the candidate orbitals
   std::vector<std::pair<size_t, double>> orbital_occupations;

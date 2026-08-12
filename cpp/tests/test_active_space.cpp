@@ -6,8 +6,8 @@
 
 #include <filesystem>
 #include <qdk/chemistry/algorithms/active_space.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 
 #include "ut_common.hpp"
 
@@ -33,13 +33,13 @@ class TestActiveSpaceSelector : public ActiveSpaceSelector {
     // info
     if (orbitals->is_unrestricted()) {
       // Unrestricted case - get separate alpha and beta data
-      auto coeffs = orbitals->get_coefficients();
+      auto coeffs = orbitals->coefficients();
 
       std::optional<Eigen::VectorXd> energies_alpha, energies_beta;
       if (orbitals->has_energies()) {
-        auto energies = orbitals->get_energies();
-        energies_alpha = energies.first;
-        energies_beta = energies.second;
+        auto energies = orbitals->energies();
+        energies_alpha = energies->block({axes::alpha()});
+        energies_beta = energies->block({axes::beta()});
       }
 
       std::optional<Eigen::MatrixXd> ao_overlap;
@@ -56,19 +56,24 @@ class TestActiveSpaceSelector : public ActiveSpaceSelector {
       std::vector<size_t> active_beta = {{0, 1, 2}};
 
       auto new_orbitals = std::make_shared<Orbitals>(
-          coeffs.first, coeffs.second, energies_alpha, energies_beta,
-          ao_overlap, basis_set,
-          std::make_tuple(std::move(active_alpha), std::move(active_beta),
-                          std::vector<size_t>{}, std::vector<size_t>{}));
+          coeffs->block({axes::alpha(), axes::alpha()}),
+          coeffs->block({axes::beta(), axes::beta()}), energies_alpha,
+          energies_beta, ao_overlap, basis_set,
+          testing::unrestricted_index_set(
+              coeffs->block({axes::alpha(), axes::alpha()}).cols(),
+              active_alpha, active_beta),
+          testing::unrestricted_index_set(
+              coeffs->block({axes::alpha(), axes::alpha()}).cols(),
+              std::vector<size_t>{}, std::vector<size_t>{}));
       return qdk::chemistry::algorithms::detail::new_wavefunction(wavefunction,
                                                                   new_orbitals);
     } else {
       // Restricted case - use first coefficient matrix only
-      auto coeffs = orbitals->get_coefficients();
+      auto coeffs = orbitals->coefficients();
 
       std::optional<Eigen::VectorXd> energies;
       if (orbitals->has_energies()) {
-        energies = orbitals->get_energies().first;
+        energies = orbitals->energies()->block({axes::alpha()});
       }
 
       std::optional<Eigen::MatrixXd> ao_overlap;
@@ -84,8 +89,14 @@ class TestActiveSpaceSelector : public ActiveSpaceSelector {
       std::vector<size_t> active_indices = {0, 1, 2};
 
       auto new_orbitals = std::make_shared<Orbitals>(
-          coeffs.first, energies, ao_overlap, basis_set,
-          std::make_tuple(std::move(active_indices), std::vector<size_t>{}));
+          coeffs->block({axes::alpha(), axes::alpha()}), energies, ao_overlap,
+          basis_set,
+          testing::restricted_index_set(
+              coeffs->block({axes::alpha(), axes::alpha()}).cols(),
+              active_indices),
+          testing::restricted_index_set(
+              coeffs->block({axes::alpha(), axes::alpha()}).cols(),
+              std::vector<size_t>{}));
       return qdk::chemistry::algorithms::detail::new_wavefunction(wavefunction,
                                                                   new_orbitals);
     }
@@ -151,13 +162,15 @@ TEST_F(ActiveSpaceTest, Occupation) {
 
   // Create a wavefunction with the orbitals
   auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
-  auto wfn = std::make_shared<Wavefunction>(
-      std::make_unique<SlaterDeterminantContainer>(Configuration("2ud0"),
-                                                   orbitals_ptr));
+  auto wfn =
+      std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+          Configuration::from_spin_half_string("2ud0"), orbitals_ptr));
 
   auto result_wavefunction = selector->run(wfn);
-  auto [indices_alpha, indices_beta] =
-      result_wavefunction->get_orbitals()->get_active_space_indices();
+  auto indices_alpha = spin_channel_indices(
+      result_wavefunction->get_orbitals()->active_indices(), axes::alpha());
+  auto indices_beta = spin_channel_indices(
+      result_wavefunction->get_orbitals()->active_indices(), axes::beta());
 
   EXPECT_EQ(indices_alpha, std::vector<size_t>({1, 2}));
   EXPECT_EQ(indices_beta, std::vector<size_t>({1, 2}));
@@ -176,12 +189,12 @@ TEST_F(ActiveSpaceTest, Occupation_EdgeCase) {
         // Create unrestricted orbitals
         auto basis = testing::create_random_basis_set(4);
         Orbitals orbitals(coeffs, coeffs2, std::nullopt, std::nullopt,
-                          std::nullopt, basis, std::nullopt);
+                          std::nullopt, basis);
 
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2000"),
-                                                         orbitals_ptr));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2000"), orbitals_ptr));
         auto result_wavefunction = selector->run(wfn);
       },
       std::runtime_error);
@@ -200,19 +213,20 @@ TEST_F(ActiveSpaceTest, Valence) {
 
   // Create orbitals with constructor
   auto basis = testing::create_random_basis_set(4);
-  Orbitals orbitals(coeffs, std::make_optional(energies), std::nullopt, basis,
-                    std::nullopt);
+  Orbitals orbitals(coeffs, std::make_optional(energies), std::nullopt, basis);
 
   auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
-  auto wfn = std::make_shared<Wavefunction>(
-      std::make_unique<SlaterDeterminantContainer>(Configuration("2ud0"),
-                                                   orbitals_ptr));
+  auto wfn =
+      std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+          Configuration::from_spin_half_string("2ud0"), orbitals_ptr));
 
   selector->settings().set("num_active_electrons", 2);
   selector->settings().set("num_active_orbitals", 2);
   auto result_wavefunction = selector->run(wfn);
-  auto [indices_alpha, indices_beta] =
-      result_wavefunction->get_orbitals()->get_active_space_indices();
+  auto indices_alpha = spin_channel_indices(
+      result_wavefunction->get_orbitals()->active_indices(), axes::alpha());
+  auto indices_beta = spin_channel_indices(
+      result_wavefunction->get_orbitals()->active_indices(), axes::beta());
 
   EXPECT_EQ(indices_alpha, std::vector<size_t>({1, 2}));
   EXPECT_EQ(indices_beta, std::vector<size_t>({1, 2}));
@@ -235,11 +249,11 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
         energies[2] = 0.1;
         energies[3] = 0.2;
         Orbitals orbitals(coeffs, coeffs2, energies, energies, std::nullopt,
-                          basis, std::nullopt);
+                          basis);
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("dd00"),
-                                                         orbitals_ptr));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("dd00"), orbitals_ptr));
         auto result_wavefunction = selector->run(wfn);
       },
       std::runtime_error);
@@ -257,11 +271,11 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
         energies[1] = -0.3;
         energies[2] = 0.1;
         energies[3] = 0.2;
-        Orbitals orbitals(coeffs, energies, std::nullopt, basis, std::nullopt);
+        Orbitals orbitals(coeffs, energies, std::nullopt, basis);
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2200"),
-                                                         orbitals_ptr));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2200"), orbitals_ptr));
         selector->settings().set("num_active_electrons", -1);
         selector->settings().set("num_active_orbitals", 2);
         auto result_wavefunction = selector->run(wfn);
@@ -280,11 +294,11 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
         energies[1] = -0.3;
         energies[2] = 0.1;
         energies[3] = 0.2;
-        Orbitals orbitals(coeffs, energies, std::nullopt, basis, std::nullopt);
+        Orbitals orbitals(coeffs, energies, std::nullopt, basis);
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2200"),
-                                                         orbitals_ptr));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2200"), orbitals_ptr));
         selector->settings().set("num_active_electrons", 2);
         selector->settings().set("num_active_orbitals", -1);
         auto result_wavefunction = selector->run(wfn);
@@ -303,11 +317,11 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
         energies[1] = -0.3;
         energies[2] = 0.1;
         energies[3] = 0.2;
-        Orbitals orbitals(coeffs, energies, std::nullopt, basis, std::nullopt);
+        Orbitals orbitals(coeffs, energies, std::nullopt, basis);
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2200"),
-                                                         orbitals_ptr));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2200"), orbitals_ptr));
         selector->settings().set("num_active_electrons", 2);
         selector->settings().set("num_active_orbitals", 5);
         auto result_wavefunction = selector->run(wfn);
@@ -326,11 +340,11 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
         energies[1] = -0.3;
         energies[2] = 0.1;
         energies[3] = 0.2;
-        Orbitals orbitals(coeffs, energies, std::nullopt, basis, std::nullopt);
+        Orbitals orbitals(coeffs, energies, std::nullopt, basis);
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2000"),
-                                                         orbitals_ptr));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2000"), orbitals_ptr));
         selector->settings().set("num_active_electrons", 3);
         selector->settings().set("num_active_orbitals", 4);
         auto result_wavefunction = selector->run(wfn);
@@ -349,11 +363,11 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
         energies[1] = -0.3;
         energies[2] = 0.1;
         energies[3] = 0.2;
-        Orbitals orbitals(coeffs, energies, std::nullopt, basis, std::nullopt);
+        Orbitals orbitals(coeffs, energies, std::nullopt, basis);
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2200"),
-                                                         orbitals_ptr));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2200"), orbitals_ptr));
         selector->settings().set("num_active_electrons", 3);
         selector->settings().set("num_active_orbitals", 4);
         auto result_wavefunction = selector->run(wfn);
@@ -367,12 +381,11 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
         Eigen::MatrixXd coeffs(4, 4);
         coeffs.setIdentity();
         auto basis = testing::create_random_basis_set(4);
-        Orbitals orbitals(coeffs, std::nullopt, std::nullopt, basis,
-                          std::nullopt);
+        Orbitals orbitals(coeffs, std::nullopt, std::nullopt, basis);
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2200"),
-                                                         orbitals_ptr));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2200"), orbitals_ptr));
         selector->settings().set("num_active_electrons", 2);
         selector->settings().set("num_active_orbitals", 2);
         auto result_wavefunction = selector->run(wfn);
@@ -391,10 +404,11 @@ TEST_F(ActiveSpaceTest, ActiveSpaceAlreadySet) {
     auto basis = testing::create_random_basis_set(4);
     auto orbitals = std::make_shared<Orbitals>(
         coeffs, std::nullopt, std::nullopt, basis,
-        std::make_tuple(std::move(active_indices), std::vector<size_t>{}));
-    auto wfn = std::make_shared<Wavefunction>(
-        std::make_unique<SlaterDeterminantContainer>(Configuration("dd00"),
-                                                     orbitals));
+        testing::restricted_index_set(coeffs.cols(), active_indices),
+        testing::restricted_index_set(coeffs.cols(), std::vector<size_t>{}));
+    auto wfn =
+        std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+            Configuration::from_spin_half_string("dd00"), orbitals));
     auto result_wavefunction = selector->run(wfn);
   });
 
@@ -412,10 +426,11 @@ TEST_F(ActiveSpaceTest, ActiveSpaceAlreadySet) {
     energies[3] = 0.2;
     auto orbitals = std::make_shared<Orbitals>(
         coeffs, energies, std::nullopt, basis,
-        std::make_tuple(std::move(active_indices), std::vector<size_t>{}));
-    auto wfn = std::make_shared<Wavefunction>(
-        std::make_unique<SlaterDeterminantContainer>(Configuration("dd00"),
-                                                     orbitals));
+        testing::restricted_index_set(coeffs.cols(), active_indices),
+        testing::restricted_index_set(coeffs.cols(), std::vector<size_t>{}));
+    auto wfn =
+        std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+            Configuration::from_spin_half_string("dd00"), orbitals));
     selector->settings().set("num_active_electrons", 2);
     selector->settings().set("num_active_orbitals", 2);
     auto result_wavefunction = selector->run(wfn);
@@ -438,7 +453,7 @@ class MockWavefunctionContainer : public WavefunctionContainer {
     for (size_t i = 0; i < (num_orbitals / 2); ++i) {
       det_string[i] = '2';
     }
-    determinants_.push_back(Configuration(det_string));
+    determinants_.push_back(Configuration::from_spin_half_string(det_string));
 
     // Initialize coefficients with a single value of 1.0
     Eigen::VectorXd coeff_vec(1);
@@ -482,12 +497,12 @@ class MockWavefunctionContainer : public WavefunctionContainer {
 
   bool has_single_orbital_entropies() const override { return true; }
 
-  std::tuple<const MatrixVariant&, const MatrixVariant&>
-  get_active_one_rdm_spin_dependent() const override {
+  std::tuple<MatrixVariant, MatrixVariant> get_active_one_rdm_spin_dependent()
+      const override {
     throw std::runtime_error("Not implemented");
   }
 
-  std::tuple<const VectorVariant&, const VectorVariant&, const VectorVariant&>
+  std::tuple<VectorVariant, VectorVariant, VectorVariant>
   get_active_two_rdm_spin_dependent() const override {
     throw std::runtime_error("Not implemented");
   }
@@ -504,20 +519,22 @@ class MockWavefunctionContainer : public WavefunctionContainer {
     return entropies_;
   }
 
-  std::pair<size_t, size_t> get_total_num_electrons() const override {
-    return std::make_pair(2, 2);
+  std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+  total_num_particles() const override {
+    return _make_particle_count(2, 2);
   }
 
-  std::pair<size_t, size_t> get_active_num_electrons() const override {
-    return std::make_pair(2, 2);
+  std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+  active_num_particles() const override {
+    return _make_particle_count(2, 2);
   }
 
-  std::pair<Eigen::VectorXd, Eigen::VectorXd> get_total_orbital_occupations()
+  std::shared_ptr<const SymmetryBlockedTensor<1>> total_orbital_occupations()
       const override {
     throw std::runtime_error("Not implemented");
   }
 
-  std::pair<Eigen::VectorXd, Eigen::VectorXd> get_active_orbital_occupations()
+  std::shared_ptr<const SymmetryBlockedTensor<1>> active_orbital_occupations()
       const override {
     throw std::runtime_error("Not implemented");
   }
@@ -531,6 +548,16 @@ class MockWavefunctionContainer : public WavefunctionContainer {
   std::string get_container_type() const override { return "mock"; }
 
   bool is_complex() const override { return false; }
+
+  std::vector<std::string> sectors() const override {
+    return {Wavefunction::DEFAULT_SECTOR};
+  }
+
+  std::shared_ptr<const Orbitals> sector_basis(
+      const std::string& name) const override {
+    if (name == Wavefunction::DEFAULT_SECTOR) return orbitals_;
+    throw std::out_of_range("Mock has no sector named '" + name + "'");
+  }
 
  private:
   std::shared_ptr<Orbitals> orbitals_;
@@ -577,8 +604,10 @@ TEST_F(WavefunctionActiveSpaceTest, Autocas) {
   auto wfn = std::make_shared<MockWavefunction>(
       MockWavefunction(entropies, orbital_indices));
   auto result_wavefunction = selector->run(wfn);
-  auto [indices_alpha, indices_beta] =
-      result_wavefunction->get_orbitals()->get_active_space_indices();
+  auto indices_alpha = spin_channel_indices(
+      result_wavefunction->get_orbitals()->active_indices(), axes::alpha());
+  auto indices_beta = spin_channel_indices(
+      result_wavefunction->get_orbitals()->active_indices(), axes::beta());
   EXPECT_EQ(indices_alpha, std::vector<size_t>({0, 1, 2, 3, 4, 5}));
   EXPECT_EQ(indices_beta, std::vector<size_t>({0, 1, 2, 3, 4, 5}));
 }
@@ -592,8 +621,10 @@ TEST_F(WavefunctionActiveSpaceTest, AutocasSinglereference) {
   auto wfn = std::make_shared<MockWavefunction>(
       MockWavefunction(entropies, orbital_indices));
   auto result_wavefunction = selector->run(wfn);
-  auto [indices_alpha, indices_beta] =
-      result_wavefunction->get_orbitals()->get_active_space_indices();
+  auto indices_alpha = spin_channel_indices(
+      result_wavefunction->get_orbitals()->active_indices(), axes::alpha());
+  auto indices_beta = spin_channel_indices(
+      result_wavefunction->get_orbitals()->active_indices(), axes::beta());
   EXPECT_EQ(indices_alpha, std::vector<size_t>({}));
   EXPECT_EQ(indices_beta, std::vector<size_t>({}));
 }
@@ -608,8 +639,11 @@ TEST_F(WavefunctionActiveSpaceTest, AutocasOnlyHighEntropies) {
   auto wfn = std::make_shared<MockWavefunction>(
       MockWavefunction(entropies, orbital_indices));
   auto result_wavefunction = selector->run(wfn);
-  auto indices =
-      result_wavefunction->get_orbitals()->get_active_space_indices();
+  auto indices = std::make_pair(
+      spin_channel_indices(
+          result_wavefunction->get_orbitals()->active_indices(), axes::alpha()),
+      spin_channel_indices(
+          result_wavefunction->get_orbitals()->active_indices(), axes::beta()));
   auto indices_alpha = indices.first;
   auto indices_beta = indices.second;
   EXPECT_EQ(indices_alpha, std::vector<size_t>({0, 1, 2, 3, 4, 5, 6, 7, 8, 9}));
@@ -627,8 +661,11 @@ TEST_F(WavefunctionActiveSpaceTest, AutocasEntropyThreshold) {
   auto wfn = std::make_shared<MockWavefunction>(
       MockWavefunction(entropies, orbital_indices));
   auto result_wavefunction = selector->run(wfn);
-  auto indices =
-      result_wavefunction->get_orbitals()->get_active_space_indices();
+  auto indices = std::make_pair(
+      spin_channel_indices(
+          result_wavefunction->get_orbitals()->active_indices(), axes::alpha()),
+      spin_channel_indices(
+          result_wavefunction->get_orbitals()->active_indices(), axes::beta()));
   auto indices_alpha = indices.first;
   auto indices_beta = indices.second;
   EXPECT_EQ(indices_alpha, std::vector<size_t>({}));
@@ -638,8 +675,11 @@ TEST_F(WavefunctionActiveSpaceTest, AutocasEntropyThreshold) {
   selector = ActiveSpaceSelectorFactory::create("qdk_autocas");
   selector->settings().set("entropy_threshold", 0.5);
   result_wavefunction = selector->run(wfn);
-  auto indices2 =
-      result_wavefunction->get_orbitals()->get_active_space_indices();
+  auto indices2 = std::make_pair(
+      spin_channel_indices(
+          result_wavefunction->get_orbitals()->active_indices(), axes::alpha()),
+      spin_channel_indices(
+          result_wavefunction->get_orbitals()->active_indices(), axes::beta()));
   auto indices2_alpha = indices2.first;
   auto indices2_beta = indices2.second;
   EXPECT_EQ(indices2_alpha, std::vector<size_t>({0, 1, 2, 3, 4, 5}));
@@ -649,8 +689,11 @@ TEST_F(WavefunctionActiveSpaceTest, AutocasEntropyThreshold) {
   selector = ActiveSpaceSelectorFactory::create("qdk_autocas");
   selector->settings().set("entropy_threshold", 0.1);
   result_wavefunction = selector->run(wfn);
-  auto indices3 =
-      result_wavefunction->get_orbitals()->get_active_space_indices();
+  auto indices3 = std::make_pair(
+      spin_channel_indices(
+          result_wavefunction->get_orbitals()->active_indices(), axes::alpha()),
+      spin_channel_indices(
+          result_wavefunction->get_orbitals()->active_indices(), axes::beta()));
   auto indices3_alpha = indices3.first;
   auto indices3_beta = indices3.second;
   EXPECT_EQ(indices3_alpha, std::vector<size_t>({0, 1, 2, 3, 4, 5}));
@@ -660,8 +703,11 @@ TEST_F(WavefunctionActiveSpaceTest, AutocasEntropyThreshold) {
   selector = ActiveSpaceSelectorFactory::create("qdk_autocas");
   selector->settings().set("entropy_threshold", 0.001);
   result_wavefunction = selector->run(wfn);
-  auto indices4 =
-      result_wavefunction->get_orbitals()->get_active_space_indices();
+  auto indices4 = std::make_pair(
+      spin_channel_indices(
+          result_wavefunction->get_orbitals()->active_indices(), axes::alpha()),
+      spin_channel_indices(
+          result_wavefunction->get_orbitals()->active_indices(), axes::beta()));
   auto indices4_alpha = indices4.first;
   auto indices4_beta = indices4.second;
   EXPECT_EQ(indices4_alpha, std::vector<size_t>({0, 1, 2, 3, 4, 5}));
@@ -680,8 +726,11 @@ TEST_F(WavefunctionActiveSpaceTest, AutocasEosEntropyThreshold) {
   auto wfn = std::make_shared<MockWavefunction>(
       MockWavefunction(entropies, orbital_indices));
   auto result_wavefunction = selector->run(wfn);
-  auto indices =
-      result_wavefunction->get_orbitals()->get_active_space_indices();
+  auto indices = std::make_pair(
+      spin_channel_indices(
+          result_wavefunction->get_orbitals()->active_indices(), axes::alpha()),
+      spin_channel_indices(
+          result_wavefunction->get_orbitals()->active_indices(), axes::beta()));
   auto indices_alpha = indices.first;
   auto indices_beta = indices.second;
   EXPECT_EQ(indices_alpha, std::vector<size_t>({}));
@@ -692,8 +741,11 @@ TEST_F(WavefunctionActiveSpaceTest, AutocasEosEntropyThreshold) {
   selector->settings().set("normalize_entropies", false);
   selector->settings().set("entropy_threshold", 0.5);
   result_wavefunction = selector->run(wfn);
-  auto indices2 =
-      result_wavefunction->get_orbitals()->get_active_space_indices();
+  auto indices2 = std::make_pair(
+      spin_channel_indices(
+          result_wavefunction->get_orbitals()->active_indices(), axes::alpha()),
+      spin_channel_indices(
+          result_wavefunction->get_orbitals()->active_indices(), axes::beta()));
   auto indices2_alpha = indices2.first;
   auto indices2_beta = indices2.second;
   EXPECT_EQ(indices2_alpha, std::vector<size_t>({4, 5}));
@@ -704,8 +756,11 @@ TEST_F(WavefunctionActiveSpaceTest, AutocasEosEntropyThreshold) {
   selector->settings().set("normalize_entropies", false);
   selector->settings().set("entropy_threshold", 0.1);
   result_wavefunction = selector->run(wfn);
-  auto indices3 =
-      result_wavefunction->get_orbitals()->get_active_space_indices();
+  auto indices3 = std::make_pair(
+      spin_channel_indices(
+          result_wavefunction->get_orbitals()->active_indices(), axes::alpha()),
+      spin_channel_indices(
+          result_wavefunction->get_orbitals()->active_indices(), axes::beta()));
   auto indices3_alpha = indices3.first;
   auto indices3_beta = indices3.second;
   EXPECT_EQ(indices3_alpha, std::vector<size_t>({0, 1, 2, 3, 4, 5}));
@@ -716,8 +771,11 @@ TEST_F(WavefunctionActiveSpaceTest, AutocasEosEntropyThreshold) {
   selector->settings().set("normalize_entropies", false);
   selector->settings().set("entropy_threshold", 0.001);
   result_wavefunction = selector->run(wfn);
-  auto indices4 =
-      result_wavefunction->get_orbitals()->get_active_space_indices();
+  auto indices4 = std::make_pair(
+      spin_channel_indices(
+          result_wavefunction->get_orbitals()->active_indices(), axes::alpha()),
+      spin_channel_indices(
+          result_wavefunction->get_orbitals()->active_indices(), axes::beta()));
   auto indices4_alpha = indices4.first;
   auto indices4_beta = indices4.second;
   EXPECT_EQ(indices4_alpha, std::vector<size_t>({0, 1, 2, 3, 4, 5}));
@@ -735,7 +793,11 @@ TEST_F(WavefunctionActiveSpaceTest, AutocasEosNormalizeEntropies) {
   selector->settings().set("normalize_entropies", true);
   selector->settings().set("entropy_threshold", 0.45);
   auto result = selector->run(wfn);
-  auto indices = result->get_orbitals()->get_active_space_indices();
+  auto indices = std::make_pair(
+      spin_channel_indices(result->get_orbitals()->active_indices(),
+                           axes::alpha()),
+      spin_channel_indices(result->get_orbitals()->active_indices(),
+                           axes::beta()));
   EXPECT_EQ(indices.first, std::vector<size_t>({0, 1}));
   EXPECT_EQ(indices.second, std::vector<size_t>({0, 1}));
 
@@ -745,7 +807,11 @@ TEST_F(WavefunctionActiveSpaceTest, AutocasEosNormalizeEntropies) {
   selector->settings().set("normalize_entropies", false);
   selector->settings().set("entropy_threshold", 0.45);
   result = selector->run(wfn);
-  auto indices2 = result->get_orbitals()->get_active_space_indices();
+  auto indices2 = std::make_pair(
+      spin_channel_indices(result->get_orbitals()->active_indices(),
+                           axes::alpha()),
+      spin_channel_indices(result->get_orbitals()->active_indices(),
+                           axes::beta()));
   EXPECT_EQ(indices2.first, std::vector<size_t>({0, 1}));
   EXPECT_EQ(indices2.second, std::vector<size_t>({0, 1}));
 
@@ -755,7 +821,11 @@ TEST_F(WavefunctionActiveSpaceTest, AutocasEosNormalizeEntropies) {
   selector->settings().set("normalize_entropies", true);
   selector->settings().set("entropy_threshold", 0.35);
   result = selector->run(wfn);
-  auto indices3 = result->get_orbitals()->get_active_space_indices();
+  auto indices3 = std::make_pair(
+      spin_channel_indices(result->get_orbitals()->active_indices(),
+                           axes::alpha()),
+      spin_channel_indices(result->get_orbitals()->active_indices(),
+                           axes::beta()));
   EXPECT_EQ(indices3.first, std::vector<size_t>({0, 1, 2, 3, 4}));
   EXPECT_EQ(indices3.second, std::vector<size_t>({0, 1, 2, 3, 4}));
 
@@ -764,7 +834,11 @@ TEST_F(WavefunctionActiveSpaceTest, AutocasEosNormalizeEntropies) {
   selector->settings().set("normalize_entropies", false);
   selector->settings().set("entropy_threshold", 0.35);
   result = selector->run(wfn);
-  auto indices4 = result->get_orbitals()->get_active_space_indices();
+  auto indices4 = std::make_pair(
+      spin_channel_indices(result->get_orbitals()->active_indices(),
+                           axes::alpha()),
+      spin_channel_indices(result->get_orbitals()->active_indices(),
+                           axes::beta()));
   EXPECT_EQ(indices4.first, std::vector<size_t>({0, 1, 2, 3, 4}));
   EXPECT_EQ(indices4.second, std::vector<size_t>({0, 1, 2, 3, 4}));
 }
@@ -777,8 +851,10 @@ TEST_F(WavefunctionActiveSpaceTest, AutocasNonContinuous) {
   auto wfn = std::make_shared<MockWavefunction>(
       MockWavefunction(entropies, orbital_indices));
   auto result_wavefunction = selector->run(wfn);
-  auto [indices_alpha, indices_beta] =
-      result_wavefunction->get_orbitals()->get_active_space_indices();
+  auto indices_alpha = spin_channel_indices(
+      result_wavefunction->get_orbitals()->active_indices(), axes::alpha());
+  auto indices_beta = spin_channel_indices(
+      result_wavefunction->get_orbitals()->active_indices(), axes::beta());
   EXPECT_EQ(indices_alpha, std::vector<size_t>({4, 12, 15, 23, 34}));
   EXPECT_EQ(indices_beta, std::vector<size_t>({4, 12, 15, 23, 34}));
 }
@@ -793,8 +869,10 @@ TEST_F(WavefunctionActiveSpaceTest, Entropy) {
   auto wfn = std::make_shared<MockWavefunction>(
       MockWavefunction(entropies, orbital_indices));
   auto result_wavefunction = selector->run(wfn);
-  auto [indices_alpha, indices_beta] =
-      result_wavefunction->get_orbitals()->get_active_space_indices();
+  auto indices_alpha = spin_channel_indices(
+      result_wavefunction->get_orbitals()->active_indices(), axes::alpha());
+  auto indices_beta = spin_channel_indices(
+      result_wavefunction->get_orbitals()->active_indices(), axes::beta());
 
   EXPECT_EQ(indices_alpha, std::vector<size_t>({0, 1, 2, 3, 4, 5}));
   EXPECT_EQ(indices_beta, std::vector<size_t>({0, 1, 2, 3, 4, 5}));
@@ -808,8 +886,10 @@ TEST_F(WavefunctionActiveSpaceTest, EntropyNonContinuous) {
   auto wfn = std::make_shared<MockWavefunction>(
       MockWavefunction(entropies, orbital_indices));
   auto result_wavefunction = selector->run(wfn);
-  auto [indices_alpha, indices_beta] =
-      result_wavefunction->get_orbitals()->get_active_space_indices();
+  auto indices_alpha = spin_channel_indices(
+      result_wavefunction->get_orbitals()->active_indices(), axes::alpha());
+  auto indices_beta = spin_channel_indices(
+      result_wavefunction->get_orbitals()->active_indices(), axes::beta());
   EXPECT_EQ(indices_alpha, std::vector<size_t>({4, 12, 15, 23, 34}));
   EXPECT_EQ(indices_beta, std::vector<size_t>({4, 12, 15, 23, 34}));
 }
