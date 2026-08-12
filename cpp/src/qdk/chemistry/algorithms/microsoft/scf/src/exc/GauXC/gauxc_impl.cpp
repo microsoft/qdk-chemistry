@@ -19,44 +19,59 @@
 #endif
 #include <qdk/chemistry/utils/logger.hpp>
 
+#include <mutex>
+
 namespace qdk::chemistry::scf::impl {
 
 namespace {
 
-// Weak declarations for OpenBLAS's threading control API. These resolve to
-// the real symbols when linking against OpenBLAS (any variant: pthread,
-// OpenMP, etc.) and remain null (weak, undefined) otherwise, e.g. when
-// linking against a different BLAS implementation (MKL, BLIS, reference
-// BLAS, ...) that does not export them.
+// MSVC's classic front end doesn't support GNU `__attribute__` syntax, so
+// only GCC/Clang get the weak declaration (OpenBLAS is our only BLAS
+// backend, so MSVC can declare these as ordinary, always-linked externs).
+#if defined(_MSC_VER) && !defined(__clang__)
+#define QDK_OPENBLAS_WEAK_ATTR
+#else
+#define QDK_OPENBLAS_WEAK_ATTR __attribute__((weak))
+#endif
+
 extern "C" {
-void openblas_set_num_threads(int) __attribute__((weak));
-int openblas_get_num_threads(void) __attribute__((weak));
+void openblas_set_num_threads(int) QDK_OPENBLAS_WEAK_ATTR;
+int openblas_get_num_threads(void) QDK_OPENBLAS_WEAK_ATTR;
 }
 
+#undef QDK_OPENBLAS_WEAK_ATTR
+
 /**
- * @brief RAII guard that forces BLAS to run single-threaded, restoring the
- * previous thread count on destruction.
+ * @brief RAII guard that forces BLAS to run single-threaded while active,
+ * restoring the previous thread count once the outermost guard exits.
  *
- * GauXC's integrators call BLAS (e.g. `dgemm`) from inside their own
- * OpenMP-parallel grid loop. If BLAS is also multi-threaded, several
- * already-parallel threads re-enter BLAS's shared thread pool concurrently -
- * threaded BLAS (OpenBLAS in particular) does not support this and can
- * silently corrupt results. This guard eliminates that hazard at its source
- * for every GauXC caller, without affecting GauXC's own outer parallelism.
+ * GauXC's OpenMP-parallel grid loop calls BLAS from many threads at once.
+ * If BLAS is also multi-threaded, those threads collide inside BLAS's own
+ * shared worker pool and can corrupt results. Forcing BLAS to 1 thread here
+ * avoids that.
+ *
+ * The thread count is process-global state, so this uses a shared,
+ * mutex-protected nesting depth instead of per-instance state: only the
+ * first guard to start changes it, and only the last one to finish restores
+ * it. This keeps concurrent/recursive calls safe.
  */
 class SingleThreadedBlasGuard {
  public:
   SingleThreadedBlasGuard() {
-    if (openblas_set_num_threads && openblas_get_num_threads) {
-      saved_nthreads_ = openblas_get_num_threads();
+    if (!(openblas_set_num_threads && openblas_get_num_threads)) return;
+    std::lock_guard<std::mutex> lock(mutex());
+    if (depth()++ == 0) {
+      saved_nthreads() = openblas_get_num_threads();
       openblas_set_num_threads(1);
-      active_ = true;
     }
+    active_ = true;
   }
 
   ~SingleThreadedBlasGuard() {
-    if (active_) {
-      openblas_set_num_threads(saved_nthreads_);
+    if (!active_) return;
+    std::lock_guard<std::mutex> lock(mutex());
+    if (--depth() == 0) {
+      openblas_set_num_threads(saved_nthreads());
     }
   }
 
@@ -64,8 +79,20 @@ class SingleThreadedBlasGuard {
   SingleThreadedBlasGuard& operator=(const SingleThreadedBlasGuard&) = delete;
 
  private:
+  static std::mutex& mutex() {
+    static std::mutex m;
+    return m;
+  }
+  static int& depth() {
+    static int d = 0;
+    return d;
+  }
+  static int& saved_nthreads() {
+    static int n = 1;
+    return n;
+  }
+
   bool active_ = false;
-  int saved_nthreads_ = 1;
 };
 
 }  // namespace
