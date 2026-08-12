@@ -54,6 +54,59 @@ print("Controlled evolution circuit generated")
 ################################################################################
 
 ################################################################################
+# start-cell-cswap
+import numpy as np
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import MajoranaMapping, Structure
+
+# 1. Molecule and mean-field reference
+coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
+structure = Structure(coords, symbols=["H", "H"])
+E_scf, wfn_scf = create("scf_solver").run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
+)
+
+# 2. Fermionic Hamiltonian, then a qubit Hamiltonian (core energy excluded,
+#    so the all-zero state satisfies H|0...0> = 0)
+hamiltonian = create("hamiltonian_constructor").run(wfn_scf.get_orbitals())
+n_spin_orbitals = 2 * hamiltonian.get_orbitals().get_num_molecular_orbitals()
+qubit_ham = create("qubit_mapper").run(
+    hamiltonian, MajoranaMapping.jordan_wigner(n_spin_orbitals)
+)
+
+# 3. Group Pauli strings that flip the same qubits. These are the strings coming
+#    from the same fermionic term, whose amplitudes cancel on |0...0>. Without
+#    this step Trotterization interleaves them and the vacuum leaks.
+grouped_ham = create("term_grouper", "qubit_flip").run(qubit_ham)
+
+# 4. Trotterize. The builder honours the grouping, so each group is exponentiated
+#    as one contiguous block and the product formula still fixes |0...0>.
+evolution = create("hamiltonian_unitary_builder", "trotter", order=1, time=0.1).run(
+    grouped_ham
+)
+
+# 5. Control it with the CSWAP sandwich. The mapper validates the ordering and
+#    raises if the product formula would leak the vacuum.
+cswap_mapper = create(
+    "controlled_circuit_mapper",
+    "cswap_pauli_sequence",
+    control_indices=[n_spin_orbitals],
+)
+circuit = cswap_mapper.run(evolution)
+print("Controlled evolution circuit generated via the CSWAP sandwich")
+
+# Feeding the ungrouped Hamiltonian instead is rejected up front:
+ungrouped_evolution = create(
+    "hamiltonian_unitary_builder", "trotter", order=1, time=0.1
+).run(qubit_ham)
+try:
+    cswap_mapper.run(ungrouped_evolution)
+except ValueError as error:
+    print("Rejected as expected:", error)
+# end-cell-cswap
+################################################################################
+
+################################################################################
 # start-cell-list-implementations
 from qdk_chemistry.algorithms import registry
 

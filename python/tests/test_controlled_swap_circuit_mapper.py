@@ -316,3 +316,185 @@ class TestPauliVacuumAction:
         """Unknown Pauli axes are rejected."""
         with pytest.raises(ValueError, match="Invalid Pauli axis"):
             pauli_map_zero_state_action({0: "Q"})
+
+
+# ---------------------------------------------------------------------------
+# Why the grouping matters: worked example and end-to-end pipeline
+# ---------------------------------------------------------------------------
+
+_PAULI_MATRICES = {
+    "I": np.eye(2, dtype=complex),
+    "X": np.array([[0, 1], [1, 0]], dtype=complex),
+    "Y": np.array([[0, -1j], [1j, 0]], dtype=complex),
+    "Z": np.array([[1, 0], [0, -1]], dtype=complex),
+}
+
+
+def _pauli_matrix(pauli_term, num_qubits):
+    """Build the dense matrix of a sparse Pauli term (qubit 0 = least significant)."""
+    matrix = np.array([[1]], dtype=complex)
+    for qubit in reversed(range(num_qubits)):
+        matrix = np.kron(matrix, _PAULI_MATRICES[pauli_term.get(qubit, "I")])
+    return matrix
+
+
+def _product_formula_matrix(terms, num_qubits):
+    r"""Multiply out :math:`\prod_j e^{-i\theta_j P_j}` in the order the terms are applied.
+
+    Each factor is evaluated in closed form via :math:`e^{-i\theta P} = \cos\theta\,I - i\sin\theta\,P`,
+    which holds because every Pauli string squares to the identity.
+    """
+    unitary = np.eye(2**num_qubits, dtype=complex)
+    for pauli_term, angle in terms:
+        pauli = _pauli_matrix(pauli_term, num_qubits)
+        factor = np.cos(angle) * np.eye(2**num_qubits, dtype=complex) - 1j * np.sin(angle) * pauli
+        unitary = factor @ unitary
+    return unitary
+
+
+_XX = {0: "X", 1: "X"}
+_YY = {0: "Y", 1: "Y"}
+_Z0 = {0: "Z"}
+_IDENTITY: dict[int, str] = {}
+
+#: The same Hamiltonian in the two orderings under comparison, as (pauli_term, coefficient).
+_GROUPED_ORDERING = [(_XX, 0.5), (_YY, 0.5), (_Z0, -0.5), (_IDENTITY, 0.5)]
+_INTERLEAVED_ORDERING = [(_XX, 0.5), (_Z0, -0.5), (_YY, 0.5), (_IDENTITY, 0.5)]
+
+
+class TestVacuumLeakageWithoutGrouping:
+    r"""Reproduce the worked example motivating the qubit-flip grouper.
+
+    For the Jordan-Wigner image of
+    :math:`H = a_0^\dagger a_1 + a_1^\dagger a_0 + a_0^\dagger a_0
+    = \tfrac12 (XX + YY) + \tfrac12 (I - Z_0)`
+    we have :math:`H|00\rangle = 0`, so the exact :math:`e^{-iHt}` fixes the vacuum.
+    A single Trotter step at :math:`\Delta t = \pi/2` only reproduces that when the
+    ``XX``/``YY`` cancellation partners stay adjacent.
+    """
+
+    TIME_STEP = np.pi / 2
+
+    def _evolve_vacuum(self, ordering):
+        """Apply one Trotter step of the given ordering to |00> and return the state."""
+        terms = [(pauli_term, coefficient * self.TIME_STEP) for pauli_term, coefficient in ordering]
+        vacuum = np.zeros(4, dtype=complex)
+        vacuum[0] = 1.0
+        return _product_formula_matrix(terms, num_qubits=2) @ vacuum
+
+    def test_interleaved_ordering_leaks_half_the_vacuum(self):
+        r"""``XX, Z0, YY, I`` sends :math:`|00\rangle` to a superposition with :math:`|11\rangle`.
+
+        The step yields :math:`\tfrac{1-i}{2}|00\rangle + \tfrac{-1+i}{2}|11\rangle`, so
+        :math:`|\langle 11|U|00\rangle|^2 = 1/2`. Inside the CSWAP sandwich that entangles
+        the vacuum register with the control, and the final ``ResetAll`` destroys the
+        control coherence.
+        """
+        state = self._evolve_vacuum(_INTERLEAVED_ORDERING)
+
+        assert np.isclose(state[0], (1 - 1j) / 2)
+        assert np.isclose(state[3], (-1 + 1j) / 2)
+        assert np.isclose(abs(state[3]) ** 2, 0.5)
+
+    def test_grouped_ordering_preserves_the_vacuum(self):
+        """``XX, YY, Z0, I`` keeps the partners adjacent and returns |00> exactly."""
+        state = self._evolve_vacuum(_GROUPED_ORDERING)
+
+        expected = np.zeros(4, dtype=complex)
+        expected[0] = 1.0
+        assert np.allclose(state, expected, atol=float_comparison_absolute_tolerance)
+
+    def test_mapper_rejects_the_leaking_ordering_and_accepts_the_grouped_one(self):
+        """The mapper's validation matches the numerics above."""
+
+        def make_rep(ordering):
+            terms = [
+                ExponentiatedPauliTerm(pauli_term=pauli_term, angle=coefficient * self.TIME_STEP)
+                for pauli_term, coefficient in ordering
+            ]
+            return UnitaryRepresentation(container=PauliProductFormulaContainer(terms, step_reps=1, num_qubits=2))
+
+        def make_mapper():
+            mapper = ControlledSwapPauliSequenceMapper()
+            mapper.settings().set("control_indices", [2])
+            return mapper
+
+        with pytest.raises(ValueError, match="vacuum-preserving product formula"):
+            make_mapper().run(make_rep(_INTERLEAVED_ORDERING))
+
+        assert isinstance(make_mapper().run(make_rep(_GROUPED_ORDERING)), Circuit)
+
+
+#: 0.5 (XX + YY) - 0.5 Z0 + 0.5 Z1, a number-conserving Hamiltonian with H|00> = 0.
+_E2E_PAULI_STRINGS = ["XX", "YY", "IZ", "ZI"]
+_E2E_COEFFICIENTS = [0.5, 0.5, -0.5, 0.5]
+
+
+class TestQubitFlipGroupingEndToEnd:
+    """End-to-end: group a qubit Hamiltonian, Trotterise it, and control it with CSWAP."""
+
+    EVOLUTION_TIME = 0.5
+
+    def _build_unitary(self, strategy):
+        """Group the Hamiltonian with *strategy* and Trotterise it into a product formula."""
+        hamiltonian = QubitOperator(_E2E_PAULI_STRINGS, np.array(_E2E_COEFFICIENTS))
+        grouped = registry.create("term_grouper", strategy).run(hamiltonian)
+
+        trotter = registry.create("hamiltonian_unitary_builder", "trotter")
+        trotter.settings().update({"order": 1, "num_divisions": 1, "time": self.EVOLUTION_TIME})
+        return trotter.run(grouped)
+
+    def test_grouped_trotter_step_preserves_the_vacuum(self):
+        """The Trotterised product formula fixes |00>, which is what the mapper requires."""
+        container = self._build_unitary("qubit_flip").get_container()
+        terms = [(term.pauli_term, term.angle) for term in container.step_terms]
+
+        vacuum = np.zeros(2**container.num_qubits, dtype=complex)
+        vacuum[0] = 1.0
+        evolved = _product_formula_matrix(terms, container.num_qubits) @ vacuum
+
+        # Only a global phase is allowed; no amplitude may leave the vacuum.
+        assert np.isclose(abs(evolved[0]), 1.0, atol=float_comparison_absolute_tolerance)
+        assert np.allclose(evolved[1:], 0.0, atol=float_comparison_absolute_tolerance)
+
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
+    def test_cswap_circuit_from_grouped_hamiltonian_is_a_controlled_unitary(self):
+        r"""The CSWAP circuit built from the grouped Hamiltonian is a genuine controlled-:math:`U`.
+
+        This is the pipeline a caller actually writes: ``qubit_flip`` grouper ->
+        ``trotter`` unitary builder -> ``cswap_pauli_sequence`` mapper. The circuit's
+        vacuum codespace block must be unitary (no leakage) and reproduce
+        :math:`e^{i\phi_0}|0\rangle\langle0| \otimes I + |1\rangle\langle1| \otimes U`.
+        """
+        unitary = self._build_unitary("qubit_flip")
+        container = unitary.get_container()
+
+        mapper = ControlledSwapPauliSequenceMapper()
+        mapper.settings().set("control_indices", [2])
+        circuit = mapper.run(unitary)
+
+        # q0, q1 = system; q2 = control; q3, q4 = internally allocated vacuum register.
+        qc = circuit.get_qiskit_circuit()
+        assert qc.num_qubits == 5
+        block = Operator(qc).data[0:8, 0:8]
+
+        terms = [(term.pauli_term, term.angle) for term in container.step_terms]
+        step = _product_formula_matrix(terms, container.num_qubits)
+        u = np.linalg.matrix_power(step, container.step_reps)
+
+        p_0 = np.array([[1, 0], [0, 0]], dtype=complex)
+        p_1 = np.array([[0, 0], [0, 1]], dtype=complex)
+        expected_matrix = u[0, 0] * np.kron(p_0, np.eye(4, dtype=complex)) + np.kron(p_1, u)
+
+        assert np.allclose(
+            block @ block.conj().T,
+            np.eye(8, dtype=complex),
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+        assert np.allclose(
+            block,
+            expected_matrix,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
