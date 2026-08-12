@@ -1,28 +1,22 @@
 r"""Utilities describing which qubits a Pauli term flips.
 
-A Pauli factor *flips* a qubit when it exchanges :math:`|0\rangle` and
-:math:`|1\rangle`: :math:`X` and :math:`Y` do, while :math:`I` and :math:`Z`
-leave the bit value alone.  The **flipped-qubit set** of a Pauli string is
-therefore the set of positions carrying :math:`X` or :math:`Y` (its
-:math:`XY`-support in Pauli-algebra terms).
-
-Two Pauli strings with the same flipped-qubit set differ only by
-:math:`Z`/:math:`I` factors and so connect the same pairs of computational
-basis states.  They are the only strings whose amplitudes can cancel on a
-given basis state.  Acting on the all-zero state in particular,
+The **flipped-qubit set** of a Pauli string is the set of positions carrying
+:math:`X` or :math:`Y` (its :math:`XY`-support), i.e. the qubits whose
+:math:`|0\rangle` and :math:`|1\rangle` get exchanged; :math:`I` and :math:`Z`
+leave the bit value alone.  Strings sharing a flipped-qubit set differ only by
+:math:`Z`/:math:`I` factors, so they connect the same pairs of basis states and
+are the only ones whose amplitudes can cancel.  On the all-zero state,
 
 .. math::
 
     P\,|0\ldots0\rangle = i^{n_Y}\,|b_F\rangle,
 
-where :math:`F` is the flipped-qubit set, :math:`n_Y` counts the :math:`Y`
-factors, and :math:`b_F` is the bit string with exactly the qubits in
-:math:`F` set.
+with :math:`F` the flipped-qubit set, :math:`n_Y` the number of :math:`Y`
+factors, and :math:`b_F` the bit string with exactly the qubits in :math:`F` set.
 
-Consumers include the ``qubit_flip`` term grouper
-(:class:`~qdk_chemistry.algorithms.term_grouper.QubitFlipTermGrouper`) and the
-CSWAP-sandwich controlled circuit mapper, which uses the all-zero action to
-check that an evolution leaves its vacuum register invariant.
+Used by the ``qubit_flip`` term grouper
+(:class:`~qdk_chemistry.algorithms.term_grouper.QubitFlipTermGrouper`) and by the
+CSWAP-sandwich mapper, which checks that an evolution fixes its vacuum register.
 """
 
 # --------------------------------------------------------------------------------------------

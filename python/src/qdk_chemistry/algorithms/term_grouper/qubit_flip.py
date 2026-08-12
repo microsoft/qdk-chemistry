@@ -17,34 +17,31 @@ __all__ = ["QubitFlipTermGrouper"]
 class QubitFlipTermGrouper(TermGrouper):
     r"""Group Pauli terms that flip the same set of qubits.
 
-    A Pauli factor flips a qubit when it exchanges :math:`|0\rangle` and
-    :math:`|1\rangle`, which :math:`X` and :math:`Y` do and :math:`I` and :math:`Z`
-    do not.  Two terms therefore land in the same group exactly when they carry
-    :math:`X`/:math:`Y` on the same qubits and differ only by :math:`Z`/:math:`I`
-    factors.  Terms that flip nothing (pure :math:`I`/:math:`Z` strings) are diagonal
-    and form a single group.
+    Terms land in the same group when they carry :math:`X`/:math:`Y` on the same
+    qubits and differ only by :math:`Z`/:math:`I` factors; terms that flip nothing
+    (diagonal :math:`I`/:math:`Z` strings) form a single group.
 
-    Terms sharing a flipped-qubit set connect the same pairs of computational basis
-    states, so they are the only ones whose amplitudes can cancel on any given basis
-    state.  Keeping them together is what makes a Trotterised evolution reproduce a
-    cancellation the full operator has but no individual Pauli string can — a unitary
-    :math:`e^{-i\theta P}` never annihilates a state, only a sum of terms does:
+    Such terms connect the same pairs of basis states, so they are the only ones
+    whose amplitudes can cancel.  Keeping them contiguous lets a Trotterised
+    evolution reproduce a cancellation that the full operator has but no single
+    Pauli string can, since a unitary :math:`e^{-i\theta P}` never annihilates a
+    state while a sum of terms may:
 
     .. math::
 
         e^{-it\sum_i P_i}|\psi\rangle
         \approx \prod_i e^{-it P_i}|\psi\rangle .
 
-    Grouping by flipped qubits is the coarsest partition with that property, so each
-    group is as large as it can be while still preserving every cancellation.
+    This is the coarsest partition with that property, so groups stay as large as
+    possible while preserving every cancellation.
 
-    Fermionic chemistry Hamiltonians are the motivating case.  Each excitation
+    The motivating case is fermionic chemistry: each excitation
     :math:`a_p^\dagger a_q` (or :math:`a_p^\dagger a_r^\dagger a_s a_q`) annihilates
-    the all-zero reference state, but the Pauli strings it maps onto do not; only
-    their weighted sum cancels.  Those strings share a flipped-qubit set, so this
-    grouper reassembles them without needing the fermionic provenance.  Their
-    :math:`Z` parts then differ by even-size subsets of the shared flip set, so group
-    members also pairwise commute and the group can be exponentiated term by term.
+    the all-zero reference, yet only the *weighted sum* of its Pauli strings cancels.
+    Those strings share a flipped-qubit set, so this grouper reassembles them without
+    needing the fermionic provenance.  Their :math:`Z` parts then differ by even-size
+    subsets of the shared flip set, hence group members also pairwise commute and can
+    be exponentiated term by term.
 
     """
 

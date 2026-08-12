@@ -86,11 +86,13 @@ evolution = create("hamiltonian_unitary_builder", "trotter", order=1, time=0.1).
 )
 
 # 5. Control it with the CSWAP sandwich. The mapper validates the ordering and
-#    raises if the product formula would leak the vacuum.
+#    raises if the product formula would leak the vacuum. Qubit 0 is the control
+#    ancilla (the convention the QPE circuit builders use) and the remaining
+#    n_spin_orbitals qubits are auto-assigned as the system register.
 cswap_mapper = create(
     "controlled_circuit_mapper",
     "cswap_pauli_sequence",
-    control_indices=[n_spin_orbitals],
+    control_indices=[0],
 )
 circuit = cswap_mapper.run(evolution)
 print("Controlled evolution circuit generated via the CSWAP sandwich")
