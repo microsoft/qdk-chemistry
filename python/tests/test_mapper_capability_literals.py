@@ -34,6 +34,7 @@ one outcome it exists to prevent.
 
 import ast
 import difflib
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -42,66 +43,93 @@ import pytest
 # tree: on a correct checkout no probed capability has any near variant at all.
 _CONFUSABLE_RATIO = 0.85
 
+# Both forms dispatch on an optional capability, so both name a literal that can drift.
+_PROBE_ARITIES = {"hasattr": (2,), "getattr": (2, 3)}
+
 _SRC = Path(__file__).parent.parent / "src" / "qdk_chemistry" / "algorithms"
 CIRCUIT_BUILDER_DIR = _SRC / "phase_estimation" / "circuit_builder"
 MAPPER_DIR = _SRC / "controlled_circuit_mapper"
 
 
+def _target_name(node: ast.expr) -> str:
+    """The identifier a probe interrogates, as far as it is statically visible."""
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    return ""
+
+
+def _is_probe_call(node: ast.AST) -> bool:
+    """A ``hasattr``/``getattr`` call with an arity that dispatches on a capability."""
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and len(node.args) in _PROBE_ARITIES.get(node.func.id, ())
+    )
+
+
 def _probed_name(node: ast.Call) -> str | None:
-    """Return the literal attribute name of a mapper ``hasattr`` probe, if this is one."""
-    if not isinstance(node.func, ast.Name):
-        return None
-    if node.func.id != "hasattr" or len(node.args) != 2:
+    """Return the literal attribute name of a mapper capability probe, if this is one.
+
+    Both ``hasattr(mapper, "name")`` and ``getattr(mapper, "name", default)`` dispatch on
+    an optional capability, so both are probes and both must be checked.
+    """
+    if not _is_probe_call(node):
         return None
 
-    target, attribute = node.args
+    target, attribute = node.args[0], node.args[1]
     if not isinstance(attribute, ast.Constant) or not isinstance(attribute.value, str):
         return None
 
-    # Only probes against something mapper-shaped; other hasattr uses are unrelated.
-    if isinstance(target, ast.Name):
-        target_name = target.id
-    elif isinstance(target, ast.Attribute):
-        target_name = target.attr
-    else:
-        return None
-
-    return attribute.value if "mapper" in target_name.lower() else None
+    # Only probes against something mapper-shaped; other lookups are unrelated.
+    return attribute.value if "mapper" in _target_name(target).lower() else None
 
 
-def _capability_probes() -> list[tuple[Path, int, str]]:
-    """Every ``hasattr(<...mapper...>, "name")`` probe under the circuit-builder package."""
-    probes: list[tuple[Path, int, str]] = []
+def _capability_probe_calls() -> Iterator[tuple[Path, ast.Call]]:
+    """Every ``hasattr``/``getattr`` capability-dispatch call under the circuit-builder package."""
     for path in sorted(CIRCUIT_BUILDER_DIR.rglob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            name = _probed_name(node)
-            if name is not None:
-                probes.append((path, node.lineno, name))
+            if _is_probe_call(node):
+                assert isinstance(node, ast.Call)
+                yield path, node
+
+
+def _capability_probes() -> list[tuple[Path, int, str]]:
+    """Every ``hasattr``/``getattr`` capability probe against a mapper-shaped target."""
+    probes: list[tuple[Path, int, str]] = []
+    for path, node in _capability_probe_calls():
+        name = _probed_name(node)
+        if name is not None:
+            probes.append((path, node.lineno, name))
     return probes
 
 
-def _unscanned_hasattr_calls() -> list[tuple[Path, int, str]]:
-    """Every two-argument ``hasattr`` under the circuit-builder package that ``_probed_name`` drops.
+def _unscanned_capability_probes() -> list[tuple[Path, int, str]]:
+    """Every capability-dispatch call under the circuit-builder package the scan drops.
 
     ``_probed_name`` recognises a probe only when the target identifier contains ``mapper``
     and the attribute is a string literal.  Both conditions are ordinary refactors away
     from being false: binding the mapper to a local named ``impl``, calling through
     ``self._resolve()``, or moving the capability name into a variable each make a live
     probe invisible to the scan while leaving it working at runtime.
+
+    Detection here is by *capability name* rather than by target shape, because the target
+    shape is exactly what the dangerous refactors change.  A dropped call is reported when
+    it names a method some mapper actually defines, or when it interrogates a
+    mapper-shaped target through a name this module cannot resolve statically.
     """
+    known = _mapper_member_names()
     skipped: list[tuple[Path, int, str]] = []
-    for path in sorted(CIRCUIT_BUILDER_DIR.rglob("*.py")):
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
-                continue
-            if node.func.id != "hasattr" or len(node.args) != 2:
-                continue
-            if _probed_name(node) is None:
-                skipped.append((path, node.lineno, ast.unparse(node)))
+    for path, node in _capability_probe_calls():
+        if _probed_name(node) is not None:
+            continue
+        target, attribute = node.args[0], node.args[1]
+        names_a_capability = isinstance(attribute, ast.Constant) and attribute.value in known
+        interrogates_a_mapper = "mapper" in _target_name(target).lower()
+        if names_a_capability or interrogates_a_mapper:
+            skipped.append((path, node.lineno, ast.unparse(node)))
     return skipped
 
 
@@ -150,7 +178,7 @@ def test_at_least_one_capability_probe_is_scanned() -> None:
     )
 
 
-def test_no_hasattr_call_escapes_the_probe_scanner() -> None:
+def test_no_capability_probe_escapes_the_scanner() -> None:
     """Guard the *discovery* step: a probe the scan cannot see is a probe it cannot check.
 
     The test above only fires when the discovered set is empty, so it catches total
@@ -160,20 +188,19 @@ def test_no_hasattr_call_escapes_the_probe_scanner() -> None:
     the same shape: constrain the whole set, not its cardinality.
 
     Rather than pinning the capability names, which would take a position on the pending
-    ``ancilla``/``ancillary`` spelling this module deliberately stays neutral on, this
-    pins *coverage*: every two-argument ``hasattr`` in the package must be one the scanner
-    recognises.  Renaming a local from ``circuit_mapper`` to ``impl`` then fails here
-    instead of quietly shrinking the parametrised set, and a genuine non-mapper ``hasattr``
-    fails informatively, asking whoever adds it to widen the scanner or scope this check.
+    ``ancilla``/``ancillary`` spelling this module deliberately stays neutral on, this pins
+    *coverage*: no capability-dispatch call may hide from the scan.  Renaming a local from
+    ``circuit_mapper`` to ``impl``, or swapping ``hasattr`` for an equivalent
+    ``getattr(..., None)``, then fails here instead of quietly shrinking the parametrised
+    set.
     """
-    skipped = _unscanned_hasattr_calls()
+    skipped = _unscanned_capability_probes()
     assert not skipped, (
-        "these hasattr calls are invisible to the capability scan, so the literals they "
-        "name are unchecked and a rename of the corresponding mapper method would pass "
-        "silently:\n"
+        "these capability probes are invisible to the scan, so the literals they name are "
+        "unchecked and a rename of the corresponding mapper method would pass silently:\n"
         + "\n".join(f"  {p.name}:{n}  {src}" for p, n, src in skipped)
-        + "\nEither make the probe target mapper-shaped, or widen _probed_name "
-        "(currently requires 'mapper' in the target identifier and a literal attribute)."
+        + "\nEither make the probe target mapper-shaped with a literal attribute, or widen "
+        "_probed_name to recognise this form."
     )
 
 
