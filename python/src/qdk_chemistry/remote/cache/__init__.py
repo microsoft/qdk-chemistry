@@ -15,12 +15,15 @@ the ``qdk_chemistry.cache_backends`` entry-point group.
 
 from __future__ import annotations
 
+import logging
 import pathlib
 from typing import Any
 
 from qdk_chemistry.remote.cache.base import CacheBackend
 from qdk_chemistry.remote.cache.folder import FolderCache
 from qdk_chemistry.remote.cache.tiered import TieredCache
+
+logger = logging.getLogger(__name__)
 
 # ── Registry ─────────────────────────────────────────────────────────────────
 
@@ -111,7 +114,7 @@ def _load_plugin_caches() -> None:
             cls = ep.load()
             register_cache(ep.name)(cls)
     except Exception:  # noqa: BLE001
-        pass
+        logger.warning("Failed to load cache plugins", exc_info=True)
 
 
 _load_plugin_caches()
