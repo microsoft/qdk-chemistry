@@ -6,7 +6,6 @@
 
 #include <qdk/chemistry/scf/config.h>
 
-#include <set>
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
 #include <mpi.h>
 #endif
@@ -471,45 +470,10 @@ size_t binomial_coefficient(size_t n, size_t k) {
   return result;
 }
 
-bool validate_active_contiguous_indices(const std::vector<size_t>& indices,
-                                        const std::string& spin_label,
-                                        size_t num_molecular_orbitals) {
+bool indices_are_contiguous(const std::vector<size_t>& indices) {
   QDK_LOG_TRACE_ENTERING();
-  if (indices.empty()) return true;
-
-  // Cannot contain more than the total number of MOs
-  if (indices.size() > num_molecular_orbitals) {
-    throw std::runtime_error("Number of requested " + spin_label +
-                             " active orbitals exceeds total number of MOs");
-  }
-
-  // Make sure that the indices are within bounds
-  for (const auto& idx : indices) {
-    if (static_cast<size_t>(idx) >= num_molecular_orbitals) {
-      throw std::runtime_error(
-          spin_label +
-          " active orbital index out of bounds: " + std::to_string(idx));
-    }
-  }
-
-  // Make sure that the indices are unique
-  std::set<size_t> unique_indices(indices.begin(), indices.end());
-  if (unique_indices.size() != indices.size()) {
-    throw std::runtime_error(spin_label +
-                             " active orbital indices must be unique");
-  }
-
-  // Make sure that the indices are sorted
-  std::vector<size_t> sorted_indices(indices.begin(), indices.end());
-  std::sort(sorted_indices.begin(), sorted_indices.end());
-  if (indices != sorted_indices) {
-    throw std::runtime_error(spin_label +
-                             " active orbital indices must be sorted");
-  }
-
-  // Check if indices are contiguous
-  for (size_t i = 0; i < indices.size() - 1; ++i) {
-    if (indices[i + 1] - indices[i] != 1) {
+  for (size_t i = 1; i < indices.size(); ++i) {
+    if (indices[i] != indices[i - 1] + 1) {
       return false;
     }
   }

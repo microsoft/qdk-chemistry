@@ -719,38 +719,6 @@ void OneBodyIntegral::pvp_integral(double* res) {
 #endif
 }
 
-void OneBodyIntegral::cross_overlap(const BasisSet& basis_a,
-                                    const BasisSet& basis_b,
-                                    const Molecule* /*mol*/,
-                                    ParallelConfig /*mpi*/, double* res) {
-  auto obs_a = libint2_util::convert_to_libint_basisset(basis_a);
-  auto obs_b = libint2_util::convert_to_libint_basisset(basis_b);
-  const size_t na = obs_a.nbf();
-  const size_t nb = obs_b.nbf();
-
-  // Result in column-major (na × nb) Eigen layout
-  Eigen::Map<Eigen::MatrixXd> S(res, na, nb);
-  S.setZero();
-
-  const auto& sh2bf_a = obs_a.shell2bf();
-  const auto& sh2bf_b = obs_b.shell2bf();
-
-  libint2::Engine engine(libint2::Operator::overlap,
-                         std::max(obs_a.max_nprim(), obs_b.max_nprim()),
-                         std::max(obs_a.max_l(), obs_b.max_l()), 0);
-
-  for (size_t s1 = 0; s1 < obs_a.size(); ++s1) {
-    for (size_t s2 = 0; s2 < obs_b.size(); ++s2) {
-      const auto& buf = engine.compute(obs_a[s1], obs_b[s2]);
-      if (buf[0] == nullptr) continue;
-      size_t n1 = obs_a[s1].size(), n2 = obs_b[s2].size();
-      // buf is row-major; copy into column-major Eigen block
-      Eigen::Map<const RowMajorMatrix> block(buf[0], n1, n2);
-      S.block(sh2bf_a[s1], sh2bf_b[s2], n1, n2) = block;
-    }
-  }
-}
-
 void OneBodyIntegral::integral_deriv_(EngineFactory engine_fn,
                                       const RowMajorMatrix& coeff,
                                       AtomCenterFn center_fn, double* res) {

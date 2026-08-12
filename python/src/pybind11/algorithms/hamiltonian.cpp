@@ -265,6 +265,10 @@ This is particularly important for molecules containing heavy elements
 (4th row and beyond) where relativistic effects significantly influence
 the electronic structure.
 
+The input must use an all-electron basis set. Effective core potentials are
+not supported. Spin-orbit coupling and two-electron picture-change corrections
+are outside the X2C-1e approximation implemented by this constructor.
+
 Typical usage:
 
 .. code-block:: python
@@ -276,6 +280,7 @@ Typical usage:
 
     # Configure settings if needed
     constructor.settings().set("eri_method", "direct")
+    constructor.settings().set("xuncontract", True)
 
     # Construct Hamiltonian with scalar relativistic corrections
     hamiltonian = constructor.run(orbitals)

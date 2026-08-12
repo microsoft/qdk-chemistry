@@ -8,7 +8,20 @@
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/settings.hpp>
 
+namespace qdk::chemistry::scf {
+class BasisSet;
+}
+
 namespace qdk::chemistry::algorithms::microsoft {
+
+namespace detail {
+
+std::shared_ptr<data::Hamiltonian> construct_canonical_hamiltonian(
+    std::shared_ptr<data::Orbitals> orbitals,
+    const std::shared_ptr<qdk::chemistry::scf::BasisSet>& internal_basis_set,
+    const Eigen::MatrixXd& one_body_ao, const std::string& eri_method);
+
+}  // namespace detail
 
 class HamiltonianSettings : public qdk::chemistry::data::Settings {
  public:

@@ -98,6 +98,29 @@ TEST(int1e, kinetic_integral) { test_integral("kinetic_integral"); }
 TEST(int1e, nuclear_integral) { test_integral("nuclear_integral", 1e-8); }
 TEST(int1e, ecp_integral) { test_integral("ecp_integral", 1e-8); }
 
+TEST(int1e, pvp_integral) {
+  auto molecule = std::make_shared<Molecule>();
+  molecule->atomic_nums = {1, 1};
+  molecule->atomic_charges = molecule->atomic_nums;
+  molecule->n_atoms = 2;
+  molecule->total_nuclear_charge = 2;
+  molecule->n_electrons = 2;
+  molecule->coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}};
+
+  auto basis = BasisSet::from_database_json(molecule, "sto-3g", BasisMode::PSI4,
+                                            true, false);
+  OneBodyIntegral int1e(basis.get(), molecule.get(),
+                        ParallelConfig{1, 0, 1, 0});
+  Eigen::MatrixXd result(2, 2);
+  int1e.pvp_integral(result.data());
+
+  // Generated with PySCF from the exact QDK STO-3G shell definitions.
+  Eigen::MatrixXd reference(2, 2);
+  reference << -2.6937881926330531, -0.55512513393737917, -0.55512513393737917,
+      -2.6937881926330531;
+  EXPECT_LT((result - reference).cwiseAbs().maxCoeff(), 1e-11);
+}
+
 // Gradients are only fully supported if GPUs are enabled
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 TEST(int1e, overlap_graident) { test_gradient("overlap_gradient"); }

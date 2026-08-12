@@ -195,23 +195,6 @@ class OneBodyIntegral {
    */
   void pvp_integral(double* res);
 
-  /**
-   * @brief Compute cross-overlap matrix between two different basis sets.
-   *
-   * S_cross[μν] = ⟨μ_A|ν_B⟩ where A and B are different basis sets
-   * (e.g. uncontracted and contracted).  Used for basis projection in
-   * X2C decontraction/recontraction.
-   *
-   * @param basis_a  First basis set
-   * @param basis_b  Second basis set
-   * @param mol      Molecular structure
-   * @param mpi      MPI configuration
-   * @param[out] res Output buffer (size: nao_a × nao_b, column-major)
-   */
-  static void cross_overlap(const BasisSet& basis_a, const BasisSet& basis_b,
-                            const Molecule* mol, ParallelConfig mpi,
-                            double* res);
-
 #ifdef QDK_CHEMISTRY_ENABLE_QMMM
   /**
    * @brief Compute point charge interaction integral matrix for QM/MM

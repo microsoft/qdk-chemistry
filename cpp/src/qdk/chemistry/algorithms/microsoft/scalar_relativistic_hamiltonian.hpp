@@ -4,38 +4,16 @@
 
 #pragma once
 
-#include <qdk/chemistry/algorithms/hamiltonian.hpp>
-#include <qdk/chemistry/data/hamiltonian.hpp>
+#include "hamiltonian.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
 
-/// @name X2C numeric thresholds
-/// @{
-
-/// Threshold for discarding near-zero eigenvalues in the 4-component
-/// metric during canonical orthogonalisation.  Must be very tight because
-/// the small-component metric T/(2c²) has inherently small eigenvalues.
-/// Matches PySCF's ``x2c.LINEAR_DEP_THRESHOLD``.
-static constexpr double x2c_metric_lindep_threshold = 1e-14;
-
-/// Number of decimal digits retained when rounding Gaussian exponents
-/// during basis decontraction.  Two exponents that agree to this many
-/// decimals are considered duplicates and merged.
-static constexpr int x2c_exponent_rounding_digits = 9;
-
-/// Derived precision for rounding and comparing exponents.
-static constexpr double x2c_exponent_rounding_factor = 1e9;
-static constexpr double x2c_exponent_duplicate_tolerance = 1e-9;
-
-/// @}
-
-class ScalarRelativisticHamiltonianSettings
-    : public qdk::chemistry::data::Settings {
+class ScalarRelativisticHamiltonianSettings : public HamiltonianSettings {
  public:
   ScalarRelativisticHamiltonianSettings() {
-    set_default("eri_method", "direct");
-    set_default("scf_type", "auto");
-    set_default("xuncontract", true);
+    set_default("xuncontract", true,
+                "Decontract the orbital basis for the X2C transformation and "
+                "recontract the resulting one-electron Hamiltonian");
   }
   ~ScalarRelativisticHamiltonianSettings() override = default;
 };
@@ -52,8 +30,8 @@ class ScalarRelativisticHamiltonianSettings
  * integrals (ERI) are left unchanged (untransformed), which is the
  * standard "one-electron X2C" or "X2C-1e" approximation.
  *
- * @note The user should supply an appropriate uncontracted or
- *       relativistic basis set (e.g. cc-pVXZ-DK, ANO-RCC).
+ * @note Effective core potentials are not supported. Use an all-electron
+ *       relativistic basis set such as cc-pVXZ-DK or ANO-RCC.
  *
  * The X2C procedure:
  *   1. Compute one-electron integrals S, T, V in the AO basis,
@@ -61,12 +39,9 @@ class ScalarRelativisticHamiltonianSettings
  *      \langle\chi_\mu|\hat{p}\cdot V\hat{p}|\chi_\nu\rangle \f$
  *      analytically via Libint2 Operator::opVop.
  *   2. Build and diagonalise the modified Dirac Hamiltonian.
- *   3. Construct the X2C decoupling matrix X from the large/small
- *      component ratio.
- *   4. Build the renormalisation matrix R.
- *   5. Form the 2-component (scalar-relativistic) core Hamiltonian
- *      \f$ h^{\text{X2C}} = R^{\dagger} (V + X^{\dagger} T +
- *      T X + X^{\dagger} (W^{SF}/(4c^2) - T) X) R \f$
+ *   3. Select the positive-energy eigenvectors and project their energies
+ *      back to the original AO metric.
+ *   4. Form the spin-free two-component one-electron Hamiltonian.
  *
  * @see HamiltonianConstructor (nonrelativistic counterpart)
  */

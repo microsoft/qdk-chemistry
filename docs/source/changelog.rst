@@ -4,6 +4,11 @@ Changelog
 
 For detailed release notes with code examples and feature walkthroughs, see the :doc:`release-notes/index` section.
 
+Unreleased
+==========
+
+- Added a native spin-free exact-two-component (X2C-1e) Hamiltonian constructor for all-electron scalar-relativistic calculations.
+
 Version 2.1.0
 =============
 
