@@ -200,22 +200,17 @@ def test_capability_probe_directories_exist() -> None:
     assert _mapper_member_names(), "parsed no members from any mapper -- the scan is broken"
 
 
-def test_at_least_one_capability_probe_is_scanned() -> None:
-    """A refactor that removes every probe should update this test, not silently skip it."""
-    assert _capability_probes(), (
-        f"no hasattr capability probes found under {CIRCUIT_BUILDER_DIR}; "
-        "if the dispatch mechanism changed, delete or rewrite this module"
-    )
-
-
 def test_no_capability_probe_escapes_the_scanner() -> None:
     """Guard the *discovery* step: a probe the scan cannot see is a probe it cannot check.
 
-    The test above only fires when the discovered set is empty, so it catches total
-    discovery loss and is blind to partial loss.  That is the same existential quantifier
-    that made the per-probe check blind to partial renames -- ``at least one probe`` hides
-    a lost probe exactly as ``some mapper`` hid a lost definition -- and the fix has to be
-    the same shape: constrain the whole set, not its cardinality.
+    A bare ``assert _capability_probes()`` liveness check fires only when the discovered set
+    is empty, so it catches total discovery loss and is blind to partial loss.  That is the
+    same existential quantifier that made the per-probe check blind to partial renames --
+    ``at least one probe`` hides a lost probe exactly as ``some mapper`` hid a lost
+    definition -- and the fix has to be the same shape: constrain the whole set, not its
+    cardinality.  (That liveness check used to live here as its own test; it is subsumed by
+    ``test_capability_probe_coverage_has_not_shrunk``, which fails on everything it failed
+    on and on the partial losses it missed.)
 
     Rather than pinning the capability names, which would take a position on the pending
     ``ancilla``/``ancillary`` spelling this module deliberately stays neutral on, this pins
@@ -237,11 +232,12 @@ def test_no_capability_probe_escapes_the_scanner() -> None:
 def test_capability_probe_coverage_has_not_shrunk() -> None:
     """Guard the *enumerator*: a probe written in an unanticipated form is not enumerated.
 
-    The test above detects a dropped probe only among calls the enumerator already yields,
-    and ``_capability_probe_calls`` yields a node only when it is a call to a name in
-    ``_PROBE_ARITIES``.  So detection-by-capability-name is applied exclusively to calls
-    already admitted by detection-by-builtin-name, and any dispatch that is not literally a
-    ``hasattr``/``getattr`` call is invisible to both.  Measured, on the tree as it stands:
+    ``test_no_capability_probe_escapes_the_scanner`` detects a dropped probe only among
+    calls the enumerator already yields, and ``_capability_probe_calls`` yields a node only
+    when it is a call to a name in ``_PROBE_ARITIES``.  So detection-by-capability-name is
+    applied exclusively to calls already admitted by detection-by-builtin-name, and any
+    dispatch that is not literally a ``hasattr``/``getattr`` call is invisible to both.
+    Measured, on the tree as it stands:
 
     ==========================================  ====================================
     ``"cap" in dir(circuit_mapper)``            a ``Compare``, never a ``Call``
