@@ -415,6 +415,23 @@ def test_lcu_phase_from_eigenvalue_raises():
         c.phase_from_eigenvalue(0.25)
 
 
+def test_lcu_phases_from_eigenvalue_raises():
+    """LCUContainer.phases_from_eigenvalue raises NotImplementedError."""
+    c = LCUContainer.__new__(LCUContainer)
+    with pytest.raises(NotImplementedError):
+        c.phases_from_eigenvalue(0.25)
+
+
+@pytest.mark.parametrize("scale", [0.5, 1.0, 2.0, 3.5])
+def test_ppf_phases_from_eigenvalue_gives_one_branch(scale):
+    """Time evolution is one-to-one on the range it encodes, so each energy has one phase."""
+    container = PauliProductFormulaContainer(step_terms=[], step_reps=1, num_qubits=1, scale=scale)
+    for energy in np.linspace(-np.pi / scale, np.pi / scale, 17, endpoint=False):
+        phases = container.phases_from_eigenvalue(float(energy))
+        assert len(phases) == 1
+        assert phases[0] == container.phase_from_eigenvalue(float(energy))
+
+
 @pytest.mark.parametrize("scale", [0.5, 1.0, 2.0, 3.5])
 def test_ppf_phase_from_eigenvalue_roundtrips(scale):
     """The time-evolution inverse recovers every energy that does not alias."""
