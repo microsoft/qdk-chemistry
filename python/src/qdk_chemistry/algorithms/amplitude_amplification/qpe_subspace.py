@@ -105,14 +105,6 @@ class QPESubspaceMarking(QpeCircuitBuilder):
         if not math.isfinite(target_energy):
             raise ValueError(f"target_energy must be a finite energy. Got {target_energy}.")
 
-        # Every bin is tested rather than solved for. Containers expose phase_from_eigenvalue,
-        # the closed-form inverse, but it returns only the principal phase: recovering the
-        # accepted set from it also needs the number of branches the law has and which side of
-        # each boundary is accepted, and neither is part of the UnitaryContainer contract. The
-        # walk is even about 1/2 and so has two branches, the product formula one; a container
-        # getting that wrong would yield silently wrong bins, and so a wrong oracle.
-        # The scan is O(2**num_phase_qubits), but so is the circuit built from it -- the phase
-        # ladder applies U 2**num_phase_qubits - 1 times -- so it is never the binding cost.
         phase_bin_count = 1 << num_phase_qubits
         ranges: list[tuple[int, int]] = []
         for phase_bin in range(phase_bin_count):
@@ -162,8 +154,6 @@ class QPESubspaceMarking(QpeCircuitBuilder):
         if math.isinf(target_energy):
             raise ValueError(f"The target_energy setting must be a finite energy. Got {target_energy}.")
 
-        # Resolve the marked bins up front: an energy that no bin of the register can hold then
-        # fails here, rather than after num_bits controlled unitaries have already been built.
         container = self._create_nested("unitary_builder").run(qubit_hamiltonian).get_container()
         bin_ranges = self._marked_phase_bins(target_energy, container.eigenvalue_from_phase, num_bits)
         lower_bounds = [start for start, _ in bin_ranges]

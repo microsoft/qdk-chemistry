@@ -76,9 +76,7 @@ Once configured, the :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_
 Available Implementations
 -------------------------
 
-QDK/Chemistry provides two primary implementations of :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilder`,
-which build a circuit whose phase register is measured, plus one specialised implementation
-described in :ref:`qpe-subspace-marking` below.
+QDK/Chemistry provides two primary implementations of :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilder`:
 
 Iterative Phase Estimation Circuit Builder (IQPE)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -143,8 +141,8 @@ Constructs the textbook multi-ancilla QPE circuit with inverse Quantum Fourier T
 
 .. _qpe-subspace-marking:
 
-Subspace Marking Circuit Builder
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+QPE Subspace Marking Circuit Builder
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. rubric:: Class: :class:`~qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.QPESubspaceMarking`
 
@@ -157,13 +155,9 @@ estimation, leaving the register as it was found. The result is a *good state or
 :doc:`AmplitudeAmplification <amplitude_amplification>`, used to amplify an eigenspace rather
 than to read out an energy.
 
-It derives directly from :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilder`
-so that it is configured like any other builder, but from neither
-:class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.IterativeQpeCircuitBuilder`
-nor :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.StandardQpeCircuitBuilder`.
-:class:`~qdk_chemistry.algorithms.PhaseEstimation` requires one of those two and raises
-``TypeError`` otherwise, so ``"qdk_qpe_subspace"`` cannot be selected where a phase estimation
-circuit is required.
+``run`` takes ``(state_preparation, qubit_hamiltonian)`` and
+returns a list of :class:`~qdk_chemistry.data.Circuit`, but the state preparation is ignored
+because the register it is applied to already holds the state to be amplified.
 
 **Additional settings:**
 

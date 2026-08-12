@@ -6,11 +6,8 @@ algorithm increases the probability of measuring a state in a chosen subspace.
 It takes two :class:`~qdk_chemistry.data.Circuit` objects:
 
 - ``state_prep_oracle`` prepares the initial state from :math:`|0\rangle`.
-- ``good_state_oracle`` *marks* the good subspace: applied to ``(register, flag)`` it flips the
+- ``good_state_oracle`` marks the good subspace: applied to ``(register, flag)`` it flips the
   flag qubit when the register holds a good state, and leaves the register itself untouched.
-  It is neither a state nor a reflection. The reflection is built from it: the algorithm runs
-  the oracle, applies a :math:`Z` to the flag, then undoes the oracle, which phases the good
-  subspace by :math:`-1`.
 
 The circuit first prepares the initial state. Each round then flags the
 good subspace and reflects. If the initial probability of the marked
@@ -49,14 +46,7 @@ The :class:`~qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.QPESu
 algorithm (``qpe_circuit_builder`` / ``qdk_qpe_subspace``) builds such a ``good_state_oracle``.
 It is configured like any other
 :doc:`QpeCircuitBuilder <qpe_circuit_builder>`, plus the energy to mark; see
-:ref:`its section there <qpe-subspace-marking>` for the settings and for why it cannot be used
-where a phase estimation circuit is required.
-``run`` takes ``(state_preparation, qubit_hamiltonian)`` and
-returns a list of :class:`~qdk_chemistry.data.Circuit`, but the state preparation is ignored
-because the register it is applied to already holds the state to be amplified.
-The returned circuit runs the QPE on the register it is handed, flips a
-flag when the phase lands in a bin whose energy is at least ``target_energy``, then undoes the
-QPE.
+:ref:`its section there <qpe-subspace-marking>`.
 
 .. tab:: Python API
 
@@ -85,22 +75,6 @@ Settings
    * - ``rounds``
      - ``int``
      - Number of Grover iterates (default 1). Must be non-negative.
-
-``qpe_circuit_builder`` / ``qdk_qpe_subspace``: the settings of
-:doc:`QpeCircuitBuilder <qpe_circuit_builder>` (``num_bits``, ``unitary_builder``,
-``controlled_circuit_mapper``), plus:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 25 15 60
-
-   * - Setting
-     - Type
-     - Description
-   * - ``target_energy``
-     - ``double``
-     - Lowest energy the marked subspace may hold. Required; it defaults to NaN because
-       there is no meaningful default.
 
 Further Reading
 ---------------
