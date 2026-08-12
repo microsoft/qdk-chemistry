@@ -63,7 +63,7 @@ The :class:`~qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.b
      - Total evolution time :math:`T`. Default: ``1.0``.
    * - ``dt``
      - float
-       - Time step for evolution discretization. Must be nonzero, match the sign of ``total_time``, and not exceed it in magnitude. Default: ``0.0`` (invalid; user must set).
+     - Time step for evolution discretization. Must be nonzero, match the sign of ``total_time``, and not exceed it in magnitude. Default: ``0.0`` (invalid; user must set).
 
 Once configured, the builder can be executed:
 
