@@ -10,8 +10,6 @@ from qdk import qsharp
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
-from qdk_chemistry.utils.pauli_commutation import do_pauli_maps_commute
-from qdk_chemistry.utils.pauli_qubit_flip import pauli_map_zero_state_action
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import ControlledCircuitMapper, ControlledCircuitMapperSettings
@@ -19,73 +17,52 @@ from .base import ControlledCircuitMapper, ControlledCircuitMapperSettings
 __all__: list[str] = [
     "ControlledSwapPauliSequenceMapper",
     "ControlledSwapPauliSequenceMapperSettings",
-    "vacuum_preserving_blocks",
 ]
 
 
-def vacuum_preserving_blocks(
-    terms: list[tuple[dict[int, str], float]],
-    *,
-    atol: float = 1e-9,
-) -> list[tuple[int, ...]] | None:
-    r"""Split an *ordered* sequence of exponentiated Pauli terms into vacuum-preserving blocks.
+def _is_vacuum_preserving(terms: list[tuple[dict[int, str], float]], atol: float) -> bool:
+    r"""Check whether an *ordered* product :math:`\prod_j e^{-i\theta_j P_j}` fixes :math:`|0\ldots0\rangle`.
 
-    A product :math:`\prod_j e^{-i\theta_j P_j}` fixes :math:`|0\ldots0\rangle` (up to a
-    phase) when it can be cut into contiguous blocks in which
-
-    #. all Pauli strings pairwise commute, so the block equals
-       :math:`\exp(-i\sum_j \theta_j P_j)`, and
-    #. the block generator :math:`\sum_j \theta_j P_j` maps the all-zero state onto a
-       multiple of itself, i.e. amplitudes cancel for every non-empty flipped-qubit set.
-
-    Blocks are cut as early as possible, giving the finest valid partition: any coarser
-    block contains a finer one and so inherits its non-commuting pairs.
+    The product preserves the vacuum (up to a phase) when it splits into contiguous blocks in
+    which all Pauli strings pairwise commute -- so the block equals :math:`\exp(-i\sum_j \theta_j P_j)`
+    -- and whose generator :math:`\sum_j \theta_j P_j` maps the all-zero state onto a multiple of
+    itself, i.e. amplitudes cancel for every non-empty flipped-qubit set.  Blocks are cut as early
+    as possible: any coarser block contains a finer one and so inherits its non-commuting pairs.
 
     Args:
         terms: Ordered ``(pauli_map, angle)`` pairs, one per exponential factor.
         atol: Absolute tolerance used when testing amplitude cancellation.
 
     Returns:
-        A list of blocks, each a tuple of indices into *terms*, or ``None`` when no such
-        split exists (i.e. the ordering does not preserve the vacuum).
+        ``True`` when such a split exists.
 
     """
-    blocks: list[tuple[int, ...]] = []
-    current: list[int] = []
-    residual: dict[frozenset[int], complex] = {}
+    block: list[tuple[int, int]] = []  # symplectic (X, Z) bit masks of the terms in the open block
+    residual: dict[int, complex] = {}
 
-    for index, (pauli_map, angle) in enumerate(terms):
-        flipped, amplitude = pauli_map_zero_state_action(pauli_map)
-        current.append(index)
-        if flipped:
-            residual[flipped] = residual.get(flipped, 0j) + angle * amplitude
-            if abs(residual[flipped]) <= atol:
-                del residual[flipped]
+    for pauli_map, angle in terms:
+        x_mask = z_mask = 0
+        for qubit, axis in pauli_map.items():
+            if axis in ("X", "Y"):
+                x_mask |= 1 << qubit
+            if axis in ("Y", "Z"):
+                z_mask |= 1 << qubit
 
-        if residual:
-            continue
+        # Two Pauli strings commute iff they anticommute on an even number of qubits.
+        if any(((x_mask & z) ^ (z_mask & x)).bit_count() % 2 for x, z in block):
+            return False
+        block.append((x_mask, z_mask))
 
-        # The accumulated generator maps the vacuum onto a multiple of itself;
-        # the block is only usable if its factors also commute.
-        if not _pairwise_commuting(terms, current):
-            return None
-        blocks.append(tuple(current))
-        current = []
+        if x_mask:
+            # P|0...0> = i^{n_Y}|b>, with b the bit pattern of the X/Y support.
+            residual[x_mask] = residual.get(x_mask, 0j) + angle * 1j ** (x_mask & z_mask).bit_count()
+            if abs(residual[x_mask]) <= atol:
+                del residual[x_mask]
 
-    if current or residual:
-        return None
-    return blocks
+        if not residual:
+            block = []
 
-
-def _pairwise_commuting(terms: list[tuple[dict[int, str], float]], indices: list[int]) -> bool:
-    """Check that every pair of Pauli terms referenced by *indices* commutes."""
-    # Explicit "I" axes are dropped: do_pauli_maps_commute miscounts them in sparse maps.
-    maps = {i: {q: axis for q, axis in terms[i][0].items() if axis != "I"} for i in indices}
-    for position, i in enumerate(indices):
-        for j in indices[position + 1 :]:
-            if not do_pauli_maps_commute(maps[i], maps[j]):
-                return False
-    return True
+    return not block and not residual
 
 
 class ControlledSwapPauliSequenceMapperSettings(ControlledCircuitMapperSettings):
@@ -243,8 +220,7 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
 
         """
         terms = [(term.pauli_term, term.angle) for term in container.step_terms]
-        tolerance = self._settings.get("vacuum_preservation_tolerance")
-        if vacuum_preserving_blocks(terms, atol=tolerance) is None:
+        if not _is_vacuum_preserving(terms, self._settings.get("vacuum_preservation_tolerance")):
             raise ValueError(
                 "ControlledSwapPauliSequenceMapper requires a vacuum-preserving product formula: the "
                 "Pauli terms could not be split into contiguous, mutually commuting blocks that leave "

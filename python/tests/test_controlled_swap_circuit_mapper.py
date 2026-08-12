@@ -17,7 +17,7 @@ except ImportError:
 from qdk_chemistry.algorithms import registry
 from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_swap_pauli_sequence_mapper import (
     ControlledSwapPauliSequenceMapper,
-    vacuum_preserving_blocks,
+    _is_vacuum_preserving,
 )
 from qdk_chemistry.data import QubitOperator
 from qdk_chemistry.data.circuit import Circuit
@@ -27,10 +27,6 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
     PauliProductFormulaContainer,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
-from qdk_chemistry.utils.pauli_qubit_flip import (
-    pauli_label_zero_state_action,
-    pauli_map_zero_state_action,
-)
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
@@ -304,60 +300,25 @@ class TestVacuumPreservationValidation:
 
 
 class TestVacuumPreservingBlocks:
-    """Tests for the ``vacuum_preserving_blocks`` helper."""
+    """Tests for the ``_is_vacuum_preserving`` helper."""
 
-    def test_blocks_are_cut_as_early_as_possible(self):
-        """The helper returns the finest valid split."""
+    def test_cancelling_partners_are_accepted(self):
+        """Partners that cancel on the vacuum split into commuting blocks."""
         terms = [(XX, 0.5), (YY, 0.5), (Z0, -0.5), (IDENTITY, 0.5)]
-        assert vacuum_preserving_blocks(terms) == [(0, 1), (2,), (3,)]
+        assert _is_vacuum_preserving(terms, 1e-9)
 
     def test_non_commuting_block_is_rejected(self):
         """A block whose factors anticommute is not equal to the exponential of its sum."""
         terms = [(XX, 0.5), (Z0, -0.5), (YY, 0.5)]
-        assert vacuum_preserving_blocks(terms) is None
+        assert not _is_vacuum_preserving(terms, 1e-9)
 
     def test_trailing_residual_is_rejected(self):
         """Amplitude left outside the vacuum at the end invalidates the sequence."""
-        assert vacuum_preserving_blocks([({0: "X"}, 0.3)]) is None
+        assert not _is_vacuum_preserving([({0: "X"}, 0.3)], 1e-9)
 
     def test_empty_sequence(self):
         """An empty product formula is trivially vacuum preserving."""
-        assert vacuum_preserving_blocks([]) == []
-
-
-class TestPauliVacuumAction:
-    """Tests for the Pauli-on-vacuum helpers."""
-
-    @pytest.mark.parametrize(
-        ("label", "support", "amplitude"),
-        [
-            ("II", frozenset(), 1 + 0j),
-            ("ZZ", frozenset(), 1 + 0j),
-            ("IX", frozenset({0}), 1 + 0j),
-            ("IY", frozenset({0}), 1j),
-            ("YY", frozenset({0, 1}), -1 + 0j),
-            ("XZ", frozenset({1}), 1 + 0j),
-        ],
-    )
-    def test_pauli_label_zero_state_action(self, label, support, amplitude):
-        """Labels map the vacuum to a single basis state with an i^{n_Y} prefactor."""
-        result_support, result_amplitude = pauli_label_zero_state_action(label)
-        assert result_support == support
-        assert np.isclose(result_amplitude, amplitude)
-
-    def test_label_and_map_agree(self):
-        """Label- and map-based helpers describe the same action."""
-        assert pauli_label_zero_state_action("YXZ") == pauli_map_zero_state_action({2: "Y", 1: "X", 0: "Z"})
-
-    def test_invalid_label_raises(self):
-        """Unknown Pauli characters are rejected."""
-        with pytest.raises(ValueError, match="Invalid character"):
-            pauli_label_zero_state_action("XQ")
-
-    def test_invalid_axis_raises(self):
-        """Unknown Pauli axes are rejected."""
-        with pytest.raises(ValueError, match="Invalid Pauli axis"):
-            pauli_map_zero_state_action({0: "Q"})
+        assert _is_vacuum_preserving([], 1e-9)
 
 
 class TestVacuumLeakageWithoutGrouping:

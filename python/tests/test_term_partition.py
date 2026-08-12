@@ -24,7 +24,6 @@ from qdk_chemistry.utils.model_hamiltonians import (
     create_ising_hamiltonian,
 )
 from qdk_chemistry.utils.pauli_commutation import do_pauli_labels_commute, do_pauli_labels_qw_commute
-from qdk_chemistry.utils.pauli_qubit_flip import pauli_label_zero_state_action
 
 # ---------------------------------------------------------------------------
 # TermPartition data classes
@@ -213,7 +212,8 @@ class TestQubitFlipTermGrouper:
         for group in out.term_partition.groups:
             amplitude = 0j
             for index in group:
-                _, phase = pauli_label_zero_state_action(out.pauli_strings[index])
+                # P|0...0> = i^{n_Y} |b_F>; within a group every term hits the same |b_F>.
+                phase = 1j ** out.pauli_strings[index].count("Y")
                 amplitude += complex(out.coefficients[index]) * phase
             assert abs(amplitude) < 1e-12
 

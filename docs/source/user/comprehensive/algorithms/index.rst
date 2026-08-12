@@ -123,44 +123,6 @@ Example::
     grouped.term_partition  # FlatPartition(strategy="qubit_wise_commuting", ...)
 
 
-.. _qubit-flip-term-grouper:
-
-Qubit-flip grouping
-~~~~~~~~~~~~~~~~~~~
-
-.. rubric:: Factory name: ``"qubit_flip"``
-
-A Pauli factor *flips* a qubit when it exchanges :math:`|0\rangle` and :math:`|1\rangle`, which
-:math:`X` and :math:`Y` do and :math:`I` and :math:`Z` do not.
-This grouper puts two terms in the same group exactly when they carry :math:`X`/:math:`Y` on the
-same qubits, i.e. when they differ only by :math:`Z`/:math:`I` factors.
-Terms that flip nothing (pure :math:`I`/:math:`Z` strings) are diagonal and form a single group.
-
-Terms sharing a flipped-qubit set connect the same pairs of computational basis states, so they
-are the only ones whose amplitudes can cancel on any given basis state.
-Keeping them together is what lets a Trotterized evolution reproduce a cancellation that the full
-operator has but no individual Pauli string can — a unitary :math:`e^{-i\theta P}` never
-annihilates a state, only a sum of terms does.
-
-This matters for fermionic Hamiltonians. Each excitation :math:`a_p^\dagger a_q` (or
-:math:`a_p^\dagger a_r^\dagger a_s a_q`) annihilates the all-zero reference state, but the Pauli
-strings it maps onto do not; only their weighted sum cancels.
-Those strings share a flipped-qubit set, so this grouper reassembles them without needing the
-fermionic provenance.
-Their :math:`Z` parts then differ by even-size subsets of the shared flip set, so group members
-also pairwise commute and each group can be exponentiated term by term.
-
-The :doc:`controlled SWAP circuit mapper <circuit_mapper>` requires this grouping: its CSWAP
-sandwich is only valid while the evolution leaves the vacuum invariant.
-
-::
-
-    from qdk_chemistry.algorithms import registry
-
-    grouped = registry.create("term_grouper", "qubit_flip").run(qubit_hamiltonian)
-    grouped.term_partition  # FlatPartition(strategy="qubit_flip", ...)
-
-
 Discovering implementations
 ---------------------------
 

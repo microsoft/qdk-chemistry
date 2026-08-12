@@ -1,4 +1,19 @@
-r"""Qubit-flip term grouper: group Pauli terms that flip the same qubits."""
+r"""Qubit-flip term grouper: group Pauli terms that flip the same qubits.
+
+The **flipped-qubit set** of a Pauli string is the set of positions carrying
+:math:`X` or :math:`Y` (its :math:`XY`-support), i.e. the qubits whose
+:math:`|0\rangle` and :math:`|1\rangle` get exchanged; :math:`I` and :math:`Z`
+leave the bit value alone.  Strings sharing a flipped-qubit set differ only by
+:math:`Z`/:math:`I` factors, so they connect the same pairs of basis states and
+are the only ones whose amplitudes can cancel.  On the all-zero state,
+
+.. math::
+
+    P\,|0\ldots0\rangle = i^{n_Y}\,|b_F\rangle,
+
+with :math:`F` the flipped-qubit set, :math:`n_Y` the number of :math:`Y`
+factors, and :math:`b_F` the bit string with exactly the qubits in :math:`F` set.
+"""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -9,7 +24,6 @@ from __future__ import annotations
 
 from qdk_chemistry.algorithms.term_grouper.base import TermGrouper
 from qdk_chemistry.data import FlatPartition, QubitOperator
-from qdk_chemistry.utils.pauli_qubit_flip import pauli_label_flipped_qubits
 
 __all__ = ["QubitFlipTermGrouper"]
 
@@ -61,7 +75,9 @@ class QubitFlipTermGrouper(TermGrouper):
         """
         buckets: dict[frozenset[int], list[int]] = {}
         for index, label in enumerate(qubit_hamiltonian.pauli_strings):
-            buckets.setdefault(pauli_label_flipped_qubits(label), []).append(index)
+            # Labels follow the Qiskit convention: the rightmost character is qubit 0.
+            flipped = frozenset(len(label) - position - 1 for position, axis in enumerate(label) if axis in "XY")
+            buckets.setdefault(flipped, []).append(index)
 
         # Order groups deterministically: the diagonal group first, then by first member.
         ordered = sorted(buckets.items(), key=lambda item: (len(item[0]) > 0, item[1][0]))

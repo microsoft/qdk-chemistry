@@ -129,9 +129,16 @@ as one contiguous block:
    U|0\ldots0\rangle = e^{-it\sum_i P_i}|0\ldots0\rangle
    \approx \prod_i e^{-it P_i}|0\ldots0\rangle = |0\ldots0\rangle .
 
-The :ref:`qubit-flip term grouper <qubit-flip-term-grouper>` produces exactly that ordering:
-it groups the Pauli strings that flip the same qubits, which are precisely the ones whose
-amplitudes can cancel on the vacuum.
+The :ref:`qubit-flip term grouper <algorithms-term-grouper>` (factory name ``"qubit_flip"``)
+produces exactly that ordering.
+A Pauli factor *flips* a qubit when it exchanges :math:`|0\rangle` and :math:`|1\rangle`, which
+:math:`X` and :math:`Y` do and :math:`I` and :math:`Z` do not.
+The grouper puts two terms in the same group exactly when they carry :math:`X`/:math:`Y` on the
+same qubits, so terms sharing a flipped-qubit set — precisely the ones whose amplitudes can
+cancel on the vacuum — are exponentiated as one block.
+Their :math:`Z` parts then differ by even-size subsets of the shared flip set, so group members
+also pairwise commute and each group can be exponentiated term by term.
+
 The mapper validates its input product formula and raises a :class:`ValueError` when the
 ordering is not vacuum preserving, rather than returning a wrong result.
 

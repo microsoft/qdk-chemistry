@@ -77,13 +77,13 @@ qubit_ham = create("qubit_mapper").run(
 # 3. Group Pauli strings that flip the same qubits. These are the strings coming
 #    from the same fermionic term, whose amplitudes cancel on |0...0>. Without
 #    this step Trotterization interleaves them and the vacuum leaks.
-grouped_ham = create("term_grouper", "qubit_flip").run(qubit_ham)
+term_grouper = create("term_grouper", "qubit_flip")
+grouped_ham = term_grouper.run(qubit_ham)
 
 # 4. Trotterize. The builder honours the grouping, so each group is exponentiated
 #    as one contiguous block and the product formula still fixes |0...0>.
-evolution = create("hamiltonian_unitary_builder", "trotter", order=1, time=0.1).run(
-    grouped_ham
-)
+trotter = create("hamiltonian_unitary_builder", "trotter", order=1, time=0.1)
+evolution = trotter.run(grouped_ham)
 
 # 5. Control it with the CSWAP sandwich. The mapper validates the ordering and
 #    raises if the product formula would leak the vacuum. Qubit 0 is the control
@@ -105,6 +105,8 @@ from qdk_chemistry.algorithms import registry
 
 # List all registered controlled circuit mapper implementations
 implementations = registry.available("controlled_circuit_mapper")
-print(implementations)  # e.g. ['pauli_sequence']
+print(
+    implementations
+)  # e.g. ['prepare_select_prepare', 'pauli_sequence', 'cswap_pauli_sequence']
 # end-cell-list-implementations
 ################################################################################
