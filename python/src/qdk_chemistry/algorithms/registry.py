@@ -679,6 +679,7 @@ def _register_cpp_factories():
     from qdk_chemistry._core._algorithms import (  # noqa: PLC0415
         ActiveSpaceSelectorFactory,
         DynamicalCorrelationCalculatorFactory,
+        EffectiveHamiltonianConstructorFactory,
         GeometryOptimizerFactory,
         HamiltonianConstructorFactory,
         LocalizerFactory,
@@ -692,15 +693,16 @@ def _register_cpp_factories():
     )
 
     register_factory(ActiveSpaceSelectorFactory)
-    register_factory(NuclearDerivativeCalculatorFactory)
-    register_factory(PopulationAnalyzerFactory)
+    register_factory(DynamicalCorrelationCalculatorFactory)
+    register_factory(EffectiveHamiltonianConstructorFactory)
+    register_factory(GeometryOptimizerFactory)
     register_factory(HamiltonianConstructorFactory)
     register_factory(LocalizerFactory)
     register_factory(MultiConfigurationCalculatorFactory)
     register_factory(MultiConfigurationScfFactory)
+    register_factory(NuclearDerivativeCalculatorFactory)
+    register_factory(PopulationAnalyzerFactory)
     register_factory(ProjectedMultiConfigurationCalculatorFactory)
-    register_factory(DynamicalCorrelationCalculatorFactory)
-    register_factory(GeometryOptimizerFactory)
     register_factory(ScfSolverFactory)
     register_factory(StabilityCheckerFactory)
 
@@ -716,6 +718,7 @@ def _register_python_factories():
     This function is automatically called during module import and should not
     be called by users.
     """
+    from qdk_chemistry.algorithms.amplitude_amplification import AmplitudeAmplificationFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.circuit_executor import CircuitExecutorFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.circuit_mapper import CircuitMapperFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
@@ -757,6 +760,7 @@ def _register_python_factories():
     register_factory(HadamardTestFactory())
     register_factory(HadamardTestCircuitBuilderFactory())
     register_factory(PropagatorFactory())
+    register_factory(AmplitudeAmplificationFactory())
 
 
 _ = _register_cpp_factories()
@@ -808,6 +812,9 @@ def _register_python_algorithms():
     This function is automatically called during module import and should not
     be called by users.
     """
+    from qdk_chemistry.algorithms.amplitude_amplification import (  # noqa: PLC0415
+        AmplitudeAmplification,
+    )
     from qdk_chemistry.algorithms.circuit_executor.qdk import (  # noqa: PLC0415
         QdkFullStateSimulator,
         QdkSparseStateSimulator,
@@ -888,6 +895,7 @@ def _register_python_algorithms():
     register(lambda: HadamardTest())
     register(lambda: QdkHadamardTestCircuitBuilder())
     register(lambda: StandardPhaseEstimation())
+    register(lambda: AmplitudeAmplification())
 
 
 _register_python_algorithms()
