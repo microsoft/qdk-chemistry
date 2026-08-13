@@ -132,7 +132,48 @@ class SparseIsometryStatePreparation(StatePreparation):
 
         """
         Logger.trace_entering()
+        return self._build_circuit(wavefunction, dense_only=False)
 
+    def create_dense(self, wavefunction: Wavefunction) -> Circuit:
+        """Build only the dense-loading stage of the sparse isometry circuit.
+
+        This is a helper function for resource estimation. It returns a Circuit that prepares
+        the dense subspace of the wavefunction. This allows users to estimate the resource cost
+        of the dense-loading stage separately from the isometry expansion.
+
+        A sparse isometry circuit loads the amplitudes densely on a reduced qubit subset and
+        then applies the isometry gates (binary encoding and/or GF(2) expansion) that map the
+        reduced state back onto the full register. This method returns the dense stage alone,
+        embedded in the same full-width register that :meth:`run` uses, so the isometry cost
+        can be obtained by subtracting the two resource estimates.
+
+        Args:
+            wavefunction: The target wavefunction to prepare.
+
+        Returns:
+            A Circuit containing only the dense-loading stage, acting on the full register.
+
+        Examples:
+            >>> prep = create("state_prep", "sparse_isometry")
+            >>> full = prep.run(wavefunction).estimate()["logicalCounts"]
+            >>> dense = prep.create_dense(wavefunction).estimate()["logicalCounts"]
+            >>> isometry_t_count = full["tCount"] - dense["tCount"]
+
+        """
+        Logger.trace_entering()
+        return self._build_circuit(wavefunction, dense_only=True)
+
+    def _build_circuit(self, wavefunction: Wavefunction, dense_only: bool) -> Circuit:
+        """Build the sparse isometry circuit, optionally stopping after the dense-loading stage.
+
+        Args:
+            wavefunction: The target wavefunction to prepare.
+            dense_only: If True, omit the isometry operations that expand back to the full space.
+
+        Returns:
+            A Circuit object acting on the full qubit register.
+
+        """
         dets = wavefunction.get_active_determinants()
         coeffs = np.asarray(wavefunction.get_coefficients())
         config_set = wavefunction.get_configuration_set()
@@ -143,12 +184,13 @@ class SparseIsometryStatePreparation(StatePreparation):
         # Check for single determinant case after filtering
         if len(state_vector) == 1:
             Logger.info("After filtering, only 1 determinant remains, using single reference state preparation")
-            return self._prepare_single_reference_state(state_vector[0])
+            # A single reference is pure expansion, so its dense stage is the empty full-width circuit.
+            return self._prepare_single_reference_state([0] * n_qubits if dense_only else state_vector[0])
 
         Logger.debug(f"Using {len(state_vector)} determinants for state preparation")
 
         if self._settings.get("binary_encoding"):
-            circuit = self._run_binary_encoding(state_vector, coeffs, n_qubits)
+            circuit = self._run_binary_encoding(state_vector, coeffs, n_qubits, dense_only)
             if circuit is not None:
                 return circuit
 
@@ -163,18 +205,21 @@ class SparseIsometryStatePreparation(StatePreparation):
         dense_circuit = dense_algo.run(reduced_wf)
 
         # Build expansion ops and compose with dense circuit
-        expansion_ops = self._build_expansion_ops(gf2x_operation_results)
+        expansion_ops = [] if dense_only else self._build_expansion_ops(gf2x_operation_results)
         return self._compose_with_expansion(
             dense_circuit, expansion_ops, gf2x_operation_results.row_map, n_qubits, dense_algo
         )
 
-    def _run_binary_encoding(self, state_vector: list[list[int]], coeffs: np.ndarray, n_qubits: int) -> Circuit | None:
+    def _run_binary_encoding(
+        self, state_vector: list[list[int]], coeffs: np.ndarray, n_qubits: int, dense_only: bool = False
+    ) -> Circuit | None:
         """Prepare a quantum circuit using binary encoding.
 
         Args:
             state_vector: List of bit vectors (determinants), each a list of 0/1 ints.
             coeffs: Wavefunction coefficients aligned with the determinants.
             n_qubits: Total number of qubits in the system.
+            dense_only: If True, omit the binary-encoding and expansion operations.
 
         Returns:
             A Circuit if binary encoding is applicable, or None to fall back to the standard path.
@@ -205,8 +250,8 @@ class SparseIsometryStatePreparation(StatePreparation):
         return self._compose_binary_encoding(
             dense_circuit,
             list(reversed(synthesis["dense_row_map"])),
-            synthesis["binary_encoding_ops"],
-            synthesis["gaussian_elimination_ops"],
+            [] if dense_only else synthesis["binary_encoding_ops"],
+            [] if dense_only else synthesis["gaussian_elimination_ops"],
             synthesis["ancilla_pool"],
             n_qubits,
             dense_algo,

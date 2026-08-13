@@ -5,9 +5,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import warnings
-from typing import ClassVar
-
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import Circuit, Wavefunction
 
@@ -59,8 +56,6 @@ class StatePreparation(Algorithm):
 class StatePreparationFactory(AlgorithmFactory):
     """Factory class for creating StatePreparation instances."""
 
-    _DEPRECATED_ALIASES: ClassVar[dict[str, str]] = {"sparse_isometry_gf2x": "sparse_isometry"}
-
     def __init__(self):
         """Initialize the StatePreparationFactory."""
         super().__init__()
@@ -72,27 +67,3 @@ class StatePreparationFactory(AlgorithmFactory):
     def default_algorithm_name(self) -> str:
         """Return the sparse_isometry as default algorithm name."""
         return "sparse_isometry"
-
-    def create(self, name: str | None = None) -> Algorithm:
-        """Create a state preparation algorithm instance by name.
-
-        Resolves deprecated algorithm names to their current replacements, emitting a
-        :class:`DeprecationWarning` so callers can update their code.
-
-        Args:
-            name (str | None): The name of the algorithm to create. If None or empty, creates the default algorithm.
-
-        Returns:
-            Algorithm: A new instance of the requested state preparation algorithm.
-
-        """
-        if name in self._DEPRECATED_ALIASES:
-            new_name = self._DEPRECATED_ALIASES[name]
-            warnings.warn(
-                f"State preparation algorithm '{name}' is deprecated and will be removed in a "
-                f"future release; use '{new_name}' instead.",
-                DeprecationWarning,
-                stacklevel=3,
-            )
-            name = new_name
-        return super().create(name)

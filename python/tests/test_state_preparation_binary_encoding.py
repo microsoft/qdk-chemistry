@@ -386,6 +386,118 @@ class TestSparseIsometryBinaryEncoding:
         )
 
 
+class TestCreateDense:
+    """Tests for :meth:`SparseIsometryStatePreparation.create_dense`.
+
+    ``create_dense`` returns the dense-loading stage alone, on the same full-width
+    register as ``run``, so the isometry cost can be recovered by subtracting the two
+    resource estimates.
+    """
+
+    ISOMETRY_OP_KEYS = ("expansionOps", "binaryEncodingOps", "gaussianEliminationOps")
+
+    @pytest.mark.parametrize("binary_encoding", [False, True], ids=["no_binenc", "binenc"])
+    def test_strips_isometry_ops(self, ozone_wf, binary_encoding):
+        """The dense stage keeps the composition program but empties every isometry op list."""
+        prep = create("state_prep", "sparse_isometry", binary_encoding=binary_encoding)
+        full = prep.run(ozone_wf)
+        dense = prep.create_dense(ozone_wf)
+
+        full_factory = full._qsharp_factory
+        dense_factory = dense._qsharp_factory
+        assert dense_factory is not None
+        assert dense_factory.program is full_factory.program
+
+        present = [key for key in self.ISOMETRY_OP_KEYS if key in full_factory.parameter]
+        assert present, "The composed circuit must carry at least one isometry op list."
+        assert any(full_factory.parameter[key] for key in present), "The full circuit must apply isometry gates."
+        assert all(dense_factory.parameter[key] == [] for key in present)
+
+        # Dense loading is untouched and still acts on the full register.
+        assert dense_factory.parameter["numQubits"] == full_factory.parameter["numQubits"]
+        assert dense_factory.parameter["embeddingMap"] == full_factory.parameter["embeddingMap"]
+        assert dense_factory.parameter["denseParams"].stateVector == full_factory.parameter["denseParams"].stateVector
+
+    def test_binary_encoding_shrinks_the_dense_stage(self, ozone_wf):
+        """Binary encoding loads 2^ceil(log2(d)) amplitudes instead of 2^rank, so its dense stage is smaller."""
+        gf2x_prep = create("state_prep", "sparse_isometry", binary_encoding=False)
+        binenc_prep = create("state_prep", "sparse_isometry", binary_encoding=True)
+
+        gf2x_dense = gf2x_prep.create_dense(ozone_wf)
+        binenc_dense = binenc_prep.create_dense(ozone_wf)
+        _assert_uses_binary_encoding(binenc_prep.run(ozone_wf))
+
+        n_dets = len(ozone_wf.get_active_determinants())
+        gf2x_sv = gf2x_dense._qsharp_factory.parameter["denseParams"].stateVector
+        binenc_sv = binenc_dense._qsharp_factory.parameter["denseParams"].stateVector
+        assert len(binenc_sv) == 2 ** math.ceil(math.log2(n_dets))
+        assert len(binenc_sv) < len(gf2x_sv)
+
+        # A smaller amplitude register means a cheaper dense load.
+        gf2x_counts = gf2x_dense.estimate()["logicalCounts"]
+        binenc_counts = binenc_dense.estimate()["logicalCounts"]
+        assert binenc_counts["rotationCount"] < gf2x_counts["rotationCount"]
+        assert binenc_counts["numQubits"] == gf2x_counts["numQubits"]
+
+    def test_binary_encoding_isometry_cost_by_subtraction(self, ozone_wf):
+        """Under binary encoding the isometry contributes the multi-controlled gates."""
+        prep = create("state_prep", "sparse_isometry", binary_encoding=True)
+        full = prep.run(ozone_wf).estimate()["logicalCounts"]
+        dense = prep.create_dense(ozone_wf).estimate()["logicalCounts"]
+
+        assert dense["cczCount"] == 0
+        assert full["cczCount"] > 0
+        assert full["rotationCount"] == dense["rotationCount"]
+
+    def test_gf2x_isometry_is_clifford_only(self, ozone_wf):
+        """Without binary encoding the isometry is only CX/X, so it adds no non-Clifford cost."""
+        prep = create("state_prep", "sparse_isometry", binary_encoding=False)
+        full = prep.run(ozone_wf).estimate()["logicalCounts"]
+        dense = prep.create_dense(ozone_wf).estimate()["logicalCounts"]
+
+        for key in ("tCount", "rotationCount", "cczCount"):
+            assert full[key] == dense[key]
+
+    def test_single_determinant_has_no_dense_stage(self):
+        """A single reference is pure expansion, so its dense stage is the empty circuit."""
+        wf = create_random_wavefunction(n_electrons=4, n_orbitals=4, n_dets=1, seed=11)
+        prep = create("state_prep", "sparse_isometry")
+
+        full = prep.run(wf)
+        dense = prep.create_dense(wf)
+        assert any(full._qsharp_factory.parameter["bitStrings"])
+        assert not any(dense._qsharp_factory.parameter["bitStrings"])
+
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+    @pytest.mark.parametrize("binary_encoding", [False, True], ids=["no_binenc", "binenc"])
+    def test_qiskit_dense_prep(self, ozone_wf, binary_encoding):
+        """The Qiskit composition path drops the isometry gates but keeps the dense load."""
+        prep = create(
+            "state_prep",
+            "sparse_isometry",
+            dense_state_prep=AlgorithmRef("state_prep", "qiskit_regular_isometry"),
+            binary_encoding=binary_encoding,
+        )
+        full_qc = prep.run(ozone_wf).get_qiskit_circuit()
+        dense_qc = prep.create_dense(ozone_wf).get_qiskit_circuit()
+
+        assert dense_qc.num_qubits == full_qc.num_qubits
+        assert dense_qc.size() < full_qc.size()
+        assert dense_qc.size() > 0
+
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+    def test_qiskit_binary_encoding_shrinks_the_dense_stage(self, ozone_wf):
+        """Binary encoding's smaller amplitude register makes its dense load cheaper on Qiskit too."""
+        kwargs = {"dense_state_prep": AlgorithmRef("state_prep", "qiskit_regular_isometry")}
+        gf2x_dense = create("state_prep", "sparse_isometry", binary_encoding=False, **kwargs).create_dense(ozone_wf)
+        binenc_dense = create("state_prep", "sparse_isometry", binary_encoding=True, **kwargs).create_dense(ozone_wf)
+
+        gf2x_qc = gf2x_dense.get_qiskit_circuit()
+        binenc_qc = binenc_dense.get_qiskit_circuit()
+        assert binenc_qc.num_qubits == gf2x_qc.num_qubits
+        assert binenc_qc.size() < gf2x_qc.size()
+
+
 class TestMeasurementBasedUncompute:
     """Tests for binary encoding with measurement-based AND uncomputation.
 

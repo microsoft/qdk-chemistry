@@ -259,6 +259,37 @@ def _resolve_algorithm_type(algorithm_type: str) -> str:
     return algorithm_type
 
 
+# Deprecated algorithm names keyed by ``(algorithm_type, deprecated_name)``. Using a
+# deprecated name still works but emits a DeprecationWarning.
+_DEPRECATED_NAME_ALIASES: dict[tuple[str, str], str] = {
+    ("state_prep", "sparse_isometry_gf2x"): "sparse_isometry",
+}
+
+
+def _resolve_algorithm_name(algorithm_type: str, algorithm_name: str) -> str:
+    """Map a deprecated algorithm name to its current name.
+
+    Args:
+        algorithm_type (str): The resolved algorithm type key.
+        algorithm_name (str): The requested algorithm name.
+
+    Returns:
+        str: The resolved algorithm name. A deprecated name is mapped to its replacement and
+            triggers a ``DeprecationWarning``; any other value passes through unchanged.
+
+    """
+    new_name = _DEPRECATED_NAME_ALIASES.get((algorithm_type, algorithm_name))
+    if new_name is not None:
+        warnings.warn(
+            f"Algorithm '{algorithm_name}' of type '{algorithm_type}' is deprecated and will be "
+            f"removed in a future release; use '{new_name}' instead.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        return new_name
+    return algorithm_name
+
+
 def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> Algorithm:
     """Create an algorithm instance by type and name.
 
@@ -308,6 +339,7 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
     algorithm_type = _resolve_algorithm_type(algorithm_type)
     if algorithm_name is None:
         algorithm_name = ""
+    algorithm_name = _resolve_algorithm_name(algorithm_type, algorithm_name)
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             try:
