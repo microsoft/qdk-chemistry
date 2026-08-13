@@ -1774,6 +1774,26 @@ TEST_F(LocalizationTest, GaugeFixingAoAnchoringIsRotationInvariant) {
   }
 }
 
+TEST_F(LocalizationTest, GaugeFixingAoAnchoringOrdersAnchorsByAoIndex) {
+  // Symmetry-equivalent atomic orbitals tie in residual norm, so the order in
+  // which the selection finds the anchors varies across platforms. Anchors
+  // must therefore be assigned to orbitals in atomic-orbital index order, not
+  // in the order they were found.
+  Eigen::MatrixXd block = Eigen::MatrixXd::Zero(6, 2);
+  block(5, 0) = 1.0;
+  block(1, 1) = 0.6;
+  block(3, 1) = 0.8;
+  // The selection finds AO 5 first and AO 3 second, so an assignment that
+  // followed the search order would return the columns the other way round.
+  const Eigen::MatrixXd anchored = microsoft::detail::ao_anchor_block(
+      block, Eigen::MatrixXd::Identity(6, 6));
+
+  EXPECT_NEAR(0.0, (anchored.col(0) - block.col(1)).cwiseAbs().maxCoeff(),
+              1e-12);
+  EXPECT_NEAR(0.0, (anchored.col(1) - block.col(0)).cwiseAbs().maxCoeff(),
+              1e-12);
+}
+
 TEST_F(LocalizationTest, GaugeFixingScalarRefinementResolvesSubgridCusp) {
   // The coefficient norm has cusps that can sit far inside one coarse grid
   // cell; refinement must resolve them to an absolute angular tolerance.

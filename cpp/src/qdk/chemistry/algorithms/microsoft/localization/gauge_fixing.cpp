@@ -31,13 +31,10 @@ Eigen::MatrixXd ao_anchor_block(const Eigen::MatrixXd& block,
   std::vector<Eigen::Index> anchors;
   anchors.reserve(static_cast<size_t>(block.cols()));
   for (Eigen::Index column = 0; column < block.cols(); ++column) {
-    // Rounding keeps the argmax tie-break independent of last-bit noise, which
-    // is what makes symmetry-equivalent atomic orbitals resolve consistently.
     Eigen::Index anchor = 0;
     double best = -1.0;
     for (Eigen::Index row = 0; row < residuals.rows(); ++row) {
-      const double norm =
-          std::round(residuals.row(row).squaredNorm() * 1e14) * 1e-14;
+      const double norm = residuals.row(row).squaredNorm();
       if (norm > best) {
         best = norm;
         anchor = row;
@@ -55,6 +52,13 @@ Eigen::MatrixXd ao_anchor_block(const Eigen::MatrixXd& block,
     anchor_vector /= anchor_norm;
     residuals -= (residuals * anchor_vector) * anchor_vector.transpose();
   }
+
+  // Symmetric orthogonalization maps the i-th anchor onto the i-th returned
+  // orbital. Symmetry-equivalent atomic orbitals tie in residual norm to
+  // within rounding, so which of them the deflation reaches first varies
+  // across platforms; ordering the anchors by atomic-orbital index keeps that
+  // assignment, and so the returned gauge, independent of the search order.
+  std::sort(anchors.begin(), anchors.end());
 
   Eigen::MatrixXd anchor_coefficients(block.cols(), block.cols());
   for (size_t i = 0; i < anchors.size(); ++i) {

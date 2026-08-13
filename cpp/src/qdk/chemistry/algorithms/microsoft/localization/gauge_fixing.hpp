@@ -22,7 +22,9 @@ namespace detail {
  *
  * Selects the atomic orbitals with the largest residual projection onto the
  * block and symmetrically orthogonalizes the block against them, so that any
- * two orientations of the same subspace map onto identical coordinates.
+ * two orientations of the same subspace map onto identical coordinates. The
+ * anchors are taken in ascending atomic-orbital index, so the result does not
+ * depend on the order in which the selection finds them.
  *
  * @param block AO-by-orbital coefficient matrix for one degenerate block.
  * @param overlap Atomic-orbital overlap matrix.
