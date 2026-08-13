@@ -331,5 +331,101 @@ def test_no_mapper_partially_renames_a_probed_capability(capability: str) -> Non
     )
 
 
+_CAPABILITY_PROVIDERS = frozenset(
+    {
+        "controlled_psp_mapper.py::ControlledPSPMapper",
+        "sossa_mapper.py::SOSSAMapper",
+    }
+)
+
+
+@pytest.mark.parametrize(
+    "capability",
+    sorted({c for _, _, c in _capability_probes()}),
+)
+def test_recorded_providers_still_define_every_probed_capability(capability: str) -> None:
+    """Every mapper recorded as advertising a capability must still define it.
+
+    This closes a gap the two tests above state in their own docstrings but cannot cover,
+    because each is satisfied by a survivor:
+
+    ==========================================  =======================================
+    check                                       satisfied by
+    ==========================================  =======================================
+    ``..._defined_by_some_mapper``              *any single* remaining definition
+    ``..._partially_renames_...``               nothing, unless a near variant is left
+    ==========================================  =======================================
+
+    So a *clean* deletion -- the member removed outright, no near variant, no residue --
+    passes both.  Measured rather than assumed: removing both capability members from
+    ``ControlledPSPMapper`` and running this module reported ``7 passed``, because
+    ``SOSSAMapper`` still defines each one.  That is the whole suite green on a mapper
+    that has silently stopped advertising a capability it used to provide.
+
+    It matters here more than the arithmetic suggests.  ``ControlledPSPMapper`` is the
+    mapper whose accessor and whose subtraction fallback currently agree, so losing the
+    accessor is arithmetically invisible *today*; the agreement is a property of today's
+    implementation, not an invariant, and the day PSP allocates an ancilla outside the
+    container's width the silent fallback becomes wrong with nothing watching.
+
+    A recorded set is the right instrument only because it is recorded over *classes*.
+    ``test_capability_probe_coverage_has_not_shrunk`` explains why pinning the discovered
+    *names* would be wrong: it would fail on a complete and correct rename and so cast a
+    vote on the pending ``ancilla``/``ancillary`` decision.  The capability strings here
+    come from ``_capability_probes()``, so a rename applied consistently flows through and
+    this stays green -- it constrains *who* provides, never *what it is called*.
+
+    It is a floor, not an equality: a new mapper that also provides the capability is not a
+    failure.  When a mapper legitimately stops providing one, remove it from
+    ``_CAPABILITY_PROVIDERS`` in the same commit.  Forcing that edit is the point -- it
+    converts a silent deletion into a deliberate one.
+    """
+    by_class = _mapper_members_by_class()
+    missing = {
+        provider: ("class not found" if provider not in by_class else "capability not defined")
+        for provider in sorted(_CAPABILITY_PROVIDERS)
+        if capability not in by_class.get(provider, set())
+    }
+    assert not missing, (
+        f'these mappers are recorded as providing the probed capability "{capability}" but no '
+        f"longer define it: {missing}. Every other check in this module is satisfied by a "
+        f"surviving definition on another mapper, so this is the only one that fires. If the "
+        f"mapper genuinely should stop providing it, delete it from _CAPABILITY_PROVIDERS in "
+        f"the same commit; if a merge resolution dropped the member, restore it."
+    )
+
+
+def test_no_mapper_defines_only_part_of_the_capability_protocol() -> None:
+    """A mapper must define all probed capabilities or none of them.
+
+    The probes are dispatched together -- the builder asks for the width accessor and the
+    ancilla-preparation operation on the same object and combines them into one result --
+    so a class answering to one and not the other satisfies the dispatch only halfway.
+
+    Defining none is legitimate and must stay legitimate: ``ControlledPauliSequenceMapper``
+    defines neither, both probes are correctly ``False``, and both fallbacks fire.  That is
+    polymorphism.  Defining a strict, non-empty subset is not: it is a half-applied rename,
+    a half-resolved merge conflict, or a new mapper that implemented the protocol partway.
+
+    This is derived rather than recorded, which is what makes it complementary to
+    ``test_recorded_providers_still_define_every_probed_capability``: the recorded set
+    cannot see a mapper that never entered it, and this cannot see a mapper that leaves the
+    protocol cleanly and entirely.  Neither subsumes the other.
+    """
+    probed = {c for _, _, c in _capability_probes()}
+    partial = {
+        klass: sorted(probed & members)
+        for klass, members in _mapper_members_by_class().items()
+        if probed & members and not probed <= members
+    }
+    assert not partial, (
+        f"these mapper classes define some but not all of the probed capabilities "
+        f"{sorted(probed)}: {partial}. The builder probes them together and combines the "
+        f"results, so a partial implementation is dispatched halfway. Define the missing "
+        f"member(s), or remove the class from the protocol entirely -- defining none is "
+        f"legitimate, defining some is not."
+    )
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))
