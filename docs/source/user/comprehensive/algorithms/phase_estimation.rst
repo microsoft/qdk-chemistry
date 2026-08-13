@@ -80,9 +80,9 @@ Settings
      The circuit builder encapsulates a :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>` and a :class:`~qdk_chemistry.algorithms.ControlledCircuitMapper` as its own nested algorithms.
      See :doc:`qpe_circuit_builder` for detailed configuration.
 
-    - ``robust_phase_estimation_circuit_builder`` — The corresponding nested builder reference for robust phase estimation.
-      It returns an on-demand circuit set carrying round, draw, seed, multiplicity, and unitary-configuration metadata.
-       See :doc:`robust_phase_estimation_circuit_builder` for details.
+   - ``robust_phase_estimation_circuit_builder`` — The corresponding nested builder reference for robust phase estimation.
+     It returns an on-demand circuit set carrying round, draw, seed, multiplicity, and unitary-configuration metadata.
+     See :doc:`robust_phase_estimation_circuit_builder` for details.
 
    - ``circuit_executor`` — A :class:`~qdk_chemistry.data.AlgorithmRef` to a backend that executes :class:`~qdk_chemistry.data.Circuit` objects and returns measurement bitstrings as :class:`~qdk_chemistry.data.CircuitExecutorData`.
      QDK/Chemistry ships native Q# simulators (sparse-state and full-state, with optional :class:`~qdk_chemistry.data.QuantumErrorProfile` noise modelling) and integrates with Qiskit's Aer simulator through the :doc:`plugin system <../plugins>`.
