@@ -257,6 +257,13 @@ def test_capability_probe_coverage_has_not_shrunk() -> None:
     width-carrying-``Circuit`` contract and stops probing at all -- the right response is to
     delete this module, not to lower the number.
 
+    A floor only ratchets if it is raised, so **raise ``_MIN_CAPABILITY_PROBES`` in the same
+    change that adds a probe.**  It equals the measured count exactly today (headroom zero),
+    which is why any drop fails.  Adding a third probe without raising it spends that
+    headroom silently: the gate would then still pass with only two visible, so a later
+    regression from three back to two -- a probe genuinely stopping being checked -- reads
+    as green.  Nothing detects that but this constant.
+
     The diagnostic is computed only once the gate has already failed.  It is a hint, and a
     hint must never be able to fail a check whose gate is satisfied.
     """
