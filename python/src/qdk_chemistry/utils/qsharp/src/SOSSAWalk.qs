@@ -26,8 +26,9 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     import Std.Convert.IntAsDouble;
     import Std.Core.Length;
     import Std.Diagnostics.Fact;
-    import Std.Math.Ceiling;
-    import Std.Math.Lg;
+
+    import Std.Math.BitSizeI;
+
     import Std.Math.PI;
     import Std.Math.Round;
     import Std.StatePreparation.PreparePureStateD;
@@ -62,7 +63,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         coefficientBitPrecision : Int,
     ) : (Qubit[], Qubit[]) => Unit is Adj {
         let nCoeffs = Length(innerCoefficients[0]);
-        let nIndexBits = Ceiling(Lg(IntAsDouble(nCoeffs)));
+        let nIndexBits = BitSizeI(nCoeffs - 1);
         let mu = coefficientBitPrecision;
         let nFreeRider = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
         let qromEnd = 2 * nIndexBits + 2 * mu + 2;
@@ -98,7 +99,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         freeRiderData : Bool[][]
     ) : (Qubit[], Qubit[]) => Unit is Adj + Ctl {
         let nCoeffs = Length(innerCoefficients[0]);
-        let nIndexBits = Ceiling(Lg(IntAsDouble(if nCoeffs > 1 { nCoeffs } else { 2 })));
+        let nIndexBits = BitSizeI((if nCoeffs > 1 { nCoeffs } else { 2 }) - 1);
         let nFreeRider = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
         // innerReg layout: bReg[nIndexBits] + freeRiderReg[nFR]
         (outerReg, innerReg) => {
@@ -203,9 +204,9 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         let N = params.numOrbitals;
         let numSF = params.numRanks * params.numCopies;
         let Xo = N + numSF;
-        let xoBits = Ceiling(Lg(IntAsDouble(if Xo > 1 { Xo } else { 2 })));
+        let xoBits = BitSizeI((if Xo > 1 { Xo } else { 2 }) - 1);
         let numBp1 = params.numBases + 1;
-        let bBits = Ceiling(Lg(IntAsDouble(if numBp1 > 1 { numBp1 } else { 2 })));
+        let bBits = BitSizeI((if numBp1 > 1 { numBp1 } else { 2 }) - 1);
         let numRotAngles = N - 1;
 
         // Register slicing
@@ -693,7 +694,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         let bBits = Length(bReg);
         let R = params.numRanks;
         let nRotBits = numRotAngles * bRot;
-        let nDQBits = Ceiling(Lg(IntAsDouble(if N > 1 { N } else { 2 })));
+        let nDQBits = BitSizeI((if N > 1 { N } else { 2 }) - 1);
 
         // DQ table: N entries × (N-1)*bRot bits, addressed by xoReg[0..nDQBits-1]
         let dqData = BuildDQBulkRotationData(params, N, numRotAngles, bRot);
@@ -874,9 +875,9 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         let numPositiveOneBody = selectData.numPositiveOneBody;
         let numSF = selectData.numRanks * selectData.numCopies;
         let Xo = N + numSF;
-        let xoBits = Ceiling(Lg(IntAsDouble(if Xo > 1 { Xo } else { 2 })));
+        let xoBits = BitSizeI((if Xo > 1 { Xo } else { 2 }) - 1);
         let numBp1 = selectData.numBases + 1;
-        let bBits = Ceiling(Lg(IntAsDouble(if numBp1 > 1 { numBp1 } else { 2 })));
+        let bBits = BitSizeI((if numBp1 > 1 { numBp1 } else { 2 }) - 1);
         let nFR = selectData.numFreeRiderBits;
 
         let nOuter = xoBits;

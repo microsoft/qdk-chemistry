@@ -12,9 +12,10 @@ namespace QDKChemistry.Utils.AliasSampling {
     import Std.Convert.IntAsBoolArray;
     import Std.Convert.IntAsDouble;
     import Std.Core.Length;
+    import Std.Math.BitSizeI;
     import Std.Math.AbsD;
     import Std.Math.Ceiling;
-    import Std.Math.Lg;
+
     import Std.StatePreparation.PrepareUniformSuperposition;
     import Std.Arrays.Mapped;
     import Std.Arrays.Padded;
@@ -190,7 +191,7 @@ namespace QDKChemistry.Utils.AliasSampling {
     /// Helper to compute the total number of qubits needed for alias sampling.
     /// Returns: numIndexQubits + bitsPrecision + 1 (flag) + bitsPrecision + numIndexQubits (qrom output)
     function ComputeAliasSamplingQubits(numCoefficients : Int, bitsPrecision : Int) : (Int, Int) {
-        let numIndexQubits = Ceiling(Lg(IntAsDouble(numCoefficients)));
+        let numIndexQubits = BitSizeI(numCoefficients - 1);
         let numQubits = 2 * numIndexQubits + 2 * bitsPrecision + 1;
         return (numIndexQubits, numQubits);
     }
@@ -384,8 +385,8 @@ namespace QDKChemistry.Utils.AliasSampling {
     ) : Unit {
         let nCond = Length(coefficients);
         let nCoeffs = Length(coefficients[0]);
-        let nIndexBits = Ceiling(Lg(IntAsDouble(nCoeffs)));
-        let nCondBits = Ceiling(Lg(IntAsDouble(nCond)));
+        let nIndexBits = BitSizeI(nCoeffs - 1);
+        let nCondBits = BitSizeI(nCond - 1);
         let nQromOutput = bitsPrecision + nIndexBits + 2;
         let totalQubits = nCondBits + nIndexBits + bitsPrecision + 1 + nQromOutput;
 
@@ -421,8 +422,8 @@ namespace QDKChemistry.Utils.AliasSampling {
     ) : Unit {
         let nCond = Length(coefficients);
         let nCoeffs = Length(coefficients[0]);
-        let nIndexBits = Ceiling(Lg(IntAsDouble(nCoeffs)));
-        let nCondBits = Ceiling(Lg(IntAsDouble(nCond)));
+        let nIndexBits = BitSizeI(nCoeffs - 1);
+        let nCondBits = BitSizeI(nCond - 1);
         let nFreeRiderBits = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
         let nQromOutput = bitsPrecision + nIndexBits + 2;
         let totalQubits = nCondBits + nIndexBits + bitsPrecision + 1 + nQromOutput + nFreeRiderBits;

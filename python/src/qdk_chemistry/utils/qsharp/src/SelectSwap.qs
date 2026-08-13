@@ -34,7 +34,9 @@ namespace QDKChemistry.Utils.SelectSwap {
     import Std.Convert.IntAsDouble;
     import Std.Convert.ResultAsBool;
     import Std.Diagnostics.Fact;
-    import Std.Math.Ceiling;
+
+    import Std.Math.BitSizeI;
+
     import Std.Math.Floor;
     import Std.Math.Lg;
     import Std.Math.MaxI;
@@ -108,7 +110,7 @@ namespace QDKChemistry.Utils.SelectSwap {
         mutable best = 2^32;
         mutable bestLambda = 0;
 
-        let addressBits = Ceiling(Lg(IntAsDouble(numInnerData)));
+        let addressBits = BitSizeI(numInnerData - 1);
         for lambda in 0..addressBits - 1 {
             let cost = SelectSwapCost2D(lambda, numOuterData, numInnerData, numBits);
             if cost < best {
@@ -175,7 +177,7 @@ namespace QDKChemistry.Utils.SelectSwap {
         mutable best = 2^32;
         mutable bestLambda = 0;
 
-        let addressBits = Ceiling(Lg(IntAsDouble(numData)));
+        let addressBits = BitSizeI(numData - 1);
         for lambda in 0..addressBits - 1 {
             let cost = SelectSwapCost1D(lambda, numData, numBits);
             if cost < best {
@@ -191,7 +193,7 @@ namespace QDKChemistry.Utils.SelectSwap {
         if lambda == 0 {
             return numData - 2;
         } else {
-            let addressBits = Ceiling(Lg(IntAsDouble(numData)));
+            let addressBits = BitSizeI(numData - 1);
             let split = MinI(Floor(Lg(IntAsDouble(2^lambda * numBits))), addressBits - 1);
 
             let select_cost = 2^(addressBits - lambda) - 2;
@@ -207,8 +209,8 @@ namespace QDKChemistry.Utils.SelectSwap {
     // ═══════════════════════════════════════════════════════════════════════════
 
     internal function SelectSwapCost2D(lambda : Int, numOuterData : Int, numInnerData : Int, numBits : Int) : Int {
-        let outerAddressBits = Ceiling(Lg(IntAsDouble(numOuterData)));
-        let innerAddressBits = Ceiling(Lg(IntAsDouble(numInnerData)));
+        let outerAddressBits = BitSizeI(numOuterData - 1);
+        let innerAddressBits = BitSizeI(numInnerData - 1);
         let split = MinI(Floor(Lg(IntAsDouble(2^lambda * numBits))), (outerAddressBits + innerAddressBits) - 1);
 
         let unselect_cost = MaxI(0, 2^split - 2) + 2^(outerAddressBits + innerAddressBits - split) - 2;
@@ -231,7 +233,7 @@ namespace QDKChemistry.Utils.SelectSwap {
         let N = Length(data);
         Fact(N > 0, "data cannot be empty");
 
-        let n = Ceiling(Lg(IntAsDouble(N)));
+        let n = BitSizeI(N - 1);
         Fact(Length(address) >= n, $"address register is too small, requires at least {n} qubits");
 
         return (N, n);
@@ -269,7 +271,7 @@ namespace QDKChemistry.Utils.SelectSwap {
     ) : Bool {
         let nData = Length(data);
         let m = Length(data[0]);
-        let nAddr = Ceiling(Lg(IntAsDouble(nData)));
+        let nAddr = BitSizeI(nData - 1);
 
         use address = Qubit[nAddr];
         use output = Qubit[m];
@@ -307,8 +309,8 @@ namespace QDKChemistry.Utils.SelectSwap {
         let nOuter = Length(data);
         let nInner = Length(data[0]);
         let m = Length(data[0][0]);
-        let nOuterAddr = Ceiling(Lg(IntAsDouble(nOuter)));
-        let nInnerAddr = Ceiling(Lg(IntAsDouble(nInner)));
+        let nOuterAddr = BitSizeI(nOuter - 1);
+        let nInnerAddr = BitSizeI(nInner - 1);
         let nTarget = if numSwapBits > 0 { m * (1 <<< numSwapBits) } else { m };
 
         use outerAddr = Qubit[nOuterAddr];
