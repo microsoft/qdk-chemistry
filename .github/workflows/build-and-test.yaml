@@ -782,20 +782,11 @@ jobs:
 
   coverage-windows-arm64:
     name: ${{ matrix.compiler }} - Build & test (Windows ARM64)
-    # GitHub-hosted Windows-on-Arm runner: free for public repositories and
-    # ships the native ARM64 MSVC toolset (VC.Tools.ARM64), clang-cl, vcpkg,
-    # CMake and Ninja. 6h is the GitHub-hosted per-job ceiling.
-    runs-on: windows-11-arm
-    # Sized from measurement rather than guessed. A cold run on this runner --
-    # which is what happens when the dependency cache genuinely has to be
-    # rebuilt -- took 317 minutes with MSVC, against the 350 this used to allow;
-    # clang-cl did the same work in 138. That margin was too thin to survive a
-    # slow runner, so use the 360 minute ceiling GitHub allows for a hosted job.
-    #
-    # The cache-save steps deliberately run immediately after the dependency
-    # install rather than at the end of the job, so even a run that later exceeds
-    # this limit still banks the expensive part instead of discarding it.
-    timeout-minutes: 360
+    # Same 1ES arrangement as the x86_64 job, on the ARM64 pool. The JobId is
+    # distinct from that job's so the two cannot collide: both matrices index
+    # from zero within the same workflow run.
+    runs-on: [self-hosted, 1ES.Pool=1es-gh-Dpsd_v6-arm-pool, 1ES.ImageOverride=windows-2025-arm64-1espt, 'JobId=qdk_chemistry-win-arm64-${{ strategy.job-index }}-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
+    timeout-minutes: 480
     permissions:
       contents: read
       actions: write
@@ -805,19 +796,19 @@ jobs:
         compiler: [msvc, clang-cl]
     env:
       VCPKG_TRIPLET: arm64-windows-static-md
-      # QDK_UARCH is deliberately not set here. MSVC has no /arch: value for a
-      # generic ARM64 baseline, so forcing one makes qdk-uarch.cmake build
-      # /arch:armv8-a, fail its own flag check and warn on every MSVC run -- and
-      # again from macis-uarch.cmake. clang-cl, meanwhile, does accept
-      # -march=armv8-a. qdk-uarch.cmake already derives exactly the right answer
-      # for each: unset for MSVC, armv8-a for clang-cl on an ARM64 target. Note
-      # it reads the environment as well as the cache variable, so leaving this
-      # unset is what lets both the C++ and the Python builds auto-detect.
+      # QDK_UARCH is deliberately not set here, unlike the x86_64 job. MSVC has
+      # no /arch: value for a generic ARM64 baseline, so forcing one makes
+      # qdk-uarch.cmake build /arch:armv8-a, fail its own flag check and warn on
+      # every MSVC run -- and again from macis-uarch.cmake. clang-cl does accept
+      # -march=armv8-a. qdk-uarch.cmake derives exactly the right answer for
+      # each from CMAKE_SYSTEM_PROCESSOR: unset for MSVC, armv8-a for clang-cl.
+      # Note it reads the environment as well as the cache variable, so leaving
+      # this unset is what lets both the C++ and the Python builds auto-detect.
       # Bump to force a rebuild of the cached dependencies.
       DEPS_CACHE_VERSION: v2
-      # The ARM64 runner image ships CMake 4.x, which errors out on projects
-      # declaring cmake_minimum_required below 3.5. Several vendored
-      # dependencies still do; this is the documented escape hatch.
+      # CMake 4.x errors out on projects declaring cmake_minimum_required below
+      # 3.5. Several vendored dependencies still do; this is the documented
+      # escape hatch, and it is a no-op on an image that ships CMake 3.x.
       CMAKE_POLICY_VERSION_MINIMUM: '3.5'
     steps:
     - name: Checkout repository
@@ -968,63 +959,7 @@ jobs:
       run: |
         $lib = "${{ github.workspace }}\vcpkg_installed\${{ env.VCPKG_TRIPLET }}\lib\openblas.lib"
         Write-Host "lib: $lib (exists: $(Test-Path $lib))"
-
-        # Declare the Fortran entry points directly: no vendor header needed, and
-        # this is the same f77 interface blaspp itself calls.
-        $src = @(
-          '#include <stdio.h>',
-          'extern char* openblas_get_config(void);',
-          'extern char* openblas_get_corename(void);',
-          'extern int  openblas_get_num_procs(void);',
-          'extern int  openblas_get_num_threads(void);',
-          'extern void dtrsm_(char*, char*, char*, char*, int*, int*, double*,',
-          '                   double*, int*, double*, int*);',
-          'extern void dgetrf_(int*, int*, double*, int*, int*, int*);',
-          'extern void dgetf2_(int*, int*, double*, int*, int*, int*);',
-          'extern void dpotrf_(char*, int*, double*, int*, int*);',
-          '#define MAXN 64',
-          'static double m[MAXN*MAXN], b[MAXN*MAXN];',
-          'static int ipiv[MAXN];',
-          'static void fill_spd(int n) {',
-          '    for (int i = 0; i < n*n; ++i) m[i] = 0.0;',
-          '    for (int i = 0; i < n; ++i) m[i*n+i] = 2.0;',
-          '}',
-          'int main(void) {',
-          '    int info = 0;',
-          '    char L = 76, N = 78, U = 85;',
-          '    double one = 1.0;',
-          '    printf("config   = %s\n", openblas_get_config()); fflush(stdout);',
-          '    printf("corename = %s\n", openblas_get_corename()); fflush(stdout);',
-          '    printf("num_procs=%d num_threads=%d\n",',
-          '           openblas_get_num_procs(), openblas_get_num_threads()); fflush(stdout);',
-          '    for (int i = 0; i < MAXN*MAXN; ++i) b[i] = 1.0;',
-          '    int n8 = 8;',
-          '    fill_spd(n8);',
-          '    printf("before dtrsm n=8\n"); fflush(stdout);',
-          '    dtrsm_(&L, &L, &N, &N, &n8, &n8, &one, m, &n8, b, &n8);',
-          '    printf("after  dtrsm\n"); fflush(stdout);',
-          '    int sizes[5]; sizes[0]=1; sizes[1]=2; sizes[2]=4; sizes[3]=24; sizes[4]=64;',
-          '    for (int s = 0; s < 5; ++s) {',
-          '        int n = sizes[s];',
-          '        fill_spd(n);',
-          '        printf("before dgetf2 n=%d\n", n); fflush(stdout);',
-          '        info = 0; dgetf2_(&n, &n, m, &n, ipiv, &info);',
-          '        printf("after  dgetf2 n=%d info=%d\n", n, info); fflush(stdout);',
-          '        fill_spd(n);',
-          '        printf("before dgetrf n=%d\n", n); fflush(stdout);',
-          '        info = 0; dgetrf_(&n, &n, m, &n, ipiv, &info);',
-          '        printf("after  dgetrf n=%d info=%d\n", n, info); fflush(stdout);',
-          '        fill_spd(n);',
-          '        printf("before dpotrf n=%d\n", n); fflush(stdout);',
-          '        info = 0; dpotrf_(&U, &n, m, &n, &info);',
-          '        printf("after  dpotrf n=%d info=%d\n", n, info); fflush(stdout);',
-          '    }',
-          '    printf("ALL OPENBLAS CALLS COMPLETED\n"); fflush(stdout);',
-          '    return 0;',
-          '}'
-        )
-        $srcPath = Join-Path $env:RUNNER_TEMP 'ob_smoke.c'
-        Set-Content -Path $srcPath -Value $src -Encoding ascii
+        $srcPath = "${{ github.workspace }}\.pipelines\checks\openblas-smoke.c"
 
         Push-Location $env:RUNNER_TEMP
         cl /nologo $srcPath "$lib" /Fe:ob_smoke.exe

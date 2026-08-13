@@ -29,11 +29,6 @@ PYTHON_EXAMPLES_DIR = EXAMPLES_DIR / "python"
 PYSCF_AVAILABLE = importlib.util.find_spec("pyscf") is not None
 OPENFERMION_AVAILABLE = importlib.util.find_spec("openfermion") is not None
 _RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
-# Guards against an example hanging; it is not an assertion about how fast one
-# runs. The default therefore has to accommodate the slowest supported CI agent.
-# The Windows ARM64 agent is a 2 vCPU machine, where quickstart.py exceeded the
-# previous 360 second limit even though it completed correctly everywhere else.
-_EXAMPLE_TIMEOUT_SECONDS = int(os.getenv("QDK_CHEMISTRY_EXAMPLE_TIMEOUT_SECONDS", "1200"))
 
 # Release-note example scripts are snapshots that only work with the matching
 # library version.  Parse the major.minor from the filename (e.g.
@@ -163,7 +158,7 @@ class TestExampleScripts(unittest.TestCase):
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
-                timeout=_EXAMPLE_TIMEOUT_SECONDS,
+                timeout=360,
                 cwd=tmpdir,
                 env={**os.environ, "PYTHONIOENCODING": "utf-8"},
             )

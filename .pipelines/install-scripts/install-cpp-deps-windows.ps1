@@ -29,20 +29,6 @@
 
 .PARAMETER KeepBuildDir
     If set, the temporary build directory is not deleted after installation.
-
-.PARAMETER Phase
-    Which portion of the dependency set to build. Defaults to 'all', which is
-    what local developers and the x86_64 CI job use.
-
-    The Windows ARM64 CI agent is a 2 vCPU box, where a cold build of the full
-    set runs for the better part of a day (libint2 alone is around seven hours).
-    Azure Pipelines' Cache@2 only saves when its job succeeds, so a single job
-    covering everything banks nothing at all if the last dependency fails, and
-    the next attempt starts again from zero. Splitting the work across jobs lets
-    each phase bank its own cache as soon as it succeeds, so a failure only ever
-    costs the phase that failed.
-
-    Phases are cumulative and must run in order: vcpkg, libint2, ecpint, gauxc.
 #>
 param(
     [Parameter(Mandatory)] [string]$SrcDir,
@@ -52,8 +38,6 @@ param(
     [string]$Triplet,
     [string]$DepsInstallDir,
     [switch]$KeepBuildDir,
-    [ValidateSet('all', 'vcpkg', 'libint2', 'ecpint', 'gauxc', 'rest')]
-    [string]$Phase = 'all',
     # Print a hash of the build plan and exit without building anything. The
     # pipeline uses this for the dependency cache key, so that the key is derived
     # from the same description of the build that the build itself consumes.
@@ -98,20 +82,10 @@ if ($missing) {
 
 $buildDir = "$SrcDir\deps-build-msvc"
 
-# ─── Phase selection and resumability ────────────────────────────────────────
+# ─── Resumability ────────────────────────────────────────────────────────────
 # Each dependency records a stamp naming the exact version that was installed,
 # so a restored cache can be inspected and only the missing work redone.
 $stampDir = Join-Path $DepsInstallDir '.deps-stamps'
-
-function Test-PhaseSelected([string]$Name) {
-    if ($Phase -eq 'all')  { return $true }
-    # 'rest' covers every cmake-built dependency, not just the tail. It normally
-    # restores libint2 from the previous phase's cache and skips straight over it
-    # via the stamps, but if that restore ever comes back without libint2 this
-    # phase rebuilds it rather than silently banking an incomplete tree.
-    if ($Phase -eq 'rest') { return $Name -in @('libint2', 'ecpint', 'gauxc') }
-    return $Phase -eq $Name
-}
 
 function Set-DepStamp([string]$Name, [string]$Id) {
     New-Item -ItemType Directory -Force -Path $stampDir | Out-Null
@@ -294,26 +268,18 @@ function Invoke-CMakeDep([string]$Name, [string]$SrcPath, [string[]]$ExtraArgs) 
 
 # ─── vcpkg install ────────────────────────────────────────────────────────────
 # Provides eigen3, openblas, hdf5, boost-headers, spdlog, nlohmann-json, etc.
-# The cmake phases need these headers and libraries, so if a phase is running on
-# its own and the vcpkg cache did not restore, install them here rather than
-# failing deep inside a cmake configure.
 $vcpkgInstalled = "$SrcDir\vcpkg_installed"
-$needVcpkg = (Test-PhaseSelected 'vcpkg') -or -not (Test-Path "$vcpkgInstalled\$Triplet")
-if ($needVcpkg) {
-    $env:X_VCPKG_ASSET_SOURCES = 'x-azurl,https://vcpkg.storage.devpackages.microsoft.io/artifacts/'
-    Write-Host "=== vcpkg install ==="
-    & "$VcpkgRoot\vcpkg.exe" install `
-        --triplet $Triplet `
-        --x-manifest-root="$SrcDir" `
-        --x-install-root="$vcpkgInstalled" `
-        --overlay-ports="$SrcDir\vcpkg-overlay\ports"
-    if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed ($LASTEXITCODE)" }
-} else {
-    Write-Host "=== vcpkg packages already present; skipping ==="
-}
+$env:X_VCPKG_ASSET_SOURCES = 'x-azurl,https://vcpkg.storage.devpackages.microsoft.io/artifacts/'
+Write-Host "=== vcpkg install ==="
+& "$VcpkgRoot\vcpkg.exe" install `
+    --triplet $Triplet `
+    --x-manifest-root="$SrcDir" `
+    --x-install-root="$vcpkgInstalled" `
+    --overlay-ports="$SrcDir\vcpkg-overlay\ports"
+if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed ($LASTEXITCODE)" }
 
 # ─── libint2 ─────────────────────────────────────────────────────────────────
-if ((Test-PhaseSelected 'libint2') -and -not (Test-DepInstalled 'libint2' $libintUrl 'libint2*')) {
+if (-not (Test-DepInstalled 'libint2' $libintUrl 'libint2*')) {
     Write-Host "=== Installing libint2 ==="
     $libintExtract = "$buildDir\libint2-extract"
     New-Item -ItemType Directory -Force -Path $libintExtract | Out-Null
@@ -354,10 +320,10 @@ if ((Test-PhaseSelected 'libint2') -and -not (Test-DepInstalled 'libint2' $libin
     Invoke-CMakeDep 'libint2' $libintSrc (Get-DepPlan 'libint2').CMakeArgs
     Remove-Item $libintExtract -Recurse -Force
     Set-DepStamp 'libint2' $libintUrl
-} else { Write-Host "=== libint2 already installed or not in this phase; skipping ===" }
+} else { Write-Host "=== libint2 already installed; skipping ===" }
 
 # ─── ecpint ──────────────────────────────────────────────────────────────────
-if ((Test-PhaseSelected 'ecpint') -and -not (Test-DepInstalled 'ecpint' $ecpintCommit 'ecpint*')) {
+if (-not (Test-DepInstalled 'ecpint' $ecpintCommit 'ecpint*')) {
     Write-Host "=== Installing ecpint ==="
     $ecpintSrc = "$buildDir\ecpint-src"
     git clone https://github.com/robashaw/libecpint $ecpintSrc
@@ -373,12 +339,12 @@ if ((Test-PhaseSelected 'ecpint') -and -not (Test-DepInstalled 'ecpint' $ecpintC
     Invoke-CMakeDep 'ecpint' $ecpintSrc (Get-DepPlan 'ecpint').CMakeArgs
     Remove-Item $ecpintSrc -Recurse -Force
     Set-DepStamp 'ecpint' $ecpintCommit
-} else { Write-Host "=== ecpint already installed or not in this phase; skipping ===" }
+} else { Write-Host "=== ecpint already installed; skipping ===" }
 
 # ─── gauxc ───────────────────────────────────────────────────────────────────
 # gauxc fetches its own transitive deps (ExchCXX, IntegratorXX, gau2grid,
 # linalg-cmake-modules) via FetchContent — all pinned in gauxc's cmake.
-if ((Test-PhaseSelected 'gauxc') -and -not (Test-DepInstalled 'gauxc' $gauxcCommit 'gauxc*')) {
+if (-not (Test-DepInstalled 'gauxc' $gauxcCommit 'gauxc*')) {
     Write-Host "=== Installing gauxc ==="
     $gauxcSrc = "$buildDir\gauxc-src"
     git clone https://github.com/wavefunction91/gauxc.git $gauxcSrc
@@ -387,11 +353,11 @@ if ((Test-PhaseSelected 'gauxc') -and -not (Test-DepInstalled 'gauxc' $gauxcComm
     Invoke-CMakeDep 'gauxc' $gauxcSrc (Get-DepPlan 'gauxc').CMakeArgs
     Remove-Item $gauxcSrc -Recurse -Force
     Set-DepStamp 'gauxc' $gauxcCommit
-} else { Write-Host "=== gauxc already installed or not in this phase; skipping ===" }
+} else { Write-Host "=== gauxc already installed; skipping ===" }
 
 # ─── Cleanup ─────────────────────────────────────────────────────────────────
 if (-not $KeepBuildDir) {
     Remove-Item $buildDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-Write-Host "=== C++ dependencies (phase: $Phase) installed to: $DepsInstallDir ==="
+Write-Host "=== C++ dependencies installed to: $DepsInstallDir ==="

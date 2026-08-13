@@ -28,9 +28,9 @@ Install from PyPI with all optional dependencies:
 ``[all]`` pulls in all optional dependencies so that examples and tests work without extra steps.
 For a minimal install, other methods (Dev Container, building from source), and platform-specific notes, see the `installation instructions <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_.
 
-Prebuilt wheels are published for Linux (x86_64, arm64), macOS (Apple Silicon), and Windows (x86_64).
-Windows arm64 is supported and tested from source; `WSL <https://learn.microsoft.com/windows/wsl/install>`_
-is supported as well, and inside it you follow the Linux instructions.
+Prebuilt wheels are published for Linux (x86_64, arm64), macOS (Apple Silicon), and Windows
+(x86_64, arm64). `WSL <https://learn.microsoft.com/windows/wsl/install>`_ is supported as well,
+and inside it you follow the Linux instructions.
 
 .. note::
 

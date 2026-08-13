@@ -23,12 +23,6 @@ parameters:
   values:
   - x64
   - arm64
-- name: pythonEnv
-  type: string
-  default: conda
-  values:
-  - conda
-  - venv
 
 steps:
 - checkout: self
@@ -37,25 +31,22 @@ steps:
   fetchDepth: 1
   retryCountOnTaskFailure: 3
 
-# The venv path builds on the agent's own interpreter, so it has to be provisioned
-# first. Conda builds bring their own Python and skip this.
+# Windows ARM64 is the only target that builds in a venv: conda publishes no
+# usable win-arm64 packages, so the wheel is built on the agent's own
+# interpreter. Everywhere else the policy-default conda path applies, and conda
+# brings its own Python. Switch to conda here once a win-arm64 conda exists.
 #
-# ARM64 cannot use UsePythonVersion@0: that image's tool cache is empty, so the
-# task downloads Python and then tries to bootstrap pip from pypi.org, which the
-# CFSClean isolation policy blocks by design. It treats that as fatal and
+# ARM64 also cannot use UsePythonVersion@0: that image's tool cache is empty, so
+# the task downloads Python and then tries to bootstrap pip from pypi.org, which
+# the CFSClean isolation policy blocks by design. It treats that as fatal and
 # unregisters the interpreter it just extracted. ensure-python-windows.ps1
-# installs the same official build without contacting any package feed.
-- ${{ if eq(parameters.pythonEnv, 'venv') }}:
-  - ${{ if eq(parameters.arch, 'arm64') }}:
-    - pwsh: >-
-        $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\ensure-python-windows.ps1
-        -Arch arm64 -Version ${{ parameters.pythonVersion }} -IncludePip
-      displayName: Use Python ${{ parameters.pythonVersion }} (arm64)
-  - ${{ else }}:
-    - task: UsePythonVersion@0
-      displayName: Use Python ${{ parameters.pythonVersion }} (${{ parameters.arch }})
-      inputs:
-        versionSpec: '${{ parameters.pythonVersion }}'
+# installs the same official build without contacting any package feed, and
+# no-ops when the agent already has a usable interpreter on PATH.
+- ${{ if eq(parameters.arch, 'arm64') }}:
+  - pwsh: >-
+      $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\ensure-python-windows.ps1
+      -Arch arm64 -Version ${{ parameters.pythonVersion }} -IncludePip
+    displayName: Use Python ${{ parameters.pythonVersion }} (arm64)
 
 - pwsh: |
     python "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\versioning.py" `
@@ -85,16 +76,13 @@ steps:
     path: $(System.DefaultWorkingDirectory)/vcpkg_installed
     cacheHitVar: VCPKG_CACHE_RESTORED
 
-# These keys must stay in step with build-pip-wheels-windows-deps.yml, which is
-# what populates the caches. The final phase token differs by architecture
-# because that is where the complete install tree ends up: x86_64 builds the
-# whole set in one job under "all", while ARM64 splits the work and finishes
-# under "deps".
+# This key must stay in step with build-pip-wheels-windows-deps.yml, which is
+# what populates the cache.
 #
-# No transitional restore key here. This job only consumes the tree, so falling
-# back to an older or partial cache would surface much later as a confusing
-# "libint2 not found" during configure. An exact-key miss is the clearer failure,
-# and the dependency jobs this one depends on will have banked the new key first.
+# No restore keys here. This job only consumes the tree, so falling back to an
+# older or partial cache would surface much later as a confusing "libint2 not
+# found" during configure. An exact-key miss is the clearer failure, and the
+# dependency job this one depends on will have banked the new key first.
 - pwsh: |
     $fp = & "$(System.DefaultWorkingDirectory)\.pipelines\install-scripts\install-cpp-deps-windows.ps1" `
         -SrcDir    "$(System.DefaultWorkingDirectory)" `
@@ -110,38 +98,21 @@ steps:
 - task: Cache@2
   displayName: Restore/save C++ deps install cache
   inputs:
-    ${{ if eq(parameters.arch, 'arm64') }}:
-      key: >-
-        "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
-        cpp/manifest/qdk-chemistry/cgmanifest.json |
-        external/macis/manifest/cgmanifest.json |
-        cpp/cmake/patches/**/* |
-        .pipelines/toolchains/windows.cmake |
-        "$(DEPS_FINGERPRINT)" |
-        "deps"
-    ${{ else }}:
-      key: >-
-        "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
-        cpp/manifest/qdk-chemistry/cgmanifest.json |
-        external/macis/manifest/cgmanifest.json |
-        cpp/cmake/patches/**/* |
-        .pipelines/toolchains/windows.cmake |
-        "$(DEPS_FINGERPRINT)" |
-        "all"
+    key: >-
+      "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
+      cpp/manifest/qdk-chemistry/cgmanifest.json |
+      external/macis/manifest/cgmanifest.json |
+      cpp/cmake/patches/**/* |
+      .pipelines/toolchains/windows.cmake |
+      "$(DEPS_FINGERPRINT)"
     path: $(System.DefaultWorkingDirectory)/deps-install-msvc
     cacheHitVar: DEPS_INSTALL_CACHE_RESTORED
 
-# Compiling our libint2 translation unit exhausts cl.exe's heap on the 7 GB
-# ARM64 agent even with a single compiler process, because what bounds one
-# cl.exe is the system commit limit rather than the job count. Raise it before
-# building. Best-effort: this only reports and warns if it cannot.
-- ${{ if eq(parameters.arch, 'arm64') }}:
-  - pwsh: $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\expand-pagefile-windows.ps1
-    displayName: Enlarge page file (arm64)
-
-# Full qdk build, C++ tests, conda environment setup, and Python wheel build.
+# Full qdk build, C++ tests, Python environment setup, and Python wheel build.
 # SYSTEM_ACCESSTOKEN is required by bootstrap-conda for the Azure Artifacts feed.
 - pwsh: |
+    # Windows ARM64 is the only target without usable win-arm64 conda packages.
+    $pythonEnv = if ('${{ parameters.arch }}' -eq 'arm64') { 'venv' } else { 'conda' }
     & "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\build-pip-wheels-windows.ps1" `
         -SrcDir         "$(System.DefaultWorkingDirectory)" `
         -March          "${{ parameters.march }}" `
@@ -150,7 +121,7 @@ steps:
         -EnableCoverage "${{ parameters.enableCoverage }}" `
         -ClPath         "$(CL_PATH)" `
         -Triplet        "$(VCPKG_TRIPLET)" `
-        -PythonEnv      "${{ parameters.pythonEnv }}" `
+        -PythonEnv      $pythonEnv `
         -PythonVersion  "${{ parameters.pythonVersion }}" `
         -DevTag         "${{ parameters.devTag }}"
   displayName: Build C++ library, run tests, build Python wheel

@@ -8,12 +8,6 @@ parameters:
 - name: condition
   type: string
   default: succeeded()
-- name: pythonEnv
-  type: string
-  default: conda
-  values:
-  - conda
-  - venv
 - name: arch
   type: string
   default: x64
@@ -22,29 +16,24 @@ parameters:
   - arm64
 
 steps:
-# The venv path tests with the agent's own interpreter, so it has to be
-# provisioned first. Conda test envs bring their own Python and skip this.
-#
-# ARM64 cannot use UsePythonVersion@0 -- see the note in
-# build-pip-wheels-windows.yml for why.
-- ${{ if eq(parameters.pythonEnv, 'venv') }}:
-  - ${{ if eq(parameters.arch, 'arm64') }}:
-    - pwsh: >-
-        $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\ensure-python-windows.ps1
-        -Arch arm64 -Version ${{ parameters.pythonVersion }} -IncludePip
-      displayName: Use Python ${{ parameters.pythonVersion }} (arm64)
-  - ${{ else }}:
-    - task: UsePythonVersion@0
-      displayName: Use Python ${{ parameters.pythonVersion }} (${{ parameters.arch }})
-      inputs:
-        versionSpec: '${{ parameters.pythonVersion }}'
+# Windows ARM64 tests in a venv on the agent's own interpreter; every other
+# target uses the policy-default conda path, and conda brings its own Python.
+# See the note in build-pip-wheels-windows.yml for why ARM64 cannot use
+# UsePythonVersion@0.
+- ${{ if eq(parameters.arch, 'arm64') }}:
+  - pwsh: >-
+      $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\ensure-python-windows.ps1
+      -Arch arm64 -Version ${{ parameters.pythonVersion }} -IncludePip
+    displayName: Use Python ${{ parameters.pythonVersion }} (arm64)
 
 - pwsh: |
     $ErrorActionPreference = 'Stop'
+    # Windows ARM64 is the only target without usable win-arm64 conda packages.
+    $pythonEnv = if ('${{ parameters.arch }}' -eq 'arm64') { 'venv' } else { 'conda' }
     & "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\test-pip-wheels-windows.ps1" `
       -SrcDir "$(System.DefaultWorkingDirectory)" `
       -PythonVersion '${{ parameters.pythonVersion }}' `
-      -PythonEnv '${{ parameters.pythonEnv }}' `
+      -PythonEnv $pythonEnv `
       -RunSlowTests '${{ parameters.runSlowTests }}'
   displayName: Test wheel (Windows, Python ${{ parameters.pythonVersion }})
   condition: ${{ parameters.condition }}

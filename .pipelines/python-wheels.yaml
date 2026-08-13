@@ -50,8 +50,7 @@ parameters:
     os: windows
     arch: aarch64
     march: armv8-a
-    poolName: Azure-Pipelines-DevTools-ARM64-EO
-    imageName: windows-2025-gen2-arm64
+    imageName: windows-2025-arm64-1espt
   displayName: Target platforms
 - name: pythonVersions
   type: stringList
@@ -135,71 +134,23 @@ extends:
           parameters:
             march: x86-64-v3
 
-      # Same rationale for Windows ARM64, but split into phases. Runs on the 1ES
-      # ARM64 pool per the image guidance from the QDK platform team.
+      # Same rationale for Windows ARM64, on the 1ES ARM64 pool.
       # hostArchitecture is required: the 1ES template otherwise defaults it to
       # amd64, which provisions an x64-emulated agent on the ARM64 image.
-      #
-      # The ARM64 agents are 2 vCPU / 7 GB (vs 4 vCPU / 16 GB on the GitHub
-      # runners), so CMAKE_BUILD_PARALLEL_LEVEL is 2 and a cold build runs for
-      # the better part of a day: 108 minutes for OpenBLAS, which vcpkg builds
-      # once for the host triplet and once for the target, and around seven
-      # hours for libint2's 1442 objects.
-      #
-      # Cache@2 only saves when its job succeeds, so while this was a single job
-      # every failure threw away the entire tree and the next attempt started
-      # from nothing -- a 480 minute timeout and a later ecpint failure each
-      # cost a full day of rebuilding. Splitting it means each phase banks its
-      # own cache the moment it succeeds, so a failure only ever costs its own
-      # phase. The phases chain through Cache@2 restoreKeys, and the build
-      # script additionally stamps each installed dependency so a restored tree
-      # is never rebuilt.
-      - job: Build_windows_aarch64_deps_vcpkg
-        pool:
-          name: Azure-Pipelines-DevTools-ARM64-EO
-          image: windows-2025-gen2-arm64
-          os: windows
-          hostArchitecture: Arm64
-        timeoutInMinutes: 360
-        displayName: Build Windows ARM64 C++ dependencies (vcpkg)
-        steps:
-        - template: .pipelines/templates/build-pip-wheels-windows-deps.yml@self
-          parameters:
-            march: armv8-a
-            arch: arm64
-            phase: vcpkg
-
-      - job: Build_windows_aarch64_deps_libint2
-        dependsOn: Build_windows_aarch64_deps_vcpkg
-        pool:
-          name: Azure-Pipelines-DevTools-ARM64-EO
-          image: windows-2025-gen2-arm64
-          os: windows
-          hostArchitecture: Arm64
-        timeoutInMinutes: 720
-        displayName: Build Windows ARM64 C++ dependencies (libint2)
-        steps:
-        - template: .pipelines/templates/build-pip-wheels-windows-deps.yml@self
-          parameters:
-            march: armv8-a
-            arch: arm64
-            phase: libint2
-
       - job: Build_windows_aarch64_deps
-        dependsOn: Build_windows_aarch64_deps_libint2
         pool:
-          name: Azure-Pipelines-DevTools-ARM64-EO
-          image: windows-2025-gen2-arm64
+          name: aqe-1es-Dpsd_v5-arm-pool
+          demands:
+          - ImageOverride -equals windows-2025-arm64-1espt
           os: windows
           hostArchitecture: Arm64
         timeoutInMinutes: 480
-        displayName: Build Windows ARM64 C++ dependencies (ecpint + gauxc)
+        displayName: Build Windows ARM64 C++ dependencies
         steps:
         - template: .pipelines/templates/build-pip-wheels-windows-deps.yml@self
           parameters:
             march: armv8-a
             arch: arm64
-            phase: rest
 
       - ${{ each target in parameters.matrix }}:
         - job: Build_${{ target.name }}
@@ -213,9 +164,10 @@ extends:
           ${{ elseif and(eq(target.os, 'windows'), eq(target.arch, 'aarch64')) }}:
             dependsOn: Build_windows_aarch64_deps
             pool:
-              name: ${{ target.poolName }}
-              image: ${{ target.imageName }}
-              os: windows
+              name: aqe-1es-Dpsd_v5-arm-pool
+              demands:
+              - ImageOverride -equals ${{ target.imageName }}
+              os: ${{ target.os }}
               hostArchitecture: Arm64
           ${{ elseif eq(target.arch, 'aarch64') }}:
             pool:
@@ -344,9 +296,6 @@ extends:
                 devTag: ${{ parameters.devTag }}
                 ${{ if eq(target.arch, 'aarch64') }}:
                   arch: arm64
-                  # conda publishes no usable win-arm64 packages, so the ARM64
-                  # wheel is built in a venv on the agent's own interpreter.
-                  pythonEnv: venv
 
           # Test - Windows (x86_64 and ARM64)
           - ${{ if eq(target.os, 'windows') }}:
@@ -357,7 +306,6 @@ extends:
                 condition: succeeded()
                 ${{ if eq(target.arch, 'aarch64') }}:
                   arch: arm64
-                  pythonEnv: venv
 
           # SBoM Manifest Generator Task requires we transfer ownership of the wheel directory
           # back to the original base image user (Linux/macOS only; not needed on Windows).

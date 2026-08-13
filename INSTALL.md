@@ -27,13 +27,12 @@ Prebuilt wheels are published for the following platforms:
 |----------|--------------|-------|
 | Linux | x86_64, arm64 | |
 | macOS | arm64 (Apple Silicon) | |
-| Windows | x86_64 | See [Windows notes](#notes-for-windows-users) |
-| Windows | arm64 | No wheel yet; [build from source](#building-from-source) or use WSL. See [Windows notes](#notes-for-windows-users) |
+| Windows | x86_64, arm64 | See [Windows notes](#notes-for-windows-users) |
 
 On Windows you can either install natively or work inside the
 [Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/windows/wsl/install). Both are
 supported: WSL uses the Linux wheels and the Linux instructions throughout this document, and is the
-simplest option on arm64 or when you need PySCF.
+simplest option when you need PySCF.
 
 > **NOTE:** Commands below are given for Linux/macOS (`bash`) and Windows (PowerShell). Where the
 > Linux/macOS commands use `python3`, use `python` on Windows.
@@ -152,13 +151,13 @@ pytest python/tests
 ### Notes for Windows Users
 
 Windows is a supported platform on both x86_64 and arm64: the project is built and tested on both
-architectures in CI. Wheels are published for x86_64 (Python 3.10-3.14); on arm64,
-[build from source](#building-from-source) or use WSL. The following caveats apply to native Windows
-installs; none of them apply under [WSL](https://learn.microsoft.com/windows/wsl/install).
+architectures in CI, and wheels are published for both (x86_64 from Python 3.10, arm64 from Python
+3.11, which is the first version CPython ships a win-arm64 build for). The following caveats apply
+to native Windows installs; none of them apply under
+[WSL](https://learn.microsoft.com/windows/wsl/install).
 
 | Topic | Detail |
 |-------|--------|
-| Architecture | Wheels are published for x86_64. On arm64, build from source or use WSL. |
 | PySCF plugin | PySCF publishes no Windows wheels, so the `plugins` extra installs no PySCF and the PySCF plugin is unavailable. The native implementations are unaffected. |
 | arm64 extras | Qiskit (and Qiskit Aer, Nature, IBM Runtime), PennyLane and RDKit are skipped on arm64: they require `rustworkx`, which publishes no win-arm64 wheels. The features that depend on them are unavailable; everything else is unaffected. |
 | OpenMP | Shared-memory threading via OpenMP is disabled on Windows. |

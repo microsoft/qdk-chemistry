@@ -55,7 +55,7 @@ python -m pip install "qdk-chemistry[all]"
 
 The `[all]` extra pulls in all optional dependencies so that examples and tests work without chasing missing packages. For other installation methods (Dev Container, building from source) and platform-specific notes, see [INSTALL.md](./INSTALL.md).
 
-Prebuilt wheels are published for Linux (x86_64, arm64), macOS (Apple Silicon), and Windows (x86_64). On Windows, [WSL](https://learn.microsoft.com/windows/wsl/install) is supported as well and is the simplest path on arm64. See [Notes for Windows users](./INSTALL.md#notes-for-windows-users) for Windows-specific caveats.
+Prebuilt wheels are published for Linux (x86_64, arm64), macOS (Apple Silicon), and Windows (x86_64, arm64). On Windows, [WSL](https://learn.microsoft.com/windows/wsl/install) is supported as well. See [Notes for Windows users](./INSTALL.md#notes-for-windows-users) for Windows-specific caveats.
 
 ## Telemetry
 

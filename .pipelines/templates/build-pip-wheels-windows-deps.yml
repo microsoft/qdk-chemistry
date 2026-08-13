@@ -11,18 +11,6 @@ parameters:
   values:
   - x64
   - arm64
-# Which slice of the dependency set this job builds. 'all' is a single job and
-# is what x86_64 uses. Windows ARM64 splits the work so each slice banks its own
-# cache as soon as it succeeds -- see the Phase notes in
-# install-cpp-deps-windows.ps1 for why.
-- name: phase
-  type: string
-  default: all
-  values:
-  - all
-  - vcpkg
-  - libint2
-  - rest
 
 steps:
 - checkout: self
@@ -36,12 +24,14 @@ steps:
 #
 # The two architectures need different mechanisms. On x64 the image ships Python
 # in the agent tool cache, so UsePythonVersion@0 simply puts it on PATH. On ARM64
-# the tool cache is empty, so that task falls through to downloading Python and
-# then tries to bootstrap pip from pypi.org -- which the CFSClean network
+# the tool cache has been empty, so that task falls through to downloading Python
+# and then tries to bootstrap pip from pypi.org -- which the CFSClean network
 # isolation policy blocks by design, since it exists to force package traffic
 # through the Centralized Feed Service. The task treats that as fatal and
 # unregisters the interpreter it just extracted. So provision ARM64 without
-# touching any package feed.
+# touching any package feed: ensure-python-windows.ps1 probes PATH and the tool
+# cache first and only downloads when neither yields a usable interpreter, so it
+# costs nothing on an image that does ship one.
 - ${{ if eq(parameters.arch, 'x64') }}:
   - task: UsePythonVersion@0
     displayName: Use Python (x64)
@@ -85,111 +75,37 @@ steps:
     path: $(System.DefaultWorkingDirectory)/vcpkg_installed
     cacheHitVar: VCPKG_CACHE_RESTORED
 
-# The install-tree cache is built up phase by phase: each phase restores the
-# previous phase's output and saves the combined result under its own key.
-#
-# The chaining has a sharp edge. Azure Pipelines appends `**` to every restore
-# key, so a restore key only ever matches caches with MORE segments than itself
-# -- a restore key of `<base>|"libint2"` resolves to `<base>|"libint2"|**` and
-# does NOT match the cache stored under exactly `<base>|"libint2"`. Getting this
-# wrong is silent: the phase simply starts from an empty tree, builds its own
-# dependencies, and banks an incomplete result. That is what happened to the
-# first "rest" cache, and since Cache@2 never overwrites an existing key, that
-# entry stayed poisoned until the key was renamed.
-#
-# So the libint2 phase republishes its tree under a deliberately longer key that
-# the next phase's restore key can actually match. The extra task costs nothing
-# when the tree is already cached: it misses, and saves what the first task
-# restored.
-#
-# The keys pair two mechanisms. Azure Pipelines' own file hashing covers the
+# The key pairs two mechanisms. Azure Pipelines' own file hashing covers the
 # file inputs -- pinned versions, patches, toolchain -- which is declarative and
 # easy to audit. $(DEPS_FINGERPRINT) covers what file hashing cannot see: the
 # cmake flags, build type and compiler identity that live in the build script.
 #
 # They used to hash install-cpp-deps-windows.ps1 instead, which meant an edit
 # anywhere in that script -- even one that only touched diagnostics -- threw away
-# a dependency tree that takes most of a day to rebuild on the ARM64 agent. The
-# fingerprint is derived from the build plan rather than the file, so it moves
-# when the build would actually differ and stays put otherwise.
+# a dependency tree that takes hours to rebuild. The fingerprint is derived from
+# the build plan rather than the file, so it moves when the build would actually
+# differ and stays put otherwise.
 #
 # The r<N> literal remains only as a manual escape hatch; it is no longer what
-# keeps the keys honest.
-#
-# Every restore key below includes the fingerprint. A restore key that stopped
-# short of it would match any cache under the same base regardless of the flags
-# it was built with, and the stamps would not catch that, because they compare
-# each dependency's pinned version rather than its flags. Such a key would
-# quietly restore a tree built with different flags and undo the whole point of
-# the fingerprint. Two of them existed briefly, to migrate the pre-fingerprint
-# caches in place rather than spending most of a day rebuilding them, and came
-# out once that migration had banked.
-- ${{ if ne(parameters.phase, 'vcpkg') }}:
-  - task: Cache@2
-    displayName: Restore/save C++ deps install cache (${{ parameters.phase }})
-    inputs:
-      ${{ if eq(parameters.phase, 'libint2') }}:
-        key: >-
-          "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
-          cpp/manifest/qdk-chemistry/cgmanifest.json |
-          external/macis/manifest/cgmanifest.json |
-          cpp/cmake/patches/**/* |
-          .pipelines/toolchains/windows.cmake |
-          "$(DEPS_FINGERPRINT)" |
-          "libint2"
-      ${{ if eq(parameters.phase, 'rest') }}:
-        key: >-
-          "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
-          cpp/manifest/qdk-chemistry/cgmanifest.json |
-          external/macis/manifest/cgmanifest.json |
-          cpp/cmake/patches/**/* |
-          .pipelines/toolchains/windows.cmake |
-          "$(DEPS_FINGERPRINT)" |
-          "deps"
-        restoreKeys: >-
-          "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" | cpp/manifest/qdk-chemistry/cgmanifest.json | external/macis/manifest/cgmanifest.json | cpp/cmake/patches/**/* | .pipelines/toolchains/windows.cmake | "$(DEPS_FINGERPRINT)" | "libint2"
-      ${{ if eq(parameters.phase, 'all') }}:
-        key: >-
-          "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
-          cpp/manifest/qdk-chemistry/cgmanifest.json |
-          external/macis/manifest/cgmanifest.json |
-          cpp/cmake/patches/**/* |
-          .pipelines/toolchains/windows.cmake |
-          "$(DEPS_FINGERPRINT)" |
-          "all"
-      path: $(System.DefaultWorkingDirectory)/deps-install-msvc
-      cacheHitVar: DEPS_INSTALL_CACHE_RESTORED
-
-# Republish the same tree under a longer key so the next phase's restore key can
-# match it. See the note above on the trailing `**` that Azure Pipelines adds.
-- ${{ if eq(parameters.phase, 'libint2') }}:
-  - task: Cache@2
-    displayName: Republish C++ deps install cache for the next phase
-    inputs:
-      key: >-
-        "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
-        cpp/manifest/qdk-chemistry/cgmanifest.json |
-        external/macis/manifest/cgmanifest.json |
-        cpp/cmake/patches/**/* |
-        .pipelines/toolchains/windows.cmake |
-        "$(DEPS_FINGERPRINT)" |
-        "libint2" | "tree"
-      path: $(System.DefaultWorkingDirectory)/deps-install-msvc
+# keeps the key honest.
+- task: Cache@2
+  displayName: Restore/save C++ deps install cache
+  inputs:
+    key: >-
+      "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
+      cpp/manifest/qdk-chemistry/cgmanifest.json |
+      external/macis/manifest/cgmanifest.json |
+      cpp/cmake/patches/**/* |
+      .pipelines/toolchains/windows.cmake |
+      "$(DEPS_FINGERPRINT)"
+    path: $(System.DefaultWorkingDirectory)/deps-install-msvc
+    cacheHitVar: DEPS_INSTALL_CACHE_RESTORED
 
 - pwsh: |
     & "$(System.DefaultWorkingDirectory)\.pipelines\install-scripts\install-cpp-deps-windows.ps1" `
         -SrcDir    "$(System.DefaultWorkingDirectory)" `
         -BuildType "${{ parameters.buildType }}" `
         -Triplet   "$(VCPKG_TRIPLET)" `
-        -ClPath    "$(CL_PATH)" `
-        -Phase     "${{ parameters.phase }}"
-  displayName: Build and install C++ dependencies (${{ parameters.phase }})
-  # A restoreKeys match reports 'inexact' rather than 'true', which is exactly
-  # when the tail phase still has work to do, so comparing against 'true' is
-  # what makes the chained caches resume correctly.
-  ${{ if eq(parameters.phase, 'vcpkg') }}:
-    condition: ne(variables['VCPKG_CACHE_RESTORED'], 'true')
-  ${{ if eq(parameters.phase, 'all') }}:
-    condition: or(ne(variables['DEPS_INSTALL_CACHE_RESTORED'], 'true'), ne(variables['VCPKG_CACHE_RESTORED'], 'true'))
-  ${{ if or(eq(parameters.phase, 'libint2'), eq(parameters.phase, 'rest')) }}:
-    condition: ne(variables['DEPS_INSTALL_CACHE_RESTORED'], 'true')
+        -ClPath    "$(CL_PATH)"
+  displayName: Build and install C++ dependencies
+  condition: or(ne(variables['DEPS_INSTALL_CACHE_RESTORED'], 'true'), ne(variables['VCPKG_CACHE_RESTORED'], 'true'))
