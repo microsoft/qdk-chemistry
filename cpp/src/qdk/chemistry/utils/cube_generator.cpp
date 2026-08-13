@@ -180,25 +180,52 @@ std::vector<std::string> generate_orbital_cubes(
     const data::Wavefunction& wfn, const std::vector<std::size_t>& indices,
     const std::string& output_dir, const CubeGrid& grid,
     const std::string& prefix) {
-  CubeGenerator gen(wfn.get_orbitals()->get_basis_set());
-  const auto& C_a = wfn.get_orbitals()->coefficients()->block(
-      {data::axes::alpha(), data::axes::alpha()});
+  const auto orbitals = wfn.get_orbitals();
+  CubeGenerator gen(orbitals->get_basis_set());
+  const auto coeffs = orbitals->coefficients();
+  const auto& C_a = coeffs->block({data::axes::alpha(), data::axes::alpha()});
+  const bool restricted = orbitals->is_restricted();
   std::filesystem::create_directories(output_dir);
 
+  // Zero-based orbital numbering, consistent with the 0-based `indices`
+  // argument and the rest of qdk-chemistry (cf. coupled_cluster frozen-orbital
+  // indices and data/symmetry spin_channel_indices). Note this differs from
+  // the Python `cubegen.py` layer, which labels files 1-based.
+  auto index_string = [](std::size_t p) {
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%04zu", p);
+    return std::string(buf);
+  };
+
   std::vector<std::string> paths;
-  paths.reserve(indices.size());
+  paths.reserve(indices.size() * (restricted ? 1u : 2u));
+
+  auto emit = [&](const Eigen::VectorXd& coeff, const std::string& filename,
+                  const std::string& comment) {
+    auto path = (std::filesystem::path(output_dir) / filename).string();
+    gen.orbital(coeff, path, grid, comment);
+    paths.push_back(std::move(path));
+  };
+
   for (auto p : indices) {
     if (std::size_t(C_a.cols()) <= p)
       throw std::out_of_range("generate_orbital_cubes: index OOB.");
-    const auto filename = prefix + [&] {
-      char index[32];
-      std::snprintf(index, sizeof(index), "%04zu.cube", p);
-      return std::string(index);
-    }();
-    auto path = (std::filesystem::path(output_dir) / filename).string();
-    gen.orbital(C_a.col(p), path, grid,
-                "Orbital " + std::to_string(p) + " (alpha)");
-    paths.push_back(std::move(path));
+    const auto stem = prefix + index_string(p);
+    // Restricted: a single spatial cube with no spin suffix. Unrestricted:
+    // separate alpha (`_a`) and beta (`_b`) cubes, mirroring `cubegen.py`.
+    if (restricted) {
+      emit(C_a.col(p), stem + ".cube",
+           "Orbital " + std::to_string(p) + " (alpha)");
+    } else {
+      const auto& C_b =
+          coeffs->block({data::axes::beta(), data::axes::beta()});
+      if (std::size_t(C_b.cols()) <= p)
+        throw std::out_of_range("generate_orbital_cubes: index OOB.");
+      emit(C_a.col(p), stem + "_a.cube",
+           "Orbital " + std::to_string(p) + " (alpha)");
+      emit(C_b.col(p), stem + "_b.cube",
+           "Orbital " + std::to_string(p) + " (beta)");
+    }
   }
   return paths;
 }

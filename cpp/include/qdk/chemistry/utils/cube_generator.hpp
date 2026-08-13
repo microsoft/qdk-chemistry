@@ -49,6 +49,12 @@ class CubeGenerator {
   std::unique_ptr<Impl> _impl;
 };
 
+// Writes one cube file per requested orbital into `output_dir`, returning the
+// paths written. Orbital `indices` are zero-based, matching the numbering used
+// throughout qdk-chemistry, and the emitted file names embed that same
+// zero-based index (`<label_prefix>%04zu`). For restricted wavefunctions a
+// single spatial cube is written per index (no spin suffix); for unrestricted
+// wavefunctions the alpha and beta channels are written as `_a`/`_b` cubes.
 std::vector<std::string> generate_orbital_cubes(
     const data::Wavefunction&, const std::vector<std::size_t>& indices,
     const std::string& output_dir, const CubeGrid& grid,
