@@ -20,7 +20,7 @@
 #include <mutex>
 #include <qdk/chemistry/utils/logger.hpp>
 
-#if !defined(_MSC_VER) || defined(__clang__)
+#if !defined(_WIN32)
 #include <dlfcn.h>
 #endif
 
@@ -28,13 +28,10 @@ namespace qdk::chemistry::scf::impl {
 
 namespace {
 
-// MSVC always links against OpenBLAS, so these can be ordinary, always-
-// linked externs there. Elsewhere the BLAS backend isn't guaranteed to be
-// OpenBLAS (e.g. Accelerate on macOS), and neither ELF `weak` nor Mach-O
-// `weak_import` make a symbol optional when nothing in the link line
-// provides it at all -- so we resolve it at runtime via dlsym instead,
-// which never requires the symbol to exist at link time.
-#if defined(_MSC_VER) && !defined(__clang__)
+// Windows builds always link OpenBLAS, so use its symbols directly.
+// Other platforms may use a different BLAS backend; resolve the optional
+// OpenBLAS thread-control symbols at runtime to avoid a link-time dependency.
+#if defined(_WIN32)
 extern "C" {
 void openblas_set_num_threads(int);
 int openblas_get_num_threads(void);
