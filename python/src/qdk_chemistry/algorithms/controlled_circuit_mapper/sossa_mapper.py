@@ -282,7 +282,7 @@ class SOSSAMapper(ControlledCircuitMapper):
         )
 
     def num_ancilla_qubits(self, container: SOSSAWalkContainer) -> int:
-        """The number of ancillary qubits used by external algorithms like phase estimation."""
+        """The number of ancilla qubits used by external algorithms like phase estimation."""
         regs = self._compute_register_sizes(container)
         num_spin_qubits = 2  # spinDQ + spinSF, matches Q# SOSSAWalk.qs
         return regs["num_outer_qubits"] + regs["num_inner_qubits"] + num_spin_qubits + regs["num_phase_gradient_qubits"]

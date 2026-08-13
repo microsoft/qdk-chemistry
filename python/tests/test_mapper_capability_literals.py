@@ -68,8 +68,8 @@ _PROBE_ARITIES = {"hasattr": (2,), "getattr": (2, 3)}
 
 # The builder has carried two capability probes since the dispatch was introduced.  This is
 # a floor on how many the scan can still *see*, not an inventory of which ones exist: it
-# names no capability and so takes no position on the pending ``ancilla``/``ancillary``
-# spelling.  See ``test_capability_probe_coverage_has_not_shrunk`` for why it is a count.
+# names no capability, so renaming one cannot move it.  See
+# ``test_capability_probe_coverage_has_not_shrunk`` for why it is a count.
 _MIN_CAPABILITY_PROBES = 2
 
 _SRC = Path(__file__).parent.parent / "src" / "qdk_chemistry" / "algorithms"
@@ -232,9 +232,9 @@ def test_no_capability_probe_escapes_the_scanner() -> None:
     ``test_capability_probe_coverage_has_not_shrunk``, which fails on everything it failed
     on and on the partial losses it missed.)
 
-    Rather than pinning the capability names, which would take a position on the pending
-    ``ancilla``/``ancillary`` spelling this module deliberately stays neutral on, this pins
-    *coverage*: no capability-dispatch call may hide from the scan.  Renaming a local from
+    Rather than pinning the capability names -- which would make this module an authority on
+    spelling rather than on structure -- this pins *coverage*: no capability-dispatch call may
+    hide from the scan.  Renaming a local from
     ``circuit_mapper`` to ``impl``, or swapping ``hasattr`` for an equivalent
     ``getattr(..., None)``, then fails here instead of quietly shrinking the parametrised
     set.
@@ -269,8 +269,9 @@ def test_capability_probe_coverage_has_not_shrunk() -> None:
     Enumerating more forms cannot close this -- the next refactor invents the next form.
     So this asserts a *magnitude* instead: however a probe is written, a probe the scan
     cannot see is one it does not count.  That also makes the check neutral on naming,
-    unlike pinning the discovered set, which would fail on a complete and correct rename
-    and so cast a vote on the pending ``ancilla``/``ancillary`` decision.
+    unlike pinning the discovered set, which would fail on a complete and correct rename.
+    The ``num_ancillary_qubits`` -> ``num_ancilla_qubits`` rename exercised exactly that:
+    every test here passed unchanged on both sides of it.
 
     It is a floor rather than an equality so that adding a capability is not a failure.
     When the count legitimately drops -- because the merged builder adopts the
@@ -397,10 +398,15 @@ def test_recorded_providers_still_define_every_probed_capability(capability: str
 
     A recorded set is the right instrument only because it is recorded over *classes*.
     ``test_capability_probe_coverage_has_not_shrunk`` explains why pinning the discovered
-    *names* would be wrong: it would fail on a complete and correct rename and so cast a
-    vote on the pending ``ancilla``/``ancillary`` decision.  The capability strings here
-    come from ``_capability_probes()``, so a rename applied consistently flows through and
-    this stays green -- it constrains *who* provides, never *what it is called*.
+    *names* would be wrong: it would fail on a complete and correct rename.  The capability
+    strings here come from ``_capability_probes()``, so a rename applied consistently flows
+    through and this stays green -- it constrains *who* provides, never *what it is called*.
+
+    That distinction was load-bearing, not hypothetical.  ``num_ancillary_qubits`` became
+    ``num_ancilla_qubits`` in ``26121952e``, moving the probe and both definitions together,
+    and this module passed on both sides.  The case it exists to catch is the *half*-applied
+    one: the sole definition lives in a file that conflicts with #617 while the probe does
+    not, so a merge resolution can drop the provider and leave the probe live.
 
     It is a floor, not an equality: a new mapper that also provides the capability is not a
     failure.  When a mapper legitimately stops providing one, remove it from
