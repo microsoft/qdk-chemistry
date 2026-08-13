@@ -193,13 +193,11 @@ TEST(CubeGeneratorTest, RejectsUnsupportedShells) {
 TEST(GenerateOrbitalCubesTest, RestrictedWritesSingleZeroBasedCube) {
   const auto wavefunction = make_restricted_wavefunction();
   const auto output_dir =
-      std::filesystem::temp_directory_path() /
-      "qdk_cube_restricted_test";
+      std::filesystem::temp_directory_path() / "qdk_cube_restricted_test";
   std::filesystem::remove_all(output_dir);
 
-  const auto paths = generate_orbital_cubes(*wavefunction, {0},
-                                            output_dir.string(),
-                                            single_point_grid());
+  const auto paths = generate_orbital_cubes(
+      *wavefunction, {0}, output_dir.string(), single_point_grid());
 
   ASSERT_EQ(paths.size(), 1u);
   // Zero-based label (index 0 -> 0000), and no spin suffix for restricted.
@@ -216,13 +214,11 @@ TEST(GenerateOrbitalCubesTest, UnrestrictedWritesAlphaAndBetaCubes) {
   ASSERT_FALSE(wavefunction->get_orbitals()->is_restricted());
 
   const auto output_dir =
-      std::filesystem::temp_directory_path() /
-      "qdk_cube_unrestricted_test";
+      std::filesystem::temp_directory_path() / "qdk_cube_unrestricted_test";
   std::filesystem::remove_all(output_dir);
 
-  const auto paths = generate_orbital_cubes(*wavefunction, {0},
-                                            output_dir.string(),
-                                            single_point_grid());
+  const auto paths = generate_orbital_cubes(
+      *wavefunction, {0}, output_dir.string(), single_point_grid());
 
   ASSERT_EQ(paths.size(), 2u);
   EXPECT_EQ(std::filesystem::path(paths[0]).filename().string(),

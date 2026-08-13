@@ -217,8 +217,7 @@ std::vector<std::string> generate_orbital_cubes(
       emit(C_a.col(p), stem + ".cube",
            "Orbital " + std::to_string(p) + " (alpha)");
     } else {
-      const auto& C_b =
-          coeffs->block({data::axes::beta(), data::axes::beta()});
+      const auto& C_b = coeffs->block({data::axes::beta(), data::axes::beta()});
       if (std::size_t(C_b.cols()) <= p)
         throw std::out_of_range("generate_orbital_cubes: index OOB.");
       emit(C_a.col(p), stem + "_a.cube",
