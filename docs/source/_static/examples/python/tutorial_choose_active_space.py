@@ -569,6 +569,7 @@ def generate_active_orbital_cube_data(
             grid_size=grid_size,
             margin=margin,
             indices=result.valence_indices,
+            label_maker=lambda index: f"orbital_{index:04d}",
         ),
     )
 
