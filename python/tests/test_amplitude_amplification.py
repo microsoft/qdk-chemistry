@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import itertools
 import math
 
 import numpy as np
@@ -348,17 +349,17 @@ def test_run_rejects_an_unusable_target_energy(target_energy, message):
 
 
 @pytest.mark.parametrize(
-    ("container", "target_energy"),
+    ("container", "target_energy", "message"),
     [
-        pytest.param(_walk_container(), 2.0, id="walk-above-band"),
-        pytest.param(_walk_container(), -2.0, id="walk-below-band"),
-        pytest.param(_trotter_container(), 4.0, id="trotter-above-range"),
-        pytest.param(_trotter_container(), -4.0, id="trotter-below-range"),
+        pytest.param(_walk_container(), 2.0, "outside the band", id="walk-above-band"),
+        pytest.param(_walk_container(), -2.0, "outside the band", id="walk-below-band"),
+        pytest.param(_trotter_container(), 4.0, "aliases", id="trotter-above-range"),
+        pytest.param(_trotter_container(), -4.0, "aliases", id="trotter-below-range"),
     ],
 )
-def test_energy_the_encoding_cannot_represent_is_rejected(container, target_energy):
+def test_energy_the_encoding_cannot_represent_is_rejected(container, target_energy, message):
     """No phase carries an energy off the encoded range, so the bound is refused, not clamped."""
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=message):
         QPESubspaceMarking._marked_phase_bins(target_energy, container, num_phase_qubits=4)
 
 
@@ -405,7 +406,7 @@ def test_marked_bins_hold_exactly_the_energies_above_the_target(container, energ
         # Sorted, non-empty and separated by at least one bin, so the ranges cannot double-flip
         # the flag: MarkPhaseRanges applies each one independently.
         assert all(start < stop for start, stop in bins), context
-        assert all(previous[1] < following[0] for previous, following in zip(bins, bins[1:], strict=False)), context
+        assert all(previous[1] < following[0] for previous, following in itertools.pairwise(bins)), context
 
 
 def test_amplified_circuit_exposes_a_measurement_free_operation():
