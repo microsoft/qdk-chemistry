@@ -177,29 +177,11 @@ elseif(_qdk_blas_link_libs)
     QDK_CHEMISTRY_BLAS_LINKS_NVPL)
 endif()
 
-# A dispatch layer can expose more than one of these APIs, so keep exactly one:
-# the backend CMake reported as the vendor, else the first one that links.
-set(_qdk_blas_backends OPENBLAS INTELMKL BLIS FLEXIBLAS NVPL)
-if(QDK_CHEMISTRY_BLAS_VENDOR STREQUAL "OpenBLAS")
-  set(_qdk_blas_preferred OPENBLAS)
-elseif(QDK_CHEMISTRY_BLAS_VENDOR STREQUAL "IntelMKL")
-  set(_qdk_blas_preferred INTELMKL)
-elseif(QDK_CHEMISTRY_BLAS_VENDOR STREQUAL "BLIS")
-  set(_qdk_blas_preferred BLIS)
-elseif(QDK_CHEMISTRY_BLAS_VENDOR STREQUAL "FlexiBLAS")
-  set(_qdk_blas_preferred FLEXIBLAS)
-elseif(QDK_CHEMISTRY_BLAS_VENDOR STREQUAL "NVPL")
-  set(_qdk_blas_preferred NVPL)
-else()
-  set(_qdk_blas_preferred "")
-endif()
-if(_qdk_blas_preferred)
-  list(REMOVE_ITEM _qdk_blas_backends ${_qdk_blas_preferred})
-  list(INSERT _qdk_blas_backends 0 ${_qdk_blas_preferred})
-endif()
-
+# config.h.in must end up with at most one backend, but a dispatch layer can
+# also expose its backend's API. Ask the dispatcher first; the remaining
+# backends are mutually exclusive in practice.
 set(_qdk_blas_thread_api "none (runtime lookup only)")
-foreach(_qdk_blas_backend IN LISTS _qdk_blas_backends)
+foreach(_qdk_blas_backend FLEXIBLAS OPENBLAS INTELMKL BLIS NVPL)
   if(_qdk_blas_thread_api STREQUAL "none (runtime lookup only)"
      AND QDK_CHEMISTRY_BLAS_LINKS_${_qdk_blas_backend})
     set(_qdk_blas_thread_api "${_qdk_blas_backend}")

@@ -11,7 +11,6 @@
 #include <qdk/chemistry/scf/config.h>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <string>
-#include <vector>
 
 #if defined(_WIN32)
 // Keep windows.h from pulling in unrelated headers and from defining the
@@ -71,6 +70,15 @@ namespace {
 #if !defined(QDK_CHEMISTRY_BLAS_VENDOR)
 #define QDK_CHEMISTRY_BLAS_VENDOR ""
 #endif
+
+/**
+ * @brief BLAS vendor reported by CMake at configure time (may be empty).
+ *
+ * This is the raw `BLAS_VENDOR` string from the linalg-cmake-modules search
+ * (e.g. "OpenBLAS", "IntelMKL", "BLIS", "ReferenceBLAS"). Used to order the
+ * runtime probes and to make the log messages actionable.
+ */
+std::string configured_blas_vendor() { return QDK_CHEMISTRY_BLAS_VENDOR; }
 
 /**
  * @brief Look up an optional symbol in the current process.
@@ -220,22 +228,6 @@ BlasThreadApi try_nvpl() {
           [set_fn](int n) { set_fn(n); }};
 }
 
-/**
- * @brief Map the configure-time CMake `BLAS_VENDOR` string onto a vendor.
- *
- * Used to decide which thread-control API to look for first when nothing was
- * bound at link time and several BLAS-like libraries may be loaded.
- */
-BlasVendor vendor_from_configuration() {
-  const std::string vendor = configured_blas_vendor();
-  if (vendor == "OpenBLAS") return BlasVendor::OpenBLAS;
-  if (vendor == "IntelMKL") return BlasVendor::IntelMKL;
-  if (vendor == "BLIS") return BlasVendor::BLIS;
-  if (vendor == "FlexiBLAS") return BlasVendor::FlexiBLAS;
-  if (vendor == "NVPL") return BlasVendor::NVPL;
-  return BlasVendor::Unknown;
-}
-
 const BlasThreadApi& blas_thread_api() {
   static const BlasThreadApi api = [] {
     // Prefer the API bound at link time: that BLAS is by construction the one
@@ -250,22 +242,12 @@ const BlasThreadApi& blas_thread_api() {
       return linked;
     }
 
+    // Same fixed order as the CMake probe: a dispatch layer can also expose
+    // its backend's API, so ask the dispatcher first; the rest are mutually
+    // exclusive in practice.
     using Probe = BlasThreadApi (*)();
-    std::vector<Probe> probes = {try_openblas, try_mkl, try_blis,
-                                 try_flexiblas, try_nvpl};
-
-    // Probe the backend selected at configure time first, so that builds
-    // linking several BLAS-like libraries control the intended one.
-    switch (vendor_from_configuration()) {
-      case BlasVendor::OpenBLAS: probes.insert(probes.begin(), try_openblas); break;
-      case BlasVendor::IntelMKL: probes.insert(probes.begin(), try_mkl); break;
-      case BlasVendor::BLIS: probes.insert(probes.begin(), try_blis); break;
-      case BlasVendor::FlexiBLAS: probes.insert(probes.begin(), try_flexiblas); break;
-      case BlasVendor::NVPL: probes.insert(probes.begin(), try_nvpl); break;
-      case BlasVendor::Unknown: break;
-    }
-
-    for (const Probe probe : probes) {
+    for (const Probe probe :
+         {try_flexiblas, try_openblas, try_mkl, try_blis, try_nvpl}) {
       BlasThreadApi api = probe();
       if (api.valid()) {
         QDK_LOGGER().debug(
@@ -322,20 +304,9 @@ const char* to_string(BlasVendor vendor) {
 
 BlasVendor detected_blas_vendor() { return blas_thread_api().vendor; }
 
-std::string configured_blas_vendor() { return QDK_CHEMISTRY_BLAS_VENDOR; }
-
-bool blas_thread_control_available() { return blas_thread_api().valid(); }
-
 int get_blas_num_threads() {
   const BlasThreadApi& api = blas_thread_api();
   return api.valid() ? api.get_num_threads() : 0;
-}
-
-bool set_blas_num_threads(int num_threads) {
-  const BlasThreadApi& api = blas_thread_api();
-  if (!api.valid() || num_threads < 1) return false;
-  api.set_num_threads(num_threads);
-  return true;
 }
 
 ScopedBlasThreads::ScopedBlasThreads(int num_threads) {

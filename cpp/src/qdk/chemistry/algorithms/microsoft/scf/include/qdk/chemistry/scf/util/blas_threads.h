@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include <string>
-
 namespace qdk::chemistry::scf::util {
 
 /**
@@ -24,41 +22,28 @@ enum class BlasVendor {
 const char* to_string(BlasVendor vendor);
 
 /**
- * @brief BLAS vendor detected at runtime (resolved once, on first use).
+ * @brief BLAS backend whose thread count this build controls (resolved once,
+ * on first use).
  *
- * Detection is based on which vendor specific thread-control symbols are
- * present in the process. The BLAS vendor selected at configure time
- * (@ref configured_blas_vendor) is probed first so that, when a build links
- * against more than one BLAS-like library, we control the one actually in use.
+ * The backend is bound at link time where CMake could probe one, and looked
+ * up in the running process otherwise.
  *
- * @return The detected vendor, or BlasVendor::Unknown when no supported
- *         thread-control API is available.
+ * @return The bound vendor, or BlasVendor::Unknown when no supported
+ *         thread-control API is available, in which case ScopedBlasThreads is
+ *         a no-op.
  */
 BlasVendor detected_blas_vendor();
 
 /**
- * @brief BLAS vendor reported by CMake at configure time (may be empty).
- *
- * This is the raw `BLAS_VENDOR` string from the linalg-cmake-modules search
- * (e.g. "OpenBLAS", "IntelMKL", "BLIS", "ReferenceBLAS").
- */
-std::string configured_blas_vendor();
-
-/// @brief Whether the current BLAS exposes a thread-count API.
-bool blas_thread_control_available();
-
-/**
  * @brief Current BLAS thread count.
+ *
+ * Exposed for diagnostics and to let tests verify that ScopedBlasThreads
+ * pins and restores the count; production code should use ScopedBlasThreads
+ * rather than managing the count itself.
+ *
  * @return Number of threads, or 0 if the BLAS backend cannot report it.
  */
 int get_blas_num_threads();
-
-/**
- * @brief Set the BLAS thread count.
- * @param num_threads Requested thread count (must be >= 1).
- * @return true if the request was forwarded to the BLAS backend.
- */
-bool set_blas_num_threads(int num_threads);
 
 /**
  * @brief RAII guard that pins BLAS to a fixed thread count while active and

@@ -598,22 +598,22 @@ TEST(AtomGuessTest, CompareWithFileGuess) {
 TEST(BlasThreadsTest, DetectionIsConsistent) {
   using namespace qdk::chemistry::scf::util;
 
-  const bool available = blas_thread_control_available();
-  EXPECT_EQ(available, detected_blas_vendor() != BlasVendor::Unknown);
-  EXPECT_NE(to_string(detected_blas_vendor()), nullptr);
+  const BlasVendor vendor = detected_blas_vendor();
+  EXPECT_NE(to_string(vendor), nullptr);
 
-  if (available) {
-    EXPECT_GT(get_blas_num_threads(), 0);
-  } else {
-    GTEST_SKIP() << "No BLAS thread-control API available (configured vendor: '"
-                 << configured_blas_vendor() << "')";
+  if (vendor == BlasVendor::Unknown) {
+    // Legal (e.g. macOS Accelerate exposes no thread-count API); the guard
+    // then degrades to a no-op.
+    EXPECT_EQ(get_blas_num_threads(), 0);
+    GTEST_SKIP() << "No BLAS thread-control API available";
   }
+  EXPECT_GT(get_blas_num_threads(), 0);
 }
 
 TEST(BlasThreadsTest, ScopedGuardPinsAndRestores) {
   using namespace qdk::chemistry::scf::util;
 
-  if (!blas_thread_control_available()) {
+  if (detected_blas_vendor() == BlasVendor::Unknown) {
     GTEST_SKIP() << "No BLAS thread-control API available";
   }
 
@@ -636,19 +636,18 @@ TEST(BlasThreadsTest, ScopedGuardPinsAndRestores) {
   EXPECT_EQ(get_blas_num_threads(), original);
 }
 
-TEST(BlasThreadsTest, SetNumThreadsRejectsInvalidCounts) {
+TEST(BlasThreadsTest, GuardIgnoresInvalidThreadCounts) {
   using namespace qdk::chemistry::scf::util;
 
-  EXPECT_FALSE(set_blas_num_threads(0));
-  EXPECT_FALSE(set_blas_num_threads(-1));
-
-  if (!blas_thread_control_available()) {
+  if (detected_blas_vendor() == BlasVendor::Unknown) {
     GTEST_SKIP() << "No BLAS thread-control API available";
   }
 
   const int original = get_blas_num_threads();
-  EXPECT_TRUE(set_blas_num_threads(1));
-  EXPECT_EQ(get_blas_num_threads(), 1);
-  EXPECT_TRUE(set_blas_num_threads(original));
+  {
+    ScopedBlasThreads guard(0);
+    EXPECT_FALSE(guard.active());
+    EXPECT_EQ(get_blas_num_threads(), original);
+  }
   EXPECT_EQ(get_blas_num_threads(), original);
 }
