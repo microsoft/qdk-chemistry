@@ -810,7 +810,7 @@ def _register_python_algorithms():
     This function is automatically called during module import and should not
     be called by users.
     """
-    from qdk_chemistry.algorithms.amplitude_amplification import (  # noqa: PLC0415
+    from qdk_chemistry.algorithms.amplitude_amplification.amplitude_amplification import (  # noqa: PLC0415
         AmplitudeAmplification,
     )
     from qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace import QPESubspaceMarking  # noqa: PLC0415

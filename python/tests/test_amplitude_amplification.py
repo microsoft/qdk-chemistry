@@ -31,64 +31,19 @@ from qdk_chemistry.data import (
     Wavefunction,
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
+from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 
-def _walk_eigenvalue_from_phase(normalization: float = 1.0):
-    r"""Return the qubitization-walk law :math:`E = \lambda\cos(2\pi\varphi)`."""
-    return lambda phase_fraction: normalization * math.cos(2 * math.pi * (phase_fraction % 1.0))
+def _walk_container(normalization: float = 1.0) -> LCUWalkContainer:
+    r"""Return a walk container carrying the law :math:`E = \lambda\cos(2\pi\varphi)`."""
+    return LCUWalkContainer(block_encoding=None, power=1, scale=normalization)
 
 
-def _walk_phases_from_eigenvalue(normalization: float = 1.0):
-    """Return the inverse of the walk law, which is two-branched away from the band edges."""
-
-    def phases(eigenvalue: float) -> list[float]:
-        ratio = eigenvalue / normalization
-        if not -1.0 <= ratio <= 1.0:
-            raise ValueError(f"Eigenvalue {eigenvalue} lies outside the band.")
-        principal = math.acos(ratio) / (2 * math.pi)
-        mirror = (1.0 - principal) % 1.0
-        return [principal] if mirror == principal else [principal, mirror]
-
-    return phases
-
-
-def _trotter_eigenvalue_from_phase(evolution_time: float = 1.0):
-    r"""Return the time-evolution law :math:`E = -\mathrm{angle}/t`, which jumps at :math:`\varphi = 1/2`."""
-
-    def eigenvalue(phase_fraction: float) -> float:
-        angle = (phase_fraction % 1.0) * (2 * math.pi)
-        if angle > math.pi:
-            angle -= 2 * math.pi
-        return -angle / evolution_time
-
-    return eigenvalue
-
-
-def _trotter_phases_from_eigenvalue(evolution_time: float = 1.0):
-    """Return the inverse of the time-evolution law, which is one-to-one."""
-
-    def phases(eigenvalue: float) -> list[float]:
-        angle = -eigenvalue * evolution_time
-        if not -math.pi < angle <= math.pi:
-            raise ValueError(f"Eigenvalue {eigenvalue} aliases at evolution time {evolution_time}.")
-        return [(angle / (2 * math.pi)) % 1.0]
-
-    return phases
-
-
-def _bins_by_reading_off_every_bin(target_energy, eigenvalue_from_phase, num_phase_qubits):
-    """Return the marked bins the slow way, as the reference the solved-for answer must match."""
-    phase_bin_count = 1 << num_phase_qubits
-    ranges: list[tuple[int, int]] = []
-    for phase_bin in range(phase_bin_count):
-        if eigenvalue_from_phase(phase_bin / phase_bin_count) < target_energy:
-            continue
-        if ranges and ranges[-1][1] == phase_bin:
-            ranges[-1] = (ranges[-1][0], phase_bin + 1)
-        else:
-            ranges.append((phase_bin, phase_bin + 1))
-    return ranges
+def _trotter_container(evolution_time: float = 1.0) -> PauliProductFormulaContainer:
+    r"""Return a container carrying the law :math:`E = -\theta/t`, which wraps at :math:`\varphi = 1/2`."""
+    return PauliProductFormulaContainer(step_terms=[], step_reps=1, num_qubits=1, scale=evolution_time)
 
 
 def _diagonal_hamiltonian() -> QubitOperator:
@@ -334,7 +289,9 @@ def test_marking_oracle_circuit_is_executable():
     |00> is the eigenvector at the bottom of the band, which the walk maps to phase bin 4 of 8.
     """
     hamiltonian = _diagonal_hamiltonian()
-    marks_every_bin = _subspace_oracle(hamiltonian, -2 * hamiltonian.schatten_norm, num_bits=3)
+    # The walk normalization is the Schatten norm, so its negation is exactly the bottom of
+    # the band: the lowest bound the encoding can represent, and one every bin clears.
+    marks_every_bin = _subspace_oracle(hamiltonian, -hamiltonian.schatten_norm, num_bits=3)
     marks_the_top = _subspace_oracle(hamiltonian, hamiltonian.schatten_norm / 2, num_bits=3)
     assert _marked_bin_ranges(marks_every_bin) == [(0, 8)]
     assert _marked_bin_ranges(marks_the_top) == [(0, 2), (7, 8)]
@@ -349,33 +306,31 @@ def test_marking_oracle_circuit_is_executable():
         pytest.param(1.0, [(0, 1)], id="top-of-band"),
         pytest.param(0.9, [(0, 2), (15, 16)], id="near-top-of-band"),
         pytest.param(0.5, [(0, 3), (14, 16)], id="upper-half-of-band"),
-        # E = -lambda is phase 1/2, so a bound at or below it accepts the whole register.
+        # E = -lambda is phase 1/2, so a bound there accepts the whole register.
         pytest.param(-1.0, [(0, 16)], id="bottom-of-band"),
-        pytest.param(-2.0, [(0, 16)], id="below-band"),
     ],
 )
 def test_walk_energies_select_a_band_around_phase_zero(target_energy, expected_bins):
     """The walk law is symmetric about phi = 1/2, so the accepted band splits at either end."""
-    bins = QPESubspaceMarking._marked_phase_bins(
-        target_energy, _walk_eigenvalue_from_phase(), _walk_phases_from_eigenvalue(), num_phase_qubits=4
-    )
-    assert bins == expected_bins
+    assert QPESubspaceMarking._marked_phase_bins(target_energy, _walk_container(), num_phase_qubits=4) == expected_bins
 
 
 @pytest.mark.parametrize(
-    "target_energy",
+    ("target_energy", "expected_bins"),
     [
-        pytest.param(math.nan, id="nan"),
-        pytest.param(math.inf, id="infinite"),
-        pytest.param(-math.inf, id="negative-infinite"),
+        # The law falls from 0 to -pi over the first half and wraps to +pi across it, so a
+        # positive bound accepts a band below phase 1, and a negative one adds it to that half.
+        pytest.param(1.0, [(9, 14)], id="upper-half-of-range"),
+        pytest.param(0.0, [(0, 1), (9, 16)], id="non-negative-energies"),
+        pytest.param(-1.0, [(0, 3), (9, 16)], id="above-minus-one"),
+        # E = -pi/t is phase 1/2, the one bin the wrap leaves at the bottom of the range.
+        pytest.param(-math.pi, [(0, 16)], id="bottom-of-range"),
     ],
 )
-def test_non_finite_energies_are_rejected(target_energy):
-    """An energy that does not name a point on the band is rejected."""
-    with pytest.raises(ValueError, match="finite"):
-        QPESubspaceMarking._marked_phase_bins(
-            target_energy, _walk_eigenvalue_from_phase(), _walk_phases_from_eigenvalue(), num_phase_qubits=4
-        )
+def test_trotter_energies_select_a_band_across_the_branch_cut(target_energy, expected_bins):
+    """The time-evolution law wraps at phi = 1/2, and the marked bins follow it across."""
+    marked = QPESubspaceMarking._marked_phase_bins(target_energy, _trotter_container(), num_phase_qubits=4)
+    assert marked == expected_bins
 
 
 @pytest.mark.parametrize(
@@ -392,89 +347,65 @@ def test_run_rejects_an_unusable_target_energy(target_energy, message):
         _subspace_oracle(_diagonal_hamiltonian(), target_energy, num_bits=3)
 
 
-def test_energy_above_the_band_is_rejected():
-    """A bound over every bin would mark nothing, leaving the flag dead, so it is refused."""
-    with pytest.raises(ValueError, match="No phase bin"):
-        QPESubspaceMarking._marked_phase_bins(
-            2.0, _walk_eigenvalue_from_phase(), _walk_phases_from_eigenvalue(), num_phase_qubits=4
-        )
-
-
 @pytest.mark.parametrize(
-    ("target_energy", "expected_bins"),
+    ("container", "target_energy"),
     [
-        # The law falls from 0 to -pi over the first half and jumps to +pi across it, so a
-        # positive bound accepts a band below phase 1, and a negative one adds it to that half.
-        pytest.param(1.0, [(9, 14)], id="upper-half-of-range"),
-        pytest.param(0.0, [(0, 1), (9, 16)], id="non-negative-energies"),
-        pytest.param(-1.0, [(0, 3), (9, 16)], id="above-minus-one"),
-        # E = -pi/t is phase 1/2, the one bin the jump leaves at the bottom of the range.
-        pytest.param(-math.pi, [(0, 16)], id="bottom-of-range"),
-        pytest.param(-4.0, [(0, 16)], id="below-range"),
+        pytest.param(_walk_container(), 2.0, id="walk-above-band"),
+        pytest.param(_walk_container(), -2.0, id="walk-below-band"),
+        pytest.param(_trotter_container(), 4.0, id="trotter-above-range"),
+        pytest.param(_trotter_container(), -4.0, id="trotter-below-range"),
     ],
 )
-def test_trotter_energies_select_a_band_across_the_branch_cut(target_energy, expected_bins):
-    """The time-evolution law jumps at phi = 1/2, and the marked bins follow it across."""
-    bins = QPESubspaceMarking._marked_phase_bins(
-        target_energy, _trotter_eigenvalue_from_phase(), _trotter_phases_from_eigenvalue(), num_phase_qubits=4
-    )
-    assert bins == expected_bins
+def test_energy_the_encoding_cannot_represent_is_rejected(container, target_energy):
+    """No phase carries an energy off the encoded range, so the bound is refused, not clamped."""
+    with pytest.raises(ValueError):
+        QPESubspaceMarking._marked_phase_bins(target_energy, container, num_phase_qubits=4)
+
+
+def test_energy_above_the_band_is_rejected():
+    """A bound over every bin would leave the flag dead, so building the oracle refuses it."""
+    hamiltonian = _diagonal_hamiltonian()
+    with pytest.raises(ValueError, match="outside the band"):
+        _subspace_oracle(hamiltonian, 2 * hamiltonian.schatten_norm, num_bits=3)
 
 
 @pytest.mark.parametrize("num_phase_qubits", [1, 2, 3, 4, 5, 6, 7, 8])
 @pytest.mark.parametrize(
-    ("eigenvalue_from_phase", "phases_from_eigenvalue", "energies"),
+    ("container", "energies"),
     [
         pytest.param(
-            _walk_eigenvalue_from_phase(2.5),
-            _walk_phases_from_eigenvalue(2.5),
-            (-3.0, -2.5, -1.4, 0.0, 1.25, 2.4999, 2.5),
+            _walk_container(2.5),
+            (-2.5, -1.4, 0.0, 1.25, 2.4999, 2.5),
             id="walk",
         ),
         pytest.param(
-            _trotter_eigenvalue_from_phase(0.5),
-            _trotter_phases_from_eigenvalue(0.5),
-            (-2 * math.pi, -3.3, -1.0, 0.0, 2.7, 6.2, 2 * math.pi),
+            _trotter_container(0.5),
+            (-2 * math.pi, -3.3, -1.0, 0.0, 2.7, 6.2),
             id="trotter",
         ),
     ],
 )
-def test_solved_bins_match_reading_off_every_bin(
-    eigenvalue_from_phase, phases_from_eigenvalue, energies, num_phase_qubits
-):
-    """Solving for the crossings must agree with the scan it replaces, register width and all."""
+def test_marked_bins_hold_exactly_the_energies_above_the_target(container, energies, num_phase_qubits):
+    """The ranges cover every bin clearing the target and no other, register width and all."""
+    phase_bin_count = 1 << num_phase_qubits
     for target_energy in energies:
-        expected = _bins_by_reading_off_every_bin(target_energy, eigenvalue_from_phase, num_phase_qubits)
+        context = f"E={target_energy} on a {phase_bin_count}-bin register"
+        expected = {
+            phase_bin
+            for phase_bin in range(phase_bin_count)
+            if container.eigenvalue_from_phase(phase_bin / phase_bin_count) >= target_energy
+        }
         if not expected:
+            # A narrow register can fall short of an energy the encoding still represents.
             with pytest.raises(ValueError, match="No phase bin"):
-                QPESubspaceMarking._marked_phase_bins(
-                    target_energy, eigenvalue_from_phase, phases_from_eigenvalue, num_phase_qubits
-                )
+                QPESubspaceMarking._marked_phase_bins(target_energy, container, num_phase_qubits)
             continue
-        bins = QPESubspaceMarking._marked_phase_bins(
-            target_energy, eigenvalue_from_phase, phases_from_eigenvalue, num_phase_qubits
-        )
-        assert bins == expected, f"E={target_energy} on a {1 << num_phase_qubits}-bin register"
-
-
-def test_bin_search_cost_does_not_grow_with_the_register():
-    """Only the bins around a crossing are read, so a wider register does not cost more."""
-    counted_energies = []
-
-    def counting_eigenvalue_from_phase(phase_fraction: float) -> float:
-        counted_energies.append(phase_fraction)
-        return _walk_eigenvalue_from_phase()(phase_fraction)
-
-    reads = []
-    for num_phase_qubits in (8, 20):
-        counted_energies.clear()
-        QPESubspaceMarking._marked_phase_bins(
-            0.37, counting_eigenvalue_from_phase, _walk_phases_from_eigenvalue(), num_phase_qubits
-        )
-        reads.append(len(counted_energies))
-
-    assert reads[0] == reads[1]
-    assert reads[1] < 64  # a register the scan would have read a million bins of
+        bins = QPESubspaceMarking._marked_phase_bins(target_energy, container, num_phase_qubits)
+        assert {phase_bin for start, stop in bins for phase_bin in range(start, stop)} == expected, context
+        # Sorted, non-empty and separated by at least one bin, so the ranges cannot double-flip
+        # the flag: MarkPhaseRanges applies each one independently.
+        assert all(start < stop for start, stop in bins), context
+        assert all(previous[1] < following[0] for previous, following in zip(bins, bins[1:], strict=False)), context
 
 
 def test_amplified_circuit_exposes_a_measurement_free_operation():

@@ -121,11 +121,6 @@ class UnitaryContainer(DataClass):
         The closed-form inverse of :meth:`eigenvalue_from_phase`, so that
         ``eigenvalue_from_phase(phi) == eigenvalue`` for every ``phi`` returned.
 
-        The forward map need not be injective, so this returns *all* of the
-        phases carrying the eigenvalue, ascending and without repeats.  Solving
-        for them is what lets a caller find where on the phase circle an energy
-        condition changes, instead of evaluating the forward map bin by bin.
-
         Args:
             eigenvalue: The Hamiltonian eigenvalue :math:`E`.
 
@@ -138,27 +133,6 @@ class UnitaryContainer(DataClass):
                 represent, so that no phase corresponds to it.
 
         """
-
-    def phase_from_eigenvalue(self, eigenvalue: float) -> float:
-        r"""Recover the principal phase fraction a Hamiltonian eigenvalue is measured at.
-
-        The smallest phase :meth:`phases_from_eigenvalue` solves for, so the two
-        can never disagree.  Use it when an encoding is known to be injective, or
-        when any one of the phases carrying the eigenvalue will do.
-
-        Args:
-            eigenvalue: The Hamiltonian eigenvalue :math:`E`.
-
-        Returns:
-            float: The smallest phase fraction :math:`\varphi \in [0, 1)` QPE
-            measures the eigenvalue at.
-
-        Raises:
-            ValueError: If the eigenvalue lies outside the range the encoding can
-                represent, so that no phase corresponds to it.
-
-        """
-        return self.phases_from_eigenvalue(eigenvalue)[0]
 
     @abstractmethod
     def combine(self, other: "UnitaryContainer") -> "UnitaryContainer":

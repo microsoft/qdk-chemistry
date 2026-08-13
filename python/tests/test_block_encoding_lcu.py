@@ -367,39 +367,6 @@ class TestLCUContainer:
             atol=float_comparison_absolute_tolerance,
         )
 
-    def test_walk_container_phase_from_eigenvalue(self):
-        """LCUWalkContainer phase_from_eigenvalue inverts E = λ·cos(2πφ) in closed form."""
-        hamiltonian = QubitOperator(
-            pauli_strings=["XX", "ZZ"],
-            coefficients=np.array([0.25, 0.5]),
-        )
-        builder = LCUBuilder(quantum_walk=True)
-        container = builder.run(hamiltonian).get_container()
-        lam = container.scale
-
-        # The band edges sit at the ends of the principal branch.
-        assert np.isclose(container.phase_from_eigenvalue(lam), 0.0, atol=float_comparison_absolute_tolerance)
-        assert np.isclose(container.phase_from_eigenvalue(-lam), 0.5, atol=float_comparison_absolute_tolerance)
-        assert np.isclose(container.phase_from_eigenvalue(0.0), 0.25, atol=float_comparison_absolute_tolerance)
-
-        # Every energy in the band round-trips, and lands on the principal branch.
-        for energy in np.linspace(-lam, lam, 25):
-            phi = container.phase_from_eigenvalue(float(energy))
-            assert 0.0 <= phi <= 0.5
-            assert np.isclose(
-                container.eigenvalue_from_phase(phi),
-                energy,
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
-            )
-            # The walk is even about φ = 1/2, so the mirror phase carries it too.
-            assert np.isclose(
-                container.eigenvalue_from_phase(1.0 - phi),
-                energy,
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
-            )
-
     def test_walk_container_phases_from_eigenvalue_gives_both_branches(self):
         """The walk measures each energy inside the band at two phases, and the edges at one."""
         hamiltonian = QubitOperator(
@@ -417,7 +384,8 @@ class TestLCUContainer:
             phases = container.phases_from_eigenvalue(float(energy))
             assert len(phases) == 2
             assert phases == sorted(phases)
-            assert phases[0] == container.phase_from_eigenvalue(float(energy))
+            # The first phase is the principal branch, and the second its mirror about 1/2.
+            assert phases[0] <= 0.5
             assert np.isclose(phases[0] + phases[1], 1.0, atol=float_comparison_absolute_tolerance)
             for phi in phases:
                 assert 0.0 <= phi < 1.0
@@ -428,7 +396,7 @@ class TestLCUContainer:
                     atol=float_comparison_absolute_tolerance,
                 )
 
-    def test_walk_container_phase_from_eigenvalue_rejects_energies_off_the_band(self):
+    def test_walk_container_phases_from_eigenvalue_rejects_energies_off_the_band(self):
         """An energy the walk cannot encode has no phase, so it is refused."""
         hamiltonian = QubitOperator(
             pauli_strings=["XX", "ZZ"],
@@ -437,8 +405,6 @@ class TestLCUContainer:
         container = LCUBuilder(quantum_walk=True).run(hamiltonian).get_container()
         lam = container.scale
         for energy in (lam * 1.001, -lam * 1.001):
-            with pytest.raises(ValueError, match="outside the band"):
-                container.phase_from_eigenvalue(energy)
             with pytest.raises(ValueError, match="outside the band"):
                 container.phases_from_eigenvalue(energy)
 

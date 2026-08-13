@@ -148,12 +148,11 @@ QPE Subspace Marking Circuit Builder
 
 .. rubric:: Factory name: ``"qdk_qpe_subspace"``
 
-Unlike the two implementations above, this one does not build a circuit whose phase register is
-measured. It runs a standard phase estimation on the register it is handed, flips a flag qubit
+Unlike the two implementations above, this one is not used for phase estimation.
+It runs a standard phase estimation on the register it is handed, flips a flag qubit
 when the phase lands in a bin whose energy is at least ``target_energy``, then undoes the phase
 estimation, leaving the register as it was found. The result is a *good state oracle* for
-:doc:`AmplitudeAmplification <amplitude_amplification>`, used to amplify an eigenspace rather
-than to read out an energy.
+:doc:`AmplitudeAmplification <amplitude_amplification>`, used to amplify an eigenspace.
 
 ``run`` takes ``(state_preparation, qubit_hamiltonian)`` and
 returns a list of :class:`~qdk_chemistry.data.Circuit`, but the state preparation is ignored

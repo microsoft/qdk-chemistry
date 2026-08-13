@@ -24,17 +24,6 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     /// # Summary
     /// Flips `target` when the little-endian `phase` register holds a value in the
     /// half-open interval [`lowerBound`, `upperBound`).
-    ///
-    /// # Description
-    /// The window is validated rather than silently ignored: an empty or out-of-range interval
-    /// would mark no phase at all, which is indistinguishable from a correct oracle that simply
-    /// found no match, and so would surface much later as a failed amplification.
-    ///
-    /// Windows that reach either end of the register are specialised, because a comparison
-    /// against the first or last representable value is vacuously true. A window covering the
-    /// whole register costs a single `X`, one touching either end costs one comparison, and a
-    /// single-bin window is a plain controlled `X`; only an interior window needs the two
-    /// comparisons and two ancillas of the general case.
     operation MarkPhaseRange(
         lowerBound : Int,
         upperBound : Int,
