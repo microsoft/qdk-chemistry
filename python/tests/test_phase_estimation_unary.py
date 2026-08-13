@@ -16,14 +16,20 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.unary_phase_estim
 from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import (
     _select_dominant_decoded_phase,
 )
+from qdk_chemistry.utils.qsharp import get_qsharp_context
 
 _PAULI_X = np.array([[0.0, 1.0], [1.0, 0.0]], dtype=complex)
 _PAULI_Z = np.array([[1.0, 0.0], [0.0, -1.0]], dtype=complex)
 
 
 def _address_qubits(num_actions: int) -> int:
-    """Number of address qubits the Q# operations allocate for ``num_actions`` values."""
-    return int(np.ceil(np.log2(num_actions))) if num_actions > 1 else 0
+    """Number of address qubits the Q# operations allocate for ``num_actions`` values.
+
+    Integer-exact by construction. ``ceil(log2(n))`` is the same function
+    mathematically but rounds wrong at large inputs, and this helper is the oracle
+    the Q# width is checked against, so it must not share a failure mode with it.
+    """
+    return (num_actions - 1).bit_length()
 
 
 def _dumped_address_index(address_value: int, num_address_qubits: int) -> int:
@@ -198,6 +204,37 @@ class TestPhaseRegisterSizing:
         """A non-positive query count is invalid."""
         with pytest.raises(ValueError, match="num_queries must be a positive integer"):
             num_phase_bits(num_queries)
+
+    @pytest.mark.parametrize("num_actions", [1, 2, 3, 4, 5, 8, 9, 16, 17, 1024, 1025, 2**20, 2**29, 2**31])
+    def test_qsharp_address_width_is_exact_at_large_powers_of_two(self, num_actions):
+        """``AddressQubits`` must stay integer-exact where ``Ceiling(Lg(...))`` is not.
+
+        ``Lg`` is a ratio of two rounded logarithms, so the float form over-allocates
+        at ``2**29`` -- the smallest power of two it gets wrong -- and again at
+        ``2**31``. An over-wide address register trips the power-of-two facts that
+        guard the unary-iteration recursion. Every other width assertion in this
+        module stays under ``2**6``, where the two forms agree, so this is the only
+        check that can see a regression to the float form.
+        """
+        computed = get_qsharp_context().code.QDKChemistry.Utils.UnaryIteration.AddressQubits(num_actions)
+
+        assert computed == (num_actions - 1).bit_length()
+        assert (1 << computed) >= num_actions
+
+    @pytest.mark.parametrize("num_queries", [1, 3, 63, 2**29 - 1, 2**31 - 1])
+    def test_qsharp_phase_register_size_is_exact_at_large_query_counts(self, num_queries):
+        """``PhaseRegisterSize`` must keep delegating rather than re-derive its width.
+
+        It is one line -- ``AddressQubits(numQueries + 1)`` -- and that single
+        definition is the property under test. An independent
+        ``Ceiling(Lg(IntAsDouble(numQueries + 1)))`` agrees with the exact value
+        everywhere below ``numQueries + 1 == 2**29``, so a second definition would be
+        invisible to every other check here.
+        """
+        computed = get_qsharp_context().code.QDKChemistry.Utils.UnaryPhaseEstimation.PhaseRegisterSize(num_queries)
+
+        assert computed == num_queries.bit_length()
+        assert (1 << computed) >= num_queries + 1
 
 
 class TestPhaseWindowState:
