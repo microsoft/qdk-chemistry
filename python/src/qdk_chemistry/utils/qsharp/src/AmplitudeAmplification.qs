@@ -23,6 +23,13 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     /// # Summary
     /// Flips `target` when the little-endian `phase` register holds a value in the
     /// half-open interval [`lowerBound`, `upperBound`).
+    ///
+    /// # Description
+    /// The `ApplyIf...L` comparisons take the classical constant first and the register
+    /// second, and read in that order: `ApplyIfGreaterOrEqualL(action, c, x, target)` acts
+    /// when `c >= x`, and `ApplyIfLessOrEqualL` when `c <= x`. The calls below are written
+    /// with the constant first for that reason, so each one reads as the opposite of the
+    /// bound it enforces.
     operation MarkPhaseRange(
         lowerBound : Int,
         upperBound : Int,
@@ -43,16 +50,20 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
         } elif upperBound == lowerBound + 1 {
             ApplyControlledOnInt(lowerBound, X, phase, target);
         } elif lowerBound == 0 {
-            // phase >= 0 always holds, so only the upper bound has to be tested.
+            // phase >= 0 always holds, so only the upper bound has to be tested:
+            // upperBound - 1 >= phase, that is phase < upperBound.
             ApplyIfGreaterOrEqualL(X, IntAsBigInt(upperBound - 1), phase, target);
         } elif upperBound == phaseBinCount {
-            // phase <= phaseBinCount - 1 always holds, so only the lower bound has to be tested.
+            // phase <= phaseBinCount - 1 always holds, so only the lower bound has to be
+            // tested: lowerBound <= phase.
             ApplyIfLessOrEqualL(X, IntAsBigInt(lowerBound), phase, target);
         } else {
             use aboveLower = Qubit();
             use belowUpper = Qubit();
             within {
+                // lowerBound <= phase
                 ApplyIfLessOrEqualL(X, IntAsBigInt(lowerBound), phase, aboveLower);
+                // upperBound - 1 >= phase
                 ApplyIfGreaterOrEqualL(X, IntAsBigInt(upperBound - 1), phase, belowUpper);
             } apply {
                 Controlled X([aboveLower, belowUpper], target);

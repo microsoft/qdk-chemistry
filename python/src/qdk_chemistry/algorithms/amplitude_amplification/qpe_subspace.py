@@ -47,12 +47,6 @@ class QPESubspaceMarking(QpeCircuitBuilder):
 
     The initial state preparation is not used, because the register already holds the state to
     amplify.
-
-    The oracle reflects exactly about the marked eigenspaces only when the estimation is
-    exact, that is when every eigenphase of the state under test is a multiple of
-    :math:`2^{-n}` for ``n = num_bits``. Off a bin the phase register comes back spread
-    instead of to :math:`|0\rangle`, which leaves the system entangled with the ancillas the
-    oracle releases and costs the amplification its invariant plane.
     """
 
     def __init__(
@@ -108,25 +102,27 @@ class QPESubspaceMarking(QpeCircuitBuilder):
 
         """
         phase_bin_count = 1 << num_phase_qubits
-        run_starts = {0, (phase_bin_count // 2 + 1) % phase_bin_count}
-        for phase in container.phases_from_eigenvalue(target_energy):
-            # The crossing is solved in floating point, so it is only known to within a
-            # bin: splitting on either side of the bins it could land in keeps the runs uniform.
-            crossing = math.floor(phase % 1.0 * phase_bin_count)
-            run_starts |= {(crossing + offset) % phase_bin_count for offset in (-1, 0, 1, 2)}
-
         ranges: list[tuple[int, int]] = []
-        starts = sorted(run_starts)
-        for start, stop in zip(starts, [*starts[1:], phase_bin_count], strict=True):
-            if container.eigenvalue_from_phase(start / phase_bin_count) < target_energy:
+        for phase_bin in range(phase_bin_count):
+            if container.eigenvalue_from_phase(phase_bin / phase_bin_count) < target_energy:
                 continue
-            if ranges and ranges[-1][1] == start:
-                ranges[-1] = (ranges[-1][0], stop)
+            if ranges and ranges[-1][1] == phase_bin:
+                ranges[-1] = (ranges[-1][0], phase_bin + 1)
             else:
-                ranges.append((start, stop))
+                ranges.append((phase_bin, phase_bin + 1))
         if not ranges:
             raise ValueError(
                 f"No phase bin of the {phase_bin_count}-bin register holds an energy at least {target_energy}."
+            )
+        # Marking every bin is as useless as marking none: the oracle would flag the whole
+        # register, its reflection would be the identity up to a phase, and the amplification
+        # would have nothing to single out. A target this low names no subspace, so it is
+        # refused rather than answered with an oracle that cannot amplify.
+        if ranges == [(0, phase_bin_count)]:
+            raise ValueError(
+                f"Every phase bin of the {phase_bin_count}-bin register holds an energy at least "
+                f"{target_energy}, so it marks no subspace to amplify. Give a bound inside the "
+                f"range the encoding represents."
             )
         return ranges
 
@@ -149,7 +145,8 @@ class QPESubspaceMarking(QpeCircuitBuilder):
 
         Raises:
             ValueError: If ``num_bits`` is not positive, if ``target_energy`` is unset or not
-                finite, or if no bin of the phase register holds an energy that high.
+                finite, or if it names no proper subspace of the phase register, because
+                either no bin reaches it or every bin does.
             RuntimeError: If the controlled unitaries do not carry Q# operations.
 
         """
@@ -163,13 +160,13 @@ class QPESubspaceMarking(QpeCircuitBuilder):
         if math.isinf(target_energy):
             raise ValueError(f"The target_energy setting must be a finite energy. Got {target_energy}.")
 
+        num_system_qubits = qubit_hamiltonian.num_qubits
         container = self._create_nested("unitary_builder").run(qubit_hamiltonian).get_container()
         bin_ranges = self._marked_phase_bins(target_energy, container, num_bits)
         lower_bounds = [start for start, _ in bin_ranges]
         upper_bounds = [stop for _, stop in bin_ranges]
         Logger.info(f"Marking phase bins {bin_ranges} for energy {target_energy}.")
 
-        num_system_qubits = qubit_hamiltonian.num_qubits
         controlled_unitaries = []
         num_ancilla_qubits = 0
         for bit in range(num_bits):

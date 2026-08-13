@@ -48,7 +48,9 @@ guiding_state = Wavefunction(
 state_preparation = create("state_prep", "dense_pure_state").run(guiding_state)
 
 # 3. To mark the target state, a QPE is run on the prepared register, and a flag
-# is flipped when the QPE phase lands in the desired range.
+# is flipped when the QPE phase lands in the desired range. The target energy is
+# halfway up the band, so |11> at +lambda is marked and the rest of the spectrum
+# is not.
 good_state_oracle = create(
     "qpe_circuit_builder",
     "qdk_qpe_subspace",
@@ -66,10 +68,19 @@ good_state_oracle = create(
 amplitude_amplification = create("amplitude_amplification", "qdk_base", rounds=2)
 circuit = amplitude_amplification.run(state_preparation, good_state_oracle)
 
-# 5. Run the circuit and measure. The |11> state should be amplified.
+# 5. Run the circuit and measure. Rounds 0 and 2 side by side show what the
+# amplification bought: |11> starts at the 9% the guiding state gives it and ends
+# up dominating the shots, matching sin^2((2k+1) arcsin(0.3)).
 executor = create("circuit_executor", "qdk_sparse_state_simulator")
 shots = 400
 counts = executor.run(circuit, shots=shots).bitstring_counts
+
+unamplified = create("amplitude_amplification", "qdk_base", rounds=0).run(
+    state_preparation, good_state_oracle
+)
+before = executor.run(unamplified, shots=shots).bitstring_counts
+print(f"rounds=0: |11> in {before.get('11', 0) / shots:.0%} of shots, {before}")
+print(f"rounds=2: |11> in {counts.get('11', 0) / shots:.0%} of shots, {counts}")
 
 # end-cell-run
 ################################################################################

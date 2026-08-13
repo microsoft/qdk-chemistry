@@ -162,6 +162,96 @@ def _measure(circuit: Circuit, shots: int = 400) -> dict[str, int]:
     return create("circuit_executor", "qdk_sparse_state_simulator").run(circuit, shots=shots).bitstring_counts
 
 
+# Drives MarkAcceptedPhase over one computational basis state of the phase register, so the
+# marking can be read off bin by bin without a QPE in front of it. The register is filled and
+# emptied with plain X gates, keeping the little-endian convention explicit rather than
+# borrowing another library routine whose argument order would also have to be trusted.
+_PHASE_MARKING_HARNESS = """
+operation AmplitudeAmplificationTestPhaseMarking(
+    lowerBounds : Int[],
+    upperBounds : Int[],
+    numPhaseQubits : Int,
+    value : Int
+) : Bool {
+    use phase = Qubit[numPhaseQubits];
+    use flag = Qubit();
+    for index in 0..numPhaseQubits - 1 {
+        if ((value >>> index) &&& 1) == 1 {
+            X(phase[index]);
+        }
+    }
+    QDKChemistry.Utils.AmplitudeAmplification.MarkAcceptedPhase(lowerBounds, upperBounds, phase, flag);
+    let marked = M(flag) == One;
+    Reset(flag);
+    for index in 0..numPhaseQubits - 1 {
+        if ((value >>> index) &&& 1) == 1 {
+            X(phase[index]);
+        }
+    }
+    return marked;
+}
+"""
+
+
+@pytest.fixture(scope="module")
+def phase_marking():
+    """Return a callable reporting whether the marking flips the flag on a given phase value."""
+    context = get_qsharp_context()
+    context.eval(_PHASE_MARKING_HARNESS)
+
+    def marks(lower_bounds: list[int], upper_bounds: list[int], num_phase_qubits: int, value: int) -> bool:
+        return bool(
+            context.eval(
+                "AmplitudeAmplificationTestPhaseMarking("
+                f"{list(lower_bounds)}, {list(upper_bounds)}, {num_phase_qubits}, {value})"
+            )
+        )
+
+    return marks
+
+
+_PHASE_MARKING_QUBITS = 3
+_PHASE_MARKING_BINS = 1 << _PHASE_MARKING_QUBITS
+
+
+@pytest.mark.parametrize(
+    ("lower_bound", "upper_bound"),
+    [
+        (lower_bound, upper_bound)
+        for lower_bound in range(_PHASE_MARKING_BINS)
+        for upper_bound in range(lower_bound + 1, _PHASE_MARKING_BINS + 1)
+    ],
+)
+def test_mark_phase_range_flags_exactly_the_half_open_interval(phase_marking, lower_bound, upper_bound):
+    """Every range of a 3-bit register marks [lower, upper) and nothing outside it.
+
+    Exhaustive over the ranges, so it covers all five branches of MarkPhaseRange: the whole
+    register, a single bin, a range starting at 0, a range ending at the top, and an interior
+    one testing both bounds. It pins the direction of each comparison, which the operand order
+    of ApplyIfGreaterOrEqualL and ApplyIfLessOrEqualL makes easy to read backwards: they act
+    when the classical constant is greater or less than the register, not the other way round.
+    """
+    for value in range(_PHASE_MARKING_BINS):
+        expected = lower_bound <= value < upper_bound
+        assert phase_marking([lower_bound], [upper_bound], _PHASE_MARKING_QUBITS, value) == expected, (
+            f"[{lower_bound}, {upper_bound}) at phase bin {value}"
+        )
+
+
+def test_mark_accepted_phase_flags_the_union_of_disjoint_ranges(phase_marking):
+    """A window wrapping phase 1 arrives as two ranges, and every bin of either one is marked.
+
+    Each range flips the flag independently, so this also pins that disjoint ranges do not
+    cancel: the marked bins are their union, not their symmetric difference.
+    """
+    lower_bounds, upper_bounds = [0, 6], [2, 8]
+    accepted = {0, 1, 6, 7}
+    for value in range(_PHASE_MARKING_BINS):
+        assert phase_marking(lower_bounds, upper_bounds, _PHASE_MARKING_QUBITS, value) == (value in accepted), (
+            f"phase bin {value}"
+        )
+
+
 def test_amplitude_amplification_is_registered():
     default = create("amplitude_amplification")
     assert default.name() == "qdk_base"
@@ -361,19 +451,21 @@ def test_amplification_matches_the_closed_form_and_overshoots():
 
 
 def test_marking_oracle_circuit_is_executable():
-    """The oracle circuit runs on its own, over an all-zeros register.
+    """The oracle circuit runs on its own, over an all-zeros register, and the flag tracks the energy.
 
-    |00> is the eigenvector at the bottom of the band, which the walk maps to phase bin 4 of 8.
+    Both Hamiltonians give the same accepted bins, [0, 2) and [7, 8), so the only thing that
+    differs is where |00> sits: at the top of the band for the interior one, which the window
+    reaches, and at the bottom for the diagonal one, which it does not.
     """
+    # |00> sits at +lambda*cos(pi/4), phase 1/8, which is bin 1 of 8 and inside the window.
+    flag_fires = _subspace_oracle(_interior_hamiltonian(marked="00"), 1.0, num_bits=3)
+    # |00> sits at -lambda, phase 1/2, which is bin 4 of 8 and outside it.
     hamiltonian = _diagonal_hamiltonian()
-    # The walk normalization is the Schatten norm, so its negation is exactly the bottom of
-    # the band: the lowest bound the encoding can represent, and one every bin clears.
-    marks_every_bin = _subspace_oracle(hamiltonian, -hamiltonian.schatten_norm, num_bits=3)
-    marks_the_top = _subspace_oracle(hamiltonian, hamiltonian.schatten_norm / 2, num_bits=3)
-    assert _marked_bin_ranges(marks_every_bin) == [(0, 8)]
-    assert _marked_bin_ranges(marks_the_top) == [(0, 2), (7, 8)]
-    assert _measure(marks_every_bin, shots=20) == {"1": 20}
-    assert _measure(marks_the_top, shots=20) == {"0": 20}
+    flag_stays_down = _subspace_oracle(hamiltonian, hamiltonian.schatten_norm / 2, num_bits=3)
+    assert _marked_bin_ranges(flag_fires) == [(0, 2), (7, 8)]
+    assert _marked_bin_ranges(flag_stays_down) == [(0, 2), (7, 8)]
+    assert _measure(flag_fires, shots=20) == {"1": 20}
+    assert _measure(flag_stays_down, shots=20) == {"0": 20}
 
 
 @pytest.mark.parametrize(
@@ -383,8 +475,9 @@ def test_marking_oracle_circuit_is_executable():
         pytest.param(1.0, [(0, 1)], id="top-of-band"),
         pytest.param(0.9, [(0, 2), (15, 16)], id="near-top-of-band"),
         pytest.param(0.5, [(0, 3), (14, 16)], id="upper-half-of-band"),
-        # E = -lambda is phase 1/2, so a bound there accepts the whole register.
-        pytest.param(-1.0, [(0, 16)], id="bottom-of-band"),
+        # E = -lambda is phase 1/2, the bottom bin, so anything above it still leaves that
+        # bin out and keeps the marking a proper subspace.
+        pytest.param(math.nextafter(-1.0, 0.0), [(0, 8), (9, 16)], id="just-above-the-bottom"),
     ],
 )
 def test_walk_energies_select_a_band_around_phase_zero(target_energy, expected_bins):
@@ -401,7 +494,7 @@ def test_walk_energies_select_a_band_around_phase_zero(target_energy, expected_b
         pytest.param(0.0, [(0, 1), (9, 16)], id="non-negative-energies"),
         pytest.param(-1.0, [(0, 3), (9, 16)], id="above-minus-one"),
         # E = -pi/t is phase 1/2, the one bin the wrap leaves at the bottom of the range.
-        pytest.param(-math.pi, [(0, 16)], id="bottom-of-range"),
+        pytest.param(math.nextafter(-math.pi, 0.0), [(0, 8), (9, 16)], id="just-above-the-bottom"),
     ],
 )
 def test_trotter_energies_select_a_band_across_the_branch_cut(target_energy, expected_bins):
@@ -425,25 +518,110 @@ def test_run_rejects_an_unusable_target_energy(target_energy, message):
 
 
 @pytest.mark.parametrize(
-    ("container", "target_energy", "message"),
+    ("container", "target_energy"),
     [
-        pytest.param(_walk_container(), 2.0, "outside the band", id="walk-above-band"),
-        pytest.param(_walk_container(), -2.0, "outside the band", id="walk-below-band"),
-        pytest.param(_trotter_container(), 4.0, "aliases", id="trotter-above-range"),
-        pytest.param(_trotter_container(), -4.0, "aliases", id="trotter-below-range"),
+        pytest.param(_walk_container(), 2.0, id="walk-above-band"),
+        pytest.param(_trotter_container(), 4.0, id="trotter-above-range"),
     ],
 )
-def test_energy_the_encoding_cannot_represent_is_rejected(container, target_energy, message):
-    """No phase carries an energy off the encoded range, so the bound is refused, not clamped."""
-    with pytest.raises(ValueError, match=message):
+def test_energy_above_the_encoded_range_is_rejected(container, target_energy):
+    """No phase carries an energy over the encoded range, so the bound is refused, not clamped."""
+    with pytest.raises(ValueError, match="No phase bin"):
         QPESubspaceMarking._marked_phase_bins(target_energy, container, num_phase_qubits=4)
 
 
-def test_energy_above_the_band_is_rejected():
-    """A bound over every bin would leave the flag dead, so building the oracle refuses it."""
+@pytest.mark.parametrize(
+    ("container", "target_energy"),
+    [
+        # The bottom bin sits exactly at the foot of each encoded range, so a bound there
+        # already clears every bin; below it is the same answer, only more so.
+        pytest.param(_walk_container(), -1.0, id="walk-band-bottom"),
+        pytest.param(_walk_container(), -2.0, id="walk-below-band"),
+        pytest.param(_trotter_container(), -math.pi, id="trotter-range-bottom"),
+        pytest.param(_trotter_container(), -4.0, id="trotter-below-range"),
+    ],
+)
+def test_energy_every_bin_clears_is_rejected(container, target_energy):
+    """A bound the whole register clears marks everything, which is no subspace at all.
+
+    Reflecting about every bin is the identity up to a phase, so such an oracle cannot
+    amplify: the good subspace has to be a proper part of the register for the reflection to
+    single anything out. A target this low means the caller has stepped outside the range the
+    encoding natively represents, so it is refused rather than answered with a useless oracle.
+    """
+    with pytest.raises(ValueError, match="Every phase bin"):
+        QPESubspaceMarking._marked_phase_bins(target_energy, container, num_phase_qubits=4)
+
+
+@pytest.mark.parametrize(
+    ("scale", "message"),
+    [
+        pytest.param(2.0, "No phase bin", id="above-the-band"),
+        pytest.param(-2.0, "Every phase bin", id="below-the-band"),
+    ],
+)
+def test_a_degenerate_bound_is_refused_when_building_the_oracle(scale, message):
+    """Neither end reaches the circuit: a flag that never fires and one that always does are both dead."""
     hamiltonian = _diagonal_hamiltonian()
-    with pytest.raises(ValueError, match="outside the band"):
-        _subspace_oracle(hamiltonian, 2 * hamiltonian.schatten_norm, num_bits=3)
+    with pytest.raises(ValueError, match=message):
+        _subspace_oracle(hamiltonian, scale * hamiltonian.schatten_norm, num_bits=3)
+
+
+class _QuarterCutLaw:
+    """A phase law shaped like the time-evolution one, but with its branch cut at phi = 1/4.
+
+    No encoding in the repo turns here yet. It stands in for one that might, and guards
+    against a phi = 1/2 split being baked back into the search.
+    """
+
+    def eigenvalue_from_phase(self, phase_fraction: float) -> float:
+        angle = (phase_fraction % 1.0) * 2.0 * math.pi
+        if angle > math.pi / 2.0:
+            angle -= 2.0 * math.pi
+        return -angle
+
+
+def _assert_marks_exactly_the_bins_above(container, target_energy, num_phase_qubits):
+    """Assert the marking holds every bin clearing the target and no other.
+
+    A target that every bin clears, or that none does, marks no proper subspace, so the
+    marking refuses it instead of returning ranges.
+    """
+    phase_bin_count = 1 << num_phase_qubits
+    context = f"E={target_energy} on a {phase_bin_count}-bin register"
+    expected = {
+        phase_bin
+        for phase_bin in range(phase_bin_count)
+        if container.eigenvalue_from_phase(phase_bin / phase_bin_count) >= target_energy
+    }
+    if len(expected) in (0, phase_bin_count):
+        with pytest.raises(ValueError, match="phase bin"):
+            QPESubspaceMarking._marked_phase_bins(target_energy, container, num_phase_qubits)
+        return
+    bins = QPESubspaceMarking._marked_phase_bins(target_energy, container, num_phase_qubits)
+    assert {phase_bin for start, stop in bins for phase_bin in range(start, stop)} == expected, context
+    # Sorted, non-empty and separated by at least one bin, so the ranges cannot double-flip
+    # the flag: MarkAcceptedPhase applies MarkPhaseRange to each one independently.
+    assert all(start < stop for start, stop in bins), context
+    assert all(previous[1] < following[0] for previous, following in itertools.pairwise(bins)), context
+
+
+@pytest.mark.parametrize("num_phase_qubits", [3, 4, 5, 6])
+@pytest.mark.parametrize("target_energy", [-6.0, -3.0, -1.0, 0.0, 1.0, 1.5])
+def test_marked_bins_follow_a_law_that_turns_away_from_phase_half(target_energy, num_phase_qubits):
+    """A container that turns at phi = 1/4 still gets exactly the bins its law says it should."""
+    _assert_marks_exactly_the_bins_above(_QuarterCutLaw(), target_energy, num_phase_qubits)
+
+
+def test_a_target_just_inside_the_band_edge_marks_only_the_top_bin():
+    """One ulp under the top of the band leaves phase 0 the only bin above the bound.
+
+    Inverting the law here is ill-conditioned: a one-ulp error in E / lambda comes back as
+    a square-root error in the phase, so a crossing solved through arccos lands nowhere
+    near a bin.  Comparing energies bin by bin never inverts anything, so the bound holds.
+    """
+    marked = QPESubspaceMarking._marked_phase_bins(math.nextafter(1.0, 0.0), _walk_container(1.0), num_phase_qubits=12)
+    assert marked == [(0, 1)]
 
 
 @pytest.mark.parametrize("num_phase_qubits", [1, 2, 3, 4, 5, 6, 7, 8])
@@ -464,25 +642,8 @@ def test_energy_above_the_band_is_rejected():
 )
 def test_marked_bins_hold_exactly_the_energies_above_the_target(container, energies, num_phase_qubits):
     """The ranges cover every bin clearing the target and no other, register width and all."""
-    phase_bin_count = 1 << num_phase_qubits
     for target_energy in energies:
-        context = f"E={target_energy} on a {phase_bin_count}-bin register"
-        expected = {
-            phase_bin
-            for phase_bin in range(phase_bin_count)
-            if container.eigenvalue_from_phase(phase_bin / phase_bin_count) >= target_energy
-        }
-        if not expected:
-            # A narrow register can fall short of an energy the encoding still represents.
-            with pytest.raises(ValueError, match="No phase bin"):
-                QPESubspaceMarking._marked_phase_bins(target_energy, container, num_phase_qubits)
-            continue
-        bins = QPESubspaceMarking._marked_phase_bins(target_energy, container, num_phase_qubits)
-        assert {phase_bin for start, stop in bins for phase_bin in range(start, stop)} == expected, context
-        # Sorted, non-empty and separated by at least one bin, so the ranges cannot double-flip
-        # the flag: MarkPhaseRanges applies each one independently.
-        assert all(start < stop for start, stop in bins), context
-        assert all(previous[1] < following[0] for previous, following in itertools.pairwise(bins)), context
+        _assert_marks_exactly_the_bins_above(container, target_energy, num_phase_qubits)
 
 
 def test_amplified_circuit_exposes_a_measurement_free_operation():
