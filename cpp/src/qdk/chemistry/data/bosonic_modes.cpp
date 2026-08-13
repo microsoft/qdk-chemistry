@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "hdf5_error_handling.hpp"
+#include "hdf5_serialization.hpp"
 
 namespace qdk::chemistry::data {
 
@@ -259,16 +260,7 @@ void BosonicModes::to_hdf5(H5::Group& group) const {
     std::string type_name = kTypeTag;
     type_attr.write(string_type, type_name);
 
-    std::vector<unsigned> dimensions;
-    dimensions.reserve(_mode_dimensions.size());
-    for (const std::size_t dimension : _mode_dimensions) {
-      dimensions.push_back(static_cast<unsigned>(dimension));
-    }
-    const hsize_t extent = dimensions.size();
-    H5::DataSpace vector_space(1, &extent);
-    H5::DataSet dimension_dataset = metadata_group.createDataSet(
-        kModeDimensionsKey, H5::PredType::NATIVE_UINT, vector_space);
-    dimension_dataset.write(dimensions.data(), H5::PredType::NATIVE_UINT);
+    save_vector_to_group(metadata_group, kModeDimensionsKey, _mode_dimensions);
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
   }
@@ -288,24 +280,13 @@ std::shared_ptr<BosonicModes> BosonicModes::from_hdf5(H5::Group& group) {
           "HDF5 group missing required metadata/mode_dimensions dataset (one "
           "local Fock-space dimension per mode)");
     }
-    H5::DataSet dataset = metadata_group.openDataSet(kModeDimensionsKey);
-    H5::DataSpace space = dataset.getSpace();
-    const std::size_t count =
-        (space.getSimpleExtentType() == H5S_SCALAR)
-            ? 1
-            : static_cast<std::size_t>(space.getSimpleExtentNpoints());
-    if (count != num_modes) {
+    auto dimensions =
+        load_size_vector_from_group(metadata_group, kModeDimensionsKey);
+    if (dimensions.size() != num_modes) {
       throw std::runtime_error("HDF5 dataset metadata/mode_dimensions holds " +
-                               std::to_string(count) +
+                               std::to_string(dimensions.size()) +
                                " entries but the basis has " +
                                std::to_string(num_modes) + " modes");
-    }
-    std::vector<unsigned> raw(count, 0);
-    dataset.read(raw.data(), H5::PredType::NATIVE_UINT);
-    std::vector<std::size_t> dimensions;
-    dimensions.reserve(raw.size());
-    for (const unsigned value : raw) {
-      dimensions.push_back(static_cast<std::size_t>(value));
     }
     return std::shared_ptr<BosonicModes>(
         new BosonicModes(*base, std::move(dimensions)));
