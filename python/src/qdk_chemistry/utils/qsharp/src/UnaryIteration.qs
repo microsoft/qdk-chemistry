@@ -125,9 +125,10 @@ namespace QDKChemistry.Utils.UnaryIteration {
     /// `Ceiling(Lg(numActions))`.
     ///
     /// Computed with integer arithmetic rather than `Ceiling(Lg(IntAsDouble(numActions)))`:
-    /// the floating-point form is off by one at several exact powers of two (the first is
-    /// `2^31`, where it yields 32), which would over-allocate the address register and trip
-    /// the power-of-two `Fact`s below. `BitSizeI(n - 1)` is exact for every positive `n`.
+    /// the floating-point form is off by one at nine exact powers of two below `2^63`, the
+    /// smallest being `2^29`, where it yields 30. That would over-allocate the address
+    /// register and trip the power-of-two `Fact`s below. `BitSizeI(n - 1)` is exact for
+    /// every positive `n`.
     function AddressQubits(numActions : Int) : Int {
         Fact(numActions > 0, "numActions must be positive");
         return BitSizeI(numActions - 1);
