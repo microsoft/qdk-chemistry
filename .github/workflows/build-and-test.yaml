@@ -831,6 +831,24 @@ jobs:
       with:
         # CPython ships win-arm64 builds from 3.11 onwards.
         python-version: '3.13'
+        # Must be explicit. The action defaults to the runner process
+        # architecture, which is x64 under emulation on this image, and that
+        # image's tool cache holds an x64 interpreter it will happily select.
+        # The failure is silent until the very end: the extension module is
+        # built ARM64 by the toolchain configured above, pip resolves win_amd64
+        # dependencies, and the import fails with "%1 is not a valid Win32
+        # application" after the whole build has already run.
+        architecture: arm64
+
+    - name: Verify the interpreter is native ARM64
+      shell: pwsh
+      run: |
+        $machine = python -c "import platform; print(platform.machine())"
+        Write-Host "python  : $((Get-Command python).Source)"
+        Write-Host "machine : $machine"
+        if ($machine -ne 'ARM64') {
+          throw "Expected a native ARM64 interpreter but got '$machine'. An x64 interpreter cannot load the ARM64 extension module this job builds."
+        }
 
     - name: Set memory-aware build parallelism
       shell: pwsh
