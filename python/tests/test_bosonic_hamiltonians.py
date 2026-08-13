@@ -28,7 +28,6 @@ import pytest
 from qdk_chemistry.algorithms import create, registry
 from qdk_chemistry.algorithms.boson_qubit_mapper import QdkBosonQubitMapper
 from qdk_chemistry.data import (
-    BosonEncoding,
     BosonicModes,
     BosonMapping,
     LatticeGraph,
@@ -143,12 +142,15 @@ def _bose_hubbard_matrix(case: tuple[int, int, float, float, float]) -> np.ndarr
     return total
 
 
-def _mapped(case: tuple[int, int, float, float, float], encoding: BosonEncoding) -> QubitOperator:
+NAMED_ENCODINGS = [BosonMapping.standard_binary, BosonMapping.gray_code]
+
+
+def _mapped(case: tuple[int, int, float, float, float], factory=BosonMapping.standard_binary) -> QubitOperator:
     """Build and map a Bose-Hubbard chain in one step.
 
     Args:
         case: The ``(modes, dim, t, u, mu)`` model parameters.
-        encoding: Boson-to-qubit encoding family.
+        factory: Named ``BosonMapping`` factory selecting the encoding.
 
     Returns:
         QubitOperator: The encoded Hamiltonian.
@@ -156,8 +158,7 @@ def _mapped(case: tuple[int, int, float, float, float], encoding: BosonEncoding)
     """
     modes, dim, t, u, mu = case
     hamiltonian = create_bose_hubbard_hamiltonian(LatticeGraph.chain(modes), t=t, U=u, mu=mu, mode_dimension=dim)
-    mapping = BosonMapping.for_encoding(modes, dim, encoding)
-    return create("boson_qubit_mapper").run(hamiltonian, mapping)
+    return create("boson_qubit_mapper").run(hamiltonian, factory(modes, dim))
 
 
 def _terms(operator: QubitOperator) -> dict[str, complex]:
@@ -280,7 +281,6 @@ class TestBosonMapping:
         assert mapping.codeword_table(0) == [0, 1, 2, 3, 4, 5, 6, 7]
         assert mapping.qubits_per_mode(0) == 3
         assert mapping.num_qubits() == 3
-        assert mapping.encoding == BosonEncoding.StandardBinary
         assert mapping.name == "standard-binary"
 
     def test_gray_code_codewords(self):
@@ -291,8 +291,8 @@ class TestBosonMapping:
 
     def test_isometry_is_a_permutation(self):
         """A power-of-two cutoff gives a surjective code, hence no leakage."""
-        for encoding in (BosonEncoding.StandardBinary, BosonEncoding.GrayCode):
-            iso = BosonMapping.for_encoding(1, 8, encoding).isometry(0)
+        for factory in NAMED_ENCODINGS:
+            iso = factory(1, 8).isometry(0)
             assert iso.shape == (8, 8)
             np.testing.assert_allclose(iso @ iso.T, np.eye(8), atol=TOL)
             np.testing.assert_allclose(iso.T @ iso, np.eye(8), atol=TOL)
@@ -315,10 +315,10 @@ class TestBosonMapping:
         with pytest.raises(ValueError, match="32 hopping terms"):
             BosonMapping.standard_binary(2, 3)
 
-    def test_for_basis_validates_the_cutoff(self):
-        """for_basis reads the cutoff from the basis and rejects a mismatch."""
+    def test_basis_factory_validates_the_cutoff(self):
+        """The basis overload reads the cutoff from the basis and rejects a mismatch."""
         modes = BosonicModes(2, 4)
-        mapping = BosonMapping.for_basis(modes)
+        mapping = BosonMapping.standard_binary(modes)
         assert mapping.mode_dimension(0) == 4
         assert mapping.mode_dimensions() == [4, 4]
         assert mapping.uniform_dimension() == 4
@@ -384,16 +384,16 @@ class TestBosonMapping:
         )
 
     @pytest.mark.parametrize("dim", [2, 4, 8, 16])
-    @pytest.mark.parametrize("encoding", [BosonEncoding.StandardBinary, BosonEncoding.GrayCode])
-    def test_primitives_reproduce_their_dense_matrices(self, dim, encoding):
+    @pytest.mark.parametrize("factory", NAMED_ENCODINGS)
+    def test_primitives_reproduce_their_dense_matrices(self, dim, factory):
         """Every single-mode primitive is an exact Pauli decomposition.
 
         Args:
             dim: Local Fock-space dimension.
-            encoding: Boson-to-qubit encoding family.
+            factory: Named ``BosonMapping`` factory selecting the encoding.
 
         """
-        mapping = BosonMapping.for_encoding(1, dim, encoding)
+        mapping = factory(1, dim)
         nq = mapping.qubits_per_mode(0)
         iso = mapping.isometry(0)
 
@@ -429,7 +429,7 @@ class TestBosonMapping:
         assert restored.num_modes() == 3
         assert restored.mode_dimension(0) == 8
         assert restored.mode_dimensions() == [8, 8, 8]
-        assert restored.encoding == BosonEncoding.GrayCode
+        assert restored.name == "gray-code"
         assert restored.codeword_table(0) == mapping.codeword_table(0)
         assert json.loads(mapping.to_json())["mode_dimensions"] == [8, 8, 8]
 
@@ -506,7 +506,7 @@ class TestBosonQubitMapperAlgorithm:
 
     def test_encoding_metadata_is_recorded(self):
         """The mapped operator records which encoding produced it."""
-        operator = _mapped((2, 4, 1.0, 4.0, 0.0), BosonEncoding.GrayCode)
+        operator = _mapped((2, 4, 1.0, 4.0, 0.0), BosonMapping.gray_code)
         assert operator.encoding == "gray-code"
         assert operator.num_qubits == 4
 
@@ -516,19 +516,19 @@ class TestVerifiedFixtures:
 
     def test_fixture_1_two_hard_core_modes(self):
         """L = 2, d = 2, t = 1, U = 4, mu = 0 gives -0.5 (XX + YY)."""
-        terms = _terms(_mapped((2, 2, 1.0, 4.0, 0.0), BosonEncoding.StandardBinary))
+        terms = _terms(_mapped((2, 2, 1.0, 4.0, 0.0)))
         assert len(terms) == 2
         assert terms == pytest.approx({"XX": -0.5, "YY": -0.5}, abs=TOL)
 
     def test_fixture_4_three_hard_core_modes(self):
         """L = 3, d = 2, t = 1, U = 8, mu = 0 gives -0.5 on the two nearest-neighbour bonds."""
-        terms = _terms(_mapped((3, 2, 1.0, 8.0, 0.0), BosonEncoding.StandardBinary))
+        terms = _terms(_mapped((3, 2, 1.0, 8.0, 0.0)))
         assert len(terms) == 4
         assert terms == pytest.approx({"IXX": -0.5, "IYY": -0.5, "XXI": -0.5, "YYI": -0.5}, abs=TOL)
 
     def test_fixture_2_selected_terms_and_count(self):
         """L = 2, d = 4, t = 1, U = 4, mu = 0 gives the published 39-term operator."""
-        terms = _terms(_mapped((2, 4, 1.0, 4.0, 0.0), BosonEncoding.StandardBinary))
+        terms = _terms(_mapped((2, 4, 1.0, 4.0, 0.0)))
         assert len(terms) == 39
         expected = {
             "IIII": 8.0,
@@ -545,7 +545,7 @@ class TestVerifiedFixtures:
 
     def test_fixture_2_spectrum(self):
         """The encoded operator reproduces the published full-space spectrum."""
-        matrix = _qubit_operator_matrix(_mapped((2, 4, 1.0, 4.0, 0.0), BosonEncoding.StandardBinary))
+        matrix = _qubit_operator_matrix(_mapped((2, 4, 1.0, 4.0, 0.0)))
         np.testing.assert_allclose(matrix, matrix.conj().T, atol=TOL)
         eigenvalues = np.linalg.eigvalsh(matrix)
         expected = [
@@ -607,20 +607,20 @@ class TestEndToEnd:
     ]
 
     @pytest.mark.parametrize("case", CASES)
-    @pytest.mark.parametrize("encoding", [BosonEncoding.StandardBinary, BosonEncoding.GrayCode])
-    def test_encoded_operator_matches_the_kronecker_construction(self, case, encoding):
+    @pytest.mark.parametrize("factory", NAMED_ENCODINGS)
+    def test_encoded_operator_matches_the_kronecker_construction(self, case, factory):
         """The encoded matrix equals the occupation-basis Hamiltonian permuted by the code.
 
         Args:
             case: The ``(modes, dim, t, u, mu)`` model parameters.
-            encoding: Boson-to-qubit encoding family.
+            factory: Named ``BosonMapping`` factory selecting the encoding.
 
         """
         modes, dim = case[0], case[1]
-        encoded = _qubit_operator_matrix(_mapped(case, encoding))
+        encoded = _qubit_operator_matrix(_mapped(case, factory))
         np.testing.assert_allclose(encoded, encoded.conj().T, atol=TOL)
 
-        codewords = BosonMapping.for_encoding(modes, dim, encoding).codeword_table(0)
+        codewords = factory(modes, dim).codeword_table(0)
         # Row-major occupation tuples map to the encoded basis index by
         # concatenating each mode's codeword, mode 0 most significant.
         permutation = []
@@ -645,7 +645,7 @@ class TestEndToEnd:
             e1: Reference first excited energy.
 
         """
-        matrix = _qubit_operator_matrix(_mapped(case, BosonEncoding.StandardBinary))
+        matrix = _qubit_operator_matrix(_mapped(case))
         eigenvalues = np.linalg.eigvalsh(matrix)
         assert eigenvalues[0] == pytest.approx(e0, abs=1e-9)
         assert eigenvalues[1] == pytest.approx(e1, abs=1e-9)
@@ -658,8 +658,8 @@ class TestEndToEnd:
             case: The ``(modes, dim, t, u, mu)`` model parameters.
 
         """
-        binary = _qubit_operator_matrix(_mapped(case, BosonEncoding.StandardBinary))
-        gray = _qubit_operator_matrix(_mapped(case, BosonEncoding.GrayCode))
+        binary = _qubit_operator_matrix(_mapped(case))
+        gray = _qubit_operator_matrix(_mapped(case, BosonMapping.gray_code))
         np.testing.assert_allclose(np.linalg.eigvalsh(binary), np.linalg.eigvalsh(gray), atol=1e-9)
 
     @pytest.mark.parametrize("case", PERMUTATION_CASES)
@@ -671,11 +671,11 @@ class TestEndToEnd:
 
         """
         modes, dim = case[0], case[1]
-        mapping = BosonMapping.for_encoding(modes, dim, BosonEncoding.StandardBinary)
+        mapping = BosonMapping.standard_binary(modes, dim)
         assert mapping.num_qubits() == modes * int(np.log2(dim))
         assert 2 ** mapping.num_qubits() == dim**modes
 
-        encoded = _qubit_operator_matrix(_mapped(case, BosonEncoding.StandardBinary))
+        encoded = _qubit_operator_matrix(_mapped(case))
         reference = _bose_hubbard_matrix(case)
         # A surjective code is a similarity transform, so the whole spectrum -
         # not merely a physical block - is preserved and nothing leaks.
@@ -759,21 +759,12 @@ class TestCustomCodewordTable:
                 assert [custom.codeword_table(i) for i in range(2)] == [named.codeword_table(i) for i in range(2)]
                 assert _all_primitives(custom) == _all_primitives(named)
 
-    def test_reports_custom_even_when_the_table_is_a_named_one(self):
-        """``encoding`` is never inferred from the table; the table is the truth."""
+    def test_labels_the_table_without_recognizing_it(self):
+        """The name is never inferred from the table; the table is the truth."""
         custom = BosonMapping.from_codeword_table([[0, 1, 2, 3]])
-        assert custom.encoding == BosonEncoding.Custom
         assert custom.name == "custom"
         assert BosonMapping.from_codeword_table([[0, 1, 2, 3]], "my-encoding").name == "my-encoding"
-        assert BosonMapping.standard_binary(1, 4).encoding == BosonEncoding.StandardBinary
-
-    def test_custom_is_a_tag_not_a_rule(self):
-        """``BosonEncoding.Custom`` parses from a string but cannot select an encoding."""
-        from qdk_chemistry._core.data import boson_encoding_from_string  # noqa: PLC0415
-
-        assert boson_encoding_from_string("custom") == BosonEncoding.Custom
-        with pytest.raises(ValueError, match="from_codeword_table"):
-            BosonMapping.for_encoding(2, 4, BosonEncoding.Custom)
+        assert BosonMapping.standard_binary(1, 4).name == "standard-binary"
 
     def test_rejects_invalid_tables(self):
         """Every way of breaking the permutation invariant is a hard, actionable error."""
@@ -789,31 +780,28 @@ class TestCustomCodewordTable:
             BosonMapping.from_codeword_table([[0, 1, 1, 3]])
 
     def test_json_and_pickle_round_trip_the_table(self):
-        """A custom table survives serialization; the table, not the enum, is on the wire."""
+        """A custom table survives serialization; the table is what is on the wire."""
         import pickle  # noqa: PLC0415
 
         original = BosonMapping.from_codeword_table([[2, 0, 3, 1], [0, 1, 3, 2]], "mixed")
         document = json.loads(original.to_json())
         assert document["codewords"] == [[2, 0, 3, 1], [0, 1, 3, 2]]
         assert document["name"] == "mixed"
-        assert document["encoding"] == "custom"
 
         for restored in (BosonMapping.from_json(original.to_json()), pickle.loads(pickle.dumps(original))):
-            assert restored.encoding == BosonEncoding.Custom
             assert restored.name == "mixed"
             assert [restored.codeword_table(i) for i in range(2)] == [[2, 0, 3, 1], [0, 1, 3, 2]]
             assert restored.content_hash() == original.content_hash()
             assert _all_primitives(restored) == _all_primitives(original)
 
-    def test_named_encoding_documents_are_unchanged(self):
-        """The new optional fields are written only for custom tables."""
+    def test_named_encodings_are_written_as_their_table(self):
+        """A named encoding is serialized exactly like any other mapping."""
         document = json.loads(BosonMapping.standard_binary(2, 4).to_json())
-        assert "codewords" not in document
-        assert "name" not in document
-        assert document["encoding"] == "standard-binary"
+        assert document["codewords"] == [[0, 1, 2, 3]] * 2
+        assert document["name"] == "standard-binary"
 
     def test_heterogeneous_tables_are_supported(self):
-        """Modes may carry different dimensions, exactly as ``for_basis`` allows."""
+        """Modes may carry different dimensions, exactly as a bosonic basis allows."""
         mapping = BosonMapping.from_codeword_table([[1, 0], [3, 2, 0, 1], [0, 1]])
         assert mapping.mode_dimensions() == [2, 4, 2]
         assert [mapping.qubits_per_mode(i) for i in range(3)] == [1, 2, 1]
@@ -880,20 +868,20 @@ class TestHardCoreBosons:
         assert modes.mode_dimensions() == [2, 2, 2]
         assert all(modes.mode_dimension(i) == 2 for i in range(3))
         assert modes.with_padded_dimensions().mode_dimensions() == [2, 2, 2]
-        assert BosonMapping.for_basis(modes).num_qubits() == 3
+        assert BosonMapping.standard_binary(modes).num_qubits() == 3
 
     def test_annihilation_is_exactly_sigma_minus(self):
         """On two levels ``b`` is the spin lowering operator, with no truncation error."""
-        mapping = BosonMapping.for_basis(BosonicModes.hard_core(1))
+        mapping = BosonMapping.standard_binary(BosonicModes.hard_core(1))
         terms = {_label(word, 1): complex(coefficient) for word, coefficient in mapping.annihilation(0)}
         assert terms == pytest.approx({"X": 0.5, "Y": 0.5j}, abs=TOL)
         assert mapping.number_times_number_minus_one(0) == []
 
     def test_u_is_inert_in_the_hard_core_limit(self):
         """``n (n - 1)`` vanishes identically at ``d = 2``, so any ``U`` gives the same operator."""
-        baseline = _terms(_mapped((2, 2, 1.0, 0.0, 0.0), BosonEncoding.StandardBinary))
+        baseline = _terms(_mapped((2, 2, 1.0, 0.0, 0.0)))
         for u in (4.0, 400.0, -17.5):
-            assert _terms(_mapped((2, 2, 1.0, u, 0.0), BosonEncoding.StandardBinary)) == baseline
+            assert _terms(_mapped((2, 2, 1.0, u, 0.0))) == baseline
         # Fixture 1 of the research report.
         assert baseline == pytest.approx({"XX": -0.5, "YY": -0.5}, abs=TOL)
 

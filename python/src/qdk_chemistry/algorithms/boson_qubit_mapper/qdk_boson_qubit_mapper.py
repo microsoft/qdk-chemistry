@@ -151,7 +151,7 @@ class QdkBosonQubitMapper(BosonQubitMapper):
             raise ValueError(
                 f"BosonMapping has {mapping.num_modes()} modes but the Hamiltonian has "
                 f"{n_modes} modes. Use BosonMapping.standard_binary(num_modes={n_modes}, ...) "
-                f"or BosonMapping.for_basis(hamiltonian.get_orbitals())."
+                f"or BosonMapping.standard_binary(hamiltonian.get_orbitals())."
             )
 
         # The C++ engine validates the cutoff against a BosonicModes basis and

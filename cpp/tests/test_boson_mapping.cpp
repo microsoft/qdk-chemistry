@@ -36,6 +36,16 @@ namespace {
 /// Reference tolerance for every exact-algebra comparison in this file.
 constexpr double kTol = 1e-10;
 
+/// The named encodings, as factory pointers, so a test can sweep both without
+/// an encoding tag.
+using UniformFactory = BosonMapping (*)(std::size_t, std::size_t);
+using BasisFactory = BosonMapping (*)(const BosonicModes&);
+
+const std::vector<UniformFactory> kUniformFactories{
+    &BosonMapping::standard_binary, &BosonMapping::gray_code};
+const std::vector<BasisFactory> kBasisFactories{&BosonMapping::standard_binary,
+                                                &BosonMapping::gray_code};
+
 /// Pauli terms rendered as a label -> coefficient map, using the
 /// QubitOperator convention (qubit 0 is the rightmost character).
 std::map<std::string, std::complex<double>> as_labels(
@@ -248,7 +258,6 @@ TEST(BosonMapping, StandardBinaryAndGrayCodewords) {
   const auto sb = BosonMapping::standard_binary(1, 8);
   EXPECT_EQ(sb.qubits_per_mode(0), 3u);
   EXPECT_EQ(sb.num_qubits(), 3u);
-  EXPECT_EQ(sb.encoding(), BosonEncoding::StandardBinary);
   EXPECT_EQ(sb.name(), "standard-binary");
   for (std::size_t n = 0; n < 8; ++n) {
     EXPECT_EQ(sb.codeword(0, n), n);
@@ -270,9 +279,8 @@ TEST(BosonMapping, StandardBinaryAndGrayCodewords) {
 }
 
 TEST(BosonMapping, IsometryIsAPermutationAtPowerOfTwoCutoff) {
-  for (const auto encoding :
-       {BosonEncoding::StandardBinary, BosonEncoding::GrayCode}) {
-    const auto mapping = BosonMapping::for_encoding(1, 8, encoding);
+  for (const auto factory : kUniformFactories) {
+    const auto mapping = factory(1, 8);
     const auto v = mapping.isometry(0);
     ASSERT_EQ(v.size(), 8u * 8u);
     // Exactly one 1 per row and per column: the code space is the whole
@@ -310,7 +318,7 @@ TEST(BosonMapping, HeterogeneousCutoffsLayOutBlocksByPerModeWidth) {
   auto modes = BosonicModes::from_json(json);
   ASSERT_NE(modes, nullptr);
 
-  const auto mapping = BosonMapping::for_basis(*modes);
+  const auto mapping = BosonMapping::standard_binary(*modes);
   EXPECT_EQ(mapping.mode_dimensions(), (std::vector<std::size_t>{4u, 8u, 2u}));
   EXPECT_FALSE(mapping.uniform_dimension().has_value());
   EXPECT_EQ(mapping.qubits_per_mode(0), 2u);
@@ -338,7 +346,7 @@ TEST(BosonMapping, HeterogeneousCutoffsLayOutBlocksByPerModeWidth) {
   json["mode_dimensions"] = std::vector<std::size_t>{4u, 3u, 2u};
   auto ragged = BosonicModes::from_json(json);
   try {
-    BosonMapping::for_basis(*ragged);
+    BosonMapping::standard_binary(*ragged);
     FAIL() << "expected std::invalid_argument";
   } catch (const std::invalid_argument& e) {
     const std::string message = e.what();
@@ -371,7 +379,7 @@ TEST(BosonMapping, RejectsNonPowerOfTwoCutoffWithAnActionableMessage) {
 
 TEST(BosonMapping, ForBasisReadsTheCutoffFromTheBasis) {
   BosonicModes modes(3, 4);
-  const auto mapping = BosonMapping::for_basis(modes);
+  const auto mapping = BosonMapping::standard_binary(modes);
   EXPECT_EQ(mapping.num_modes(), 3u);
   EXPECT_EQ(mapping.mode_dimension(0), 4u);
   EXPECT_EQ(mapping.mode_dimensions(), (std::vector<std::size_t>{4u, 4u, 4u}));
@@ -386,7 +394,8 @@ TEST(BosonMapping, ForBasisReadsTheCutoffFromTheBasis) {
   EXPECT_THROW(mapping.validate_basis(wrong_count), std::invalid_argument);
 
   BosonicModes not_mappable(2, 3);
-  EXPECT_THROW(BosonMapping::for_basis(not_mappable), std::invalid_argument);
+  EXPECT_THROW(BosonMapping::standard_binary(not_mappable),
+               std::invalid_argument);
 }
 
 // ---------------------------------------------------------------------------
@@ -474,10 +483,9 @@ TEST(BosonMapping, AnnihilationOperatorMatchesTheClosedForm) {
   EXPECT_NEAR(terms.at("YY").real(), c, kTol);
 
   // Term count is nq * 2^nq for every power-of-two d and both encodings.
-  for (const auto encoding :
-       {BosonEncoding::StandardBinary, BosonEncoding::GrayCode}) {
+  for (const auto factory : kUniformFactories) {
     for (const std::size_t d : {2u, 4u, 8u, 16u}) {
-      const auto wide = BosonMapping::for_encoding(1, d, encoding);
+      const auto wide = factory(1, d);
       const std::size_t nq = wide.qubits_per_mode(0);
       EXPECT_EQ(wide.annihilation(0).size(), nq * (std::size_t{1} << nq))
           << "d=" << d;
@@ -486,9 +494,8 @@ TEST(BosonMapping, AnnihilationOperatorMatchesTheClosedForm) {
 }
 
 TEST(BosonMapping, CreationIsTheAdjointOfAnnihilation) {
-  for (const auto encoding :
-       {BosonEncoding::StandardBinary, BosonEncoding::GrayCode}) {
-    const auto mapping = BosonMapping::for_encoding(1, 8, encoding);
+  for (const auto factory : kUniformFactories) {
+    const auto mapping = factory(1, 8);
     const auto annihilate = mapping.annihilation(0);
     const auto create = mapping.creation(0);
     ASSERT_EQ(annihilate.size(), create.size());
@@ -557,21 +564,21 @@ TEST(BosonMapping, GrayCodeNumberOperatorIsExactButHigherWeight) {
 // Verified fixtures from the encoding report (section 5.6)
 // ---------------------------------------------------------------------------
 
-BosonMapResult map_bose_hubbard(std::size_t sites, std::size_t dim, double t,
-                                double u, double mu, BosonEncoding encoding) {
+BosonMapResult map_bose_hubbard(
+    std::size_t sites, std::size_t dim, double t, double u, double mu,
+    BasisFactory factory = &BosonMapping::standard_binary) {
   const auto hamiltonian =
       mh::create_bose_hubbard_hamiltonian(chain(sites), t, u, mu, dim);
   const auto* modes =
       dynamic_cast<const BosonicModes*>(hamiltonian.get_orbitals().get());
   EXPECT_NE(modes, nullptr);
-  const auto mapping = BosonMapping::for_basis(*modes, encoding);
+  const auto mapping = factory(*modes);
   return boson_map_hamiltonian(mapping, hamiltonian, 1e-12, 1e-14);
 }
 
 TEST(BosonMapEngine, Fixture1TwoHardCoreModes) {
   // L = 2, d = 2, t = 1, U = 4, mu = 0 -> -0.5 (XX + YY) on 2 qubits.
-  const auto result =
-      map_bose_hubbard(2, 2, 1.0, 4.0, 0.0, BosonEncoding::StandardBinary);
+  const auto result = map_bose_hubbard(2, 2, 1.0, 4.0, 0.0);
   const auto terms = as_labels(result, 2);
   ASSERT_EQ(terms.size(), 2u);
   EXPECT_NEAR(terms.at("XX").real(), -0.5, kTol);
@@ -584,8 +591,7 @@ TEST(BosonMapEngine, Fixture1TwoHardCoreModes) {
 TEST(BosonMapEngine, Fixture4ThreeHardCoreModesPinsTheRegisterLayout) {
   // L = 3, d = 2, t = 1, U = 8, mu = 0.  The exact strings — not just the
   // spectrum — distinguish the mode-to-qubit layout and the endianness.
-  const auto result =
-      map_bose_hubbard(3, 2, 1.0, 8.0, 0.0, BosonEncoding::StandardBinary);
+  const auto result = map_bose_hubbard(3, 2, 1.0, 8.0, 0.0);
   const auto terms = as_labels(result, 3);
   ASSERT_EQ(terms.size(), 4u);
   EXPECT_NEAR(terms.at("IXX").real(), -0.5, kTol);
@@ -596,8 +602,7 @@ TEST(BosonMapEngine, Fixture4ThreeHardCoreModesPinsTheRegisterLayout) {
 
 TEST(BosonMapEngine, Fixture2TwoModesFourLevels) {
   // L = 2, d = 4, t = 1, U = 4, mu = 0 -> 39 terms on 4 qubits.
-  const auto result =
-      map_bose_hubbard(2, 4, 1.0, 4.0, 0.0, BosonEncoding::StandardBinary);
+  const auto result = map_bose_hubbard(2, 4, 1.0, 4.0, 0.0);
   const auto terms = as_labels(result, 4);
   const std::vector<std::pair<std::string, double>> reference{
       {"IIII", 8.0},
@@ -674,12 +679,11 @@ TEST(BosonMapEngine, ThreeWayBuilderAgreementAndZeroLeakage) {
     EXPECT_LT((occupation - kronecker).cwiseAbs().maxCoeff(), kTol)
         << "L=" << c.sites << " d=" << c.dim;
 
-    for (const auto encoding :
-         {BosonEncoding::StandardBinary, BosonEncoding::GrayCode}) {
+    for (std::size_t index = 0; index < kBasisFactories.size(); ++index) {
       // Builder 3: the library's chemist-notation contraction, encoded.
-      const auto result =
-          map_bose_hubbard(c.sites, c.dim, c.t, c.u, c.mu, encoding);
-      const auto mapping = BosonMapping::for_encoding(c.sites, c.dim, encoding);
+      const auto result = map_bose_hubbard(c.sites, c.dim, c.t, c.u, c.mu,
+                                           kBasisFactories[index]);
+      const auto mapping = kUniformFactories[index](c.sites, c.dim);
       const Eigen::MatrixXcd encoded =
           to_matrix(result.words, result.coefficients, mapping.num_qubits());
       ASSERT_EQ(encoded.rows(), occupation.rows());
@@ -699,7 +703,7 @@ TEST(BosonMapEngine, ThreeWayBuilderAgreementAndZeroLeakage) {
         }
       }
       EXPECT_LT(max_error, kTol) << "L=" << c.sites << " d=" << c.dim
-                                 << " encoding=" << to_string(encoding);
+                                 << " encoding=" << mapping.name();
 
       // Leakage: the codeword map is a bijection onto the whole register at a
       // power-of-two cutoff, so every register state is physical and the
@@ -766,8 +770,7 @@ TEST(BosonMapEngine, ExactGroundAndExcitedEnergies) {
 
 TEST(BosonMapEngine, EncodedSpectrumMatchesTheReferenceFixture) {
   // Fixture 2 full 16-dimensional spectrum (report section 5.4).
-  const auto result =
-      map_bose_hubbard(2, 4, 1.0, 4.0, 0.0, BosonEncoding::StandardBinary);
+  const auto result = map_bose_hubbard(2, 4, 1.0, 4.0, 0.0);
   const Eigen::MatrixXcd encoded =
       to_matrix(result.words, result.coefficients, 4);
   const Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcd> solver(encoded);
@@ -799,10 +802,9 @@ TEST(BosonMapEngine, EncodedSpectrumMatchesTheReferenceFixture) {
 }
 
 TEST(BosonMapEngine, GrayCodeIsIsospectralWithStandardBinary) {
-  const auto sb =
-      map_bose_hubbard(3, 4, 0.7, 3.3, 0.9, BosonEncoding::StandardBinary);
+  const auto sb = map_bose_hubbard(3, 4, 0.7, 3.3, 0.9);
   const auto gc =
-      map_bose_hubbard(3, 4, 0.7, 3.3, 0.9, BosonEncoding::GrayCode);
+      map_bose_hubbard(3, 4, 0.7, 3.3, 0.9, &BosonMapping::gray_code);
   const Eigen::MatrixXcd sb_matrix = to_matrix(sb.words, sb.coefficients, 6);
   const Eigen::MatrixXcd gc_matrix = to_matrix(gc.words, gc.coefficients, 6);
   const Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcd> sb_solver(sb_matrix);
@@ -826,25 +828,14 @@ TEST(BosonMapping, JsonRoundTrip) {
   EXPECT_EQ(loaded.mode_dimension(0), 8u);
   EXPECT_EQ(json.at("mode_dimensions").get<std::vector<std::size_t>>(),
             (std::vector<std::size_t>{8u, 8u, 8u}));
-  EXPECT_EQ(loaded.encoding(), BosonEncoding::GrayCode);
+  EXPECT_EQ(loaded.name(), "gray-code");
+  EXPECT_EQ(loaded.codeword_table(0),
+            (std::vector<std::uint64_t>{0, 1, 3, 2, 6, 7, 5, 4}));
   EXPECT_EQ(loaded.content_hash(), mapping.content_hash());
   EXPECT_NE(loaded.content_hash(),
             BosonMapping::standard_binary(3, 8).content_hash());
   EXPECT_EQ(mapping.get_data_type_name(), "boson_mapping");
   EXPECT_NE(mapping.get_summary().find("gray-code"), std::string::npos);
-}
-
-TEST(BosonMapping, EncodingNameParsing) {
-  EXPECT_EQ(boson_encoding_from_string("standard-binary"),
-            BosonEncoding::StandardBinary);
-  EXPECT_EQ(boson_encoding_from_string("standard_binary"),
-            BosonEncoding::StandardBinary);
-  EXPECT_EQ(boson_encoding_from_string("SB"), BosonEncoding::StandardBinary);
-  EXPECT_EQ(boson_encoding_from_string("Gray-Code"), BosonEncoding::GrayCode);
-  EXPECT_EQ(boson_encoding_from_string("gray"), BosonEncoding::GrayCode);
-  EXPECT_THROW(boson_encoding_from_string("unary"), std::invalid_argument);
-  EXPECT_EQ(to_string(BosonEncoding::StandardBinary), "standard-binary");
-  EXPECT_EQ(to_string(BosonEncoding::GrayCode), "gray-code");
 }
 
 TEST(BoseHubbardBuilder, StoresChemistNotationIntegralsOnABosonicBasis) {
@@ -966,28 +957,17 @@ TEST(BosonMappingCustomTable, ReproducesTheNamedEncodingsExactly) {
   }
 }
 
-TEST(BosonMappingCustomTable, ReportsCustomEvenWhenTheTableIsANamedOne) {
-  // The tag records how the mapping was built; no table recognition happens,
-  // so encoding() never has to guess and can never be subtly wrong.
+TEST(BosonMappingCustomTable, LabelsTheTableWithoutRecognizingIt) {
+  // No table recognition happens: a table that is the standard-binary one is
+  // still labelled by whatever the caller supplied.
   const auto mapping = BosonMapping::from_codeword_table(
       table_of(BosonMapping::standard_binary(1, 4)));
-  EXPECT_EQ(mapping.encoding(), BosonEncoding::Custom);
   EXPECT_EQ(mapping.name(), "custom");
-  EXPECT_EQ(to_string(BosonEncoding::Custom), "custom");
-  EXPECT_EQ(boson_encoding_from_string("custom"), BosonEncoding::Custom);
-  EXPECT_EQ(boson_encoding_from_string("CUSTOM"), BosonEncoding::Custom);
 
   const auto named =
       BosonMapping::from_codeword_table({{0, 1, 3, 2}}, "reflected");
   EXPECT_EQ(named.name(), "reflected");
-  EXPECT_EQ(named.encoding(), BosonEncoding::Custom);
   EXPECT_NE(named.get_summary().find("reflected"), std::string::npos);
-}
-
-TEST(BosonMappingCustomTable, CustomEncodingCannotSelectAnEncoding) {
-  // "custom" names no particular table, so it cannot stand in for one.
-  EXPECT_THROW(BosonMapping::for_encoding(2, 4, BosonEncoding::Custom),
-               std::invalid_argument);
 }
 
 TEST(BosonMappingCustomTable, HeterogeneousTablesLayOutBlocksPerMode) {
@@ -1096,8 +1076,7 @@ TEST(BosonMappingCustomTable, SerializationRoundTripsTheTable) {
       BosonMapping::from_codeword_table({{2, 0, 3, 1}, {1, 0}}, "my-encoding");
   const auto json = mapping.to_json();
 
-  // The table -- not the tag -- is what goes on the wire for a custom mapping.
-  EXPECT_EQ(json.at("encoding").get<std::string>(), "custom");
+  // The table is what goes on the wire; it is the identity of the mapping.
   EXPECT_EQ(json.at("name").get<std::string>(), "my-encoding");
   EXPECT_EQ(json.at("codewords").get<std::vector<std::vector<std::uint64_t>>>(),
             (std::vector<std::vector<std::uint64_t>>{{2, 0, 3, 1}, {1, 0}}));
@@ -1106,7 +1085,6 @@ TEST(BosonMappingCustomTable, SerializationRoundTripsTheTable) {
   EXPECT_EQ(json.at("version").get<std::string>(), "0.1.0");
 
   const auto loaded = BosonMapping::from_json(json);
-  EXPECT_EQ(loaded.encoding(), BosonEncoding::Custom);
   EXPECT_EQ(loaded.name(), "my-encoding");
   EXPECT_EQ(loaded.codeword_table(0), (std::vector<std::uint64_t>{2, 0, 3, 1}));
   EXPECT_EQ(loaded.codeword_table(1), (std::vector<std::uint64_t>{1, 0}));
@@ -1123,50 +1101,30 @@ TEST(BosonMappingCustomTable, SerializationRoundTripsTheTable) {
   EXPECT_NE(relabelled.content_hash(), mapping.content_hash());
 }
 
-TEST(BosonMappingCustomTable, NamedEncodingPayloadsAndHashesAreUnchanged) {
-  // The new fields are written only for custom mappings, so a document for a
-  // named encoding is exactly what it was before custom tables existed.
-  for (const auto encoding :
-       {BosonEncoding::StandardBinary, BosonEncoding::GrayCode}) {
-    const auto json = BosonMapping::for_encoding(2, 4, encoding).to_json();
-    EXPECT_FALSE(json.contains("codewords"));
-    EXPECT_FALSE(json.contains("name"));
-    EXPECT_EQ(json.size(), 4u);
+TEST(BosonMappingCustomTable, NamedEncodingsRoundTripThroughTheirTable) {
+  // A named encoding is written exactly like any other mapping: the table is
+  // the payload, and the name is a label on it.
+  for (const auto factory : kUniformFactories) {
+    const auto mapping = factory(2, 4);
+    const auto json = mapping.to_json();
+    EXPECT_TRUE(json.contains("codewords"));
+    EXPECT_EQ(json.at("name").get<std::string>(), mapping.name());
+    const auto loaded = BosonMapping::from_json(json);
+    EXPECT_EQ(loaded.name(), mapping.name());
+    EXPECT_EQ(loaded.content_hash(), mapping.content_hash());
+    expect_same_operators(loaded, mapping);
   }
-
-  // And an old-style document -- no codewords field at all -- still loads.
-  const nlohmann::json legacy{{"version", "0.1.0"},
-                              {"num_modes", 2},
-                              {"mode_dimensions", {4, 4}},
-                              {"encoding", "gray-code"}};
-  const auto loaded = BosonMapping::from_json(legacy);
-  EXPECT_EQ(loaded.encoding(), BosonEncoding::GrayCode);
-  expect_same_operators(loaded, BosonMapping::gray_code(2, 4));
 }
 
 TEST(BosonMappingCustomTable, RejectsSelfContradictoryDocuments) {
-  // "custom" without a table has nothing to rebuild the mapping from.
-  const nlohmann::json no_table{{"version", "0.1.0"},
-                                {"num_modes", 1},
-                                {"mode_dimensions", {4}},
-                                {"encoding", "custom"}};
+  // Without a table there is nothing to rebuild the mapping from.
+  const nlohmann::json no_table{
+      {"version", "0.1.0"}, {"num_modes", 1}, {"mode_dimensions", {4}}};
   EXPECT_THROW(BosonMapping::from_json(no_table), std::invalid_argument);
 
-  // A named encoding shipped with a table that is not that encoding's table:
-  // encoding() would then describe an operator set the mapping does not have.
-  nlohmann::json inconsistent{{"version", "0.1.0"},
-                              {"num_modes", 1},
-                              {"mode_dimensions", {4}},
-                              {"encoding", "standard-binary"}};
-  inconsistent["codewords"] =
-      std::vector<std::vector<std::uint64_t>>{{0, 1, 3, 2}};
-  EXPECT_THROW(BosonMapping::from_json(inconsistent), std::invalid_argument);
-
   // The declared dimensions must agree with the table they accompany.
-  nlohmann::json bad_dimensions{{"version", "0.1.0"},
-                                {"num_modes", 1},
-                                {"mode_dimensions", {8}},
-                                {"encoding", "custom"}};
+  nlohmann::json bad_dimensions{
+      {"version", "0.1.0"}, {"num_modes", 1}, {"mode_dimensions", {8}}};
   bad_dimensions["codewords"] =
       std::vector<std::vector<std::uint64_t>>{{0, 1, 3, 2}};
   EXPECT_THROW(BosonMapping::from_json(bad_dimensions), std::invalid_argument);
@@ -1207,11 +1165,8 @@ TEST(BosonMappingCustomTable, MapsAHamiltonianIdenticallyToTheNamedEncoding) {
 
 TEST(HardCoreBosons, OnSiteInteractionVanishesSoUIsInert) {
   // n(n-1) = 0 for n in {0, 1}, so U cannot appear in the mapped operator.
-  const auto free_terms = as_labels(
-      map_bose_hubbard(3, 2, 1.0, 0.0, 0.0, BosonEncoding::StandardBinary), 3);
-  const auto huge_terms = as_labels(
-      map_bose_hubbard(3, 2, 1.0, 400.0, 0.0, BosonEncoding::StandardBinary),
-      3);
+  const auto free_terms = as_labels(map_bose_hubbard(3, 2, 1.0, 0.0, 0.0), 3);
+  const auto huge_terms = as_labels(map_bose_hubbard(3, 2, 1.0, 400.0, 0.0), 3);
   ASSERT_EQ(free_terms.size(), huge_terms.size());
   for (const auto& [label, coefficient] : free_terms) {
     ASSERT_TRUE(huge_terms.count(label) == 1) << label;
@@ -1242,7 +1197,7 @@ TEST(HardCoreBosons, HardCoreBasisIsTwoLevelAndNeedsNoPadding) {
   // Power of two already, so padding is a no-op and the basis maps directly.
   const auto padded = modes->with_padded_dimensions();
   EXPECT_EQ(padded->mode_dimensions(), modes->mode_dimensions());
-  const auto mapping = BosonMapping::for_basis(*modes);
+  const auto mapping = BosonMapping::standard_binary(*modes);
   EXPECT_EQ(mapping.num_qubits(), 4u);
   EXPECT_EQ(mapping.qubits_per_mode(0), 1u);
   EXPECT_NO_THROW(mapping.validate_basis(*modes));
@@ -1250,7 +1205,8 @@ TEST(HardCoreBosons, HardCoreBasisIsTwoLevelAndNeedsNoPadding) {
 
 TEST(HardCoreBosons, AnnihilationIsExactlySigmaMinus) {
   // b = |0><1| = (X + iY)/2 at d = 2.
-  const auto mapping = BosonMapping::for_basis(*BosonicModes::hard_core(1));
+  const auto mapping =
+      BosonMapping::standard_binary(*BosonicModes::hard_core(1));
   const auto terms = as_labels(mapping.annihilation(0), 1);
   ASSERT_EQ(terms.size(), 2u);
   EXPECT_NEAR(terms.at("X").real(), 0.5, kTol);
@@ -1264,7 +1220,7 @@ TEST(HardCoreBosons, ReproducesResearchFixtureOne) {
   const auto modes = BosonicModes::hard_core(2);
   const auto hamiltonian = mh::create_bose_hubbard_hamiltonian(
       chain(2), 1.0, 4.0, 0.0, modes->mode_dimension(0));
-  const auto mapping = BosonMapping::for_basis(*modes);
+  const auto mapping = BosonMapping::standard_binary(*modes);
   const auto terms =
       as_labels(boson_map_hamiltonian(mapping, hamiltonian, 1e-12, 1e-14), 2);
   ASSERT_EQ(terms.size(), 2u);

@@ -699,7 +699,9 @@ std::shared_ptr<ModelOrbitals> SparseHamiltonianContainer::_make_orbitals(
 std::shared_ptr<Orbitals> SparseHamiltonianContainer::_check_orbitals(
     const std::shared_ptr<Orbitals>& orbitals, Eigen::Index num_orbitals) {
   if (!orbitals) {
-    return _make_orbitals(static_cast<int>(num_orbitals));
+    throw std::invalid_argument(
+        "SparseHamiltonianContainer: the supplied basis is null. Use an "
+        "overload without an orbitals parameter to default to ModelOrbitals.");
   }
   if (static_cast<Eigen::Index>(orbitals->get_num_molecular_orbitals()) !=
       num_orbitals) {

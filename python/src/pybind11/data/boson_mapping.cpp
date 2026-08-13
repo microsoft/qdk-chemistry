@@ -42,42 +42,6 @@ py::list terms_to_python(const BosonPauliTerms& terms) {
 void bind_boson_mapping(pybind11::module& data) {
   using namespace qdk::chemistry::data;
 
-  py::enum_<BosonEncoding>(data, "BosonEncoding",
-                           R"(
-Boson-to-qubit encoding family.
-
-Every encoding maps the truncated local Fock space of one mode onto
-``nq = log2(d)`` qubits. ``StandardBinary``, the default, uses
-``codeword(n) = n``; ``GrayCode`` uses ``codeword(n) = n XOR (n >> 1)``, so
-adjacent occupations differ in a single bit. The two use exactly the same
-number of Pauli terms and differ only in which computational basis state
-represents which occupation number.
-
-``Custom`` is not an encoding rule but a tag: it marks a mapping built by
-:meth:`BosonMapping.from_codeword_table`, whose codeword table is arbitrary and
-is carried explicitly by the object. It is never inferred, so a table that
-happens to equal the standard-binary one still reports ``Custom``, and it cannot
-be passed to :meth:`BosonMapping.for_encoding`.
-)")
-      .value("StandardBinary", BosonEncoding::StandardBinary)
-      .value("GrayCode", BosonEncoding::GrayCode)
-      .value("Custom", BosonEncoding::Custom);
-
-  data.def("boson_encoding_from_string", &boson_encoding_from_string,
-           py::arg("name"),
-           R"(
-Parse a boson encoding name.
-
-Args:
-    name (str): Case-insensitive encoding name; ``"standard-binary"`` (aliases ``"standard_binary"``, ``"binary"``, ``"sb"``), ``"gray-code"`` (aliases ``"gray_code"``, ``"gray"``, ``"gc"``) or ``"custom"``.
-
-Returns:
-    BosonEncoding: The parsed encoding. ``"custom"`` yields ``BosonEncoding.Custom``, which is a tag rather than a rule and cannot be given to :meth:`BosonMapping.for_encoding`.
-
-Raises:
-    ValueError: If the name is not a recognised encoding.
-)");
-
   py::class_<BosonMapping, DataClass, py::smart_holder> mapping(data,
                                                                 "BosonMapping",
                                                                 R"(
@@ -90,9 +54,9 @@ a power of two: the code is then surjective, the encoded subspace is the whole
 Hilbert space, and there is no leakage.
 
 The cutoff is owned by the ``BosonicModes`` basis and is attributed per mode, so
-every accessor here takes a mode index. The uniform factories
-(``standard_binary``, ``gray_code``, ``for_encoding``) simply give every mode the
-same dimension; ``for_basis`` carries whatever the basis states.
+every accessor here takes a mode index. Given a mode count and a dimension, the
+named factories give every mode the same dimension; given a ``BosonicModes``
+basis, they carry whatever the basis states.
 
 The encoding set is open. An encoding *is* its codeword table, so
 ``from_codeword_table`` accepts any per-mode permutation of ``range(d)`` and the
@@ -106,7 +70,7 @@ significant (leftmost) block and the encoded basis index of an occupation
 tuple ``(n_0, ..., n_{L-1})`` is row-major in that tuple.
 
 Examples:
-    >>> from qdk_chemistry.data import BosonMapping, BosonEncoding
+    >>> from qdk_chemistry.data import BosonMapping
     >>> mapping = BosonMapping.standard_binary(num_modes=2, mode_dimension=4)
     >>> mapping.num_qubits()
     4
@@ -116,10 +80,12 @@ Examples:
 )");
 
   mapping
-      .def_static("standard_binary", &BosonMapping::standard_binary,
+      .def_static("standard_binary",
+                  py::overload_cast<std::size_t, std::size_t>(
+                      &BosonMapping::standard_binary),
                   py::arg("num_modes"), py::arg("mode_dimension"),
                   R"(
-Create a standard-binary boson-to-qubit mapping.
+Create a standard-binary boson-to-qubit mapping with a uniform cutoff.
 
 Args:
     num_modes (int): Number of bosonic modes.
@@ -131,49 +97,54 @@ Returns:
 Raises:
     ValueError: If ``mode_dimension`` is not a power of two of at least 2.
 )")
-      .def_static("gray_code", &BosonMapping::gray_code, py::arg("num_modes"),
-                  py::arg("mode_dimension"),
+      .def_static("standard_binary",
+                  py::overload_cast<const BosonicModes&>(
+                      &BosonMapping::standard_binary),
+                  py::arg("modes"),
                   R"(
-Create a Gray-code boson-to-qubit mapping.
-
-Args:
-    num_modes (int): Number of bosonic modes.
-    mode_dimension (int): Local Fock-space dimension; must be a power of two of at least 2.
-
-Returns:
-    BosonMapping: The mapping.
-
-Raises:
-    ValueError: If ``mode_dimension`` is not a power of two of at least 2.
-)")
-      .def_static("for_encoding", &BosonMapping::for_encoding,
-                  py::arg("num_modes"), py::arg("mode_dimension"),
-                  py::arg("encoding"),
-                  R"(
-Create a mapping for an explicitly chosen encoding.
-
-Args:
-    num_modes (int): Number of bosonic modes.
-    mode_dimension (int): Local Fock-space dimension; must be a power of two of at least 2.
-    encoding (BosonEncoding): The encoding family to use.
-
-Returns:
-    BosonMapping: The mapping.
-
-Raises:
-    ValueError: If ``mode_dimension`` is not a power of two of at least 2.
-)")
-      .def_static("for_basis", &BosonMapping::for_basis, py::arg("modes"),
-                  py::arg("encoding") = BosonEncoding::StandardBinary,
-                  R"(
-Create a mapping that matches a bosonic basis.
+Create a standard-binary mapping that matches a bosonic basis.
 
 The cutoff is read from ``modes`` per mode; the mapping never owns or duplicates
 it. This is the recommended entry point.
 
 Args:
     modes (BosonicModes): The bosonic single-particle basis.
-    encoding (BosonEncoding, optional): The encoding family; defaults to standard binary.
+
+Returns:
+    BosonMapping: A mapping whose cutoffs match ``modes``.
+
+Raises:
+    ValueError: If any mode dimension of the basis is not a power of two.
+)")
+      .def_static(
+          "gray_code",
+          py::overload_cast<std::size_t, std::size_t>(&BosonMapping::gray_code),
+          py::arg("num_modes"), py::arg("mode_dimension"),
+          R"(
+Create a Gray-code boson-to-qubit mapping with a uniform cutoff.
+
+Args:
+    num_modes (int): Number of bosonic modes.
+    mode_dimension (int): Local Fock-space dimension; must be a power of two of at least 2.
+
+Returns:
+    BosonMapping: The mapping.
+
+Raises:
+    ValueError: If ``mode_dimension`` is not a power of two of at least 2.
+)")
+      .def_static(
+          "gray_code",
+          py::overload_cast<const BosonicModes&>(&BosonMapping::gray_code),
+          py::arg("modes"),
+          R"(
+Create a Gray-code mapping that matches a bosonic basis.
+
+The cutoff is read from ``modes`` per mode; the mapping never owns or duplicates
+it.
+
+Args:
+    modes (BosonicModes): The bosonic single-particle basis.
 
 Returns:
     BosonMapping: A mapping whose cutoffs match ``modes``.
@@ -198,9 +169,8 @@ Because every cutoff is a power of two and the code must be surjective on
 is ``n ^ (n >> 1)``; passing either reproduces the corresponding named mapping
 operator for operator.
 
-The resulting mapping always reports ``BosonEncoding.Custom`` -- the table is
-never matched against the named families -- and the table, not the enum, is
-what is written to and read back from serialized documents.
+The table is never matched against the named families, and it is what is
+written to and read back from serialized documents.
 
 Args:
     per_mode_codewords (list[list[int]]): One list per mode; entry ``n`` is the codeword for occupation ``n``.
@@ -213,10 +183,10 @@ Raises:
     ValueError: If the table is empty, if any mode has fewer than 2 levels, if any mode's level count is not a power of two, or if a mode's codewords are not a permutation of ``range(d)`` (out of range or repeated).
 
 Examples:
-    >>> from qdk_chemistry.data import BosonMapping, BosonEncoding
+    >>> from qdk_chemistry.data import BosonMapping
     >>> mapping = BosonMapping.from_codeword_table([[0, 1, 3, 2]] * 2)
-    >>> mapping.encoding == BosonEncoding.Custom
-    True
+    >>> mapping.name
+    'custom'
     >>> mapping.codeword_table(0) == BosonMapping.gray_code(num_modes=2, mode_dimension=4).codeword_table(0)
     True
 )")
@@ -286,10 +256,6 @@ Total number of qubits used by the mapping.
 
 Returns:
     int: The sum of ``qubits_per_mode(i)`` over every mode.
-)")
-      .def_property_readonly("encoding", &BosonMapping::encoding,
-                             R"(
-BosonEncoding: The encoding family used by this mapping. Mappings built by ``from_codeword_table`` always report ``BosonEncoding.Custom``.
 )")
       .def_property_readonly("name", &BosonMapping::name,
                              R"(

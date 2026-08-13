@@ -19,6 +19,7 @@ All algorithms follow a :doc:`factory pattern <factory_pattern>` design, allowin
    mcscf
    pmc
    qubit_mapper
+   boson_qubit_mapper
    scf_solver
    stability_checker
    state_preparation
@@ -71,6 +72,9 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
    * - :doc:`QubitMapper <qubit_mapper>`
      - Fermion-to-qubit mapping
      - Hamiltonian → QubitOperator
+   * - :doc:`BosonQubitMapper <boson_qubit_mapper>`
+     - Boson-to-qubit mapping
+     - Hamiltonian + BosonMapping → QubitOperator
    * - :doc:`StatePreparation <state_preparation>`
      - Quantum state preparation
      - Wavefunction → Circuit
