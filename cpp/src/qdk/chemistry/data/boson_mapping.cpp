@@ -20,6 +20,8 @@
 #include <utility>
 #include <vector>
 
+#include "bit_utils.hpp"
+
 namespace qdk::chemistry::data {
 
 namespace detail {
@@ -30,18 +32,6 @@ using LocalPauliMap = std::unordered_map<std::uint64_t, std::complex<double>>;
 
 /// Dense d x d complex matrix in row-major order.
 using LocalMatrix = std::vector<std::complex<double>>;
-
-bool is_power_of_two(std::size_t value) {
-  return value != 0 && (value & (value - 1)) == 0;
-}
-
-std::size_t log2_exact(std::size_t value) {
-  std::size_t bits = 0;
-  while ((std::size_t{1} << bits) < value) {
-    ++bits;
-  }
-  return bits;
-}
 
 /// Accumulate the exact Pauli expansion of coeff * |row><col| into @p out.
 ///
@@ -277,7 +267,7 @@ void BosonMapping::validate_mode_dimension(std::size_t mode,
         ", but a mode dimension must be at least 2 (a mode with fewer than "
         "two levels carries no bosonic degree of freedom).");
   }
-  if (!detail::is_power_of_two(mode_dimension)) {
+  if (!is_power_of_two(mode_dimension)) {
     throw std::invalid_argument(
         "BosonMapping: mode " + std::to_string(mode) +
         " has local dimension d=" + std::to_string(mode_dimension) +
@@ -316,7 +306,7 @@ void BosonMapping::validate_codeword_table(
           ", but a mode dimension must be at least 2 (a mode with fewer than "
           "two levels carries no bosonic degree of freedom).");
     }
-    if (!detail::is_power_of_two(dimension)) {
+    if (!is_power_of_two(dimension)) {
       throw std::invalid_argument(
           "BosonMapping::from_codeword_table: mode " + std::to_string(mode) +
           " was given " + std::to_string(dimension) +
@@ -337,7 +327,7 @@ void BosonMapping::validate_codeword_table(
             "BosonMapping::from_codeword_table: mode " + std::to_string(mode) +
             " maps level " + std::to_string(level) + " to codeword " +
             std::to_string(code) + ", which does not fit in the " +
-            std::to_string(detail::log2_exact(dimension)) +
+            std::to_string(log2_exact(dimension)) +
             " qubit(s) implied by that mode's " + std::to_string(dimension) +
             " codewords. Every codeword must be less than d=" +
             std::to_string(dimension) + ".");
@@ -422,7 +412,7 @@ BosonMapping::BosonMapping(
   mode_qubit_counts_.resize(num_modes);
   for (std::size_t i = 0; i < num_modes; ++i) {
     mode_dimensions_[i] = codewords_[i].size();
-    mode_qubit_counts_[i] = detail::log2_exact(mode_dimensions_[i]);
+    mode_qubit_counts_[i] = log2_exact(mode_dimensions_[i]);
     num_qubits_ += mode_qubit_counts_[i];
   }
 

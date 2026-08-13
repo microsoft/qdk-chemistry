@@ -18,7 +18,7 @@
 
 namespace qdk::chemistry::data {
 
-namespace {
+namespace detail {
 
 using TermAccumulator =
     std::unordered_map<SparsePauliWord, std::complex<double>,
@@ -53,7 +53,7 @@ BosonMapResult finalize(TermAccumulator& sink, double threshold) {
   return result;
 }
 
-}  // namespace
+}  // namespace detail
 
 BosonMapResult boson_map_hamiltonian(const BosonMapping& mapping,
                                      double core_energy, const double* one_body,
@@ -80,7 +80,7 @@ BosonMapResult boson_map_hamiltonian(const BosonMapping& mapping,
         "num_entries > 0");
   }
 
-  TermAccumulator sink;
+  detail::TermAccumulator sink;
   if (std::abs(core_energy) >= integral_threshold) {
     sink[SparsePauliWord{}] += std::complex<double>(core_energy, 0.0);
   }
@@ -92,7 +92,8 @@ BosonMapResult boson_map_hamiltonian(const BosonMapping& mapping,
       if (std::abs(value) < integral_threshold) {
         continue;
       }
-      accumulate(sink, mapping.ladder_product({{p, true}, {q, false}}), value);
+      detail::accumulate(sink, mapping.ladder_product({{p, true}, {q, false}}),
+                         value);
     }
   }
 
@@ -116,13 +117,13 @@ BosonMapResult boson_map_hamiltonian(const BosonMapping& mapping,
     const auto q = static_cast<std::size_t>(idx[1]);
     const auto r = static_cast<std::size_t>(idx[2]);
     const auto s = static_cast<std::size_t>(idx[3]);
-    accumulate(
+    detail::accumulate(
         sink,
         mapping.ladder_product({{p, true}, {r, true}, {s, false}, {q, false}}),
         0.5 * value);
   }
 
-  return finalize(sink, threshold);
+  return detail::finalize(sink, threshold);
 }
 
 BosonMapResult boson_map_hamiltonian(const BosonMapping& mapping,

@@ -11,22 +11,19 @@
 #include <utility>
 #include <vector>
 
+#include "bit_utils.hpp"
 #include "hdf5_error_handling.hpp"
 #include "hdf5_serialization.hpp"
 
 namespace qdk::chemistry::data {
 
-namespace {
+namespace detail {
 
 /// HDF5/JSON key holding the per-mode local Fock-space dimensions.
 constexpr const char* kModeDimensionsKey = "mode_dimensions";
 
 /// Type tag written by to_json()/to_hdf5() and dispatched on by Orbitals.
 constexpr const char* kTypeTag = "BosonicModes";
-
-bool is_power_of_two(std::size_t value) {
-  return value != 0 && (value & (value - 1)) == 0;
-}
 
 /// Render a dimension list compactly, eliding the middle of long lists.
 std::string format_dimensions(const std::vector<std::size_t>& dimensions) {
@@ -46,7 +43,7 @@ std::string format_dimensions(const std::vector<std::size_t>& dimensions) {
   return out;
 }
 
-}  // namespace
+}  // namespace detail
 
 void BosonicModes::_validate_dimension(std::size_t mode,
                                        std::size_t mode_dimension) {
@@ -187,8 +184,9 @@ std::string BosonicModes::get_summary() const {
     summary += "  Local dimension d: " + std::to_string(*uniform) +
                " (n_max = " + std::to_string(*uniform - 1) + ")\n";
   } else {
-    summary += "  Local dimensions d: " + format_dimensions(_mode_dimensions) +
-               " (per mode)\n";
+    summary +=
+        "  Local dimensions d: " + detail::format_dimensions(_mode_dimensions) +
+        " (per mode)\n";
   }
   summary += "  Power-of-two dimensions: " +
              std::string(has_power_of_two_dimensions() ? "Yes" : "No") + "\n";
@@ -206,8 +204,8 @@ nlohmann::json BosonicModes::to_json() const {
   // written as one entry per mode so that per-mode cutoffs round-trip without
   // a schema change.
   nlohmann::json j = ModelOrbitals::to_json();
-  j["type"] = kTypeTag;
-  j[kModeDimensionsKey] = _mode_dimensions;
+  j["type"] = detail::kTypeTag;
+  j[detail::kModeDimensionsKey] = _mode_dimensions;
   return j;
 }
 
@@ -220,12 +218,12 @@ std::shared_ptr<BosonicModes> BosonicModes::from_json(const nlohmann::json& j) {
     // The schema is an array of one dimension per mode, always. No default is
     // possible here: inventing a cutoff would silently change the physics,
     // which is exactly what the basis-owns-the-cutoff rule is there to prevent.
-    if (!j.contains(kModeDimensionsKey)) {
+    if (!j.contains(detail::kModeDimensionsKey)) {
       throw std::runtime_error(
           "JSON missing required mode_dimensions field (an array holding one "
           "local Fock-space dimension per mode)");
     }
-    const auto& entry = j[kModeDimensionsKey];
+    const auto& entry = j[detail::kModeDimensionsKey];
     if (!entry.is_array()) {
       throw std::runtime_error(
           "JSON field mode_dimensions must be an array holding one local "
@@ -257,10 +255,11 @@ void BosonicModes::to_hdf5(H5::Group& group) const {
 
     H5::Group metadata_group = group.openGroup("metadata");
     H5::Attribute type_attr = metadata_group.openAttribute("type");
-    std::string type_name = kTypeTag;
+    std::string type_name = detail::kTypeTag;
     type_attr.write(string_type, type_name);
 
-    save_vector_to_group(metadata_group, kModeDimensionsKey, _mode_dimensions);
+    save_vector_to_group(metadata_group, detail::kModeDimensionsKey,
+                         _mode_dimensions);
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
   }
@@ -275,13 +274,13 @@ std::shared_ptr<BosonicModes> BosonicModes::from_hdf5(H5::Group& group) {
     H5::Group metadata_group = group.openGroup("metadata");
     // The schema is a one-dimensional dataset holding one dimension per mode,
     // always. A missing dataset is an error, never a silent default.
-    if (!metadata_group.nameExists(kModeDimensionsKey)) {
+    if (!metadata_group.nameExists(detail::kModeDimensionsKey)) {
       throw std::runtime_error(
           "HDF5 group missing required metadata/mode_dimensions dataset (one "
           "local Fock-space dimension per mode)");
     }
     auto dimensions =
-        load_size_vector_from_group(metadata_group, kModeDimensionsKey);
+        load_size_vector_from_group(metadata_group, detail::kModeDimensionsKey);
     if (dimensions.size() != num_modes) {
       throw std::runtime_error("HDF5 dataset metadata/mode_dimensions holds " +
                                std::to_string(dimensions.size()) +
@@ -297,7 +296,7 @@ std::shared_ptr<BosonicModes> BosonicModes::from_hdf5(H5::Group& group) {
 
 void BosonicModes::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
   Orbitals::hash_update(ctx);
-  qdk::chemistry::utils::hash_value(ctx, std::string(kTypeTag));
+  qdk::chemistry::utils::hash_value(ctx, std::string(detail::kTypeTag));
   qdk::chemistry::utils::hash_value(
       ctx, static_cast<std::uint64_t>(get_num_molecular_orbitals()));
   for (const std::size_t dimension : _mode_dimensions) {
