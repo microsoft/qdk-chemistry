@@ -57,6 +57,13 @@ class TestCubegen:
         orbitals = _no_orbitals()
         assert generate_cubefiles_from_orbitals(orbitals, indices=[]) == {}
 
+    def test_generate_cubefiles_uses_zero_based_default_labels(self):
+        orbitals = _o2_orbitals()
+
+        cubes = generate_cubefiles_from_orbitals(orbitals, indices=[0], grid_size=(4, 4, 4))
+
+        assert list(cubes) == ["orbital_0000"]
+
     def test_generate_cubefiles_are_identical_for_singlet_and_triplet(self, monkeypatch):
         orbitals = _o2_orbitals()
         basis_set = orbitals.get_basis_set()

@@ -75,7 +75,7 @@ def generate_cube_data_with_info(
 
     cube_data_with_info: dict[str, dict] = {}
     for raw_label, cube_str in cube_data_raw.items():
-        idx = int(raw_label.split("_")[1]) - 1
+        idx = int(raw_label.split("_")[1])
         cube_data_with_info[orbital_label(idx, n_occupied)] = {
             "data": cube_str,
             "info": {
@@ -163,7 +163,7 @@ def generate_cube_data_with_correlation_info(
 
     cube_data_with_info: dict[str, dict] = {}
     for raw_label, cube_str in cube_data_raw.items():
-        mo_idx = int(raw_label.split("_")[1]) - 1
+        mo_idx = int(raw_label.split("_")[1])
         pos = mo_to_pos[mo_idx]
         cube_data_with_info[f"MO {mo_idx + 1}"] = {
             "data": cube_str,

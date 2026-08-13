@@ -17,6 +17,7 @@ Bug fixes:
 
 - Corrected the iterative phase estimation phase convention: for :math:`U = e^{-iHt}` the energy is recovered as :math:`E = -\theta / t`, the feedback phase is negated, and ``QpeResult.bits_msb_first`` is now genuinely most-significant-bit first
 - ``QpeResult`` files written by v1 are now upgraded by ``python -m qdk_chemistry.migrate``
+- Orbital cube files generated with the default label maker now use zero-based indices, consistent with orbital indexing elsewhere in QDK/Chemistry. For example, orbital index ``0`` is now labeled ``orbital_0000`` instead of ``orbital_0001``; update code that consumes the previous filenames or provide a custom ``label_maker`` to retain them
 
 Version 2.0.0
 =============
