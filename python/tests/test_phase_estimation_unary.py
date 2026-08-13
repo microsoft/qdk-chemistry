@@ -210,8 +210,11 @@ class TestPhaseWindowState:
         amplitudes = np.array(phase_window_state(num_queries, window))
         assert len(amplitudes) == 1 << num_phase_bits(num_queries)
         assert np.linalg.norm(amplitudes) == pytest.approx(1.0)
-        assert np.all(amplitudes[num_queries + 1 :] == 0.0)
         assert np.all(amplitudes[: num_queries + 1] > 0.0)
+        # Counting the nonzeros rather than slicing the padding keeps this check
+        # meaningful when there is no padding: num_queries = 2^k - 1 fills the
+        # register exactly, and a slice-based assertion would be vacuously true.
+        assert np.count_nonzero(amplitudes) == num_queries + 1
 
     @pytest.mark.parametrize("num_queries", [3, 8, 25])
     def test_cosine_matches_babbush2018_control_state(self, num_queries):
@@ -227,6 +230,11 @@ class TestPhaseWindowState:
         amplitudes = np.array(phase_window_state(num_queries, "cosine"))[: num_queries + 1]
         np.testing.assert_allclose(amplitudes, amplitudes[::-1], rtol=1e-12, atol=1e-15)
         peak = int(np.argmax(amplitudes))
+        # A single lobe puts the peak strictly inside the window. Asserting it
+        # also keeps the two monotonicity checks below non-vacuous: an edge peak
+        # makes one slice a singleton, and np.diff of a singleton is empty, so
+        # np.all would pass without inspecting anything.
+        assert 0 < peak < len(amplitudes) - 1
         assert np.all(np.diff(amplitudes[: peak + 1]) > 0.0)
         assert np.all(np.diff(amplitudes[peak:]) < 0.0)
 

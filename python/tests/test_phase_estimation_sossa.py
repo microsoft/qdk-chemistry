@@ -863,8 +863,10 @@ class TestSOSSAQPEIntegration:
         )
         eigenvalues = np.linalg.eigvalsh(h_matrix)
 
-        # All eigenvalues should be ≤ 2Λ (with small numerical tolerance)
-        assert np.all(eigenvalues <= 2 * lambda_sos + 1e-10), (
+        # All eigenvalues should be ≤ 2Λ (with small numerical tolerance).
+        # Comparing the maximum rather than np.all keeps an empty spectrum loud:
+        # np.max raises on an empty array while np.all would return True.
+        assert eigenvalues.max() <= 2 * lambda_sos + 1e-10, (
             f"Eigenvalue {eigenvalues.max():.6f} exceeds 2Λ={2 * lambda_sos:.6f}"
         )
 
