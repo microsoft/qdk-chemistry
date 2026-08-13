@@ -173,7 +173,7 @@ std::vector<double> mulliken_population(
 
   const auto& overlap = orbitals->get_overlap_matrix();
   Eigen::MatrixXd density;
-  if (orbitals->is_restricted()) {
+  if (!has_spin_axis(orbitals) || orbitals->is_restricted()) {
     density = orbitals->calculate_ao_density_matrix_from_rdm(
         total_one_rdm_spin_traced(wavefunction, orbitals));
   } else {
@@ -189,9 +189,7 @@ std::vector<double> mulliken_population(
   for (int ao = 0; ao < population_matrix.rows(); ++ao) {
     const auto atom_index =
         basis->get_atom_index_for_atomic_orbital(static_cast<size_t>(ao));
-    if (atom_index < electron_population.size()) {
-      electron_population[atom_index] += population_matrix(ao, ao);
-    }
+    electron_population.at(atom_index) += population_matrix(ao, ao);
   }
 
   return electron_population;
@@ -204,11 +202,7 @@ std::unique_ptr<PopulationAnalyzer> make_qdk_population_analyzer() {
 }  // namespace
 
 std::vector<double> QdkPopulationAnalyzer::_run_impl(
-    std::shared_ptr<data::Wavefunction> wavefunction, int charge,
-    int spin_multiplicity, unsigned int n_inactive_orbitals) const {
-  (void)charge;
-  (void)spin_multiplicity;
-  (void)n_inactive_orbitals;
+    std::shared_ptr<data::Wavefunction> wavefunction) const {
   const auto method = _settings->get<std::string>("method");
   if (method == "mulliken") {
     return mulliken_population(wavefunction);

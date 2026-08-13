@@ -92,6 +92,14 @@ def create_li_structure():
     return Structure(["Li"], np.array([[0.0, 0.0, 0.0]]))
 
 
+def create_lih_structure():
+    """Create a lithium hydride structure."""
+    return Structure(
+        ["Li", "H"],
+        np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.595 * ANGSTROM_TO_BOHR]]),
+    )
+
+
 def create_o2_structure():
     """Create an oxygen molecule (O2) structure."""
     symbols = ["O", "O"]
@@ -215,33 +223,56 @@ class TestPyscfPlugin:
         analyzer = algorithms.create("population_analyzer", "pyscf")
 
         with pytest.raises(ValueError, match="requires orbitals with an associated basis set"):
-            analyzer.run(wavefunction, charge=0, spin_multiplicity=1)
+            analyzer.run(wavefunction)
 
-    def test_pyscf_h2_population_analysis(self):
-        """Test PySCF Mulliken electron populations on neutral H2."""
-        h2 = Structure(["H", "H"], np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]]))
+    def test_pyscf_lih_population_analysis(self):
+        """Test heteronuclear AO-to-atom population assignment."""
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        _, wavefunction = scf_solver.run(h2, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
-        analyzer = algorithms.create("population_analyzer", "pyscf")
+        _, wavefunction = scf_solver.run(create_lih_structure(), charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+        pyscf_analyzer = algorithms.create("population_analyzer", "pyscf")
 
-        populations = analyzer.run(wavefunction, charge=0, spin_multiplicity=1)
+        pyscf_populations = pyscf_analyzer.run(wavefunction)
 
-        assert len(populations) == 2
-        np.testing.assert_allclose(populations, [1.0, 1.0], atol=1e-8)
+        assert len(pyscf_populations) == 2
+        assert not np.isclose(pyscf_populations[0], pyscf_populations[1])
+        np.testing.assert_allclose(sum(pyscf_populations), 4.0, atol=1e-8)
+
+    def test_pyscf_population_analysis_uses_correlated_one_rdm(self):
+        """Test that correlated populations use the 1-RDM in the current MO basis."""
+        h2 = Structure(
+            ["H", "H"],
+            np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4 * ANGSTROM_TO_BOHR]]),
+        )
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+        _, reference = scf_solver.run(h2, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+        orbitals = reference.get_orbitals()
+        determinants = [
+            data.Configuration.from_spin_half_string("20"),
+            data.Configuration.from_spin_half_string("du"),
+        ]
+        coefficients = np.full(2, 1.0 / np.sqrt(2.0))
+        one_rdm = np.array([[1.5, 0.5], [0.5, 0.5]])
+        wavefunction = data.Wavefunction(data.StateVectorContainer(coefficients, determinants, orbitals, one_rdm))
+        pyscf_analyzer = algorithms.create("population_analyzer", "pyscf")
+
+        pyscf_populations = pyscf_analyzer.run(wavefunction)
+
+        assert not np.isclose(pyscf_populations[0], pyscf_populations[1])
+        np.testing.assert_allclose(sum(pyscf_populations), 2.0, atol=1e-8)
 
     def test_pyscf_o2_unrestricted_population_analysis(self):
         """Test spin-summed PySCF populations from unrestricted orbitals."""
         scf_solver = algorithms.create("scf_solver", "pyscf", scf_type="unrestricted")
         _, wavefunction = scf_solver.run(create_o2_structure(), charge=0, spin_multiplicity=3, basis_or_guess="sto-3g")
-        analyzer = algorithms.create("population_analyzer", "pyscf")
-        analyzer.settings().set(
+        pyscf_analyzer = algorithms.create("population_analyzer", "pyscf")
+        pyscf_analyzer.settings().set(
             "scf_solver",
             AlgorithmRef("scf_solver", "pyscf", scf_type="unrestricted"),
         )
 
-        populations = analyzer.run(wavefunction, charge=0, spin_multiplicity=3)
+        pyscf_populations = pyscf_analyzer.run(wavefunction)
 
-        np.testing.assert_allclose(populations, [8.0, 8.0], atol=1e-8)
+        np.testing.assert_allclose(pyscf_populations, [8.0, 8.0], atol=1e-8)
 
     def test_pyscf_scf_solver_settings(self):
         """Test PySCF SCF solver settings interface."""

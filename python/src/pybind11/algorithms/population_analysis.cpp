@@ -30,12 +30,10 @@ class PopulationAnalyzerBase : public PopulationAnalyzer,
 
  protected:
   std::vector<double> _run_impl(
-      std::shared_ptr<qdk::chemistry::data::Wavefunction> wavefunction,
-      int charge, int spin_multiplicity,
-      unsigned int n_inactive_orbitals) const override {
+      std::shared_ptr<qdk::chemistry::data::Wavefunction> wavefunction)
+      const override {
     PYBIND11_OVERRIDE_PURE(std::vector<double>, PopulationAnalyzer, _run_impl,
-                           wavefunction, charge, spin_multiplicity,
-                           n_inactive_orbitals);
+                           wavefunction);
   }
 };
 
@@ -53,21 +51,15 @@ void bind_population_analysis(py::module& m) {
   analyzer.def(
       "run",
       [](const PopulationAnalyzer& self,
-         std::shared_ptr<qdk::chemistry::data::Wavefunction> wavefunction,
-         int charge, int spin_multiplicity, unsigned int n_inactive_orbitals) {
-        return self.run(wavefunction, charge, spin_multiplicity,
-                        n_inactive_orbitals);
+         std::shared_ptr<qdk::chemistry::data::Wavefunction> wavefunction) {
+        return self.run(wavefunction);
       },
-      py::arg("input"), py::arg("charge"), py::arg("spin_multiplicity"),
-      py::arg("n_inactive_orbitals") = 0,
+      py::arg("input"),
       R"(
 Compute per-center populations.
 
 Args:
   input: Wavefunction to analyze.
-    charge: Total molecular charge.
-    spin_multiplicity: Spin multiplicity of the molecular system.
-    n_inactive_orbitals: Number of doubly occupied orbitals excluded from active-space treatments. Full-population analyses ignore this value.
 
 Returns:
     list[float]: Per-center populations in center order.

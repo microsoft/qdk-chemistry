@@ -127,7 +127,7 @@ TEST(PopulationAnalyzerTest, QdkAnalyzerDoesNotUseMethodAliases) {
 TEST(PopulationAnalyzerTest, QdkAnalyzerReturnsModelSitePopulations) {
   auto analyzer = PopulationAnalyzerFactory::create("qdk");
 
-  auto populations = analyzer->run(create_model_wavefunction(), 0, 1, 0);
+  auto populations = analyzer->run(create_model_wavefunction());
 
   ASSERT_EQ(populations.size(), 3);
   EXPECT_DOUBLE_EQ(populations[0], 1.0);
@@ -138,8 +138,7 @@ TEST(PopulationAnalyzerTest, QdkAnalyzerReturnsModelSitePopulations) {
 TEST(PopulationAnalyzerTest, QdkAnalyzerUsesModelOneRdmInSiteBasis) {
   auto analyzer = PopulationAnalyzerFactory::create("qdk");
 
-  auto populations =
-      analyzer->run(create_correlated_model_wavefunction(), 0, 2, 0);
+  auto populations = analyzer->run(create_correlated_model_wavefunction());
 
   ASSERT_EQ(populations.size(), 2);
   EXPECT_DOUBLE_EQ(populations[0], 0.5);
@@ -149,7 +148,7 @@ TEST(PopulationAnalyzerTest, QdkAnalyzerUsesModelOneRdmInSiteBasis) {
 TEST(PopulationAnalyzerTest, QdkAnalyzerReturnsMolecularPopulations) {
   auto analyzer = PopulationAnalyzerFactory::create("qdk");
 
-  auto populations = analyzer->run(create_molecular_wavefunction(), 0, 1, 0);
+  auto populations = analyzer->run(create_molecular_wavefunction());
 
   ASSERT_EQ(populations.size(), 2);
   EXPECT_NEAR(populations[0], 1.0, 1e-12);
@@ -160,7 +159,7 @@ TEST(PopulationAnalyzerTest, QdkAnalyzerUsesMolecularOneRdmAndInactiveCore) {
   auto analyzer = PopulationAnalyzerFactory::create("qdk");
 
   auto populations = analyzer->run(
-      create_correlated_molecular_wavefunction_with_inactive_core(), 0, 2, 1);
+      create_correlated_molecular_wavefunction_with_inactive_core());
 
   ASSERT_EQ(populations.size(), 3);
   EXPECT_DOUBLE_EQ(populations[0], 2.0);

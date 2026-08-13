@@ -31,8 +31,7 @@ class PopulationAnalysisSettings : public data::Settings {
  */
 class PopulationAnalyzer
     : public Algorithm<PopulationAnalyzer, std::vector<double>,
-                       std::shared_ptr<data::Wavefunction>, int, int,
-                       unsigned int> {
+                       std::shared_ptr<data::Wavefunction>> {
  public:
   PopulationAnalyzer() {
     _settings = std::make_unique<PopulationAnalysisSettings>();
@@ -45,10 +44,6 @@ class PopulationAnalyzer
    *
    * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
    * @param wavefunction Wavefunction to analyze
-   * @param charge Total molecular charge
-   * @param spin_multiplicity Spin multiplicity of the molecular system
-   * @param n_inactive_orbitals Number of doubly occupied orbitals excluded
-   * from active-space treatments; full-population analyses ignore this value
    * \endcond
    *
    * @return Per-center populations in center order.
@@ -67,15 +62,10 @@ class PopulationAnalyzer
    * @brief Implementation hook for derived population analyzers.
    *
    * @param wavefunction Wavefunction to analyze
-   * @param charge Total molecular charge
-   * @param spin_multiplicity Spin multiplicity of the molecular system
-   * @param n_inactive_orbitals Number of doubly occupied orbitals excluded
-   * from active-space treatments; full-population analyses ignore this value
    * @return Per-center populations in center order
    */
   virtual std::vector<double> _run_impl(
-      std::shared_ptr<data::Wavefunction> wavefunction, int charge,
-      int spin_multiplicity, unsigned int n_inactive_orbitals) const = 0;
+      std::shared_ptr<data::Wavefunction> wavefunction) const = 0;
 };
 
 /**
@@ -115,8 +105,7 @@ class QdkPopulationAnalyzer : public PopulationAnalyzer {
    * @brief Compute per-center populations.
    */
   std::vector<double> _run_impl(
-      std::shared_ptr<data::Wavefunction> wavefunction, int charge,
-      int spin_multiplicity, unsigned int n_inactive_orbitals) const override;
+      std::shared_ptr<data::Wavefunction> wavefunction) const override;
 };
 
 }  // namespace qdk::chemistry::algorithms

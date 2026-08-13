@@ -43,13 +43,9 @@ class PyscfPopulationAnalyzer(PopulationAnalyzer):
     def _run_impl(
         self,
         wavefunction: Wavefunction,
-        charge: int,
-        spin_multiplicity: int,
-        n_inactive_orbitals: int,
     ) -> list[float]:
         """Compute electron populations using PySCF Mulliken analysis."""
         Logger.trace_entering()
-        del charge, spin_multiplicity, n_inactive_orbitals
         method = self._settings.get("method").lower()
         if method != "mulliken":
             raise ValueError(f"Unsupported PySCF population-analysis method: {method}")

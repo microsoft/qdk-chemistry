@@ -44,13 +44,13 @@ def test_qdk_population_analyzer_requires_wavefunction_input():
     analyzer = algorithms.create("population_analyzer", "qdk")
 
     with np.testing.assert_raises(TypeError):
-        analyzer.run(_h2_structure(), charge=1, spin_multiplicity=1)
+        analyzer.run(_h2_structure())
 
 
 def test_qdk_population_analyzer_model_wavefunction():
     """The QDK analyzer returns particle counts for model-system sites."""
     analyzer = algorithms.create("population_analyzer", "qdk")
 
-    populations = analyzer.run(_model_wavefunction(), charge=0, spin_multiplicity=1)
+    populations = analyzer.run(_model_wavefunction())
 
     np.testing.assert_allclose(populations, [1.0, 1.0, 0.0])
