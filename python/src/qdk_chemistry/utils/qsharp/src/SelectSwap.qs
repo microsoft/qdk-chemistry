@@ -31,14 +31,9 @@ namespace QDKChemistry.Utils.SelectSwap {
     import Std.Arrays.Zipped;
     import Std.Canon.ApplyToEachA;
     import Std.Canon.ApplyToEachCA;
-    import Std.Convert.IntAsDouble;
     import Std.Convert.ResultAsBool;
     import Std.Diagnostics.Fact;
-
     import Std.Math.BitSizeI;
-
-    import Std.Math.Floor;
-    import Std.Math.Lg;
     import Std.Math.MaxI;
     import Std.Math.MinI;
     import Std.Measurement.MResetEachZ;
@@ -194,7 +189,7 @@ namespace QDKChemistry.Utils.SelectSwap {
             return numData - 2;
         } else {
             let addressBits = BitSizeI(numData - 1);
-            let split = MinI(Floor(Lg(IntAsDouble(2^lambda * numBits))), addressBits - 1);
+            let split = MinI(BitSizeI(2^lambda * numBits) - 1, addressBits - 1);
 
             let select_cost = 2^(addressBits - lambda) - 2;
             let unselect_cost = MaxI(0, 2^split - 2) + 2^(addressBits - split) - 2;
@@ -211,7 +206,7 @@ namespace QDKChemistry.Utils.SelectSwap {
     internal function SelectSwapCost2D(lambda : Int, numOuterData : Int, numInnerData : Int, numBits : Int) : Int {
         let outerAddressBits = BitSizeI(numOuterData - 1);
         let innerAddressBits = BitSizeI(numInnerData - 1);
-        let split = MinI(Floor(Lg(IntAsDouble(2^lambda * numBits))), (outerAddressBits + innerAddressBits) - 1);
+        let split = MinI(BitSizeI(2^lambda * numBits) - 1, (outerAddressBits + innerAddressBits) - 1);
 
         let unselect_cost = MaxI(0, 2^split - 2) + 2^(outerAddressBits + innerAddressBits - split) - 2;
 

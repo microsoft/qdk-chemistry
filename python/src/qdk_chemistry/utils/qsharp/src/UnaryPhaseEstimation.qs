@@ -26,10 +26,7 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     import Std.Arrays.Subarray;
     import Std.Canon.ApplyQFT;
     import Std.Canon.ApplyToEach;
-    import Std.Convert.IntAsDouble;
     import Std.Diagnostics.Fact;
-    import Std.Math.Ceiling;
-    import Std.Math.Lg;
     import Std.Math.AbsI;
     import Std.Math.PI;
     import Std.ResourceEstimation.BeginEstimateCaching;
@@ -38,12 +35,16 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     import QDKChemistry.Utils.PrepSelPrep.PrepSelPrep;
     import QDKChemistry.Utils.PrepSelPrep.PSPWalk;
     import QDKChemistry.Utils.PrepSelPrep.Reflect;
+    import QDKChemistry.Utils.UnaryIteration.AddressQubits;
     import QDKChemistry.Utils.UnaryIteration.UnaryIterationWithControl;
 
     /// Number of phase qubits required to address `numQueries + 1` reflection slots.
+    ///
+    /// Delegates to `AddressQubits` so the phase register and the unary-iteration address
+    /// register can never disagree about how wide `numQueries + 1` slots are.
     function PhaseRegisterSize(numQueries : Int) : Int {
         Fact(numQueries > 0, "numQueries must be positive");
-        return Ceiling(Lg(IntAsDouble(numQueries + 1)));
+        return AddressQubits(numQueries + 1);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
