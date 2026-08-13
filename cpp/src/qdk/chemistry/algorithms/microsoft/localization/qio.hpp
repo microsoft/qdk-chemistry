@@ -47,11 +47,15 @@ class QIOLocalizerSettings : public data::Settings {
 
 /**
  * @class QIOLocalizer
- * @brief Quantum-information orbital (QIO/QICAS) localizer.
+ * @brief Quantum-information orbital (QIO) active-space localizer.
  *
  * Rotates restricted active orbitals to minimize the total single-orbital
  * entropy using gradient-free Jacobi sweeps. The input wavefunction must
  * provide spin-dependent active-space 1- and 2-RDMs.
+ *
+ * This localizer performs only the active-space orbital-rotation optimization
+ * used within QICAS. It does not implement the self-consistent QICAS outer loop
+ * that alternates orbital optimization with correlated wavefunction updates.
  *
  * @see Wavefunction::get_single_orbital_entropies
  */

@@ -2,7 +2,7 @@ Orbital localization
 ====================
 
 The :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` algorithm in QDK/Chemistry performs various orbital transformations to create localized or otherwise transformed molecular orbitals.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.Wavefunction` instance with reference orbitals as input and produces a new :class:`~qdk_chemistry.data.Wavefunction` instance with transformed orbitals as output.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.Wavefunction` instance with reference orbitals as input and produces a new :class:`~qdk_chemistry.data.Wavefunction` instance with localized orbitals as output.
 For more information about this pattern, see the :doc:`Factory Pattern <factory_pattern>` documentation.
 
 Overview
@@ -46,15 +46,13 @@ Input requirements
 The :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` requires the following inputs:
 
 Wavefunction
-   A :class:`~qdk_chemistry.data.Wavefunction` instance containing the molecular orbitals to be transformed.
+   A :class:`~qdk_chemistry.data.Wavefunction` instance containing the molecular orbitals to be localized.
 
 Alpha orbital indices (``loc_indices_a``)
-   A list/vector of indices specifying which alpha orbitals to include in the transformation. Indices must be sorted in ascending order; an empty list selects no alpha orbitals.
+   A list/vector of indices specifying which alpha orbitals to include in the localization. Indices must be sorted in ascending order.
 
 Beta orbital indices (``loc_indices_b``)
-   A list/vector of indices specifying which beta orbitals to include in the transformation. Indices must be sorted in ascending order; an empty list selects no beta orbitals.
-
-If both index lists are empty, the orbital transformation is a no-op.
+   A list/vector of indices specifying which beta orbitals to include in the localization. Indices must be sorted in ascending order.
 
 
 .. rubric:: Creating a localizer
@@ -92,7 +90,7 @@ See `Available implementations`_ below for implementation-specific options.
       :start-after: // start-cell-configure
       :end-before: // end-cell-configure
 
-.. rubric:: Running the transformation
+.. rubric:: Running localization
 
 .. note::
    For restricted calculations, ``loc_indices_a`` and ``loc_indices_b`` must be identical.
@@ -114,7 +112,7 @@ See `Available implementations`_ below for implementation-specific options.
 Available implementations
 -------------------------
 
-QDK/Chemistry's :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` provides a unified interface to orbital localization and transformation methods.
+QDK/Chemistry's :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` provides a unified interface to orbital localization methods.
 You can discover available implementations programmatically:
 
 .. tab:: Python API
@@ -173,7 +171,6 @@ QDK Natural Orbitals
 
 Transforms active orbitals to natural orbitals :cite:`Lowdin1956` by diagonalizing the active-space one-particle reduced density matrix (1-RDM).
 The eigenvalues are the natural-orbital occupation numbers.
-Natural orbitals are not necessarily spatially localized.
 
 The input wavefunction must define an active space and contain active-space 1-RDM data.
 The selected alpha and beta indices must be identical and must match the active-space indices.
@@ -200,7 +197,8 @@ The selected alpha and beta indices must be identical and match the active-space
 
 The localizer optimizes against the fixed input density matrices and returns a single orbital rotation.
 It does not recompute the correlated wavefunction after rotating the orbitals.
-Applications that require a self-consistent outer loop must reconstruct the Hamiltonian and correlated wavefunction between localization steps.
+It therefore implements the active-space orbital-rotation optimization used within QICAS, not the complete QICAS method.
+The self-consistent QICAS workflow, which alternates these rotations with Hamiltonian reconstruction and correlated wavefunction updates, will be added separately.
 
 .. rubric:: Settings
 
