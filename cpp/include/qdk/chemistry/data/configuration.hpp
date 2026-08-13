@@ -241,7 +241,9 @@ class Configuration : public DataClass {
    * @brief Get the static data type name for this class.
    * @return "configuration"
    */
-  static std::string data_type_name() { return "configuration"; }
+  static std::string data_type_name() {
+    return DATACLASS_TO_SNAKE_CASE(Configuration);
+  }
 
   /**
    * @brief Get the data type name for this instance.

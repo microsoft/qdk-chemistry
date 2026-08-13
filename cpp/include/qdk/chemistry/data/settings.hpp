@@ -408,7 +408,9 @@ class Settings : public DataClass,
    * @brief Get the static data type name for this class.
    * @return "settings"
    */
-  static std::string data_type_name() { return "settings"; }
+  static std::string data_type_name() {
+    return DATACLASS_TO_SNAKE_CASE(Settings);
+  }
 
   /**
    * @brief Get the data type name for this instance.

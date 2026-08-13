@@ -139,7 +139,9 @@ class Ansatz : public DataClass, public std::enable_shared_from_this<Ansatz> {
    * @brief Get the static data type name for this class.
    * @return "ansatz"
    */
-  static std::string data_type_name() { return "ansatz"; }
+  static std::string data_type_name() {
+    return DATACLASS_TO_SNAKE_CASE(Ansatz);
+  }
 
   /**
    * @brief Get the data type name for this instance.

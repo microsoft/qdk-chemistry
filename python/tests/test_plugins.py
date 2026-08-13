@@ -5,6 +5,10 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import os
+import subprocess
+import sys
+from pathlib import Path
 from unittest.mock import MagicMock, call
 
 import pytest
@@ -12,6 +16,9 @@ import pytest
 import qdk_chemistry
 from qdk_chemistry import plugins
 from qdk_chemistry._core import DuplicateRegistrationError as CoreDuplicateRegistrationError
+from qdk_chemistry.algorithms import ScfSolver, registry
+from qdk_chemistry.data import DataClass, register_dataclass
+from qdk_chemistry.data import registry as dataclass_registry
 from qdk_chemistry.plugins import ChemistryPlugin, DuplicateRegistrationError, PluginRegistrar, QdkChemistryPlugin
 
 _BUNDLED_PLUGIN_AUTOLOAD_CASES = (
@@ -38,6 +45,138 @@ class _EntryPoint:
         return self._target
 
 
+def _write_test_plugin(project_dir: Path) -> None:
+    """Create a complete installable plugin package for entry-point testing."""
+    package_dir = project_dir / "src" / "qdk_chemistry_entry_point_test"
+    package_dir.mkdir(parents=True)
+    (project_dir / "pyproject.toml").write_text(
+        """\
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qdk-chemistry-entry-point-test"
+version = "0.0.0"
+dependencies = ["qdk-chemistry"]
+
+[project.entry-points."qdk_chemistry.plugins"]
+pytest = "qdk_chemistry_entry_point_test.plugin:PipEntryPointPlugin"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+""",
+        encoding="utf-8",
+    )
+    (package_dir / "__init__.py").write_text("", encoding="utf-8")
+    (package_dir / "plugin.py").write_text(
+        """\
+from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
+from qdk_chemistry.plugins import PluginRegistrar, QdkChemistryPlugin
+
+
+class PipEntryPointAlgorithm(Algorithm):
+    def type_name(self):
+        return "pytest_entry_point"
+
+    def name(self):
+        return "pip"
+
+    def _run_impl(self):
+        return "loaded through pip entry point"
+
+
+class PipEntryPointAlgorithmFactory(AlgorithmFactory):
+    def algorithm_type_name(self):
+        return "pytest_entry_point"
+
+    def default_algorithm_name(self):
+        return "pip"
+
+
+class PipEntryPointPlugin(QdkChemistryPlugin):
+    def register(self, registrar: PluginRegistrar):
+        registrar.register_algorithm_factory(PipEntryPointAlgorithmFactory())
+        registrar.register_algorithm(PipEntryPointAlgorithm)
+""",
+        encoding="utf-8",
+    )
+
+
+def test_pip_installed_plugin_entry_point_loads_complete_module(tmp_path):
+    """An independently installed plugin is discovered and usable on import."""
+    project_dir = tmp_path / "plugin"
+    target_dir = tmp_path / "site-packages"
+    _write_test_plugin(project_dir)
+
+    install = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "--disable-pip-version-check",
+            "--no-build-isolation",
+            "--no-deps",
+            "--no-index",
+            "--target",
+            str(target_dir),
+            str(project_dir),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert install.returncode == 0, install.stdout + install.stderr
+
+    package_root = Path(qdk_chemistry.__file__).resolve().parent.parent
+    env = os.environ.copy()
+    python_paths = [str(target_dir), str(package_root)]
+    if existing_python_path := env.get("PYTHONPATH"):
+        python_paths.append(existing_python_path)
+    env["PYTHONPATH"] = os.pathsep.join(python_paths)
+    for _, disable_env_var in _BUNDLED_PLUGIN_AUTOLOAD_CASES:
+        env[disable_env_var] = "1"
+
+    verify = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            """\
+import importlib.metadata
+from pathlib import Path
+import sys
+
+target_dir = Path(sys.argv[1]).resolve()
+matching_entry_points = [
+    entry_point
+    for entry_point in importlib.metadata.entry_points(group="qdk_chemistry.plugins")
+    if entry_point.name == "pytest"
+]
+assert len(matching_entry_points) == 1
+assert matching_entry_points[0].value == (
+    "qdk_chemistry_entry_point_test.plugin:PipEntryPointPlugin"
+)
+
+from qdk_chemistry.algorithms import available, create
+import qdk_chemistry_entry_point_test
+
+assert Path(qdk_chemistry_entry_point_test.__file__).resolve().is_relative_to(target_dir)
+assert "pip" in available("pytest_entry_point")
+algorithm = create("pytest_entry_point", "pip")
+assert algorithm.__class__.__module__ == "qdk_chemistry_entry_point_test.plugin"
+assert algorithm.run() == "loaded through pip entry point"
+""",
+            str(target_dir),
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
+    assert verify.returncode == 0, verify.stdout + verify.stderr
+
+
 def test_duplicate_registration_error_is_public_value_error():
     """The plugin API exposes the native collision error as a ValueError subtype."""
     assert DuplicateRegistrationError is CoreDuplicateRegistrationError
@@ -52,9 +191,11 @@ def test_plugin_registrar_delegates_to_existing_registries(monkeypatch):
     register_algorithm = MagicMock()
     register_algorithm_factory = MagicMock()
     register_dataclass = MagicMock()
+    validate_dataclasses = MagicMock(side_effect=tuple)
     monkeypatch.setattr("qdk_chemistry.algorithms.register", register_algorithm)
     monkeypatch.setattr("qdk_chemistry.algorithms.registry.register_factory", register_algorithm_factory)
     monkeypatch.setattr("qdk_chemistry.data.register_dataclass", register_dataclass)
+    monkeypatch.setattr("qdk_chemistry.data.registry._validate_dataclass_registrations", validate_dataclasses)
 
     registrar = PluginRegistrar()
     registrar.register_algorithm_factory(algorithm_type_factory)
@@ -62,8 +203,52 @@ def test_plugin_registrar_delegates_to_existing_registries(monkeypatch):
     registrar.register_dataclass(dataclass_type)
 
     register_algorithm_factory.assert_called_once_with(algorithm_type_factory)
+    validate_dataclasses.assert_called_once_with((dataclass_type,))
     register_algorithm.assert_called_once_with(algorithm_factory)
     assert register_dataclass.call_args_list == [call(dataclass_type), call(dataclass_type)]
+
+
+def test_plugin_registrar_validates_dataclasses_before_registering_algorithm(monkeypatch):
+    """A DataClass collision cannot leave the plugin algorithm registered."""
+    monkeypatch.setattr(dataclass_registry, "_DATACLASS_REGISTRY", {})
+    monkeypatch.setattr(dataclass_registry, "_DISCOVERY_COMPLETE", True)
+
+    class PluginAlgorithm(ScfSolver):
+        """Algorithm that must not survive the failed plugin registration."""
+
+        def name(self):
+            """Return the unique test registry name."""
+            return "failed_plugin_algorithm"
+
+        def _run_impl(self, structure, charge, spin_multiplicity):
+            """Provide the minimal implementation required by the base class."""
+
+    class FirstPluginData(DataClass):
+        """Existing owner of the shared test wire type."""
+
+        @staticmethod
+        def data_type_name():
+            """Return the shared test wire type."""
+            return "test.plugin_transaction"
+
+    class ConflictingPluginData(DataClass):
+        """Plugin DataClass colliding with an existing owner."""
+
+        @staticmethod
+        def data_type_name():
+            """Return the shared test wire type."""
+            return "test.plugin_transaction"
+
+    register_dataclass(FirstPluginData)
+
+    try:
+        with pytest.raises(DuplicateRegistrationError, match="already registered"):
+            PluginRegistrar().register_algorithm(PluginAlgorithm, data_classes=(ConflictingPluginData,))
+
+        assert "failed_plugin_algorithm" not in registry.available("scf_solver")
+        assert dataclass_registry.get_dataclass_type("test.plugin_transaction") is FirstPluginData
+    finally:
+        registry.unregister("scf_solver", "failed_plugin_algorithm")
 
 
 def test_legacy_plugin_base_is_alias():

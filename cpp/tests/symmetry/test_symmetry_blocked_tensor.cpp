@@ -42,6 +42,17 @@ static SBT2 make_simple_tensor() {
   return SBT2({sym, sym}, extents2(2), blocks);
 }
 
+TEST(SymmetryBlockedTensorTest, DataTypeNameIncludesRankAndScalarType) {
+  EXPECT_EQ((SymmetryBlockedTensor<2, double>::data_type_name()),
+            "symmetry_blocked_tensor_2_real");
+  EXPECT_EQ((SymmetryBlockedTensor<2, std::complex<double>>::data_type_name()),
+            "symmetry_blocked_tensor_2_complex");
+  EXPECT_EQ((SymmetryBlockedTensor<3, float>::data_type_name()),
+            "symmetry_blocked_tensor_3_real32");
+  EXPECT_EQ((SymmetryBlockedTensor<4, std::complex<float>>::data_type_name()),
+            "symmetry_blocked_tensor_4_complex32");
+}
+
 TEST(SymmetryBlockedTensorTest, RestrictedAutoAliasesPartner) {
   auto sym = std::make_shared<const SymmetryProduct>(
       SymmetryProduct({axes::spin(1, /*equivalent=*/true)}));

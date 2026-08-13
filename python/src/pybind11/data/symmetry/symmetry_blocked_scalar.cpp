@@ -69,7 +69,7 @@ void bind_sbscalar_instance(py::module& m, const char* name) {
     Return the wire-format identifier for symmetry-blocked scalars.
 
     Returns:
-        str: ``"symmetry_blocked_scalar"``
+      str: ``"symmetry_blocked_scalar_uint"``
 
     )")
       .def("get_data_type_name", &SBS::get_data_type_name)

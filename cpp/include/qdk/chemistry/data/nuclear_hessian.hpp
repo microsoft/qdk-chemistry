@@ -61,7 +61,9 @@ class NuclearHessian : public DataClass,
    * @brief Return the static serialized data type name.
    * @return "nuclear_hessian"
    */
-  static std::string data_type_name() { return "nuclear_hessian"; }
+  static std::string data_type_name() {
+    return DATACLASS_TO_SNAKE_CASE(NuclearHessian);
+  }
 
   /**
    * @brief Return the serialized data type name for this instance.

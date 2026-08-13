@@ -14,6 +14,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
+from qdk_chemistry._core import DuplicateRegistrationError as _DuplicateRegistrationError
 from qdk_chemistry.data import Settings
 
 if TYPE_CHECKING:
@@ -375,15 +376,26 @@ class AlgorithmFactory(ABC):
         Args:
             generator (Callable[[], Algorithm]): A callable that returns a new instance of the algorithm.
 
-                Must return an Algorithm whose name()
-                will be used as the registration key.
+                Must return an Algorithm whose aliases() will be used as the
+                registration keys.
+
+        Raises:
+            DuplicateRegistrationError: If an algorithm name or alias is already registered in this factory.
 
         Examples:
             >>> factory = ScfSolverFactory()
             >>> factory.register_instance(lambda: MyCustomScf())
 
         """
-        self._registry[generator().name()] = generator
+        aliases = generator().aliases()
+        for alias in aliases:
+            if alias in self._registry:
+                raise _DuplicateRegistrationError(
+                    f"Algorithm factory for {self.algorithm_type_name()}: "
+                    f"algorithm with name/alias '{alias}' already exists in registry"
+                )
+        for alias in aliases:
+            self._registry[alias] = generator
 
     def unregister_instance(self, name: str) -> bool:
         """Remove an algorithm implementation from this factory.

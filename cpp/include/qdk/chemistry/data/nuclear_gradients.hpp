@@ -64,7 +64,9 @@ class NuclearGradients : public DataClass,
    * @brief Return the static serialized data type name.
    * @return "nuclear_gradients"
    */
-  static std::string data_type_name() { return "nuclear_gradients"; }
+  static std::string data_type_name() {
+    return DATACLASS_TO_SNAKE_CASE(NuclearGradients);
+  }
 
   /**
    * @brief Return the serialized data type name for this instance.

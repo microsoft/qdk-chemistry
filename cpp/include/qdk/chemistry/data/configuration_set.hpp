@@ -111,7 +111,9 @@ class ConfigurationSet : public DataClass {
    * @brief Get the static data type name for this class.
    * @return "configuration_set"
    */
-  static std::string data_type_name() { return "configuration_set"; }
+  static std::string data_type_name() {
+    return DATACLASS_TO_SNAKE_CASE(ConfigurationSet);
+  }
 
   /**
    * @brief Get the data type name for this instance.

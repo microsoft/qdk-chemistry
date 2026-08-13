@@ -121,7 +121,9 @@ class SymmetryBlockedIndexSet
    * @brief Static @ref DataClass type identifier.
    * @return The stable string @c "symmetry_blocked_index_set".
    */
-  static std::string data_type_name() { return "symmetry_blocked_index_set"; }
+  static std::string data_type_name() {
+    return DATACLASS_TO_SNAKE_CASE(SymmetryBlockedIndexSet);
+  }
 
   /**
    * @brief @ref DataClass type identifier for this instance.

@@ -324,7 +324,9 @@ class StabilityResult : public DataClass,
    * @brief Get the static data type name for this class.
    * @return "stability_result"
    */
-  static std::string data_type_name() { return "stability_result"; }
+  static std::string data_type_name() {
+    return DATACLASS_TO_SNAKE_CASE(StabilityResult);
+  }
 
   /**
    * @brief Get the data type name for this instance.

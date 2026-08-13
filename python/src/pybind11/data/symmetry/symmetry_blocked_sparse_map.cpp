@@ -91,7 +91,7 @@ void bind_symmetry_blocked_sparse_map(py::module& m) {
       Return the wire-format identifier for symmetry-blocked sparse maps.
 
       Returns:
-        str: ``"symmetry_blocked_sparse_map"``
+        str: ``"symmetry_blocked_sparse_map_4_real"``
 
       )")
       .def("get_data_type_name", &SBSM::get_data_type_name)

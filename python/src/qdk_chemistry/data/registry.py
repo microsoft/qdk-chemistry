@@ -8,11 +8,15 @@
 from __future__ import annotations
 
 from threading import RLock
+from typing import TYPE_CHECKING, Any, Type  # noqa: UP035
 
 from qdk_chemistry._core import DuplicateRegistrationError as _DuplicateRegistrationError
 from qdk_chemistry._core.data import DataClass as _CoreDataClass
 from qdk_chemistry.data._type_name import class_data_type_name, declares_data_type_name
 from qdk_chemistry.data.base import DataClass as _PythonDataClass
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 _DATACLASS_REGISTRY: dict[str, type[_CoreDataClass]] = {}
 _REGISTRY_LOCK = RLock()
@@ -30,7 +34,37 @@ def _declared_type_name(dataclass_type: type[_CoreDataClass]) -> str:
     return class_data_type_name(dataclass_type)
 
 
-def register_dataclass(dataclass_type: type[_CoreDataClass]) -> type[_CoreDataClass]:
+def _validate_dataclass_type(dataclass_type: type[_CoreDataClass]) -> str:
+    """Validate a DataClass loader and return its declared wire type."""
+    if not isinstance(dataclass_type, type) or not issubclass(dataclass_type, _CoreDataClass):
+        raise TypeError("registered data classes must derive from qdk_chemistry.data.DataClass")
+    return _declared_type_name(dataclass_type)
+
+
+def _validate_dataclass_registrations(
+    dataclass_types: Iterable[type[_CoreDataClass]],
+) -> tuple[type[_CoreDataClass], ...]:
+    """Validate a registration batch without changing the registry."""
+    validated_types = tuple(dataclass_types)
+    registrations = [(dataclass_type, _validate_dataclass_type(dataclass_type)) for dataclass_type in validated_types]
+
+    _discover_imported_dataclasses(excluded_types=frozenset(validated_types))
+    pending_types: dict[str, type[_CoreDataClass]] = {}
+    with _REGISTRY_LOCK:
+        for dataclass_type, type_name in registrations:
+            registered_type = pending_types.get(type_name)
+            if registered_type is None:
+                registered_type = _DATACLASS_REGISTRY.get(type_name)
+            if registered_type is not None and registered_type is not dataclass_type:
+                raise _DuplicateRegistrationError(
+                    f"DataClass type name {type_name!r} is already registered by "
+                    f"{registered_type.__module__}.{registered_type.__qualname__}"
+                )
+            pending_types[type_name] = dataclass_type
+    return validated_types
+
+
+def register_dataclass(dataclass_type: Type[Any]) -> type[_CoreDataClass]:  # noqa: UP006
     """Register a DataClass subclass for file deserialization.
 
     The loader must declare its own static ``data_type_name()`` method rather
@@ -47,10 +81,9 @@ def register_dataclass(dataclass_type: type[_CoreDataClass]) -> type[_CoreDataCl
         DuplicateRegistrationError: If another class already owns the declared type name.
 
     """
-    if not isinstance(dataclass_type, type) or not issubclass(dataclass_type, _CoreDataClass):
-        raise TypeError("registered data classes must derive from qdk_chemistry.data.DataClass")
+    _validate_dataclass_type(dataclass_type)
 
-    _discover_imported_dataclasses(excluded_type=dataclass_type)
+    _discover_imported_dataclasses(excluded_types=frozenset((dataclass_type,)))
     return _register_dataclass(dataclass_type)
 
 
@@ -68,7 +101,7 @@ def _register_dataclass(dataclass_type: type[_CoreDataClass]) -> type[_CoreDataC
     return dataclass_type
 
 
-def _discover_imported_dataclasses(*, excluded_type: type[_CoreDataClass] | None = None) -> None:
+def _discover_imported_dataclasses(*, excluded_types: frozenset[type[_CoreDataClass]] = frozenset()) -> None:
     """Register canonical DataClass types that are already imported."""
     global _DISCOVERY_COMPLETE  # noqa: PLW0603
 
@@ -88,7 +121,7 @@ def _discover_imported_dataclasses(*, excluded_type: type[_CoreDataClass] | None
             seen.add(id(dataclass_type))
             if (
                 dataclass_type is not _PythonDataClass
-                and dataclass_type is not excluded_type
+                and dataclass_type not in excluded_types
                 and dataclass_type.__module__.startswith("qdk_chemistry.")
                 and declares_data_type_name(dataclass_type)
             ):

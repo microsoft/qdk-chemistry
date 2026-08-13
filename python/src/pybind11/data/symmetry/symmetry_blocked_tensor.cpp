@@ -81,7 +81,7 @@ void bind_sbt_instance(py::module& m, const char* name) {
       Return the wire-format identifier for this tensor specialization.
 
       Returns:
-        str: Identifier of the form ``symmetry_blocked_tensor_r2c``.
+        str: Identifier of the form ``symmetry_blocked_tensor_2_complex``.
 
       )")
       .def("get_data_type_name", &SBT::get_data_type_name)

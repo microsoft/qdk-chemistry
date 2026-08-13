@@ -12,6 +12,7 @@ class Group;
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/utils/hash_context.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 #include <string>
 #include <type_traits>
 

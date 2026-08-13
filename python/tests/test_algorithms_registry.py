@@ -5,10 +5,13 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from unittest.mock import MagicMock
+
 import pytest
 
 from qdk_chemistry._core._algorithms import ScfSolverFactory
 from qdk_chemistry.algorithms import ScfSolver, registry
+from qdk_chemistry.plugins import DuplicateRegistrationError
 from qdk_chemistry.plugins.qiskit import (
     QDK_CHEMISTRY_HAS_QISKIT,
     QDK_CHEMISTRY_HAS_QISKIT_AER,
@@ -556,6 +559,129 @@ class TestRegistryRegisterUnregister:
         # Clean up
         registry.unregister("scf_solver", "custom_test_scf_v2")
 
+    def test_register_duplicate_name_preserves_original(self):
+        """A C++ factory rejects a duplicate name without replacing its owner."""
+
+        class FirstCustomTestScf(ScfSolver):
+            """First SCF implementation claiming the test name."""
+
+            registration_owner = "first"
+
+            def name(self):
+                """Return the shared test name."""
+                return "duplicate_custom_test_scf"
+
+            def _run_impl(self, structure, charge, spin_multiplicity):
+                """Provide the minimal implementation required by the base class."""
+
+        class SecondCustomTestScf(ScfSolver):
+            """Second SCF implementation claiming the test name."""
+
+            registration_owner = "second"
+
+            def name(self):
+                """Return the shared test name."""
+                return "duplicate_custom_test_scf"
+
+            def _run_impl(self, structure, charge, spin_multiplicity):
+                """Provide the minimal implementation required by the base class."""
+
+        registry.register(FirstCustomTestScf)
+        try:
+            with pytest.raises(DuplicateRegistrationError, match="already exists in registry"):
+                registry.register(SecondCustomTestScf)
+
+            registered = registry.create("scf_solver", "duplicate_custom_test_scf")
+            assert registered.registration_owner == "first"
+        finally:
+            registry.unregister("scf_solver", "duplicate_custom_test_scf")
+
+    def test_python_factory_rejects_duplicate_name(self):
+        """A Python factory rejects a duplicate name without replacing its owner."""
+
+        class FirstAlgorithm:
+            """First Python algorithm claiming the test name."""
+
+            registration_owner = "first"
+
+            def type_name(self):
+                """Return a type owned by a Python factory."""
+                return "expectation_estimator"
+
+            def name(self):
+                """Return the shared test name."""
+                return "duplicate_python_algorithm"
+
+            def aliases(self):
+                """Return the shared name as the sole alias."""
+                return [self.name()]
+
+            def settings(self):
+                """Return the settings stub required during creation."""
+                return MagicMock()
+
+        class SecondAlgorithm(FirstAlgorithm):
+            """Second Python algorithm claiming the test name."""
+
+            registration_owner = "second"
+
+        registry.register(FirstAlgorithm)
+        try:
+            with pytest.raises(DuplicateRegistrationError, match="already exists in registry"):
+                registry.register(SecondAlgorithm)
+
+            registered = registry.create("expectation_estimator", "duplicate_python_algorithm")
+            assert registered.registration_owner == "first"
+        finally:
+            registry.unregister("expectation_estimator", "duplicate_python_algorithm")
+
+    def test_python_factory_registers_aliases_atomically(self):
+        """An alias collision cannot leave earlier aliases partially registered."""
+
+        class AliasedAlgorithm:
+            """Python algorithm with a primary and secondary registry name."""
+
+            def type_name(self):
+                """Return a type owned by a Python factory."""
+                return "expectation_estimator"
+
+            def name(self):
+                """Return the primary test name."""
+                return "aliased_python_algorithm"
+
+            def aliases(self):
+                """Return both test registry names."""
+                return [self.name(), "python_algorithm_alias"]
+
+            def settings(self):
+                """Return the settings stub required during creation."""
+                return MagicMock()
+
+        class ConflictingAlgorithm(AliasedAlgorithm):
+            """Python algorithm whose secondary alias is already registered."""
+
+            def name(self):
+                """Return an otherwise-unused primary name."""
+                return "partially_registered_python_algorithm"
+
+            def aliases(self):
+                """Return a fresh primary name and an occupied alias."""
+                return [self.name(), "python_algorithm_alias"]
+
+        registry.register(AliasedAlgorithm)
+        try:
+            assert registry.create("expectation_estimator", "python_algorithm_alias").name() == (
+                "aliased_python_algorithm"
+            )
+
+            with pytest.raises(DuplicateRegistrationError, match="python_algorithm_alias"):
+                registry.register(ConflictingAlgorithm)
+
+            assert "partially_registered_python_algorithm" not in registry.available("expectation_estimator")
+        finally:
+            registry.unregister("expectation_estimator", "aliased_python_algorithm")
+            registry.unregister("expectation_estimator", "python_algorithm_alias")
+
     def test_unregister_custom_algorithm(self):
         """Test unregistering a custom algorithm."""
 
@@ -599,9 +725,9 @@ class TestRegistryFactoryRegistration:
     """Test the register_factory and unregister_factory functions."""
 
     def test_register_factory_duplicate(self):
-        """Test that registering a duplicate factory raises ValueError."""
+        """Test that registering a duplicate factory raises DuplicateRegistrationError."""
         # ScfSolverFactory is already registered
-        with pytest.raises(ValueError, match="already registered"):
+        with pytest.raises(DuplicateRegistrationError, match="already registered"):
             registry.register_factory(ScfSolverFactory)
 
     def test_unregister_factory_invalid_type(self):

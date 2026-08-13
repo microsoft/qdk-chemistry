@@ -241,7 +241,9 @@ class SymmetryAxis : public DataClass {
    * @brief Static @ref DataClass type identifier.
    * @return The string @c "symmetry_axis".
    */
-  static std::string data_type_name() { return "symmetry_axis"; }
+  static std::string data_type_name() {
+    return DATACLASS_TO_SNAKE_CASE(SymmetryAxis);
+  }
 
   /**
    * @brief @ref DataClass type identifier for this instance.
@@ -434,7 +436,9 @@ class SymmetryProduct : public DataClass {
    * @brief Static @ref DataClass type identifier.
    * @return The string @c "symmetry_product".
    */
-  static std::string data_type_name() { return "symmetry_product"; }
+  static std::string data_type_name() {
+    return DATACLASS_TO_SNAKE_CASE(SymmetryProduct);
+  }
 
   /**
    * @brief @ref DataClass type identifier for this instance.

@@ -128,7 +128,9 @@ class MajoranaMapping : public DataClass {
 
   /// @brief Get the static data type name for serialization.
   /// @return "majorana_mapping"
-  static std::string data_type_name() { return "majorana_mapping"; }
+  static std::string data_type_name() {
+    return DATACLASS_TO_SNAKE_CASE(MajoranaMapping);
+  }
 
   /// @brief Get the data type name for this instance.
   /// @return "majorana_mapping"

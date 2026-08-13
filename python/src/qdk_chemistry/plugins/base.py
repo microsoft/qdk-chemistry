@@ -40,10 +40,13 @@ class PluginRegistrar:
 
         Raises:
             DuplicateRegistrationError: If the algorithm name or a DataClass wire type is already registered.
+            TypeError: If a DataClass loader is invalid.
 
         """
         from qdk_chemistry.algorithms import register  # noqa: PLC0415
+        from qdk_chemistry.data.registry import _validate_dataclass_registrations  # noqa: PLC0415
 
+        data_classes = _validate_dataclass_registrations(data_classes)
         register(factory)
         for dataclass_type in data_classes:
             self.register_dataclass(dataclass_type)

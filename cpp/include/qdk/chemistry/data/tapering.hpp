@@ -78,7 +78,9 @@ class TaperingSpecification : public DataClass {
 
   /// @brief Get the static data type name for serialization.
   /// @return "tapering_specification"
-  static std::string data_type_name() { return "tapering_specification"; }
+  static std::string data_type_name() {
+    return DATACLASS_TO_SNAKE_CASE(TaperingSpecification);
+  }
 
   /// @brief Get the data type name for this instance.
   /// @return "tapering_specification"

@@ -158,11 +158,11 @@ class SymmetryBlockedTensor
 
   /**
    * @brief Static @ref DataClass type identifier for this specialization.
-   * @return A stable identifier of the form @c symmetry_blocked_tensor_r2c.
+   * @return A stable identifier such as @c symmetry_blocked_tensor_2_complex.
    */
   static std::string data_type_name() {
-    return "symmetry_blocked_tensor_r" + std::to_string(Rank) +
-           (utils::is_complex_scalar_v<Scalar> ? "c" : "r");
+    return DATACLASS_TO_SNAKE_CASE(SymmetryBlockedTensor, utils::NTTPTag<Rank>,
+                                   Scalar);
   }
 
   /**

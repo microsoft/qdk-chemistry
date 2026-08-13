@@ -58,7 +58,8 @@ def test_tensor_specializations_have_distinct_loader_names(
     block = np.full((1,) if rank in (1, 4) else (1, 1), scalar)
     tensor = tensor_type([syms] * rank, extents, [(labels, block)])
 
-    assert tensor.get_data_type_name() == f"symmetry_blocked_tensor_r{rank}{'c' if is_complex else 'r'}"
+    scalar_tag = "complex" if is_complex else "real"
+    assert tensor.get_data_type_name() == f"symmetry_blocked_tensor_{rank}_{scalar_tag}"
 
 
 class TestSymmetryBlockedTensorRank2:
@@ -213,6 +214,10 @@ class TestSerialization:
 
 class TestSymmetryBlockedScalarCount:
     """Tests for the SymmetryBlockedScalarCount Python bindings."""
+
+    def test_data_type_name(self):
+        """The loader name includes the scalar specialization."""
+        assert sym.SymmetryBlockedScalarCount.data_type_name() == "symmetry_blocked_scalar_uint"
 
     def test_spin_blocked_holds_independent_channels(self, unrestricted_spin):
         """Per-spin counts are stored as independent (non-aliased) blocks."""
@@ -392,6 +397,10 @@ class TestHdf5Serialization:
 
 class TestSymmetryBlockedSparseMapRank4:
     """Tests for the SymmetryBlockedSparseMapRank4 Python bindings."""
+
+    def test_data_type_name(self):
+        """The loader name includes the rank and scalar specialization."""
+        assert sym.SymmetryBlockedSparseMapRank4.data_type_name() == "symmetry_blocked_sparse_map_4_real"
 
     @staticmethod
     def _make(syms, alpha):
