@@ -203,7 +203,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         let systems = register[0..numSystemQubits - 1];
         let ancilla = register[numSystemQubits...];
         for _ in 1..power {
-            if BeginEstimateCaching(useWalk ? "Controlled PSPWalk" | "Controlled PrepSelPrep", SingleVariant()) {
+            if BeginEstimateCaching(useWalk ? "ControlledPSPWalk" | "ControlledPrepSelPrep", SingleVariant()) {
                 Controlled PrepSelPrep([control], (prepareOp, selectOp, systems, ancilla));
                 if useWalk {
                     Controlled Reflect([control], ancilla);
