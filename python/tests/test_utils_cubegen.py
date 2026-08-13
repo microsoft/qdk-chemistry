@@ -57,12 +57,19 @@ class TestCubegen:
         orbitals = _no_orbitals()
         assert generate_cubefiles_from_orbitals(orbitals, indices=[]) == {}
 
-    def test_generate_cubefiles_uses_zero_based_default_labels(self):
+    def test_generate_cubefiles_uses_zero_based_default_labels(self, tmp_path):
         orbitals = _o2_orbitals()
 
         cubes = generate_cubefiles_from_orbitals(orbitals, indices=[0], grid_size=(4, 4, 4))
+        paths = generate_cubefiles_from_orbitals(
+            orbitals,
+            output_folder=tmp_path,
+            indices=[0],
+            grid_size=(4, 4, 4),
+        )
 
         assert list(cubes) == ["orbital_0000"]
+        assert paths == [str(tmp_path / "orbital_0000.cube")]
 
     def test_generate_cubefiles_are_identical_for_singlet_and_triplet(self, monkeypatch):
         orbitals = _o2_orbitals()

@@ -44,9 +44,10 @@ def generate_cubefiles_from_orbitals(
         indices: Specific molecular orbital indices to generate cube files for. If None, all orbitals are processed.
         grid_size: The size of the grid in each dimension (nx, ny, nz). Default is (40, 40, 40).
         margin: The margin (in Bohr radii) to extend around molecule. Default is 3.
-        label_maker: A function that takes an orbital index and returns a string label for the cube file.
+        label_maker: A function that takes an orbital index and returns a base label without the ``.cube`` extension.
 
-            If None, files are labeled with the zero-based orbital index, for example, ``orbital_0000.cube``.
+            If None, files are labeled with the zero-based orbital index; orbital ``0`` generates
+            ``orbital_0000.cube``.
 
     Returns:
         list[str] | dict[str, str]: Paths or contents of the generated cube files.
