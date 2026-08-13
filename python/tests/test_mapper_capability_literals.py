@@ -13,12 +13,32 @@ replace with a no-op state preparation.  A mapper that silently stops advertisin
 capability therefore produces a circuit that builds and runs while quietly omitting the
 work the capability was there to do.
 
+For the PREPARE-SELECT mapper the substitution is not merely tolerable, it is
+*indistinguishable*.  ``Select.num_target_qubits`` is assigned from
+``qubit_hamiltonian.num_qubits`` at the only site that constructs a ``Select``, so the
+system terms cancel exactly and the fallback
+``unitary.get_num_qubits() - qubit_hamiltonian.num_qubits`` returns the same
+``ceil(log2(num_terms))`` that ``num_prepare_ancillas`` would have supplied -- verified
+over ``num_qubits`` 1-4 x ``num_terms`` 1-65 in both quantum-walk modes, 90 cases, no
+divergence.  **No runtime assertion can catch a dropped capability on this mapper**, because
+both branches agree on every input; a test comparing them would pass no matter what the code
+did.  That is why this gate has to be static.
+
+The fallback is not harmless everywhere, which is why it exists: ``SOSSAWalkContainer``
+exposes no ancilla count at all, so there the subtraction is the only source of the number
+and a broken cancellation would silently return a wrong allocation size.  That case is
+pinned separately by
+``TestSOSSAWalkContainer.test_num_qubits_ancilla_excess_is_exactly_the_structural_widths``
+in ``test_block_encoding_sossa.py``.
+
 This test is deliberately source-only (``ast`` over files on disk, no imports), so it
 still runs in environments where the compiled extension module is unavailable.
 
 **This module's liveness is tied to the ``hasattr`` dispatch mechanism, and should be
 deleted rather than repaired if that mechanism goes away.**  The probes it scans are the
-only two in the tree, and both live in ``circuit_builder/base.py``.  If the builder is
+only two in the tree, and both live in ``phase_estimation/circuit_builder/base.py`` -- the
+prefix matters, as three separate packages carry a ``circuit_builder/base.py`` and only
+this one dispatches on mapper capabilities.  If the builder is
 ever refactored to obtain the ancilla width from the mapper's returned object instead of
 probing for optional methods, ``_capability_probes()`` becomes empty and
 ``test_at_least_one_capability_probe_is_scanned`` fails.  That failure means the mechanism
