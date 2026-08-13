@@ -1,4 +1,4 @@
-"""Lazy circuit generation for robust phase estimation."""
+"""On-demand circuit generation for robust phase estimation."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -39,8 +39,13 @@ class _AlgorithmSnapshot:
     """Immutable snapshot of an algorithm reference and its nested settings."""
 
     algorithm_type: str
+    """Registry type of the snapshotted algorithm."""
+
     algorithm_name: str
+    """Registered implementation name of the snapshotted algorithm."""
+
     settings_json: str
+    """Serialized settings used to reconstruct independent algorithm instances."""
 
     @classmethod
     def from_ref(cls, ref: AlgorithmRef) -> _AlgorithmSnapshot:
@@ -90,13 +95,28 @@ class RobustPhaseEstimationRound:
     """Circuit-generation metadata for one robust phase estimation round."""
 
     round_index: int
+    """Zero-based position in the geometric RPE schedule."""
+
     evolution_time: float
+    """Evolution time assigned to the round."""
+
     shots_per_basis: int
+    """Number of measurement shots scheduled for each X/Y basis."""
+
     num_draws: int
+    """Number of independent unitary circuit draws generated for the round."""
+
     scheduled_samples: int
+    """Unitary sample count assigned by the RPE schedule."""
+
     circuit_multiplicity: int
+    """Number of executions represented by each generated circuit."""
+
     draw_seeds: tuple[int, ...]
+    """Concrete random seed for each independent draw, or an empty tuple for deterministic evolution."""
+
     _unitary_builder_snapshot: _AlgorithmSnapshot = field(repr=False)
+    """Resolved unitary-builder configuration for the round."""
 
     @property
     def unitary_builder_configuration(self) -> AlgorithmRef:
@@ -106,17 +126,34 @@ class RobustPhaseEstimationRound:
 
 @dataclass(frozen=True)
 class RobustPhaseEstimationExperiment:
-    """One lazily generated X/Y Hadamard-test circuit pair."""
+    """One X/Y Hadamard-test circuit pair generated during iteration."""
 
     round_index: int
+    """Zero-based index of the round that produced the circuit pair."""
+
     evolution_time: float
+    """Evolution time implemented by the circuit pair."""
+
     shots_per_basis: int
+    """Total number of measurement shots scheduled per basis for the round."""
+
     draw_index: int | None
+    """Zero-based randomized draw index, or ``None`` for deterministic evolution."""
+
     draw_seed: int | None
+    """Random seed used for the unitary draw, or ``None`` for deterministic evolution."""
+
     circuit_multiplicity: int
+    """Number of executions represented by each circuit in the pair."""
+
     x_circuit: Circuit
+    """Hadamard-test circuit measured in the X basis."""
+
     y_circuit: Circuit
+    """Hadamard-test circuit measured in the Y basis."""
+
     _unitary_builder_snapshot: _AlgorithmSnapshot = field(repr=False)
+    """Exact unitary-builder configuration used to generate the circuit pair."""
 
     @property
     def unitary_builder_configuration(self) -> AlgorithmRef:
@@ -126,23 +163,52 @@ class RobustPhaseEstimationExperiment:
 
 @dataclass(frozen=True)
 class RobustPhaseEstimationCircuitSet:
-    """Re-iterable lazy circuit collection for robust phase estimation."""
+    """Re-iterable robust phase estimation circuit collection that generates pairs on demand."""
 
     rounds: tuple[RobustPhaseEstimationRound, ...]
+    """Resolved round schedule in execution order."""
+
     lambda_norm: float
+    """One-norm of the qubit Hamiltonian coefficients."""
+
     base_time: float
+    """Evolution time used for round zero."""
+
     target_accuracy: float
+    """Requested absolute accuracy of the final energy estimate."""
+
     epsilon_rpe: float
+    """Energy tolerance used to determine the number of RPE rounds."""
+
     epsilon_unitary: float
+    """Resolved accuracy parameter supplied to the unitary builder."""
+
     unitary_accuracy_fraction: float
+    """Resolved legacy fraction used to partition non-Trotter accuracy budgets."""
+
     error_budget_mode: str
+    """Mode used to resolve the RPE and unitary accuracy parameters."""
+
     unitary_builder_category: str
+    """Category of the configured unitary builder."""
+
     energy_correction: str
+    """Resolved phase-to-energy conversion method."""
+
     requested_seed: int
+    """Root seed requested in the builder settings, where ``-1`` requests entropy."""
+
     root_seed: int | None
+    """Concrete root seed for randomized draws, or ``None`` for deterministic evolution."""
+
     _state_preparation: Circuit = field(repr=False)
+    """Trial-state circuit retained for on-demand circuit generation."""
+
     _qubit_hamiltonian: QubitOperator = field(repr=False)
+    """Qubit Hamiltonian retained for on-demand unitary construction."""
+
     _hadamard_builder_snapshot: _AlgorithmSnapshot = field(repr=False)
+    """Hadamard-test builder configuration retained for circuit generation."""
 
     @property
     def num_rounds(self) -> int:
@@ -160,12 +226,12 @@ class RobustPhaseEstimationCircuitSet:
         return self._hadamard_builder_snapshot.to_ref()
 
     def __iter__(self) -> Iterator[RobustPhaseEstimationExperiment]:
-        """Generate every circuit pair lazily in round and draw order."""
+        """Generate every circuit pair on demand in round and draw order."""
         for round_data in self.rounds:
             yield from self._iter_round(round_data)
 
     def iter_round(self, round_index: int) -> Iterator[RobustPhaseEstimationExperiment]:
-        """Generate circuit pairs lazily for one round.
+        """Generate circuit pairs on demand for one round.
 
         Args:
             round_index: Zero-based round index.
@@ -332,7 +398,7 @@ class RobustPhaseEstimationCircuitBuilder(Algorithm):
         state_preparation: Circuit,
         qubit_hamiltonian: QubitOperator,
     ) -> RobustPhaseEstimationCircuitSet:
-        """Build a lazy robust phase estimation circuit set."""
+        """Build an on-demand robust phase estimation circuit set."""
 
 
 class RobustPhaseEstimationCircuitBuilderFactory(AlgorithmFactory):
@@ -348,21 +414,21 @@ class RobustPhaseEstimationCircuitBuilderFactory(AlgorithmFactory):
 
 
 class QdkRobustPhaseEstimationCircuitBuilder(RobustPhaseEstimationCircuitBuilder):
-    """QDK implementation of lazy robust phase estimation circuit generation."""
+    """QDK implementation of on-demand robust phase estimation circuit generation."""
 
     def _run_impl(
         self,
         state_preparation: Circuit,
         qubit_hamiltonian: QubitOperator,
     ) -> RobustPhaseEstimationCircuitSet:
-        """Resolve the RPE schedule and return a lazy circuit set.
+        """Resolve the RPE schedule and return an on-demand circuit set.
 
         Args:
             state_preparation: Circuit preparing the trial state.
             qubit_hamiltonian: Qubit Hamiltonian whose eigenenergy will be estimated.
 
         Returns:
-            Lazy, re-iterable robust phase estimation circuit collection.
+            Re-iterable robust phase estimation circuit collection that generates pairs on demand.
 
         """
         unitary_ref = self._settings.get("unitary_builder")

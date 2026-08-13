@@ -118,14 +118,14 @@ class RobustPhaseEstimation(PhaseEstimation):
         state_preparation: Circuit,
         qubit_hamiltonian: QubitOperator,
     ) -> RobustPhaseEstimationCircuitSet:
-        """Build the public lazy circuit collection configured for this estimator.
+        """Build the public on-demand circuit collection configured for this estimator.
 
         Args:
             state_preparation: Circuit preparing the trial state on the system qubits.
             qubit_hamiltonian: Qubit Hamiltonian whose eigenenergy is estimated.
 
         Returns:
-            Lazy, re-iterable robust phase estimation circuit collection.
+            Re-iterable robust phase estimation circuit collection that generates pairs on demand.
 
         Raises:
             TypeError: If the configured nested algorithm is not an RPE circuit builder.
@@ -148,7 +148,7 @@ class RobustPhaseEstimation(PhaseEstimation):
         """Execute a public RPE circuit set and return the recovered energy.
 
         Args:
-            circuit_set: Lazy circuit collection returned by an RPE circuit builder.
+            circuit_set: On-demand circuit collection returned by an RPE circuit builder.
             noise: Optional noise profile applied to every X/Y circuit execution.
 
         Returns:

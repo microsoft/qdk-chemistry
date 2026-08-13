@@ -81,7 +81,7 @@ Settings
      See :doc:`qpe_circuit_builder` for detailed configuration.
 
     - ``robust_phase_estimation_circuit_builder`` — The corresponding nested builder reference for robust phase estimation.
-       It returns a lazy circuit set carrying round, draw, seed, multiplicity, and unitary-configuration metadata.
+      It returns an on-demand circuit set carrying round, draw, seed, multiplicity, and unitary-configuration metadata.
        See :doc:`robust_phase_estimation_circuit_builder` for details.
 
    - ``circuit_executor`` — A :class:`~qdk_chemistry.data.AlgorithmRef` to a backend that executes :class:`~qdk_chemistry.data.Circuit` objects and returns measurement bitstrings as :class:`~qdk_chemistry.data.CircuitExecutorData`.
@@ -219,7 +219,7 @@ The estimator has two direct settings:
 - ``circuit_executor`` — The backend used to execute every generated basis circuit.
 
 The circuit builder can also be used independently.
-Its lazy, re-iterable circuit set supports resource estimation before execution while preserving the exact schedule and concrete random draws used by :meth:`~qdk_chemistry.algorithms.phase_estimation.robust_phase_estimation.RobustPhaseEstimation.execute_circuit_set`.
+Its re-iterable circuit set generates circuits on demand, supporting resource estimation before execution while preserving the exact schedule and concrete random draws used by :meth:`~qdk_chemistry.algorithms.phase_estimation.robust_phase_estimation.RobustPhaseEstimation.execute_circuit_set`.
 
 .. tab:: Python API
 
@@ -334,7 +334,7 @@ Further reading
 
 - The above examples can be downloaded as a complete `Python <../../../_static/examples/python/phase_estimation.py>`_ script.
 - :doc:`QpeCircuitBuilder <qpe_circuit_builder>`: Abstract base class for phase estimation circuit builders
-- :doc:`RobustPhaseEstimationCircuitBuilder <robust_phase_estimation_circuit_builder>`: Lazy round- and draw-aware robust circuit generation
+- :doc:`RobustPhaseEstimationCircuitBuilder <robust_phase_estimation_circuit_builder>`: On-demand round- and draw-aware robust circuit generation
 - :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`: Hamiltonian simulation via Trotter-Suzuki decomposition or block-encoding methods
 - :doc:`CircuitExecutor <circuit_executor>`: Quantum circuit execution backends
 - :doc:`StatePreparation <state_preparation>`: Load wavefunctions onto qubits as quantum circuits

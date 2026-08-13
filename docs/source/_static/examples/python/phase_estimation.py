@@ -154,7 +154,7 @@ print(result.get_summary())
 
 ################################################################################
 # start-cell-robust-circuit-set
-# Build the same lazy circuit collection used by robust phase estimation
+# Build the same on-demand circuit collection used by robust phase estimation
 builder = create(
     "robust_phase_estimation_circuit_builder",
     "qdk",

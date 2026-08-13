@@ -2,7 +2,7 @@ Robust phase estimation circuit builder
 =======================================
 
 The :class:`~qdk_chemistry.algorithms.RobustPhaseEstimationCircuitBuilder` separates robust phase-estimation circuit generation from execution.
-It resolves the geometric evolution-time schedule, measurement workload, and unitary-builder configuration, then returns a lazy, re-iterable circuit collection.
+It resolves the geometric evolution-time schedule, measurement workload, and unitary-builder configuration, then returns a re-iterable circuit collection that generates circuits on demand.
 The high-level :doc:`PhaseEstimation <phase_estimation>` algorithm consumes the same collection through a separately configured :doc:`CircuitExecutor <circuit_executor>`.
 
 Overview
@@ -114,7 +114,7 @@ The QRE application describes one circuit; ``circuit_multiplicity`` remains sepa
 Related classes
 ---------------
 
-- :doc:`PhaseEstimation <phase_estimation>`: Executes the lazy circuit set and reconstructs the energy
+- :doc:`PhaseEstimation <phase_estimation>`: Executes the on-demand circuit set and reconstructs the energy
 - :doc:`HadamardTest <hadamard_test>`: Constructs and executes individual controlled-unitary overlap tests
 - :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`: Builds the scheduled evolution unitaries
 - :doc:`CircuitExecutor <circuit_executor>`: Executes generated circuits

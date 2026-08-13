@@ -1,4 +1,4 @@
-"""Tests for lazy robust phase estimation circuit generation."""
+"""Tests for on-demand robust phase estimation circuit generation."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -31,7 +31,7 @@ class _FakeUnitary:
 
 
 class _FakeUnitaryBuilder:
-    """Record one lazy unitary construction."""
+    """Record one on-demand unitary construction."""
 
     def __init__(self, settings: Settings, records: list[dict[str, object]]) -> None:
         self._settings = settings
@@ -142,7 +142,7 @@ def test_deterministic_round_yields_one_pair_with_shot_multiplicity(
     assert hadamard_records[0][1] is hadamard_records[1][1]
 
 
-def test_randomized_round_generates_independent_pairs_lazily(
+def test_randomized_round_generates_independent_pairs_on_demand(
     rpe_problem: tuple[Circuit, QubitOperator],
     recording_builders: tuple[list[dict[str, object]], list[tuple[str, _FakeUnitary]]],
 ) -> None:

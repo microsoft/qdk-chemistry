@@ -31,7 +31,7 @@ The ``run`` method returns a list of :class:`~qdk_chemistry.data.Circuit` contai
 .. note::
 
    Robust phase estimation uses a dedicated :doc:`RobustPhaseEstimationCircuitBuilder <robust_phase_estimation_circuit_builder>`.
-   Its randomized workloads require lazy circuit pairs plus round, seed, and multiplicity metadata, which cannot be represented faithfully by this builder's eager ``list[Circuit]`` contract.
+   Its randomized workloads require on-demand circuit pairs plus round, seed, and multiplicity metadata, which cannot be represented faithfully by this builder's eager ``list[Circuit]`` contract.
 
 Input requirements
 ~~~~~~~~~~~~~~~~~~
