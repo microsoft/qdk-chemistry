@@ -53,6 +53,35 @@ TEST(SymmetryBlockedTensorTest, DataTypeNameIncludesRankAndScalarType) {
             "symmetry_blocked_tensor_4_complex32");
 }
 
+TEST(SymmetryBlockedTensorTest, ContentHashSupportsGenericScalarTypes) {
+  auto sym = std::make_shared<const SymmetryProduct>(
+      SymmetryProduct({axes::spin(1, false)}));
+  std::unordered_map<SymmetryLabel, std::size_t> slot;
+  slot.emplace(SymmetryLabel({axes::alpha()}), 1);
+  const SymmetryLabel alpha({axes::alpha()});
+
+  using SBT1f = SymmetryBlockedTensor<1, float>;
+  Eigen::VectorXf real_data(1);
+  real_data << 1.5F;
+  SBT1f::BlockMap real_blocks;
+  real_blocks.emplace(SBT1f::Labels{alpha},
+                      std::make_shared<const Eigen::VectorXf>(real_data));
+  SBT1f real_tensor({sym}, {slot}, real_blocks);
+
+  using SBT4cf = SymmetryBlockedTensor<4, std::complex<float>>;
+  Eigen::Matrix<std::complex<float>, Eigen::Dynamic, 1> complex_data(1);
+  complex_data << std::complex<float>(2.0F, -3.0F);
+  SBT4cf::BlockMap complex_blocks;
+  complex_blocks.emplace(
+      SBT4cf::Labels{alpha, alpha, alpha, alpha},
+      std::make_shared<const SBT4cf::Base::BlockType>(complex_data));
+  SBT4cf complex_tensor({sym, sym, sym, sym}, {slot, slot, slot, slot},
+                        complex_blocks);
+
+  EXPECT_EQ(real_tensor.content_hash().size(), 16u);
+  EXPECT_EQ(complex_tensor.content_hash().size(), 16u);
+}
+
 TEST(SymmetryBlockedTensorTest, RestrictedAutoAliasesPartner) {
   auto sym = std::make_shared<const SymmetryProduct>(
       SymmetryProduct({axes::spin(1, /*equivalent=*/true)}));
