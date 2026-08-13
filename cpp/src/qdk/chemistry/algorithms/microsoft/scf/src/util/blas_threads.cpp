@@ -10,7 +10,6 @@
 #include <mutex>
 #include <qdk/chemistry/scf/config.h>
 #include <qdk/chemistry/utils/logger.hpp>
-#include <string>
 
 #if defined(_WIN32)
 // Keep windows.h from pulling in unrelated headers and from defining the
@@ -71,14 +70,12 @@ namespace {
 #define QDK_CHEMISTRY_BLAS_VENDOR ""
 #endif
 
-/**
- * @brief BLAS vendor reported by CMake at configure time (may be empty).
- *
- * This is the raw `BLAS_VENDOR` string from the linalg-cmake-modules search
- * (e.g. "OpenBLAS", "IntelMKL", "BLIS", "ReferenceBLAS"). Used to order the
- * runtime probes and to make the log messages actionable.
- */
-std::string configured_blas_vendor() { return QDK_CHEMISTRY_BLAS_VENDOR; }
+// Raw `BLAS_VENDOR` string from the CMake BLAS search (e.g. "OpenBLAS",
+// "IntelMKL", "ReferenceBLAS"), used only to make the "no thread-control API"
+// warning below actionable. sizeof > 1 means the string is not empty.
+constexpr const char* kConfiguredBlasVendor =
+    sizeof(QDK_CHEMISTRY_BLAS_VENDOR) > 1 ? QDK_CHEMISTRY_BLAS_VENDOR
+                                          : "unknown";
 
 /**
  * @brief Look up an optional symbol in the current process.
@@ -234,11 +231,8 @@ const BlasThreadApi& blas_thread_api() {
     // our calls go to, and it is the only option when BLAS is linked
     // statically (no module exports the symbols to look up at runtime).
     if (BlasThreadApi linked = linked_blas_thread_api(); linked.valid()) {
-      QDK_LOGGER().debug("Using {} BLAS thread control (linked; vendor: {})",
-                         to_string(linked.vendor),
-                         configured_blas_vendor().empty()
-                             ? "unknown"
-                             : configured_blas_vendor());
+      QDK_LOGGER().debug("Using {} BLAS thread control (bound at link time)",
+                         to_string(linked.vendor));
       return linked;
     }
 
@@ -250,12 +244,8 @@ const BlasThreadApi& blas_thread_api() {
          {try_flexiblas, try_openblas, try_mkl, try_blis, try_nvpl}) {
       BlasThreadApi api = probe();
       if (api.valid()) {
-        QDK_LOGGER().debug(
-            "Using {} BLAS thread control (found at runtime; vendor: {})",
-                           to_string(api.vendor),
-                           configured_blas_vendor().empty()
-                               ? "unknown"
-                               : configured_blas_vendor());
+        QDK_LOGGER().debug("Using {} BLAS thread control (found at runtime)",
+                           to_string(api.vendor));
         return api;
       }
     }
@@ -267,7 +257,7 @@ const BlasThreadApi& blas_thread_api() {
         "thread via its environment variable (e.g. OPENBLAS_NUM_THREADS, "
         "MKL_NUM_THREADS, BLIS_NUM_THREADS or VECLIB_MAXIMUM_THREADS), or "
         "configure with -DQDK_CHEMISTRY_BLAS_THREAD_API=<backend>.",
-        configured_blas_vendor().empty() ? "unknown" : configured_blas_vendor());
+        kConfiguredBlasVendor);
     return BlasThreadApi{};
   }();
   return api;
