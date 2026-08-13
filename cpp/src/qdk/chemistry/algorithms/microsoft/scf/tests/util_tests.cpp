@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 #include <qdk/chemistry/scf/core/basis_set.h>
 #include <qdk/chemistry/scf/core/molecule.h>
+#include <qdk/chemistry/scf/util/blas_threads.h>
 #include <qdk/chemistry/scf/util/cache.h>
 #include <qdk/chemistry/scf/util/class_registry.h>
 #include <qdk/chemistry/scf/util/gauxc_util.h>
@@ -588,4 +589,66 @@ TEST(AtomGuessTest, CompareWithFileGuess) {
           << "for basis " << basis_name << std::endl;
     }
   }
+}
+
+//==============================================================================
+// BLAS thread control tests
+//==============================================================================
+
+TEST(BlasThreadsTest, DetectionIsConsistent) {
+  using namespace qdk::chemistry::scf::util;
+
+  const bool available = blas_thread_control_available();
+  EXPECT_EQ(available, detected_blas_vendor() != BlasVendor::Unknown);
+  EXPECT_NE(to_string(detected_blas_vendor()), nullptr);
+
+  if (available) {
+    EXPECT_GT(get_blas_num_threads(), 0);
+  } else {
+    GTEST_SKIP() << "No BLAS thread-control API available (configured vendor: '"
+                 << configured_blas_vendor() << "')";
+  }
+}
+
+TEST(BlasThreadsTest, ScopedGuardPinsAndRestores) {
+  using namespace qdk::chemistry::scf::util;
+
+  if (!blas_thread_control_available()) {
+    GTEST_SKIP() << "No BLAS thread-control API available";
+  }
+
+  const int original = get_blas_num_threads();
+  ASSERT_GT(original, 0);
+
+  {
+    ScopedBlasThreads guard(1);
+    EXPECT_TRUE(guard.active());
+    EXPECT_EQ(get_blas_num_threads(), 1);
+
+    // Nested guards must not restore the count early.
+    {
+      ScopedBlasThreads nested(1);
+      EXPECT_EQ(get_blas_num_threads(), 1);
+    }
+    EXPECT_EQ(get_blas_num_threads(), 1);
+  }
+
+  EXPECT_EQ(get_blas_num_threads(), original);
+}
+
+TEST(BlasThreadsTest, SetNumThreadsRejectsInvalidCounts) {
+  using namespace qdk::chemistry::scf::util;
+
+  EXPECT_FALSE(set_blas_num_threads(0));
+  EXPECT_FALSE(set_blas_num_threads(-1));
+
+  if (!blas_thread_control_available()) {
+    GTEST_SKIP() << "No BLAS thread-control API available";
+  }
+
+  const int original = get_blas_num_threads();
+  EXPECT_TRUE(set_blas_num_threads(1));
+  EXPECT_EQ(get_blas_num_threads(), 1);
+  EXPECT_TRUE(set_blas_num_threads(original));
+  EXPECT_EQ(get_blas_num_threads(), original);
 }

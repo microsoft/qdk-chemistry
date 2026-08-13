@@ -17,90 +17,10 @@
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 #include <qdk/chemistry/scf/util/gpu/cuda_helper.h>
 #endif
-#include <mutex>
+#include <qdk/chemistry/scf/util/blas_threads.h>
 #include <qdk/chemistry/utils/logger.hpp>
 
-#if !defined(_WIN32)
-#include <dlfcn.h>
-#endif
-
 namespace qdk::chemistry::scf::impl {
-
-namespace {
-
-// Windows builds always link OpenBLAS, so use its symbols directly.
-// Other platforms may use a different BLAS backend; resolve the optional
-// OpenBLAS thread-control symbols at runtime to avoid a link-time dependency.
-#if defined(_WIN32)
-extern "C" {
-void openblas_set_num_threads(int);
-int openblas_get_num_threads(void);
-}
-#else
-using SetNumThreadsFn = void (*)(int);
-using GetNumThreadsFn = int (*)(void);
-
-SetNumThreadsFn openblas_set_num_threads = reinterpret_cast<SetNumThreadsFn>(
-    dlsym(RTLD_DEFAULT, "openblas_set_num_threads"));
-GetNumThreadsFn openblas_get_num_threads = reinterpret_cast<GetNumThreadsFn>(
-    dlsym(RTLD_DEFAULT, "openblas_get_num_threads"));
-#endif
-
-/**
- * @brief RAII guard that forces BLAS to run single-threaded while active,
- * restoring the previous thread count once the outermost guard exits.
- *
- * GauXC's OpenMP-parallel grid loop calls BLAS from many threads at once.
- * If BLAS is also multi-threaded, those threads collide inside BLAS's own
- * shared worker pool and can corrupt results. Forcing BLAS to 1 thread here
- * avoids that.
- *
- * The thread count is process-global state, so this uses a shared,
- * mutex-protected nesting depth instead of per-instance state: only the
- * first guard to start changes it, and only the last one to finish restores
- * it. This keeps concurrent/recursive calls safe.
- */
-class SingleThreadedBlasGuard {
- public:
-  SingleThreadedBlasGuard() {
-    if (!(openblas_set_num_threads && openblas_get_num_threads)) return;
-    std::lock_guard<std::mutex> lock(mutex());
-    if (depth()++ == 0) {
-      saved_nthreads() = openblas_get_num_threads();
-      openblas_set_num_threads(1);
-    }
-    active_ = true;
-  }
-
-  ~SingleThreadedBlasGuard() {
-    if (!active_) return;
-    std::lock_guard<std::mutex> lock(mutex());
-    if (--depth() == 0) {
-      openblas_set_num_threads(saved_nthreads());
-    }
-  }
-
-  SingleThreadedBlasGuard(const SingleThreadedBlasGuard&) = delete;
-  SingleThreadedBlasGuard& operator=(const SingleThreadedBlasGuard&) = delete;
-
- private:
-  static std::mutex& mutex() {
-    static std::mutex m;
-    return m;
-  }
-  static int& depth() {
-    static int d = 0;
-    return d;
-  }
-  static int& saved_nthreads() {
-    static int n = 1;
-    return n;
-  }
-
-  bool active_ = false;
-};
-
-}  // namespace
 
 // Map string to GauXC preset grid defaults
 std::map<std::string, GauXC::AtomicGridSizeDefault> mg_map = {
@@ -375,7 +295,9 @@ void GAUXC::free_device_buffer_async_(cudaStream_t stream) {
 void GAUXC::build_XC(const double* D, double* XC, double* xc_energy) {
   QDK_LOG_TRACE_ENTERING();
 
-  SingleThreadedBlasGuard blas_thread_guard;  // avoid nested BLAS threading
+  // GauXC parallelizes over grid batches with OpenMP and calls BLAS from
+  // each thread; pin BLAS to one thread to avoid nested threading.
+  util::ScopedBlasThreads blas_thread_guard(1);
 
   // Allocate a large temporary buffer
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
@@ -433,7 +355,9 @@ void GAUXC::build_XC(const double* D, double* XC, double* xc_energy) {
 void GAUXC::get_gradients(const double* D, double* dXC) {
   QDK_LOG_TRACE_ENTERING();
 
-  SingleThreadedBlasGuard blas_thread_guard;  // avoid nested BLAS threading
+  // GauXC parallelizes over grid batches with OpenMP and calls BLAS from
+  // each thread; pin BLAS to one thread to avoid nested threading.
+  util::ScopedBlasThreads blas_thread_guard(1);
 
   // Allocate a large temporary buffer
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
@@ -481,7 +405,9 @@ void GAUXC::get_gradients(const double* D, double* dXC) {
 void GAUXC::build_snK(const double* D, double* K) {
   QDK_LOG_TRACE_ENTERING();
 
-  SingleThreadedBlasGuard blas_thread_guard;  // avoid nested BLAS threading
+  // GauXC parallelizes over grid batches with OpenMP and calls BLAS from
+  // each thread; pin BLAS to one thread to avoid nested threading.
+  util::ScopedBlasThreads blas_thread_guard(1);
 
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
   allocate_device_buffer_async_(device_buffer_sz_, 0);
@@ -516,7 +442,9 @@ void GAUXC::eval_fxc_contraction(const double* D, const double* tD,
 
   AutoTimer __timer("polarizability::  GAUXC::eval_fxc_contraction");
 
-  SingleThreadedBlasGuard blas_thread_guard;  // avoid nested BLAS threading
+  // GauXC parallelizes over grid batches with OpenMP and calls BLAS from
+  // each thread; pin BLAS to one thread to avoid nested threading.
+  util::ScopedBlasThreads blas_thread_guard(1);
 
   // Allocate a large temporary buffer
 #ifdef QDK_CHEMISTRY_ENABLE_GPU

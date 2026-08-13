@@ -42,6 +42,7 @@ target_sources(chemistry PRIVATE
 ###############################################################################
 
 target_sources(chemistry PRIVATE
+  util/blas_threads.cpp
   util/gauxc_util.cpp
   util/int1e.cpp
   util/libint2_util.cpp
@@ -100,6 +101,125 @@ install(
   DESTINATION ${QDK_RESOURCE_PREFIX}
   COMPONENT qdk_chemistry_resources
 )
+
+###############################################################################
+# Detect the BLAS thread-control API (see util/blas_threads.cpp)
+###############################################################################
+#
+# GauXC calls BLAS from inside an OpenMP-parallel region, so BLAS itself must
+# be pinned to a single thread there. Every BLAS backend spells that API
+# differently, so instead of assuming OpenBLAS we probe the BLAS the user
+# actually configured (found by linalg-cmake-modules via GauXC/MACIS) and bind
+# directly to whichever thread-control API links.
+#
+# This matters for statically linked BLAS (e.g. the x64-windows-static-md
+# vcpkg triplet), where the symbols are not exported from any module and so
+# cannot be discovered at runtime. When no API links, blas_threads.cpp still
+# falls back to a runtime lookup (dlsym / GetProcAddress), which covers builds
+# where BLAS is loaded dynamically by someone else.
+
+include(CheckFunctionExists)
+
+set(QDK_CHEMISTRY_BLAS_VENDOR "${BLAS_VENDOR}")
+
+# Escape hatch for BLAS installations the probe below cannot classify (or
+# misclassifies): pick the backend explicitly, or NONE to disable the
+# link-time binding and rely on the runtime lookup only.
+set(QDK_CHEMISTRY_BLAS_THREAD_API "AUTO" CACHE STRING
+    "BLAS thread-control API to bind: AUTO, OPENBLAS, INTELMKL, BLIS, FLEXIBLAS, NVPL or NONE")
+set_property(CACHE QDK_CHEMISTRY_BLAS_THREAD_API PROPERTY STRINGS
+    AUTO OPENBLAS INTELMKL BLIS FLEXIBLAS NVPL NONE)
+
+if(TARGET BLAS::BLAS)
+  set(_qdk_blas_link_libs BLAS::BLAS)
+else()
+  set(_qdk_blas_link_libs ${BLAS_LIBRARIES})
+endif()
+
+# Check whether both halves of a vendor's thread-control API link against the
+# configured BLAS, and set ${out_var} accordingly.
+function(qdk_check_blas_thread_api set_fn get_fn out_var)
+  set(CMAKE_REQUIRED_LIBRARIES ${_qdk_blas_link_libs})
+  set(CMAKE_REQUIRED_INCLUDES ${BLAS_INCLUDE_DIRS})
+  set(CMAKE_REQUIRED_QUIET TRUE)
+  check_function_exists(${set_fn} QDK_CHEMISTRY_HAS_${set_fn})
+  check_function_exists(${get_fn} QDK_CHEMISTRY_HAS_${get_fn})
+  if(QDK_CHEMISTRY_HAS_${set_fn} AND QDK_CHEMISTRY_HAS_${get_fn})
+    set(${out_var} TRUE PARENT_SCOPE)
+  else()
+    set(${out_var} FALSE PARENT_SCOPE)
+  endif()
+endfunction()
+
+if(NOT QDK_CHEMISTRY_BLAS_THREAD_API STREQUAL "AUTO")
+  # Explicit user choice: trust it instead of probing.
+  foreach(_qdk_blas_backend OPENBLAS INTELMKL BLIS FLEXIBLAS NVPL)
+    if(QDK_CHEMISTRY_BLAS_THREAD_API STREQUAL "${_qdk_blas_backend}")
+      set(QDK_CHEMISTRY_BLAS_LINKS_${_qdk_blas_backend} TRUE)
+    endif()
+  endforeach()
+  if(NOT QDK_CHEMISTRY_BLAS_THREAD_API STREQUAL "NONE"
+     AND NOT QDK_CHEMISTRY_BLAS_LINKS_${QDK_CHEMISTRY_BLAS_THREAD_API})
+    message(FATAL_ERROR
+      "Invalid QDK_CHEMISTRY_BLAS_THREAD_API='${QDK_CHEMISTRY_BLAS_THREAD_API}'. "
+      "Expected AUTO, OPENBLAS, INTELMKL, BLIS, FLEXIBLAS, NVPL or NONE.")
+  endif()
+elseif(_qdk_blas_link_libs)
+  qdk_check_blas_thread_api(openblas_set_num_threads openblas_get_num_threads
+    QDK_CHEMISTRY_BLAS_LINKS_OPENBLAS)
+  qdk_check_blas_thread_api(MKL_Set_Num_Threads MKL_Get_Max_Threads
+    QDK_CHEMISTRY_BLAS_LINKS_INTELMKL)
+  qdk_check_blas_thread_api(bli_thread_set_num_threads bli_thread_get_num_threads
+    QDK_CHEMISTRY_BLAS_LINKS_BLIS)
+  qdk_check_blas_thread_api(flexiblas_set_num_threads flexiblas_get_num_threads
+    QDK_CHEMISTRY_BLAS_LINKS_FLEXIBLAS)
+  qdk_check_blas_thread_api(nvpl_blas_set_num_threads nvpl_blas_get_max_threads
+    QDK_CHEMISTRY_BLAS_LINKS_NVPL)
+endif()
+
+# A dispatch layer can expose more than one of these APIs, so keep exactly one:
+# the backend CMake reported as the vendor, else the first one that links.
+set(_qdk_blas_backends OPENBLAS INTELMKL BLIS FLEXIBLAS NVPL)
+if(QDK_CHEMISTRY_BLAS_VENDOR STREQUAL "OpenBLAS")
+  set(_qdk_blas_preferred OPENBLAS)
+elseif(QDK_CHEMISTRY_BLAS_VENDOR STREQUAL "IntelMKL")
+  set(_qdk_blas_preferred INTELMKL)
+elseif(QDK_CHEMISTRY_BLAS_VENDOR STREQUAL "BLIS")
+  set(_qdk_blas_preferred BLIS)
+elseif(QDK_CHEMISTRY_BLAS_VENDOR STREQUAL "FlexiBLAS")
+  set(_qdk_blas_preferred FLEXIBLAS)
+elseif(QDK_CHEMISTRY_BLAS_VENDOR STREQUAL "NVPL")
+  set(_qdk_blas_preferred NVPL)
+else()
+  set(_qdk_blas_preferred "")
+endif()
+if(_qdk_blas_preferred)
+  list(REMOVE_ITEM _qdk_blas_backends ${_qdk_blas_preferred})
+  list(INSERT _qdk_blas_backends 0 ${_qdk_blas_preferred})
+endif()
+
+set(_qdk_blas_thread_api "none (runtime lookup only)")
+foreach(_qdk_blas_backend IN LISTS _qdk_blas_backends)
+  if(_qdk_blas_thread_api STREQUAL "none (runtime lookup only)"
+     AND QDK_CHEMISTRY_BLAS_LINKS_${_qdk_blas_backend})
+    set(_qdk_blas_thread_api "${_qdk_blas_backend}")
+    # Bind directly to the BLAS providing the API. It is already linked
+    # transitively through GauXC; naming it here keeps the reference explicit
+    # and works for statically linked BLAS too.
+    target_link_libraries(chemistry PRIVATE ${_qdk_blas_link_libs})
+  else()
+    unset(QDK_CHEMISTRY_BLAS_LINKS_${_qdk_blas_backend})
+  endif()
+endforeach()
+
+message(STATUS "QDK Chemistry BLAS vendor: '${QDK_CHEMISTRY_BLAS_VENDOR}', "
+               "thread-control API: ${_qdk_blas_thread_api}")
+
+# The runtime fallback uses dlsym(), which lives in libdl on glibc (folded into
+# libc on newer glibc, but linking it explicitly keeps older toolchains
+# working). CMAKE_DL_LIBS is empty on Windows and macOS, where the equivalent
+# APIs come from kernel32 / libSystem.
+target_link_libraries(chemistry PRIVATE ${CMAKE_DL_LIBS})
 
 # Generate Config Header
 configure_file(${CMAKE_CURRENT_LIST_DIR}/config.h.in ${PROJECT_BINARY_DIR}/include/qdk/chemistry/scf/config.h)
