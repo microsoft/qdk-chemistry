@@ -23,10 +23,19 @@ using namespace qdk::chemistry::data;
 
 namespace {
 
-std::shared_ptr<Structure> create_h2_structure() {
-  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}};
-  std::vector<std::string> symbols = {"H", "H"};
+std::shared_ptr<Structure> create_lih_structure() {
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 3.0}};
+  std::vector<std::string> symbols = {"Li", "H"};
   return std::make_shared<Structure>(coords, symbols);
+}
+
+std::shared_ptr<BasisSet> create_lih_basis() {
+  std::vector<Shell> shells = {
+      Shell(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0}),
+      Shell(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0}),
+      Shell(0, OrbitalType::P, std::vector{1.0}, std::vector{1.0}),
+      Shell(1, OrbitalType::S, std::vector{1.0}, std::vector{1.0})};
+  return std::make_shared<BasisSet>("minimal", shells, create_lih_structure());
 }
 
 std::shared_ptr<Wavefunction> create_model_wavefunction() {
@@ -51,19 +60,24 @@ std::shared_ptr<Wavefunction> create_correlated_model_wavefunction() {
 }
 
 std::shared_ptr<Wavefunction> create_molecular_wavefunction() {
-  std::vector<Shell> shells = {
-      Shell(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0}),
-      Shell(1, OrbitalType::S, std::vector{1.0}, std::vector{1.0})};
-  auto basis =
-      std::make_shared<BasisSet>("minimal", shells, create_h2_structure());
-  Eigen::MatrixXd overlap(2, 2);
-  overlap << 1.0, 0.5, 0.5, 1.0;
-  const double bonding_norm = 1.0 / std::sqrt(3.0);
-  Eigen::MatrixXd coefficients(2, 2);
-  coefficients << bonding_norm, 1.0, bonding_norm, -1.0;
-  auto orbitals = std::make_shared<Orbitals>(coefficients, std::nullopt,
-                                             overlap, std::move(basis));
-  auto determinant = Configuration::from_spin_half_string("20");
+  Eigen::MatrixXd identity = Eigen::MatrixXd::Identity(6, 6);
+  auto orbitals = std::make_shared<Orbitals>(identity, std::nullopt, identity,
+                                             create_lih_basis());
+  auto determinant = Configuration::from_spin_half_string("00002u");
+  auto container =
+      std::make_unique<StateVectorContainer>(determinant, orbitals);
+  return std::make_shared<Wavefunction>(std::move(container));
+}
+
+std::shared_ptr<Wavefunction> create_unrestricted_molecular_wavefunction() {
+  Eigen::MatrixXd coefficients_alpha = Eigen::MatrixXd::Identity(6, 6);
+  Eigen::MatrixXd coefficients_beta = Eigen::MatrixXd::Identity(6, 6);
+  coefficients_beta.col(0).swap(coefficients_beta.col(5));
+  Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(6, 6);
+  auto orbitals = std::make_shared<Orbitals>(
+      coefficients_alpha, coefficients_beta, std::nullopt, std::nullopt,
+      overlap, create_lih_basis());
+  auto determinant = Configuration::from_spin_half_string("0000u2");
   auto container =
       std::make_unique<StateVectorContainer>(determinant, orbitals);
   return std::make_shared<Wavefunction>(std::move(container));
@@ -145,13 +159,24 @@ TEST(PopulationAnalyzerTest, QdkAnalyzerUsesModelOneRdmInSiteBasis) {
   EXPECT_DOUBLE_EQ(populations[1], 0.5);
 }
 
-TEST(PopulationAnalyzerTest, QdkAnalyzerReturnsMolecularPopulations) {
+TEST(PopulationAnalyzerTest, QdkAnalyzerAssignsHeteronuclearAoBlocksToAtoms) {
   auto analyzer = PopulationAnalyzerFactory::create("qdk");
 
   auto populations = analyzer->run(create_molecular_wavefunction());
 
   ASSERT_EQ(populations.size(), 2);
-  EXPECT_NEAR(populations[0], 1.0, 1e-12);
+  EXPECT_NEAR(populations[0], 2.0, 1e-12);
+  EXPECT_NEAR(populations[1], 1.0, 1e-12);
+}
+
+TEST(PopulationAnalyzerTest, QdkAnalyzerUsesUnrestrictedMolecularDensity) {
+  auto analyzer = PopulationAnalyzerFactory::create("qdk");
+
+  auto populations =
+      analyzer->run(create_unrestricted_molecular_wavefunction());
+
+  ASSERT_EQ(populations.size(), 2);
+  EXPECT_NEAR(populations[0], 2.0, 1e-12);
   EXPECT_NEAR(populations[1], 1.0, 1e-12);
 }
 

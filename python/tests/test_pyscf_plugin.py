@@ -233,9 +233,12 @@ class TestPyscfPlugin:
 
         pyscf_populations = pyscf_analyzer.run(wavefunction)
 
-        assert len(pyscf_populations) == 2
-        assert not np.isclose(pyscf_populations[0], pyscf_populations[1])
-        np.testing.assert_allclose(sum(pyscf_populations), 4.0, atol=1e-8)
+        np.testing.assert_allclose(
+            pyscf_populations,
+            [3.0161156314704147, 0.9838843685295866],
+            atol=1e-8,
+            err_msg="LiH populations must follow the five-AO lithium and one-AO hydrogen boundary",
+        )
 
     def test_pyscf_population_analysis_uses_correlated_one_rdm(self):
         """Test that correlated populations use the 1-RDM in the current MO basis."""
@@ -245,7 +248,21 @@ class TestPyscfPlugin:
         )
         scf_solver = algorithms.create("scf_solver", "pyscf")
         _, reference = scf_solver.run(h2, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
-        orbitals = reference.get_orbitals()
+        reference_orbitals = reference.get_orbitals()
+        coefficients = np.array(
+            spin_channel_matrix(reference_orbitals.coefficients(), axes.alpha()),
+            copy=True,
+        )
+        for column in range(coefficients.shape[1]):
+            first_nonzero = np.flatnonzero(np.abs(coefficients[:, column]) > 1e-12)[0]
+            if coefficients[first_nonzero, column] < 0:
+                coefficients[:, column] *= -1
+        orbitals = data.Orbitals(
+            coefficients,
+            None,
+            reference_orbitals.get_overlap_matrix(),
+            reference_orbitals.get_basis_set(),
+        )
         determinants = [
             data.Configuration.from_spin_half_string("20"),
             data.Configuration.from_spin_half_string("du"),
@@ -257,13 +274,17 @@ class TestPyscfPlugin:
 
         pyscf_populations = pyscf_analyzer.run(wavefunction)
 
-        assert not np.isclose(pyscf_populations[0], pyscf_populations[1])
-        np.testing.assert_allclose(sum(pyscf_populations), 2.0, atol=1e-8)
+        np.testing.assert_allclose(
+            pyscf_populations,
+            [1.523406124803181, 0.4765938751968194],
+            atol=1e-8,
+            err_msg="Correlated population analysis must preserve off-diagonal 1-RDM contributions",
+        )
 
-    def test_pyscf_o2_unrestricted_population_analysis(self):
-        """Test spin-summed PySCF populations from unrestricted orbitals."""
+    def test_pyscf_lih_cation_unrestricted_population_analysis(self):
+        """Test spin-summed heteronuclear populations from unrestricted orbitals."""
         scf_solver = algorithms.create("scf_solver", "pyscf", scf_type="unrestricted")
-        _, wavefunction = scf_solver.run(create_o2_structure(), charge=0, spin_multiplicity=3, basis_or_guess="sto-3g")
+        _, wavefunction = scf_solver.run(create_lih_structure(), charge=1, spin_multiplicity=2, basis_or_guess="sto-3g")
         pyscf_analyzer = algorithms.create("population_analyzer", "pyscf")
         pyscf_analyzer.settings().set(
             "scf_solver",
@@ -272,7 +293,12 @@ class TestPyscfPlugin:
 
         pyscf_populations = pyscf_analyzer.run(wavefunction)
 
-        np.testing.assert_allclose(pyscf_populations, [8.0, 8.0], atol=1e-8)
+        np.testing.assert_allclose(
+            pyscf_populations,
+            [2.19786389376805, 0.8021361062319504],
+            atol=1e-8,
+            err_msg="Unrestricted LiH+ populations must include both spin-resolved 1-RDM blocks",
+        )
 
     def test_pyscf_scf_solver_settings(self):
         """Test PySCF SCF solver settings interface."""

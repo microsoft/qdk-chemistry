@@ -10,10 +10,75 @@ from pyscf.scf.hf import mulliken_pop
 
 from qdk_chemistry.algorithms import PopulationAnalyzer, ScfSolver
 from qdk_chemistry.data import AlgorithmRef, Settings, Wavefunction
+from qdk_chemistry.data._spin_channels import spin_channel_indices
+from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.plugins.pyscf.conversion import orbitals_to_scf
 from qdk_chemistry.utils import Logger
 
 __all__ = ["PyscfPopulationAnalysisSettings", "PyscfPopulationAnalyzer"]
+
+
+def _embed_active_one_rdm(
+    active_one_rdm: np.ndarray,
+    active_indices: list[int],
+    inactive_indices: list[int],
+    n_orbitals: int,
+    inactive_occupation: float,
+) -> np.ndarray:
+    active_one_rdm = np.asarray(active_one_rdm)
+    expected_shape = (len(active_indices), len(active_indices))
+    if active_one_rdm.shape != expected_shape:
+        raise ValueError("PySCF population analysis requires 1-RDM dimensions to match the active space.")
+
+    all_indices = active_indices + inactive_indices
+    if any(index < 0 or index >= n_orbitals for index in all_indices):
+        raise ValueError("PySCF population analysis encountered an invalid orbital index.")
+
+    one_rdm = np.zeros((n_orbitals, n_orbitals), dtype=active_one_rdm.dtype)
+    one_rdm[np.ix_(active_indices, active_indices)] = active_one_rdm
+    one_rdm[inactive_indices, inactive_indices] = inactive_occupation
+    return one_rdm
+
+
+def _density_from_wavefunction(wavefunction: Wavefunction) -> np.ndarray:
+    orbitals = wavefunction.get_orbitals()
+    n_orbitals = orbitals.get_num_molecular_orbitals()
+
+    if orbitals.is_unrestricted():
+        if not wavefunction.has_one_rdm_spin_dependent():
+            raise ValueError(
+                "PySCF population analysis requires spin-dependent active-space 1-RDM blocks for unrestricted orbitals."
+            )
+        active_alpha, active_beta = wavefunction.get_active_one_rdm_spin_dependent()
+        active_indices = orbitals.active_indices()
+        inactive_indices = orbitals.inactive_indices()
+        one_rdm_alpha = _embed_active_one_rdm(
+            active_alpha,
+            spin_channel_indices(active_indices, axes.alpha()),
+            spin_channel_indices(inactive_indices, axes.alpha()),
+            n_orbitals,
+            1.0,
+        )
+        one_rdm_beta = _embed_active_one_rdm(
+            active_beta,
+            spin_channel_indices(active_indices, axes.beta()),
+            spin_channel_indices(inactive_indices, axes.beta()),
+            n_orbitals,
+            1.0,
+        )
+        density_alpha, density_beta = orbitals.calculate_ao_density_matrix_from_rdm(one_rdm_alpha, one_rdm_beta)
+        return np.asarray(density_alpha) + np.asarray(density_beta)
+
+    if not wavefunction.has_one_rdm_spin_traced():
+        raise ValueError("PySCF population analysis requires a spin-traced active-space 1-RDM.")
+    one_rdm = _embed_active_one_rdm(
+        wavefunction.get_active_one_rdm_spin_traced(),
+        spin_channel_indices(orbitals.active_indices(), axes.alpha()),
+        spin_channel_indices(orbitals.inactive_indices(), axes.alpha()),
+        n_orbitals,
+        2.0,
+    )
+    return np.asarray(orbitals.calculate_ao_density_matrix_from_rdm(one_rdm))
 
 
 class PyscfPopulationAnalysisSettings(Settings):
@@ -69,9 +134,7 @@ class PyscfPopulationAnalyzer(PopulationAnalyzer):
             scf_settings.get("scf_type"),
             scf_settings.get("method"),
         )
-        density = np.asarray(mean_field.make_rdm1())
-        if density.ndim == 3 and density.shape[0] == 2:
-            density = density.sum(axis=0)
+        density = _density_from_wavefunction(wavefunction)
         ao_populations, _ = mulliken_pop(mean_field.mol, density, s=mean_field.get_ovlp(), verbose=0)
         ao_slices = mean_field.mol.aoslice_by_atom()
         return [float(np.sum(ao_populations[start:stop])) for _, _, start, stop in ao_slices]
