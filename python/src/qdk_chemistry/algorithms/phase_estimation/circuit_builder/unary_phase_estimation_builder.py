@@ -206,9 +206,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
 
         # The mapper puts every qubit it wants reflected about after the system register, so naming the
         # tail of its register is enough — the builder never has to ask the mapper for a reflection.
-        apply_reflection = QSHARP_UTILS.PrepSelPrep.MakeIndexReflectionOp(
-            list(range(num_system_qubits, num_system_qubits + num_ancilla_qubits))
-        )
+        apply_reflection = QSHARP_UTILS.PrepSelPrep.MakeAncillaReflectionOp(num_system_qubits)
 
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         if state_prep_op is None:

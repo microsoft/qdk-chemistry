@@ -37,6 +37,23 @@ def _post_process_phase_estimation(
     energy by the unitary representation's ``eigenvalue_from_phase`` exactly as standard
     QPE does, which for a walk operator is :math:`E = \lambda \cos(2\pi\varphi)`.
 
+    .. note::
+        The measurement cannot distinguish the two eigenvalue signs: the walk's spectrum
+        is :math:`e^{\pm i \arccos(E/\lambda)}`, and both branches land in the same pair of
+        conjugate bins. ``use_positive_sign`` chooses which one to report, and it is a
+        genuine choice, not a refinement of the data. The folded phase lies in
+        :math:`[0, 1/4]`, so the two branches partition the spectrum exactly:
+
+        * ``False`` (the default) returns :math:`\varphi \in [1/4, 1/2]`, hence
+          :math:`\cos(2\pi\varphi) \le 0` and :math:`E \le 0` for every input.
+        * ``True`` returns :math:`\varphi \in [0, 1/4]`, hence :math:`E \ge 0`.
+
+        Leave it ``False`` for a ground-state energy below zero, which is the usual case
+        for an electronic Hamiltonian including nuclear repulsion. Set it ``True`` when the
+        target eigenvalue is known to be non-negative -- for a shifted or purely repulsive
+        Hamiltonian -- otherwise the reported energy is the correct magnitude with the
+        wrong sign.
+
     Args:
         counts: Measured bitstring counts, most-significant bit first.
         num_bits: Size of the phase register.

@@ -10,19 +10,19 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     import Std.Canon.ApplyQFT;
     import Std.Canon.ApplyToEach;
     import Std.Canon.ApplyXorInPlace;
-    import Std.Convert.IntAsDouble;
     import Std.Core.Length;
     import Std.Diagnostics.Fact;
     import Std.Math.AbsI;
-    import Std.Math.Ceiling;
-    import Std.Math.Lg;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
     import QDKChemistry.Utils.UnaryIteration.UnaryIterationWithControl;
 
     /// Number of phase qubits required to address `numQueries + 1` reflection slots.
+    ///
+    /// Delegates to `AddressQubits` so the phase register and the unary-iteration address
+    /// register can never disagree about how wide `numQueries + 1` slots are.
     function PhaseRegisterSize(numQueries : Int) : Int {
         Fact(numQueries > 0, "numQueries must be positive");
-        return Ceiling(Lg(IntAsDouble(numQueries + 1)));
+        return AddressQubits(numQueries + 1);
     }
 
     /// Applies `numQueries` self-inverse blocks, omitting the one reflection `phaseReg` selects.
@@ -67,6 +67,23 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
 
         let totalQubits = numBits + Length(systems) + numAncillas;
         use qs = Qubit[totalQubits];
+        // `phaseAncillas` and `systemQubits` are addressed by caller-supplied indices while
+        // `beAncillas` is the tail of the register, so the three only partition `qs` when the
+        // callers pass the contiguous prefixes this layout assumes. Check it rather than trust
+        // it: a stray index would silently alias the system register onto the block-encoding
+        // ancillas and yield a plausible-looking but wrong spectrum.
+        Fact(
+            Length(ancillas) + Length(systems) + numAncillas == totalQubits,
+            "phase, system and block-encoding registers must exactly partition the circuit",
+        );
+        Fact(
+            ancillas == SequenceI(0, numBits - 1),
+            $"phase register must be qubits 0..{numBits - 1}",
+        );
+        Fact(
+            systems == SequenceI(numBits, numBits + Length(systems) - 1),
+            $"system register must be qubits {numBits}..{numBits + Length(systems) - 1}",
+        );
         let phaseAncillas = Subarray(ancillas, qs);
         let systemQubits = Subarray(systems, qs);
         let beAncillas = if numAncillas == 0 {

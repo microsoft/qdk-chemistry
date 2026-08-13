@@ -7,12 +7,10 @@ namespace QDKChemistry.Utils.UnaryIteration {
     import Std.Arrays.MostAndTail;
     import Std.Canon.ApplyToEach;
     import Std.Canon.ApplyXorInPlace;
-    import Std.Convert.IntAsDouble;
     import Std.Core.Length;
     import Std.Diagnostics.Fact;
     import Std.Intrinsic.AND;
-    import Std.Math.Ceiling;
-    import Std.Math.Lg;
+    import Std.Math.BitSizeI;
 
 
     /// Unary iteration
@@ -47,7 +45,7 @@ namespace QDKChemistry.Utils.UnaryIteration {
     ) : Unit is Adj {
         Fact(numActions > 0, "actions cannot be empty");
 
-        let n = Ceiling(Lg(IntAsDouble(numActions)));
+        let n = AddressQubits(numActions);
         Fact(
             Length(address) >= n,
             $"address register is too small, requires at least {n} qubits",
@@ -88,7 +86,7 @@ namespace QDKChemistry.Utils.UnaryIteration {
     ) : Unit is Adj {
         Fact(numActions > 0, "actions cannot be empty");
 
-        let n = Ceiling(Lg(IntAsDouble(numActions)));
+        let n = AddressQubits(numActions);
         Fact(
             Length(address) >= n,
             $"address register is too small, requires at least {n} qubits",
@@ -123,9 +121,16 @@ namespace QDKChemistry.Utils.UnaryIteration {
         }
     }
 
-    /// Number of address qubits needed to enumerate `numActions` values.
+    /// Number of address qubits needed to enumerate `numActions` values, i.e.
+    /// `Ceiling(Lg(numActions))`.
+    ///
+    /// Computed with integer arithmetic rather than `Ceiling(Lg(IntAsDouble(numActions)))`:
+    /// the floating-point form is off by one at several exact powers of two (the first is
+    /// `2^31`, where it yields 32), which would over-allocate the address register and trip
+    /// the power-of-two `Fact`s below. `BitSizeI(n - 1)` is exact for every positive `n`.
     function AddressQubits(numActions : Int) : Int {
-        return Ceiling(Lg(IntAsDouble(numActions)));
+        Fact(numActions > 0, "numActions must be positive");
+        return BitSizeI(numActions - 1);
     }
 
     /// Flips `flags[index]` for the single selected address.

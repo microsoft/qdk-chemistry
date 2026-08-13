@@ -172,19 +172,6 @@ class PSPMapper(CircuitMapper):
         lcu, _ = self.resolve_lcu(container)
         return QSHARP_UTILS.PrepSelPrep.MakeAncillaReflectionOp(lcu.select.num_target_qubits)
 
-    def num_ancilla_qubits(self, container: UnitaryContainer) -> int:
-        """The number of ancilla qubits the block encoding needs beyond the system register.
-
-        Args:
-            container: The container held by the unitary representation.
-
-        Returns:
-            The size of the PREPARE ancilla register.
-
-        """
-        lcu, _ = self.resolve_lcu(container)
-        return lcu.num_prepare_ancillas
-
     def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
         r"""Construct the block-encoding circuit on the flat ``[system | ancilla]`` register.
 

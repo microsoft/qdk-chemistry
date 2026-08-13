@@ -11,6 +11,7 @@ from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.circuit_mapper.psp_mapper import PSPMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
+from qdk_chemistry.algorithms.phase_estimation.circuit_builder import unary_phase_estimation_builder
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.unary_phase_estimation_builder import (
     QdkUnaryQpeCircuitBuilder,
     cosine_window_state,
@@ -22,6 +23,7 @@ from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import (
 from qdk_chemistry.data import AlgorithmRef, QubitOperator
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
+from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 _PAULI_X = np.array([[0.0, 1.0], [1.0, 0.0]], dtype=complex)
@@ -195,6 +197,222 @@ class TestPhaseDecoding:
         assert phase_fraction == pytest.approx(0.125)
         assert bitstring in {"010", "110"}
         assert measured in {0.25, 0.75}
+
+    @pytest.mark.parametrize("num_bits", [1, 2, 3, 4])
+    def test_the_shipped_default_reports_a_non_positive_eigenvalue(self, num_bits):
+        r"""The default branch must fold every bin into :math:`[1/4, 1/2]`, i.e. :math:`E \le 0`.
+
+        ``use_positive_sign`` defaults to ``False``, which is only correct for a ground state
+        below zero. Pinning the reachable interval here documents that the default *cannot*
+        report a positive energy, so a caller with a non-negative target must opt in.
+        """
+        for value in range(1 << num_bits):
+            counts = {format(value, f"0{num_bits}b"): 1}
+            phase_fraction, _, _ = _post_process_phase_estimation(counts, num_bits)
+            assert 0.25 <= phase_fraction <= 0.5
+            assert np.cos(2 * np.pi * phase_fraction) <= 1e-12
+
+    @pytest.mark.parametrize("num_bits", [1, 2, 3, 4])
+    def test_the_two_sign_branches_partition_the_spectrum(self, num_bits):
+        """The flag picks a branch of a sign ambiguity; it must not change the magnitude."""
+        for value in range(1 << num_bits):
+            counts = {format(value, f"0{num_bits}b"): 1}
+            positive, _, _ = _post_process_phase_estimation(counts, num_bits, use_positive_sign=True)
+            negative, _, _ = _post_process_phase_estimation(counts, num_bits, use_positive_sign=False)
+            assert 0.0 <= positive <= 0.25
+            assert positive + negative == pytest.approx(0.5)
+
+
+class _FixedWidthMapper:
+    """A circuit mapper that reports a chosen register width and nothing else.
+
+    The builder locates the reflected qubits from ``Circuit.num_qubits``, so the width a
+    mapper declares is the only thing these tests need to vary.
+    """
+
+    def __init__(self, num_qubits: int | None) -> None:
+        self._num_qubits = num_qubits
+
+    def run(self, _unitary: UnitaryRepresentation) -> Circuit:
+        """Return a circuit that declares the configured width."""
+        return Circuit(qasm="OPENQASM 3.0;\n", num_qubits=self._num_qubits)
+
+
+class _RecordingLogger:
+    """Collects ``Logger.warn`` messages so a warning path can be asserted.
+
+    ``Logger`` lives in the compiled core, so the module-level name is replaced rather
+    than an attribute of the extension type.
+    """
+
+    def __init__(self) -> None:
+        self.warnings: list[str] = []
+
+    def warn(self, message: str) -> None:
+        """Record a warning."""
+        self.warnings.append(str(message))
+
+    def __getattr__(self, _name: str):
+        """Ignore every other logging call."""
+        return lambda *_args, **_kwargs: None
+
+
+class TestInvalidConfigurationIsRejected:
+    """Each documented failure mode must raise rather than silently mis-size a register."""
+
+    @staticmethod
+    def _hamiltonian() -> QubitOperator:
+        """``H = (X + Z)/2`` on a single qubit."""
+        return QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([0.5, 0.5]))
+
+    def _build_with_mapper(self, mapper, num_queries: int = 3):
+        """Run the builder with ``mapper`` substituted for the configured circuit mapper."""
+        builder = QdkUnaryQpeCircuitBuilder(num_queries=num_queries)
+        hamiltonian = self._hamiltonian()
+        original = builder._create_nested
+        builder._create_nested = (
+            lambda name, *args, **kwargs: mapper if name == "circuit_mapper" else original(name, *args, **kwargs)
+        )
+        return builder.run(
+            state_preparation=_identity_state_preparation(hamiltonian.num_qubits),
+            qubit_hamiltonian=hamiltonian,
+        )
+
+    @pytest.mark.parametrize("num_queries", [0, -1, -7])
+    def test_a_non_positive_query_count_is_rejected(self, num_queries):
+        """``num_queries`` sizes the whole schedule, so it must be positive."""
+        builder = QdkUnaryQpeCircuitBuilder(num_queries=num_queries)
+        with pytest.raises(ValueError, match="num_queries must be a positive integer"):
+            builder.resolve_num_queries()
+
+    def test_a_plain_block_encoding_is_rejected(self):
+        """The schedule drops one reflection, so a bare LCU has nothing to drop."""
+        builder = QdkUnaryQpeCircuitBuilder(num_queries=3)
+        hamiltonian = self._hamiltonian()
+        original = builder._create_nested
+        builder._create_nested = (
+            lambda name, *args, **kwargs: LCUBuilder(quantum_walk=False)
+            if name == "unitary_builder"
+            else original(name, *args, **kwargs)
+        )
+        with pytest.raises(ValueError, match="Requires a block encoding unitary representation"):
+            builder.run(
+                state_preparation=_identity_state_preparation(hamiltonian.num_qubits),
+                qubit_hamiltonian=hamiltonian,
+            )
+
+    def test_a_mapper_that_hides_its_width_is_rejected(self):
+        """Without ``num_qubits`` the builder cannot tell which qubits to reflect about."""
+        with pytest.raises(ValueError, match="did not report num_qubits"):
+            self._build_with_mapper(_FixedWidthMapper(None))
+
+    @pytest.mark.parametrize("declared_width", [1, 0])
+    def test_a_mapper_without_an_ancilla_register_is_rejected(self, declared_width):
+        """A width that leaves no ancilla past the system register has no reflection."""
+        with pytest.raises(ValueError, match="non-empty ancilla register"):
+            self._build_with_mapper(_FixedWidthMapper(declared_width))
+
+    def test_a_non_unary_circuit_builder_is_rejected(self):
+        """The algorithm decodes a doubled phase, so it needs its own builder."""
+        qpe = UnaryPhaseEstimation(shots=8)
+        qpe.settings().set("qpe_circuit_builder", AlgorithmRef("qpe_circuit_builder", "qdk_standard"))
+        hamiltonian = self._hamiltonian()
+        with pytest.raises(TypeError, match="QdkUnaryQpeCircuitBuilder"):
+            qpe.run(
+                qubit_hamiltonian=hamiltonian,
+                state_preparation=_identity_state_preparation(hamiltonian.num_qubits),
+            )
+
+
+class TestIgnoredSettingsAreAnnounced:
+    """Settings the schedule overrides must warn rather than silently take no effect."""
+
+    @staticmethod
+    def _hamiltonian() -> QubitOperator:
+        """``H = (X + Z)/2`` on a single qubit."""
+        return QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([0.5, 0.5]))
+
+    def _run_with_recording_logger(self, builder, monkeypatch) -> list[str]:
+        """Run ``builder`` with its module-level ``Logger`` replaced, returning the warnings."""
+        recorder = _RecordingLogger()
+        monkeypatch.setattr(unary_phase_estimation_builder, "Logger", recorder)
+        hamiltonian = self._hamiltonian()
+        builder.run(
+            state_preparation=_identity_state_preparation(hamiltonian.num_qubits),
+            qubit_hamiltonian=hamiltonian,
+        )
+        return recorder.warnings
+
+    def test_a_configured_num_bits_is_ignored_with_a_warning(self, monkeypatch):
+        """The query count fixes the register size, so ``num_bits`` cannot also set it."""
+        builder = QdkUnaryQpeCircuitBuilder(num_queries=3)
+        builder.settings().set("num_bits", 7)
+
+        warnings = self._run_with_recording_logger(builder, monkeypatch)
+
+        assert any("num_bits=7 is ignored" in message for message in warnings), warnings
+
+    def test_a_carried_walk_power_is_ignored_with_a_warning(self, monkeypatch):
+        """The schedule picks its own power per slot, so a container power is meaningless."""
+        builder = QdkUnaryQpeCircuitBuilder(num_queries=3)
+        walk = LCUBuilder(quantum_walk=True).run(self._hamiltonian())
+        container = walk.get_container()
+        powered = UnitaryRepresentation(
+            container=LCUWalkContainer(container.block_encoding, power=2, scale=container.scale)
+        )
+        original = builder._create_nested
+        builder._create_nested = (
+            lambda name, *args, **kwargs: _PoweredUnitaryBuilder(powered)
+            if name == "unitary_builder"
+            else original(name, *args, **kwargs)
+        )
+
+        warnings = self._run_with_recording_logger(builder, monkeypatch)
+
+        assert any("carries power 2" in message for message in warnings), warnings
+
+
+class _PoweredUnitaryBuilder:
+    """A unitary builder that hands back a prepared representation."""
+
+    def __init__(self, representation: UnitaryRepresentation) -> None:
+        self._representation = representation
+
+    def run(self, _qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
+        """Return the prepared representation."""
+        return self._representation
+
+
+class TestRegisterSizeHasOneDefinition:
+    """The phase register width must have a single definition across Python and Q#."""
+
+    @pytest.mark.parametrize("num_queries", [1, 2, 3, 4, 5, 7, 8, 15, 16, 17, 31, 63, 64])
+    def test_python_and_qsharp_agree_on_the_phase_register_size(self, num_queries):
+        """``resolve_num_queries``, ``PhaseRegisterSize`` and ``AddressQubits`` are one quantity.
+
+        They agreed by coincidence of three separate formulas before; ``PhaseRegisterSize``
+        now delegates to ``AddressQubits``, and this pins the Python side to the same value.
+        """
+        _, num_bits = QdkUnaryQpeCircuitBuilder(num_queries=num_queries).resolve_num_queries()
+        context = get_qsharp_context()
+        qsharp_phase_bits = context.eval(f"QDKChemistry.Utils.UnaryPhaseEstimation.PhaseRegisterSize({num_queries})")
+        qsharp_address_bits = context.eval(f"QDKChemistry.Utils.UnaryIteration.AddressQubits({num_queries + 1})")
+
+        assert num_bits == qsharp_phase_bits == qsharp_address_bits
+        assert (1 << num_bits) >= num_queries + 1
+
+    @pytest.mark.parametrize("num_actions", [1, 2, 3, 4, 5, 8, 9, 16, 17, 1024, 1025, 2**20, 2**31])
+    def test_address_width_is_exact_at_large_powers_of_two(self, num_actions):
+        """``AddressQubits`` must be integer-exact where ``Ceiling(Lg(...))`` is not.
+
+        The floating-point form returns 32 for ``2**31``, over-allocating the address
+        register and tripping the power-of-two facts that guard the recursion.
+        """
+        context = get_qsharp_context()
+        computed = context.eval(f"QDKChemistry.Utils.UnaryIteration.AddressQubits({num_actions})")
+
+        assert computed == (num_actions - 1).bit_length()
+        assert (1 << computed) >= num_actions
 
 
 class TestUnaryQpeEndToEnd:

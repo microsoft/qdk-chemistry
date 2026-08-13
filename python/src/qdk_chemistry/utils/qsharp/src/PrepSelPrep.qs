@@ -127,17 +127,12 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     /// # Summary
     /// Reflection about the all-zero state of the block-encoding ancillas of a flat
     /// `[systemReg | ancillaReg]` register.
+    ///
+    /// Naming the tail rather than an explicit index list keeps one definition of "the
+    /// ancillas": every caller lays its target register out as system-then-ancilla, so a
+    /// second index-based factory would only be another way to spell this same slice.
     function MakeAncillaReflectionOp(numSystemQubits : Int) : (Qubit[] => Unit is Adj + Ctl) {
         (allQubits) => Reflect(allQubits[numSystemQubits...])
-    }
-
-    /// # Summary
-    /// Reflection about the all-zero state of the qubits `reflectIndices` picks out.
-    ///
-    /// Indices make the register layout explicit, so a caller that already knows where the
-    /// block-encoding ancillas sit does not have to ask the mapper for a reflection.
-    function MakeIndexReflectionOp(reflectIndices : Int[]) : (Qubit[] => Unit is Adj + Ctl) {
-        (allQubits) => Reflect(Subarray(reflectIndices, allQubits))
     }
 
     /// Block encoding on the flat `[systemReg | ancillaReg]` register.

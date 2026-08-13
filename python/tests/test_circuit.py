@@ -246,6 +246,40 @@ class TestCircuitSerialization:
         assert "num_qubits" not in json_data
         assert Circuit.from_json(json_data).num_qubits is None
 
+    def test_a_payload_written_before_num_qubits_existed_still_loads(self, simple_qasm):
+        """``num_qubits`` is purely additive, so the serialization version must not bump.
+
+        ``_validate_serialization_version`` rejects *minor* differences outright, so moving
+        ``Circuit`` from ``0.1.0`` to ``0.2.0`` would convert every previously written
+        circuit from "loads fine" into a hard ``RuntimeError`` that needs the migration
+        tool. Reading a payload that predates the field is what has to keep working, and it
+        does because both readers use ``.get``.
+        """
+        legacy = {"qasm": simple_qasm, "version": "0.1.0"}
+
+        restored = Circuit.from_json(legacy)
+
+        assert restored.num_qubits is None
+        assert Circuit._serialization_version == "0.1.0", (
+            "bumping the minor version would reject every circuit written by an earlier release"
+        )
+
+    def test_num_qubits_participates_in_the_content_hash(self, simple_qasm):
+        """Circuits differing only in declared width must not share a cache entry.
+
+        The field is appended to the hashed stream, so it can only *split* previously equal
+        hashes and never merge distinct ones: stale cache entries become unreachable and are
+        recomputed, which is why no cached artifact needs explicit invalidation.
+        """
+        hashes = [
+            Circuit(qasm=simple_qasm).content_hash(),
+            Circuit(qasm=simple_qasm, num_qubits=4).content_hash(),
+            Circuit(qasm=simple_qasm, num_qubits=5).content_hash(),
+        ]
+
+        assert len(set(hashes)) == 3
+        assert Circuit(qasm=simple_qasm, num_qubits=4).content_hash() == hashes[1]
+
     def test_hdf5_roundtrip_preserves_num_qubits(self, simple_qasm, simple_qir):
         """HDF5 stores attributes as numpy scalars, so check the width comes back as an int."""
         original = Circuit(qasm=simple_qasm, qir=simple_qir, num_qubits=7)
