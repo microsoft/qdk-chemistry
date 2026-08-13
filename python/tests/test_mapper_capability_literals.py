@@ -14,15 +14,20 @@ capability therefore produces a circuit that builds and runs while quietly omitt
 work the capability was there to do.
 
 For the PREPARE-SELECT mapper the substitution is not merely tolerable, it is
-*indistinguishable*.  ``Select.num_target_qubits`` is assigned from
-``qubit_hamiltonian.num_qubits`` at the only site that constructs a ``Select``, so the
-system terms cancel exactly and the fallback
-``unitary.get_num_qubits() - qubit_hamiltonian.num_qubits`` returns the same
-``ceil(log2(num_terms))`` that ``num_prepare_ancillas`` would have supplied -- verified
-over ``num_qubits`` 1-4 x ``num_terms`` 1-65 in both quantum-walk modes, 90 cases, no
-divergence.  **No runtime assertion can catch a dropped capability on this mapper**, because
-both branches agree on every input; a test comparing them would pass no matter what the code
-did.  That is why this gate has to be static.
+*indistinguishable*, and the reason is an identity rather than a sample.  Three source
+lines close it::
+
+    lcu.py:215              num_system_qubits = qubit_hamiltonian.num_qubits
+    lcu.py:230              Select(num_target_qubits=num_system_qubits)   # only construction site
+    block_encoding.py:217   num_qubits = select.num_target_qubits + num_prepare_ancillas
+
+so the fallback at ``phase_estimation/circuit_builder/base.py:131``,
+``unitary_rep.get_num_qubits() - qubit_hamiltonian.num_qubits``, reduces to
+``num_prepare_ancillas`` -- the very quantity the capability would have supplied -- for
+**every** input, not merely for a tested grid.  **No runtime assertion can catch a
+dropped capability on this mapper**, because both branches agree identically; a test
+comparing them would pass no matter what the code did.  That is why this gate has to be
+static.
 
 The fallback is not harmless everywhere, which is why it exists: ``SOSSAWalkContainer``
 exposes no ancilla count at all, so there the subtraction is the only source of the number
