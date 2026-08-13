@@ -249,11 +249,16 @@ class TestCircuitSerialization:
     def test_a_payload_written_before_num_qubits_existed_still_loads(self, simple_qasm):
         """``num_qubits`` is purely additive, so the serialization version must not bump.
 
-        ``_validate_serialization_version`` rejects *minor* differences outright, so moving
-        ``Circuit`` from ``0.1.0`` to ``0.2.0`` would convert every previously written
-        circuit from "loads fine" into a hard ``RuntimeError`` that needs the migration
-        tool. Reading a payload that predates the field is what has to keep working, and it
-        does because both readers use ``.get``.
+        ``_validate_serialization_version`` grades a mismatch in three tiers: a differing
+        *major* or *minor* throws, while a differing *patch* is accepted. Moving ``Circuit``
+        from ``0.1.0`` to ``0.2.0`` would therefore convert every previously written circuit
+        from "loads fine" into a hard ``RuntimeError`` that needs the migration tool.
+
+        A *patch* bump to ``0.1.1`` would be tolerated in both directions and is the only
+        bump that stays readable, but it is not taken: no class in the repo carries a
+        non-zero patch, so it would invent a convention to record a change that costs a
+        reader nothing. Reading a payload that predates the field is what has to keep
+        working, and it does because both readers use ``.get``.
         """
         legacy = {"qasm": simple_qasm, "version": "0.1.0"}
 
