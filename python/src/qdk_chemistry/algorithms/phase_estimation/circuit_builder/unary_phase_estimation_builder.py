@@ -133,7 +133,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
     exactly :math:`p` walk blocks, so :math:`p` need not be a power of two.
 
     The builder works with any controlled circuit mapper that exposes ``build_walk_op``,
-    ``num_ancillary_qubits`` and ``get_ancilla_prep_op``; the SOSSA mapper is only the
+    ``num_ancilla_qubits`` and ``get_ancilla_prep_op``; the SOSSA mapper is only the
     default.
 
     """
@@ -236,7 +236,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         # The schedule is built already bound to num_queries: it applies all of the walk
         # blocks itself, sharing one unary-iteration ladder with the phase-register decode.
         signed_power_schedule = mapper.build_walk_op(unitary_rep, num_queries, use_unary_iteration=True)
-        num_ancilla_qubits = mapper.num_ancillary_qubits(unitary_rep.get_container())
+        num_ancilla_qubits = mapper.num_ancilla_qubits(unitary_rep.get_container())
 
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         if state_prep_op is None:

@@ -156,7 +156,7 @@ class ControlledPSPMapper(ControlledCircuitMapper):
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
 
-    def num_ancillary_qubits(self, container: Any) -> int:
+    def num_ancilla_qubits(self, container: Any) -> int:
         """The number of ancilla qubits the walk needs beyond the system register.
 
         Args:

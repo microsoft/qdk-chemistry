@@ -123,10 +123,10 @@ class QpeCircuitBuilder(Algorithm):
         circuit_mapper.settings().update("control_indices", [0])
         circuit = circuit_mapper.run(unitary_rep)
 
-        # Use mapper's num_ancillary_qubits if available
-        if hasattr(circuit_mapper, "num_ancillary_qubits"):
+        # Use mapper's num_ancilla_qubits if available
+        if hasattr(circuit_mapper, "num_ancilla_qubits"):
             container = unitary_rep.get_container()
-            num_ancilla_qubits = circuit_mapper.num_ancillary_qubits(container)
+            num_ancilla_qubits = circuit_mapper.num_ancilla_qubits(container)
         else:
             num_ancilla_qubits = unitary_rep.get_num_qubits() - qubit_hamiltonian.num_qubits
 

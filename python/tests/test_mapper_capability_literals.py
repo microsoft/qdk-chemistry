@@ -7,7 +7,7 @@ it silently turns the probe ``False`` and takes the fallback branch.  Nothing ra
 no linter, type checker, or import gate can see through a string.
 
 That matters here because the fallbacks are designed to tolerate absence.  A missing
-``num_ancillary_qubits`` substitutes an arithmetic qubit-count estimate, and a missing
+``num_ancilla_qubits`` substitutes an arithmetic qubit-count estimate, and a missing
 ``get_ancilla_prep_op`` yields ``None``, which the standard and iterative builders then
 replace with a no-op state preparation.  A mapper that silently stops advertising a
 capability therefore produces a circuit that builds and runs while quietly omitting the
