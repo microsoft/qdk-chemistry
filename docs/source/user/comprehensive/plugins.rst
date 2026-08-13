@@ -80,6 +80,7 @@ In addition to the native implementations packaged within QDK/Chemistry, plugins
 - `PySCF <https://pyscf.org/>`_ — Python-based quantum chemistry
 - `Qiskit <https://www.ibm.com/quantum/qiskit>`_ — Quantum algorithm primitives
 - `OpenFermion <https://quantumai.google/openfermion>`_ — Quantum algorithm primitives
+- `geomeTRIC <https://github.com/leeping/geomeTRIC>`_ — Molecular geometry optimization
 
 These plugins are enabled automatically when the corresponding package is installed.
 
@@ -135,7 +136,9 @@ Alternatively, you can install them directly:
 
 .. note::
 
-   The ``qiskit-extras`` extra is not currently supported on Python 3.14.
+   On Python 3.14, ``qiskit-aer`` is omitted from ``qiskit-extras`` on Linux ARM64
+   (aarch64), because Qiskit does not yet publish a Python 3.14 wheel for that
+   platform. All other platforms install the full set.
 
 **Checking what is loaded:**
 

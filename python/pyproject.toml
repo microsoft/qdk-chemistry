@@ -20,6 +20,7 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Programming Language :: C++",
   "Operating System :: POSIX :: Linux",
   "Operating System :: MacOS",
@@ -98,13 +99,14 @@ qiskit-extras = [
   # The qiskit stack and pennylane both require rustworkx, which publishes no
   # win-arm64 wheels and whose sdist needs a Rust toolchain, so the whole stack
   # is unavailable on Windows ARM64. QDK_CHEMISTRY_HAS_QISKIT* guard its use.
-  "qiskit[qasm3-import]>=2.2.0; python_version < '3.14' and (sys_platform != 'win32' or platform_machine != 'ARM64')",
-  "qiskit-aer; python_version < '3.14' and (sys_platform != 'win32' or platform_machine != 'ARM64')",
-  "qiskit-ibm-runtime>=0.46.1; python_version < '3.14' and (sys_platform != 'win32' or platform_machine != 'ARM64')",
-  "qiskit-nature; python_version < '3.14' and (sys_platform != 'win32' or platform_machine != 'ARM64')",
-  "qiskit-qasm3-import; python_version < '3.14' and (sys_platform != 'win32' or platform_machine != 'ARM64')",
-  "pylatexenc==2.10; python_version < '3.14'",
-  "requests>=2.33.0; python_version < '3.14'"
+  "qiskit[qasm3-import]>=2.2.0; sys_platform != 'win32' or platform_machine != 'ARM64'",
+  # cp314 manylinux aarch64 wheel not available
+  "qiskit-aer; (python_version < '3.14' or platform_machine != 'aarch64' or sys_platform != 'linux') and (sys_platform != 'win32' or platform_machine != 'ARM64')",
+  "qiskit-ibm-runtime>=0.46.1; sys_platform != 'win32' or platform_machine != 'ARM64'",
+  "qiskit-nature; sys_platform != 'win32' or platform_machine != 'ARM64'",
+  "qiskit-qasm3-import; sys_platform != 'win32' or platform_machine != 'ARM64'",
+  "pylatexenc==2.10",
+  "requests>=2.33.0"
 ]
 qre = [
   "qdk[qre,jupyter]>=1.30.0"
@@ -190,6 +192,7 @@ filterwarnings = [
 ]
 markers = [
   "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+  "tutorial_baseline: validates portable tutorial invariants and optional version-pinned snapshots",
 ]
 testpaths = ["tests"]
 env = [
@@ -281,6 +284,7 @@ metadata.version.input = "../VERSION"
 [tool.scikit-build.wheel]
 packages = ["src/qdk_chemistry"]
 install-dir = "qdk_chemistry"
+exclude = ["**/.no-stubgen"]
 
 [tool.scikit-build.cmake.define]
 BUILD_SHARED_LIBS = "OFF"

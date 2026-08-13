@@ -51,23 +51,27 @@ void warn_if_not_aufbau_determinant_wavefunction(
  * @param wavefunction The original wavefunction providing electron counts.
  * @param new_orbitals The orbitals to attach to the output wavefunction.
  * @param one_rdm_spin_traced Optional spin-traced active-space 1-RDM payload.
+ * @param active_one_rdm Optional spin-dependent active-space 1-RDM payload.
  * @return An Aufbau determinant wavefunction with the updated orbitals.
  */
 std::shared_ptr<data::Wavefunction> new_aufbau_determinant_wavefunction(
     std::shared_ptr<data::Wavefunction> wavefunction,
     std::shared_ptr<data::Orbitals> new_orbitals,
-    std::optional<data::ContainerTypes::MatrixVariant> one_rdm_spin_traced =
-        std::nullopt);
+    const std::optional<data::ContainerTypes::MatrixVariant>&
+        one_rdm_spin_traced = std::nullopt,
+    std::shared_ptr<const data::SymmetryBlockedTensorVariant<2>>
+        active_one_rdm = nullptr);
 }  // namespace detail
 
 /**
- * @brief Abstract base class for orbital localization algorithms
+ * @brief Abstract base class for orbital localization and transformation
+ * algorithms
  *
  * The Localizer class provides a common interface for various orbital
- * localization methods used in quantum chemistry. Orbital localization
- * transforms canonical molecular orbitals (which are typically delocalized
- * across the entire molecule) into localized orbitals that are confined
- * subject to some metric (spatial, bond, etc.).
+ * localization and transformation methods used in quantum chemistry.
+ * Implementations transform selected molecular orbitals into alternative
+ * representations, which may be spatially localized or otherwise useful for
+ * analysis and downstream calculations.
  *
  * This class uses the Factory design pattern through LocalizerFactory to
  * allow dynamic creation of different localization algorithms at runtime.
@@ -100,20 +104,20 @@ class Localizer
   virtual ~Localizer() = default;
 
   /**
-   * @brief Localize the given molecular orbitals
+   * @brief Transform the selected molecular orbitals
    *
    *
    * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
-   * @param orbitals The orbitals to localize
-   * @param loc_indices_a Indices of alpha orbitals to localize (must be sorted,
-   * if empty, no alpha orbitals are localized)
-   * @param loc_indices_b Indices of beta orbitals to localize (must be sorted,
-   * if empty, no beta orbitals are localized)
+   * @param wavefunction The wavefunction containing the orbitals to transform
+   * @param loc_indices_a Indices of alpha orbitals to transform (must be
+   * sorted; empty selects no alpha orbitals)
+   * @param loc_indices_b Indices of beta orbitals to transform (must be sorted;
+   * empty selects no beta orbitals)
    * \endcond
    *
-   * @return The localized molecular orbitals with updated coefficients.
+   * @return The output wavefunction with transformed orbital coefficients.
    *
-   * @throws std::runtime_error If localization fails
+   * @throws std::runtime_error If the transformation fails
    * @throws std::invalid_argument If the input orbitals are invalid for the
    *                               specified instance of the localizer
    * @throws qdk::chemistry::data::SettingsAreLocked if attempting to modify
@@ -158,17 +162,19 @@ class Localizer
 
  protected:
   /**
-   * @brief Implementation of orbital localization
+   * @brief Implementation of the orbital transformation
    *
-   * This method contains the actual localization logic. It is automatically
+   * This method contains the transformation logic. It is automatically
    * called by run() after settings have been locked.
    *
    * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
-   * @param orbitals The orbitals to localize
-   * @param loc_indices_a Indices of alpha orbitals to localize (must be sorted)
-   * @param loc_indices_b Indices of beta orbitals to localize (must be sorted)
+   * @param wavefunction The wavefunction containing the orbitals to transform
+   * @param loc_indices_a Indices of alpha orbitals to transform (must be
+   * sorted; empty selects no alpha orbitals)
+   * @param loc_indices_b Indices of beta orbitals to transform (must be sorted;
+   * empty selects no beta orbitals)
    * \endcond
-   * @return The localized orbitals
+   * @return The output wavefunction with transformed orbitals
    */
   virtual std::shared_ptr<data::Wavefunction> _run_impl(
       std::shared_ptr<data::Wavefunction> wavefunction,

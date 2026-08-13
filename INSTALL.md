@@ -85,9 +85,9 @@ If you prefer a minimal install (core library only, no optional backends):
 python3 -m pip install qdk-chemistry
 ```
 
-> **NOTE:** The `all` and `qiskit-extras` extras are not supported on Python 3.14 because Qiskit does not yet publish Python 3.14 wheels. See the [Optional Extras](#optional-extras) table below for details and alternative install targets.
+> **NOTE:** On Python 3.14, `qiskit-aer` is omitted from the `qiskit-extras` and `all` extras on Linux ARM64 (aarch64), because Qiskit does not yet publish a Python 3.14 wheel for that platform. See the [Optional Extras](#optional-extras) table below for details.
 >
-> **NOTE:** PySCF is the only package in the `plugins` extra and publishes no Windows wheels, so it is skipped on native Windows. See [Notes for Windows users](#notes-for-windows-users).
+> **NOTE:** On Windows, PySCF is skipped from the `plugins` extra because it publishes no Windows wheels; on Windows arm64 the Qiskit stack, PennyLane and RDKit are skipped as well. See [Notes for Windows users](#notes-for-windows-users).
 
 ### Step 3: Verify the installation
 
@@ -121,9 +121,14 @@ If you chose the minimal `pip install qdk-chemistry` above, you can add specific
 | `qiskit-extras` | Qiskit ecosystem packages | qiskit, qiskit-aer, qiskit-nature |
 | `openfermion-extras` | OpenFermion ecosystem packages | openfermion |
 | `networkx-extras` | NetworkX ecosystem packages | networkx |
+| `docs` | [Sphinx documentation build tools](docs/README.md) | sphinx, sphinx-rtd-theme, myst-parser, breathe, sphinx-autodoc-typehints, sphinx-inline-tabs, sphinxcontrib-napoleon, sphinxcontrib-bibtex, sphinx_copybutton |
+| `qre` | Quantum Resource Estimator support | qdk[qre,jupyter]>=1.30.0 |
 | `dev` | Development and testing tools | pytest, ruff, mypy, and related tooling |
-| `test` | Testing tools and optional dependencies | pytest, ipykernel, networkx, openfermion, pennylane, pyscf, qiskit, rdkit |
+| `test` | Testing tools and optional runtime dependencies; does not include `docs` | qdk-chemistry[coverage,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre], nbclient, nbformat, pennylane, rdkit, requests>=2.33.0 |
 | `all` | **All of the above** | All optional dependencies |
+
+Building the documentation also requires the system packages Doxygen and
+Graphviz. See the [documentation build instructions](docs/README.md).
 
 Install one or more extras with:
 
