@@ -10,10 +10,10 @@ namespace qdk::chemistry::scf::util {
  * @brief BLAS backends whose threading can be controlled at runtime.
  */
 enum class BlasVendor {
-  Unknown,   ///< No recognized thread-control API was found
-  OpenBLAS,  ///< OpenBLAS (also covers the OpenBLAS-compatible ARMPL builds)
-  IntelMKL,  ///< Intel oneMKL
-  BLIS,      ///< BLIS / AMD AOCL-BLAS
+  Unknown,    ///< No recognized thread-control API was found
+  OpenBLAS,   ///< OpenBLAS (also covers the OpenBLAS-compatible ARMPL builds)
+  IntelMKL,   ///< Intel oneMKL
+  BLIS,       ///< BLIS / AMD AOCL-BLAS
   FlexiBLAS,  ///< FlexiBLAS dispatch layer
   NVPL,       ///< NVIDIA Performance Libraries BLAS
 };

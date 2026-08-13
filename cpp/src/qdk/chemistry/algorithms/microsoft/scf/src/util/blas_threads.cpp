@@ -2,13 +2,13 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <qdk/chemistry/scf/config.h>
 #include <qdk/chemistry/scf/util/blas_threads.h>
 
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
 #include <mutex>
-#include <qdk/chemistry/scf/config.h>
 #include <qdk/chemistry/utils/logger.hpp>
 
 #if defined(_WIN32)
@@ -90,10 +90,9 @@ void* find_symbol(const char* name) {
   // Modules that may export a BLAS thread-control API. Only already loaded
   // modules are inspected; nothing new is brought into the process.
   static const char* const kModules[] = {
-      "openblas.dll",   "libopenblas.dll",
-      "mkl_rt.dll",     "mkl_rt.2.dll",
-      "blis.dll",       "AOCL-LibBlis-Win-MT-dll.dll",
-      "flexiblas.dll",  "nvpl_blas_core.dll",
+      "openblas.dll",  "libopenblas.dll",    "mkl_rt.dll",
+      "mkl_rt.2.dll",  "blis.dll",           "AOCL-LibBlis-Win-MT-dll.dll",
+      "flexiblas.dll", "nvpl_blas_core.dll",
   };
   for (const char* module_name : kModules) {
     if (HMODULE handle = GetModuleHandleA(module_name)) {
@@ -146,14 +145,13 @@ BlasThreadApi linked_blas_thread_api() {
   return {BlasVendor::IntelMKL, [] { return MKL_Get_Max_Threads(); },
           [](int n) { MKL_Set_Num_Threads(n); }};
 #elif defined(QDK_CHEMISTRY_BLAS_LINKS_BLIS)
-  return {BlasVendor::BLIS,
-          [] {
-            return static_cast<int>(
-                static_cast<std::int32_t>(bli_thread_get_num_threads()));
-          },
-          [](int n) {
-            bli_thread_set_num_threads(static_cast<std::int64_t>(n));
-          }};
+  return {
+      BlasVendor::BLIS,
+      [] {
+        return static_cast<int>(
+            static_cast<std::int32_t>(bli_thread_get_num_threads()));
+      },
+      [](int n) { bli_thread_set_num_threads(static_cast<std::int64_t>(n)); }};
 #elif defined(QDK_CHEMISTRY_BLAS_LINKS_FLEXIBLAS)
   return {BlasVendor::FlexiBLAS, [] { return flexiblas_get_num_threads(); },
           [](int n) { flexiblas_set_num_threads(n); }};
@@ -201,7 +199,9 @@ BlasThreadApi try_blis() {
   auto get_fn = find_function<GetFn>("bli_thread_get_num_threads");
   if (!set_fn || !get_fn) return {};
   return {BlasVendor::BLIS,
-          [get_fn] { return static_cast<int>(static_cast<std::int32_t>(get_fn())); },
+          [get_fn] {
+            return static_cast<int>(static_cast<std::int32_t>(get_fn()));
+          },
           [set_fn](int n) { set_fn(static_cast<std::int64_t>(n)); }};
 }
 
@@ -282,12 +282,18 @@ int& saved_num_threads() {
 
 const char* to_string(BlasVendor vendor) {
   switch (vendor) {
-    case BlasVendor::OpenBLAS: return "OpenBLAS";
-    case BlasVendor::IntelMKL: return "Intel MKL";
-    case BlasVendor::BLIS: return "BLIS";
-    case BlasVendor::FlexiBLAS: return "FlexiBLAS";
-    case BlasVendor::NVPL: return "NVPL BLAS";
-    case BlasVendor::Unknown: break;
+    case BlasVendor::OpenBLAS:
+      return "OpenBLAS";
+    case BlasVendor::IntelMKL:
+      return "Intel MKL";
+    case BlasVendor::BLIS:
+      return "BLIS";
+    case BlasVendor::FlexiBLAS:
+      return "FlexiBLAS";
+    case BlasVendor::NVPL:
+      return "NVPL BLAS";
+    case BlasVendor::Unknown:
+      break;
   }
   return "unknown";
 }

@@ -18,6 +18,7 @@
 #include <qdk/chemistry/scf/util/gpu/cuda_helper.h>
 #endif
 #include <qdk/chemistry/scf/util/blas_threads.h>
+
 #include <qdk/chemistry/utils/logger.hpp>
 
 namespace qdk::chemistry::scf::impl {
