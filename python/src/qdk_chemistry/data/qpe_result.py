@@ -48,11 +48,13 @@ class QpeResult(DataClass):
             method: Identifier for the algorithm or workflow that produced the result.
             phase_fraction:  Raw measured phase fraction in ``[0, 1)``.
             phase_angle: Raw measured phase angle in radians.
-            canonical_phase_fraction:  Alias-resolved phase fraction consistent with the selected energy branch.
+            canonical_phase_fraction: Alias-resolved phase fraction consistent with the selected energy branch.
+                Equals ``phase_fraction`` when the algorithm performs no alias resolution.
             canonical_phase_angle: Alias-resolved phase angle in radians.
-            raw_energy: Energy computed directly from ``phase_fraction``.
-            branching: Sorted tuple of all alias energy candidates considered.
-            resolved_energy: Alias energy selected with the optional reference value, if available.
+            raw_energy: Energy computed from ``canonical_phase_fraction``.
+            branching: Sorted tuple of all alias energy candidates considered, including ``raw_energy``.
+            resolved_energy: Candidate from ``branching`` picked by the algorithm's alias-resolution rule,
+                or ``None`` when no resolution was performed.
             bits_msb_first: Tuple of measured bits ordered from MSB to LSB, when provided.
             bitstring_msb_first: Measured bitstring representation, when provided.
             metadata: Optional metadata dictionary.

@@ -29,8 +29,7 @@ def cosine_window_state(num_queries: int) -> list[float]:
 
     The cosine window is the Heisenberg-limited control state of
     :cite:`Babbush2018` (Eq. 17), :math:`\psi_t \propto \sin(\pi (t + 1) / (p + 2))`
-    over the :math:`p + 1` reflection slots. It is the optimal single-lobe
-    window for phase estimation and needs no special functions.
+    over the :math:`p + 1` reflection slots.
 
     Args:
         num_queries: Number of walk blocks; the window spans ``num_queries + 1`` slots.
@@ -57,22 +56,20 @@ class QdkUnaryQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
             "num_queries",
             "int",
             -1,
-            "Number of walk blocks the signed-power schedule applies. Sizing it as "
-            "ceil(pi * lambda / (2 * epsilon)) targets an energy error epsilon for a block encoding "
-            "of normalization lambda (Lee et al. 2021, Eq. 45); unlike standard QPE it need not be "
-            "a power of two.",
+            "Number of queries. Should be ceil(pi * lambda / (2 * epsilon)) for target energy error epsilon. "
+            "Doesn't need to be a power of two.",
         )
         self._set_default(
             "circuit_mapper",
             "algorithm_ref",
             AlgorithmRef("circuit_mapper", "prepare_select_prepare"),
-            "Mapper producing the uncontrolled block encoding the schedule applies.",
+            "Mapper producing the uncontrolled block encoding.",
         )
         self.set("unitary_builder", AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True))
 
 
 class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
-    r"""Phase estimation circuit builder driven by unary iteration over a signed-power schedule.
+    r"""Phase estimation circuit builder driven by unary iteration.
 
     Standard QPE applies controlled :math:`U^{2^k}` once per phase qubit and therefore
     consumes a power-of-two number of walk queries. This builder instead emits a single
@@ -81,11 +78,8 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
     query count is supported.
 
     The phase register is prepared in a cosine window state to suppress the spectral leakage
-    of the truncated schedule. It only supports block-encoded Hamiltonians with a unitary builder.
-
-    The phase register addresses one of :math:`p + 1` reflection slots, where :math:`p`
-    is the query count. Omitting slot :math:`t` realizes :math:`W^{p-2t}` while applying
-    exactly :math:`p` walk blocks, so :math:`p` need not be a power of two.
+    of the truncated schedule. The unitary builder must set ``quantum_walk=True`` for the 
+    post-processing formula.
 
     References:
         * :cite:`Babbush2018` — cosine-window control state.
@@ -118,11 +112,6 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
 
     def resolve_num_queries(self) -> tuple[int, int]:
         """Return the configured query count and the phase-register size addressing it.
-
-        The schedule applies exactly ``num_queries`` walk blocks, so the count is the query
-        complexity of the estimate. Choosing ``ceil(pi * lambda / (2 * epsilon))`` targets an
-        energy error ``epsilon`` for a block encoding of normalization ``lambda``
-        (:cite:`Lee2021`, Eq. 45).
 
         Returns:
             The number of walk blocks the schedule applies, and the number of phase qubits
@@ -162,62 +151,50 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
         container = unitary_rep.get_container()
         if not isinstance(container, LCUWalkContainer):
-            raise ValueError(f"Requires a block encoding unitary representation, got '{type(container).__name__}'.")
+            raise ValueError(f"Requires a LCU walk unitary representation, got '{type(container).__name__}'.")
 
         container_power = getattr(container, "power", 1)
         block_encoding_container = container.block_encoding
         if container_power != 1 or block_encoding_container.power != 1:
             Logger.warn(
-                f"The unitary representation carries power {container_power}, which is ignored: the schedule "
-                "picks its own power for each phase-register slot."
+                f"The unitary representation's power {container_power} is ignored."
             )
             block_encoding_container = LCUContainer(
                 prepare=block_encoding_container.prepare, select=block_encoding_container.select, power=1
             )
 
-        num_queries, num_bits = self.resolve_num_queries()
+        num_queries, num_phase_qubits = self.resolve_num_queries()
         configured_num_bits = self._settings.get("num_bits")
-        if configured_num_bits > 0 and configured_num_bits != num_bits:
+        if configured_num_bits > 0 and configured_num_bits != num_phase_qubits:
             Logger.warn(
-                f"num_bits={configured_num_bits} is ignored; num_queries={num_queries} needs {num_bits} "
-                f"phase bits to address its {num_queries + 1} reflection slots."
+                f"num_bits={configured_num_bits} is ignored; num_queries={num_queries} needs {num_phase_qubits}."
             )
 
-        # The schedule interleaves the block encoding and the reflection itself, so that it can drop the
-        # reflection the phase register addresses. It therefore maps the bare block encoding rather than
-        # the walk that the mapper would otherwise hand back already composed.
         mapper = self._create_nested("circuit_mapper")
         block_encoding = mapper.run(UnitaryRepresentation(container=block_encoding_container))
         block_encoding_op = block_encoding._qsharp_op  # noqa: SLF001
-
-        num_system_qubits = qubit_hamiltonian.num_qubits
-        if block_encoding.num_qubits is None:
+        num_qubits = block_encoding.num_qubits
+        if num_qubits is None:
             raise ValueError(
-                f"Circuit mapper '{type(mapper).__name__}' did not report num_qubits, so the walk cannot tell "
-                "which qubits to reflect about. Use a mapper that declares its register width, such as "
-                "'prepare_select_prepare'."
+                f"Circuit mapper '{type(mapper).__name__}' did not report num_qubits."
             )
-        num_ancilla_qubits = block_encoding.num_qubits - num_system_qubits
+        num_system_qubits = qubit_hamiltonian.num_qubits
+        num_ancilla_qubits = num_qubits - num_system_qubits
         if num_ancilla_qubits <= 0:
             raise ValueError(
-                f"Requires a non-empty ancilla register to reflect about, but the block encoding spans "
-                f"{block_encoding.num_qubits} qubits for a {num_system_qubits}-qubit system."
+                f"Requires a non-empty ancilla register to reflect about, got {num_ancilla_qubits}."
             )
 
-        # The mapper puts every qubit it wants reflected about after the system register, so naming the
-        # tail of its register is enough — the builder never has to ask the mapper for a reflection.
         apply_reflection = QSHARP_UTILS.PrepSelPrep.MakeAncillaReflectionOp(num_system_qubits)
-
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         if state_prep_op is None:
             raise RuntimeError("State preparation has no Q# operation.")
 
-        # rowMap is reversed so the window state is big-endian, matching ApplyQFT.
         phase_prep_params = QSHARP_UTILS.StatePreparation.StatePreparationParams(
-            rowMap=list(range(num_bits - 1, -1, -1)),
+            rowMap=list(range(num_phase_qubits - 1, -1, -1)),
             stateVector=cosine_window_state(num_queries),
             expansionOps=[],
-            numQubits=num_bits,
+            numQubits=num_phase_qubits,
         )
         parameters = {
             "statePrep": state_prep_op,
@@ -225,8 +202,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
             "applyReflection": apply_reflection,
             "phaseQubitPrep": QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(phase_prep_params),
             "numQueries": num_queries,
-            "ancillas": list(range(num_bits)),
-            "systems": [index + num_bits for index in range(qubit_hamiltonian.num_qubits)],
+            "numSystemQubits": num_system_qubits,
             "numAncillas": num_ancilla_qubits,
         }
         circuit = Circuit(
@@ -234,9 +210,8 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
                 program=QSHARP_UTILS.UnaryPhaseEstimation.MakeUnaryQPECircuit,
                 parameter=parameters,
             ),
-            num_qubits=num_bits + num_system_qubits + num_ancilla_qubits,
+            num_qubits=num_phase_qubits + num_system_qubits + num_ancilla_qubits,
         )
-        Logger.info(f"Built unary QPE circuit with {num_queries} queries and {num_bits} phase qubits.")
         return [circuit]
 
     def name(self) -> str:

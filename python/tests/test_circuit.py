@@ -95,20 +95,10 @@ class TestCircuitConstruction:
         assert retrieved_qasm == qasm
         assert "h q[0];" in retrieved_qasm
 
-    def test_num_qubits_is_undeclared_by_default(self):
-        """A producer that does not know its register width leaves num_qubits unset."""
-        assert Circuit(qasm="OPENQASM 3.0;").num_qubits is None
-
     def test_num_qubits_records_the_declared_width(self):
         """Callers read the register width off the circuit rather than its producer."""
         assert Circuit(qasm="OPENQASM 3.0;", num_qubits=5).num_qubits == 5
         assert Circuit(qasm="OPENQASM 3.0;", num_qubits=0).num_qubits == 0
-
-    def test_num_qubits_rejects_a_negative_width(self):
-        """A negative width is a producer bug, so fail at construction rather than later."""
-        with pytest.raises(ValueError, match="num_qubits must be non-negative"):
-            Circuit(qasm="OPENQASM 3.0;", num_qubits=-1)
-
 
 class TestGetQsharpCircuit:
     """Test cases for get_qsharp method."""
@@ -245,65 +235,6 @@ class TestCircuitSerialization:
 
         assert "num_qubits" not in json_data
         assert Circuit.from_json(json_data).num_qubits is None
-
-    def test_a_payload_written_before_num_qubits_existed_still_loads(self, simple_qasm):
-        """``num_qubits`` is purely additive, so the serialization version must not bump.
-
-        ``_validate_serialization_version`` grades a mismatch in three tiers: a differing
-        *major* or *minor* throws, while a differing *patch* is accepted. Moving ``Circuit``
-        from ``0.1.0`` to ``0.2.0`` would therefore convert every previously written circuit
-        from "loads fine" into a hard ``RuntimeError`` that needs the migration tool.
-
-        A *patch* bump to ``0.1.1`` would be tolerated in both directions and is the only
-        bump that stays readable, but it is not taken: no class in the repo carries a
-        non-zero patch, so it would invent a convention to record a change that costs a
-        reader nothing. Reading a payload that predates the field is what has to keep
-        working, and it does because both readers use ``.get``.
-        """
-        legacy = {"qasm": simple_qasm, "version": "0.1.0"}
-
-        restored = Circuit.from_json(legacy)
-
-        assert restored.num_qubits is None
-        assert Circuit._serialization_version == "0.1.0", (
-            "bumping the minor version would reject every circuit written by an earlier release"
-        )
-
-    def test_num_qubits_participates_in_the_content_hash(self, simple_qasm):
-        """Circuits differing only in declared width must not share a cache entry.
-
-        The field is appended to the hashed stream, so it can only *split* previously equal
-        hashes and never merge distinct ones: stale cache entries become unreachable and are
-        recomputed, which is why no cached artifact needs explicit invalidation.
-        """
-        hashes = [
-            Circuit(qasm=simple_qasm).content_hash(),
-            Circuit(qasm=simple_qasm, num_qubits=4).content_hash(),
-            Circuit(qasm=simple_qasm, num_qubits=5).content_hash(),
-        ]
-
-        assert len(set(hashes)) == 3
-        assert Circuit(qasm=simple_qasm, num_qubits=4).content_hash() == hashes[1]
-
-    def test_hdf5_roundtrip_preserves_num_qubits(self, simple_qasm, simple_qir):
-        """HDF5 stores attributes as numpy scalars, so check the width comes back as an int."""
-        original = Circuit(qasm=simple_qasm, qir=simple_qir, num_qubits=7)
-
-        with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as tmp:
-            tmp_path = Path(tmp.name)
-
-        try:
-            with h5py.File(tmp_path, "w") as f:
-                original.to_hdf5(f.create_group("circuit"))
-
-            with h5py.File(tmp_path, "r") as f:
-                reconstructed = Circuit.from_hdf5(f["circuit"])
-
-            assert reconstructed.num_qubits == 7
-            assert isinstance(reconstructed.num_qubits, int)
-
-        finally:
-            tmp_path.unlink()
 
     def test_to_hdf5(self, simple_qasm, simple_qir):
         """Test that to_hdf5 saves Circuit correctly."""

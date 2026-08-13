@@ -17,7 +17,7 @@ namespace QDKChemistry.Utils.UnaryIteration {
     ///
     /// Produces the one-hot indicator of the address register one qubit at a time, so the
     /// indicators never have to be materialized all at once. Supports a `numActions` that is
-    /// not a power of two, at a T-count of `4 * numActions - 4`.
+    /// not a power of two.
     ///
     /// References:
     ///   Babbush et al. Encoding Electronic Spectra in Quantum Circuits with Linear T Complexity
@@ -123,18 +123,6 @@ namespace QDKChemistry.Utils.UnaryIteration {
 
     /// Number of address qubits needed to enumerate `numActions` values, i.e.
     /// `Ceiling(Lg(numActions))`.
-    ///
-    /// Computed with integer arithmetic rather than `Ceiling(Lg(IntAsDouble(numActions)))`,
-    /// which is off by one in *both* directions below `2^63`. It over-reports at nine exact
-    /// powers of two -- the smallest is `2^29`, where it yields 30 -- and under-reports at
-    /// nine values just above a power, the smallest being `2^49 + 1`, where it yields 49
-    /// instead of 50.
-    ///
-    /// The two directions are not equally bad. Over-reporting only over-allocates the
-    /// register and trips the power-of-two `Fact`s below, so it fails loudly. Under-reporting
-    /// returns an address register too small to enumerate the actions, which silently
-    /// truncates the action space instead of raising. `BitSizeI(n - 1)` is exact for every
-    /// positive `n`, so neither arises.
     function AddressQubits(numActions : Int) : Int {
         Fact(numActions > 0, "numActions must be positive");
         return BitSizeI(numActions - 1);

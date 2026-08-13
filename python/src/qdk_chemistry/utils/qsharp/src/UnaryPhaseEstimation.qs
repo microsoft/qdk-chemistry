@@ -5,21 +5,15 @@
 namespace QDKChemistry.Utils.UnaryPhaseEstimation {
 
     import Std.Arrays.Reversed;
-    import Std.Arrays.SequenceI;
-    import Std.Arrays.Subarray;
     import Std.Canon.ApplyQFT;
     import Std.Canon.ApplyToEach;
     import Std.Canon.ApplyXorInPlace;
-    import Std.Core.Length;
     import Std.Diagnostics.Fact;
     import Std.Math.AbsI;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
     import QDKChemistry.Utils.UnaryIteration.UnaryIterationWithControl;
 
     /// Number of phase qubits required to address `numQueries + 1` reflection slots.
-    ///
-    /// Delegates to `AddressQubits` so the phase register and the unary-iteration address
-    /// register can never disagree about how wide `numQueries + 1` slots are.
     function PhaseRegisterSize(numQueries : Int) : Int {
         Fact(numQueries > 0, "numQueries must be positive");
         return AddressQubits(numQueries + 1);
@@ -55,60 +49,34 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
         applyReflection : (Qubit[] => Unit is Adj + Ctl),
         phaseQubitPrep : Qubit[] => Unit,
         numQueries : Int,
-        ancillas : Int[],
-        systems : Int[],
+        numSystemQubits : Int,
         numAncillas : Int,
     ) : Result[] {
-        let numBits = PhaseRegisterSize(numQueries);
-        Fact(
-            Length(ancillas) == numBits,
-            $"phase register must hold {numBits} qubits for {numQueries} queries",
-        );
+        Fact(numSystemQubits > 0, "numSystemQubits must be positive");
+        Fact(numAncillas >= 0, "numAncillas must be non-negative");
+        let numPhaseQubits = PhaseRegisterSize(numQueries);
 
-        let totalQubits = numBits + Length(systems) + numAncillas;
-        use qs = Qubit[totalQubits];
-        // `phaseAncillas` and `systemQubits` are addressed by caller-supplied indices while
-        // `beAncillas` is the tail of the register, so the three only partition `qs` when the
-        // callers pass the contiguous prefixes this layout assumes. Check it rather than trust
-        // it: a stray index would silently alias the system register onto the block-encoding
-        // ancillas and yield a plausible-looking but wrong spectrum.
-        Fact(
-            Length(ancillas) + Length(systems) + numAncillas == totalQubits,
-            "phase, system and block-encoding registers must exactly partition the circuit",
-        );
-        Fact(
-            ancillas == SequenceI(0, numBits - 1),
-            $"phase register must be qubits 0..{numBits - 1}",
-        );
-        Fact(
-            systems == SequenceI(numBits, numBits + Length(systems) - 1),
-            $"system register must be qubits {numBits}..{numBits + Length(systems) - 1}",
-        );
-        let phaseAncillas = Subarray(ancillas, qs);
-        let systemQubits = Subarray(systems, qs);
-        let beAncillas = if numAncillas == 0 {
-            []
-        } else {
-            qs[numBits + Length(systems)..Length(qs) - 1]
-        };
-        let allTargets = systemQubits + beAncillas;
+        use qs = Qubit[numPhaseQubits + numSystemQubits + numAncillas];
+        let phaseQubits = qs[0..numPhaseQubits - 1];
+        let systemQubits = qs[numPhaseQubits..numPhaseQubits + numSystemQubits - 1];
+        let allTargets = qs[numPhaseQubits...];
 
         statePrep(systemQubits);
-        phaseQubitPrep(phaseAncillas);
+        phaseQubitPrep(phaseQubits);
 
         ApplySignedPowerSchedule(
             applyBlockEncoding,
             applyReflection,
             numQueries,
-            Reversed(phaseAncillas),
+            Reversed(phaseQubits),
             allTargets
         );
 
-        Adjoint ApplyQFT(phaseAncillas);
+        Adjoint ApplyQFT(phaseQubits);
 
-        mutable results = [Zero, size = numBits];
-        for idx in 0..numBits - 1 {
-            set results w/= idx <- MResetZ(phaseAncillas[idx]);
+        mutable results = [Zero, size = numPhaseQubits];
+        for idx in 0..numPhaseQubits - 1 {
+            set results w/= idx <- MResetZ(phaseQubits[idx]);
         }
 
         ResetAll(allTargets);
@@ -152,8 +120,10 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
 
     /// Runs `MakeUnaryQPECircuit` on a synthetic one-qubit walk with an exact eigenphase.
     operation TestUnaryQpeSyntheticWalk(numQueries : Int, theta : Double, systemAngle : Double) : Result[] {
-        let numBits = PhaseRegisterSize(numQueries);
-        Fact(2^numBits == numQueries + 1, "numQueries must be one less than a power of two");
+        Fact(
+            2^PhaseRegisterSize(numQueries) == numQueries + 1,
+            "numQueries must be one less than a power of two",
+        );
 
         return MakeUnaryQPECircuit(
             (systems) => Ry(systemAngle, systems[0]),
@@ -165,8 +135,7 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
             (qubits) => X(qubits[0]),
             ApplyToEach(H, _),
             numQueries,
-            SequenceI(0, numBits - 1),
-            [numBits],
+            1,
             0
         );
     }

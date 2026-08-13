@@ -198,10 +198,6 @@ class PSPMapper(CircuitMapper):
             qsharp_op = QSHARP_UTILS.PrepSelPrep.MakeWalkOp(qsharp_op, self.reflection_op(container))
 
         if container.power != 1:
-            # BeginEstimateCaching keys on the name alone, so a flat name would charge the walk at
-            # the cost of whichever variant the estimator saw first. These two names deliberately
-            # match MakePrepSelPrepCircuit's own keys: that entry point caches the identical body
-            # (PrepSelPrep, plus Reflect on the ancillas when walking), so sharing them is correct.
             qsharp_op = QSHARP_UTILS.CircuitComposition.MakeRepeatedOp(
                 "PSPWalk" if use_quantum_walk else "PrepSelPrep",
                 qsharp_op,

@@ -5,6 +5,9 @@ r"""Unary-iteration phase estimation with a number of walk queries."""
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import math
+from collections.abc import Callable
+
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
@@ -26,59 +29,68 @@ __all__: list[str] = [
 def _post_process_phase_estimation(
     counts: dict[str, int],
     num_bits: int,
-    use_positive_sign: bool = False,
-) -> tuple[float, str, float]:
+    method: str,
+    use_positive_sign: bool,
+    eigenvalue_from_phase: Callable[[float], float],
+) -> QpeResult:
     r"""Reduce measured shot counts to a walk phase fraction.
 
     Every branch phase is doubled relative to the walk phase, so a measured bin
-    :math:`y` satisfies :math:`y = \pm 2\varphi \bmod 1`. The conjugate bins :math:`y`
-    and :math:`1 - y` therefore describe the same eigenvalue and are summed before the
-    winner is chosen. What comes out is an ordinary QPE phase fraction, converted to an
+    :math:`y` satisfies :math:`y = \pm 2\varphi \bmod 1`, where :math:`\varphi` is the walk
+    phase fraction of :math:`E = \lambda \cos(2\pi\varphi)`. Since :math:`\varphi` and
+    :math:`1/2 - \varphi` are observationally identical and map to :math:`E` and :math:`-E`,
+    the two eigenvalue signs cannot be distinguished, and ``use_positive_sign`` supplies the
+    missing information:
+
+    * ``False`` (the default) returns :math:`\varphi \in [1/4, 1/2]`, hence
+      :math:`\cos(2\pi\varphi) \le 0` and :math:`E \le 0` for every input.
+    * ``True`` returns :math:`\varphi \in [0, 1/4]`, hence :math:`E \ge 0`.
+
+    What comes out is an ordinary QPE phase fraction, converted to an
     energy by the unitary representation's ``eigenvalue_from_phase`` exactly as standard
-    QPE does, which for a walk operator is :math:`E = \lambda \cos(2\pi\varphi)`.
-
-    .. note::
-        The measurement cannot distinguish the two eigenvalue signs: the walk's spectrum
-        is :math:`e^{\pm i \arccos(E/\lambda)}`, and both branches land in the same pair of
-        conjugate bins. ``use_positive_sign`` chooses which one to report, and it is a
-        genuine choice, not a refinement of the data. The folded phase lies in
-        :math:`[0, 1/4]`, so the two branches partition the spectrum exactly:
-
-        * ``False`` (the default) returns :math:`\varphi \in [1/4, 1/2]`, hence
-          :math:`\cos(2\pi\varphi) \le 0` and :math:`E \le 0` for every input.
-        * ``True`` returns :math:`\varphi \in [0, 1/4]`, hence :math:`E \ge 0`.
-
-        Leave it ``False`` for a ground-state energy below zero, which is the usual case
-        for an electronic Hamiltonian including nuclear repulsion. Set it ``True`` when the
-        target eigenvalue is known to be non-negative -- for a shifted or purely repulsive
-        Hamiltonian -- otherwise the reported energy is the correct magnitude with the
-        wrong sign.
+    QPE does.
 
     Args:
         counts: Measured bitstring counts, most-significant bit first.
         num_bits: Size of the phase register.
+        method: Phase estimation algorithm label recorded on the result.
         use_positive_sign: ``True`` selects the non-negative eigenvalue branch,
-            ``False`` (the default) the non-positive one, as wanted for a ground state.
+            ``False`` the non-positive one, as wanted for a ground state.
+        eigenvalue_from_phase: A callable mapping a walk phase fraction to a Hamiltonian eigenvalue.
 
     Returns:
-        A tuple of (decoded phase fraction, representative bitstring, its raw measured fraction).
+        A :class:`~qdk_chemistry.data.QpeResult` whose ``phase_fraction`` is the measured bin,
+        whose ``canonical_phase_fraction`` is the decoded walk phase, and whose ``branching``
+        holds both sign candidates.
 
     """
-    decoded_counts: dict[float, int] = {}
-    representatives: dict[float, tuple[str, float, int]] = {}
+    num_bins = 2**num_bits
+    canonical_counts: dict[float, int] = {}
     for bitstring, count in counts.items():
-        measured_phase = int(bitstring, 2) / (2**num_bits)
-        doubled_phase = measured_phase % 1.0
-        folded_phase = min(doubled_phase, (-doubled_phase) % 1.0) / 2.0
-        decoded_phase = folded_phase if use_positive_sign else 0.5 - folded_phase
-        decoded_counts[decoded_phase] = decoded_counts.get(decoded_phase, 0) + count
-        representative = representatives.get(decoded_phase)
-        if representative is None or count > representative[2]:
-            representatives[decoded_phase] = (bitstring, measured_phase, count)
+        measured = int(bitstring, 2) / num_bins
+        folded = min(measured, (-measured) % 1.0) / 2.0
+        canonical = folded if use_positive_sign else 0.5 - folded
+        canonical_counts[canonical] = canonical_counts.get(canonical, 0) + count
 
-    phase_fraction = max(decoded_counts, key=decoded_counts.__getitem__)
-    dominant_bitstring, measured_phase, _ = representatives[phase_fraction]
-    return phase_fraction, dominant_bitstring, measured_phase
+    canonical_phase_fraction = max(canonical_counts, key=canonical_counts.__getitem__)
+    raw_energy = eigenvalue_from_phase(canonical_phase_fraction)
+    mirror_energy = eigenvalue_from_phase(0.5 - canonical_phase_fraction)
+
+    phase_fraction = 2.0 * min(canonical_phase_fraction, 0.5 - canonical_phase_fraction)
+    bitstring_msb_first = format(round(phase_fraction * num_bins), f"0{num_bits}b")
+
+    return QpeResult(
+        method=method,
+        phase_fraction=phase_fraction,
+        phase_angle=phase_fraction * math.tau,
+        canonical_phase_fraction=canonical_phase_fraction,
+        canonical_phase_angle=canonical_phase_fraction * math.tau,
+        raw_energy=raw_energy,
+        branching=tuple(sorted({raw_energy, mirror_energy})),
+        resolved_energy=raw_energy,
+        bits_msb_first=tuple(int(bit) for bit in bitstring_msb_first),
+        bitstring_msb_first=bitstring_msb_first,
+    )
 
 
 class UnaryPhaseEstimationSettings(PhaseEstimationSettings):
@@ -97,7 +109,7 @@ class UnaryPhaseEstimationSettings(PhaseEstimationSettings):
             "use_positive_sign",
             "bool",
             False,
-            "Whether the doubled measured phase resolves to a non-negative eigenvalue rather than a non-positive one.",
+            "Whether the doubled measured phase resolves to a positive eigenvalue rather than a negative one.",
         )
         self.set("qpe_circuit_builder", AlgorithmRef("qpe_circuit_builder", "qdk_unary"))
 
@@ -163,18 +175,12 @@ class UnaryPhaseEstimation(PhaseEstimation):
         execution_data = circuit_executor.run(circuits[0], shots=self._settings.get("shots"), noise=noise)
         counts = execution_data.bitstring_counts
 
-        phase_fraction, dominant_bitstring, measured_phase = _post_process_phase_estimation(
+        return _post_process_phase_estimation(
             counts,
             num_bits,
-            self._settings.get("use_positive_sign"),
-        )
-
-        return QpeResult.from_phase_fraction(
             method=self.name(),
-            phase_fraction=phase_fraction,
+            use_positive_sign=self._settings.get("use_positive_sign"),
             eigenvalue_from_phase=container.eigenvalue_from_phase,
-            bits_msb_first=dominant_bitstring,
-            metadata={"measured_phase_fraction": measured_phase},
         )
 
     def name(self) -> str:

@@ -57,7 +57,7 @@ class Circuit(DataClass):
     _data_type_name = "circuit"
 
     # Serialization version for this class
-    _serialization_version = "0.1.0"
+    _serialization_version = "0.2.0"
 
     # Use keyword arguments to be future-proof
     def __init__(
@@ -82,9 +82,7 @@ class Circuit(DataClass):
                 Valid values include "jordan-wigner", "bravyi-kitaev", "parity", or None.
                 Defaults to None.
             num_qubits: The width of the register ``qsharp_op`` acts on, when the producer
-                knows it. Circuit mappers that lay their register out as ``[system | ancilla]``
-                set it so a caller can address the ancillas without knowing which mapper built
-                the circuit. Scratch qubits a circuit allocates internally are not counted.
+                knows it. Scratch qubits a circuit allocates internally are not counted.
                 Defaults to None.
 
         Notes:

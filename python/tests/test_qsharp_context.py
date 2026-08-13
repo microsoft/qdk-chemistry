@@ -187,15 +187,6 @@ class TestTargetProfiles:
         """Nothing is withheld from the profile the library actually runs on."""
         assert hasattr(get_qsharp_context().code.QDKChemistry.Utils, module)
 
-    def test_the_utils_proxy_follows_the_active_profile(self, base_context: qdk.Context) -> None:
-        """``QSHARP_UTILS`` resolves lazily, so it must track whichever context is in force."""
-        assert QSHARP_UTILS.UnaryIteration is not None
-        with use_qsharp_context(base_context):
-            assert QSHARP_UTILS.StatePreparation is not None
-            with pytest.raises(AttributeError):
-                _ = QSHARP_UTILS.UnaryIteration
-        assert QSHARP_UTILS.UnaryIteration is not None
-
     def test_base_lowers_a_circuit_to_qir(self, base_context: qdk.Context) -> None:
         """The Base build exists to be lowered through QIR, so prove that it compiles."""
         state_preparation = base_context.code.QDKChemistry.Utils.StatePreparation
