@@ -352,19 +352,21 @@ class SymmetryBlockedTensor
 
  protected:
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override {
-    hash_value(ctx, this->get_data_type_name());
-    hash_value(ctx, static_cast<uint64_t>(Rank));
+    qdk::chemistry::utils::hash_value(ctx, this->get_data_type_name());
+    qdk::chemistry::utils::hash_value(ctx, static_cast<uint64_t>(Rank));
     // Distinguish real and complex scalar encodings.
-    hash_value(ctx, utils::is_complex_scalar_v<Scalar>);
+    qdk::chemistry::utils::hash_value(ctx, utils::is_complex_scalar_v<Scalar>);
     this->_hash_symmetry_blocked_metadata(ctx);
     auto groups = this->_sorted_pointer_groups();
-    hash_value(ctx, static_cast<uint64_t>(groups.size()));
+    qdk::chemistry::utils::hash_value(ctx,
+                                      static_cast<uint64_t>(groups.size()));
     for (const auto& group : groups) {
-      hash_value(ctx, static_cast<uint64_t>(group.keys.size()));
+      qdk::chemistry::utils::hash_value(
+          ctx, static_cast<uint64_t>(group.keys.size()));
       for (const auto& key : group.keys) {
         this->_hash_labels(ctx, key);
       }
-      hash_value(ctx, *group.ptr);
+      qdk::chemistry::utils::hash_value(ctx, *group.ptr);
     }
   }
 
