@@ -25,7 +25,7 @@ Phase estimation algorithms extract energy eigenvalues from a quantum state by m
 QDK/Chemistry provides several phase estimation approaches, including:
 
 Iterative Quantum Phase Estimation (:term:`IQPE`)
-   Kitaev's algorithm using a single ancilla qubit with sequential MSB-to-LSB bit extraction and adaptive feedback phase correction.
+   Kitaev's algorithm using a single ancilla qubit with sequential LSB-to-MSB bit extraction and adaptive feedback phase correction.
    Particularly suited to near-term hardware due to its low ancilla requirements and configurable shots-per-bit precision.
 
 Standard QFT-based Quantum Phase Estimation (:term:`QPE`)
