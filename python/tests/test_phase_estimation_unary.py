@@ -158,14 +158,36 @@ class TestBlockEncodingAgnosticSchedule:
 class TestPhaseWindowState:
     """Window states prepared on the phase register."""
 
-    @pytest.mark.parametrize("num_queries", [4, 9, 24])
+    @pytest.mark.parametrize("num_queries", [4, 9, 24, 25])
     def test_cosine_is_symmetric_and_single_lobed(self, num_queries):
-        """The cosine window peaks in the middle and decays monotonically to both edges."""
+        """The cosine window peaks in the middle and decays monotonically to both edges.
+
+        The peak is a *block*, not always a point: with ``num_queries + 1`` even, the
+        window has two mathematically equal maxima, since
+        ``sin(pi k / (n + 1)) == sin(pi (n + 1 - k) / (n + 1))``. Whether ``argmax``
+        separates them is then decided by rounding alone -- at ``num_queries = 9`` the
+        two differ by 5.6e-17 and at ``num_queries = 25`` they are bit-identical -- so
+        anchoring on a single ``argmax`` index makes the assertion's outcome a property
+        of the libm build. The maxima are located as a block instead, and the strict
+        monotonicity is asserted outside it.
+
+        Requiring the block to be interior is what the name "single-lobed" actually
+        claims, and it is load-bearing rather than decorative: without it, a window with
+        no interior peak at all leaves one or both ``np.diff`` slices empty, and
+        ``np.all([])`` is ``True``. ``num_queries`` of 0 and 1 both reach that state
+        through the real window function, so every assertion below would hold on a
+        window that has no lobe.
+        """
         amplitudes = np.array(cosine_window_state(num_queries))[: num_queries + 1]
         np.testing.assert_allclose(amplitudes, amplitudes[::-1], rtol=1e-12, atol=1e-15)
-        peak = int(np.argmax(amplitudes))
-        assert np.all(np.diff(amplitudes[: peak + 1]) > 0.0)
-        assert np.all(np.diff(amplitudes[peak:]) < 0.0)
+
+        maxima = np.flatnonzero(np.isclose(amplitudes, amplitudes.max(), rtol=0.0, atol=1e-15))
+        first, last = int(maxima[0]), int(maxima[-1])
+
+        assert 0 < first <= last < len(amplitudes) - 1, "the lobe must be interior"
+        assert last - first <= 1, f"a single lobe peaks over at most two slots, got {last - first + 1}"
+        assert np.all(np.diff(amplitudes[: first + 1]) > 0.0)
+        assert np.all(np.diff(amplitudes[last:]) < 0.0)
 
     def test_cosine_suppresses_spectral_leakage_relative_to_uniform(self):
         """The cosine window's phase spectrum has far lighter tails than a uniform one."""
