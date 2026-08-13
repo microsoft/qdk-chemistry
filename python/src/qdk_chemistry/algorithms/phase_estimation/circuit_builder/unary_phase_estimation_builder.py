@@ -78,7 +78,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
     query count is supported.
 
     The phase register is prepared in a cosine window state to suppress the spectral leakage
-    of the truncated schedule. The unitary builder must set ``quantum_walk=True`` for the 
+    of the truncated schedule. The unitary builder must set ``quantum_walk=True`` for the
     post-processing formula.
 
     References:
@@ -156,9 +156,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         container_power = getattr(container, "power", 1)
         block_encoding_container = container.block_encoding
         if container_power != 1 or block_encoding_container.power != 1:
-            Logger.warn(
-                f"The unitary representation's power {container_power} is ignored."
-            )
+            Logger.warn(f"The unitary representation's power {container_power} is ignored.")
             block_encoding_container = LCUContainer(
                 prepare=block_encoding_container.prepare, select=block_encoding_container.select, power=1
             )
@@ -175,15 +173,11 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         block_encoding_op = block_encoding._qsharp_op  # noqa: SLF001
         num_qubits = block_encoding.num_qubits
         if num_qubits is None:
-            raise ValueError(
-                f"Circuit mapper '{type(mapper).__name__}' did not report num_qubits."
-            )
+            raise ValueError(f"Circuit mapper '{type(mapper).__name__}' did not report num_qubits.")
         num_system_qubits = qubit_hamiltonian.num_qubits
         num_ancilla_qubits = num_qubits - num_system_qubits
         if num_ancilla_qubits <= 0:
-            raise ValueError(
-                f"Requires a non-empty ancilla register to reflect about, got {num_ancilla_qubits}."
-            )
+            raise ValueError(f"Requires a non-empty ancilla register to reflect about, got {num_ancilla_qubits}.")
 
         apply_reflection = QSHARP_UTILS.PrepSelPrep.MakeAncillaReflectionOp(num_system_qubits)
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001

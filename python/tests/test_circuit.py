@@ -100,6 +100,7 @@ class TestCircuitConstruction:
         assert Circuit(qasm="OPENQASM 3.0;", num_qubits=5).num_qubits == 5
         assert Circuit(qasm="OPENQASM 3.0;", num_qubits=0).num_qubits == 0
 
+
 class TestGetQsharpCircuit:
     """Test cases for get_qsharp method."""
 
