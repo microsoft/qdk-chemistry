@@ -401,18 +401,35 @@ class TestRegisterSizeHasOneDefinition:
         assert num_bits == qsharp_phase_bits == qsharp_address_bits
         assert (1 << num_bits) >= num_queries + 1
 
-    @pytest.mark.parametrize("num_actions", [1, 2, 3, 4, 5, 8, 9, 16, 17, 1024, 1025, 2**20, 2**31])
+    @pytest.mark.parametrize("num_actions", [1, 2, 3, 4, 5, 8, 9, 16, 17, 1024, 1025, 2**20, 2**29, 2**31])
     def test_address_width_is_exact_at_large_powers_of_two(self, num_actions):
         """``AddressQubits`` must be integer-exact where ``Ceiling(Lg(...))`` is not.
 
         The floating-point form returns 32 for ``2**31``, over-allocating the address
-        register and tripping the power-of-two facts that guard the recursion.
+        register and tripping the power-of-two facts that guard the recursion. ``2**29``
+        is the smallest power of two it gets wrong, so it is the case a realistic input
+        could plausibly reach.
         """
         context = get_qsharp_context()
         computed = context.eval(f"QDKChemistry.Utils.UnaryIteration.AddressQubits({num_actions})")
 
         assert computed == (num_actions - 1).bit_length()
         assert (1 << computed) >= num_actions
+
+    @pytest.mark.parametrize("num_queries", [1, 3, 63, 2**29 - 1, 2**31 - 1])
+    def test_phase_register_size_is_exact_at_large_query_counts(self, num_queries):
+        """``PhaseRegisterSize`` must keep delegating rather than compute its own width.
+
+        ``test_python_and_qsharp_agree_on_the_phase_register_size`` only reaches 64, and
+        an independent ``Ceiling(Lg(IntAsDouble(numQueries + 1)))`` agrees with the exact
+        value everywhere below ``numQueries + 1 == 2**29``. A second definition would
+        therefore be invisible to every other check in this module.
+        """
+        context = get_qsharp_context()
+        computed = context.eval(f"QDKChemistry.Utils.UnaryPhaseEstimation.PhaseRegisterSize({num_queries})")
+
+        assert computed == num_queries.bit_length()
+        assert (1 << computed) >= num_queries + 1
 
 
 class TestUnaryQpeEndToEnd:
