@@ -11,7 +11,6 @@
 /// Computation*, arXiv:2201.08309, Chapter 2.
 namespace QDKChemistry.Utils.AmplitudeAmplification {
 
-    import Std.Canon.ApplyToEachCA;
     import Std.Canon.ApplyControlledOnInt;
     import Std.Arithmetic.ApplyIfGreaterOrEqualL;
     import Std.Arithmetic.ApplyIfLessOrEqualL;
@@ -63,7 +62,7 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
 
     /// # Summary
     /// Flips `target` when `phase` lies in one of the half-open intervals
-    /// [`lowerBounds[i]`, `upperBounds[i]`) and every signal ancilla is $|0\rangle$.
+    /// [`lowerBounds[i]`, `upperBounds[i]`).
     ///
     /// # Description
     /// The bounds are read pairwise, so the two arrays must be the same length. The intervals
@@ -74,7 +73,6 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
         lowerBounds : Int[],
         upperBounds : Int[],
         phase : Qubit[],
-        signalAncillas : Qubit[],
         target : Qubit,
     ) : Unit is Adj {
         if Length(lowerBounds) != Length(upperBounds) {
@@ -85,9 +83,8 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
             for index in 0..Length(lowerBounds) - 1 {
                 MarkPhaseRange(lowerBounds[index], upperBounds[index], phase, inRange);
             }
-            ApplyToEachCA(X, signalAncillas);
         } apply {
-            Controlled X(signalAncillas + [inRange], target);
+            CNOT(inRange, target);
         }
     }
 
@@ -99,6 +96,23 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     /// # Description
     /// `qpe` acts on `phase + system + signalAncillas` and must not prepare a state of its
     /// own, because `system` already holds the one being tested.
+    ///
+    /// Only the phase register is tested. The signal ancillas are allocated because the
+    /// estimated unitary needs them, but they are deliberately left out of the marking
+    /// condition: a qubitized walk entangles them with the system inside every eigenspace,
+    /// with $|0\rangle_{\text{signal}}|E\rangle = (|w_+\rangle + |w_-\rangle)/\sqrt{2}$, so
+    /// requiring them to be $|0\rangle$ would project inside that eigenspace instead of
+    /// selecting on the energy. `Adjoint qpe` would then have nothing clean to undo and would
+    /// leave `system` entangled with the released ancillas. Testing the phase alone keeps the
+    /// marking diagonal in the walk eigenbasis, because the accepted phases are symmetric
+    /// under $\varphi \mapsto 1 - \varphi$ and so cover both branches of an eigenspace or
+    /// neither.
+    ///
+    /// This is a reflection about the marked eigenspaces only when the estimation is exact,
+    /// that is when every eigenphase of the state under test is a multiple of
+    /// $2^{-\texttt{numPhaseQubits}}$. Off a bin the phase register comes back spread rather
+    /// than to $|0\rangle$, the amplification's invariant plane is lost, and the released
+    /// ancillas carry away part of the state.
     operation MarkQPEPhase(
         qpe : Qubit[] => Unit is Adj,
         numPhaseQubits : Int,
@@ -113,7 +127,7 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
         within {
             qpe(phase + system + signalAncillas);
         } apply {
-            MarkAcceptedPhase(lowerBounds, upperBounds, phase, signalAncillas, target);
+            MarkAcceptedPhase(lowerBounds, upperBounds, phase, target);
         }
     }
 

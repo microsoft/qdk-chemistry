@@ -53,6 +53,33 @@ def _diagonal_hamiltonian() -> QubitOperator:
     return QubitOperator(pauli_strings=["ZI", "IZ"], coefficients=np.array([coefficient, coefficient]))
 
 
+# (x - y) / (x + y) = cos(pi/4) fixes x / y = 3 + 2*sqrt(2).
+_INTERIOR_RATIO = 3.0 + 2.0 * math.sqrt(2.0)
+
+
+def _interior_hamiltonian(marked: str) -> QubitOperator:
+    r"""Return H whose ``marked`` eigenvector sits at :math:`+\lambda\cos(\pi/4)`.
+
+    The walk law is :math:`E = \lambda\cos(2\pi\varphi)`, so that energy is phase :math:`1/8`:
+    an exact bin of any register at least three bits wide, yet strictly inside the band rather
+    than at an edge, where the two walk branches merge and the block-encoding ancilla
+    decouples. Its partner sits at :math:`-\lambda\cos(\pi/4)`, phase :math:`3/8`, which no
+    window holding the marked one reaches.
+
+    Only |00> and |11> are used, and their energies are :math:`\pm(c_0 + c_1)` whichever qubit
+    each Pauli string acts on, so neither depends on the qubit ordering.
+
+    Args:
+        marked: Which eigenvector carries the positive energy, ``"00"`` or ``"11"``.
+
+    """
+    sign = -1.0 if marked == "11" else 1.0
+    return QubitOperator(
+        pauli_strings=["ZI", "IZ"],
+        coefficients=np.array([sign * _INTERIOR_RATIO, -sign]),
+    )
+
+
 def _guiding_state(amplitude: float, index: int, num_qubits: int = 2) -> Circuit:
     """Prepare a state with the given amplitude on one computational basis state."""
     remainder = math.sqrt(max(0.0, 1.0 - amplitude**2))
@@ -258,6 +285,55 @@ def test_amplified_qpe_acceptance_follows_the_round_count():
     for rounds in (1, 2):
         expected = math.sin((2 * rounds + 1) * angle) ** 2
         assert abs(observed[rounds] - expected) < 0.1, f"rounds={rounds}: {observed[rounds]} != {expected}"
+
+
+def test_subspace_oracle_flags_an_interior_eigenstate():
+    r"""The marking tests the phase register alone, never the block-encoding ancilla.
+
+    |00> sits at :math:`E/\lambda = \cos(\pi/4)` here, strictly inside the band, so the walk
+    splits it into branches :math:`(|0\rangle_{\rm sig}|E\rangle \pm i|\perp\rangle)/\sqrt{2}`
+    that each carry weight on both settings of the signal ancilla. Requiring that ancilla to
+    be :math:`|0\rangle` would project inside the walk eigenspace instead of selecting on
+    energy, so the flag would fire only half the time and ``Adjoint qpe`` would leave the
+    register entangled with the ancillas the oracle releases. The other oracle tests all mark
+    a band-edge eigenvector, where the two branches merge and the ancilla decouples, so they
+    cannot see this.
+    """
+    oracle = _subspace_oracle(_interior_hamiltonian(marked="00"), 1.0, num_bits=4)
+    # Phase 1/8 is bin 2, strictly inside the accepted [0, 4) rather than at its edge.
+    assert _marked_bin_ranges(oracle) == [(0, 4), (13, 16)]
+    assert _measure(oracle, shots=40) == {"1": 40}
+
+
+def test_amplified_qpe_acceptance_at_an_interior_eigenvalue():
+    r"""P(good) tracks :math:`\sin^2((2k+1)\vartheta)` when the marked eigenvector is interior.
+
+    Amplification only follows the closed form while the oracle reflects about the marked
+    eigenspaces, which needs the marked phases to cover both walk branches of an eigenspace or
+    neither. That holds because the accepted bins are symmetric under
+    :math:`\varphi \mapsto 1 - \varphi`, and this pins it for an eigenvector the walk really
+    does split, not just for the band-edge ones the other tests use.
+    """
+    hamiltonian = _interior_hamiltonian(marked="11")
+    amplitude = 0.3
+    angle = math.asin(amplitude)
+    shots = 2000
+    observed = []
+    for rounds in range(4):
+        circuit, marked = _amplified_qpe_circuit(
+            hamiltonian,
+            # |11> is the marked eigenvector and |00> holds the rest of the guiding state at
+            # the negated energy, so the window reaching one cannot reach the other.
+            _guiding_state(amplitude, 3),
+            1.0,
+            rounds=rounds,
+        )
+        assert marked == [(0, 4), (13, 16)]
+        observed.append(_measure(circuit, shots=shots).get("11", 0) / shots)
+
+    for rounds, probability in enumerate(observed):
+        expected = math.sin((2 * rounds + 1) * angle) ** 2
+        assert abs(probability - expected) < 0.05, f"rounds={rounds}: {probability} != {expected}"
 
 
 def test_amplification_matches_the_closed_form_and_overshoots():

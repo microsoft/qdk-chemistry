@@ -47,6 +47,12 @@ class QPESubspaceMarking(QpeCircuitBuilder):
 
     The initial state preparation is not used, because the register already holds the state to
     amplify.
+
+    The oracle reflects exactly about the marked eigenspaces only when the estimation is
+    exact, that is when every eigenphase of the state under test is a multiple of
+    :math:`2^{-n}` for ``n = num_bits``. Off a bin the phase register comes back spread
+    instead of to :math:`|0\rangle`, which leaves the system entangled with the ancillas the
+    oracle releases and costs the amplification its invariant plane.
     """
 
     def __init__(
