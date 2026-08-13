@@ -75,7 +75,7 @@ Classifying an orbital of :math:`Q` as virtual describes its occupation in the o
 Consumers of an effective Hamiltonian should not attempt to re-correlate :math:`Q`, since its contribution is already folded in.
 
 Input validation is opt-in.
-The ``run`` method does not validate its arguments; each concrete implementation decides whether to check the nested-space contract :math:`P \subseteq W_{\mathrm{ref}} \subseteq W_H` before computing.
+The ``run`` method does not validate its arguments; each concrete implementation decides whether to check the space contract :math:`P \subseteq W_H` and :math:`W_{\mathrm{ref}} \subseteq W_H` before computing.
 
 The base interface defines no common settings.
 Concrete implementations can expose method-specific configuration through the ``settings()`` object.
