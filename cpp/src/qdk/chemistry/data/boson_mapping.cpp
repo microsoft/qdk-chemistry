@@ -31,8 +31,6 @@ using LocalPauliMap = std::unordered_map<std::uint64_t, std::complex<double>>;
 /// Dense d x d complex matrix in row-major order.
 using LocalMatrix = std::vector<std::complex<double>>;
 
-namespace {
-
 bool is_power_of_two(std::size_t value) {
   return value != 0 && (value & (value - 1)) == 0;
 }
@@ -268,7 +266,6 @@ std::vector<std::pair<std::uint64_t, std::complex<double>>> sorted_local(
   return out;
 }
 
-}  // namespace
 }  // namespace detail
 
 void BosonMapping::validate_mode_dimension(std::size_t mode,
