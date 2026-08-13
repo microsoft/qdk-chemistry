@@ -66,9 +66,10 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     /// [`lowerBounds[i]`, `upperBounds[i]`) and every signal ancilla is $|0\rangle$.
     ///
     /// # Description
-    /// The intervals must be pairwise disjoint. Each one flips `inRange` independently, so a
-    /// value covered twice would be flipped twice and left unmarked. More than one interval
-    /// is needed when the accepted energies wrap around $\varphi = 1$.
+    /// The bounds are read pairwise, so the two arrays must be the same length. The intervals
+    /// must be pairwise disjoint. Each one flips `inRange` independently, so a value covered
+    /// twice would be flipped twice and left unmarked. More than one interval is needed when
+    /// the accepted energies wrap around $\varphi = 1$.
     operation MarkAcceptedPhase(
         lowerBounds : Int[],
         upperBounds : Int[],
@@ -76,6 +77,9 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
         signalAncillas : Qubit[],
         target : Qubit,
     ) : Unit is Adj {
+        if Length(lowerBounds) != Length(upperBounds) {
+            fail $"Got {Length(lowerBounds)} lower bounds and {Length(upperBounds)} upper bounds, but each phase range needs one of each.";
+        }
         use inRange = Qubit();
         within {
             for index in 0..Length(lowerBounds) - 1 {
