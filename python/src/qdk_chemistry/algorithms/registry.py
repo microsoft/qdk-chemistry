@@ -716,8 +716,10 @@ def _register_python_factories():
     This function is automatically called during module import and should not
     be called by users.
     """
-    from qdk_chemistry.algorithms.amplitude_amplification import (  # noqa: PLC0415
+    from qdk_chemistry.algorithms.amplitude_amplification.amplitude_amplification import (  # noqa: PLC0415
         AmplitudeAmplificationFactory,
+    )
+    from qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace import (  # noqa: PLC0415
         AmplitudeAmplificationOracleFactory,
     )
     from qdk_chemistry.algorithms.circuit_executor import CircuitExecutorFactory  # noqa: PLC0415
@@ -814,10 +816,10 @@ def _register_python_algorithms():
     This function is automatically called during module import and should not
     be called by users.
     """
-    from qdk_chemistry.algorithms.amplitude_amplification import (  # noqa: PLC0415
+    from qdk_chemistry.algorithms.amplitude_amplification.amplitude_amplification import (  # noqa: PLC0415
         AmplitudeAmplification,
-        QPESubspaceMarking,
     )
+    from qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace import QPESubspaceMarking  # noqa: PLC0415
     from qdk_chemistry.algorithms.circuit_executor.qdk import (  # noqa: PLC0415
         QdkFullStateSimulator,
         QdkSparseStateSimulator,

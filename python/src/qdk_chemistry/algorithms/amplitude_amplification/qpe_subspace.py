@@ -22,17 +22,6 @@ __all__: list[str] = [
 ]
 
 
-def _prepare_nothing(num_qubits: int) -> Circuit:
-    """Return a state preparation that leaves the register as it finds it."""
-    params = QSHARP_UTILS.StatePreparation.SingleReferenceParams(bitStrings=[0] * num_qubits, numQubits=num_qubits)
-    return Circuit(
-        qsharp_factory=QsharpFactoryData(
-            program=QSHARP_UTILS.StatePreparation.MakeSingleReferenceStateCircuit, parameter=vars(params)
-        ),
-        qsharp_op=QSHARP_UTILS.StatePreparation.MakePrepareSingleReferenceStateOp(params),
-    )
-
-
 class QPESubspaceMarkingSettings(Settings):
     r"""Settings for the QPE subspace marking oracle."""
 
@@ -130,8 +119,6 @@ class QPESubspaceMarking(Algorithm):
             raise ValueError(
                 f"No phase bin of the {phase_bin_count}-bin register holds an energy at least {energy_lower_bound}."
             )
-        # Reflecting about every bin is the identity up to a phase, so an oracle that marks
-        # them all cannot amplify anything.
         if ranges == [(0, phase_bin_count)]:
             raise ValueError(
                 f"Every phase bin of the {phase_bin_count}-bin register holds an energy at least "
@@ -171,8 +158,6 @@ class QPESubspaceMarking(Algorithm):
         if num_bits <= 0:
             raise ValueError(f"The nested qpe_circuit_builder needs a positive num_bits. Got {num_bits}.")
 
-        # The encoding the builder estimates carries both the phase-to-energy law the bins are
-        # chosen by and the width of the signal register the estimation allocates.
         num_system_qubits = qubit_hamiltonian.num_qubits
         unitary = create_from_ref(builder.settings(), "unitary_builder").run(qubit_hamiltonian)
         num_signal_ancillas = unitary.get_num_qubits() - num_system_qubits
@@ -181,7 +166,15 @@ class QPESubspaceMarking(Algorithm):
         upper_bounds = [stop for _, stop in bin_ranges]
         Logger.info(f"Marking phase bins {bin_ranges} for energies at least {energy_lower_bound}.")
 
-        qpe_circuit = builder.run(_prepare_nothing(num_system_qubits), qubit_hamiltonian)[0]
+        state_prep = QSHARP_UTILS.StatePreparation
+        prep_params = state_prep.SingleReferenceParams(bitStrings=[0] * num_system_qubits, numQubits=num_system_qubits)
+        prepare_nothing = Circuit(
+            qsharp_factory=QsharpFactoryData(
+                program=state_prep.MakeSingleReferenceStateCircuit, parameter=vars(prep_params)
+            ),
+            qsharp_op=state_prep.MakePrepareSingleReferenceStateOp(prep_params),
+        )
+        qpe_circuit = builder.run(prepare_nothing, qubit_hamiltonian)[0]
         qpe_operation = qpe_circuit._qsharp_op  # noqa: SLF001
         if qpe_operation is None:
             raise RuntimeError("Failed to create the subspace oracle: the Q# phase estimation is not available.")

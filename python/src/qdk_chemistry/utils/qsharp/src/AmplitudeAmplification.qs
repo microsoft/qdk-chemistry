@@ -23,11 +23,6 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     /// # Summary
     /// Flips `target` when the little-endian `phase` register holds a value in the
     /// half-open interval [`lowerBound`, `upperBound`).
-    ///
-    /// # Description
-    /// The `ApplyIf...L` comparisons take the classical constant first:
-    /// `ApplyIfGreaterOrEqualL(action, c, x, target)` acts when `c >= x`, so each call below
-    /// reads as the opposite of the bound it enforces.
     operation MarkPhaseRange(
         lowerBound : Int,
         upperBound : Int,
@@ -82,7 +77,7 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
         lowerBounds : Int[],
         upperBounds : Int[],
         phase : Qubit[],
-        target : Qubit,
+        target : Qubpit,
     ) : Unit is Adj {
         if Length(lowerBounds) != Length(upperBounds) {
             fail $"Got {Length(lowerBounds)} lower bounds and {Length(upperBounds)} upper bounds, but each phase range needs one of each.";
@@ -100,20 +95,6 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     /// # Summary
     /// Flips `target` when phase estimation of `system` lands in one of the accepted phase
     /// windows, then undoes the estimation.
-    ///
-    /// # Description
-    /// `qpe` acts on `phase + system + signalAncillas` and must not prepare a state of its
-    /// own, because `system` already holds the one being tested.
-    ///
-    /// Only the phase register is tested. Requiring the signal ancillas to be $|0\rangle$
-    /// would project inside a walk eigenspace rather than select on energy. Testing the phase
-    /// alone stays diagonal in the walk eigenbasis, because the accepted phases are symmetric
-    /// under $\varphi \mapsto 1 - \varphi$ and so cover both branches of an eigenspace or neither.
-    ///
-    /// This reflects about the marked eigenspaces only when the estimation is exact, that is
-    /// when every eigenphase of the state under test is a multiple of
-    /// $2^{-\texttt{numPhaseQubits}}$. Off a bin the phase register comes back spread rather
-    /// than to $|0\rangle$, and the released ancillas carry away part of the state.
     operation MarkQPEPhase(
         qpe : Qubit[] => Unit is Adj,
         numPhaseQubits : Int,

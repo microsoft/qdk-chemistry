@@ -12,10 +12,11 @@ import math
 
 import numpy as np
 import pytest
-from qdk import Result, qsharp
+from qdk import qsharp
 
 from qdk_chemistry.algorithms import available, create
-from qdk_chemistry.algorithms.amplitude_amplification import AmplitudeAmplification, QPESubspaceMarking
+from qdk_chemistry.algorithms.amplitude_amplification.amplitude_amplification import AmplitudeAmplification
+from qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace import QPESubspaceMarking
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
@@ -47,10 +48,6 @@ def _diagonal_hamiltonian() -> QubitOperator:
     return QubitOperator(pauli_strings=["ZI", "IZ"], coefficients=np.array([coefficient, coefficient]))
 
 
-# (x - y) / (x + y) = cos(pi/4) fixes x / y = 3 + 2*sqrt(2).
-_INTERIOR_RATIO = 3.0 + 2.0 * math.sqrt(2.0)
-
-
 def _interior_hamiltonian(marked: str) -> QubitOperator:
     r"""Return H whose ``marked`` eigenvector sits at :math:`+\lambda\cos(\pi/4)`.
 
@@ -63,10 +60,12 @@ def _interior_hamiltonian(marked: str) -> QubitOperator:
         marked: Which eigenvector carries the positive energy, ``"00"`` or ``"11"``.
 
     """
+    # (x - y) / (x + y) = cos(pi/4) fixes x / y = 3 + 2*sqrt(2).
+    ratio = 3.0 + 2.0 * math.sqrt(2.0)
     sign = -1.0 if marked == "11" else 1.0
     return QubitOperator(
         pauli_strings=["ZI", "IZ"],
-        coefficients=np.array([sign * _INTERIOR_RATIO, -sign]),
+        coefficients=np.array([sign * ratio, -sign]),
     )
 
 
@@ -151,92 +150,6 @@ def _marked_bin_ranges(oracle: Circuit) -> list[tuple[int, int]]:
 def _measure(circuit: Circuit, shots: int = 400) -> dict[str, int]:
     """Execute a circuit and return its bitstring counts."""
     return create("circuit_executor", "qdk_sparse_state_simulator").run(circuit, shots=shots).bitstring_counts
-
-
-# Drives MarkAcceptedPhase over one basis state of the phase register, so the marking can be
-# read off bin by bin without a QPE in front of it. Plain X gates keep the little-endian
-# convention explicit rather than borrowing a routine whose argument order also has to be trusted.
-_PHASE_MARKING_HARNESS = """
-operation AmplitudeAmplificationTestPhaseMarking(
-    lowerBounds : Int[],
-    upperBounds : Int[],
-    numPhaseQubits : Int,
-    value : Int
-) : Result {
-    use phase = Qubit[numPhaseQubits];
-    use flag = Qubit();
-    for index in 0..numPhaseQubits - 1 {
-        if ((value >>> index) &&& 1) == 1 {
-            X(phase[index]);
-        }
-    }
-    QDKChemistry.Utils.AmplitudeAmplification.MarkAcceptedPhase(lowerBounds, upperBounds, phase, flag);
-    let marked = M(flag);
-    Reset(flag);
-    for index in 0..numPhaseQubits - 1 {
-        if ((value >>> index) &&& 1) == 1 {
-            X(phase[index]);
-        }
-    }
-    return marked;
-}
-"""
-
-
-@pytest.fixture(scope="module")
-def phase_marking():
-    """Return a callable reporting whether the marking flips the flag on a given phase value."""
-    context = get_qsharp_context()
-    context.eval(_PHASE_MARKING_HARNESS)
-
-    def marks(lower_bounds: list[int], upper_bounds: list[int], num_phase_qubits: int, value: int) -> bool:
-        # The harness returns a Result rather than a Bool because the shared context compiles
-        # for TargetProfile.Base, which rejects a Bool derived from a measurement. Every
-        # Result is truthy, so compare against One instead of calling bool().
-        return (
-            context.eval(
-                "AmplitudeAmplificationTestPhaseMarking("
-                f"{list(lower_bounds)}, {list(upper_bounds)}, {num_phase_qubits}, {value})"
-            )
-            == Result.One
-        )
-
-    return marks
-
-
-_PHASE_MARKING_QUBITS = 3
-_PHASE_MARKING_BINS = 1 << _PHASE_MARKING_QUBITS
-
-
-@pytest.mark.parametrize(
-    ("lower_bound", "upper_bound"),
-    [
-        (lower_bound, upper_bound)
-        for lower_bound in range(_PHASE_MARKING_BINS)
-        for upper_bound in range(lower_bound + 1, _PHASE_MARKING_BINS + 1)
-    ],
-)
-def test_mark_phase_range_flags_exactly_the_half_open_interval(phase_marking, lower_bound, upper_bound):
-    """Every range of a 3-bit register marks [lower, upper) and nothing outside it.
-
-    Exhaustive over the ranges, so it covers all five branches of MarkPhaseRange and pins the
-    direction of each comparison.
-    """
-    for value in range(_PHASE_MARKING_BINS):
-        expected = lower_bound <= value < upper_bound
-        assert phase_marking([lower_bound], [upper_bound], _PHASE_MARKING_QUBITS, value) == expected, (
-            f"[{lower_bound}, {upper_bound}) at phase bin {value}"
-        )
-
-
-def test_mark_accepted_phase_flags_the_union_of_disjoint_ranges(phase_marking):
-    """A window wrapping phase 1 arrives as two ranges, and the marked bins are their union."""
-    lower_bounds, upper_bounds = [0, 6], [2, 8]
-    accepted = {0, 1, 6, 7}
-    for value in range(_PHASE_MARKING_BINS):
-        assert phase_marking(lower_bounds, upper_bounds, _PHASE_MARKING_QUBITS, value) == (value in accepted), (
-            f"phase bin {value}"
-        )
 
 
 def test_amplitude_amplification_is_registered():

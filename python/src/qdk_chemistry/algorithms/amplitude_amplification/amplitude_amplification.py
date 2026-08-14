@@ -89,8 +89,6 @@ class AmplitudeAmplification(Algorithm):
         if good_state_operation is None:
             raise TypeError("Amplitude amplification requires a good state oracle qsharp operation.")
 
-        # A Q# callable carries no arity, so the register width is taken from a resource
-        # estimate of the state preparation.
         try:
             num_qubits = int(state_prep_oracle.estimate().logical_counts["numQubits"])
         except Exception as error:

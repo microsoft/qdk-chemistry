@@ -10,21 +10,17 @@ name the subspace it amplifies.
 # --------------------------------------------------------------------------------------------
 
 from .amplitude_amplification import (
-    AmplitudeAmplification,
     AmplitudeAmplificationFactory,
     AmplitudeAmplificationSettings,
 )
 from .qpe_subspace import (
     AmplitudeAmplificationOracleFactory,
-    QPESubspaceMarking,
     QPESubspaceMarkingSettings,
 )
 
 __all__: list[str] = [
-    "AmplitudeAmplification",
     "AmplitudeAmplificationFactory",
     "AmplitudeAmplificationOracleFactory",
     "AmplitudeAmplificationSettings",
-    "QPESubspaceMarking",
     "QPESubspaceMarkingSettings",
 ]
