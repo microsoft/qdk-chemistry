@@ -248,6 +248,31 @@ TEST(CubeGeneratorTest, AcceptsExplicitZeroRadialPowers) {
   EXPECT_NO_THROW({ CubeGenerator generator(basis); });
 }
 
+TEST(CubeGeneratorTest, IndexesAtomicOrbitalsInAtomMajorOrder) {
+  // AO 0 belongs to the atom at the origin and AO 1 to the atom at z = 2, so
+  // selecting each in turn at the origin distinguishes the two orderings.
+  auto structure = std::make_shared<Structure>(
+      std::vector<Eigen::Vector3d>{{0.0, 0.0, 0.0}, {0.0, 0.0, 2.0}},
+      std::vector<Element>{Element::H, Element::H});
+  std::vector<Shell> shells;
+  shells.emplace_back(0, OrbitalType::S, std::vector<double>{1.0},
+                      std::vector<double>{1.0});
+  shells.emplace_back(1, OrbitalType::S, std::vector<double>{1.0},
+                      std::vector<double>{1.0});
+  auto basis = std::make_shared<BasisSet>("two-atom", shells, structure);
+  CubeGenerator generator(basis);
+
+  Eigen::VectorXd first(2), second(2);
+  first << 1.0, 0.0;
+  second << 0.0, 1.0;
+  const auto near = generator.orbital(first, "", single_point_grid());
+  const auto far = generator.orbital(second, "", single_point_grid());
+
+  const double normalization = std::pow(2.0 / std::acos(-1.0), 0.75);
+  EXPECT_NEAR(near[0], normalization, 1e-12);
+  EXPECT_NEAR(far[0], normalization * std::exp(-4.0), 1e-12);
+}
+
 TEST(CubeGeneratorTest, EvaluatesEcpBasisIgnoringProjectorShells) {
   // The r^2 projector lives in the ECP shell container, which the generator
   // does not traverse; only the valence Gaussians reach gauXC.

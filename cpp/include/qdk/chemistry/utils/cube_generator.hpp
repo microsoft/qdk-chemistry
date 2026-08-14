@@ -32,6 +32,20 @@ struct CubeGrid {
 // Evaluates molecular orbitals and densities on a `CubeGrid` and optionally
 // writes Gaussian cube files.
 //
+// Atomic orbital ordering: coefficients and density matrices passed to this
+// class are indexed in the canonical ordering of the `BasisSet` they were
+// built from, which is the ordering `BasisSet::get_shell` exposes. Shells are
+// grouped by atom in structure order, and within an atom they follow the order
+// established by the basis set, namely ascending angular momentum and then
+// descending leading exponent. No reordering is applied here, so a matrix
+// produced against a different convention must be permuted by the caller.
+//
+// Within a shell, s and p shells are always Cartesian, so a p shell always
+// contributes three components in x, y, z order regardless of the basis set's
+// AOType. Only shells with angular momentum above p honour AOType, matching the
+// convention used elsewhere in qdk-chemistry. Component ordering for those
+// higher shells follows gauXC's convention.
+//
 // Effective core potentials: basis sets carrying an ECP are fully supported.
 // The ECP is an operator in the Hamiltonian, so it influences the SCF
 // coefficients but never enters the evaluation of a basis function at a grid
@@ -49,10 +63,26 @@ class CubeGenerator {
   CubeGenerator(CubeGenerator&&) noexcept;
   CubeGenerator& operator=(CubeGenerator&&) noexcept;
 
+  // Evaluates a single molecular orbital on `grid`.
+  //
+  // `mo_coeff` holds one coefficient per atomic orbital, in the canonical
+  // ordering described above, and must have exactly `nbf` entries.
   CubeField orbital(const Eigen::VectorXd& mo_coeff, const std::string& outfile,
                     const CubeGrid& grid,
                     const std::string& comment = "") const;
 
+  // Evaluates a density on `grid` as sum_{uv} D_uv phi_u(r) phi_v(r).
+  //
+  // `density_matrix` is `nbf` by `nbf`, indexed by atomic orbital in the
+  // canonical ordering described above.
+  //
+  // The matrix is applied exactly as supplied. It is not scaled, symmetrised,
+  // or spin-summed, so the caller decides which physical quantity results:
+  // pass Da + Db for the total electron density, or a single spin block for
+  // that spin density. Note that a restricted calculation storing a spatial
+  // density matrix without its factor of two yields a field that is uniformly
+  // half the total density. Both matrices have identical dimensions, so no
+  // shape check can detect the difference.
   CubeField density(const Eigen::MatrixXd& density_matrix,
                     const std::string& outfile, const CubeGrid& grid,
                     const std::string& comment = "") const;
