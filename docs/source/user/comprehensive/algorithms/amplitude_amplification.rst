@@ -46,9 +46,9 @@ The :class:`~qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.QPESu
 algorithm (``amplitude_amplification_oracle`` / ``qdk_qpe_subspace``) builds a
 ``good_state_oracle`` for an eigenspace. It runs the nested phase estimation on the register
 it is handed, flips the flag when the phase lands in a bin whose energy is at least
-``target_energy``, then undoes the estimation so the register comes back as it was found.
-``run`` takes only the ``qubit_hamiltonian``: the register already holds the state under
-test, so no state preparation is needed.
+``energy_lower_bound``, then undoes the estimation so the register comes back as it was
+found. ``run`` takes only the ``qubit_hamiltonian``: the register already holds the state
+under test, so no state preparation is needed.
 
 The oracle reflects about the marked eigenspaces only when the estimation is exact, that is
 when every eigenphase of the state under test is a multiple of :math:`2^{-n}` for
@@ -92,7 +92,7 @@ Settings
    * - Setting
      - Type
      - Description
-   * - ``target_energy``
+   * - ``energy_lower_bound``
      - ``float``
      - Lowest energy the marked subspace may hold. Must be finite. Default: ``nan`` (invalid; user must set).
    * - ``qpe_circuit_builder``

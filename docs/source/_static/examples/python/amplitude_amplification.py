@@ -48,13 +48,12 @@ guiding_state = Wavefunction(
 state_preparation = create("state_prep", "dense_pure_state").run(guiding_state)
 
 # 3. To mark the target state, a QPE is run on the prepared register, and a flag
-# is flipped when the QPE phase lands in the desired range. The target energy is
-# halfway up the band, so |11> at +lambda is marked and the rest of the spectrum
-# is not.
+# is flipped when the QPE phase lands in the desired range. The bound is halfway
+# up the band, so |11> at +lambda is marked and the rest of the spectrum is not.
 good_state_oracle = create(
     "amplitude_amplification_oracle",
     "qdk_qpe_subspace",
-    target_energy=qubit_hamiltonian.schatten_norm / 2,
+    energy_lower_bound=qubit_hamiltonian.schatten_norm / 2,
     qpe_circuit_builder=AlgorithmRef(
         "qpe_circuit_builder",
         "qdk_standard",
