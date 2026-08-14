@@ -34,6 +34,17 @@ class MatrixCompressionType(CaseInsensitiveStrEnum):
     SELECT_AND = "SELECT_AND"
 
 
+_QSHARP_OPERATION_CODES = {
+    MatrixCompressionType.X: 0,
+    MatrixCompressionType.CX: 1,
+    MatrixCompressionType.SWAP: 2,
+    MatrixCompressionType.CCX: 3,
+    MatrixCompressionType.MCX: 4,
+    MatrixCompressionType.SELECT: 5,
+    MatrixCompressionType.SELECT_AND: 6,
+}
+
+
 @dataclass
 class MatrixCompressionOp:
     """Gate representation for matrix compression operations."""
@@ -44,12 +55,13 @@ class MatrixCompressionOp:
     lookup_data: list[list[bool]] = field(default_factory=list)
 
     def __post_init__(self):
-        """Validate that SELECT/SELECT_AND operations have lookup_data.
+        """Validate the operation type and SELECT lookup data.
 
         Raises:
-            ValueError: If name is SELECT or SELECT_AND but lookup_data is empty.
+            ValueError: If the operation type is unknown, or SELECT/SELECT_AND has no lookup data.
 
         """
+        self.name = MatrixCompressionType(self.name)
         if self.name in {MatrixCompressionType.SELECT, MatrixCompressionType.SELECT_AND} and not self.lookup_data:
             raise ValueError(f"lookup_data must be provided for {self.name} operations")
 
@@ -57,11 +69,11 @@ class MatrixCompressionOp:
         """Serialize to a camelCase dict matching the Q# ``MatrixCompressionOp`` struct.
 
         Returns:
-            dict[str, Any]: Dictionary with keys 'name', 'qubits', 'controlState', 'lookupData'.
+            dict[str, Any]: Dictionary matching the Q# ``MatrixCompressionOp`` fields.
 
         """
         return {
-            "name": self.name,
+            "kind": _QSHARP_OPERATION_CODES[self.name],
             "qubits": self.qubits,
             "controlState": self.control_state,
             "lookupData": self.lookup_data,
@@ -75,7 +87,7 @@ class MatrixCompressionOp:
 
         """
         return QSHARP_UTILS.BinaryEncoding.MatrixCompressionOp(
-            name=self.name,
+            kind=_QSHARP_OPERATION_CODES[self.name],
             qubits=self.qubits,
             controlState=self.control_state,
             lookupData=self.lookup_data,

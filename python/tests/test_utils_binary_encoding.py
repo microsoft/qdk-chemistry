@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms.state_preparation._binary_encoding_utils import (
+    MatrixCompressionOp,
     MatrixCompressionType,
     RefTableau,
     _BinaryEncodingSynthesizer,
@@ -664,6 +665,29 @@ class TestToGf2xOperations:
         }
         for op in ops:
             assert op.name in valid_types, f"Unexpected op type: {op.name}"
+
+    def test_matrix_compression_op_rejects_unknown_type(self):
+        """Unknown operation names fail before serialization to Q#."""
+        with pytest.raises(ValueError, match="INVALID"):
+            MatrixCompressionOp("INVALID", [0])  # type: ignore[arg-type]
+
+    @pytest.mark.parametrize(
+        ("op_type", "expected"),
+        [
+            (MatrixCompressionType.X, 0),
+            (MatrixCompressionType.CX, 1),
+            (MatrixCompressionType.SWAP, 2),
+            (MatrixCompressionType.CCX, 3),
+            (MatrixCompressionType.MCX, 4),
+            (MatrixCompressionType.SELECT, 5),
+            (MatrixCompressionType.SELECT_AND, 6),
+        ],
+    )
+    def test_matrix_compression_op_serializes_qsharp_opcode(self, op_type, expected):
+        """Q# serialization keeps the complete integer opcode contract stable."""
+        lookup_data = [[True]] if op_type in {MatrixCompressionType.SELECT, MatrixCompressionType.SELECT_AND} else []
+        op = MatrixCompressionOp(op_type, [0, 1], lookup_data=lookup_data)
+        assert op.to_dict()["kind"] == expected
 
     def test_to_operations_identity_mapping(self):
         """When active_qubit_indices is identity, ops stay the same."""

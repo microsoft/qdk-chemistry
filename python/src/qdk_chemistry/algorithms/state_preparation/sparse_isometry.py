@@ -59,7 +59,10 @@ from ._binary_encoding_utils import MatrixCompressionOp, MatrixCompressionType, 
 
 __all__: list[str] = ["SparseIsometryStatePreparationSettings"]
 
-_QSHARP_DENSE_PREP_PROGRAM = "QDKChemistry.Utils.StatePreparation.MakeStatePreparationCircuit"
+
+def _is_qsharp_dense_factory(factory: QsharpFactoryData | None) -> bool:
+    """Return whether a factory uses the built-in Q# dense state preparation."""
+    return factory is not None and factory.program is QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit
 
 
 class SparseIsometryStatePreparationSettings(Settings):
@@ -396,7 +399,7 @@ class SparseIsometryStatePreparation(StatePreparation):
 
         """
         factory = dense_circuit._qsharp_factory  # noqa: SLF001
-        if factory is not None and getattr(factory.program, "__name__", None) == _QSHARP_DENSE_PREP_PROGRAM:
+        if _is_qsharp_dense_factory(factory):
             # Compose with the dense preparation parameters rather than its callable: a callable capturing
             # another callable cannot be resolved statically by the adaptive-profile code generator.
             dense_params = QSHARP_UTILS.StatePreparation.StatePreparationParams(**factory.parameter)
@@ -482,7 +485,7 @@ class SparseIsometryStatePreparation(StatePreparation):
 
         """
         factory = dense_circuit._qsharp_factory  # noqa: SLF001
-        if factory is not None and getattr(factory.program, "__name__", None) == _QSHARP_DENSE_PREP_PROGRAM:
+        if _is_qsharp_dense_factory(factory):
             # Compose with the dense preparation parameters rather than its callable: a callable capturing
             # another callable cannot be resolved statically by the adaptive-profile code generator.
             dense_params = QSHARP_UTILS.StatePreparation.StatePreparationParams(**factory.parameter)

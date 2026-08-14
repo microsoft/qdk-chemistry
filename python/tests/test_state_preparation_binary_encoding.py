@@ -29,6 +29,7 @@ from qdk_chemistry.data import (
 from qdk_chemistry.data.symmetry import SymmetryLabel, axes
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 from .test_helpers import create_random_wavefunction
@@ -99,10 +100,7 @@ def _assert_uses_binary_encoding(circuit: Circuit) -> None:
     """
     factory = circuit._qsharp_factory
     assert factory is not None, "Binary encoding must produce a Q# circuit, not a QASM fallback."
-    program = getattr(factory.program, "__name__", "")
-    assert program == "QDKChemistry.Utils.BinaryEncoding.MakeComposeBinaryEncodingCircuit", (
-        f"Expected the binary-encoding composition but the circuit was built by '{program}'."
-    )
+    assert factory.program is QSHARP_UTILS.BinaryEncoding.MakeComposeBinaryEncodingCircuit
     assert factory.parameter["binaryEncodingOps"], "Binary-encoding op sequence must not be empty."
 
 
@@ -339,8 +337,7 @@ class TestSparseIsometryBinaryEncoding:
         assert circuit.encoding == "jordan-wigner"
 
         # The fallback must not go through the binary-encoding composition.
-        factory_program = getattr(circuit._qsharp_factory.program, "__name__", "")
-        assert factory_program == "QDKChemistry.Utils.StatePreparation.MakeComposeSparseIsometryCircuit"
+        assert circuit._qsharp_factory.program is QSHARP_UTILS.StatePreparation.MakeComposeSparseIsometryCircuit
 
         lc = circuit.estimate()["logicalCounts"]
         # No binary-encoding SELECT/SELECT_AND ops in the fallback path.
@@ -519,6 +516,21 @@ class TestMeasurementBasedUncompute:
         assert toffoli_counts["measurementCount"] == 0
         assert measured_counts["measurementCount"] > 0
         assert measured_counts["cczCount"] < toffoli_counts["cczCount"]
+
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+    def test_adaptive_qir_preserves_measurement_uncompute(self, ozone_wf):
+        """Adaptive QIR imports each measured uncompute as Qiskit control flow."""
+        circuit = create("state_prep", "sparse_isometry", binary_encoding=True, measurement_based_uncompute=True).run(
+            ozone_wf
+        )
+        measurement_count = circuit.estimate()["logicalCounts"]["measurementCount"]
+
+        qc = circuit.get_qiskit_circuit()
+        ops = qc.count_ops()
+        assert qc.num_clbits == measurement_count
+        assert ops.get("measure", 0) == measurement_count
+        assert ops.get("reset", 0) == measurement_count
+        assert ops.get("if_else", 0) == measurement_count
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
     @pytest.mark.parametrize("seed_simulator", [1, 7, 13, 21])

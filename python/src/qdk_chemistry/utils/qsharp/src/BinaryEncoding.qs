@@ -17,15 +17,10 @@ namespace QDKChemistry.Utils.BinaryEncoding {
 
     /// A single gate produced by the matrix compression pipeline.
     ///
-    /// ``qubits`` always contains qubit indices only:
-    ///   ("X",      [target],                    0,  [])
-    ///   ("CX",     [control, target],           0,  [])
-    ///   ("SWAP",   [a, b],                      0,  [])
-    ///   ("CCX",    [ctrl1, ctrl2, target],      0,  [])
-    ///   ("MCX",    [ctrl0, ctrl1, ..., target], ctrlStateBitmask, [])
-    ///   ("SELECT", [addr0..addrN, data0..dataM], numAddrQubits,  data[][])
+    /// ``kind`` identifies X, CX, SWAP, CCX, MCX, SELECT, and SELECT_AND as 0 through 6.
+    /// ``qubits`` always contains qubit indices only.
     struct MatrixCompressionOp {
-        name : String,
+        kind : Int,
         qubits : Int[],
         controlState : Int,
         lookupData : Bool[][],
@@ -48,21 +43,21 @@ namespace QDKChemistry.Utils.BinaryEncoding {
     /// therefore cannot be adjoint- or control-generated. Callers that only ever emit plain
     /// gates (such as the GF2+X expansion) can use this to stay adjointable.
     operation ApplyAdjointableCompressionOp(gate : MatrixCompressionOp, qs : Qubit[]) : Unit is Adj + Ctl {
-        if gate.name == "X" {
+        if gate.kind == 0 {
             X(qs[gate.qubits[0]]);
-        } elif gate.name == "CX" {
+        } elif gate.kind == 1 {
             CX(qs[gate.qubits[0]], qs[gate.qubits[1]]);
-        } elif gate.name == "SWAP" {
+        } elif gate.kind == 2 {
             SWAP(qs[gate.qubits[0]], qs[gate.qubits[1]]);
-        } elif gate.name == "CCX" {
+        } elif gate.kind == 3 {
             CCNOT(qs[gate.qubits[0]], qs[gate.qubits[1]], qs[gate.qubits[2]]);
-        } elif gate.name == "MCX" {
+        } elif gate.kind == 4 {
             let numControls = Length(gate.qubits) - 1;
             let controlQubits = Subarray(gate.qubits[0..numControls - 1], qs);
             let ctrlStateBools = ControlStateBits(gate.controlState, numControls);
             ApplyControlledOnBitString(ctrlStateBools, X, controlQubits, qs[gate.qubits[numControls]]);
         } else {
-            fail $"Gate is not adjointable: {gate.name}";
+            fail "Unsupported adjointable matrix-compression operation.";
         }
     }
 
@@ -70,29 +65,17 @@ namespace QDKChemistry.Utils.BinaryEncoding {
     /// SparseOneHotSelect may borrow as helpers (avoids allocating new qubits).
     /// Pass an empty array when no pool is available (e.g. for GF2+X ops).
     operation ApplyMatrixCompressionOp(gate : MatrixCompressionOp, qs : Qubit[], ancillaPool : Qubit[]) : Unit {
-        if gate.name == "SELECT" {
+        if gate.kind == 5 {
             let numAddr = gate.controlState;
-            mutable addrQubits : Qubit[] = [];
-            mutable targetQubits : Qubit[] = [];
-            for i in 0..Length(gate.qubits) - 1 {
-                if i < numAddr {
-                    set addrQubits += [qs[gate.qubits[i]]];
-                } else {
-                    set targetQubits += [qs[gate.qubits[i]]];
-                }
-            }
+            let selectedQubits = Subarray(gate.qubits, qs);
+            let addrQubits = selectedQubits[...numAddr - 1];
+            let targetQubits = selectedQubits[numAddr...];
             SparseOneHotSelect(gate.lookupData, addrQubits, targetQubits, false, ancillaPool);
-        } elif gate.name == "SELECT_AND" {
+        } elif gate.kind == 6 {
             let numAddr = gate.controlState;
-            mutable addrQubits : Qubit[] = [];
-            mutable targetQubits : Qubit[] = [];
-            for i in 0..Length(gate.qubits) - 1 {
-                if i < numAddr {
-                    set addrQubits += [qs[gate.qubits[i]]];
-                } else {
-                    set targetQubits += [qs[gate.qubits[i]]];
-                }
-            }
+            let selectedQubits = Subarray(gate.qubits, qs);
+            let addrQubits = selectedQubits[...numAddr - 1];
+            let targetQubits = selectedQubits[numAddr...];
             SparseOneHotSelect(gate.lookupData, addrQubits, targetQubits, true, ancillaPool);
         } else {
             ApplyAdjointableCompressionOp(gate, qs);
