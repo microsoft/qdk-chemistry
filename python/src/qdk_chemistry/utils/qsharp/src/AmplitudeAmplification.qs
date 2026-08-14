@@ -77,7 +77,7 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
         lowerBounds : Int[],
         upperBounds : Int[],
         phase : Qubit[],
-        target : Qubpit,
+        target : Qubit,
     ) : Unit is Adj {
         if Length(lowerBounds) != Length(upperBounds) {
             fail $"Got {Length(lowerBounds)} lower bounds and {Length(upperBounds)} upper bounds, but each phase range needs one of each.";
