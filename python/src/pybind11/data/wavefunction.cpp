@@ -16,7 +16,6 @@
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -29,7 +28,6 @@ py::object variant_to_python(
   return std::visit(
       [](const auto& value) -> py::object { return py::cast(value); }, var);
 }
-
 py::object variant_to_python(
     const qdk::chemistry::data::ContainerTypes::MatrixVariant& var) {
   return std::visit(
@@ -1186,8 +1184,13 @@ Examples:
         return *wf_ptr;
       }));
 
-  // Data type name class attribute
-  wavefunction.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(Wavefunction);
+  wavefunction.def_static("data_type_name", &Wavefunction::data_type_name, R"(
+Return the wire-format identifier for wavefunctions.
+
+Returns:
+        str: ``"wavefunction"``
+
+)");
 
   // Bind StateVectorContainer
   py::class_<StateVectorContainer, WavefunctionContainer, py::smart_holder>(

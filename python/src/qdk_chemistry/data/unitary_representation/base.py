@@ -28,8 +28,15 @@ class UnitaryRepresentation(DataClass):
 
     """
 
-    # Class attribute for filename validation
-    _data_type_name = "unitary_representation"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for unitary representations.
+
+        Returns:
+            ``"unitary_representation"``.
+
+        """
+        return "unitary_representation"
 
     # Serialization version for this class
     _serialization_version = "0.2.0"
