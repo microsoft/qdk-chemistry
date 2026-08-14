@@ -13,7 +13,7 @@
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/localization.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
-#include <qdk/chemistry/algorithms/microsoft/localization/qio.hpp>
+#include <qdk/chemistry/algorithms/microsoft/localization/active_space_qio.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/orbital_entropy.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
@@ -64,7 +64,7 @@ TEST_F(LocalizationTest, Factory) {
                         "qdk_natural_orbitals") != available_localizers.end());
   EXPECT_TRUE(std::find(available_localizers.begin(),
                         available_localizers.end(),
-                        "qdk_qio") != available_localizers.end());
+                        "qdk_active_space_qio") != available_localizers.end());
   EXPECT_TRUE(std::find(available_localizers.begin(),
                         available_localizers.end(),
                         "qdk_vvhv") != available_localizers.end());
@@ -106,7 +106,7 @@ TEST_F(LocalizationTest,
   const std::vector<size_t> empty_indices;
   const std::vector<std::string> localizer_names = {
       "qdk_pipek_mezey", "qdk_mp2_natural_orbitals", "qdk_natural_orbitals",
-      "qdk_qio", "qdk_vvhv"};
+      "qdk_active_space_qio", "qdk_vvhv"};
 
   for (const auto& localizer_name : localizer_names) {
     auto localizer = LocalizerFactory::create(localizer_name);
@@ -1776,7 +1776,7 @@ TEST_F(LocalizationTest, NaturalOrbitals_EdgeCase) {
       std::invalid_argument);
 }
 
-static void expect_qio_entropy_helper_matches_wavefunction(
+static void expect_active_space_qio_entropy_helper_matches_wavefunction(
     const Wavefunction& wavefunction, std::size_t expected_alpha_electrons,
     std::size_t expected_beta_electrons) {
   ASSERT_TRUE(wavefunction.has_one_rdm_spin_dependent());
@@ -1824,13 +1824,14 @@ static void expect_qio_entropy_helper_matches_wavefunction(
   }
 }
 
-struct QIOEntropyTestWavefunction {
+struct ActiveSpaceQIOEntropyTestWavefunction {
   std::shared_ptr<Wavefunction> wavefunction;
   std::size_t alpha_electrons;
   std::size_t beta_electrons;
 };
 
-static QIOEntropyTestWavefunction make_qio_entropy_test_wavefunction(
+static ActiveSpaceQIOEntropyTestWavefunction
+make_active_space_qio_entropy_test_wavefunction(
     const std::shared_ptr<Structure>& structure, int charge, int multiplicity) {
   auto scf_solver = ScfSolverFactory::create();
   scf_solver->settings().set("enable_gdm", false);
@@ -1864,7 +1865,8 @@ static QIOEntropyTestWavefunction make_qio_entropy_test_wavefunction(
   return {wavefunction, alpha_electrons, beta_electrons};
 }
 
-TEST_F(LocalizationTest, QIOSingleOrbitalEntropyIncludesTinyPositiveWeight) {
+TEST_F(LocalizationTest,
+       ActiveSpaceQIOSingleOrbitalEntropyIncludesTinyPositiveWeight) {
   constexpr std::size_t dim = 2;
   constexpr double tiny_weight = 1e-15;
   Eigen::MatrixXd rdm_alpha = Eigen::MatrixXd::Zero(dim, dim);
@@ -1904,23 +1906,25 @@ TEST_F(LocalizationTest, QIOSingleOrbitalEntropyIncludesTinyPositiveWeight) {
           std::make_optional<ContainerTypes::VectorVariant>(rdm_aabb),
           std::make_optional<ContainerTypes::VectorVariant>(same_spin)));
 
-  expect_qio_entropy_helper_matches_wavefunction(*wavefunction, 1, 1);
+  expect_active_space_qio_entropy_helper_matches_wavefunction(*wavefunction, 1,
+                                                              1);
 }
 
 TEST_F(LocalizationTest,
-       QIOSingleOrbitalEntropyMatchesClosedShellWavefunction) {
+       ActiveSpaceQIOSingleOrbitalEntropyMatchesClosedShellWavefunction) {
   const auto test_wavefunction =
-      make_qio_entropy_test_wavefunction(testing::create_lih_structure(), 0, 1);
+      make_active_space_qio_entropy_test_wavefunction(
+          testing::create_lih_structure(), 0, 1);
   ASSERT_EQ(test_wavefunction.alpha_electrons,
             test_wavefunction.beta_electrons);
   ASSERT_TRUE(test_wavefunction.wavefunction->get_orbitals()->is_restricted());
-  expect_qio_entropy_helper_matches_wavefunction(
+  expect_active_space_qio_entropy_helper_matches_wavefunction(
       *test_wavefunction.wavefunction, test_wavefunction.alpha_electrons,
       test_wavefunction.beta_electrons);
 }
 
-TEST_F(LocalizationTest, QIO) {
-  auto localizer = LocalizerFactory::create("qdk_qio");
+TEST_F(LocalizationTest, ActiveSpaceQIO) {
+  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
   EXPECT_NO_THROW({ auto settings = localizer->settings(); });
 
   // Get a canonical set of water orbitals.
@@ -1935,7 +1939,8 @@ TEST_F(LocalizationTest, QIO) {
   auto active_space_wfn = active_space->run(wfn_HF);
   auto active_orbitals = active_space_wfn->get_orbitals();
 
-  // Run CAS with spin-dependent 1- and 2-RDMs (required by the QIO localizer).
+  // Run CAS with spin-dependent 1- and 2-RDMs (required by the active-space QIO
+  // localizer).
   auto hamil_ctor = HamiltonianConstructorFactory::create();
   auto hamiltonian_cas = hamil_ctor->run(active_orbitals);
   auto mc_calc = MultiConfigurationCalculatorFactory::create("macis_cas");
@@ -2013,19 +2018,21 @@ TEST_F(LocalizationTest, QIO) {
               1e-8);
 }
 
-TEST_F(LocalizationTest, QIOSingleOrbitalEntropyMatchesOpenShellWavefunction) {
+TEST_F(LocalizationTest,
+       ActiveSpaceQIOSingleOrbitalEntropyMatchesOpenShellWavefunction) {
   const auto test_wavefunction =
-      make_qio_entropy_test_wavefunction(testing::create_oh_structure(), 0, 2);
+      make_active_space_qio_entropy_test_wavefunction(
+          testing::create_oh_structure(), 0, 2);
   ASSERT_NE(test_wavefunction.alpha_electrons,
             test_wavefunction.beta_electrons);
   ASSERT_TRUE(test_wavefunction.wavefunction->get_orbitals()->is_restricted());
-  expect_qio_entropy_helper_matches_wavefunction(
+  expect_active_space_qio_entropy_helper_matches_wavefunction(
       *test_wavefunction.wavefunction, test_wavefunction.alpha_electrons,
       test_wavefunction.beta_electrons);
 }
 
-TEST_F(LocalizationTest, QIORejectsMismatchedSpinIndices) {
-  auto localizer = LocalizerFactory::create("qdk_qio");
+TEST_F(LocalizationTest, ActiveSpaceQIORejectsMismatchedSpinIndices) {
+  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
 
   Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(4, 4);
   Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(4, 4);
@@ -2049,9 +2056,9 @@ TEST_F(LocalizationTest, QIORejectsMismatchedSpinIndices) {
 }
 
 // Minimal restricted single-determinant wavefunction with a defined active
-// space, used to exercise the QIO localizer input-validation branches that
-// reject before any RDM is accessed.
-static std::shared_ptr<Wavefunction> make_minimal_qio_wfn(
+// space, used to exercise the active-space QIO localizer input-validation
+// branches that reject before any RDM is accessed.
+static std::shared_ptr<Wavefunction> make_minimal_active_space_qio_wfn(
     const std::vector<size_t>& active_indices,
     const std::vector<size_t>& inactive_indices, const std::string& config) {
   const size_t n = active_indices.size() + inactive_indices.size();
@@ -2065,22 +2072,22 @@ static std::shared_ptr<Wavefunction> make_minimal_qio_wfn(
       Configuration::from_spin_half_string(config), orbitals));
 }
 
-TEST_F(LocalizationTest, QIORejectsUnsortedIndices) {
-  auto localizer = LocalizerFactory::create("qdk_qio");
-  auto wfn = make_minimal_qio_wfn({0, 1, 2, 3}, {}, "2200");
+TEST_F(LocalizationTest, ActiveSpaceQIORejectsUnsortedIndices) {
+  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto wfn = make_minimal_active_space_qio_wfn({0, 1, 2, 3}, {}, "2200");
   std::vector<size_t> unsorted({2, 0, 1, 3});
   EXPECT_THROW(localizer->run(wfn, unsorted, unsorted), std::invalid_argument);
 }
-TEST_F(LocalizationTest, QIORejectsDuplicateIndices) {
-  auto localizer = LocalizerFactory::create("qdk_qio");
-  auto wfn = make_minimal_qio_wfn({0, 1, 2, 3}, {}, "2200");
+TEST_F(LocalizationTest, ActiveSpaceQIORejectsDuplicateIndices) {
+  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto wfn = make_minimal_active_space_qio_wfn({0, 1, 2, 3}, {}, "2200");
   std::vector<size_t> duplicated({0, 1, 1, 2});  // sorted but not unique
   EXPECT_THROW(localizer->run(wfn, duplicated, duplicated),
                std::invalid_argument);
 }
 
-TEST_F(LocalizationTest, QIORejectsMissingOverlap) {
-  auto localizer = LocalizerFactory::create("qdk_qio");
+TEST_F(LocalizationTest, ActiveSpaceQIORejectsMissingOverlap) {
+  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
   const std::vector<size_t> active({0, 1, 2, 3});
   const std::vector<size_t> inactive;
   Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(4, 4);
@@ -2095,9 +2102,9 @@ TEST_F(LocalizationTest, QIORejectsMissingOverlap) {
   EXPECT_THROW(localizer->run(wfn, active, active), std::invalid_argument);
 }
 
-TEST_F(LocalizationTest, QIOEmptyIndicesAreNoOp) {
-  auto localizer = LocalizerFactory::create("qdk_qio");
-  auto wfn = make_minimal_qio_wfn({0, 1, 2, 3}, {}, "2200");
+TEST_F(LocalizationTest, ActiveSpaceQIOEmptyIndicesAreNoOp) {
+  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto wfn = make_minimal_active_space_qio_wfn({0, 1, 2, 3}, {}, "2200");
   std::shared_ptr<Wavefunction> result;
   std::vector<size_t> empty;
   EXPECT_NO_THROW({ result = localizer->run(wfn, empty, empty); });
@@ -2117,8 +2124,8 @@ TEST_F(LocalizationTest, QIOEmptyIndicesAreNoOp) {
               testing::numerical_zero_tolerance);
 }
 
-TEST_F(LocalizationTest, QIORejectsUnrestricted) {
-  auto localizer = LocalizerFactory::create("qdk_qio");
+TEST_F(LocalizationTest, ActiveSpaceQIORejectsUnrestricted) {
+  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
   Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(4, 4);
   Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(4, 4);
   Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(4, 4);
@@ -2133,15 +2140,15 @@ TEST_F(LocalizationTest, QIORejectsUnrestricted) {
   EXPECT_THROW(localizer->run(wfn, idx, idx), std::invalid_argument);
 }
 
-TEST_F(LocalizationTest, QIORejectsPartialActiveSpaceIndices) {
-  auto localizer = LocalizerFactory::create("qdk_qio");
-  auto wfn = make_minimal_qio_wfn({0, 1, 2, 3}, {}, "2200");
+TEST_F(LocalizationTest, ActiveSpaceQIORejectsPartialActiveSpaceIndices) {
+  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto wfn = make_minimal_active_space_qio_wfn({0, 1, 2, 3}, {}, "2200");
   std::vector<size_t> partial({1, 2});  // strict subset of the active space
   EXPECT_THROW(localizer->run(wfn, partial, partial), std::invalid_argument);
 }
 
-TEST_F(LocalizationTest, QIORejectsMissingSpinDependentRdm) {
-  auto localizer = LocalizerFactory::create("qdk_qio");
+TEST_F(LocalizationTest, ActiveSpaceQIORejectsMissingSpinDependentRdm) {
+  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
   // A multi-determinant wavefunction that neither carries nor can lazily
   // generate the spin-dependent active RDMs that QIO requires.
   Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(4, 4);
@@ -2171,13 +2178,13 @@ TEST_F(LocalizationTest, QIORejectsMissingSpinDependentRdm) {
 // scrambled (non-natural-orbital) basis, so QIO must perform real rotations to
 // lower the single-orbital entropy. A lightweight wavefunction with attached
 // RDMs (no SCF/CAS) for tests that must reach QIO's RDM-dependent code paths.
-static std::shared_ptr<Wavefunction> make_scrambled_meanfield_qio_wfn(
-    size_t n) {
+static std::shared_ptr<Wavefunction>
+make_scrambled_meanfield_active_space_qio_wfn(size_t n) {
   // Requires n >= 2: the occupation ramp divides by (n - 1) and the 2-config
   // determinant strings below index n / 2 - 1.
   if (n < 2) {
     throw std::invalid_argument(
-        "make_scrambled_meanfield_qio_wfn requires n >= 2");
+        "make_scrambled_meanfield_active_space_qio_wfn requires n >= 2");
   }
   // Fractional closed-shell occupations in (0, 1) -> nonzero single-orbital
   // entropy, rotated by one layer of disjoint Givens rotations into a scrambled
@@ -2259,8 +2266,8 @@ static std::shared_ptr<Wavefunction> make_scrambled_meanfield_qio_wfn(
           ContainerTypes::VectorVariant(bbbb))));
 }
 
-TEST_F(LocalizationTest, QIOSettings) {
-  auto localizer = LocalizerFactory::create("qdk_qio");
+TEST_F(LocalizationTest, ActiveSpaceQIOSettings) {
+  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
   auto& settings = localizer->settings();
   // Jacobi-sweep controls are exposed with documented defaults.
   EXPECT_EQ(settings.get<int64_t>("max_cycles"), 200);
@@ -2291,14 +2298,14 @@ TEST_F(LocalizationTest, QIOSettings) {
                std::invalid_argument);
 }
 
-TEST_F(LocalizationTest, QIORejectsNonFiniteSetting) {
+TEST_F(LocalizationTest, ActiveSpaceQIORejectsNonFiniteSetting) {
   // A NaN slips past the BoundConstraint range check (every comparison with NaN
   // is false), so it must be rejected at run time with std::invalid_argument.
-  auto localizer = LocalizerFactory::create("qdk_qio");
+  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
   localizer->settings().set("coarse_angle_step",
                             std::numeric_limits<double>::quiet_NaN());
   const size_t n = 4;
-  auto wfn = make_scrambled_meanfield_qio_wfn(n);
+  auto wfn = make_scrambled_meanfield_active_space_qio_wfn(n);
   std::vector<size_t> active(n);
   std::iota(active.begin(), active.end(), 0);
   EXPECT_THROW(localizer->run(wfn, active, active), std::invalid_argument);

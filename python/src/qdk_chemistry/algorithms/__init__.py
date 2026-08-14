@@ -48,10 +48,10 @@ from qdk_chemistry.algorithms.nuclear_derivative import (
 )
 from qdk_chemistry.algorithms.orbital_localizer import (
     OrbitalLocalizer,
+    QdkActiveSpaceQIOLocalizer,
     QdkMP2NaturalOrbitalLocalizer,
     QdkNaturalOrbitalLocalizer,
     QdkPipekMezeyLocalizer,
-    QdkQIOLocalizer,
     QdkVVHVLocalizer,
 )
 from qdk_chemistry.algorithms.phase_estimation.base import PhaseEstimation
@@ -89,6 +89,7 @@ __all__ = [
     "OrbitalLocalizer",
     "PhaseEstimation",
     "ProjectedMultiConfigurationCalculator",
+    "QdkActiveSpaceQIOLocalizer",
     "QdkAutocasActiveSpaceSelector",
     "QdkAutocasEosActiveSpaceSelector",
     "QdkExpectationEstimator",
@@ -102,7 +103,6 @@ __all__ = [
     "QdkNuclearDerivativeCalculator",
     "QdkOccupationActiveSpaceSelector",
     "QdkPipekMezeyLocalizer",
-    "QdkQIOLocalizer",
     "QdkQubitMapper",
     "QdkScfSolver",
     "QdkStabilityChecker",
