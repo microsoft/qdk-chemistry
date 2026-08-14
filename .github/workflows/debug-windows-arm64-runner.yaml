@@ -1,0 +1,250 @@
+name: Debug Windows ARM64 Runner
+
+# Investigate missing tools on the Windows ARM64 self-hosted runner.
+# Related to: actions/cache/save@v5 failure in build-and-test.yaml
+# See: https://github.com/microsoft/qdk-chemistry/issues/593
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  debug-arm64:
+    name: Debug Windows ARM64 runner environment
+    runs-on: [self-hosted, 1ES.Pool=1es-gh-Dpsd_v6-arm-pool, 1ES.ImageOverride=windows-2025-arm64-1espt, 'JobId=qdk_chemistry-debug-arm64-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
+    timeout-minutes: 30
+    steps:
+
+    # -------------------------------------------------------------------------
+    # 1. System info
+    # -------------------------------------------------------------------------
+    - name: System info
+      shell: pwsh
+      run: |
+        Write-Host "=== OS / Architecture ==="
+        [System.Runtime.InteropServices.RuntimeInformation]::OSDescription
+        [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture
+        $env:PROCESSOR_ARCHITECTURE
+        $env:PROCESSOR_IDENTIFIER
+        systeminfo | Select-String -Pattern "^OS|^System Type|^Processor"
+
+    # -------------------------------------------------------------------------
+    # 2. Check git architecture (x86 vs ARM64)
+    # -------------------------------------------------------------------------
+    - name: Check git architecture
+      shell: pwsh
+      run: |
+        Write-Host "=== git version & binary ==="
+        $gitPath = (Get-Command git -ErrorAction SilentlyContinue).Source
+        if ($gitPath) {
+          Write-Host "git path: $gitPath"
+          git --version
+          # Use dumpbin if available, otherwise file-info approach
+          try {
+            $bytes = [System.IO.File]::ReadAllBytes($gitPath)
+            # PE header: offset 0x3C holds pointer to PE signature, then Machine word
+            $peOffset = [BitConverter]::ToInt32($bytes, 0x3C)
+            $machine  = [BitConverter]::ToUInt16($bytes, $peOffset + 4)
+            $arch = switch ($machine) {
+              0x014C { "x86 (i386)" }
+              0x8664 { "x86_64 (AMD64)" }
+              0xAA64 { "ARM64 (AArch64)" }
+              default { "Unknown (0x{0:X4})" -f $machine }
+            }
+            Write-Host "git binary architecture: $arch"
+          } catch {
+            Write-Host "Could not determine git binary architecture: $_"
+          }
+        } else {
+          Write-Host "git NOT found in PATH"
+        }
+
+    # -------------------------------------------------------------------------
+    # 3. Check gzip
+    # -------------------------------------------------------------------------
+    - name: Check gzip
+      shell: pwsh
+      run: |
+        Write-Host "=== gzip ==="
+        $gzip = Get-Command gzip -ErrorAction SilentlyContinue
+        if ($gzip) {
+          Write-Host "gzip found: $($gzip.Source)"
+          gzip --version
+        } else {
+          Write-Host "gzip NOT found in PATH"
+        }
+
+    # -------------------------------------------------------------------------
+    # 4. Check tar
+    # -------------------------------------------------------------------------
+    - name: Check tar
+      shell: pwsh
+      run: |
+        Write-Host "=== tar ==="
+        $tar = Get-Command tar -ErrorAction SilentlyContinue
+        if ($tar) {
+          Write-Host "tar found: $($tar.Source)"
+          tar --version
+          # Also check binary architecture
+          try {
+            $bytes = [System.IO.File]::ReadAllBytes($tar.Source)
+            $peOffset = [BitConverter]::ToInt32($bytes, 0x3C)
+            $machine  = [BitConverter]::ToUInt16($bytes, $peOffset + 4)
+            $arch = switch ($machine) {
+              0x014C { "x86 (i386)" }
+              0x8664 { "x86_64 (AMD64)" }
+              0xAA64 { "ARM64 (AArch64)" }
+              default { "Unknown (0x{0:X4})" -f $machine }
+            }
+            Write-Host "tar binary architecture: $arch"
+          } catch {
+            Write-Host "Could not determine tar binary architecture: $_"
+          }
+        } else {
+          Write-Host "tar NOT found in PATH"
+        }
+
+    # -------------------------------------------------------------------------
+    # 5. Check 7-Zip
+    # -------------------------------------------------------------------------
+    - name: Check 7-Zip
+      shell: pwsh
+      run: |
+        Write-Host "=== 7-Zip ==="
+        $7z = Get-Command 7z -ErrorAction SilentlyContinue
+        if ($7z) {
+          Write-Host "7z found: $($7z.Source)"
+          7z i 2>&1 | Select-Object -First 5
+        } else {
+          Write-Host "7z NOT found in PATH"
+          # Check common install locations
+          $candidates = @(
+            "C:\Program Files\7-Zip\7z.exe",
+            "C:\Program Files (x86)\7-Zip\7z.exe"
+          )
+          foreach ($c in $candidates) {
+            if (Test-Path $c) { Write-Host "Found at: $c" }
+          }
+        }
+
+    # -------------------------------------------------------------------------
+    # 6. Check zstd
+    # -------------------------------------------------------------------------
+    - name: Check zstd
+      shell: pwsh
+      run: |
+        Write-Host "=== zstd ==="
+        $zstd = Get-Command zstd -ErrorAction SilentlyContinue
+        if ($zstd) {
+          Write-Host "zstd found: $($zstd.Source)"
+          zstd --version
+        } else {
+          Write-Host "zstd NOT found in PATH"
+          # Check if it ships alongside tar/Git
+          $candidates = @(
+            "C:\Program Files\Git\usr\bin\zstd.exe",
+            "C:\Windows\System32\zstd.exe"
+          )
+          foreach ($c in $candidates) {
+            if (Test-Path $c) { Write-Host "Found at: $c (not in PATH)" }
+          }
+        }
+
+    # -------------------------------------------------------------------------
+    # 7. List compression-related binaries in common locations
+    # -------------------------------------------------------------------------
+    - name: Scan for compression tools
+      shell: pwsh
+      run: |
+        Write-Host "=== Scanning for compression-related binaries ==="
+        $searchRoots = @(
+          "C:\Windows\System32",
+          "C:\Program Files\Git",
+          "C:\Program Files\7-Zip",
+          "C:\ProgramData\chocolatey\bin",
+          "C:\tools"
+        )
+        $patterns = @("*gz*", "*tar*", "*zstd*", "*zst*", "*7z*")
+        foreach ($root in $searchRoots) {
+          if (Test-Path $root) {
+            foreach ($p in $patterns) {
+              Get-ChildItem -Path $root -Filter $p -Recurse -ErrorAction SilentlyContinue |
+                Select-Object -ExpandProperty FullName
+            }
+          }
+        }
+
+    # -------------------------------------------------------------------------
+    # 8. Check winget availability
+    # -------------------------------------------------------------------------
+    - name: Check winget
+      shell: pwsh
+      run: |
+        Write-Host "=== winget ==="
+        $winget = Get-Command winget -ErrorAction SilentlyContinue
+        if ($winget) {
+          Write-Host "winget found: $($winget.Source)"
+          winget --version
+        } else {
+          Write-Host "winget NOT found in PATH"
+        }
+
+    # -------------------------------------------------------------------------
+    # 9. Try installing zstd via winget
+    # -------------------------------------------------------------------------
+    - name: Attempt to install zstd via winget
+      shell: pwsh
+      run: |
+        Write-Host "=== Attempting to install zstd via winget ==="
+        $winget = Get-Command winget -ErrorAction SilentlyContinue
+        if (-not $winget) {
+          Write-Host "winget not available — skipping"
+        } else {
+          winget install --id Facebook.Zstandard --accept-package-agreements --accept-source-agreements --silent 2>&1
+          # Re-check after install attempt
+          $zstd = Get-Command zstd -ErrorAction SilentlyContinue
+          if ($zstd) {
+            Write-Host "zstd now available: $($zstd.Source)"
+            zstd --version
+          } else {
+            Write-Host "zstd still not found after winget install"
+            # Look in default install location
+            Get-ChildItem "C:\Program Files\Facebook\Zstandard" -ErrorAction SilentlyContinue
+          }
+        }
+
+    # -------------------------------------------------------------------------
+    # 10. Try installing 7-Zip via winget
+    # -------------------------------------------------------------------------
+    - name: Attempt to install 7-Zip via winget
+      shell: pwsh
+      run: |
+        Write-Host "=== Attempting to install 7-Zip via winget ==="
+        $winget = Get-Command winget -ErrorAction SilentlyContinue
+        if (-not $winget) {
+          Write-Host "winget not available — skipping"
+        } else {
+          winget install --id 7zip.7zip --accept-package-agreements --accept-source-agreements --silent 2>&1
+          $7z = Get-Command 7z -ErrorAction SilentlyContinue
+          if ($7z) {
+            Write-Host "7z now available: $($7z.Source)"
+          } else {
+            # Check default location
+            if (Test-Path "C:\Program Files\7-Zip\7z.exe") {
+              Write-Host "7z installed at C:\Program Files\7-Zip\7z.exe (not in PATH)"
+            } else {
+              Write-Host "7z still not found after winget install"
+            }
+          }
+        }
+
+    # -------------------------------------------------------------------------
+    # 11. Full PATH dump
+    # -------------------------------------------------------------------------
+    - name: Dump PATH
+      shell: pwsh
+      run: |
+        Write-Host "=== PATH entries ==="
+        $env:PATH -split ";" | ForEach-Object { Write-Host $_ }
