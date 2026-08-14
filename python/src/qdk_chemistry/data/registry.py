@@ -127,7 +127,8 @@ def _discover_imported_dataclasses(*, excluded_types: frozenset[type[_CoreDataCl
             ):
                 _register_dataclass(dataclass_type)
             stack.extend(dataclass_type.__subclasses__())
-        _DISCOVERY_COMPLETE = True
+        if not excluded_types:
+            _DISCOVERY_COMPLETE = True
 
 
 def get_dataclass_type(type_name: str) -> type[_CoreDataClass] | None:

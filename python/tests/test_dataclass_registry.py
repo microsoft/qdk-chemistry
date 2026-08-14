@@ -76,6 +76,29 @@ def test_registration_rejects_builtin_wire_type_before_discovery(monkeypatch):
     assert get_dataclass_type("settings") is Settings
 
 
+def test_registration_discovery_does_not_recurse(monkeypatch):
+    """Discovery uses the internal registration path without re-entering itself."""
+    monkeypatch.setattr(dataclass_registry, "_DATACLASS_REGISTRY", {})
+    monkeypatch.setattr(dataclass_registry, "_DISCOVERY_COMPLETE", False)
+    original_discover = dataclass_registry._discover_imported_dataclasses
+    discovery_active = False
+
+    def tracked_discover(*, excluded_types=frozenset()):
+        nonlocal discovery_active
+        assert not discovery_active
+        discovery_active = True
+        try:
+            return original_discover(excluded_types=excluded_types)
+        finally:
+            discovery_active = False
+
+    monkeypatch.setattr(dataclass_registry, "_discover_imported_dataclasses", tracked_discover)
+
+    register_dataclass(Settings)
+
+    assert get_dataclass_type("settings") is Settings
+
+
 def test_registration_rejects_duplicate_wire_type(monkeypatch):
     """Two plugin classes cannot silently claim the same serialized identifier."""
     monkeypatch.setattr(dataclass_registry, "_DATACLASS_REGISTRY", {})

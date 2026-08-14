@@ -635,11 +635,13 @@ class TestRegistryRegisterUnregister:
         finally:
             registry.unregister("expectation_estimator", "duplicate_python_algorithm")
 
-    def test_python_factory_registers_aliases_atomically(self):
-        """An alias collision cannot leave earlier aliases partially registered."""
+    def test_python_factory_resolves_aliases_without_registering_them(self):
+        """Aliases resolve at creation time without becoming registry entries."""
 
         class AliasedAlgorithm:
-            """Python algorithm with a primary and secondary registry name."""
+            """Python algorithm with a primary name and an alias."""
+
+            registration_owner = "first"
 
             def type_name(self):
                 """Return a type owned by a Python factory."""
@@ -657,12 +659,53 @@ class TestRegistryRegisterUnregister:
                 """Return the settings stub required during creation."""
                 return MagicMock()
 
+        class ReplacementAlgorithm(AliasedAlgorithm):
+            """Replacement implementation using the same name and alias."""
+
+            registration_owner = "replacement"
+
+        registry.register(AliasedAlgorithm)
+        try:
+            assert "aliased_python_algorithm" in registry.available("expectation_estimator")
+            assert "python_algorithm_alias" not in registry.available("expectation_estimator")
+            assert registry.create("expectation_estimator", "python_algorithm_alias").registration_owner == "first"
+
+            registry.unregister("expectation_estimator", "aliased_python_algorithm")
+            registry.register(ReplacementAlgorithm)
+
+            replacement = registry.create("expectation_estimator", "python_algorithm_alias")
+            assert replacement.registration_owner == "replacement"
+        finally:
+            registry.unregister("expectation_estimator", "aliased_python_algorithm")
+
+    def test_python_factory_rejects_duplicate_alias(self):
+        """Registration rejects an alias owned by another implementation."""
+
+        class AliasedAlgorithm:
+            """Python algorithm with a primary name and an alias."""
+
+            def type_name(self):
+                """Return a type owned by a Python factory."""
+                return "expectation_estimator"
+
+            def name(self):
+                """Return the primary test name."""
+                return "aliased_python_algorithm"
+
+            def aliases(self):
+                """Return the primary name and test alias."""
+                return [self.name(), "python_algorithm_alias"]
+
+            def settings(self):
+                """Return the settings stub required during creation."""
+                return MagicMock()
+
         class ConflictingAlgorithm(AliasedAlgorithm):
-            """Python algorithm whose secondary alias is already registered."""
+            """Python algorithm claiming the registered alias."""
 
             def name(self):
                 """Return an otherwise-unused primary name."""
-                return "partially_registered_python_algorithm"
+                return "conflicting_python_algorithm"
 
             def aliases(self):
                 """Return a fresh primary name and an occupied alias."""
@@ -670,17 +713,12 @@ class TestRegistryRegisterUnregister:
 
         registry.register(AliasedAlgorithm)
         try:
-            assert registry.create("expectation_estimator", "python_algorithm_alias").name() == (
-                "aliased_python_algorithm"
-            )
-
             with pytest.raises(DuplicateRegistrationError, match="python_algorithm_alias"):
                 registry.register(ConflictingAlgorithm)
 
-            assert "partially_registered_python_algorithm" not in registry.available("expectation_estimator")
+            assert "conflicting_python_algorithm" not in registry.available("expectation_estimator")
         finally:
             registry.unregister("expectation_estimator", "aliased_python_algorithm")
-            registry.unregister("expectation_estimator", "python_algorithm_alias")
 
     def test_unregister_custom_algorithm(self):
         """Test unregistering a custom algorithm."""

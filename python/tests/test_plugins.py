@@ -17,9 +17,10 @@ import qdk_chemistry
 from qdk_chemistry import plugins
 from qdk_chemistry._core import DuplicateRegistrationError as CoreDuplicateRegistrationError
 from qdk_chemistry.algorithms import ScfSolver, registry
-from qdk_chemistry.data import DataClass, register_dataclass
+from qdk_chemistry.data import DataClass, Structure, register_dataclass
 from qdk_chemistry.data import registry as dataclass_registry
 from qdk_chemistry.plugins import ChemistryPlugin, DuplicateRegistrationError, PluginRegistrar, QdkChemistryPlugin
+from qdk_chemistry.remote.cache import FolderCache
 
 _BUNDLED_PLUGIN_AUTOLOAD_CASES = (
     ("pyscf", "QDK_CHEMISTRY_DISABLE_PYSCF_AUTOLOAD"),
@@ -283,6 +284,40 @@ def test_unified_plugin_entry_points_load_independently(monkeypatch):
 
     assert len(loaded) == 1
     assert isinstance(loaded[0], PluginRegistrar)
+
+
+def test_failed_plugin_registration_does_not_latch_filtered_dataclass_discovery(monkeypatch, tmp_path):
+    """A plugin failure after validation does not prevent cache loader discovery."""
+
+    class FailingPlugin(QdkChemistryPlugin):
+        """Plugin whose algorithm construction fails after DataClass validation."""
+
+        def register(self, registrar):
+            """Validate Structure before reproducing an algorithm registration failure."""
+
+            def fail_algorithm():
+                raise RuntimeError("algorithm registration failed")
+
+            registrar.register_algorithm(fail_algorithm, data_classes=[Structure])
+
+    def find_entry_points(*, group):
+        assert group == "qdk_chemistry.plugins"
+        return [_EntryPoint("failed", FailingPlugin)]
+
+    monkeypatch.setattr(dataclass_registry, "_DATACLASS_REGISTRY", {})
+    monkeypatch.setattr(dataclass_registry, "_DISCOVERY_COMPLETE", False)
+    monkeypatch.setattr("importlib.metadata.entry_points", find_entry_points)
+
+    with pytest.warns(UserWarning, match="plugin 'failed'.*algorithm registration failed"):
+        plugins._load_plugins()
+
+    cache = FolderCache(tmp_path)
+    structure = Structure([[0.0, 0.0, 0.0]], [1])
+    cache.put_data("c7fa6171bf37a03c", structure)
+
+    loaded = cache.get_data("c7fa6171bf37a03c")
+    assert isinstance(loaded, Structure)
+    assert loaded.get_num_atoms() == 1
 
 
 def test_unified_plugins_load_before_bundled_integrations(monkeypatch):
