@@ -44,7 +44,12 @@ struct CubeGrid {
 // contributes three components in x, y, z order regardless of the basis set's
 // AOType. Only shells with angular momentum above p honour AOType, matching the
 // convention used elsewhere in qdk-chemistry. Component ordering for those
-// higher shells follows gauXC's convention.
+// higher shells follows gauXC's convention, which for spherical shells is the
+// same ordering PySCF uses. This whole convention, ordering and normalisation
+// together, is pinned by a test that reproduces PySCF's own atomic orbital
+// evaluation to machine precision for a basis containing d functions; see
+// `test_matches_pyscf_atomic_orbital_evaluation` in
+// `python/tests/test_utils_cube_generator.py`.
 //
 // Effective core potentials: basis sets carrying an ECP are fully supported.
 // The ECP is an operator in the Hamiltonian, so it influences the SCF
