@@ -177,7 +177,7 @@ namespace QDKChemistry.Utils.StatePreparation {
         embeddingMap : Int[],
         expansionOps : MatrixCompressionOp[],
         qs : Qubit[],
-    ) : Unit {
+    ) : Unit is Adj + Ctl {
         StatePreparation(denseParams, Subarray(embeddingMap, qs));
         ApplyExpansion(expansionOps, qs);
     }
@@ -187,7 +187,7 @@ namespace QDKChemistry.Utils.StatePreparation {
         denseParams : StatePreparationParams,
         embeddingMap : Int[],
         expansionOps : MatrixCompressionOp[],
-    ) : Qubit[] => Unit {
+    ) : Qubit[] => Unit is Adj + Ctl {
         ComposeSparseIsometry(denseParams, embeddingMap, expansionOps, _)
     }
 

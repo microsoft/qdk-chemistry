@@ -65,6 +65,7 @@ def _is_qsharp_dense_factory(factory: QsharpFactoryData | None) -> bool:
     """Return whether a factory uses the built-in Q# dense state preparation."""
     return factory is not None and factory.program is QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit
 
+
 # Pre-rename settings, kept working via translation onto the nested dense preparation algorithm.
 _DEPRECATED_DENSE_METHODS = {"qdk": "dense_pure_state", "qiskit": "qiskit_regular_isometry"}
 _DEPRECATED_TRANSPILE_KEYS = ("basis_gates", "transpile", "transpile_optimization_level")
@@ -197,8 +198,8 @@ class SparseIsometryStatePreparation(StatePreparation):
         A sparse isometry circuit loads the amplitudes densely on a reduced qubit subset and
         then applies the isometry gates (binary encoding and/or GF(2) expansion) that map the
         reduced state back onto the full register. This method returns the dense stage alone,
-        embedded in the same full-width register that :meth:`run` uses, so the isometry cost
-        can be obtained by subtracting the two resource estimates.
+        embedded in the same full-width register that `StatePreparation.run` uses, so the
+        isometry cost can be obtained by subtracting the two resource estimates.
 
         Args:
             wavefunction: The target wavefunction to prepare.

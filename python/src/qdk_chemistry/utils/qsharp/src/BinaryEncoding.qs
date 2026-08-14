@@ -316,6 +316,10 @@ namespace QDKChemistry.Utils.BinaryEncoding {
     /// The dense preparation is taken as *parameters* rather than as a callable: a callable
     /// that captures another callable cannot be resolved statically by the adaptive-profile
     /// code generator, which makes the composition unusable as a QPE `statePrep` argument.
+    ///
+    /// Unlike `StatePreparation.ComposeSparseIsometry`, this is deliberately *not* `Adj`:
+    /// the binary-encoding sequence may contain SELECT/SELECT_AND, which borrow ancilla and
+    /// uncompute by measurement, so no adjoint can be generated.
     operation ComposeBinaryEncoding(
         denseParams : StatePreparationParams,
         embeddingMap : Int[],

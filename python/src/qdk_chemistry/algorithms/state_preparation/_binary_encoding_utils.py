@@ -23,7 +23,10 @@ __all__ = [
 
 
 class MatrixCompressionType(CaseInsensitiveStrEnum):
-    """Supported operation types for matrix compression."""
+    """Supported operation types for matrix compression.
+
+    Declaration order is the wire contract: ``BinaryEncoding.qs`` identifies these as 0 through 6.
+    """
 
     X = "X"
     CX = "CX"
@@ -33,16 +36,10 @@ class MatrixCompressionType(CaseInsensitiveStrEnum):
     SELECT = "SELECT"
     SELECT_AND = "SELECT_AND"
 
-
-_QSHARP_OPERATION_CODES = {
-    MatrixCompressionType.X: 0,
-    MatrixCompressionType.CX: 1,
-    MatrixCompressionType.SWAP: 2,
-    MatrixCompressionType.CCX: 3,
-    MatrixCompressionType.MCX: 4,
-    MatrixCompressionType.SELECT: 5,
-    MatrixCompressionType.SELECT_AND: 6,
-}
+    @property
+    def qsharp_code(self) -> int:
+        """Integer ``kind`` discriminator expected by the Q# ``MatrixCompressionOp`` struct."""
+        return list(type(self)).index(self)
 
 
 @dataclass
@@ -73,7 +70,7 @@ class MatrixCompressionOp:
 
         """
         return {
-            "kind": _QSHARP_OPERATION_CODES[self.name],
+            "kind": self.name.qsharp_code,
             "qubits": self.qubits,
             "controlState": self.control_state,
             "lookupData": self.lookup_data,
@@ -87,7 +84,7 @@ class MatrixCompressionOp:
 
         """
         return QSHARP_UTILS.BinaryEncoding.MatrixCompressionOp(
-            kind=_QSHARP_OPERATION_CODES[self.name],
+            kind=self.name.qsharp_code,
             qubits=self.qubits,
             controlState=self.control_state,
             lookupData=self.lookup_data,

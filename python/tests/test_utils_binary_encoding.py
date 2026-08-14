@@ -778,3 +778,37 @@ class TestLookupSelect:
         table = {(1,): (1,)}
         ops = _BinaryEncodingSynthesizer._lookup_select(table, [0], [1], use_measurement_and=True)
         assert ops[0][0] == MatrixCompressionType.SELECT_AND
+
+
+class TestControlStateEndianness:
+    """The Qiskit conversion must honour the little-endian control-state bitmask.
+
+    Q# ``ControlStateBits`` maps bit ``i`` of ``controlState`` onto the ``i``-th control
+    qubit, and Qiskit's ``ctrl_state`` integer uses the same significance, so the bitmask
+    is passed through unchanged. These tests pin that agreement down.
+    """
+
+    @pytest.mark.parametrize("control_state", [0, 1, 2, 3])
+    def test_mcx_fires_on_the_qsharp_control_pattern(self, control_state):
+        """An MCX triggers exactly on the pattern Q# would select for the same bitmask."""
+        from qiskit import QuantumCircuit  # noqa: PLC0415
+        from qiskit.quantum_info import Statevector  # noqa: PLC0415
+
+        from qdk_chemistry.plugins.qiskit.conversion import apply_matrix_compression_ops  # noqa: PLC0415
+
+        op = MatrixCompressionOp(MatrixCompressionType.MCX, [0, 1, 2], control_state=control_state)
+        for q0 in (0, 1):
+            for q1 in (0, 1):
+                circuit = QuantumCircuit(3)
+                if q0:
+                    circuit.x(0)
+                if q1:
+                    circuit.x(1)
+                apply_matrix_compression_ops(circuit, [op])
+                index = int(np.argmax(np.abs(Statevector.from_instruction(circuit).data)))
+                target = (index >> 2) & 1
+                # bit i of control_state must match control qubit i
+                expected = int(q0 == (control_state & 1) and q1 == ((control_state >> 1) & 1))
+                assert target == expected, (
+                    f"control_state={control_state} q0={q0} q1={q1}: target={target}, expected={expected}"
+                )
