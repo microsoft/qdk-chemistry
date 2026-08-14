@@ -29,6 +29,19 @@ struct CubeGrid {
   std::size_t num_points() const;
 };
 
+// Evaluates molecular orbitals and densities on a `CubeGrid` and optionally
+// writes Gaussian cube files.
+//
+// Effective core potentials: basis sets carrying an ECP are fully supported.
+// The ECP is an operator in the Hamiltonian, so it influences the SCF
+// coefficients but never enters the evaluation of a basis function at a grid
+// point; the valence shells are ordinary contracted Gaussians that are
+// evaluated exactly. The consequence is one of interpretation rather than
+// accuracy: the resulting field is a *valence-only* quantity. Core density is
+// absent near ECP-carrying nuclei, the nuclear cusp there is smoothed, and a
+// density cube integrates to the valence electron count rather than the total.
+// This matches the behaviour of PySCF's cubegen. When the basis reports ECP
+// electrons, the generated cube files record this in their comment line.
 class CubeGenerator {
  public:
   explicit CubeGenerator(std::shared_ptr<data::BasisSet> basis_set);

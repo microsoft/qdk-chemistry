@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -54,6 +55,30 @@ std::shared_ptr<BasisSet> make_hydrogen_p_basis() {
   shells.emplace_back(0, OrbitalType::P, std::vector<double>{1.0},
                       std::vector<double>{1.0});
   return std::make_shared<BasisSet>("test-p", shells, structure);
+}
+
+std::shared_ptr<BasisSet> make_ecp_basis(std::size_t core_electrons = 2) {
+  auto structure =
+      std::make_shared<Structure>(std::vector<Eigen::Vector3d>{{0.0, 0.0, 0.0}},
+                                  std::vector<Element>{Element::H});
+  // Valence shell: an ordinary contracted Gaussian, exactly as an ECP basis
+  // stores it. The r^n projectors live in the separate ECP shell container.
+  std::vector<Shell> shells;
+  shells.emplace_back(0, OrbitalType::S, std::vector<double>{1.0},
+                      std::vector<double>{1.0});
+  std::vector<Shell> ecp_shells;
+  ecp_shells.emplace_back(0, OrbitalType::S, std::vector<double>{10.0},
+                          std::vector<double>{50.0}, std::vector<int>{2});
+  const std::vector<std::size_t> ecp_electrons{core_electrons};
+  return std::make_shared<BasisSet>("test-ecp", shells, "test-ecp-potential",
+                                    ecp_shells, ecp_electrons, structure);
+}
+
+std::string first_line_of(const std::filesystem::path& path) {
+  std::ifstream stream(path);
+  std::string line;
+  std::getline(stream, line);
+  return line;
 }
 
 std::shared_ptr<Wavefunction> make_wavefunction(
@@ -140,6 +165,27 @@ TEST(CubeGeneratorTest, EvaluatesHydrogenOrbitalAndDensity) {
   EXPECT_NEAR(density[0], orbital[0] * orbital[0], 1e-12);
 }
 
+TEST(CubeGeneratorTest, EvaluatesHydrogenOrbitalFromNamedBasis) {
+  auto structure =
+      std::make_shared<Structure>(std::vector<Eigen::Vector3d>{{0.0, 0.0, 0.0}},
+                                  std::vector<Element>{Element::H});
+  const auto basis = BasisSet::from_basis_name("sto-3g", structure);
+  ASSERT_EQ(basis->get_num_atomic_orbitals(), 1u);
+
+  const auto shells = basis->get_shells_for_atom(0);
+  ASSERT_FALSE(shells.empty());
+  ASSERT_TRUE(shells.front().has_radial_powers());
+  EXPECT_TRUE((shells.front().rpowers.array() == 0).all());
+
+  CubeGenerator generator(basis);
+  Eigen::VectorXd coefficients(1);
+  coefficients << 1.0;
+  const auto orbital = generator.orbital(coefficients, "", single_point_grid());
+
+  ASSERT_EQ(orbital.size(), 1);
+  EXPECT_GT(orbital[0], 0.0);
+}
+
 TEST(CubeGeneratorTest, EvaluatesNormalizedHydrogenPOrbitals) {
   CubeGenerator generator(make_hydrogen_p_basis());
   CubeGrid grid;
@@ -188,6 +234,74 @@ TEST(CubeGeneratorTest, RejectsUnsupportedShells) {
   auto radial_basis = std::make_shared<BasisSet>("radial", shells, structure);
   EXPECT_THROW(
       { CubeGenerator generator(radial_basis); }, std::invalid_argument);
+}
+
+TEST(CubeGeneratorTest, AcceptsExplicitZeroRadialPowers) {
+  auto structure =
+      std::make_shared<Structure>(std::vector<Eigen::Vector3d>{{0.0, 0.0, 0.0}},
+                                  std::vector<Element>{Element::H});
+  std::vector<Shell> shells;
+  shells.emplace_back(0, OrbitalType::S, std::vector<double>{1.0},
+                      std::vector<double>{1.0}, std::vector<int>{0});
+  auto basis = std::make_shared<BasisSet>("zero-radial", shells, structure);
+
+  EXPECT_NO_THROW({ CubeGenerator generator(basis); });
+}
+
+TEST(CubeGeneratorTest, EvaluatesEcpBasisIgnoringProjectorShells) {
+  // The r^2 projector lives in the ECP shell container, which the generator
+  // does not traverse; only the valence Gaussians reach gauXC.
+  CubeGenerator generator(make_ecp_basis());
+  Eigen::VectorXd coefficients(1);
+  coefficients << 1.0;
+
+  const auto orbital = generator.orbital(coefficients, "", single_point_grid());
+
+  ASSERT_EQ(orbital.size(), 1);
+  EXPECT_NEAR(orbital[0], std::pow(2.0 / std::acos(-1.0), 0.75), 1e-12);
+}
+
+TEST(CubeGeneratorTest, EcpCubeCommentRecordsValenceOnlyField) {
+  CubeGenerator generator(make_ecp_basis(28));
+  Eigen::VectorXd coefficients(1);
+  coefficients << 1.0;
+  const auto output =
+      std::filesystem::temp_directory_path() / "qdk_ecp_orbital.cube";
+
+  generator.orbital(coefficients, output.string(), single_point_grid());
+
+  const std::string comment = first_line_of(output);
+  EXPECT_NE(comment.find("valence-only"), std::string::npos) << comment;
+  EXPECT_NE(comment.find("28 core electrons"), std::string::npos) << comment;
+  std::filesystem::remove(output);
+}
+
+TEST(CubeGeneratorTest, EcpAnnotationPreservesCallerComment) {
+  CubeGenerator generator(make_ecp_basis(28));
+  Eigen::VectorXd coefficients(1);
+  coefficients << 1.0;
+  const auto output =
+      std::filesystem::temp_directory_path() / "qdk_ecp_annotated.cube";
+
+  generator.orbital(coefficients, output.string(), single_point_grid(), "HOMO");
+
+  const std::string comment = first_line_of(output);
+  EXPECT_EQ(comment.rfind("HOMO", 0), 0u) << comment;
+  EXPECT_NE(comment.find("valence-only"), std::string::npos) << comment;
+  std::filesystem::remove(output);
+}
+
+TEST(CubeGeneratorTest, NonEcpCubeCommentIsUnchanged) {
+  CubeGenerator generator(make_hydrogen_basis());
+  Eigen::VectorXd coefficients(1);
+  coefficients << 1.0;
+  const auto output =
+      std::filesystem::temp_directory_path() / "qdk_plain_orbital.cube";
+
+  generator.orbital(coefficients, output.string(), single_point_grid(), "HOMO");
+
+  EXPECT_EQ(first_line_of(output), "HOMO");
+  std::filesystem::remove(output);
 }
 
 TEST(GenerateOrbitalCubesTest, RestrictedWritesSingleZeroBasedCube) {

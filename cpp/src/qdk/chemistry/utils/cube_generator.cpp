@@ -81,7 +81,9 @@ GauXC::BasisSet<double> to_gauxc_basis(const data::BasisSet& qdk) {
   for (std::size_t ia = 0; ia < qdk.get_num_atoms(); ++ia) {
     CA center{coords(ia, 0), coords(ia, 1), coords(ia, 2)};
     for (const auto& sh : qdk.get_shells_for_atom(ia)) {
-      if (sh.has_radial_powers())
+      // All-zero radial powers are plain r^0 Gaussians, which
+      // from_basis_name uses to represent ordinary electron shells.
+      if (sh.has_radial_powers() && (sh.rpowers.array() != 0).any())
         throw std::invalid_argument(
             "CubeGenerator: radial-power shells are unsupported.");
       const int l = sh.get_angular_momentum();
@@ -124,6 +126,20 @@ GauXC::CubeGrid to_gauxc_grid(const CubeGrid& g) {
           int64_t(g.nz)};
 }
 
+// Records ECP provenance in the cube comment so that a valence-only field is
+// self-describing once the file leaves this process. Fields evaluated from an
+// ECP basis omit core density by construction.
+std::string annotate_comment(const data::BasisSet& basis_set,
+                             const std::string& comment) {
+  if (!basis_set.has_ecp_electrons()) return comment;
+  std::size_t core_electrons = 0;
+  for (std::size_t n : basis_set.get_ecp_electrons()) core_electrons += n;
+  if (core_electrons == 0) return comment;
+  const std::string note = "valence-only: ECP replaces " +
+                           std::to_string(core_electrons) + " core electrons";
+  return comment.empty() ? note : comment + " [" + note + "]";
+}
+
 }  // namespace
 
 struct CubeGenerator::Impl {
@@ -158,7 +174,8 @@ CubeField CubeGenerator::orbital(const Eigen::VectorXd& C,
   CubeField field(g.num_points());
   _impl->evaluator.eval_orbital(g, C.data(), field.data());
   if (!outfile.empty())
-    GauXC::write_cube(outfile, _impl->gauxc_mol, g, field.data(), comment);
+    GauXC::write_cube(outfile, _impl->gauxc_mol, g, field.data(),
+                      annotate_comment(*_impl->basis_set, comment));
   return field;
 }
 
@@ -172,7 +189,8 @@ CubeField CubeGenerator::density(const Eigen::MatrixXd& D,
   CubeField field(g.num_points());
   _impl->evaluator.eval_density(g, D.data(), _impl->nbf, field.data());
   if (!outfile.empty())
-    GauXC::write_cube(outfile, _impl->gauxc_mol, g, field.data(), comment);
+    GauXC::write_cube(outfile, _impl->gauxc_mol, g, field.data(),
+                      annotate_comment(*_impl->basis_set, comment));
   return field;
 }
 
