@@ -16,7 +16,7 @@ try:
 except ImportError:
     PYSCF_AVAILABLE = False
 
-from qdk_chemistry.data import Configuration, Orbitals, StateVectorContainer, Structure, Wavefunction
+from qdk_chemistry.data import Orbitals, Structure
 from qdk_chemistry.utils import CubeGenerator, CubeGrid, generate_orbital_cubes
 
 if PYSCF_AVAILABLE:
@@ -164,23 +164,20 @@ class TestGenerateOrbitalCubes:
     """Tests for the batch cube writer."""
 
     @staticmethod
-    def _h2_wavefunction():
-        """Build a minimal restricted H2 wavefunction and its basis set."""
+    def _h2_orbitals():
+        """Build minimal restricted H2 orbitals and their basis set."""
         coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
         structure = Structure(["H", "H"], coords)
         mol = gto.M(atom=[("H", coords[0]), ("H", coords[1])], basis="sto-3g", unit="Bohr")
         basis_set = pyscf_mol_to_qdk_basis(mol, structure, "sto-3g")
         nao = mol.nao_nr()
-        orbitals = Orbitals(np.eye(nao), None, None, basis_set)
-        determinant = Configuration.from_spin_half_string("2" + "0" * (nao - 1))
-        container = StateVectorContainer(np.array([1.0]), [determinant], orbitals, "electrons")
-        return Wavefunction(container), basis_set
+        return Orbitals(np.eye(nao), None, None, basis_set), basis_set
 
-    def test_writes_zero_based_names_for_restricted_wavefunction(self, tmp_path):
-        """Restricted wavefunctions get one zero-based cube per orbital."""
-        wavefunction, basis_set = self._h2_wavefunction()
+    def test_writes_zero_based_names_for_restricted_orbitals(self, tmp_path):
+        """Restricted orbitals get one zero-based cube per orbital."""
+        orbitals, basis_set = self._h2_orbitals()
         grid = CubeGrid.from_basis_set(basis_set, 8, 8, 8, 3.0)
-        paths = generate_orbital_cubes(wavefunction, [0, 1], str(tmp_path), grid)
+        paths = generate_orbital_cubes(orbitals, [0, 1], str(tmp_path), grid)
         assert [p.rsplit("/", 1)[-1] for p in paths] == [
             "orbital_0000.cube",
             "orbital_0001.cube",
@@ -189,7 +186,7 @@ class TestGenerateOrbitalCubes:
 
     def test_respects_label_prefix(self, tmp_path):
         """A custom prefix replaces the default orbital label."""
-        wavefunction, basis_set = self._h2_wavefunction()
+        orbitals, basis_set = self._h2_orbitals()
         grid = CubeGrid.from_basis_set(basis_set, 8, 8, 8, 3.0)
-        paths = generate_orbital_cubes(wavefunction, [0], str(tmp_path), grid, "mo_")
+        paths = generate_orbital_cubes(orbitals, [0], str(tmp_path), grid, "mo_")
         assert paths[0].endswith("mo_0000.cube")

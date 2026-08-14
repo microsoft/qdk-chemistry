@@ -9,7 +9,7 @@
 
 #include <memory>
 #include <qdk/chemistry/data/basis_set.hpp>
-#include <qdk/chemistry/data/wavefunction.hpp>
+#include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/utils/cube_generator.hpp>
 #include <string>
 #include <utility>
@@ -18,7 +18,7 @@
 namespace py = pybind11;
 
 using qdk::chemistry::data::BasisSet;
-using qdk::chemistry::data::Wavefunction;
+using qdk::chemistry::data::Orbitals;
 using qdk::chemistry::utils::CubeField;
 using qdk::chemistry::utils::CubeGenerator;
 using qdk::chemistry::utils::CubeGrid;
@@ -195,13 +195,12 @@ Write one cube file per requested orbital.
 
 Orbital indices are zero-based, matching the numbering used throughout
 qdk-chemistry, and the emitted file names embed that same zero-based index as
-``<label_prefix>%04d``. Restricted wavefunctions produce a single spatial cube
-per index with no spin suffix. Unrestricted wavefunctions produce an ``_a`` and
-a ``_b`` cube per index.
+``<label_prefix>%04d``. Restricted orbitals produce a single spatial cube per
+index with no spin suffix. Unrestricted orbitals produce an ``_a`` and a ``_b``
+cube per index.
 
 Args:
-    wavefunction: Wavefunction supplying the basis set and orbital
-        coefficients.
+    orbitals: Orbitals supplying the basis set and coefficients.
     indices: Zero-based orbital indices to write.
     output_dir: Existing directory to write the cube files into.
     grid: Grid to evaluate on.
@@ -211,9 +210,9 @@ Returns:
     list[str]: Paths of the cube files written, in the order written.
 
 Examples:
-    >>> paths = generate_orbital_cubes(wavefunction, [0, 1], "cubes", grid)
+    >>> paths = generate_orbital_cubes(orbitals, [0, 1], "cubes", grid)
 )",
-        py::arg("wavefunction"), py::arg("indices"), py::arg("output_dir"),
+        py::arg("orbitals"), py::arg("indices"), py::arg("output_dir"),
         py::arg("grid"), py::arg("label_prefix") = "orbital_",
         py::call_guard<py::gil_scoped_release>());
 }

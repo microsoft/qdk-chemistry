@@ -14,11 +14,9 @@
 #include <optional>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
-#include <qdk/chemistry/data/configuration.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/cube_generator.hpp>
 #include <stdexcept>
 #include <vector>
@@ -29,14 +27,11 @@ namespace {
 
 using qdk::chemistry::algorithms::ScfSolverFactory;
 using qdk::chemistry::data::BasisSet;
-using qdk::chemistry::data::Configuration;
 using qdk::chemistry::data::Element;
 using qdk::chemistry::data::Orbitals;
 using qdk::chemistry::data::OrbitalType;
 using qdk::chemistry::data::Shell;
-using qdk::chemistry::data::StateVectorContainer;
 using qdk::chemistry::data::Structure;
-using qdk::chemistry::data::Wavefunction;
 using qdk::chemistry::utils::CubeGenerator;
 using qdk::chemistry::utils::CubeGrid;
 using qdk::chemistry::utils::generate_orbital_cubes;
@@ -86,29 +81,21 @@ std::string first_line_of(const std::filesystem::path& path) {
   return line;
 }
 
-std::shared_ptr<Wavefunction> make_wavefunction(
-    std::shared_ptr<Orbitals> orbitals) {
-  return std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
-      Configuration::from_spin_half_string("2"), std::move(orbitals)));
-}
-
-std::shared_ptr<Wavefunction> make_restricted_wavefunction() {
+std::shared_ptr<Orbitals> make_restricted_orbitals() {
   Eigen::MatrixXd coefficients(1, 1);
   coefficients << 1.0;
-  auto orbitals = std::make_shared<Orbitals>(
-      coefficients, std::nullopt, std::nullopt, make_hydrogen_basis());
-  return make_wavefunction(orbitals);
+  return std::make_shared<Orbitals>(coefficients, std::nullopt, std::nullopt,
+                                    make_hydrogen_basis());
 }
 
-std::shared_ptr<Wavefunction> make_unrestricted_wavefunction() {
+std::shared_ptr<Orbitals> make_unrestricted_orbitals() {
   Eigen::MatrixXd coefficients_alpha(1, 1);
   coefficients_alpha << 1.0;
   Eigen::MatrixXd coefficients_beta(1, 1);
   coefficients_beta << 2.0;
-  auto orbitals = std::make_shared<Orbitals>(
-      coefficients_alpha, coefficients_beta, std::nullopt, std::nullopt,
-      std::nullopt, make_hydrogen_basis());
-  return make_wavefunction(orbitals);
+  return std::make_shared<Orbitals>(coefficients_alpha, coefficients_beta,
+                                    std::nullopt, std::nullopt, std::nullopt,
+                                    make_hydrogen_basis());
 }
 
 CubeGrid single_point_grid() {
@@ -363,13 +350,13 @@ TEST(CubeGeneratorTest, NonEcpCubeCommentIsUnchanged) {
 }
 
 TEST(GenerateOrbitalCubesTest, RestrictedWritesSingleZeroBasedCube) {
-  const auto wavefunction = make_restricted_wavefunction();
+  const auto orbitals = make_restricted_orbitals();
   const auto output_dir =
       std::filesystem::temp_directory_path() / "qdk_cube_restricted_test";
   std::filesystem::remove_all(output_dir);
 
-  const auto paths = generate_orbital_cubes(
-      *wavefunction, {0}, output_dir.string(), single_point_grid());
+  const auto paths = generate_orbital_cubes(*orbitals, {0}, output_dir.string(),
+                                            single_point_grid());
 
   ASSERT_EQ(paths.size(), 1u);
   // Zero-based label (index 0 -> 0000), and no spin suffix for restricted.
@@ -382,15 +369,15 @@ TEST(GenerateOrbitalCubesTest, RestrictedWritesSingleZeroBasedCube) {
 }
 
 TEST(GenerateOrbitalCubesTest, UnrestrictedWritesAlphaAndBetaCubes) {
-  const auto wavefunction = make_unrestricted_wavefunction();
-  ASSERT_FALSE(wavefunction->get_orbitals()->is_restricted());
+  const auto orbitals = make_unrestricted_orbitals();
+  ASSERT_FALSE(orbitals->is_restricted());
 
   const auto output_dir =
       std::filesystem::temp_directory_path() / "qdk_cube_unrestricted_test";
   std::filesystem::remove_all(output_dir);
 
-  const auto paths = generate_orbital_cubes(
-      *wavefunction, {0}, output_dir.string(), single_point_grid());
+  const auto paths = generate_orbital_cubes(*orbitals, {0}, output_dir.string(),
+                                            single_point_grid());
 
   ASSERT_EQ(paths.size(), 2u);
   EXPECT_EQ(std::filesystem::path(paths[0]).filename().string(),
@@ -406,12 +393,12 @@ TEST(GenerateOrbitalCubesTest, UnrestrictedWritesAlphaAndBetaCubes) {
 }
 
 TEST(GenerateOrbitalCubesTest, RejectsOutOfRangeIndex) {
-  const auto wavefunction = make_restricted_wavefunction();
+  const auto orbitals = make_restricted_orbitals();
   const auto output_dir =
       std::filesystem::temp_directory_path() / "qdk_cube_oob_test";
   std::filesystem::remove_all(output_dir);
 
-  EXPECT_THROW(generate_orbital_cubes(*wavefunction, {1}, output_dir.string(),
+  EXPECT_THROW(generate_orbital_cubes(*orbitals, {1}, output_dir.string(),
                                       single_point_grid()),
                std::out_of_range);
 

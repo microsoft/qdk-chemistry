@@ -11,7 +11,7 @@
 
 namespace qdk::chemistry::data {
 class BasisSet;
-class Wavefunction;
+class Orbitals;
 }  // namespace qdk::chemistry::data
 
 namespace qdk::chemistry::utils {
@@ -206,10 +206,10 @@ class CubeGenerator {
  * Orbital `indices` are zero-based, matching the numbering used throughout
  * qdk-chemistry, and the emitted file names embed that same zero-based index
  * (`<label_prefix>%04zu`). For restricted wavefunctions a single spatial cube
- * is written per index, with no spin suffix; for unrestricted wavefunctions
- * the alpha and beta channels are written as `_a` and `_b` cubes.
+ * is written per index, with no spin suffix; for unrestricted orbitals the
+ * alpha and beta channels are written as `_a` and `_b` cubes.
  *
- * @param wavefunction Wavefunction supplying the orbitals and their basis set
+ * @param orbitals Orbitals supplying the coefficients and their basis set
  * @param indices Zero-based orbital indices to write
  * @param output_dir Directory to write into. Created if it does not exist.
  * @param grid Grid on which to sample each orbital
@@ -221,8 +221,8 @@ class CubeGenerator {
  * @throws std::out_of_range if any index is beyond the available orbitals
  */
 std::vector<std::string> generate_orbital_cubes(
-    const data::Wavefunction& wavefunction,
-    const std::vector<std::size_t>& indices, const std::string& output_dir,
-    const CubeGrid& grid, const std::string& label_prefix = "orbital_");
+    const data::Orbitals& orbitals, const std::vector<std::size_t>& indices,
+    const std::string& output_dir, const CubeGrid& grid,
+    const std::string& label_prefix = "orbital_");
 
 }  // namespace qdk::chemistry::utils

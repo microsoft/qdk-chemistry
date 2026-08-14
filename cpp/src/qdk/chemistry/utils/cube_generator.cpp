@@ -12,8 +12,8 @@
 #include <gauxc/shell.hpp>
 #include <limits>
 #include <qdk/chemistry/data/basis_set.hpp>
+#include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
-#include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/utils/cube_generator.hpp>
 #include <stdexcept>
 
@@ -201,14 +201,13 @@ CubeField CubeGenerator::density(const Eigen::MatrixXd& D,
 }
 
 std::vector<std::string> generate_orbital_cubes(
-    const data::Wavefunction& wfn, const std::vector<std::size_t>& indices,
+    const data::Orbitals& orbitals, const std::vector<std::size_t>& indices,
     const std::string& output_dir, const CubeGrid& grid,
     const std::string& prefix) {
-  const auto orbitals = wfn.get_orbitals();
-  CubeGenerator gen(orbitals->get_basis_set());
-  const auto coeffs = orbitals->coefficients();
+  CubeGenerator gen(orbitals.get_basis_set());
+  const auto coeffs = orbitals.coefficients();
   const auto& C_a = coeffs->block({data::axes::alpha(), data::axes::alpha()});
-  const bool restricted = orbitals->is_restricted();
+  const bool restricted = orbitals.is_restricted();
   std::filesystem::create_directories(output_dir);
 
   // Zero-based orbital numbering, consistent with the 0-based `indices`
