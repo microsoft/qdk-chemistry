@@ -51,10 +51,16 @@ CubeGrid CubeGrid::from_basis_set(const data::BasisSet& basis_set,
 std::size_t CubeGrid::num_points() const {
   if (nx == 0 || ny == 0 || nz == 0)
     throw std::invalid_argument("CubeGrid: dimensions must be positive.");
+  // gauXC hands the point count to BLAS gemm as a leading dimension, and that
+  // parameter is a plain int, so INT_MAX points is a hard backend limit rather
+  // than a choice. Checking it here keeps the rejection ahead of the caller's
+  // allocation, which would otherwise reserve eight bytes per point for a grid
+  // that gauXC was always going to refuse.
   constexpr auto max =
-      static_cast<std::size_t>(std::numeric_limits<int64_t>::max());
+      static_cast<std::size_t>(std::numeric_limits<int>::max());
   if (nx > max / ny || nx * ny > max / nz)
-    throw std::overflow_error("CubeGrid: point count exceeds gauXC's limit.");
+    throw std::overflow_error(
+        "CubeGrid: point count exceeds gauXC's limit of 2147483647 points.");
   return nx * ny * nz;
 }
 

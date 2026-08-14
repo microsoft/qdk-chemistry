@@ -144,6 +144,34 @@ TEST(CubeGridTest, RejectsInvalidDimensionsAndOverflow) {
   }
 }
 
+TEST(CubeGridTest, BoundsPointCountByBackendIntLimit) {
+  // gauXC forwards the point count to BLAS as an int leading dimension, so
+  // INT_MAX is admissible and anything beyond it must be refused before the
+  // caller allocates a field of that size.
+  constexpr auto limit =
+      static_cast<std::size_t>(std::numeric_limits<int>::max());
+
+  CubeGrid grid;
+  grid.nx = limit;
+  grid.ny = 1;
+  grid.nz = 1;
+  EXPECT_EQ(grid.num_points(), limit);
+
+  grid.nz = 2;
+  EXPECT_THROW(grid.num_points(), std::overflow_error);
+
+  grid.nx = limit + 1;
+  grid.nz = 1;
+  EXPECT_THROW(grid.num_points(), std::overflow_error);
+
+  // A grid that fits in int64_t but not in int was previously accepted and
+  // only failed after allocation inside gauXC.
+  grid.nx = 4000;
+  grid.ny = 4000;
+  grid.nz = 4000;
+  EXPECT_THROW(grid.num_points(), std::overflow_error);
+}
+
 TEST(CubeGeneratorTest, EvaluatesHydrogenOrbitalAndDensity) {
   CubeGenerator generator(make_hydrogen_basis());
   CubeGrid grid;
