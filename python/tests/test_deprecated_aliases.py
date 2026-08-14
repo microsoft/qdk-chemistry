@@ -197,3 +197,50 @@ class TestSparseIsometryGF2XDeprecation:
         with warnings.catch_warnings():
             warnings.simplefilter("error", DeprecationWarning)
             assert algorithms.create("state_prep", "sparse_isometry").name() == "sparse_isometry"
+
+
+class TestSparseIsometryDeprecatedSettings:
+    """Translation of the pre-rename settings onto the nested ``dense_state_prep`` algorithm."""
+
+    @pytest.mark.parametrize(
+        ("method", "expected"),
+        [("qdk", "dense_pure_state"), ("qiskit", "qiskit_regular_isometry")],
+    )
+    def test_dense_preparation_method_maps_to_nested_algorithm(self, method, expected):
+        """``dense_preparation_method`` selects the nested dense algorithm instead of raising."""
+        with pytest.warns(DeprecationWarning, match="dense_preparation_method"):
+            prep = algorithms.create("state_prep", "sparse_isometry", dense_preparation_method=method)
+        assert prep.settings().get("dense_state_prep").algorithm_name == expected
+
+    def test_transpile_keys_are_forwarded_to_qiskit_dense_prep(self):
+        """The old transpilation keys land on the nested Qiskit algorithm."""
+        with pytest.warns(DeprecationWarning, match="basis_gates"):
+            prep = algorithms.create(
+                "state_prep",
+                "sparse_isometry",
+                dense_preparation_method="qiskit",
+                transpile=False,
+                basis_gates=["h", "cx"],
+            )
+        dense = prep._create_nested("dense_state_prep")
+        assert dense.name() == "qiskit_regular_isometry"
+        assert dense.settings().get("transpile") is False
+        assert list(dense.settings().get("basis_gates")) == ["h", "cx"]
+
+    def test_transpile_key_alone_keeps_default_dense_prep(self):
+        """Transpilation keys without ``dense_preparation_method`` keep the default nested algorithm."""
+        with pytest.warns(DeprecationWarning, match="transpile"):
+            prep = algorithms.create("state_prep", "sparse_isometry", transpile=False)
+        assert prep.settings().get("dense_state_prep").algorithm_name == "dense_pure_state"
+
+    def test_unknown_dense_preparation_method_raises_value_error(self):
+        """An invalid value reports the real problem rather than an algorithm-lookup failure."""
+        with pytest.raises(ValueError, match="Unknown dense_preparation_method"):
+            algorithms.create("state_prep", "sparse_isometry", dense_preparation_method="bogus")
+
+    def test_current_settings_do_not_warn(self):
+        """Configuring the nested algorithm the new way must stay warning-free."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            prep = algorithms.create("state_prep", "sparse_isometry", binary_encoding=True)
+        assert prep.settings().get("binary_encoding") is True

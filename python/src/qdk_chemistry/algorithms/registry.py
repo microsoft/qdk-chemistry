@@ -344,8 +344,6 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
         if factory.algorithm_type_name() == algorithm_type:
             try:
                 instance = factory.create(algorithm_name)
-                instance.settings().update(kwargs or {})
-                return _AlgorithmWrapper(instance)
             except (KeyError, RuntimeError, ValueError) as e:
                 available_algorithms = factory.available()
                 if not available_algorithms:
@@ -360,6 +358,9 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
                     "Please ensure the relevant plugins are loaded or custom algorithms are registered "
                     "ahead of calling create()."
                 ) from e
+            # Settings failures are configuration errors, not lookup failures, so they propagate as-is.
+            instance.settings().update(kwargs or {})
+            return _AlgorithmWrapper(instance)
     available_types = [factory.algorithm_type_name() for factory in __factories]
     raise KeyError(
         f"Algorithm type '{algorithm_type}' is not registered. Available algorithm types: {', '.join(available_types)}."

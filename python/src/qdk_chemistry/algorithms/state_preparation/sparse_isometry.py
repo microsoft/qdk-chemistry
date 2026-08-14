@@ -34,6 +34,7 @@ Algorithm Details:
 # --------------------------------------------------------------------------------------------
 
 import math
+import warnings
 from dataclasses import dataclass
 
 import numpy as np
@@ -63,6 +64,10 @@ __all__: list[str] = ["SparseIsometryStatePreparationSettings"]
 def _is_qsharp_dense_factory(factory: QsharpFactoryData | None) -> bool:
     """Return whether a factory uses the built-in Q# dense state preparation."""
     return factory is not None and factory.program is QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit
+
+# Pre-rename settings, kept working via translation onto the nested dense preparation algorithm.
+_DEPRECATED_DENSE_METHODS = {"qdk": "dense_pure_state", "qiskit": "qiskit_regular_isometry"}
+_DEPRECATED_TRANSPILE_KEYS = ("basis_gates", "transpile", "transpile_optimization_level")
 
 
 class SparseIsometryStatePreparationSettings(Settings):
@@ -95,6 +100,51 @@ class SparseIsometryStatePreparationSettings(Settings):
             False,
             "Use measurement-based AND uncomputation in PUI blocks.",
         )
+
+    def update(self, values: dict) -> None:
+        """Apply setting overrides, translating the deprecated pre-rename keys.
+
+        ``dense_preparation_method`` and the transpilation keys used to live on this algorithm.
+        They now belong to the nested algorithm selected by ``dense_state_prep``, so they are
+        folded into that reference instead of being rejected as unknown settings.
+
+        Args:
+            values (dict): Setting overrides, possibly containing deprecated keys.
+
+        Raises:
+            ValueError: If ``dense_preparation_method`` is not one of the supported values.
+
+        """
+        values = dict(values)
+        method = values.pop("dense_preparation_method", None)
+        transpile_overrides = {key: values.pop(key) for key in _DEPRECATED_TRANSPILE_KEYS if key in values}
+        if method is None and not transpile_overrides:
+            super().update(values)
+            return
+
+        deprecated = ([f"dense_preparation_method={method!r}"] if method is not None else []) + sorted(
+            transpile_overrides
+        )
+        if method is None:
+            algorithm_name = values.get("dense_state_prep", self.get("dense_state_prep")).algorithm_name
+        elif method in _DEPRECATED_DENSE_METHODS:
+            algorithm_name = _DEPRECATED_DENSE_METHODS[method]
+        else:
+            raise ValueError(
+                f"Unknown dense_preparation_method {method!r}; expected one of {sorted(_DEPRECATED_DENSE_METHODS)}."
+            )
+
+        # The transpilation keys were already inert on the Q# dense path before the rename.
+        forwarded = transpile_overrides if algorithm_name == "qiskit_regular_isometry" else {}
+        warnings.warn(
+            f"{', '.join(deprecated)} is deprecated and will be removed in a future release; "
+            f"configure the nested algorithm instead, e.g. "
+            f"dense_state_prep=AlgorithmRef('state_prep', '{algorithm_name}', ...).",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        values["dense_state_prep"] = AlgorithmRef("state_prep", algorithm_name, **forwarded)
+        super().update(values)
 
 
 class SparseIsometryStatePreparation(StatePreparation):
@@ -179,6 +229,12 @@ class SparseIsometryStatePreparation(StatePreparation):
         """
         dets = wavefunction.get_active_determinants()
         coeffs = np.asarray(wavefunction.get_coefficients())
+        # The Q# dense preparation takes Double[] amplitudes, so complex coefficients are only
+        # usable when their imaginary part vanishes.
+        if np.iscomplexobj(coeffs):
+            if not np.allclose(coeffs.imag, 0.0):
+                raise ValueError("Sparse isometry requires real coefficients (imaginary part must be zero).")
+            coeffs = coeffs.real
         config_set = wavefunction.get_configuration_set()
         n_bits = config_set.num_modes() * dets[0].bits_per_mode()
         state_vector = [det.to_bits(n_bits) for det in dets]
