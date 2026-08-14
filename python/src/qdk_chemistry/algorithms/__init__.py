@@ -21,8 +21,10 @@ from qdk_chemistry.algorithms.active_space_selector import (
     QdkOccupationActiveSpaceSelector,
     QdkValenceActiveSpaceSelector,
 )
-from qdk_chemistry.algorithms.amplitude_amplification.amplitude_amplification import AmplitudeAmplification
-from qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace import QPESubspaceMarking
+from qdk_chemistry.algorithms.amplitude_amplification import (
+    AmplitudeAmplification,
+    QPESubspaceMarking,
+)
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.controlled_circuit_mapper.base import ControlledCircuitMapper
 from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator, QdkMP2Calculator

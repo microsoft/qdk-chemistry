@@ -1,7 +1,7 @@
 """QDK/Chemistry amplitude amplification algorithms module.
 
-This module provides amplitude amplification and the subspace oracles that
-name the good subspace it amplifies.
+This module provides amplitude amplification and the good state oracles that
+name the subspace it amplifies.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -10,15 +10,21 @@ name the good subspace it amplifies.
 # --------------------------------------------------------------------------------------------
 
 from .amplitude_amplification import (
+    AmplitudeAmplification,
     AmplitudeAmplificationFactory,
     AmplitudeAmplificationSettings,
 )
 from .qpe_subspace import (
+    AmplitudeAmplificationOracleFactory,
+    QPESubspaceMarking,
     QPESubspaceMarkingSettings,
 )
 
 __all__: list[str] = [
+    "AmplitudeAmplification",
     "AmplitudeAmplificationFactory",
+    "AmplitudeAmplificationOracleFactory",
     "AmplitudeAmplificationSettings",
+    "QPESubspaceMarking",
     "QPESubspaceMarkingSettings",
 ]

@@ -115,26 +115,6 @@ class UnitaryContainer(DataClass):
         """
 
     @abstractmethod
-    def phases_from_eigenvalue(self, eigenvalue: float) -> list[float]:
-        r"""Recover every phase fraction a Hamiltonian eigenvalue is measured at.
-
-        The closed-form inverse of :meth:`eigenvalue_from_phase`, so that
-        ``eigenvalue_from_phase(phi) == eigenvalue`` for every ``phi`` returned.
-
-        Args:
-            eigenvalue: The Hamiltonian eigenvalue :math:`E`.
-
-        Returns:
-            list[float]: The phase fractions :math:`\varphi \in [0, 1)` QPE
-            measures the eigenvalue at, sorted ascending.  Never empty.
-
-        Raises:
-            ValueError: If the eigenvalue lies outside the range the encoding can
-                represent, so that no phase corresponds to it.
-
-        """
-
-    @abstractmethod
     def combine(self, other: "UnitaryContainer") -> "UnitaryContainer":
         """Combine this container with another to represent sequential application.
 

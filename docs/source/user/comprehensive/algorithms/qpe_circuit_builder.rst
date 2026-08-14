@@ -139,40 +139,6 @@ Constructs the textbook multi-ancilla QPE circuit with inverse Quantum Fourier T
    :start-after: start-cell-configure-standard
    :end-before: end-cell-configure-standard
 
-.. _qpe-subspace-marking:
-
-QPE Subspace Marking Circuit Builder
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. rubric:: Class: :class:`~qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.QPESubspaceMarking`
-
-.. rubric:: Factory name: ``"qdk_qpe_subspace"``
-
-Unlike the two implementations above, this one is not used for phase estimation.
-It runs a standard phase estimation on the register it is handed, flips a flag qubit
-when the phase lands in a bin whose energy is at least ``target_energy``, then undoes the phase
-estimation, leaving the register as it was found. The result is a *good state oracle* for
-:doc:`AmplitudeAmplification <amplitude_amplification>`, used to amplify an eigenspace.
-
-``run`` takes ``(state_preparation, qubit_hamiltonian)`` and
-returns a list of :class:`~qdk_chemistry.data.Circuit`, but the state preparation is ignored
-because the register it is applied to already holds the state to be amplified.
-
-**Additional settings:**
-
-.. list-table::
-   :header-rows: 1
-   :widths: 20 15 65
-
-   * - Setting
-     - Type
-     - Description
-   * - ``target_energy``
-     - float
-     - Lowest energy the marked subspace may hold. Must be finite. Default: ``nan`` (invalid; user must set).
-
-See :doc:`Amplitude amplification <amplitude_amplification>` for a worked example.
-
 Circuit Composition Details
 ----------------------------
 

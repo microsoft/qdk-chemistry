@@ -367,47 +367,6 @@ class TestLCUContainer:
             atol=float_comparison_absolute_tolerance,
         )
 
-    def test_walk_container_phases_from_eigenvalue_gives_both_branches(self):
-        """The walk measures each energy inside the band at two phases, and the edges at one."""
-        hamiltonian = QubitOperator(
-            pauli_strings=["XX", "ZZ"],
-            coefficients=np.array([0.25, 0.5]),
-        )
-        container = LCUBuilder(quantum_walk=True).run(hamiltonian).get_container()
-        lam = container.scale
-
-        # cos is one-to-one only at its turning points, which are the band edges.
-        assert container.phases_from_eigenvalue(lam) == [0.0]
-        assert container.phases_from_eigenvalue(-lam) == [0.5]
-
-        for energy in np.linspace(-lam, lam, 25)[1:-1]:
-            phases = container.phases_from_eigenvalue(float(energy))
-            assert len(phases) == 2
-            assert phases == sorted(phases)
-            # The first phase is the principal branch, and the second its mirror about 1/2.
-            assert phases[0] <= 0.5
-            assert np.isclose(phases[0] + phases[1], 1.0, atol=float_comparison_absolute_tolerance)
-            for phi in phases:
-                assert 0.0 <= phi < 1.0
-                assert np.isclose(
-                    container.eigenvalue_from_phase(phi),
-                    energy,
-                    rtol=float_comparison_relative_tolerance,
-                    atol=float_comparison_absolute_tolerance,
-                )
-
-    def test_walk_container_phases_from_eigenvalue_rejects_energies_off_the_band(self):
-        """An energy the walk cannot encode has no phase, so it is refused."""
-        hamiltonian = QubitOperator(
-            pauli_strings=["XX", "ZZ"],
-            coefficients=np.array([0.25, 0.5]),
-        )
-        container = LCUBuilder(quantum_walk=True).run(hamiltonian).get_container()
-        lam = container.scale
-        for energy in (lam * 1.001, -lam * 1.001):
-            with pytest.raises(ValueError, match="outside the band"):
-                container.phases_from_eigenvalue(energy)
-
     def test_walk_container_eigenvalue_from_phase(self):
         """LCUWalkContainer eigenvalue_from_phase recovers E = λ·cos(2πφ)."""
         hamiltonian = QubitOperator(

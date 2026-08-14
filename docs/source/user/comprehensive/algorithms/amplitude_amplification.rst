@@ -39,14 +39,21 @@ Using amplitude amplification
 ``run`` takes the two oracles as :class:`~qdk_chemistry.data.Circuit`. See below for an
 example of amplifying an eigenstate found by QPE.
 
-Amplitude amplified QPE
------------------------
+QPE subspace marking oracle
+---------------------------
 
 The :class:`~qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.QPESubspaceMarking`
-algorithm (``qpe_circuit_builder`` / ``qdk_qpe_subspace``) builds such a ``good_state_oracle``.
-It is configured like any other
-:doc:`QpeCircuitBuilder <qpe_circuit_builder>`, plus the energy to mark; see
-:ref:`its section there <qpe-subspace-marking>`.
+algorithm (``amplitude_amplification_oracle`` / ``qdk_qpe_subspace``) builds a
+``good_state_oracle`` for an eigenspace. It runs the nested phase estimation on the register
+it is handed, flips the flag when the phase lands in a bin whose energy is at least
+``target_energy``, then undoes the estimation so the register comes back as it was found.
+``run`` takes only the ``qubit_hamiltonian``: the register already holds the state under
+test, so no state preparation is needed.
+
+The oracle reflects about the marked eigenspaces only when the estimation is exact, that is
+when every eigenphase of the state under test is a multiple of :math:`2^{-n}` for
+``num_bits`` :math:`n`. Off a bin the phase register comes back spread rather than to
+:math:`|0\rangle`, so the ancillas the oracle releases carry away part of the state.
 
 .. tab:: Python API
 
@@ -76,11 +83,25 @@ Settings
      - ``int``
      - Number of Grover iterates (default 1). Must be non-negative.
 
+``amplitude_amplification_oracle`` / ``qdk_qpe_subspace``:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``target_energy``
+     - ``float``
+     - Lowest energy the marked subspace may hold. Must be finite. Default: ``nan`` (invalid; user must set).
+   * - ``qpe_circuit_builder``
+     - ``AlgorithmRef``
+     - The phase estimation to mark. Default: ``AlgorithmRef("qpe_circuit_builder", "qdk_standard")``.
+
 Further Reading
 ---------------
 
-- :doc:`PhaseEstimation <phase_estimation>`: the un-amplified algorithm.
-- :doc:`QpeCircuitBuilder <qpe_circuit_builder>`: builds the coherent preparation this algorithm amplifies.
 - Lin, L. *Lecture Notes on Quantum Algorithms for Scientific Computation*, `arXiv:2201.08309 <https://arxiv.org/abs/2201.08309>`_, Chapter 2.
 - Brassard, G., Høyer, P., Mosca, M., and Tapp, A. *Quantum Amplitude Amplification and Estimation*, `arXiv:quant-ph/0005055 <https://arxiv.org/abs/quant-ph/0005055>`_.
 - Lin, L. and Tong, Y. *Near-optimal ground state preparation*, `arXiv:2002.12508 <https://arxiv.org/abs/2002.12508>`_: the signal-processing eigenspace reflection.

@@ -359,22 +359,6 @@ class LCUContainer(BlockEncodingContainer):
             "LCUContainer does not define an eigenvalue-phase relationship. Wrap it in an LCUWalkContainer to use QPE."
         )
 
-    def phases_from_eigenvalue(self, eigenvalue: float) -> list[float]:
-        """Not applicable for a raw block encoding.
-
-        A plain block encoding does not define an eigenvalue-phase
-        relationship on its own.  Use
-        :class:`~qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer`
-        for QPE with qubitization.
-
-        Raises:
-            NotImplementedError: Always.
-
-        """
-        raise NotImplementedError(
-            "LCUContainer does not define an eigenvalue-phase relationship. Wrap it in an LCUWalkContainer to use QPE."
-        )
-
 
 def _wavefunction_to_hdf5(wavefunction: "Wavefunction", group: h5py.Group) -> None:
     """Serialize a Wavefunction into an h5py Group via a temp-file bridge.

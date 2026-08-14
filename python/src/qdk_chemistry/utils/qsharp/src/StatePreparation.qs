@@ -146,12 +146,4 @@ namespace QDKChemistry.Utils.StatePreparation {
     function MakePrepareHadamardAllOp() : Qubit[] => Unit is Adj + Ctl {
         PrepareHadamardAll(_)
     }
-
-    /// Leaves the qubits untouched.
-    operation PrepareNothing(qubits : Qubit[]) : Unit is Adj + Ctl {}
-
-    /// Returns a callable that prepares nothing, for a register that already holds its state.
-    function MakePrepareNothingOp() : Qubit[] => Unit is Adj + Ctl {
-        PrepareNothing(_)
-    }
 }

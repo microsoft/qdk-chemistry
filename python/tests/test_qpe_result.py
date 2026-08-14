@@ -14,7 +14,6 @@ import pytest
 
 from qdk_chemistry.data import QpeResult
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import LCUContainer
-from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
 from tests.reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
 
@@ -406,52 +405,3 @@ def test_lcu_eigenvalue_from_phase_raises():
     c = LCUContainer.__new__(LCUContainer)
     with pytest.raises(NotImplementedError):
         c.eigenvalue_from_phase(0.25)
-
-
-def test_lcu_phases_from_eigenvalue_raises():
-    """LCUContainer.phases_from_eigenvalue raises NotImplementedError."""
-    c = LCUContainer.__new__(LCUContainer)
-    with pytest.raises(NotImplementedError):
-        c.phases_from_eigenvalue(0.25)
-
-
-@pytest.mark.parametrize("scale", [0.5, 1.0, 2.0, 3.5])
-def test_ppf_phases_from_eigenvalue_gives_one_branch(scale):
-    """Time evolution is one-to-one on the range it encodes, so each energy has one phase."""
-    container = PauliProductFormulaContainer(step_terms=[], step_reps=1, num_qubits=1, scale=scale)
-    for energy in np.linspace(-np.pi / scale, np.pi / scale, 17, endpoint=False):
-        phases = container.phases_from_eigenvalue(float(energy))
-        assert len(phases) == 1
-        assert 0.0 <= phases[0] < 1.0
-
-
-@pytest.mark.parametrize("scale", [0.5, 1.0, 2.0, 3.5])
-def test_ppf_phases_from_eigenvalue_roundtrips(scale):
-    """The time-evolution inverse recovers every energy that does not alias."""
-    container = PauliProductFormulaContainer(step_terms=[], step_reps=1, num_qubits=1, scale=scale)
-    for energy in np.linspace(-np.pi / scale, np.pi / scale, 33, endpoint=False):
-        phi = container.phases_from_eigenvalue(float(energy))[0]
-        assert 0.0 <= phi < 1.0
-        assert np.isclose(
-            container.eigenvalue_from_phase(phi),
-            energy,
-            rtol=float_comparison_relative_tolerance,
-            atol=float_comparison_absolute_tolerance,
-        )
-
-
-def test_ppf_phases_from_eigenvalue_rejects_aliasing_energies():
-    """An energy needing more than one turn of the circle has no unique phase."""
-    container = PauliProductFormulaContainer(step_terms=[], step_reps=1, num_qubits=1, scale=2.0)
-    # E * t must lie in [-pi, pi); +pi/t is the endpoint the forward map never returns.
-    with pytest.raises(ValueError, match="aliases"):
-        container.phases_from_eigenvalue(np.pi / 2.0)
-    with pytest.raises(ValueError, match="aliases"):
-        container.phases_from_eigenvalue(-np.pi)
-
-
-def test_ppf_phases_from_eigenvalue_rejects_zero_time():
-    """With no evolution time every energy maps to phase zero, so it cannot be inverted."""
-    container = PauliProductFormulaContainer(step_terms=[], step_reps=1, num_qubits=1, scale=0.0)
-    with pytest.raises(ValueError, match="nonzero"):
-        container.phases_from_eigenvalue(1.0)

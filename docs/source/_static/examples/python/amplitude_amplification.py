@@ -52,17 +52,21 @@ state_preparation = create("state_prep", "dense_pure_state").run(guiding_state)
 # halfway up the band, so |11> at +lambda is marked and the rest of the spectrum
 # is not.
 good_state_oracle = create(
-    "qpe_circuit_builder",
+    "amplitude_amplification_oracle",
     "qdk_qpe_subspace",
-    num_bits=4,
-    unitary_builder=AlgorithmRef(
-        "hamiltonian_unitary_builder", "lcu", quantum_walk=True
-    ),
-    controlled_circuit_mapper=AlgorithmRef(
-        "controlled_circuit_mapper", "prepare_select_prepare"
-    ),
     target_energy=qubit_hamiltonian.schatten_norm / 2,
-).run(state_preparation, qubit_hamiltonian)[0]
+    qpe_circuit_builder=AlgorithmRef(
+        "qpe_circuit_builder",
+        "qdk_standard",
+        num_bits=4,
+        unitary_builder=AlgorithmRef(
+            "hamiltonian_unitary_builder", "lcu", quantum_walk=True
+        ),
+        controlled_circuit_mapper=AlgorithmRef(
+            "controlled_circuit_mapper", "prepare_select_prepare"
+        ),
+    ),
+).run(qubit_hamiltonian)
 
 # 4. Amplify the initial state against the qpe subspace marking oracle.
 amplitude_amplification = create("amplitude_amplification", "qdk_base", rounds=2)
