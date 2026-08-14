@@ -238,7 +238,6 @@ python/VERSION
 
 # GHCP
 .github/copilot-instructions.md
-.github/skills/
 
 # Claude
 .claude
