@@ -25,10 +25,13 @@ matplotlib.use("Agg")
 
 import platform as plt
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 
 import numpy as np
 import pytest
+import qdk
+from qdk import TargetProfile
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
@@ -40,6 +43,7 @@ from qdk_chemistry.data import (
     StateVectorContainer,
     Wavefunction,
 )
+from qdk_chemistry.utils.qsharp import create_qsharp_context, use_qsharp_context
 
 from .test_helpers import create_test_orbitals
 
@@ -73,6 +77,54 @@ if build_dir.exists():
                 break
         if lib_dir_found:
             break
+
+
+@pytest.fixture
+def qdk_ctx() -> qdk.Context:
+    """Fresh Q# context at the default profile, isolated from the shared one.
+
+    Tests that inspect quantum state need their own interpreter, because
+    ``dump_machine`` reports every qubit currently allocated in the context.
+    """
+    return create_qsharp_context()
+
+
+@pytest.fixture(scope="session")
+def base_qdk_ctx() -> qdk.Context:
+    """Shared ``TargetProfile.Base`` context, built once per session.
+
+    Base forbids mid-circuit measurement, so measurement-based uncompute
+    (``Adjoint AND``) lowers to a unitary circuit instead of one carrying
+    classical bits. Circuits handed to Qiskit must be compiled this way, since a
+    Qiskit circuit with classical bits cannot be converted to a gate.
+    """
+    return create_qsharp_context(TargetProfile.Base)
+
+
+@pytest.fixture(scope="module")
+def use_base_qdk_ctx(base_qdk_ctx: qdk.Context) -> Iterator[qdk.Context]:
+    """Resolve ``QSHARP_UTILS`` against the Base-profile context for a whole module.
+
+    Module-scoped on purpose. The original reason was ordering: pytest instantiates
+    higher-scoped fixtures first, so a function-scoped version is set up *after* any
+    module-scoped fixture that already built a ``Circuit``. Those circuits pin the
+    context their Q# callable was evaluated into, and generating QIR for them once the
+    shared context has been swapped to Base panics in the compiler with "callable
+    should exist in lowered package" rather than raising.
+
+    That panic is no longer the way this fails. ``_base_profile_context`` in
+    ``test_hadamard_test.py`` and ``test_phase_estimation_qubitization.py`` is itself
+    module-scoped and *requests* this fixture, and pytest requires a dependency to be
+    equal or broader in scope. Narrowing this fixture now raises ``ScopeMismatch``
+    during setup, before the body runs at all, so the context is never swapped and the
+    panic is unreachable. Verified by executing both cases: module scope passes,
+    function scope errors at setup with the fixture body never entered.
+
+    The ordering rationale is kept because it explains the choice, but the guard is
+    pytest's, and it is loud.
+    """
+    with use_qsharp_context(base_qdk_ctx) as context:
+        yield context
 
 
 @pytest.fixture

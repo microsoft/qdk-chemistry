@@ -16,6 +16,9 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     /// - `ancillas`: An array of indices representing the ancilla qubits.
     /// - `systems`: An array of indices representing the system qubits.
     /// - `numAncillaQubits`: Number of extra ancilla qubits needed by the controlled unitary (0 for Trotter, >0 for block encoding).
+    /// - `ancillaPrep`: A function to prepare persistent ancillas (e.g., phase gradient state).
+    ///   Called once before the controlled unitaries; because this operation is adjointable the
+    ///   adjoint unprepares them. No-op when the controlled unitary needs no persistent ancillas.
     struct StandardPhaseEstimationParams {
         statePrep : Qubit[] => Unit is Adj,
         controlledUnitary : ((Qubit, Qubit[]) => Unit is Adj)[],
@@ -24,6 +27,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         ancillas : Int[],
         systems : Int[],
         numAncillaQubits : Int,
+        ancillaPrep : Qubit[] => Unit is Adj,
     }
 
     /// Runs the standard Quantum Phase Estimation (QPE) circuit based on the provided parameters.
@@ -45,6 +49,10 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
 
         // Step 1: Prepare the initial state on system qubits
         params.statePrep(systems);
+
+        // Step 1.5: Prepare persistent ancillas (e.g., the phase gradient state) used by
+        // every controlled unitary. Adjointing this operation unprepares them.
+        params.ancillaPrep(unitaryAncillas);
 
         // Step 2: Prepare phase (ancilla) qubits
         params.phaseQubitPrep(ancillas);
@@ -72,6 +80,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         systems : Int[],
         phaseQubitPrep : Qubit[] => Unit is Adj,
         numAncillaQubits : Int,
+        ancillaPrep : Qubit[] => Unit is Adj,
     ) : Qubit[] => Unit is Adj {
         RunStandardQPE(
             new StandardPhaseEstimationParams {
@@ -82,6 +91,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
                 ancillas = ancillas,
                 systems = systems,
                 numAncillaQubits = numAncillaQubits,
+                ancillaPrep = ancillaPrep,
             },
             _
         )
@@ -108,6 +118,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         systems : Int[],
         phaseQubitPrep : Qubit[] => Unit is Adj,
         numAncillaQubits : Int,
+        ancillaPrep : Qubit[] => Unit is Adj,
         measurePhase : Bool,
     ) : Result[] {
         let totalQubits = numBits + Length(systems) + numAncillaQubits;
@@ -121,6 +132,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
                 ancillas = ancillas,
                 systems = systems,
                 numAncillaQubits = numAncillaQubits,
+                ancillaPrep = ancillaPrep,
             },
             qs
         );

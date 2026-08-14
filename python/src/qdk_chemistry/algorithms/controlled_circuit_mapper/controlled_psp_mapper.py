@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from typing import Any
+
 from qdk import qsharp
 
 from qdk_chemistry.data import AlgorithmRef
@@ -61,6 +63,10 @@ class ControlledPSPMapper(ControlledCircuitMapper):
     .. math::
 
         W = (2|0\rangle\langle 0| - I) \cdot B[H]
+
+    That walk is a self-inverse block encoding plus a reflection, which is the shape
+    unary-iteration phase estimation schedules, so this mapper can also drive it via
+    :meth:`build_walk_op`.
 
     """
 
@@ -149,6 +155,78 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         qsharp_op = make_op(prepare_op, select_op, num_system, num_ancilla, power)
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
+
+    def num_ancilla_qubits(self, container: Any) -> int:
+        """The number of ancilla qubits the walk needs beyond the system register.
+
+        Args:
+            container: The container held by the unitary representation.
+
+        Returns:
+            The size of the PREPARE ancilla register, which is also the register the walk
+            reflection acts on.
+
+        """
+        lcu = container.block_encoding if isinstance(container, LCUWalkContainer) else container
+        return lcu.num_prepare_ancillas
+
+    def build_walk_op(
+        self,
+        unitary: UnitaryRepresentation,
+        num_queries: int,
+        use_unary_iteration: bool = True,
+    ) -> Any:
+        """Build a PSP walk callable acting on (control register, system + ancilla register).
+
+        When ``use_unary_iteration`` is ``True`` the control register is the phase register and
+        the generic signed-power schedule applies ``num_queries`` block encodings while
+        skipping the one reflection its address selects, so branch ``t`` realizes
+        ``W^(num_queries - 2t)``. Otherwise the control register holds a single qubit and the
+        controlled walk is repeated ``num_queries`` times.
+
+        Args:
+            unitary: The unitary representation containing the LCU block encoding.
+            num_queries: Number of block encodings to apply.
+            use_unary_iteration: Whether the control register is a phase register iterated over.
+
+        Returns:
+            A Q# callable accepting the control register and the combined system/ancilla register.
+
+        Raises:
+            ValueError: If ``num_queries`` is not positive, or the walk has no ancilla to
+                reflect about.
+
+        """
+        if num_queries <= 0:
+            raise ValueError(f"num_queries must be a positive integer. Got {num_queries}.")
+
+        container = unitary.get_container()
+        lcu = container.block_encoding if isinstance(container, LCUWalkContainer) else container
+        if lcu.num_prepare_ancillas == 0:
+            raise ValueError(
+                "A signed-power schedule needs a non-empty ancilla register to reflect about, "
+                "but this block encoding has none."
+            )
+
+        return QSHARP_UTILS.UnaryPhaseEstimation.MakePSPWalkOp(
+            self._build_prepare_op(lcu),
+            self._build_pauli_select_op(lcu.select),
+            lcu.select.num_target_qubits,
+            num_queries,
+            use_unary_iteration,
+        )
+
+    def get_ancilla_prep_op(self) -> Any:
+        """Return the Q# ancilla preparation op used by external algorithms like QPE.
+
+        A PSP walk needs its ancillas in the all-zero state, which is how phase estimation
+        already allocates them, so no preparation is required.
+
+        Returns:
+            A Q# callable that leaves the ancilla register untouched.
+
+        """
+        return QSHARP_UTILS.StatePreparation.MakeNoOpAncillaPrep()
 
     def _build_prepare_op(self, lcu: LCUContainer):
         """Build the PREPARE Q# operation from an LCU container.

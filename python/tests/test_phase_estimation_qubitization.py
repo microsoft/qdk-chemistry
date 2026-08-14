@@ -32,6 +32,18 @@ _builder_params = [
 ]
 
 
+@pytest.fixture(scope="module", autouse=True)
+def _base_profile_context(use_base_qdk_ctx):
+    """Compile this module's Q# under the Base profile.
+
+    Qubitization circuits are handed to Qiskit, and a Qiskit circuit that carries
+    classical bits can neither be converted to a gate nor composed onto the QPE
+    circuit. Base forbids mid-circuit measurement, so the AND-ladder uncompute in
+    ``PrepSelPrep.Reflect`` lowers to a purely unitary circuit.
+    """
+    return use_base_qdk_ctx
+
+
 def _qubitization_circuit_builder_ref(num_bits: int = 4, builder: str = "qdk_iterative") -> AlgorithmRef:
     """Return an AlgorithmRef for the iterative QPE circuit builder with qubitization."""
     return AlgorithmRef(
