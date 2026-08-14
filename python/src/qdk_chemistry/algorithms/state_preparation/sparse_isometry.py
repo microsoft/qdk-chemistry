@@ -147,8 +147,9 @@ class SparseIsometryStatePreparation(StatePreparation):
         A sparse isometry circuit loads the amplitudes densely on a reduced qubit subset and
         then applies the isometry gates (binary encoding and/or GF(2) expansion) that map the
         reduced state back onto the full register. This method returns the dense stage alone,
-        embedded in the same full-width register that :meth:`run` uses, so the isometry cost
-        can be obtained by subtracting the two resource estimates.
+        embedded in the same full-width register that
+        :meth:`~qdk_chemistry.algorithms.StatePreparation.run` uses,
+        so the isometry cost can be obtained by subtracting the two resource estimates.
 
         Args:
             wavefunction: The target wavefunction to prepare.
