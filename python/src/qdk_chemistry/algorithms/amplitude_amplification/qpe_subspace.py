@@ -56,15 +56,14 @@ class QPESubspaceMarking(Algorithm):
     r"""Build a good state oracle that flags the eigenspace above an energy bound.
 
     The nested ``qpe_circuit_builder`` estimates the phase of the register handed to the
-    oracle, a flag qubit is flipped when that phase lands in a bin whose energy is at least
-    ``energy_lower_bound``, and the estimation is then undone. The builder is run without a
-    state preparation, because the register already holds the state under test.
+    oracle, a flag is flipped when that phase lands in a bin whose energy is at least
+    ``energy_lower_bound``, and the estimation is undone. No state preparation is used:
+    the register already holds the state under test.
 
-    The oracle reflects about the marked eigenspaces only when the estimation is exact, that
-    is when every eigenphase of that state is a multiple of :math:`2^{-n}` for the builder's
-    ``num_bits`` :math:`n`. Off a bin the phase register comes back spread instead of to
-    :math:`|0\rangle`, leaving the system entangled with the ancillas the oracle releases.
-    Widening ``num_bits`` shrinks the leak but does not close it, and nothing here detects it.
+    This reflects about the marked eigenspaces only when the estimation is exact, that is
+    when every eigenphase of that state is a multiple of :math:`2^{-n}` for the builder's
+    ``num_bits`` :math:`n`. Off a bin the phase register comes back spread rather than to
+    :math:`|0\rangle`, leaking part of the state into the ancillas the oracle releases.
     """
 
     def __init__(
@@ -103,22 +102,19 @@ class QPESubspaceMarking(Algorithm):
         r"""Return the half-open phase-bin ranges whose energy is at least ``energy_lower_bound``.
 
         Every bin is tested against the encoding's phase-to-energy law, so the answer follows
-        that law wherever it turns or wraps, and stays exact where inverting it would not:
-        near a band edge a one-ulp error in the energy comes back as a square-root error in
-        the phase.
+        that law wherever it turns or wraps.
 
         Args:
             energy_lower_bound: The lowest energy the marked subspace may hold.
             container: The unitary encoding whose phases are being marked.
-            num_phase_qubits: Width :math:`n` of the QPE phase register.
+            num_phase_qubits: Width of the QPE phase register.
 
         Returns:
-            Sorted half-open bin ranges, separated by at least one bin so that no
-            bin is marked twice.
+            Sorted disjoint half-open bin ranges.
 
         Raises:
-            ValueError: If no bin of the register reaches the bound, or if every bin does,
-                because neither names a proper subspace to amplify.
+            ValueError: If no bin reaches the bound, or if every bin does, because neither
+                names a proper subspace to amplify.
 
         """
         phase_bin_count = 1 << num_phase_qubits
@@ -155,7 +151,7 @@ class QPESubspaceMarking(Algorithm):
 
         Raises:
             TypeError: If the nested ``qpe_circuit_builder`` is not a standard (QFT-based) one,
-                the only kind whose circuit runs coherently and so can be undone.
+                the only kind whose circuit can be undone.
             ValueError: If its ``num_bits`` is not positive, if ``energy_lower_bound`` is unset
                 or not finite, or if it names no proper subspace of the phase register.
             RuntimeError: If the phase estimation does not carry a Q# operation.

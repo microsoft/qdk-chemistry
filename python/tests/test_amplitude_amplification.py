@@ -216,8 +216,7 @@ def test_mark_phase_range_flags_exactly_the_half_open_interval(phase_marking, lo
     """Every range of a 3-bit register marks [lower, upper) and nothing outside it.
 
     Exhaustive over the ranges, so it covers all five branches of MarkPhaseRange and pins the
-    direction of each comparison, which the operand order of the ApplyIf...L calls makes easy
-    to read backwards.
+    direction of each comparison.
     """
     for value in range(_PHASE_MARKING_BINS):
         expected = lower_bound <= value < upper_bound
@@ -227,10 +226,7 @@ def test_mark_phase_range_flags_exactly_the_half_open_interval(phase_marking, lo
 
 
 def test_mark_accepted_phase_flags_the_union_of_disjoint_ranges(phase_marking):
-    """A window wrapping phase 1 arrives as two ranges, and the marked bins are their union.
-
-    Each range flips the flag independently, so this pins that disjoint ranges do not cancel.
-    """
+    """A window wrapping phase 1 arrives as two ranges, and the marked bins are their union."""
     lower_bounds, upper_bounds = [0, 6], [2, 8]
     accepted = {0, 1, 6, 7}
     for value in range(_PHASE_MARKING_BINS):
@@ -360,10 +356,8 @@ def test_amplified_qpe_acceptance_follows_the_round_count():
 def test_subspace_oracle_flags_an_interior_eigenstate():
     r"""The marking tests the phase register alone, never the block-encoding ancilla.
 
-    |00> sits strictly inside the band here, so the walk splits it into branches that each
-    carry weight on both settings of the signal ancilla. Requiring that ancilla to be
-    :math:`|0\rangle` would project inside the walk eigenspace instead of selecting on energy.
-    The other oracle tests mark a band-edge eigenvector, where the ancilla decouples.
+    |00> sits strictly inside the band, so the walk splits it across both settings of the
+    signal ancilla; the other oracle tests mark a band-edge eigenvector, where it decouples.
     """
     oracle = _subspace_oracle(_interior_hamiltonian(marked="00"), 1.0, num_bits=4)
     # Phase 1/8 is bin 2, strictly inside the accepted [0, 4) rather than at its edge.
@@ -374,10 +368,8 @@ def test_subspace_oracle_flags_an_interior_eigenstate():
 def test_amplified_qpe_acceptance_at_an_interior_eigenvalue():
     r"""P(good) tracks :math:`\sin^2((2k+1)\vartheta)` when the marked eigenvector is interior.
 
-    The closed form holds only while the marked phases cover both walk branches of an
-    eigenspace or neither, which the symmetry of the accepted bins under
-    :math:`\varphi \mapsto 1 - \varphi` gives. This pins it for an eigenvector the walk really
-    does split, not just for the band-edge ones the other tests use.
+    Pins the closed form for an eigenvector the walk really does split, not just for the
+    band-edge ones the other tests use.
     """
     hamiltonian = _interior_hamiltonian(marked="11")
     amplitude = 0.3
@@ -517,10 +509,7 @@ def test_energy_above_the_encoded_range_is_rejected(container, energy_lower_boun
     ],
 )
 def test_energy_every_bin_clears_is_rejected(container, energy_lower_bound):
-    """A bound the whole register clears marks everything, which is no subspace at all.
-
-    Reflecting about every bin is the identity up to a phase, so such an oracle cannot amplify.
-    """
+    """A bound the whole register clears marks everything, which is no subspace at all."""
     with pytest.raises(ValueError, match="Every phase bin"):
         QPESubspaceMarking._marked_phase_bins(energy_lower_bound, container, num_phase_qubits=4)
 
@@ -542,8 +531,7 @@ def test_a_degenerate_bound_is_refused_when_building_the_oracle(scale, message):
 class _QuarterCutLaw:
     """A phase law shaped like the time-evolution one, but cut at phi = 1/4.
 
-    No encoding in the repo turns here yet; it guards against a phi = 1/2 split being baked
-    back into the search.
+    Guards against a phi = 1/2 split being baked back into the search.
     """
 
     def eigenvalue_from_phase(self, phase_fraction: float) -> float:

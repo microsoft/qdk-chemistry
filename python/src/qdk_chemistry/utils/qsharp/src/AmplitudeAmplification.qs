@@ -25,9 +25,9 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     /// half-open interval [`lowerBound`, `upperBound`).
     ///
     /// # Description
-    /// The `ApplyIf...L` comparisons take the classical constant first and read in that order:
-    /// `ApplyIfGreaterOrEqualL(action, c, x, target)` acts when `c >= x`. The calls below are
-    /// written that way, so each one reads as the opposite of the bound it enforces.
+    /// The `ApplyIf...L` comparisons take the classical constant first:
+    /// `ApplyIfGreaterOrEqualL(action, c, x, target)` acts when `c >= x`, so each call below
+    /// reads as the opposite of the bound it enforces.
     operation MarkPhaseRange(
         lowerBound : Int,
         upperBound : Int,
@@ -74,10 +74,10 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     /// [`lowerBounds[i]`, `upperBounds[i]`).
     ///
     /// # Description
-    /// The bounds are read pairwise, so the two arrays must be the same length. The intervals
-    /// must be pairwise disjoint. Each one flips `inRange` independently, so a value covered
-    /// twice would be flipped twice and left unmarked. More than one interval is needed when
-    /// the accepted energies wrap around $\varphi = 1$.
+    /// The bounds are read pairwise, so the two arrays must be the same length, and the
+    /// intervals must be pairwise disjoint: a value covered twice is flipped twice and so
+    /// left unmarked. More than one interval is needed when the accepted energies wrap
+    /// around $\varphi = 1$.
     operation MarkAcceptedPhase(
         lowerBounds : Int[],
         upperBounds : Int[],
@@ -106,10 +106,9 @@ namespace QDKChemistry.Utils.AmplitudeAmplification {
     /// own, because `system` already holds the one being tested.
     ///
     /// Only the phase register is tested. Requiring the signal ancillas to be $|0\rangle$
-    /// would project inside a walk eigenspace rather than select on energy, because
-    /// $|0\rangle_{\text{signal}}|E\rangle = (|w_+\rangle + |w_-\rangle)/\sqrt{2}$. Testing the
-    /// phase alone stays diagonal in the walk eigenbasis, since the accepted phases are
-    /// symmetric under $\varphi \mapsto 1 - \varphi$ and so cover both branches or neither.
+    /// would project inside a walk eigenspace rather than select on energy. Testing the phase
+    /// alone stays diagonal in the walk eigenbasis, because the accepted phases are symmetric
+    /// under $\varphi \mapsto 1 - \varphi$ and so cover both branches of an eigenspace or neither.
     ///
     /// This reflects about the marked eigenspaces only when the estimation is exact, that is
     /// when every eigenphase of the state under test is a multiple of

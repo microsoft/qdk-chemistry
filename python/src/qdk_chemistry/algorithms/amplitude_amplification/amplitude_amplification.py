@@ -37,23 +37,10 @@ class AmplitudeAmplificationSettings(Settings):
 class AmplitudeAmplification(Algorithm):
     r"""Build an amplitude-amplified circuit.
 
-    Amplitude amplification raises the probability of measuring a state in a chosen
-    "good" subspace. Given a state preparation :math:`U` with
-    :math:`|\psi\rangle = U|0\rangle` and an oracle that reflects about the good
-    subspace, one round applies the Grover iterate
-    :math:`Q = -(2|\psi\rangle\langle\psi| - I)(I - 2\Pi_G)`, a rotation by
-    :math:`2\vartheta` in the plane spanned by the good and bad components. If the good
-    subspace initially carries probability :math:`a = \sin^2\vartheta`, then after
-    :math:`k` rounds it carries
-
-    .. math::
-
-        p_k = \sin^2\!\big((2k+1)\arcsin\sqrt{a}\big),
-
-    so :math:`O(1/\sqrt{a})` rounds suffice where direct sampling would need
-    :math:`O(1/a)` shots. More rounds are not always better: past the first maximum near
-    :math:`k \approx \pi/(4\arcsin\sqrt{a})` the success probability falls again, so pick
-    ``rounds`` from an estimate of :math:`a`.
+    Each round flips a flag on the good subspace and reflects about the prepared state,
+    taking probability :math:`a` to :math:`\sin^2((2k+1)\arcsin\sqrt{a})` after :math:`k`
+    rounds. That falls again past the first maximum, so pick ``rounds`` from an estimate
+    of :math:`a`.
 
     Reference: L. Lin, *Lecture Notes on Quantum Algorithms for Scientific Computation*,
     arXiv:2201.08309, Chapter 2.
