@@ -126,6 +126,11 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND CMAKE_C_SIMULATE_ID STREQUAL "MSVC")
       PATCH_COMMAND "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_LIST_DIR}/patches/gauxc-clang-cl-gau2grid-stdlib.cmake"
   )
 endif()
+# gauXC is pinned to an unreleased upstream merge commit that first provides the
+# cube backend (gauxc/external/cube.hpp). Older installations report the same
+# project version, so find_package cannot tell them apart and would be accepted
+# silently, only to fail later on the missing header. FORCE_FETCH keeps the
+# build on the revision recorded in cgmanifest.json.
 handle_dependency(gauxc
   GIT_REPOSITORY https://github.com/wavefunction91/gauxc.git
   GIT_TAG 162e4562552323a871af17ae4acd73b71071bd24
@@ -133,6 +138,7 @@ handle_dependency(gauxc
   INSTALL_TARGET gauxc::gauxc
   ${DEPENDENCY_BUILD_FLAGS}
   ${_gauxc_patch_args}
+  FORCE_FETCH
   REQUIRED
 )
 
