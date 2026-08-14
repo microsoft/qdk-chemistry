@@ -12,7 +12,7 @@ import math
 
 import numpy as np
 import pytest
-from qdk import qsharp
+from qdk import Result, qsharp
 
 from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.algorithms.amplitude_amplification import AmplitudeAmplification, QPESubspaceMarking
@@ -162,7 +162,7 @@ operation AmplitudeAmplificationTestPhaseMarking(
     upperBounds : Int[],
     numPhaseQubits : Int,
     value : Int
-) : Bool {
+) : Result {
     use phase = Qubit[numPhaseQubits];
     use flag = Qubit();
     for index in 0..numPhaseQubits - 1 {
@@ -171,7 +171,7 @@ operation AmplitudeAmplificationTestPhaseMarking(
         }
     }
     QDKChemistry.Utils.AmplitudeAmplification.MarkAcceptedPhase(lowerBounds, upperBounds, phase, flag);
-    let marked = M(flag) == One;
+    let marked = M(flag);
     Reset(flag);
     for index in 0..numPhaseQubits - 1 {
         if ((value >>> index) &&& 1) == 1 {
@@ -190,11 +190,15 @@ def phase_marking():
     context.eval(_PHASE_MARKING_HARNESS)
 
     def marks(lower_bounds: list[int], upper_bounds: list[int], num_phase_qubits: int, value: int) -> bool:
-        return bool(
+        # The harness returns a Result rather than a Bool because the shared context compiles
+        # for TargetProfile.Base, which rejects a Bool derived from a measurement. Every
+        # Result is truthy, so compare against One instead of calling bool().
+        return (
             context.eval(
                 "AmplitudeAmplificationTestPhaseMarking("
                 f"{list(lower_bounds)}, {list(upper_bounds)}, {num_phase_qubits}, {value})"
             )
+            == Result.One
         )
 
     return marks
