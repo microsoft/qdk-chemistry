@@ -242,9 +242,6 @@ TEST(EffectiveHamiltonianConstructorTest, RejectsNonNestedOrbitalSpaces) {
       std::invalid_argument);
 }
 
-// A kept orbital takes its correlation from the downstream solve, so only the
-// folded orbitals rely on the reference density. P is therefore constrained by
-// the Hamiltonian window, not by the reference active space.
 TEST(EffectiveHamiltonianConstructorTest, AllowsPOutsideReferenceActiveSpace) {
   auto base_orbitals = testing::create_test_orbitals(4, 4);
   auto hamiltonian_orbitals =

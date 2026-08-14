@@ -143,9 +143,6 @@ void EffectiveHamiltonianConstructor::_validate_inputs(
         "wavefunction active orbitals must be a subset of the Hamiltonian "
         "active orbitals");
   }
-  // P is not required to lie inside the reference active space. A kept orbital
-  // gets its correlation from the downstream solve, not from the reference, so
-  // only the folded orbitals of Q rely on the reference density.
   if (!is_subset(*p_indices, *hamiltonian_orbitals->active_indices())) {
     throw_incompatible(
         "P-space indices must be a subset of the Hamiltonian active orbitals");
