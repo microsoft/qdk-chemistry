@@ -22,6 +22,7 @@ from qdk_chemistry.algorithms.active_space_selector import (
     QdkValenceActiveSpaceSelector,
 )
 from qdk_chemistry.algorithms.amplitude_amplification import AmplitudeAmplification, phase_marking_oracle
+from qdk_chemistry.algorithms.boson_qubit_mapper import BosonQubitMapper, QdkBosonQubitMapper
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.controlled_circuit_mapper.base import ControlledCircuitMapper
 from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator, QdkMP2Calculator
@@ -71,6 +72,7 @@ __all__ = [
     # Classes
     "ActiveSpaceSelector",
     "AmplitudeAmplification",
+    "BosonQubitMapper",
     "CircuitExecutor",
     "ControlledCircuitMapper",
     "DynamicalCorrelationCalculator",
@@ -90,6 +92,7 @@ __all__ = [
     "ProjectedMultiConfigurationCalculator",
     "QdkAutocasActiveSpaceSelector",
     "QdkAutocasEosActiveSpaceSelector",
+    "QdkBosonQubitMapper",
     "QdkExpectationEstimator",
     "QdkHamiltonianConstructor",
     "QdkMP2Calculator",

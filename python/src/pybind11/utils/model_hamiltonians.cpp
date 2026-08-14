@@ -165,6 +165,54 @@ Returns:
 )",
       py::arg("lattice"), py::arg("epsilon"), py::arg("t"), py::arg("U"));
 
+  // --- Bose-Hubbard -----------------------------------------------------
+  mh.def(
+      "create_bose_hubbard_hamiltonian",
+      [](const qdk::chemistry::data::LatticeGraph& lattice, const py::object& t,
+         const py::object& U, const py::object& mu,
+         std::size_t mode_dimension) {
+        return create_bose_hubbard_hamiltonian(
+            lattice, to_pair_param(t, lattice, "t"),
+            to_site_param(U, lattice, "U"), to_site_param(mu, lattice, "mu"),
+            mode_dimension);
+      },
+      R"(
+Create a Bose-Hubbard model Hamiltonian.
+
+``H = -sum_<ij> t_ij (b_i_dag b_j + b_j_dag b_i) + (U / 2) sum_i n_i (n_i - 1)
+- mu sum_i n_i``.
+
+The integrals are stored in the same chemist notation as every other model
+Hamiltonian (``h_ii = -mu_i``, ``h_ij = -t_ij`` on bonds, ``(ii|ii) = U_i``),
+so the usual contraction ``0.5 * sum_pqrs (pq|rs) b_p_dag b_r_dag b_s b_q``
+reproduces the on-site interaction exactly. What makes the result bosonic is
+its basis: the returned Hamiltonian carries a
+:class:`~qdk_chemistry.data.BosonicModes` orbital set holding the occupation
+cutoff.
+
+To map the result to qubits the cutoff must be a power of two; use
+``BosonicModes.padded_dimension`` to round up (padding is free in Pauli-term
+count and removes the unphysical subspace entirely).
+
+Warning:
+    At ``mode_dimension = 2`` -- the hard-core limit -- ``U`` has no effect whatsoever, because ``n (n - 1)`` is zero for both ``n = 0`` and ``n = 1``, so the on-site term vanishes identically. Any ``U`` produces the same operator. This is the correct physics of hard-core bosons, not a truncation artefact, and the requested ``U`` is still stored as ``(ii|ii)``; but because it is easy to miss, a warning is logged when a non-zero ``U`` is combined with ``mode_dimension = 2``. Use ``mode_dimension = 4`` or larger for an interacting model, or :meth:`~qdk_chemistry.data.BosonicModes.hard_core` to state the hard-core limit explicitly.
+
+Args:
+    lattice (LatticeGraph): Symmetric lattice graph defining connectivity.
+    t (float or numpy.ndarray): Hopping integral(s).
+    U (float or numpy.ndarray): On-site interaction strength(s); inert when ``mode_dimension`` is 2.
+    mu (float or numpy.ndarray): Chemical potential(s).
+    mode_dimension (int): Local Fock-space dimension ``d = n_max + 1`` of every mode.
+
+Returns:
+    Hamiltonian: Bose-Hubbard model Hamiltonian on a ``BosonicModes`` basis.
+
+Raises:
+    ValueError: If a parameter size mismatches the lattice or ``mode_dimension`` is less than 2.
+)",
+      py::arg("lattice"), py::arg("t"), py::arg("U"), py::arg("mu"),
+      py::arg("mode_dimension"));
+
   // --- PPP --------------------------------------------------------------
   mh.def(
       "create_ppp_hamiltonian",

@@ -8,6 +8,7 @@
 #include <iomanip>
 #include <limits>
 #include <numeric>
+#include <qdk/chemistry/data/bosonic_modes.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
@@ -122,10 +123,40 @@ SparseHamiltonianContainer::SparseHamiltonianContainer(
       _one_body_sparse(std::move(one_body_integrals)),
       _two_body_sparse(std::move(two_body)) {}
 
+SparseHamiltonianContainer::SparseHamiltonianContainer(
+    Eigen::SparseMatrix<double> one_body_integrals,
+    TwoBodyMap two_body_integrals, std::shared_ptr<Orbitals> orbitals,
+    double core_energy, HamiltonianType type)
+    : SparseHamiltonianContainer(
+          Eigen::SparseMatrix<double>(one_body_integrals),
+          make_spin_diagonal_rank4_sbsm<double>(
+              to_sparse_block(std::move(two_body_integrals)),
+              static_cast<std::size_t>(one_body_integrals.rows())),
+          std::move(orbitals), core_energy, type) {}
+
+SparseHamiltonianContainer::SparseHamiltonianContainer(
+    Eigen::SparseMatrix<double> one_body_integrals,
+    std::shared_ptr<const SymmetryBlockedSparseMap<4>> two_body,
+    std::shared_ptr<Orbitals> orbitals, double core_energy,
+    HamiltonianType type)
+    : HamiltonianContainer(
+          make_spin_diagonal_rank2_sbt(Eigen::MatrixXd(one_body_integrals),
+                                       Eigen::MatrixXd{}, /*restricted=*/true),
+          _check_orbitals(orbitals, one_body_integrals.rows()), core_energy,
+          make_spin_diagonal_rank2_sbt(
+              Eigen::MatrixXd(Eigen::MatrixXd::Zero(one_body_integrals.rows(),
+                                                    one_body_integrals.cols())),
+              Eigen::MatrixXd{}),
+          type),
+      _one_body_sparse(std::move(one_body_integrals)),
+      _two_body_sparse(std::move(two_body)) {}
+
 std::unique_ptr<HamiltonianContainer> SparseHamiltonianContainer::clone()
     const {
+  // Preserve the single-particle basis: a caller-supplied basis (e.g.
+  // BosonicModes, which carries the occupation cutoff) must survive cloning.
   return std::make_unique<SparseHamiltonianContainer>(
-      _one_body_sparse, _two_body_sparse, _core_energy, _type);
+      _one_body_sparse, _two_body_sparse, _orbitals, _core_energy, _type);
 }
 
 std::string SparseHamiltonianContainer::get_container_type() const {
@@ -217,6 +248,13 @@ nlohmann::json SparseHamiltonianContainer::to_json() const {
     j["two_body_integrals"] = _two_body_sparse->to_json();
   }
 
+  // Persist the single-particle basis only when it carries information that
+  // cannot be rebuilt from num_orbitals alone (currently: the bosonic
+  // occupation cutoff).  Existing fermionic files stay byte-identical.
+  if (dynamic_cast<const BosonicModes*>(_orbitals.get()) != nullptr) {
+    j["orbitals"] = _orbitals->to_json();
+  }
+
   return j;
 }
 
@@ -265,6 +303,20 @@ SparseHamiltonianContainer::from_json(const nlohmann::json& j) {
           SymmetryBlockedSparseMap<4>::from_json(j["two_body_integrals"]);
     }
 
+    // Restore a serialized bosonic basis when present; older files and
+    // fermionic model Hamiltonians fall back to the default ModelOrbitals.
+    std::shared_ptr<Orbitals> orbitals;
+    if (j.contains("orbitals") && !j["orbitals"].is_null()) {
+      auto loaded = Orbitals::from_json(j["orbitals"]);
+      if (std::dynamic_pointer_cast<BosonicModes>(loaded)) {
+        orbitals = std::move(loaded);
+      }
+    }
+    if (orbitals) {
+      return std::make_unique<SparseHamiltonianContainer>(
+          std::move(one_body_sparse), std::move(h2_sparse), std::move(orbitals),
+          core_energy, type);
+    }
     return std::make_unique<SparseHamiltonianContainer>(
         std::move(one_body_sparse), std::move(h2_sparse), core_energy, type);
 
@@ -458,6 +510,17 @@ SparseHamiltonianContainer::from_hdf5(H5::Group& group) {
     one_body_sparse.setFromTriplets(triplets.begin(), triplets.end());
     one_body_sparse.makeCompressed();
 
+    // Restore a serialized bosonic basis when present; older files and
+    // fermionic model Hamiltonians fall back to the default ModelOrbitals.
+    std::shared_ptr<Orbitals> orbitals;
+    if (group.nameExists("orbitals")) {
+      H5::Group orbitals_group = group.openGroup("orbitals");
+      auto loaded = Orbitals::from_hdf5(orbitals_group);
+      if (std::dynamic_pointer_cast<BosonicModes>(loaded)) {
+        orbitals = std::move(loaded);
+      }
+    }
+
     // Load sparse two-body integrals (if present)
     TwoBodyMap two_body_map;
     try {
@@ -497,8 +560,19 @@ SparseHamiltonianContainer::from_hdf5(H5::Group& group) {
     }
 
     if (two_body_map.empty()) {
+      if (orbitals) {
+        return std::make_unique<SparseHamiltonianContainer>(
+            std::move(one_body_sparse),
+            std::shared_ptr<const SymmetryBlockedSparseMap<4>>{},
+            std::move(orbitals), core_energy, type);
+      }
       return std::make_unique<SparseHamiltonianContainer>(
           std::move(one_body_sparse), core_energy, type);
+    }
+    if (orbitals) {
+      return std::make_unique<SparseHamiltonianContainer>(
+          std::move(one_body_sparse), std::move(two_body_map),
+          std::move(orbitals), core_energy, type);
     }
     return std::make_unique<SparseHamiltonianContainer>(
         std::move(one_body_sparse), std::move(two_body_map), core_energy, type);
@@ -620,6 +694,24 @@ std::shared_ptr<ModelOrbitals> SparseHamiltonianContainer::_make_orbitals(
   // Model Hamiltonian basis: a full active space over n modes with no spin
   // axis. The container itself is always restricted (is_restricted() == true).
   return std::make_shared<ModelOrbitals>(static_cast<size_t>(n));
+}
+
+std::shared_ptr<Orbitals> SparseHamiltonianContainer::_check_orbitals(
+    const std::shared_ptr<Orbitals>& orbitals, Eigen::Index num_orbitals) {
+  if (!orbitals) {
+    throw std::invalid_argument(
+        "SparseHamiltonianContainer: the supplied basis is null. Use an "
+        "overload without an orbitals parameter to default to ModelOrbitals.");
+  }
+  if (static_cast<Eigen::Index>(orbitals->get_num_molecular_orbitals()) !=
+      num_orbitals) {
+    throw std::invalid_argument(
+        "SparseHamiltonianContainer: the supplied basis has " +
+        std::to_string(orbitals->get_num_molecular_orbitals()) +
+        " modes but the one-body matrix is " + std::to_string(num_orbitals) +
+        "x" + std::to_string(num_orbitals));
+  }
+  return orbitals;
 }
 
 Eigen::SparseMatrix<double> SparseHamiltonianContainer::_to_sparse(

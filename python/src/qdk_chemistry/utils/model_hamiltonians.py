@@ -8,6 +8,7 @@
 import numpy as np
 
 from qdk_chemistry._core.utils.model_hamiltonians import (
+    create_bose_hubbard_hamiltonian,
     create_hubbard_hamiltonian,
     create_huckel_hamiltonian,
     create_ppp_hamiltonian,
@@ -21,6 +22,7 @@ from qdk_chemistry.data import LatticeGraph, LayeredPartition, PauliOperator, Qu
 from qdk_chemistry.utils import Logger
 
 __all__ = [
+    "create_bose_hubbard_hamiltonian",
     "create_heisenberg_hamiltonian",
     "create_hubbard_hamiltonian",
     "create_huckel_hamiltonian",

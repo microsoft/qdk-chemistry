@@ -6,6 +6,8 @@
 
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+#include <cstddef>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -13,6 +15,7 @@
 #include <vector>
 
 #include "qdk/chemistry/constants.hpp"
+#include "qdk/chemistry/data/bosonic_modes.hpp"
 #include "qdk/chemistry/data/hamiltonian_containers/sparse.hpp"
 #include "qdk/chemistry/data/lattice_graph.hpp"
 #include "qdk/chemistry/utils/logger.hpp"
@@ -383,6 +386,92 @@ inline qdk::chemistry::data::Hamiltonian create_ppp_hamiltonian(
   return qdk::chemistry::data::Hamiltonian(
       std::make_unique<qdk::chemistry::data::SparseHamiltonianContainer>(
           std::move(h1), std::move(h2), core_energy));
+}
+
+/**
+ * @brief Create a Bose-Hubbard model Hamiltonian.
+ *
+ * @f[
+ *   H = -\sum_{\langle ij\rangle} t_{ij}\,(b_i^\dagger b_j + b_j^\dagger b_i)
+ *       + \frac{U}{2}\sum_i n_i (n_i - 1) - \mu \sum_i n_i .
+ * @f]
+ *
+ * The integrals are stored in the same chemist notation as every other model
+ * Hamiltonian — @f$h_{ii} = -\mu_i@f$, @f$h_{ij} = -t_{ij}@f$ on bonds and
+ * @f$(ii|ii) = U_i@f$ — so the standard contraction
+ * @f$\tfrac12\sum_{pqrs}(pq|rs)\,b_p^\dagger b_r^\dagger b_s b_q@f$ reproduces
+ * the on-site interaction exactly. The returned Hamiltonian carries a
+ * @ref qdk::chemistry::data::BosonicModes basis, which is what makes it
+ * bosonic: the occupation cutoff lives on the basis, not on the integrals.
+ *
+ * @note To map the result to qubits the cutoff must be a power of two. It is
+ *       stored verbatim and never padded implicitly; pad explicitly with
+ *       @ref qdk::chemistry::data::BosonicModes::padded_dimension or
+ *       @ref qdk::chemistry::data::BosonicModes::padded_to_power_of_two.
+ *
+ * @warning **@p mode_dimension = 2 is the hard-core limit and @p U_in is inert
+ *          there.** With @f$n \in \{0,1\}@f$ the on-site term
+ *          @f$n(n-1)@f$ is identically zero, so every value of @f$U@f$ gives
+ *          bit-identical output: @f$U = 0@f$ and @f$U = 400@f$ produce the same
+ *          operator. This is correct physics — the hard-core Bose-Hubbard model
+ *          — and the integrals are stored exactly as given, but it is silent,
+ *          so a non-zero @f$U@f$ at @f$d = 2@f$ is reported as a warning
+ *          through the library logger. Use @f$d \ge 4@f$ if the on-site
+ *          interaction is meant to be felt, or
+ *          @ref qdk::chemistry::data::BosonicModes::hard_core to say the
+ *          hard-core limit was intended.
+ *
+ * @tparam TT   double or Eigen::MatrixXd
+ * @tparam UT   double or Eigen::VectorXd
+ * @tparam MuT  double or Eigen::VectorXd
+ * @param lattice  Symmetric lattice graph defining the connectivity.
+ * @param t_in  Hopping integrals. Scalar or n x n MatrixXd.
+ * @param U_in  On-site interaction. Scalar or VectorXd of size n.
+ * @param mu_in  Chemical potential. Scalar or VectorXd of size n.
+ * @param mode_dimension  Local Fock-space dimension d = n_max + 1 of every
+ *        mode; stored verbatim on the basis.
+ * @return Hamiltonian for the Bose-Hubbard model on a BosonicModes basis.
+ * @throws std::invalid_argument if a parameter size mismatches the lattice or
+ *         @p mode_dimension is less than 2.
+ */
+template <typename TT, typename UT, typename MuT>
+inline qdk::chemistry::data::Hamiltonian create_bose_hubbard_hamiltonian(
+    const qdk::chemistry::data::LatticeGraph& lattice, TT&& t_in, UT&& U_in,
+    MuT&& mu_in, std::size_t mode_dimension) {
+  QDK_LOG_TRACE_ENTERING();
+  static_assert(detail::is_site_param_v<MuT>,
+                "mu must be double or Eigen::VectorXd");
+
+  // A chemical potential is an on-site energy of the opposite sign, so the
+  // fermionic Hubbard integral builder is reused verbatim.
+  const Eigen::VectorXd mu =
+      detail::to_site_param(std::forward<MuT>(mu_in), lattice, "mu");
+  const Eigen::VectorXd epsilon = -mu;
+
+  auto [h1, h2] = detail::_build_hubbard_integrals(
+      lattice, epsilon, std::forward<TT>(t_in), std::forward<UT>(U_in));
+
+  // The hard-core limit silently ignores U: n(n-1) = 0 for n in {0, 1}, so the
+  // two-body term contributes nothing whatever U is. The Hamiltonian is left
+  // exactly as asked -- the physics is right -- but the caller is told, because
+  // otherwise U = 0 and U = 400 give bit-identical output with no indication.
+  // _build_hubbard_integrals stores (ii|ii) = U_i and skips zeros, so a
+  // non-empty two-body map is precisely "some U_i is non-zero".
+  if (mode_dimension == 2 && !h2.empty()) {
+    QDK_LOGGER().warn(
+        "Bose-Hubbard with mode_dimension = 2 is the hard-core limit, where "
+        "the on-site interaction n(n-1) vanishes identically (n is 0 or 1). "
+        "The requested U has no effect on this Hamiltonian: any value would "
+        "give the same operator. Use mode_dimension = 4 or larger (a power of "
+        "two) for an interacting model, or BosonicModes::hard_core to make the "
+        "hard-core limit explicit.");
+  }
+
+  auto modes = std::make_shared<qdk::chemistry::data::BosonicModes>(
+      static_cast<std::size_t>(lattice.num_sites()), mode_dimension);
+  return qdk::chemistry::data::Hamiltonian(
+      std::make_unique<qdk::chemistry::data::SparseHamiltonianContainer>(
+          std::move(h1), std::move(h2), std::move(modes)));
 }
 
 /**

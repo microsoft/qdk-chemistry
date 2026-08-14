@@ -717,6 +717,8 @@ def _register_python_factories():
     be called by users.
     """
     from qdk_chemistry.algorithms.amplitude_amplification import AmplitudeAmplificationFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.boson_qubit_mapper import BosonQubitMapperFactory  # noqa: PLC0415
+
     from qdk_chemistry.algorithms.circuit_executor import CircuitExecutorFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.circuit_mapper import CircuitMapperFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
@@ -749,6 +751,7 @@ def _register_python_factories():
     register_factory(StatePreparationFactory())
     register_factory(TermGrouperFactory())
     register_factory(QubitMapperFactory())
+    register_factory(BosonQubitMapperFactory())
     register_factory(QubitHamiltonianSolverFactory())
     register_factory(HamiltonianUnitaryBuilderFactory())
     register_factory(ControlledCircuitMapperFactory())
@@ -813,6 +816,7 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.amplitude_amplification import (  # noqa: PLC0415
         AmplitudeAmplification,
     )
+    from qdk_chemistry.algorithms.boson_qubit_mapper import QdkBosonQubitMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.circuit_executor.qdk import (  # noqa: PLC0415
         QdkFullStateSimulator,
         QdkSparseStateSimulator,
@@ -870,6 +874,7 @@ def _register_python_algorithms():
     register(lambda: DenseMatrixSolver())
     register(lambda: SparseMatrixSolver())
     register(lambda: QdkQubitMapper())
+    register(lambda: QdkBosonQubitMapper())
     register(lambda: FullCommutingTermGrouper())
     register(lambda: QubitWiseCommutingTermGrouper())
     register(lambda: IdentityTermGrouper())

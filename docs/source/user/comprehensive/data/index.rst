@@ -20,6 +20,7 @@ Each of the links below leads to a detailed description of the data class, inclu
    orbitals
    lattice_graph
    majorana_mapping
+   boson_mapping
    pauli_operator
    structure
    symmetries
@@ -66,6 +67,9 @@ The following table summarizes the available data classes in QDK/Chemistry and t
      - Factory methods, User input
    * - :doc:`MajoranaMapping <majorana_mapping>`
      - Fermion-to-qubit encoding (Majorana-to-Pauli table)
+     - Factory methods, User input
+   * - :doc:`BosonMapping <boson_mapping>`
+     - Boson-to-qubit encoding (per-mode codeword table)
      - Factory methods, User input
    * - :doc:`PauliOperator <pauli_operator>`
      - Pauli operator expressions with arithmetic

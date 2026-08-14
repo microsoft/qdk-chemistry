@@ -10,6 +10,7 @@
 
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry.hpp>
+#include <qdk/chemistry/data/bosonic_modes.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
@@ -62,6 +63,8 @@ std::shared_ptr<qdk::chemistry::data::Orbitals> orbitals_from_json_file_wrapper(
 }
 
 void bind_model_orbitals(py::module &data);
+
+void bind_bosonic_modes(py::module &data);
 
 namespace {
 
@@ -1204,4 +1207,225 @@ Examples:
             // Reconstruct from JSON string
             return *ModelOrbitals::from_json(nlohmann::json::parse(json_str));
           }));
+
+  // Bind BosonicModes, which derives from ModelOrbitals.
+  bind_bosonic_modes(data);
+}
+
+void bind_bosonic_modes(py::module &data) {
+  using namespace qdk::chemistry::data;
+
+  py::class_<BosonicModes, ModelOrbitals, py::smart_holder> bosonic_modes(
+      data, "BosonicModes",
+      R"(
+Single-particle basis for bosonic modes with a local occupation cutoff.
+
+``BosonicModes`` is a ``ModelOrbitals`` specialisation that additionally records
+the dimension ``d`` of each mode's truncated local Fock space. A mode with
+dimension ``d`` carries occupations ``n = 0, 1, ..., d - 1``, so ``n_max = d - 1``,
+and the truncated ladder operators are ``b = sum_n sqrt(n) |n-1><n|`` and
+``n_hat = diag(0, ..., d - 1)``.
+
+The occupation cutoff lives on the basis, not on the boson-to-qubit mapping: a
+``BosonMapping`` reads its cutoff from here and a mismatch is a hard error.
+
+Because ``BosonicModes`` is an ``Orbitals``, it can be used anywhere the library
+expects a single-particle basis.
+
+Examples:
+    >>> from qdk_chemistry.data import BosonicModes
+    >>> modes = BosonicModes(4, 8)
+    >>> modes.num_modes()
+    4
+    >>> modes.mode_dimension(0)
+    8
+
+    >>> # Qubit encodings need a power-of-two cutoff; padding is free, but it
+    >>> # is always explicit -- a stated cutoff is never padded behind your back.
+    >>> padded = BosonicModes.padded_to_power_of_two(4, 5)
+    >>> padded.mode_dimension(0)
+    8
+)");
+
+  bosonic_modes.def(py::init<size_t, size_t>(),
+                    R"(
+Construct a uniform-cutoff bosonic mode basis.
+
+Args:
+    num_modes (int): Number of bosonic modes.
+    mode_dimension (int): Local Fock-space dimension ``d = n_max + 1`` of every mode; must be at least 2.
+
+Raises:
+    ValueError: If ``num_modes`` is 0 or ``mode_dimension`` is less than 2.
+)",
+                    py::arg("num_modes"), py::arg("mode_dimension"));
+
+  bosonic_modes.def_static("padded_dimension", &BosonicModes::padded_dimension,
+                           R"(
+Round a requested local dimension up to the next power of two.
+
+Args:
+    requested_dimension (int): Requested local Fock-space dimension.
+
+Returns:
+    int: The smallest power of two at least as large as ``requested_dimension``, and at least 2.
+)",
+                           py::arg("requested_dimension"));
+
+  bosonic_modes.def_static(
+      "padded_to_power_of_two", &BosonicModes::padded_to_power_of_two,
+      R"(
+Construct a bosonic basis whose cutoff is padded to a power of two.
+
+Padding costs nothing in Pauli-term count (``d = 3`` and ``d = 4`` both need 32
+hopping terms), removes the unphysical subspace entirely, and only lowers the
+truncation error. It is the recommended way to build a basis destined for a
+qubit mapping, and it is deliberately explicit: a stated cutoff is never padded
+implicitly.
+
+Args:
+    num_modes (int): Number of bosonic modes.
+    requested_dimension (int): Requested local Fock-space dimension.
+
+Returns:
+    BosonicModes: A basis whose mode dimensions are powers of two.
+)",
+      py::arg("num_modes"), py::arg("requested_dimension"));
+
+  bosonic_modes.def_static("hard_core", &BosonicModes::hard_core,
+                           R"(
+Construct a hard-core bosonic basis: every mode is two-level (``d = 2``).
+
+Truncating at two levels is the hard-core limit, in which at most one boson may
+occupy a mode. It is exact rather than approximate for that model: on two
+levels the annihilation operator ``b`` *is* the spin lowering operator
+``sigma^-``, so one mode maps onto exactly one qubit with no padding and no
+unphysical subspace.
+
+Warning:
+    The two-body on-site interaction ``(U/2) n (n - 1)`` vanishes identically here, because ``n(n - 1) = 0`` for both ``n = 0`` and ``n = 1``. A Bose-Hubbard model built on this basis is therefore independent of ``U``: use ``mode_dimension >= 4`` if the interaction is meant to be felt.
+
+Args:
+    num_modes (int): Number of bosonic modes.
+
+Returns:
+    BosonicModes: A basis with ``mode_dimension(i) == 2`` for every mode.
+)",
+                           py::arg("num_modes"));
+
+  bosonic_modes.def("with_padded_dimensions",
+                    &BosonicModes::with_padded_dimensions,
+                    R"(
+Copy of this basis with every mode dimension padded to a power of two.
+
+Modes that already have a power-of-two dimension are left untouched. This is the
+instance counterpart of :meth:`padded_to_power_of_two`; it carries a different
+name because a single Python attribute cannot be both a static and an instance
+method.
+
+Returns:
+    BosonicModes: A basis with the same mode count and padded dimensions.
+)");
+
+  bosonic_modes.def("mode_dimensions", &BosonicModes::mode_dimensions,
+                    R"(
+All local Fock-space dimensions, indexed by mode.
+
+Returns:
+    list[int]: One local Fock-space dimension per mode.
+)");
+
+  bosonic_modes.def("mode_dimension", &BosonicModes::mode_dimension,
+                    R"(
+Local Fock-space dimension of a single mode.
+
+Args:
+    mode (int): Mode index.
+
+Returns:
+    int: Dimension ``d`` of that mode's truncated Fock space.
+
+Raises:
+    IndexError: If ``mode`` is not a valid mode index.
+)",
+                    py::arg("mode"));
+
+  bosonic_modes.def("max_occupation", &BosonicModes::max_occupation,
+                    R"(
+Largest occupation number representable on a single mode.
+
+Args:
+    mode (int): Mode index.
+
+Returns:
+    int: ``n_max = d - 1`` for that mode.
+
+Raises:
+    IndexError: If ``mode`` is not a valid mode index.
+)",
+                    py::arg("mode"));
+
+  bosonic_modes.def("uniform_dimension", &BosonicModes::uniform_dimension,
+                    R"(
+Common local dimension, when every mode shares one.
+
+Returns:
+    int | None: The uniform dimension, or ``None`` if the modes do not all share a single dimension.
+)");
+
+  bosonic_modes.def("has_power_of_two_dimensions",
+                    &BosonicModes::has_power_of_two_dimensions,
+                    R"(
+Whether every mode's dimension is a power of two.
+
+Returns:
+    bool: ``True`` if all mode dimensions are powers of two.
+)");
+
+  bosonic_modes.def("fock_space_dimension", &BosonicModes::fock_space_dimension,
+                    R"(
+Dimension of the full truncated Fock space of all modes.
+
+Returns:
+    int: The product of every mode dimension.
+
+Raises:
+    OverflowError: If the product does not fit in a machine word.
+)");
+
+  bosonic_modes
+      .def_static(
+          "from_json",
+          [](const std::string &json_str) {
+            return BosonicModes::from_json(nlohmann::json::parse(json_str));
+          },
+          R"(
+Load BosonicModes from a JSON string (static method).
+
+Args:
+    json_str (str): JSON string containing ``BosonicModes`` data.
+
+Returns:
+    BosonicModes: New object created from the JSON data.
+
+Raises:
+    RuntimeError: If the JSON string is malformed.
+)",
+          py::arg("json_str"))
+
+      .def("__repr__",
+           [](const BosonicModes &modes) { return modes.get_summary(); })
+
+      .def("__str__",
+           [](const BosonicModes &modes) { return modes.get_summary(); })
+
+      .def(py::pickle(
+          [](const BosonicModes &modes) -> std::string {
+            return modes.to_json().dump();
+          },
+          [](const std::string &json_str) -> BosonicModes {
+            return *BosonicModes::from_json(nlohmann::json::parse(json_str));
+          }));
+
+  bosonic_modes.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(BosonicModes);
 }
