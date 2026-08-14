@@ -673,22 +673,34 @@ class TestToGf2xOperations:
     @pytest.mark.parametrize(
         ("op_type", "expected"),
         [
-            (MatrixCompressionType.X, "X"),
-            (MatrixCompressionType.CX, "CX"),
-            (MatrixCompressionType.SWAP, "SWAP"),
-            (MatrixCompressionType.CCX, "CCX"),
-            (MatrixCompressionType.SELECT, "SELECT"),
-            (MatrixCompressionType.SELECT_AND, "SELECT_AND"),
+            (MatrixCompressionType.X, 0),
+            (MatrixCompressionType.CX, 1),
+            (MatrixCompressionType.SWAP, 2),
+            (MatrixCompressionType.CCX, 3),
+            (MatrixCompressionType.SELECT, 4),
+            (MatrixCompressionType.SELECT_AND, 5),
         ],
     )
     def test_matrix_compression_op_serializes_qsharp_opcode(self, op_type, expected):
-        """Q# serialization emits the gate name that ``BinaryEncoding.qs`` dispatches on."""
+        """Q# serialization emits the integer opcode that ``BinaryEncoding.qs`` dispatches on."""
         lookup_data = [[True]] if op_type in {MatrixCompressionType.SELECT, MatrixCompressionType.SELECT_AND} else []
         op = MatrixCompressionOp(op_type, [0, 1], lookup_data=lookup_data)
         kind = op.to_dict()["kind"]
         assert kind == expected
-        # Q# needs a plain string, not the enum member.
-        assert type(kind) is str
+        assert type(kind) is int
+
+    def test_matrix_compression_qsharp_opcodes_are_exhaustive(self):
+        """Every operation type must have one stable, contiguous Q# wire value."""
+        expected_types = [
+            MatrixCompressionType.X,
+            MatrixCompressionType.CX,
+            MatrixCompressionType.SWAP,
+            MatrixCompressionType.CCX,
+            MatrixCompressionType.SELECT,
+            MatrixCompressionType.SELECT_AND,
+        ]
+        assert list(MatrixCompressionType) == expected_types
+        assert [op_type.qsharp_code for op_type in expected_types] == list(range(len(expected_types)))
 
     def test_to_operations_identity_mapping(self):
         """When active_qubit_indices is identity, ops stay the same."""

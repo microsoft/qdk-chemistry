@@ -17,10 +17,11 @@ namespace QDKChemistry.Utils.BinaryEncoding {
 
     /// A single gate produced by the matrix compression pipeline.
     ///
-    /// ``kind`` names the gate: X, CX, SWAP, CCX, SELECT, or SELECT_AND.
+    /// ``kind`` identifies X, CX, SWAP, CCX, SELECT, and SELECT_AND as 0 through 5.
+    /// These values match the declaration order of the Python ``MatrixCompressionType`` enum.
     /// ``qubits`` always contains qubit indices only.
     struct MatrixCompressionOp {
-        kind : String,
+        kind : Int,
         qubits : Int[],
         controlState : Int,
         lookupData : Bool[][],
@@ -33,16 +34,16 @@ namespace QDKChemistry.Utils.BinaryEncoding {
     /// therefore cannot be adjoint- or control-generated. Callers that only ever emit plain
     /// gates (such as the GF2+X expansion) can use this to stay adjointable.
     operation ApplyAdjointableCompressionOp(gate : MatrixCompressionOp, qs : Qubit[]) : Unit is Adj + Ctl {
-        if gate.kind == "X" {
+        if gate.kind == 0 {
             X(qs[gate.qubits[0]]);
-        } elif gate.kind == "CX" {
+        } elif gate.kind == 1 {
             CX(qs[gate.qubits[0]], qs[gate.qubits[1]]);
-        } elif gate.kind == "SWAP" {
+        } elif gate.kind == 2 {
             SWAP(qs[gate.qubits[0]], qs[gate.qubits[1]]);
-        } elif gate.kind == "CCX" {
+        } elif gate.kind == 3 {
             CCNOT(qs[gate.qubits[0]], qs[gate.qubits[1]], qs[gate.qubits[2]]);
         } else {
-            fail $"Unsupported adjointable matrix-compression operation: {gate.kind}.";
+            fail "Unsupported adjointable matrix-compression operation.";
         }
     }
 
@@ -50,12 +51,12 @@ namespace QDKChemistry.Utils.BinaryEncoding {
     /// SparseOneHotSelect may borrow as helpers (avoids allocating new qubits).
     /// Pass an empty array when no pool is available (e.g. for GF2+X ops).
     operation ApplyMatrixCompressionOp(gate : MatrixCompressionOp, qs : Qubit[], ancillaPool : Qubit[]) : Unit is Adj {
-        if gate.kind == "SELECT" or gate.kind == "SELECT_AND" {
+        if gate.kind == 4 or gate.kind == 5 {
             let numAddr = gate.controlState;
             let selectedQubits = Subarray(gate.qubits, qs);
             let addrQubits = selectedQubits[...numAddr - 1];
             let targetQubits = selectedQubits[numAddr...];
-            SparseOneHotSelect(gate.lookupData, addrQubits, targetQubits, gate.kind == "SELECT_AND", ancillaPool);
+            SparseOneHotSelect(gate.lookupData, addrQubits, targetQubits, gate.kind == 5, ancillaPool);
         } else {
             ApplyAdjointableCompressionOp(gate, qs);
         }

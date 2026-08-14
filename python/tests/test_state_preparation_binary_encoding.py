@@ -527,6 +527,27 @@ class TestCreateDense:
         assert binenc_qc.size() < gf2x_qc.size()
 
 
+class TestMatrixCompressionQsharpInterop:
+    """Regression tests for Q# compilation of serialized matrix-compression operations."""
+
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+    def test_base_nonbinary_f2_expansion_compiles(self, wavefunction_10e6o):
+        """The coherent three-determinant F2 expansion compiles through QIR and Qiskit."""
+        with use_qsharp_context(create_qsharp_context(target_profile=TargetProfile.Base)):
+            circuit = create(
+                "state_prep",
+                "sparse_isometry",
+                binary_encoding=False,
+                dense_state_prep=AlgorithmRef("state_prep", "dense_pure_state"),
+                measurement_based_uncompute=False,
+            ).run(wavefunction_10e6o)
+            assert str(circuit.get_qir())
+            qc = circuit.get_qiskit_circuit()
+
+        assert qc.num_qubits == 12
+        assert qc.num_clbits == 0
+
+
 class TestMeasurementBasedUncompute:
     """Tests for binary encoding with measurement-based AND uncomputation.
 
@@ -558,6 +579,8 @@ class TestMeasurementBasedUncompute:
             ozone_wf
         )
         measurement_count = circuit.estimate()["logicalCounts"]["measurementCount"]
+        assert measurement_count > 0
+        assert str(circuit.get_qir())
 
         qc = circuit.get_qiskit_circuit()
         ops = qc.count_ops()
