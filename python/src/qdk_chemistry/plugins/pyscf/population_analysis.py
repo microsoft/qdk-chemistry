@@ -8,8 +8,8 @@
 import numpy as np
 from pyscf.scf.hf import mulliken_pop
 
-from qdk_chemistry.algorithms import PopulationAnalyzer, ScfSolver
-from qdk_chemistry.data import AlgorithmRef, Settings, Wavefunction
+from qdk_chemistry.algorithms import PopulationAnalyzer
+from qdk_chemistry.data import Settings, Wavefunction
 from qdk_chemistry.data._spin_channels import spin_channel_indices
 from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.plugins.pyscf.conversion import orbitals_to_scf
@@ -89,11 +89,6 @@ class PyscfPopulationAnalysisSettings(Settings):
         Logger.trace_entering()
         super().__init__()
         self._set_default("method", "string", "mulliken", "Population-analysis method", ["mulliken"])
-        self._set_default(
-            "scf_solver",
-            "algorithm_ref",
-            AlgorithmRef("scf_solver", "pyscf"),
-        )
 
 
 class PyscfPopulationAnalyzer(PopulationAnalyzer):
@@ -115,10 +110,9 @@ class PyscfPopulationAnalyzer(PopulationAnalyzer):
         if method != "mulliken":
             raise ValueError(f"Unsupported PySCF population-analysis method: {method}")
 
-        scf_solver: ScfSolver = self._create_nested("scf_solver")
-        return self._populations_from_wavefunction(wavefunction, scf_solver)
+        return self._populations_from_wavefunction(wavefunction)
 
-    def _populations_from_wavefunction(self, wavefunction: Wavefunction, scf_solver: ScfSolver) -> list[float]:
+    def _populations_from_wavefunction(self, wavefunction: Wavefunction) -> list[float]:
         orbitals = wavefunction.get_orbitals()
         if orbitals is None:
             raise ValueError("PySCF population analysis requires a wavefunction with orbitals.")
@@ -126,16 +120,13 @@ class PyscfPopulationAnalyzer(PopulationAnalyzer):
             raise ValueError("PySCF population analysis requires orbitals with an associated basis set.")
 
         occ_alpha, occ_beta = wavefunction.get_total_orbital_occupations()
-        scf_settings = scf_solver.settings()
         mean_field = orbitals_to_scf(
             orbitals,
             np.asarray(occ_alpha, dtype=float),
             np.asarray(occ_beta, dtype=float),
-            scf_settings.get("scf_type"),
-            scf_settings.get("method"),
         )
         density = _density_from_wavefunction(wavefunction)
-        ao_populations, _ = mulliken_pop(mean_field.mol, density, s=mean_field.get_ovlp(), verbose=0)
+        ao_populations, _ = mulliken_pop(mean_field.mol, density, s=orbitals.get_overlap_matrix(), verbose=0)
         ao_slices = mean_field.mol.aoslice_by_atom()
         return [float(np.sum(ao_populations[start:stop])) for _, _, start, stop in ao_slices]
 

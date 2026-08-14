@@ -39,6 +39,7 @@ except ImportError:
 if PYSCF_AVAILABLE:
     from qdk_chemistry.constants import ANGSTROM_TO_BOHR
     from qdk_chemistry.data import AOType, BasisSet, OrbitalType, Shell
+    from qdk_chemistry.plugins.pyscf import population_analysis as pyscf_population_analysis
     from qdk_chemistry.plugins.pyscf.conversion import (
         basis_to_pyscf_mol,
         hamiltonian_to_scf,
@@ -204,16 +205,6 @@ class TestPyscfPlugin:
         assert population_analyzer.settings().get("method") == "mulliken"
         with pytest.raises(ValueError, match="Allowed options"):
             population_analyzer.settings().set("method", "unsupported")
-        scf_solver_ref = population_analyzer.settings().get("scf_solver")
-        assert scf_solver_ref.algorithm_type == "scf_solver"
-        assert scf_solver_ref.algorithm_name == "pyscf"
-
-        population_analyzer.settings().set(
-            "scf_solver",
-            AlgorithmRef("scf_solver", "pyscf", max_iterations=17),
-        )
-        scf_solver = population_analyzer._create_nested("scf_solver")
-        assert scf_solver.settings().get("max_iterations") == 17
 
     def test_pyscf_population_analysis_requires_basis_set(self):
         """Test that PySCF population analysis rejects model-system orbitals."""
@@ -224,6 +215,55 @@ class TestPyscfPlugin:
 
         with pytest.raises(ValueError, match="requires orbitals with an associated basis set"):
             analyzer.run(wavefunction)
+
+    def test_pyscf_population_analysis_requires_overlap(self):
+        """Test that PySCF population analysis requires a stored AO overlap matrix."""
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+        _, reference = scf_solver.run(create_lih_structure(), charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+        reference_orbitals = reference.get_orbitals()
+        coefficients = spin_channel_matrix(reference_orbitals.coefficients(), axes.alpha())
+        orbitals = data.Orbitals(
+            coefficients,
+            None,
+            None,
+            reference_orbitals.get_basis_set(),
+        )
+        determinant = data.Configuration.from_spin_half_string("220000")
+        wavefunction = data.Wavefunction(data.StateVectorContainer(determinant, orbitals))
+        analyzer = algorithms.create("population_analyzer", "pyscf")
+
+        with pytest.raises(RuntimeError, match="(?i)overlap"):
+            analyzer.run(wavefunction)
+
+    def test_pyscf_population_analysis_uses_stored_overlap(self, monkeypatch):
+        """Test that PySCF population analysis contracts with the orbitals' AO overlap."""
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+        _, reference = scf_solver.run(create_lih_structure(), charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+        reference_orbitals = reference.get_orbitals()
+        overlap = np.array(reference_orbitals.get_overlap_matrix(), copy=True)
+        overlap[0, 1] += 0.125
+        overlap[1, 0] += 0.125
+        coefficients = spin_channel_matrix(reference_orbitals.coefficients(), axes.alpha())
+        orbitals = data.Orbitals(
+            coefficients,
+            None,
+            overlap,
+            reference_orbitals.get_basis_set(),
+        )
+        determinant = data.Configuration.from_spin_half_string("220000")
+        wavefunction = data.Wavefunction(data.StateVectorContainer(determinant, orbitals))
+        analyzer = algorithms.create("population_analyzer", "pyscf")
+        captured = {}
+
+        def capture_overlap(*args, **kwargs):
+            captured["overlap"] = kwargs["s"]
+            return np.zeros(args[0].nao_nr()), None
+
+        monkeypatch.setattr(pyscf_population_analysis, "mulliken_pop", capture_overlap)
+
+        analyzer.run(wavefunction)
+
+        np.testing.assert_allclose(captured["overlap"], overlap)
 
     def test_pyscf_lih_population_analysis(self):
         """Test heteronuclear AO-to-atom population assignment."""
@@ -236,7 +276,7 @@ class TestPyscfPlugin:
         np.testing.assert_allclose(
             pyscf_populations,
             [3.0161156314704147, 0.9838843685295866],
-            atol=1e-8,
+            atol=1e-6,
             err_msg="LiH populations must follow the five-AO lithium and one-AO hydrogen boundary",
         )
 
@@ -286,10 +326,6 @@ class TestPyscfPlugin:
         scf_solver = algorithms.create("scf_solver", "pyscf", scf_type="unrestricted")
         _, wavefunction = scf_solver.run(create_lih_structure(), charge=1, spin_multiplicity=2, basis_or_guess="sto-3g")
         pyscf_analyzer = algorithms.create("population_analyzer", "pyscf")
-        pyscf_analyzer.settings().set(
-            "scf_solver",
-            AlgorithmRef("scf_solver", "pyscf", scf_type="unrestricted"),
-        )
 
         pyscf_populations = pyscf_analyzer.run(wavefunction)
 

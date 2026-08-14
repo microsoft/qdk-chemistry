@@ -84,6 +84,33 @@ std::shared_ptr<Wavefunction> create_unrestricted_molecular_wavefunction() {
 }
 
 std::shared_ptr<Wavefunction>
+create_correlated_molecular_wavefunction_with_ao_overlap() {
+  std::vector<Eigen::Vector3d> coordinates = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}};
+  std::vector<std::string> symbols = {"H", "H"};
+  auto structure = std::make_shared<Structure>(coordinates, symbols);
+  std::vector<Shell> shells = {
+      Shell(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0}),
+      Shell(1, OrbitalType::S, std::vector{1.0}, std::vector{1.0})};
+  auto basis = std::make_shared<BasisSet>("minimal", shells, structure);
+
+  Eigen::MatrixXd overlap(2, 2);
+  overlap << 1.0, 0.3, 0.3, 1.0;
+  Eigen::MatrixXd coefficients =
+      overlap.llt().matrixU().solve(Eigen::MatrixXd::Identity(2, 2));
+  auto orbitals =
+      std::make_shared<Orbitals>(coefficients, std::nullopt, overlap, basis);
+
+  std::vector<Configuration> determinants = {
+      Configuration::from_spin_half_string("20")};
+  Eigen::VectorXd state_coefficients = Eigen::VectorXd::Ones(1);
+  Eigen::MatrixXd one_rdm(2, 2);
+  one_rdm << 1.5, 0.5, 0.5, 0.5;
+  auto container = std::make_unique<StateVectorContainer>(
+      state_coefficients, determinants, orbitals, one_rdm, std::nullopt);
+  return std::make_shared<Wavefunction>(std::move(container));
+}
+
+std::shared_ptr<Wavefunction>
 create_correlated_molecular_wavefunction_with_inactive_core() {
   std::vector<Eigen::Vector3d> coordinates = {
       {0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}, {0.0, 0.0, 2.8}};
@@ -178,6 +205,17 @@ TEST(PopulationAnalyzerTest, QdkAnalyzerUsesUnrestrictedMolecularDensity) {
   ASSERT_EQ(populations.size(), 2);
   EXPECT_NEAR(populations[0], 2.0, 1e-12);
   EXPECT_NEAR(populations[1], 1.0, 1e-12);
+}
+
+TEST(PopulationAnalyzerTest, QdkAnalyzerContractsDensityWithAoOverlap) {
+  auto analyzer = PopulationAnalyzerFactory::create("qdk");
+
+  auto populations =
+      analyzer->run(create_correlated_molecular_wavefunction_with_ao_overlap());
+
+  ASSERT_EQ(populations.size(), 2);
+  EXPECT_NEAR(populations[0], 1.342757274492, 1e-12);
+  EXPECT_NEAR(populations[1], 0.657242725508, 1e-12);
 }
 
 TEST(PopulationAnalyzerTest, QdkAnalyzerUsesMolecularOneRdmAndInactiveCore) {
