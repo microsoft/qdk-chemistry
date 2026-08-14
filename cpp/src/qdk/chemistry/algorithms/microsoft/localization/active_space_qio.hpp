@@ -13,12 +13,12 @@
 namespace qdk::chemistry::algorithms::microsoft {
 
 /**
- * @class QIOLocalizerSettings
- * @brief Tunable Jacobi-sweep controls for the QIO localizer.
+ * @class ActiveSpaceQIOLocalizerSettings
+ * @brief Tunable Jacobi-sweep controls for the active-space QIO localizer.
  */
-class QIOLocalizerSettings : public data::Settings {
+class ActiveSpaceQIOLocalizerSettings : public data::Settings {
  public:
-  QIOLocalizerSettings() {
+  ActiveSpaceQIOLocalizerSettings() {
     set_default(
         "max_cycles", int64_t{200},
         "Maximum number of Jacobi sweeps over all active orbital pairs",
@@ -46,37 +46,39 @@ class QIOLocalizerSettings : public data::Settings {
 };
 
 /**
- * @class QIOLocalizer
+ * @class ActiveSpaceQIOLocalizer
  * @brief Quantum-information orbital (QIO) active-space localizer.
  *
  * Rotates restricted active orbitals to minimize the total single-orbital
  * entropy using gradient-free Jacobi sweeps. The input wavefunction must
  * provide spin-dependent active-space 1- and 2-RDMs.
  *
- * This localizer performs only the active-space orbital-rotation optimization
- * used within QICAS. It does not implement the self-consistent QICAS outer loop
- * that alternates orbital optimization with correlated wavefunction updates.
+ * This localizer minimizes the QIO objective restricted to rotations within a
+ * fixed active space. It does not implement full-space QIO or QICAS, both of
+ * which mix orbitals across the active-space boundary.
  *
  * @see Wavefunction::get_single_orbital_entropies
  */
-class QIOLocalizer : public Localizer {
+class ActiveSpaceQIOLocalizer : public Localizer {
  public:
   /**
    * @brief Default constructor
    */
-  QIOLocalizer() { _settings = std::make_unique<QIOLocalizerSettings>(); }
+  ActiveSpaceQIOLocalizer() {
+    _settings = std::make_unique<ActiveSpaceQIOLocalizerSettings>();
+  }
 
   /**
    * @brief Virtual destructor
    */
-  ~QIOLocalizer() override = default;
+  ~ActiveSpaceQIOLocalizer() override = default;
 
   /**
    * @brief Access the algorithm's name
    *
    * @return The algorithm's name
    */
-  virtual std::string name() const final { return "qdk_qio"; }
+  virtual std::string name() const final { return "qdk_active_space_qio"; }
 
  protected:
   /**

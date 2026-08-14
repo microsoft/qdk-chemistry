@@ -9,10 +9,10 @@
 #include <qdk/chemistry.hpp>
 
 #include "factory_bindings.hpp"
+#include "qdk/chemistry/algorithms/microsoft/localization/active_space_qio.hpp"
 #include "qdk/chemistry/algorithms/microsoft/localization/mp2_natural_orbitals.hpp"
 #include "qdk/chemistry/algorithms/microsoft/localization/natural_orbitals.hpp"
 #include "qdk/chemistry/algorithms/microsoft/localization/pipek_mezey.hpp"
-#include "qdk/chemistry/algorithms/microsoft/localization/qio.hpp"
 #include "qdk/chemistry/algorithms/microsoft/localization/vvhv.hpp"
 
 namespace py = pybind11;
@@ -337,17 +337,17 @@ Initializes a natural orbital transformer with default settings.
 
 )");
 
-  // Bind concrete microsoft::QIOLocalizer implementation
-  py::class_<microsoft::QIOLocalizer, Localizer, py::smart_holder>(
-      m, "QdkQIOLocalizer", R"(
+  // Bind concrete microsoft::ActiveSpaceQIOLocalizer implementation
+  py::class_<microsoft::ActiveSpaceQIOLocalizer, Localizer, py::smart_holder>(
+      m, "QdkActiveSpaceQIOLocalizer", R"(
 QDK quantum-information orbital (QIO) active-space localizer.
 
 Rotates restricted active orbitals to minimize the total single-orbital entropy
 using gradient-free Jacobi sweeps.
 
-This class implements only the active-space orbital-rotation optimization used
-within QICAS. It does not implement the self-consistent QICAS outer loop that
-alternates orbital optimization with correlated wavefunction updates.
+This class minimizes the QIO objective restricted to rotations within a fixed
+active space. It does not implement full-space QIO or QICAS, both of which mix
+orbitals across the active-space boundary.
 
 .. note::
     Requires a restricted active orbital space, matching alpha and beta

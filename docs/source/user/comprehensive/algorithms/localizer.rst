@@ -180,12 +180,12 @@ For unrestricted inputs, spin-dependent active-space 1-RDM blocks are combined i
 
 This implementation has no configurable settings.
 
-.. _localizer-qdk-qio:
+.. _localizer-qdk-active-space-qio:
 
-QDK Quantum-Information Orbitals
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+QDK Active-Space Quantum-Information Orbitals
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. rubric:: Factory name: ``"qdk_qio"``
+.. rubric:: Factory name: ``"qdk_active_space_qio"``
 
 Transforms active orbitals by minimizing the sum of their single-orbital entropies with gradient-free Jacobi sweeps.
 The objective uses the same entropy convention as :meth:`~qdk_chemistry.data.Wavefunction.get_single_orbital_entropies`.
@@ -197,8 +197,8 @@ The selected alpha and beta indices must be identical and match the active-space
 
 The localizer optimizes against the fixed input density matrices and returns a single orbital rotation.
 It does not recompute the correlated wavefunction after rotating the orbitals.
-It therefore implements the active-space orbital-rotation optimization used within QICAS, not the complete QICAS method.
-The self-consistent QICAS workflow, which alternates these rotations with Hamiltonian reconstruction and correlated wavefunction updates, will be added separately.
+It minimizes the quantum-information-orbital objective restricted to rotations within a fixed active space.
+It does not implement full-space QIO or QICAS, both of which mix orbitals across the active-space boundary and require a self-consistent correlated workflow.
 
 .. rubric:: Settings
 

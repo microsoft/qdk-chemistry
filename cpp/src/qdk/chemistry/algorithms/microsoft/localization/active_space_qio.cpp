@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include "qio.hpp"
+#include "active_space_qio.hpp"
 
 #include <Eigen/Dense>
 #include <algorithm>
@@ -296,7 +296,7 @@ Eigen::MatrixXd optimize_rotation(Eigen::MatrixXd& rdm_alpha,
 
 }  // namespace detail
 
-std::shared_ptr<data::Wavefunction> QIOLocalizer::_run_impl(
+std::shared_ptr<data::Wavefunction> ActiveSpaceQIOLocalizer::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction,
     const std::vector<size_t>& loc_indices_a,
     const std::vector<size_t>& loc_indices_b) const {
@@ -326,13 +326,15 @@ std::shared_ptr<data::Wavefunction> QIOLocalizer::_run_impl(
 
   if (!orbitals->is_restricted()) {
     throw std::invalid_argument(
-        "QIOLocalizer requires a single spatial orbital set (RHF/ROHF); "
+        "ActiveSpaceQIOLocalizer requires a single spatial orbital set "
+        "(RHF/ROHF); "
         "unrestricted (UHF) orbitals are not supported.");
   }
 
   if (!orbitals->has_active_space()) {
     throw std::invalid_argument(
-        "QIOLocalizer requires an active space to be defined in the orbitals.");
+        "ActiveSpaceQIOLocalizer requires an active space to be defined in the "
+        "orbitals.");
   }
 
   // The output Orbitals carry the AO overlap matrix; require it up front so a
@@ -340,7 +342,8 @@ std::shared_ptr<data::Wavefunction> QIOLocalizer::_run_impl(
   // input checks) rather than a std::runtime_error from get_overlap_matrix().
   if (!orbitals->has_overlap_matrix()) {
     throw std::invalid_argument(
-        "QIOLocalizer requires an overlap matrix to be available in the "
+        "ActiveSpaceQIOLocalizer requires an overlap matrix to be available in "
+        "the "
         "orbitals.");
   }
 
@@ -351,7 +354,8 @@ std::shared_ptr<data::Wavefunction> QIOLocalizer::_run_impl(
       data::spin_channel_indices(active_index_set, data::axes::beta());
   if (loc_indices_a != active_indices_a || loc_indices_b != active_indices_b) {
     throw std::invalid_argument(
-        "QIOLocalizer requires loc_indices_a and loc_indices_b to match the "
+        "ActiveSpaceQIOLocalizer requires loc_indices_a and loc_indices_b to "
+        "match the "
         "orbitals' active-space indices.");
   }
 
@@ -367,7 +371,8 @@ std::shared_ptr<data::Wavefunction> QIOLocalizer::_run_impl(
   if (!wavefunction->has_one_rdm_spin_dependent() ||
       !wavefunction->has_two_rdm_spin_dependent()) {
     throw std::invalid_argument(
-        "QIOLocalizer requires spin-dependent active 1- and 2-RDMs in the "
+        "ActiveSpaceQIOLocalizer requires spin-dependent active 1- and 2-RDMs "
+        "in the "
         "wavefunction.");
   }
 
@@ -384,7 +389,7 @@ std::shared_ptr<data::Wavefunction> QIOLocalizer::_run_impl(
           &wavefunction->active_two_rdm());
   if (!active_one_rdm || !active_two_rdm) {
     throw std::invalid_argument(
-        "QIOLocalizer requires real-valued active RDMs.");
+        "ActiveSpaceQIOLocalizer requires real-valued active RDMs.");
   }
   const auto& rdm_aa =
       active_one_rdm->block({data::axes::alpha(), data::axes::alpha()});
@@ -421,8 +426,9 @@ std::shared_ptr<data::Wavefunction> QIOLocalizer::_run_impl(
   // so reject non-finite double settings explicitly.
   const auto require_finite = [](const char* setting_name, double value) {
     if (!std::isfinite(value)) {
-      throw std::invalid_argument(std::string("QIOLocalizer setting '") +
-                                  setting_name + "' must be finite.");
+      throw std::invalid_argument(
+          std::string("ActiveSpaceQIOLocalizer setting '") + setting_name +
+          "' must be finite.");
     }
   };
   require_finite("convergence_tolerance", convergence_tolerance);

@@ -1,4 +1,4 @@
-"""Integration tests for the QdkQIOLocalizer Python bindings."""
+"""Integration tests for the QdkActiveSpaceQIOLocalizer Python bindings."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -11,7 +11,7 @@ import pytest
 from qdk_chemistry import algorithms, data
 from qdk_chemistry.algorithms import (
     OrbitalLocalizer,
-    QdkQIOLocalizer,
+    QdkActiveSpaceQIOLocalizer,
     create,
 )
 
@@ -56,31 +56,31 @@ def _correlated_cas_wavefunction(structure_path, multiplicity, n_active_e, n_act
     return active_wfn, cas_energy, cas_wfn
 
 
-class TestQIOLocalizerBindings:
-    """Test that the QdkQIOLocalizer Python bindings work correctly."""
+class TestActiveSpaceQIOLocalizerBindings:
+    """Test that the QdkActiveSpaceQIOLocalizer Python bindings work correctly."""
 
     def test_factory_registration(self):
-        """The QIO localizer is registered in the factory."""
+        """The active-space QIO localizer is registered in the factory."""
         available = algorithms.available("orbital_localizer")
-        assert "qdk_qio" in available
+        assert "qdk_active_space_qio" in available
 
     def test_factory_creation(self):
         """Creating the localizer via the factory."""
-        localizer = algorithms.create("orbital_localizer", "qdk_qio")
+        localizer = algorithms.create("orbital_localizer", "qdk_active_space_qio")
         assert localizer is not None
         assert isinstance(localizer, OrbitalLocalizer)
 
     def test_direct_construction(self):
-        """Direct construction of QdkQIOLocalizer."""
-        localizer = QdkQIOLocalizer()
+        """Direct construction of QdkActiveSpaceQIOLocalizer."""
+        localizer = QdkActiveSpaceQIOLocalizer()
         assert localizer is not None
         assert isinstance(localizer, OrbitalLocalizer)
-        assert localizer.name() == "qdk_qio"
+        assert localizer.name() == "qdk_active_space_qio"
         assert localizer.type_name() == "orbital_localizer"
 
     def test_settings(self):
         """The localizer provides a settings interface."""
-        localizer = QdkQIOLocalizer()
+        localizer = QdkActiveSpaceQIOLocalizer()
         assert localizer.settings() is not None
 
     @pytest.mark.parametrize(
@@ -127,7 +127,7 @@ class TestQIOLocalizerBindings:
             assert n_a != n_b
 
         entropy_before = float(np.sum(cas_wfn.get_single_orbital_entropies()))
-        localizer = create("orbital_localizer", "qdk_qio")
+        localizer = create("orbital_localizer", "qdk_active_space_qio")
         qio_wfn = localizer.run(cas_wfn, active_indices, active_indices)
         assert qio_wfn is not None
 
@@ -147,7 +147,7 @@ class TestQIOLocalizerBindings:
 
     def test_settings_defaults_and_override(self):
         """The Jacobi-sweep controls are exposed with defaults and settable."""
-        localizer = QdkQIOLocalizer()
+        localizer = QdkActiveSpaceQIOLocalizer()
         settings = localizer.settings()
         assert settings.get("max_cycles") == 200
         settings.set("max_cycles", 50)
