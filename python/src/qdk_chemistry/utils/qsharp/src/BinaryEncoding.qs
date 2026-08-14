@@ -143,107 +143,65 @@ namespace QDKChemistry.Utils.BinaryEncoding {
             let parts = Partitioned([2^(n - 1)], data);
             let leftEmpty = IsDataAllZeros(parts[0]);
             let rightEmpty = IsDataAllZeros(parts[1]);
-            let poolLen = Length(ancillaPool);
 
-            if not leftEmpty and not rightEmpty {
-                if poolLen > 0 {
-                    let helper = ancillaPool[0];
-                    let restPool = ancillaPool[1...];
-                    if useMeasurementAND {
-                        within { X(tail); } apply {
-                            AND(ctl, tail, helper);
-                        }
-                        SparseOneHotSCS(helper, parts[0], most, target, true, restPool);
-                        CNOT(ctl, helper);
-                        SparseOneHotSCS(helper, parts[1], most, target, true, restPool);
-                        Adjoint AND(ctl, tail, helper);
-                    } else {
-                        within { X(tail); } apply {
-                            CCNOT(ctl, tail, helper);
-                        }
-                        SparseOneHotSCS(helper, parts[0], most, target, false, restPool);
-                        CNOT(ctl, helper);
-                        SparseOneHotSCS(helper, parts[1], most, target, false, restPool);
-                        CCNOT(ctl, tail, helper);
-                    }
-                } else {
-                    use helper = Qubit();
-                    if useMeasurementAND {
-                        within { X(tail); } apply {
-                            AND(ctl, tail, helper);
-                        }
-                        SparseOneHotSCS(helper, parts[0], most, target, true, []);
-                        CNOT(ctl, helper);
-                        SparseOneHotSCS(helper, parts[1], most, target, true, []);
-                        Adjoint AND(ctl, tail, helper);
-                    } else {
-                        within { X(tail); } apply {
-                            CCNOT(ctl, tail, helper);
-                        }
-                        SparseOneHotSCS(helper, parts[0], most, target, false, []);
-                        CNOT(ctl, helper);
-                        SparseOneHotSCS(helper, parts[1], most, target, false, []);
-                        CCNOT(ctl, tail, helper);
-                    }
-                }
-            } elif not rightEmpty {
-                if poolLen > 0 {
-                    let helper = ancillaPool[0];
-                    let restPool = ancillaPool[1...];
-                    if useMeasurementAND {
-                        AND(ctl, tail, helper);
-                        SparseOneHotSCS(helper, parts[1], most, target, true, restPool);
-                        Adjoint AND(ctl, tail, helper);
-                    } else {
-                        CCNOT(ctl, tail, helper);
-                        SparseOneHotSCS(helper, parts[1], most, target, false, restPool);
-                        CCNOT(ctl, tail, helper);
-                    }
-                } else {
-                    use helper = Qubit();
-                    if useMeasurementAND {
-                        AND(ctl, tail, helper);
-                        SparseOneHotSCS(helper, parts[1], most, target, true, []);
-                        Adjoint AND(ctl, tail, helper);
-                    } else {
-                        CCNOT(ctl, tail, helper);
-                        SparseOneHotSCS(helper, parts[1], most, target, false, []);
-                        CCNOT(ctl, tail, helper);
-                    }
-                }
-            } elif not leftEmpty {
-                if poolLen > 0 {
-                    let helper = ancillaPool[0];
-                    let restPool = ancillaPool[1...];
-                    if useMeasurementAND {
-                        X(tail);
-                        AND(ctl, tail, helper);
-                        SparseOneHotSCS(helper, parts[0], most, target, true, restPool);
-                        Adjoint AND(ctl, tail, helper);
-                        X(tail);
-                    } else {
-                        X(tail);
-                        CCNOT(ctl, tail, helper);
-                        SparseOneHotSCS(helper, parts[0], most, target, false, restPool);
-                        CCNOT(ctl, tail, helper);
-                        X(tail);
-                    }
-                } else {
-                    use helper = Qubit();
-                    if useMeasurementAND {
-                        X(tail);
-                        AND(ctl, tail, helper);
-                        SparseOneHotSCS(helper, parts[0], most, target, true, []);
-                        Adjoint AND(ctl, tail, helper);
-                        X(tail);
-                    } else {
-                        X(tail);
-                        CCNOT(ctl, tail, helper);
-                        SparseOneHotSCS(helper, parts[0], most, target, false, []);
-                        CCNOT(ctl, tail, helper);
-                        X(tail);
-                    }
-                }
+            if leftEmpty and rightEmpty {
+                // Both halves empty: nothing to recurse into.
+            } elif Length(ancillaPool) > 0 {
+                SparseOneHotSCSStep(
+                    ctl,
+                    tail,
+                    ancillaPool[0],
+                    parts,
+                    most,
+                    target,
+                    leftEmpty,
+                    rightEmpty,
+                    useMeasurementAND,
+                    ancillaPool[1...]
+                );
+            } else {
+                use helper = Qubit();
+                SparseOneHotSCSStep(ctl, tail, helper, parts, most, target, leftEmpty, rightEmpty, useMeasurementAND, []);
+            }
+        }
+    }
+
+    /// One recursion level of `SparseOneHotSCS`, given the branch ancilla to use.
+    ///
+    /// Split out so the pooled and freshly-allocated helper cases share a body; `use` scoping
+    /// is the only reason the caller distinguishes them.
+    operation SparseOneHotSCSStep(
+        ctl : Qubit,
+        tail : Qubit,
+        helper : Qubit,
+        parts : Bool[][][],
+        most : Qubit[],
+        target : Qubit[],
+        leftEmpty : Bool,
+        rightEmpty : Bool,
+        useMeasurementAND : Bool,
+        restPool : Qubit[]
+    ) : Unit is Adj {
+        // CCNOT is self-adjoint, so both strategies uncompute via `Adjoint andOp`.
+        let andOp : (Qubit, Qubit, Qubit) => Unit is Adj = useMeasurementAND ? AND | CCNOT;
+
+        if not leftEmpty and not rightEmpty {
+            within { X(tail); } apply {
+                andOp(ctl, tail, helper);
+            }
+            SparseOneHotSCS(helper, parts[0], most, target, useMeasurementAND, restPool);
+            CNOT(ctl, helper);
+            SparseOneHotSCS(helper, parts[1], most, target, useMeasurementAND, restPool);
+            Adjoint andOp(ctl, tail, helper);
+        } elif not rightEmpty {
+            andOp(ctl, tail, helper);
+            SparseOneHotSCS(helper, parts[1], most, target, useMeasurementAND, restPool);
+            Adjoint andOp(ctl, tail, helper);
+        } else {
+            within { X(tail); } apply {
+                andOp(ctl, tail, helper);
+                SparseOneHotSCS(helper, parts[0], most, target, useMeasurementAND, restPool);
+                Adjoint andOp(ctl, tail, helper);
             }
         }
     }
@@ -271,10 +229,6 @@ namespace QDKChemistry.Utils.BinaryEncoding {
     /// The dense preparation is taken as *parameters* rather than as a callable: a callable
     /// that captures another callable cannot be resolved statically by the adaptive-profile
     /// code generator, which makes the composition unusable as a QPE `statePrep` argument.
-    ///
-    /// Unlike `StatePreparation.ComposeSparseIsometry`, this is deliberately *not* `Adj`:
-    /// the binary-encoding sequence may contain SELECT/SELECT_AND, which borrow ancilla and
-    /// uncompute by measurement, so no adjoint can be generated.
     operation ComposeBinaryEncoding(
         denseParams : StatePreparationParams,
         embeddingMap : Int[],
