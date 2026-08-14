@@ -26,13 +26,8 @@ def _dense_register_width(num_cols: int) -> int:
     return 1 if num_cols < 2 else math.ceil(math.log2(num_cols))
 
 
-def _int_to_bits(val: int, nbits: int) -> list[bool]:
-    """Local helper mirroring the inlined _int_to_bits."""
-    return [bool((val >> i) & 1) for i in range(nbits - 1, -1, -1)]
-
-
 def _bits_to_int(bits) -> int:
-    """Local helper mirroring the inlined _bits_to_int."""
+    """Decode a big-endian bit row, used to read dense labels back out of the tableau."""
     return sum(int(b) << i for i, b in enumerate(reversed(list(bits))))
 
 
@@ -51,71 +46,6 @@ def _get_ops(synth, num_local_qubits):
         active_qubit_indices=list(range(num_local_qubits)),
         ancilla_start=num_local_qubits,
     )
-
-
-class TestDenseQubitsSize:
-    """Tests for RefTableau.dense_register_width."""
-
-    @pytest.mark.parametrize(
-        ("num_cols", "expected"),
-        [
-            (1, 1),
-            (2, 1),
-            (3, 2),
-            (4, 2),
-            (5, 3),
-            (8, 3),
-            (16, 4),
-            (1000, 10),
-        ],
-    )
-    def test_dense_register_width(self, num_cols, expected):
-        """ceil(log2(num_cols)) must equal the expected dense register width."""
-        assert _dense_register_width(num_cols) == expected
-
-
-class TestIntToBits:
-    """Tests for _int_to_bits helper."""
-
-    @pytest.mark.parametrize(
-        ("val", "nbits", "expected"),
-        [
-            (0, 4, [False, False, False, False]),
-            (1, 4, [False, False, False, True]),
-            (15, 4, [True, True, True, True]),
-            (5, 3, [True, False, True]),
-            (0, 1, [False]),
-            (1, 1, [True]),
-            (3, 5, [False, False, False, True, True]),
-        ],
-    )
-    def test_int_to_bits(self, val, nbits, expected):
-        """Integer must convert to the expected big-endian bit list."""
-        assert _int_to_bits(val, nbits) == expected
-
-
-class TestBitsToInt:
-    """Tests for _bits_to_int helper."""
-
-    @pytest.mark.parametrize(
-        ("bits", "expected"),
-        [
-            ([0, 0, 0], 0),
-            ([1, 1, 1, 1], 15),
-            ([1, 0, 1], 5),
-            ([1], 1),
-            ([0], 0),
-            ([True, False, True], 5),
-        ],
-    )
-    def test_bits_to_int(self, bits, expected):
-        """Big-endian bit list must convert to the expected integer."""
-        assert _bits_to_int(bits) == expected
-
-    def test_roundtrip(self):
-        """Int -> bits -> int must be the identity for all 4-bit values."""
-        for val in range(16):
-            assert _bits_to_int(_int_to_bits(val, 4)) == val
 
 
 class TestCheckRef:
@@ -190,7 +120,7 @@ class TestRefTableau:
         t = self._make_ref(3, 2)
         assert t.num_rows == 4
         assert t.num_cols == 5
-        assert t.dense_size == _dense_register_width(5)
+        assert t.dense_size == 3  # ceil(log2(5)) — 5 determinants need a 3-qubit dense register
         assert len(t.pivots) == 3
 
     def test_construction_rejects_non_ref(self):
@@ -269,7 +199,7 @@ class TestBinaryEncodingSynthesizerBasic:
         """Identity REF matrix should produce a valid synthesiser."""
         mat = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]], dtype=np.int8)
         synth = _run_synth(mat)
-        assert synth.tableau.dense_size == _dense_register_width(4)
+        assert synth.tableau.dense_size == 2  # ceil(log2(4))
         assert len(synth.bijection) == 4
 
     def test_from_matrix_rejects_non_ref(self):
