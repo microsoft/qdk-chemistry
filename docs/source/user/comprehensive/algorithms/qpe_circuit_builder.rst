@@ -76,7 +76,7 @@ Once configured, the :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_
 Available Implementations
 -------------------------
 
-QDK/Chemistry provides two primary implementations of :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilder`:
+QDK/Chemistry provides three primary implementations of :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilder`:
 
 Iterative Phase Estimation Circuit Builder (IQPE)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -139,6 +139,34 @@ Constructs the textbook multi-ancilla QPE circuit with inverse Quantum Fourier T
    :start-after: start-cell-configure-standard
    :end-before: end-cell-configure-standard
 
+Unary-iteration Phase Estimation Circuit Builder
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. rubric:: Class: ``QdkUnaryQpeCircuitBuilder`` (QDK native)
+
+.. rubric:: Factory name: ``"qdk_unary"``
+
+Constructs a single flat chain of :math:`p` qubitized walk queries and uses unary iteration over the phase register to select which of the interleaved reflections is omitted, which realizes :math:`W^{2a-p}` from one chain :cite:`Babbush2018` :cite:`Lee2021`.
+Precision is therefore set by ``num_queries`` directly rather than by a bit count, so any positive query count is spendable instead of rounding up to the next power of two. The phase register is sized to :math:`\lceil \log_2(p+1) \rceil` and ``num_bits`` is ignored.
+
+This builder requires a qubitized walk, so ``unitary_builder`` must be an LCU builder with ``quantum_walk=True`` (its default here); there is no Trotter path.
+
+**Additional settings:**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 15 65
+
+   * - Setting
+     - Type
+     - Description
+   * - ``num_queries``
+     - int
+     - Number of walk queries :math:`p`. For a target energy error :math:`\epsilon`, the Heisenberg-limited setting is :math:`p = \lceil \pi \lambda / (2\epsilon) \rceil` with :math:`\lambda` the block-encoding 1-norm. Need not be a power of two.
+   * - ``circuit_mapper``
+     - AlgorithmRef
+     - Mapper producing the uncontrolled block encoding. It must lay the register out as ``[system | ancilla]`` and expose a reflection over that ancilla tail via ``reflection_op``. Default: ``"prepare_select_prepare"``.
+
 Circuit Composition Details
 ----------------------------
 
@@ -148,6 +176,8 @@ The phase estimation circuit is built by composing:
 2. **Controlled Unitaries** — Applies controlled powers of the unitary operator :math:`C\text{-}U^{2^k}` to extract phase information
 3. **Phase Feedback (IQPE only)** — Applies adaptive phase corrections between iterations
 4. **Measurement/QFT** — For standard QPE, applies the inverse QFT before measurement
+
+The unary-iteration builder replaces steps 2 and 3 with a single uncontrolled query chain whose omitted reflection is selected by unary iteration, so it composes a state preparation, that chain, an inverse QFT, and measurement.
 
 To accomplish this, the :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilder` maintains two key nested algorithm references:
 

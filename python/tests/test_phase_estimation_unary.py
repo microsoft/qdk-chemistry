@@ -236,12 +236,36 @@ class TestPhaseDecoding:
             assert positive.canonical_phase_fraction + negative.canonical_phase_fraction == pytest.approx(0.5)
             assert positive.raw_energy == pytest.approx(-negative.raw_energy)
 
+    @pytest.mark.parametrize("num_bits", [1, 2, 3, 4])
+    def test_branching_names_both_branches_even_where_they_coincide(self, num_bits):
+        """``branching`` counts the branches weighed, not the distinct values they took.
+
+        At ``canonical_phase_fraction == 1/4`` both branches give ``E = 0``. Deduplicating
+        them would report a one-candidate tuple, which is how ``QpeResult`` spells "no alias
+        resolution happened" — the opposite of what this decoder just did.
+        """
+        for value in range(1 << num_bits):
+            counts = {format(value, f"0{num_bits}b"): 1}
+            for use_positive_sign in (True, False):
+                result = _decode(counts, num_bits, use_positive_sign=use_positive_sign)
+                assert len(result.branching) == 2
+                assert result.raw_energy in result.branching
+                assert result.branching == tuple(sorted(result.branching))
+
+    def test_branching_is_still_two_candidates_at_the_degenerate_phase(self):
+        """The half-way bin is the one that collapses, so pin it directly."""
+        result = _decode({"10": 1}, 2, use_positive_sign=True)
+        assert result.canonical_phase_fraction == pytest.approx(0.25)
+        assert result.branching == pytest.approx((0.0, 0.0), abs=1e-12)
+
 
 class _FixedWidthMapper:
     """A circuit mapper that reports a chosen register width and nothing else.
 
     The builder locates the reflected qubits from ``Circuit.num_qubits``, so the width a
-    mapper declares is the only thing these tests need to vary.
+    mapper declares is what the width-rejection tests vary. Declaring no ``reflection_op``
+    is the other half of "nothing else", which is what makes this double as the mapper the
+    reflection-rejection test needs.
     """
 
     def __init__(self, num_qubits: int | None) -> None:
@@ -325,6 +349,15 @@ class TestInvalidConfigurationIsRejected:
         """A width that leaves no ancilla past the system register has no reflection."""
         with pytest.raises(ValueError, match="non-empty ancilla register"):
             self._build_with_mapper(_FixedWidthMapper(declared_width))
+
+    def test_a_mapper_that_exposes_no_reflection_is_rejected(self):
+        """The schedule omits one reflection, so the mapper has to say what it reflects about.
+
+        Deriving the boundary from the Hamiltonian width instead would silently reflect over
+        whatever the mapper considers system when the two disagree.
+        """
+        with pytest.raises(ValueError, match="does not expose reflection_op"):
+            self._build_with_mapper(_FixedWidthMapper(2))
 
     def test_a_non_unary_circuit_builder_is_rejected(self):
         """The algorithm decodes a doubled phase, so it needs its own builder."""
@@ -560,7 +593,6 @@ def test_the_builder_reflects_the_ancilla_tail_the_mapper_declared():
     """Every qubit the mapper exposes past the system register is reflected about."""
     hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([0.5, 0.5]))
     rep = LCUBuilder(quantum_walk=True).run(hamiltonian)
-    hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([0.5, 0.5]))
     declared = PSPMapper().run(rep).num_qubits
     assert declared is not None
 

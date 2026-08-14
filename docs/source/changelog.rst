@@ -10,7 +10,9 @@ Version 2.1.0
 See :ref:`release-v2.1.0` for full details.
 
 - Geometry optimization as a first-class algorithm type (``geometry_optimizer``), with a geomeTRIC-backed implementation driven by the existing nuclear derivative calculators
+- Unary-iteration phase estimation (``qdk_unary``), which spends an arbitrary number of qubitized walk queries instead of rounding up to the next power of two; see :ref:`unary-qpe-algorithm`
 - Vendored Q# utilities load into a private ``qdk.Context`` instead of the global interpreter, so importing ``qdk_chemistry`` no longer changes the caller's target profile
+- The vendored Q# context now defaults to the ``Adaptive_RIF`` target profile rather than ``Base``. Adaptive profile features (measurement-based uncomputation of ``AND``) are what make the unary-iteration circuits affordable — at 63 queries the walk chain costs 15 T gates under ``Adaptive_RIF`` versus 511 under ``Base``. Circuits that must be emitted as Base-profile QIR, including the Qiskit interop path, should request the Base context explicitly
 - Qiskit extras supported on Python 3.14
 
 Bug fixes:

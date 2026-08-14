@@ -46,6 +46,14 @@ def _post_process_phase_estimation(
       :math:`\cos(2\pi\varphi) \le 0` and :math:`E \le 0` for every input.
     * ``True`` returns :math:`\varphi \in [0, 1/4]`, hence :math:`E \ge 0`.
 
+    The degeneracy is a property of this schedule, not of qubitization as such:
+    :cite:`Babbush2018` (Fig. 2 caption) breaks it by replacing the first
+    :math:`R \cdot W \cdot R` unit with a :math:`W` controlled on an ancilla, which
+    separates :math:`\arccos(E/\lambda)` from :math:`\arccos(E/\lambda) + \pi`. This
+    builder omits that extra controlled query in exchange for a simpler schedule and asks
+    the caller for the sign instead, which is free for ground-state work and is not for an
+    excited state of unknown sign.
+
     What comes out is an ordinary QPE phase fraction, converted to an
     energy by the unitary representation's ``eigenvalue_from_phase`` exactly as standard
     QPE does.
@@ -61,7 +69,10 @@ def _post_process_phase_estimation(
     Returns:
         A :class:`~qdk_chemistry.data.QpeResult` whose ``phase_fraction`` is the measured bin,
         whose ``canonical_phase_fraction`` is the decoded walk phase, and whose ``branching``
-        holds both sign candidates.
+        holds both sign candidates. The two candidates coincide at
+        :math:`\varphi = 1/4`, where both branches give :math:`E = 0`; ``branching`` still
+        reports both, so its length names how many branches were weighed rather than how
+        many distinct values they happened to take.
 
     """
     num_bins = 2**num_bits
@@ -86,7 +97,7 @@ def _post_process_phase_estimation(
         canonical_phase_fraction=canonical_phase_fraction,
         canonical_phase_angle=canonical_phase_fraction * math.tau,
         raw_energy=raw_energy,
-        branching=tuple(sorted({raw_energy, mirror_energy})),
+        branching=tuple(sorted((raw_energy, mirror_energy))),
         resolved_energy=raw_energy,
         bits_msb_first=tuple(int(bit) for bit in bitstring_msb_first),
         bitstring_msb_first=bitstring_msb_first,

@@ -213,7 +213,9 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     /// schedules from a test.
     ///
     /// PREPARE is a single-ancilla `Ry` rotation; SELECT is a sign flip on the system qubit.
-    function MakeTestBlockEncodingOp(theta : Double) : (Qubit[] => Unit is Adj + Ctl) {
+    ///
+    /// Test-only; kept `internal` so it does not widen the library's public surface.
+    internal function MakeTestBlockEncodingOp(theta : Double) : (Qubit[] => Unit is Adj + Ctl) {
         MakePrepSelPrepOp(
             (ancilla) => Ry(theta, ancilla[0]),
             (ancilla, system) => Controlled Z(ancilla, system[0]),

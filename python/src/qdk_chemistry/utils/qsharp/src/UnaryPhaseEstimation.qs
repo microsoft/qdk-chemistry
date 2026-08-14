@@ -20,6 +20,9 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     }
 
     /// Applies `numQueries` self-inverse blocks, omitting the one reflection `phaseReg` selects.
+    ///
+    /// `phaseReg` must be supported on `0..numQueries`; addresses past that alias valid slots
+    /// (see `UnaryIterationWithControl`) and realize a wrong walk power.
     internal operation ApplySignedPowerSchedule(
         applyBlockEncoding : (Qubit[] => Unit is Adj),
         applyReflection : (Qubit[] => Unit is Adj + Ctl),
@@ -43,6 +46,15 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     /// Build a unary-iteration QPE circuit for an arbitrary (non-power-of-two) query count.
     /// Lee et al. Even More Efficient Quantum Computations of Chemistry Through Tensor Hypercontraction.
     /// https://journals.aps.org/prxquantum/abstract/10.1103/PRXQuantum.2.030305
+    ///
+    /// # Input
+    /// ## phaseQubitPrep
+    /// Prepares the phase register. It must leave zero amplitude on the addresses at or above
+    /// `numQueries + 1`, which exist whenever `numQueries + 1` is not a power of two. Those
+    /// addresses have no reflection slot assigned, and unary iteration aliases them onto valid
+    /// slots rather than skipping them, so amplitude parked there applies a wrong walk power and
+    /// silently biases the spectrum. The cosine window this builder ships zero-pads exactly that
+    /// tail; a uniform superposition would not.
     operation MakeUnaryQPECircuit(
         statePrep : Qubit[] => Unit,
         applyBlockEncoding : (Qubit[] => Unit is Adj),
@@ -84,7 +96,9 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     }
 
     /// Checks the generic schedule against the explicit walk power.
-    function MakeTestSignedPowerScheduleAgainstWalkOp(
+    ///
+    /// Test-only; kept `internal` so it does not widen the library's public surface.
+    internal function MakeTestSignedPowerScheduleAgainstWalkOp(
         applyBlockEncoding : (Qubit[] => Unit is Adj),
         applyReflection : (Qubit[] => Unit is Adj + Ctl),
         numQueries : Int,
@@ -119,7 +133,9 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     }
 
     /// Runs `MakeUnaryQPECircuit` on a synthetic one-qubit walk with an exact eigenphase.
-    operation TestUnaryQpeSyntheticWalk(numQueries : Int, theta : Double, systemAngle : Double) : Result[] {
+    ///
+    /// Test-only; kept `internal` so it does not widen the library's public surface.
+    internal operation TestUnaryQpeSyntheticWalk(numQueries : Int, theta : Double, systemAngle : Double) : Result[] {
         Fact(
             2^PhaseRegisterSize(numQueries) == numQueries + 1,
             "numQueries must be one less than a power of two",
