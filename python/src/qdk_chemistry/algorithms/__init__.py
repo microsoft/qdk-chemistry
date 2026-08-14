@@ -56,6 +56,7 @@ from qdk_chemistry.algorithms.orbital_localizer import (
 )
 from qdk_chemistry.algorithms.phase_estimation.base import PhaseEstimation
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import QpeCircuitBuilder
+from qdk_chemistry.algorithms.population_analysis import PopulationAnalyzer, QdkPopulationAnalyzer
 from qdk_chemistry.algorithms.projected_multi_configuration_calculator import (
     ProjectedMultiConfigurationCalculator,
     QdkMacisPmc,
@@ -88,6 +89,7 @@ __all__ = [
     "NuclearDerivativeCalculator",
     "OrbitalLocalizer",
     "PhaseEstimation",
+    "PopulationAnalyzer",
     "ProjectedMultiConfigurationCalculator",
     "QPESubspaceMarking",
     "QdkAutocasActiveSpaceSelector",
@@ -103,6 +105,7 @@ __all__ = [
     "QdkNuclearDerivativeCalculator",
     "QdkOccupationActiveSpaceSelector",
     "QdkPipekMezeyLocalizer",
+    "QdkPopulationAnalyzer",
     "QdkQubitMapper",
     "QdkScfSolver",
     "QdkStabilityChecker",
