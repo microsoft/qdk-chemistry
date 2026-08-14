@@ -128,6 +128,11 @@ if [[ -z "$GAUXC_COMMIT" ]]; then
     echo "Error: Could not find gauxc commit hash in $CGMANIFEST"
     exit 1
 fi
+BTAS_COMMIT=$(get_commit_hash "$CGMANIFEST" "BTAS/btas")
+if [[ -z "$BTAS_COMMIT" ]]; then
+    echo "Error: Could not find BTAS commit hash in $CGMANIFEST"
+    exit 1
+fi
 
 # Read versions from macis cgmanifest
 BLASPP_COMMIT=$(get_commit_hash "$MACIS_CGMANIFEST" "icl-utk-edu/blaspp")
@@ -148,6 +153,7 @@ echo "  lapackpp: $LAPACKPP_COMMIT"
 echo "  libecpint: ${LIBECPINT_TAG:-$LIBECPINT_COMMIT}"
 echo "  libint: $LIBINT_URL"
 echo "  gauxc: $GAUXC_COMMIT"
+echo "  btas: $BTAS_COMMIT"
 
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
@@ -202,6 +208,26 @@ make -j"$JOBS"
 make install
 cd "$BUILD_DIR"
 rm -rf lapackpp
+
+# Install BTAS
+# Must follow blaspp/lapackpp and share their prefix: BTAS installs the
+# `blaspp_headers` marker beside them, where its installed config looks for it.
+echo "=== Installing BTAS ==="
+git clone https://github.com/BTAS/btas.git btas
+cd btas
+git checkout "$BTAS_COMMIT"
+mkdir -p build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
+         -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
+         -DCMAKE_PREFIX_PATH="$INSTALL_PREFIX" \
+         -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+         -DBUILD_TESTING=OFF \
+         -DBTAS_BUILD_UNITTEST=OFF \
+         -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS"
+make install
+cd "$BUILD_DIR"
+rm -rf btas
 
 # Install libint2
 echo "=== Installing libint2 ==="

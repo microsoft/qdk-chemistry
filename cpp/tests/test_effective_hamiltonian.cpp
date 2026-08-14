@@ -86,7 +86,9 @@ TEST(EffectiveHamiltonianConstructorTest, MetaData) {
 }
 
 TEST(EffectiveHamiltonianConstructorTest, Factory) {
-  EXPECT_TRUE(EffectiveHamiltonianConstructorFactory::available().empty());
+  EXPECT_TRUE(EffectiveHamiltonianConstructorFactory::has("ducc"));
+  EXPECT_EQ(EffectiveHamiltonianConstructorFactory::default_algorithm_name(),
+            "ducc");
   EXPECT_THROW(
       EffectiveHamiltonianConstructorFactory::create("nonexistent_constructor"),
       std::runtime_error);

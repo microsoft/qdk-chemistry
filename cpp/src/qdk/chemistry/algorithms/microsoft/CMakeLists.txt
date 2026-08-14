@@ -9,6 +9,7 @@ target_sources(chemistry PRIVATE
     localization/natural_orbitals.cpp
     localization/pipek_mezey.cpp
     localization/vvhv.cpp
+    ducc/ducc.cpp
     hamiltonian.cpp
     cholesky_hamiltonian.cpp
     macis_asci.cpp

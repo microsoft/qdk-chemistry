@@ -129,6 +129,9 @@ handle_dependency(gauxc
   REQUIRED
 )
 
+# Boost for BTAS
+find_package(Boost CONFIG REQUIRED)
+
 # Restore previous settings
 set(CMAKE_WARN_DEPRECATED ${_old_warn_deprecated} CACHE BOOL "" FORCE)
 set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS ${_old_suppress_dev} CACHE BOOL "" FORCE)

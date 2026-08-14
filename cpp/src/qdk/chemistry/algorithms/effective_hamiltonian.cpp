@@ -8,8 +8,11 @@
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <string>
+
+#include "microsoft/ducc/ducc.hpp"
 
 namespace qdk::chemistry::algorithms {
 
@@ -146,6 +149,15 @@ void EffectiveHamiltonianConstructor::_validate_inputs(
   }
 }
 
-void EffectiveHamiltonianConstructorFactory::register_default_instances() {}
+std::unique_ptr<EffectiveHamiltonianConstructor> make_microsoft_ducc_solver() {
+  QDK_LOG_TRACE_ENTERING();
+  return std::make_unique<microsoft::DuccSolver>();
+}
+
+void EffectiveHamiltonianConstructorFactory::register_default_instances() {
+  QDK_LOG_TRACE_ENTERING();
+  EffectiveHamiltonianConstructorFactory::register_instance(
+      &make_microsoft_ducc_solver);
+}
 
 }  // namespace qdk::chemistry::algorithms

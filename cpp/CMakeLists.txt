@@ -139,6 +139,22 @@ else()
     endif()
 endif()
 
+# BTAS for dense tensor contraction in DUCC; must follow MACIS to reuse its BLAS and blaspp/lapackpp.
+find_package(BTAS QUIET)
+if(NOT BTAS_FOUND)
+    include(FetchContent)
+    FetchContent_Declare(BTAS
+        GIT_REPOSITORY https://github.com/BTAS/btas.git
+        GIT_TAG 287b145ead818a0332f2b7ce0b7375a83d328bae
+    )
+    # BTAS's linalg kit force-writes the BUILD_TESTING it sees back into the cache.
+    set(_qdk_build_testing "${BUILD_TESTING}")
+    set(BUILD_TESTING OFF CACHE BOOL "Build the testing tree." FORCE)
+    FetchContent_MakeAvailable(BTAS)
+    set(BUILD_TESTING "${_qdk_build_testing}" CACHE BOOL "Build the testing tree." FORCE)
+    add_library(BTAS::BTAS ALIAS BTAS)
+endif()
+
 # Enable CUDA for GPU bindings in QDK Chemistry
 if(QDK_CHEMISTRY_ENABLE_GPU)
     enable_language(CUDA)
@@ -166,6 +182,9 @@ target_link_libraries(chemistry PUBLIC
     nlohmann_json::nlohmann_json
     macis::macis
 )
+
+# Header-only and absent from public headers, so keep BTAS out of the export.
+target_link_libraries(chemistry PRIVATE $<BUILD_INTERFACE:BTAS::BTAS>)
 
 # Conditionally link OpenMP
 if(QDK_ENABLE_OPENMP)

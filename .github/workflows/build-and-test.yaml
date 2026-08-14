@@ -625,7 +625,10 @@ jobs:
       uses: actions/cache/restore@v5
       with:
         path: vcpkg_installed
-        key: windows-vcpkg-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', '.pipelines/install-scripts/install-cpp-deps-windows.ps1') }}
+        # Keyed only on what determines the vcpkg package set. The install script is
+        # deliberately excluded: editing its CMake-dependency section would otherwise
+        # force a cold vcpkg rebuild, which re-exposes flaky upstream downloads.
+        key: windows-vcpkg-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
 
     - name: Restore deps-install cache
       id: cache-deps
@@ -652,7 +655,7 @@ jobs:
       uses: actions/cache/save@v5
       with:
         path: vcpkg_installed
-        key: windows-vcpkg-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', '.pipelines/install-scripts/install-cpp-deps-windows.ps1') }}
+        key: windows-vcpkg-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
 
     - name: Save deps-install cache
       if: steps.cache-deps.outputs.cache-hit != 'true'

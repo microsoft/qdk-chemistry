@@ -84,8 +84,37 @@ See :doc:`Settings <settings>` for a general treatment of algorithm settings in 
 Available implementations
 -------------------------
 
-QDK/Chemistry currently provides the :class:`~qdk_chemistry.algorithms.EffectiveHamiltonianConstructor` interface but no concrete implementation or default factory choice.
-Creation, configuration, and execution examples will be added with the first concrete implementation.
+DUCC
+~~~~
+
+.. rubric:: Factory name: ``"ducc"`` (default)
+
+The double unitary coupled-cluster (DUCC) implementation constructs a P-space Hamiltonian from a full-space Hamiltonian and coupled-cluster amplitudes.
+It evaluates a truncated Baker-Campbell-Hausdorff transformation
+
+.. math::
+
+   H_{\mathrm{eff}}^P = \hat P e^{-\sigma} H_W e^{\sigma} \hat P,
+   \qquad
+   \sigma = T_{\mathrm{ext}} - T_{\mathrm{ext}}^\dagger,
+
+where :math:`T_{\mathrm{ext}}` excludes amplitudes whose indices are all in :math:`P`.
+The reference wavefunction must contain real coupled-cluster amplitudes and use the same full-space orbitals as the Hamiltonian.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 15 45
+
+   * - Setting
+     - Type
+     - Default
+     - Description
+   * - ``ducc_level``
+     - int
+     - ``2``
+     - Baker-Campbell-Hausdorff truncation level; supported values are 0, 1, and 2
 
 Related classes
 ---------------

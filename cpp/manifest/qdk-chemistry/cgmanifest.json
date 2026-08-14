@@ -170,6 +170,16 @@
       "component": {
         "type": "git",
         "git": {
+          "repositoryUrl": "https://github.com/BTAS/btas.git",
+          "commitHash": "287b145ead818a0332f2b7ce0b7375a83d328bae"
+        }
+      },
+      "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
           "repositoryUrl": "https://github.com/wavefunction91/linalg-cmake-modules.git",
           "commitHash": "222364df5e7639f371bf2f37ceb0f476301101a1"
         }
