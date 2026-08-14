@@ -254,7 +254,7 @@ The circuit structure consists of:
 3. Apply an inverse Quantum Fourier Transform to the phase register
 4. Measure all phase qubits
 
-Because the walk operator's spectrum is :math:`e^{\pm i \arccos(E/\lambda)}`, the two signs are indistinguishable from the measured bin alone; ``use_positive_sign`` selects which branch is reported as the resolved energy, and both candidates are always returned in :attr:`~qdk_chemistry.data.QpeResult.branching`.
+Because the walk operator's spectrum is :math:`e^{\pm i \arccos(E/\lambda)}`, the two signs are indistinguishable from the measured bin alone; ``use_positive_sign`` selects which branch is reported as the resolved energy, and both candidates are always returned in the result's ``branching`` tuple.
 
 This method requires a qubitized walk operator, so it is only available with an LCU-based ``unitary_builder``; there is no Trotter path.
 
