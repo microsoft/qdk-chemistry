@@ -12,6 +12,7 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import Stand
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator, Settings
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
+from qdk_chemistry.data.unitary_representation.containers.quantum_walk import QuantumWalkContainer
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -109,7 +110,12 @@ class QPESubspaceMarking(Algorithm):
         phase_bin_count = 1 << num_phase_qubits
         ranges: list[tuple[int, int]] = []
         for phase_bin in range(phase_bin_count):
-            if container.eigenvalue_from_phase(phase_bin / phase_bin_count) < energy_lower_bound:
+            canonical_bin = (
+                min(phase_bin, phase_bin_count - phase_bin)
+                if isinstance(container, QuantumWalkContainer)
+                else phase_bin
+            )
+            if container.eigenvalue_from_phase(canonical_bin / phase_bin_count) < energy_lower_bound:
                 continue
             if ranges and ranges[-1][1] == phase_bin:
                 ranges[-1] = (ranges[-1][0], phase_bin + 1)
@@ -137,6 +143,7 @@ class QPESubspaceMarking(Algorithm):
             The circuit to use as the ``good_state_oracle`` of ``AmplitudeAmplification``.
 
         Raises:
+            KeyError: If the nested ``qpe_circuit_builder`` reference is not registered.
             TypeError: If the nested ``qpe_circuit_builder`` is not a standard (QFT-based) one,
                 the only kind whose circuit can be undone.
             ValueError: If its ``num_bits`` is not positive, if ``energy_lower_bound`` is unset

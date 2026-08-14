@@ -369,6 +369,16 @@ def test_walk_energies_select_a_band_around_phase_zero(energy_lower_bound, expec
     assert marked == expected_bins
 
 
+def test_walk_bins_stay_symmetric_at_an_exact_energy_boundary():
+    """Mirrored walk phases use one floating-point value at an inclusive boundary."""
+    container = _walk_container()
+    energy_lower_bound = container.eigenvalue_from_phase(1 / 8)
+    assert QPESubspaceMarking._marked_phase_bins(energy_lower_bound, container, num_phase_qubits=3) == [
+        (0, 2),
+        (7, 8),
+    ]
+
+
 @pytest.mark.parametrize(
     ("energy_lower_bound", "expected_bins"),
     [
