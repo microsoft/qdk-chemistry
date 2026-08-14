@@ -12,8 +12,10 @@
 #include <limits>
 #include <memory>
 #include <optional>
+#include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/configuration.hpp>
+#include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
@@ -21,8 +23,11 @@
 #include <stdexcept>
 #include <vector>
 
+#include "ut_common.hpp"
+
 namespace {
 
+using qdk::chemistry::algorithms::ScfSolverFactory;
 using qdk::chemistry::data::BasisSet;
 using qdk::chemistry::data::Configuration;
 using qdk::chemistry::data::Element;
@@ -411,4 +416,81 @@ TEST(GenerateOrbitalCubesTest, RejectsOutOfRangeIndex) {
                std::out_of_range);
 
   std::filesystem::remove_all(output_dir);
+}
+
+// Real effective core potential coverage. Every other ECP test in this file
+// builds the basis by hand, so nothing exercised the path a user actually
+// takes: ask for a named basis whose heavy element carries an ECP and let
+// `from_basis_name` decide how to represent it.
+//
+// AgH in def2-SVP is the useful case because the answer is unambiguous. Ag has
+// 47 electrons and H has 1, so an all-electron treatment holds 48. The def2
+// ECP replaces the 28 core electrons on Ag, leaving 20. The generated field is
+// valence-only by construction, so integrating it must give 20 and not 48. A
+// 60^3 grid with a 6 Bohr margin is enough to see that clearly: the ECP has
+// removed the sharp Ag core that a uniform grid would struggle to integrate,
+// and the only remaining cusp is the hydrogen 1s.
+TEST(CubeGeneratorEcpTest, AgHValenceDensityIntegratesToValenceElectronCount) {
+  auto structure = testing::create_agh_structure();
+  auto scf = ScfSolverFactory::create();
+  const auto& [energy, wavefunction] = scf->run(structure, 0, 1, "def2-svp");
+  ASSERT_NE(wavefunction, nullptr);
+
+  const auto orbitals = wavefunction->get_orbitals();
+  const auto basis_set = orbitals->get_basis_set();
+  ASSERT_TRUE(basis_set->has_ecp_electrons());
+  const auto& ecp_electrons = basis_set->get_ecp_electrons();
+  ASSERT_EQ(ecp_electrons.size(), 2u);
+  EXPECT_EQ(ecp_electrons[0], 28u);  // Ag
+  EXPECT_EQ(ecp_electrons[1], 0u);   // H
+
+  // The ECP projector shells are stored separately and must not contribute
+  // atomic orbitals. If they leaked into the gauXC basis, `nbf` would grow and
+  // this density matrix would be rejected for shape.
+  const auto [occupations_alpha, occupations_beta] =
+      wavefunction->get_total_orbital_occupations();
+  const auto [density_alpha, density_beta] =
+      orbitals->calculate_ao_density_matrix(occupations_alpha,
+                                            occupations_beta);
+  const Eigen::MatrixXd density_matrix = density_alpha + density_beta;
+  ASSERT_EQ(std::size_t(density_matrix.rows()),
+            basis_set->get_num_atomic_orbitals());
+
+  CubeGenerator generator(basis_set);
+  const auto grid = CubeGrid::from_basis_set(*basis_set, 60, 60, 60, 6.0);
+  const auto field = generator.density(density_matrix, "", grid);
+  ASSERT_EQ(field.size(), grid.num_points());
+
+  const double volume_element =
+      grid.spacing[0] * grid.spacing[1] * grid.spacing[2];
+  double integral = 0.0;
+  for (double value : field) integral += value;
+  integral *= volume_element;
+
+  // 47 + 1 - 28 = 20. An all-electron field would integrate to 48, so this
+  // tolerance separates valence-only from total by a wide margin while still
+  // being tight enough to catch a normalization error.
+  EXPECT_NEAR(integral, 20.0, 0.05);
+}
+
+// The valence-only annotation must fire for a basis produced by
+// `from_basis_name`, not just for the hand-built one above.
+TEST(CubeGeneratorEcpTest, AgHCubeCommentRecordsRealEcpCoreCount) {
+  auto structure = testing::create_agh_structure();
+  const auto basis_set = BasisSet::from_basis_name("def2-svp", structure);
+  ASSERT_TRUE(basis_set->has_ecp_electrons());
+
+  CubeGenerator generator(basis_set);
+  Eigen::VectorXd coefficients =
+      Eigen::VectorXd::Zero(basis_set->get_num_atomic_orbitals());
+  coefficients[0] = 1.0;
+  const auto output =
+      std::filesystem::temp_directory_path() / "qdk_agh_orbital.cube";
+
+  generator.orbital(coefficients, output.string(), single_point_grid());
+
+  const std::string comment = first_line_of(output);
+  EXPECT_NE(comment.find("valence-only"), std::string::npos) << comment;
+  EXPECT_NE(comment.find("28 core electrons"), std::string::npos) << comment;
+  std::filesystem::remove(output);
 }
