@@ -31,6 +31,8 @@ def _validated_data_type_name(type_name: object, owner: str) -> str:
     """
     if not isinstance(type_name, str) or not type_name:
         raise TypeError(f"{owner} must provide a non-empty data_type_name()")
+    if any(token in type_name for token in ("/", "\\", "..", "*", "?", "[", "]")):
+        raise TypeError(f"{owner} returned an unsafe data_type_name(): {type_name!r}")
     return type_name
 
 
