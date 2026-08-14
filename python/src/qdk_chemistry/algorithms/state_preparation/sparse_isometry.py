@@ -54,7 +54,7 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 from ._binary_encoding_utils import MatrixCompressionOp, MatrixCompressionType, RefTableau, _BinaryEncodingSynthesizer
 
@@ -337,10 +337,24 @@ class SparseIsometryStatePreparation(StatePreparation):
 
         """
         include_negative_controls = self._settings.get("include_negative_controls")
+        measurement_based_uncompute = self._settings.get("measurement_based_uncompute")
+        if measurement_based_uncompute:
+            profile = get_qsharp_context().get_target_profile()
+            if "adaptive" in str(profile).lower():
+                Logger.info(f"measurement_based_uncompute is active on target profile {profile}.")
+            else:
+                Logger.warn(
+                    f"measurement_based_uncompute was requested but the target profile is {profile}, "
+                    "which has no mid-circuit measurement; Std.Intrinsic.AND will uncompute unitarily "
+                    "and the circuit will contain no measurements.\n"
+                    "To use measurement-based uncomputation, set the target profile by  "
+                    "adaptive_context = create_qsharp_context(target_profile=TargetProfile.Adaptive_RIF)\n"
+                    "set_qsharp_context(adaptive_context)"
+                )
         encoded_ops, bijection, dense_size = _BinaryEncodingSynthesizer(
             RefTableau(gf2x_result.reduced_matrix),
             include_negative_controls=include_negative_controls,
-            measurement_based_uncompute=self._settings.get("measurement_based_uncompute"),
+            measurement_based_uncompute=measurement_based_uncompute,
         ).synthesize(
             num_local_qubits=n_qubits,
             active_qubit_indices=gf2x_result.row_map,

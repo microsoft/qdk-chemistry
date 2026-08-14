@@ -146,15 +146,13 @@ def apply_matrix_compression_ops(
     """Apply matrix compression operations to a Qiskit QuantumCircuit.
 
     Supports all :class:`~qdk_chemistry.algorithms.state_preparation._binary_encoding_utils.MatrixCompressionType`
-    operations: X, CX, SWAP, CCX, MCX, SELECT, and SELECT_AND.
+    operations: X, CX, SWAP, CCX, SELECT, and SELECT_AND.
 
     Args:
         circuit: Qiskit QuantumCircuit to append gates to (modified in place).
         ops: List of MatrixCompressionOp to apply.
 
     """
-    from qiskit.circuit.library import XGate  # noqa: PLC0415
-
     for op in ops:
         name = op.name.upper()
         if name == "X":
@@ -165,12 +163,6 @@ def apply_matrix_compression_ops(
             circuit.swap(op.qubits[0], op.qubits[1])
         elif name == "CCX":
             circuit.ccx(op.qubits[0], op.qubits[1], op.qubits[2])
-        elif name == "MCX":
-            num_controls = len(op.qubits) - 1
-            target = op.qubits[num_controls]
-            controls = op.qubits[:num_controls]
-            gate = XGate().control(num_controls, ctrl_state=op.control_state)
-            circuit.append(gate, [*controls, target])
         elif name in ("SELECT", "SELECT_AND"):
             # SELECT_AND differs from SELECT only in how Q# uncomputes its helper ancilla;
             # the ancilla-free decomposition below realizes the same unitary for both.

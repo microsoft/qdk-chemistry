@@ -13,7 +13,8 @@ from typing import Any
 
 import numpy as np
 
-from qdk_chemistry.utils import CaseInsensitiveStrEnum, Logger
+from qdk_chemistry.utils import Logger
+from qdk_chemistry.utils.enum import CaseInsensitiveStrEnum
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 __all__ = [
@@ -23,23 +24,14 @@ __all__ = [
 
 
 class MatrixCompressionType(CaseInsensitiveStrEnum):
-    """Supported operation types for matrix compression.
-
-    Declaration order is the wire contract: ``BinaryEncoding.qs`` identifies these as 0 through 6.
-    """
+    """Supported operation types for matrix compression."""
 
     X = "X"
     CX = "CX"
     SWAP = "SWAP"
     CCX = "CCX"
-    MCX = "MCX"
     SELECT = "SELECT"
     SELECT_AND = "SELECT_AND"
-
-    @property
-    def qsharp_code(self) -> int:
-        """Integer ``kind`` discriminator expected by the Q# ``MatrixCompressionOp`` struct."""
-        return list(type(self)).index(self)
 
 
 @dataclass
@@ -70,7 +62,7 @@ class MatrixCompressionOp:
 
         """
         return {
-            "kind": self.name.qsharp_code,
+            "kind": self.name.value,
             "qubits": self.qubits,
             "controlState": self.control_state,
             "lookupData": self.lookup_data,
@@ -84,7 +76,7 @@ class MatrixCompressionOp:
 
         """
         return QSHARP_UTILS.BinaryEncoding.MatrixCompressionOp(
-            kind=self.name.qsharp_code,
+            kind=self.name.value,
             qubits=self.qubits,
             controlState=self.control_state,
             lookupData=self.lookup_data,
@@ -259,7 +251,7 @@ class _BinaryEncodingSynthesizer:
         self.measurement_based_uncompute = measurement_based_uncompute
         self.batch: list[tuple[int, int]] = []
         self.batch_index: int = 0
-        self.circuit: list[tuple[str, Any]] = []
+        self.circuit: list[MatrixCompressionOp] = []
         self.bijection: list[tuple[int, int]] = []
 
     def synthesize(
@@ -323,26 +315,25 @@ class _BinaryEncodingSynthesizer:
             return sparse_size
         return 1 << (sparse_size.bit_length() - 1)
 
-    def _record(self, op: tuple[str, Any]):
+    def _record(self, op: MatrixCompressionOp) -> None:
         """Append an operation and apply it to the tableau.
 
         Args:
-            op: A tuple of (MatrixCompressionType, qubit_args) representing the gate to record.
+            op: The gate to record, addressing tableau rows rather than global qubits.
 
         """
         self.circuit.append(op)
-        compress_type, qubit_args = op
-        if compress_type is MatrixCompressionType.CX:
-            self.tableau.cx(*qubit_args)
-        elif compress_type is MatrixCompressionType.SWAP:
-            self.tableau.swap(*qubit_args)
-        elif compress_type is MatrixCompressionType.CCX:
-            self.tableau.toffoli(qubit_args[0], (qubit_args[1], True), (qubit_args[2], True))
-        elif compress_type in {MatrixCompressionType.SELECT, MatrixCompressionType.SELECT_AND}:
-            data_table, addr_qubits, dat_qubits = qubit_args
-            self.tableau.select(data_table, addr_qubits, dat_qubits)
-        elif compress_type is MatrixCompressionType.X:
-            self.tableau.x(*qubit_args)
+        qubits = op.qubits
+        if op.name is MatrixCompressionType.CX:
+            self.tableau.cx(qubits[0], qubits[1])
+        elif op.name is MatrixCompressionType.SWAP:
+            self.tableau.swap(qubits[0], qubits[1])
+        elif op.name is MatrixCompressionType.CCX:
+            self.tableau.toffoli(qubits[2], (qubits[0], True), (qubits[1], True))
+        elif op.name in {MatrixCompressionType.SELECT, MatrixCompressionType.SELECT_AND}:
+            self.tableau.select(op.lookup_data, qubits[: op.control_state], qubits[op.control_state :])
+        elif op.name is MatrixCompressionType.X:
+            self.tableau.x(qubits[0])
 
     def _permute_columns_pivots_first(self) -> tuple[int, list[int]]:
         """Move pivot columns to the front; return rank and column permutation.
@@ -393,8 +384,8 @@ class _BinaryEncodingSynthesizer:
         for j in range(1, rank):
             for i in range(j):
                 if not self.tableau.data[logical_rows[i], j]:
-                    self._record((MatrixCompressionType.CX, (logical_rows[j], logical_rows[i])))
-        self._record((MatrixCompressionType.X, (logical_rows[0],)))
+                    self._record(MatrixCompressionOp(MatrixCompressionType("CX"), [logical_rows[j], logical_rows[i]]))
+        self._record(MatrixCompressionOp(MatrixCompressionType("X"), [logical_rows[0]]))
         return logical_rows
 
     def _convert_unary_to_binary(self, limit: int, logical_rows: list[int]):
@@ -421,15 +412,15 @@ class _BinaryEncodingSynthesizer:
 
             for p in range(len(unary_bits) // 2):
                 x, y = unary_bits[2 * p], unary_bits[2 * p + 1]
-                self._record((MatrixCompressionType.CX, (x, accumulator)))
-                self._record((MatrixCompressionType.CX, (y, accumulator)))
-                self._record((MatrixCompressionType.CCX, (y, accumulator, x)))
+                self._record(MatrixCompressionOp(MatrixCompressionType("CX"), [x, accumulator]))
+                self._record(MatrixCompressionOp(MatrixCompressionType("CX"), [y, accumulator]))
+                self._record(MatrixCompressionOp(MatrixCompressionType("CCX"), [accumulator, x, y]))
                 next_active_unary.append(x)
                 zero_rows.append(y)
 
             if len(unary_bits) % 2 == 1:
                 x = unary_bits[-1]
-                self._record((MatrixCompressionType.CX, (x, accumulator)))
+                self._record(MatrixCompressionOp(MatrixCompressionType("CX"), [x, accumulator]))
                 next_active_unary.append(x)
 
             active_unary = next_active_unary
@@ -448,7 +439,7 @@ class _BinaryEncodingSynthesizer:
             target_row = final_physical_rows[i]
             if row_at[i] != target_row:
                 curr_idx = current_pos[target_row]
-                self._record((MatrixCompressionType.SWAP, (i, curr_idx)))
+                self._record(MatrixCompressionOp(MatrixCompressionType("SWAP"), [i, curr_idx]))
                 swapped_row = row_at[i]
                 row_at[curr_idx], current_pos[swapped_row] = swapped_row, curr_idx
                 row_at[i], current_pos[target_row] = target_row, i
@@ -499,7 +490,7 @@ class _BinaryEncodingSynthesizer:
                 is_direct, col, row = element
                 if is_direct:
                     if row != target_row:
-                        self._record((MatrixCompressionType.SWAP, (target_row, row)))
+                        self._record(MatrixCompressionOp(MatrixCompressionType("SWAP"), [target_row, row]))
                 else:
                     self._synthesize_target_row(target_row, col, row)
                 self._permute_col_and_add_to_batch(col, target_row)
@@ -566,10 +557,10 @@ class _BinaryEncodingSynthesizer:
         diff_val = bool(col_data[diff_row])
 
         if not diff_val:
-            self._record((MatrixCompressionType.X, (diff_row,)))
-        self._record((MatrixCompressionType.CCX, (target_row, row, diff_row)))
+            self._record(MatrixCompressionOp(MatrixCompressionType("X"), [diff_row]))
+        self._record(MatrixCompressionOp(MatrixCompressionType("CCX"), [row, diff_row, target_row]))
         if not diff_val:
-            self._record((MatrixCompressionType.X, (diff_row,)))
+            self._record(MatrixCompressionOp(MatrixCompressionType("X"), [diff_row]))
 
     def _permute_col_and_add_to_batch(self, current_col: int, ctrl_row: int):
         """Normalize column's dense/sparse bits and append to batch.
@@ -584,20 +575,24 @@ class _BinaryEncodingSynthesizer:
 
         dense_col_data = self.tableau.data[:dense_size, current_col].astype(bool)
         for d_qubit in np.flatnonzero(dense_col_data != k_bits):
-            self._record((MatrixCompressionType.CX, (ctrl_row, int(d_qubit))))
+            self._record(MatrixCompressionOp(MatrixCompressionType("CX"), [ctrl_row, int(d_qubit)]))
 
         sparse_col_data = self.tableau.data[dense_size:, current_col].astype(bool)
         target_bits = np.zeros(self.tableau.num_rows - dense_size, dtype=bool)
         target_bits[len(self.batch)] = True
         for s_qubit in np.flatnonzero(sparse_col_data != target_bits):
-            self._record((MatrixCompressionType.CX, (ctrl_row, dense_size + int(s_qubit))))
+            self._record(MatrixCompressionOp(MatrixCompressionType("CX"), [ctrl_row, dense_size + int(s_qubit)]))
 
         self.batch.append((current_col, self.batch_index))
         self.bijection.append((self.batch_index, current_col))
         self.batch_index += 1
 
     def _clear_sparse_bits(self):
-        """Emit PUI block to zero all sparse indicator rows for current batch."""
+        """Emit PUI block to zero all sparse indicator rows for current batch.
+
+        The batch is lowered as one wide lookup, or as power-of-two chunks when those
+        cost fewer Toffolis.
+        """
         assert self.batch
         dense_size = self.tableau.dense_size
         num_changing = 1 if len(self.batch) < 2 else math.ceil(math.log2(len(self.batch)))
@@ -618,50 +613,26 @@ class _BinaryEncodingSynthesizer:
             ]
             rest_entries.append((i, changing_controls))
 
-        select_ops: list[tuple[str, Any]] = []
-        self._flush_pui_lookup_block(select_ops, dense_size, fixed_controls, rest_entries)
-        for op in select_ops:
-            self._record(op)
+        select_ops, mono_count = self._synthesize_single_pui_lookup_block(dense_size, fixed_controls, rest_entries)
 
-    def _flush_pui_lookup_block(self, ops, sbs, fixed_controls, rest_entries):
-        """Convert PUI block into lookup ops, choosing mono vs chunked by cost.
-
-        Args:
-            ops: Output list to append generated operations to.
-            sbs: Sparse block start row index (equal to dense_size).
-            fixed_controls: List of (row, polarity) pairs that are constant across the batch.
-            rest_entries: List of (offset, changing_controls) pairs for each batch element.
-
-        """
-        if not rest_entries:
-            return
-
-        mono_ops, mono_count = self._synthesize_single_pui_lookup_block(sbs, fixed_controls, rest_entries)
-
-        # Split into power-of-two chunks
-        n = len(rest_entries)
-        if n <= 2:
-            ops.extend(mono_ops)
-            return
-
-        chunks, i, remaining = [], 0, n
+        chunks, start, remaining = [], 0, len(rest_entries)
         while remaining > 0:
             chunk_size = 1 << (remaining.bit_length() - 1)
-            chunks.append(rest_entries[i : i + chunk_size])
-            i += chunk_size
+            chunks.append(rest_entries[start : start + chunk_size])
+            start += chunk_size
             remaining -= chunk_size
 
-        if len(chunks) <= 1:
-            ops.extend(mono_ops)
-            return
+        if len(chunks) > 1:
+            chunked_ops, chunked_count = [], 0
+            for chunk in chunks:
+                sub_ops, sub_count = self._synthesize_single_pui_lookup_block(dense_size, fixed_controls, chunk)
+                chunked_ops.extend(sub_ops)
+                chunked_count += sub_count
+            if chunked_count <= mono_count:
+                select_ops = chunked_ops
 
-        chunked_ops, chunked_count = [], 0
-        for chunk in chunks:
-            sub_ops, sub_count = self._synthesize_single_pui_lookup_block(sbs, fixed_controls, chunk)
-            chunked_ops.extend(sub_ops)
-            chunked_count += sub_count
-
-        ops.extend(chunked_ops if chunked_count <= mono_count else mono_ops)
+        for op in select_ops:
+            self._record(op)
 
     def _synthesize_single_pui_lookup_block(self, sbs, fixed_controls, rest_entries):
         """Lower one PUI sub-block into lookup ops.
@@ -722,9 +693,9 @@ class _BinaryEncodingSynthesizer:
         )
         gf2x_ops = list(reversed(lookup_ops))
         toffoli_cost = sum(
-            self._scs_toffoli_cost(data_table, root=True)
-            for name, (data_table, _, _) in lookup_ops
-            if name in (MatrixCompressionType.SELECT, MatrixCompressionType.SELECT_AND)
+            self._scs_toffoli_cost(op.lookup_data, root=True)
+            for op in lookup_ops
+            if op.name in (MatrixCompressionType.SELECT, MatrixCompressionType.SELECT_AND)
         )
         return gf2x_ops, toffoli_cost
 
@@ -748,28 +719,15 @@ class _BinaryEncodingSynthesizer:
                 int(active_qubit_indices[idx]) if idx < num_local_qubits else ancilla_start + (idx - num_local_qubits)
             )
 
-        ops: list[MatrixCompressionOp] = []
-        for compress_type, qubit_args in self.circuit:
-            op_type = MatrixCompressionType(compress_type)
-            if op_type is MatrixCompressionType.X:
-                ops.append(MatrixCompressionOp(op_type, [map_idx(qubit_args[0])]))
-            elif op_type in {MatrixCompressionType.CX, MatrixCompressionType.SWAP}:
-                ops.append(MatrixCompressionOp(op_type, [map_idx(int(qubit_args[0])), map_idx(int(qubit_args[1]))]))
-            elif op_type is MatrixCompressionType.CCX:
-                target, ctrl1, ctrl2 = qubit_args
-                ops.append(
-                    MatrixCompressionOp(op_type, [map_idx(int(ctrl1)), map_idx(int(ctrl2)), map_idx(int(target))])
-                )
-            elif op_type in {MatrixCompressionType.SELECT, MatrixCompressionType.SELECT_AND}:
-                data_table, addr_qubits, dat_qubits = qubit_args
-                qubits = [map_idx(int(q)) for q in addr_qubits] + [map_idx(int(q)) for q in dat_qubits]
-                ops.append(MatrixCompressionOp(op_type, qubits, control_state=len(addr_qubits), lookup_data=data_table))
-            elif op_type is MatrixCompressionType.MCX:
-                controls, control_state, target_qubit = qubit_args
-                qubits = [map_idx(int(q)) for q in controls] + [map_idx(int(target_qubit))]
-                ops.append(MatrixCompressionOp(op_type, qubits, control_state=control_state))
-            else:
-                raise ValueError(f"Unknown op type: {op_type}")
+        ops = [
+            MatrixCompressionOp(
+                op.name,
+                [map_idx(int(q)) for q in op.qubits],
+                control_state=op.control_state,
+                lookup_data=op.lookup_data,
+            )
+            for op in self.circuit
+        ]
         ops.reverse()
         return ops
 
@@ -816,7 +774,7 @@ class _BinaryEncodingSynthesizer:
             use_measurement_and: If True, emit SELECT_AND instead of SELECT.
 
         Returns:
-            list[tuple]: List of (op_type, (data_table, address_qubits, data_qubits)) tuples.
+            list[MatrixCompressionOp]: A single-element list holding the SELECT operation.
 
         """
         if not table_dict:
@@ -833,5 +791,12 @@ class _BinaryEncodingSynthesizer:
             addr_int = sum(int(bit) << i for i, bit in enumerate(reversed_tuple))
             data_table[addr_int] = [bool(b) for b in data_tuple]
 
-        op_type = MatrixCompressionType.SELECT_AND if use_measurement_and else MatrixCompressionType.SELECT
-        return [(op_type, (data_table, reversed_address, list(data_qubits)))]
+        op_type = MatrixCompressionType("SELECT_AND") if use_measurement_and else MatrixCompressionType("SELECT")
+        return [
+            MatrixCompressionOp(
+                op_type,
+                [*reversed_address, *data_qubits],
+                control_state=len(reversed_address),
+                lookup_data=data_table,
+            )
+        ]

@@ -509,14 +509,14 @@ class TestBinaryEncodingSynthesizerCircuit:
             dtype=np.int8,
         )
         synth = _run_synth(mat)
-        for operation_type, _ in synth.circuit:
-            assert isinstance(operation_type, MatrixCompressionType)
+        for op in synth.circuit:
+            assert isinstance(op.name, MatrixCompressionType)
 
     def test_stage1_starts_with_cx_or_x(self):
         """Stage 1 always begins with CX or X (unary staircase)."""
         mat = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]], dtype=np.int8)
         synth = _run_synth(mat)
-        first_operation_type = synth.circuit[0][0]
+        first_operation_type = synth.circuit[0].name
         assert first_operation_type in (MatrixCompressionType.CX, MatrixCompressionType.X)
 
     @pytest.mark.parametrize(
@@ -540,7 +540,7 @@ class TestBinaryEncodingSynthesizerCircuit:
         rref_synth = _BinaryEncodingSynthesizer(RefTableau(rref_result.reduced_matrix))
         rank, _ = rref_synth._permute_columns_pivots_first()
         rref_synth._apply_unary_staircase(rank)
-        rref_cx = sum(1 for t, _ in rref_synth.circuit if t is MatrixCompressionType.CX)
+        rref_cx = sum(1 for op in rref_synth.circuit if op.name is MatrixCompressionType.CX)
         assert rref_cx == rank * (rank - 1) // 2
 
         # --- REF path (forward-only) ---
@@ -548,7 +548,7 @@ class TestBinaryEncodingSynthesizerCircuit:
         ref_synth = _BinaryEncodingSynthesizer(RefTableau(ref_result.reduced_matrix))
         rank_ref, _ = ref_synth._permute_columns_pivots_first()
         ref_synth._apply_unary_staircase(rank_ref)
-        ref_cx = sum(1 for t, _ in ref_synth.circuit if t is MatrixCompressionType.CX)
+        ref_cx = sum(1 for op in ref_synth.circuit if op.name is MatrixCompressionType.CX)
         assert ref_cx < rref_cx
 
     @pytest.mark.parametrize(
@@ -572,16 +572,16 @@ class TestBinaryEncodingSynthesizerCircuit:
         rref_synth = _BinaryEncodingSynthesizer(RefTableau(rref_result.reduced_matrix))
         rank, _ = rref_synth._permute_columns_pivots_first()
         rref_synth._run_stage1_diagonal_encoding(rank)
-        rref_cx = sum(1 for t, _ in rref_synth.circuit if t is MatrixCompressionType.CX)
-        rref_x = sum(1 for t, _ in rref_synth.circuit if t is MatrixCompressionType.X)
+        rref_cx = sum(1 for op in rref_synth.circuit if op.name is MatrixCompressionType.CX)
+        rref_x = sum(1 for op in rref_synth.circuit if op.name is MatrixCompressionType.X)
 
         # --- REF path (forward-only) ---
         ref_result = gf2x_with_tracking(raw_matrix, forward_only=True)
         ref_synth = _BinaryEncodingSynthesizer(RefTableau(ref_result.reduced_matrix))
         rank_ref, _ = ref_synth._permute_columns_pivots_first()
         ref_synth._run_stage1_diagonal_encoding(rank_ref)
-        ref_cx = sum(1 for t, _ in ref_synth.circuit if t is MatrixCompressionType.CX)
-        ref_x = sum(1 for t, _ in ref_synth.circuit if t is MatrixCompressionType.X)
+        ref_cx = sum(1 for op in ref_synth.circuit if op.name is MatrixCompressionType.CX)
+        ref_x = sum(1 for op in ref_synth.circuit if op.name is MatrixCompressionType.X)
 
         assert ref_cx < rref_cx
         assert ref_x == rref_x
@@ -616,18 +616,18 @@ class TestBinaryEncodingSynthesizerReplay:
         replay.permute_columns(col_perm)
 
         # Replay all operations
-        for operation_type, qubit_args in synth.circuit:
-            if operation_type is MatrixCompressionType.CX:
-                replay.cx(*qubit_args)
-            elif operation_type is MatrixCompressionType.SWAP:
-                replay.swap(*qubit_args)
-            elif operation_type is MatrixCompressionType.CCX:
-                replay.toffoli(qubit_args[0], (qubit_args[1], True), (qubit_args[2], True))
-            elif operation_type is MatrixCompressionType.X:
-                replay.x(*qubit_args)
-            elif operation_type in {MatrixCompressionType.SELECT, MatrixCompressionType.SELECT_AND}:
-                data_table, addr_qubits, dat_qubits = qubit_args
-                replay.select(data_table, addr_qubits, dat_qubits)
+        for op in synth.circuit:
+            qubits = op.qubits
+            if op.name is MatrixCompressionType.CX:
+                replay.cx(qubits[0], qubits[1])
+            elif op.name is MatrixCompressionType.SWAP:
+                replay.swap(qubits[0], qubits[1])
+            elif op.name is MatrixCompressionType.CCX:
+                replay.toffoli(qubits[2], (qubits[0], True), (qubits[1], True))
+            elif op.name is MatrixCompressionType.X:
+                replay.x(qubits[0])
+            elif op.name in {MatrixCompressionType.SELECT, MatrixCompressionType.SELECT_AND}:
+                replay.select(op.lookup_data, qubits[: op.control_state], qubits[op.control_state :])
 
         # Undo column permutation
         inv_perm = [0] * len(col_perm)
@@ -659,7 +659,6 @@ class TestToGf2xOperations:
             MatrixCompressionType.SWAP,
             MatrixCompressionType.CCX,
             MatrixCompressionType.X,
-            MatrixCompressionType.MCX,
             MatrixCompressionType.SELECT,
             MatrixCompressionType.SELECT_AND,
         }
@@ -674,20 +673,22 @@ class TestToGf2xOperations:
     @pytest.mark.parametrize(
         ("op_type", "expected"),
         [
-            (MatrixCompressionType.X, 0),
-            (MatrixCompressionType.CX, 1),
-            (MatrixCompressionType.SWAP, 2),
-            (MatrixCompressionType.CCX, 3),
-            (MatrixCompressionType.MCX, 4),
-            (MatrixCompressionType.SELECT, 5),
-            (MatrixCompressionType.SELECT_AND, 6),
+            (MatrixCompressionType.X, "X"),
+            (MatrixCompressionType.CX, "CX"),
+            (MatrixCompressionType.SWAP, "SWAP"),
+            (MatrixCompressionType.CCX, "CCX"),
+            (MatrixCompressionType.SELECT, "SELECT"),
+            (MatrixCompressionType.SELECT_AND, "SELECT_AND"),
         ],
     )
     def test_matrix_compression_op_serializes_qsharp_opcode(self, op_type, expected):
-        """Q# serialization keeps the complete integer opcode contract stable."""
+        """Q# serialization emits the gate name that ``BinaryEncoding.qs`` dispatches on."""
         lookup_data = [[True]] if op_type in {MatrixCompressionType.SELECT, MatrixCompressionType.SELECT_AND} else []
         op = MatrixCompressionOp(op_type, [0, 1], lookup_data=lookup_data)
-        assert op.to_dict()["kind"] == expected
+        kind = op.to_dict()["kind"]
+        assert kind == expected
+        # Q# needs a plain string, not the enum member.
+        assert type(kind) is str
 
     def test_to_operations_identity_mapping(self):
         """When active_qubit_indices is identity, ops stay the same."""
@@ -744,18 +745,19 @@ class TestLookupSelect:
         table = {(1,): (1,)}
         ops = _BinaryEncodingSynthesizer._lookup_select(table, [0], [1])
         assert len(ops) == 1
-        assert ops[0][0] == MatrixCompressionType.SELECT
+        assert ops[0].name == MatrixCompressionType.SELECT
 
     def test_two_address_bits(self):
         """Two address bits produce a 2^2 = 4 entry dense data table."""
         table = {(0, 1): (1,), (1, 0): (1,)}
         ops = _BinaryEncodingSynthesizer._lookup_select(table, [0, 1], [2])
         assert len(ops) == 1
-        name, (data_table, addr, dat) = ops[0]
-        assert name == MatrixCompressionType.SELECT
-        assert addr == [1, 0]
-        assert dat == [2]
-        assert len(data_table) == 4
+        op = ops[0]
+        assert op.name == MatrixCompressionType.SELECT
+        # Address qubits come first, then data qubits; control_state marks the split.
+        assert op.qubits[: op.control_state] == [1, 0]
+        assert op.qubits[op.control_state :] == [2]
+        assert len(op.lookup_data) == 4
 
     def test_data_table_correctness(self):
         """Verify the dense Bool[][] table encodes the sparse dict correctly."""
@@ -764,7 +766,7 @@ class TestLookupSelect:
         #                 (0,1) → reversed (1,0) → addr_int=1
         table = {(1, 0): (1, 0), (0, 1): (0, 1)}
         ops = _BinaryEncodingSynthesizer._lookup_select(table, [0, 1], [2, 3])
-        _, (data_table, _, _) = ops[0]
+        data_table = ops[0].lookup_data
         # addr_int for (1,0): reversed to (0,1), bit0=0, bit1=1 → addr_int=2
         assert data_table[2] == [True, False]
         # addr_int for (0,1): reversed to (1,0), bit0=1, bit1=0 → addr_int=1
@@ -777,26 +779,29 @@ class TestLookupSelect:
         """use_measurement_and=True emits select_and instead of select."""
         table = {(1,): (1,)}
         ops = _BinaryEncodingSynthesizer._lookup_select(table, [0], [1], use_measurement_and=True)
-        assert ops[0][0] == MatrixCompressionType.SELECT_AND
+        assert ops[0].name == MatrixCompressionType.SELECT_AND
 
 
 class TestControlStateEndianness:
-    """The Qiskit conversion must honour the little-endian control-state bitmask.
+    """The Qiskit conversion must decode SELECT addresses with Q#'s bit significance.
 
-    Q# ``ControlStateBits`` maps bit ``i`` of ``controlState`` onto the ``i``-th control
-    qubit, and Qiskit's ``ctrl_state`` integer uses the same significance, so the bitmask
-    is passed through unchanged. These tests pin that agreement down.
+    Q# ``SparseOneHotSelect`` indexes ``lookupData`` by the address register value with bit
+    ``i`` taken from the ``i``-th address qubit, matching :meth:`RefTableau.select`. The
+    Qiskit path rebuilds that lookup from multi-controlled X gates, so the two must agree.
     """
 
-    @pytest.mark.parametrize("control_state", [0, 1, 2, 3])
-    def test_mcx_fires_on_the_qsharp_control_pattern(self, control_state):
-        """An MCX triggers exactly on the pattern Q# would select for the same bitmask."""
+    @pytest.mark.parametrize("hot_address", [0, 1, 2, 3])
+    def test_select_fires_on_the_qsharp_address(self, hot_address):
+        """SELECT flips its data qubit exactly on the address Q# would decode."""
         from qiskit import QuantumCircuit  # noqa: PLC0415
         from qiskit.quantum_info import Statevector  # noqa: PLC0415
 
         from qdk_chemistry.plugins.qiskit.conversion import apply_matrix_compression_ops  # noqa: PLC0415
 
-        op = MatrixCompressionOp(MatrixCompressionType.MCX, [0, 1, 2], control_state=control_state)
+        # Two address qubits (0, 1) and one data qubit (2); only `hot_address` sets the data bit.
+        lookup_data = [[i == hot_address] for i in range(4)]
+        op = MatrixCompressionOp(MatrixCompressionType.SELECT, [0, 1, 2], control_state=2, lookup_data=lookup_data)
+
         for q0 in (0, 1):
             for q1 in (0, 1):
                 circuit = QuantumCircuit(3)
@@ -807,8 +812,8 @@ class TestControlStateEndianness:
                 apply_matrix_compression_ops(circuit, [op])
                 index = int(np.argmax(np.abs(Statevector.from_instruction(circuit).data)))
                 target = (index >> 2) & 1
-                # bit i of control_state must match control qubit i
-                expected = int(q0 == (control_state & 1) and q1 == ((control_state >> 1) & 1))
+                # Address bit i comes from address qubit i, matching RefTableau.select.
+                expected = int((q0 | (q1 << 1)) == hot_address)
                 assert target == expected, (
-                    f"control_state={control_state} q0={q0} q1={q1}: target={target}, expected={expected}"
+                    f"hot_address={hot_address} q0={q0} q1={q1}: target={target}, expected={expected}"
                 )

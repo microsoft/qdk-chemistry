@@ -7,35 +7,25 @@ namespace QDKChemistry.Utils.BinaryEncoding {
     import Std.Arrays.MostAndTail;
     import Std.Arrays.Partitioned;
     import Std.Arrays.Subarray;
-    import Std.Canon.ApplyControlledOnBitString;
+    import Std.Canon.ApplyPauliFromBitString;
     import Std.Convert.IntAsDouble;
     import Std.Math.Ceiling;
     import Std.Math.Lg;
-    import Std.Measurement.MResetX;
+    import Std.Intrinsic.AND;
     import QDKChemistry.Utils.StatePreparation.StatePreparation;
     import QDKChemistry.Utils.StatePreparation.StatePreparationParams;
 
     /// A single gate produced by the matrix compression pipeline.
     ///
-    /// ``kind`` identifies X, CX, SWAP, CCX, MCX, SELECT, and SELECT_AND as 0 through 6.
+    /// ``kind`` names the gate: X, CX, SWAP, CCX, SELECT, or SELECT_AND.
     /// ``qubits`` always contains qubit indices only.
     struct MatrixCompressionOp {
-        kind : Int,
+        kind : String,
         qubits : Int[],
         controlState : Int,
         lookupData : Bool[][],
     }
 
-    /// Apply a single matrix-compression gate to a qubit register.
-    ///
-    /// Little-endian control-state bits for a multi-controlled gate.
-    function ControlStateBits(controlState : Int, numControls : Int) : Bool[] {
-        mutable bits = [];
-        for i in 0..numControls - 1 {
-            set bits += [((controlState >>> i) &&& 1) == 1];
-        }
-        bits
-    }
 
     /// Apply a single matrix-compression gate that is a plain unitary.
     ///
@@ -43,40 +33,29 @@ namespace QDKChemistry.Utils.BinaryEncoding {
     /// therefore cannot be adjoint- or control-generated. Callers that only ever emit plain
     /// gates (such as the GF2+X expansion) can use this to stay adjointable.
     operation ApplyAdjointableCompressionOp(gate : MatrixCompressionOp, qs : Qubit[]) : Unit is Adj + Ctl {
-        if gate.kind == 0 {
+        if gate.kind == "X" {
             X(qs[gate.qubits[0]]);
-        } elif gate.kind == 1 {
+        } elif gate.kind == "CX" {
             CX(qs[gate.qubits[0]], qs[gate.qubits[1]]);
-        } elif gate.kind == 2 {
+        } elif gate.kind == "SWAP" {
             SWAP(qs[gate.qubits[0]], qs[gate.qubits[1]]);
-        } elif gate.kind == 3 {
+        } elif gate.kind == "CCX" {
             CCNOT(qs[gate.qubits[0]], qs[gate.qubits[1]], qs[gate.qubits[2]]);
-        } elif gate.kind == 4 {
-            let numControls = Length(gate.qubits) - 1;
-            let controlQubits = Subarray(gate.qubits[0..numControls - 1], qs);
-            let ctrlStateBools = ControlStateBits(gate.controlState, numControls);
-            ApplyControlledOnBitString(ctrlStateBools, X, controlQubits, qs[gate.qubits[numControls]]);
         } else {
-            fail "Unsupported adjointable matrix-compression operation.";
+            fail $"Unsupported adjointable matrix-compression operation: {gate.kind}.";
         }
     }
 
     /// ``ancillaPool`` is a list of pre-initialised |0⟩ qubits that
     /// SparseOneHotSelect may borrow as helpers (avoids allocating new qubits).
     /// Pass an empty array when no pool is available (e.g. for GF2+X ops).
-    operation ApplyMatrixCompressionOp(gate : MatrixCompressionOp, qs : Qubit[], ancillaPool : Qubit[]) : Unit {
-        if gate.kind == 5 {
+    operation ApplyMatrixCompressionOp(gate : MatrixCompressionOp, qs : Qubit[], ancillaPool : Qubit[]) : Unit is Adj {
+        if gate.kind == "SELECT" or gate.kind == "SELECT_AND" {
             let numAddr = gate.controlState;
             let selectedQubits = Subarray(gate.qubits, qs);
             let addrQubits = selectedQubits[...numAddr - 1];
             let targetQubits = selectedQubits[numAddr...];
-            SparseOneHotSelect(gate.lookupData, addrQubits, targetQubits, false, ancillaPool);
-        } elif gate.kind == 6 {
-            let numAddr = gate.controlState;
-            let selectedQubits = Subarray(gate.qubits, qs);
-            let addrQubits = selectedQubits[...numAddr - 1];
-            let targetQubits = selectedQubits[numAddr...];
-            SparseOneHotSelect(gate.lookupData, addrQubits, targetQubits, true, ancillaPool);
+            SparseOneHotSelect(gate.lookupData, addrQubits, targetQubits, gate.kind == "SELECT_AND", ancillaPool);
         } else {
             ApplyAdjointableCompressionOp(gate, qs);
         }
@@ -90,33 +69,6 @@ namespace QDKChemistry.Utils.BinaryEncoding {
             }
         }
         return true;
-    }
-
-    /// Apply X to each target qubit where the corresponding data bit is true.
-    operation WriteOneHotData(data : Bool[], target : Qubit[]) : Unit {
-        for i in 0..Length(data) - 1 {
-            if data[i] { X(target[i]); }
-        }
-    }
-
-    /// Controlled variant: apply CX(ctl, target[i]) for each true bit.
-    operation ControlledWriteOneHotData(ctl : Qubit, data : Bool[], target : Qubit[]) : Unit {
-        for i in 0..Length(data) - 1 {
-            if data[i] { CX(ctl, target[i]); }
-        }
-    }
-
-
-    /// AND gate with measurement-based adjoint uncomputation.
-    operation MeasurementBasedAND(a : Qubit, b : Qubit, target : Qubit) : Unit is Adj {
-        body (...) {
-            CCNOT(a, b, target);
-        }
-        adjoint (...) {
-            if MResetX(target) == One {
-                CZ(a, b);
-            }
-        }
     }
 
     /// Sparse one-hot select.
@@ -134,13 +86,14 @@ namespace QDKChemistry.Utils.BinaryEncoding {
         target : Qubit[],
         useMeasurementAND : Bool,
         ancillaPool : Qubit[]
-    ) : Unit {
+    ) : Unit is Adj {
         let N = Length(data);
 
         if N == 0 or IsDataAllZeros(data) {
             // Nothing to apply
         } elif N == 1 {
-            WriteOneHotData(data[0], target);
+            // Sole surviving row: write it straight onto the target bits.
+            ApplyPauliFromBitString(PauliX, true, data[0], target);
         } else {
             let n = Ceiling(Lg(IntAsDouble(N)));
             let (most, tail) = MostAndTail(address[...n - 1]);
@@ -175,13 +128,14 @@ namespace QDKChemistry.Utils.BinaryEncoding {
         target : Qubit[],
         useMeasurementAND : Bool,
         ancillaPool : Qubit[]
-    ) : Unit {
+    ) : Unit is Adj {
         let N = Length(data);
 
         if N == 0 or IsDataAllZeros(data) {
             // Skip empty branch
         } elif N == 1 {
-            ControlledWriteOneHotData(ctl, data[0], target);
+            // Sole surviving row: write it onto the target bits, gated on this branch's control.
+            Controlled ApplyPauliFromBitString([ctl], (PauliX, true, data[0], target));
         } else {
             let n = Ceiling(Lg(IntAsDouble(N)));
             let (most, tail) = MostAndTail(address[...n - 1]);
@@ -196,12 +150,12 @@ namespace QDKChemistry.Utils.BinaryEncoding {
                     let restPool = ancillaPool[1...];
                     if useMeasurementAND {
                         within { X(tail); } apply {
-                            MeasurementBasedAND(ctl, tail, helper);
+                            AND(ctl, tail, helper);
                         }
                         SparseOneHotSCS(helper, parts[0], most, target, true, restPool);
                         CNOT(ctl, helper);
                         SparseOneHotSCS(helper, parts[1], most, target, true, restPool);
-                        Adjoint MeasurementBasedAND(ctl, tail, helper);
+                        Adjoint AND(ctl, tail, helper);
                     } else {
                         within { X(tail); } apply {
                             CCNOT(ctl, tail, helper);
@@ -215,12 +169,12 @@ namespace QDKChemistry.Utils.BinaryEncoding {
                     use helper = Qubit();
                     if useMeasurementAND {
                         within { X(tail); } apply {
-                            MeasurementBasedAND(ctl, tail, helper);
+                            AND(ctl, tail, helper);
                         }
                         SparseOneHotSCS(helper, parts[0], most, target, true, []);
                         CNOT(ctl, helper);
                         SparseOneHotSCS(helper, parts[1], most, target, true, []);
-                        Adjoint MeasurementBasedAND(ctl, tail, helper);
+                        Adjoint AND(ctl, tail, helper);
                     } else {
                         within { X(tail); } apply {
                             CCNOT(ctl, tail, helper);
@@ -236,9 +190,9 @@ namespace QDKChemistry.Utils.BinaryEncoding {
                     let helper = ancillaPool[0];
                     let restPool = ancillaPool[1...];
                     if useMeasurementAND {
-                        MeasurementBasedAND(ctl, tail, helper);
+                        AND(ctl, tail, helper);
                         SparseOneHotSCS(helper, parts[1], most, target, true, restPool);
-                        Adjoint MeasurementBasedAND(ctl, tail, helper);
+                        Adjoint AND(ctl, tail, helper);
                     } else {
                         CCNOT(ctl, tail, helper);
                         SparseOneHotSCS(helper, parts[1], most, target, false, restPool);
@@ -247,9 +201,9 @@ namespace QDKChemistry.Utils.BinaryEncoding {
                 } else {
                     use helper = Qubit();
                     if useMeasurementAND {
-                        MeasurementBasedAND(ctl, tail, helper);
+                        AND(ctl, tail, helper);
                         SparseOneHotSCS(helper, parts[1], most, target, true, []);
-                        Adjoint MeasurementBasedAND(ctl, tail, helper);
+                        Adjoint AND(ctl, tail, helper);
                     } else {
                         CCNOT(ctl, tail, helper);
                         SparseOneHotSCS(helper, parts[1], most, target, false, []);
@@ -262,9 +216,9 @@ namespace QDKChemistry.Utils.BinaryEncoding {
                     let restPool = ancillaPool[1...];
                     if useMeasurementAND {
                         X(tail);
-                        MeasurementBasedAND(ctl, tail, helper);
+                        AND(ctl, tail, helper);
                         SparseOneHotSCS(helper, parts[0], most, target, true, restPool);
-                        Adjoint MeasurementBasedAND(ctl, tail, helper);
+                        Adjoint AND(ctl, tail, helper);
                         X(tail);
                     } else {
                         X(tail);
@@ -277,9 +231,9 @@ namespace QDKChemistry.Utils.BinaryEncoding {
                     use helper = Qubit();
                     if useMeasurementAND {
                         X(tail);
-                        MeasurementBasedAND(ctl, tail, helper);
+                        AND(ctl, tail, helper);
                         SparseOneHotSCS(helper, parts[0], most, target, true, []);
-                        Adjoint MeasurementBasedAND(ctl, tail, helper);
+                        Adjoint AND(ctl, tail, helper);
                         X(tail);
                     } else {
                         X(tail);
@@ -299,7 +253,7 @@ namespace QDKChemistry.Utils.BinaryEncoding {
         gaussianEliminationOps : MatrixCompressionOp[],
         qs : Qubit[],
         ancillaPool : Int[],
-    ) : Unit {
+    ) : Unit is Adj {
         let poolQubits = Subarray(ancillaPool, qs);
         for gate in binaryEncodingOps {
             ApplyMatrixCompressionOp(gate, qs, poolQubits);
@@ -327,7 +281,7 @@ namespace QDKChemistry.Utils.BinaryEncoding {
         gaussianEliminationOps : MatrixCompressionOp[],
         ancillaPool : Int[],
         qs : Qubit[],
-    ) : Unit {
+    ) : Unit is Adj {
         StatePreparation(denseParams, Subarray(embeddingMap, qs));
         ApplyExpansion(binaryEncodingOps, gaussianEliminationOps, qs, ancillaPool);
     }
@@ -339,7 +293,7 @@ namespace QDKChemistry.Utils.BinaryEncoding {
         binaryEncodingOps : MatrixCompressionOp[],
         gaussianEliminationOps : MatrixCompressionOp[],
         ancillaPool : Int[],
-    ) : Qubit[] => Unit {
+    ) : Qubit[] => Unit is Adj {
         ComposeBinaryEncoding(denseParams, embeddingMap, binaryEncodingOps, gaussianEliminationOps, ancillaPool, _)
     }
 

@@ -9,6 +9,7 @@ import math
 
 import numpy as np
 import pytest
+from qdk import TargetProfile
 from qdk.estimator import EstimatorResult
 
 from qdk_chemistry.algorithms import create
@@ -28,8 +29,14 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.data.symmetry import SymmetryLabel, axes
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
+from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+from qdk_chemistry.utils.qsharp import (
+    QSHARP_UTILS,
+    create_qsharp_context,
+    get_qsharp_context,
+    use_qsharp_context,
+)
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 from .test_helpers import create_random_wavefunction
@@ -86,6 +93,31 @@ def _matrix_qubit_counts(wf: Wavefunction) -> tuple[int, int]:
 def ozone_wf(test_data_files_path) -> Wavefunction:
     """Load the ozone SCI wavefunction from test data."""
     return Wavefunction.from_hdf5_file(str(test_data_files_path / "ozone_sparse_ci_wavefunction.wavefunction.h5"))
+
+
+@pytest.fixture(scope="session")
+def _adaptive_context():
+    """Build one Adaptive Q# interpreter for the whole session.
+
+    Each ``qdk.Context`` owns an unsendable Rust interpreter, so building one per test
+    leaves interpreters to be dropped on whichever thread happens to run the collection.
+    """
+    return create_qsharp_context(target_profile=TargetProfile.Adaptive_RIF)
+
+
+@pytest.fixture
+def adaptive_profile(_adaptive_context):
+    """Compile Q# for an Adaptive profile for the duration of the test.
+
+    The package default is ``TargetProfile.Base``, which has no mid-circuit measurement;
+    ``Std.Intrinsic.AND`` then uncomputes unitarily instead of by measurement.
+    """
+    with use_qsharp_context(_adaptive_context):
+        # Assert the override actually took effect; otherwise these tests would silently
+        # run on the Base default and pass for the wrong reason.
+        active = get_qsharp_context().get_target_profile()
+        assert "adaptive" in str(active).lower(), f"Expected an Adaptive profile, got {active}."
+        yield
 
 
 def _assert_uses_binary_encoding(circuit: Circuit) -> None:
@@ -503,6 +535,7 @@ class TestMeasurementBasedUncompute:
     feedforward and can only be simulated by a shot-based simulator.
     """
 
+    @pytest.mark.usefixtures("adaptive_profile")
     def test_trades_toffolis_for_measurements(self, ozone_wf):
         """measurement_based_uncompute=True lowers the CCZ count and introduces measurements."""
         toffoli_circuit = create("state_prep", "sparse_isometry", binary_encoding=True).run(ozone_wf)
@@ -518,6 +551,7 @@ class TestMeasurementBasedUncompute:
         assert measured_counts["cczCount"] < toffoli_counts["cczCount"]
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+    @pytest.mark.usefixtures("adaptive_profile")
     def test_adaptive_qir_preserves_measurement_uncompute(self, ozone_wf):
         """Adaptive QIR imports each measured uncompute as Qiskit control flow."""
         circuit = create("state_prep", "sparse_isometry", binary_encoding=True, measurement_based_uncompute=True).run(
@@ -533,6 +567,7 @@ class TestMeasurementBasedUncompute:
         assert ops.get("if_else", 0) == measurement_count
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+    @pytest.mark.usefixtures("adaptive_profile")
     @pytest.mark.parametrize("seed_simulator", [1, 7, 13, 21])
     def test_statevector_independent_of_measurement_outcome(self, ozone_wf, seed_simulator):
         """The prepared state must be the target state whichever way the mid-circuit measurements fall."""
@@ -558,6 +593,7 @@ class TestMeasurementBasedUncompute:
         )
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+    @pytest.mark.usefixtures("adaptive_profile")
     def test_qiskit_dense_prep_path_prepares_correct_state(self, ozone_wf):
         """SELECT_AND must stay correct on the Qiskit path, which decomposes it without ancilla."""
         from qiskit.quantum_info import Statevector  # noqa: PLC0415
@@ -576,6 +612,47 @@ class TestMeasurementBasedUncompute:
 
         qc = circuit.get_qiskit_circuit()
         # The ancilla-free decomposition leaves nothing to uncompute, so no measurement is emitted.
+        assert qc.count_ops().get("measure", 0) == 0
+        system_sv = np.array(Statevector.from_instruction(qc))[: 2**n_system]
+        overlap = np.abs(np.vdot(expected_sv, system_sv))
+        assert np.isclose(
+            overlap, 1.0, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+        )
+
+    def test_base_profile_warns_and_uncomputes_unitarily(self, ozone_wf, monkeypatch):
+        """On a Base profile the request is honoured unitarily, with a warning instead of a failure."""
+        emitted: list[str] = []
+        monkeypatch.setattr(Logger, "warn", emitted.append)
+
+        with use_qsharp_context(create_qsharp_context(target_profile=TargetProfile.Base)):
+            circuit = create(
+                "state_prep", "sparse_isometry", binary_encoding=True, measurement_based_uncompute=True
+            ).run(ozone_wf)
+            _assert_uses_binary_encoding(circuit)
+            counts = circuit.estimate()["logicalCounts"]
+
+        assert any("measurement_based_uncompute" in message and "Base" in message for message in emitted), (
+            f"Expected a fallback warning naming the profile, got: {emitted}"
+        )
+        # Std.Intrinsic.AND uncomputes unitarily off-Adaptive, so no measurement survives.
+        assert counts["measurementCount"] == 0
+
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+    def test_base_profile_fallback_prepares_correct_state(self, ozone_wf):
+        """The unitary fallback must still prepare the target state, not merely compile."""
+        from qiskit.quantum_info import Statevector  # noqa: PLC0415
+
+        from qdk_chemistry.plugins.qiskit.conversion import create_statevector_from_wavefunction  # noqa: PLC0415
+
+        with use_qsharp_context(create_qsharp_context(target_profile=TargetProfile.Base)):
+            circuit = create(
+                "state_prep", "sparse_isometry", binary_encoding=True, measurement_based_uncompute=True
+            ).run(ozone_wf)
+            qc = circuit.get_qiskit_circuit()
+
+        expected_sv = create_statevector_from_wavefunction(ozone_wf, normalize=True)
+        n_system = int(np.log2(len(expected_sv)))
+        # No mid-circuit measurement, so the statevector is well defined without a shot-based run.
         assert qc.count_ops().get("measure", 0) == 0
         system_sv = np.array(Statevector.from_instruction(qc))[: 2**n_system]
         overlap = np.abs(np.vdot(expected_sv, system_sv))
