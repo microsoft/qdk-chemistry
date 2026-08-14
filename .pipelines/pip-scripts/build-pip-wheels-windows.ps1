@@ -3,9 +3,10 @@
     Build a Python wheel for qdk-chemistry on Windows.
 
 .DESCRIPTION
-    Bootstraps a conda environment, installs build tooling, then builds the
-    wheel with scikit-build-core. C++ deps are pre-installed by the deps job
-    and found via CMAKE_PREFIX_PATH. Mirrors the approach of build-pip-wheels.sh.
+    Bootstraps a Python environment (conda, or a plain venv on platforms conda
+    does not package), installs build tooling, then builds the wheel with
+    scikit-build-core. C++ deps are pre-installed by the deps job and found via
+    CMAKE_PREFIX_PATH. Mirrors the approach of build-pip-wheels.sh.
 #>
 param(
     [Parameter(Mandatory)] [string]$SrcDir,
@@ -16,7 +17,10 @@ param(
     [string]$EnableCoverage = 'OFF',
     [string]$PythonVersion  = '3.11',
     [string]$DevTag         = 'None',
+    [ValidateSet('conda', 'venv')]
+    [string]$PythonEnv      = 'conda',
     [string]$VcpkgRoot,
+    [string]$Triplet,
     [string]$DepsInstallDir
 )
 $ErrorActionPreference = 'Stop'
@@ -24,36 +28,59 @@ $ErrorActionPreference = 'Stop'
 if (-not $VcpkgRoot) {
     $VcpkgRoot = if ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_INSTALLATION_ROOT } else { 'C:\vcpkg' }
 }
+if (-not $Triplet) {
+    $Triplet = if ($env:VCPKG_TRIPLET) { $env:VCPKG_TRIPLET } else { 'x64-windows-static-md' }
+}
 if (-not $DepsInstallDir) { $DepsInstallDir = "$SrcDir\deps-install-msvc" }
+Write-Host "vcpkg triplet: $Triplet"
 
 if (-not $env:CMAKE_BUILD_PARALLEL_LEVEL) {
     $cpu   = [int]$env:NUMBER_OF_PROCESSORS
     $ramGB = [math]::Floor((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
-    $jobs  = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 3.5)))
-    Write-Host "CPUs=$cpu  RAM=${ramGB} GB  -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
+    # Budget for the OS, the agent and ninja itself before dividing what is left
+    # among compiler processes. Without that reserve a 7 GB machine looks like it
+    # can run two jobs, and on Windows ARM64 the pair of cl.exe processes then
+    # exhaust the commit limit while instantiating libint2's engine.impl.h:
+    #
+    #   libint2\./engine.impl.h(643): fatal error C1060: compiler is out of heap space
+    #
+    # This leaves larger agents unaffected: a 16 GB machine still gets 4 jobs.
+    $usableGB = $ramGB - 2
+    $jobs  = [math]::Min($cpu, [math]::Max(1, [math]::Floor($usableGB / 3.5)))
+    Write-Host "CPUs=$cpu  RAM=${ramGB} GB (usable ${usableGB} GB)  -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
     $env:CMAKE_BUILD_PARALLEL_LEVEL = $jobs
 }
 
-# ─── Conda bootstrap ─────────────────────────────────────────────────────────
-Write-Host "=== Conda bootstrap ==="
-$condaExe = & "$PSScriptRoot\bootstrap-conda.ps1" -EnvName buildenv -PythonVersion $PythonVersion
-if ($LASTEXITCODE -ne 0) { throw "Conda bootstrap failed ($LASTEXITCODE)" }
+# ─── Python environment bootstrap ────────────────────────────────────────────
+# conda everywhere except Windows ARM64, where conda has no usable win-arm64
+# packages; there the wheel is built in a venv on top of the agent interpreter.
+if ($PythonEnv -eq 'venv') {
+    Write-Host "=== venv bootstrap ==="
+    $runExe = & "$PSScriptRoot\bootstrap-venv.ps1" -EnvName buildenv -PythonVersion $PythonVersion
+    if ($LASTEXITCODE -ne 0) { throw "venv bootstrap failed ($LASTEXITCODE)" }
+    $runArgs = @()
+} else {
+    Write-Host "=== Conda bootstrap ==="
+    $runExe = & "$PSScriptRoot\bootstrap-conda.ps1" -EnvName buildenv -PythonVersion $PythonVersion
+    if ($LASTEXITCODE -ne 0) { throw "Conda bootstrap failed ($LASTEXITCODE)" }
+    $runArgs = @('run', '-n', 'buildenv', 'python')
+}
 
 # ─── Install Python build tooling ────────────────────────────────────────────
 Write-Host "=== pip install build tooling ==="
-& $condaExe run -n buildenv python -m pip install --upgrade pip
+& $runExe @runArgs -m pip install --upgrade pip
 if ($LASTEXITCODE -ne 0) { throw "pip upgrade failed" }
-& $condaExe run -n buildenv python -m pip install -r "$SrcDir\.pipelines\requirements.txt"
+& $runExe @runArgs -m pip install -r "$SrcDir\.pipelines\requirements.txt"
 if ($LASTEXITCODE -ne 0) { throw "pip install requirements failed" }
 
 # ─── Component Governance PipReport (non-fatal) ──────────────────────────────
 $manifestDir = "$SrcDir\python\build\build-manifest"
 New-Item -ItemType Directory -Force -Path $manifestDir | Out-Null
-$reqs = & $condaExe run -n buildenv python -m pip list --format=freeze
+$reqs = & $runExe @runArgs -m pip list --format=freeze
 if ($LASTEXITCODE -ne 0) { throw "pip list failed ($LASTEXITCODE)" }
 $reqs | Set-Content -Encoding utf8 "$manifestDir\requirements.txt"
 $reqs | ForEach-Object { Write-Host $_ }
-& $condaExe run -n buildenv python -m pip install `
+& $runExe @runArgs -m pip install `
     --dry-run --ignore-installed --quiet `
     --report "$manifestDir\component-detection-pip-report.json" `
     -r "$manifestDir\requirements.txt"
@@ -74,10 +101,9 @@ try {
 Write-Host "=== python -m build --wheel ==="
 # Default to a non-release build unless explicitly overridden (to keep +local on dev builds).
 if (-not $env:QDK_CHEMISTRY_RELEASE_BUILD) { $env:QDK_CHEMISTRY_RELEASE_BUILD = '0' }
-$prefix = "$DepsInstallDir;$SrcDir\vcpkg_installed\x64-windows-static-md"
-$buildArgs = @(
-    'run', '-n', 'buildenv',
-    'python', '-m', 'build', '--wheel',
+$prefix = "$DepsInstallDir;$SrcDir\vcpkg_installed\$Triplet"
+$buildArgs = $runArgs + @(
+    '-m', 'build', '--wheel',
     "-C=build-dir=build/{wheel_tag}",
     "-C=cmake.args=-GNinja",
     "-C=cmake.define.QDK_UARCH=$March",
@@ -95,19 +121,20 @@ $buildArgs = @(
     "-C=cmake.define.CMAKE_CXX_COMPILER=$ClPath",
     "-C=cmake.define.CMAKE_TOOLCHAIN_FILE=$VcpkgRoot\scripts\buildsystems\vcpkg.cmake",
     "-C=cmake.define.VCPKG_CHAINLOAD_TOOLCHAIN_FILE=$SrcDir\.pipelines\toolchains\windows.cmake",
-    '-C=cmake.define.VCPKG_TARGET_TRIPLET=x64-windows-static-md',
+    "-C=cmake.define.VCPKG_TARGET_TRIPLET=$Triplet",
     "-C=cmake.define.VCPKG_INSTALLED_DIR=$SrcDir\vcpkg_installed",
     "-C=cmake.define.CMAKE_PREFIX_PATH=$prefix",
     '-C=cmake.define.FETCHCONTENT_QUIET=OFF'
 )
 Push-Location "$SrcDir\python"
-& $condaExe @buildArgs
+& $runExe @buildArgs
 $wheelCode = $LASTEXITCODE
 Pop-Location
 if ($wheelCode -ne 0) { throw "python -m build --wheel failed ($wheelCode)" }
 
 # ─── Copy wheel to repaired_wheelhouse ───────────────────────────────────────
-# No wheel repair needed: x64-windows-static-md statically links all vcpkg deps.
+# No wheel repair needed: the *-windows-static-md triplets statically link all
+# vcpkg deps.
 $distDir   = "$SrcDir\python\dist"
 $outputDir = "$SrcDir\python\repaired_wheelhouse"
 New-Item -ItemType Directory -Force -Path $outputDir | Out-Null

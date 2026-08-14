@@ -84,6 +84,28 @@ In addition to the native implementations packaged within QDK/Chemistry, plugins
 
 These plugins are enabled automatically when the corresponding package is installed.
 
+.. _pyscf-plugin-details:
+
+PySCF plugin details
+^^^^^^^^^^^^^^^^^^^^
+
+The PySCF plugin is installed via the ``plugins`` extra:
+
+.. code-block:: bash
+
+   pip install 'qdk-chemistry[plugins]'
+
+.. note::
+
+   PySCF is the only package in the ``plugins`` extra and publishes no Windows wheels, so the PySCF
+   plugin is unavailable on native Windows. Because ``jupyter``, ``test``, and ``all`` depend on
+   ``plugins``, this applies to those extras as well — they install successfully on Windows, but
+   without PySCF.
+
+   The native QDK/Chemistry implementations are unaffected and remain available on Windows.
+   To use the PySCF plugin on a Windows machine, work inside
+   `WSL <https://learn.microsoft.com/windows/wsl/install>`_.
+
 .. _qiskit-plugin-details:
 
 Qiskit plugin details
