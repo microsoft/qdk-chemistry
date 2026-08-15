@@ -463,14 +463,17 @@ std::shared_ptr<data::Wavefunction> ActiveSpaceQIOLocalizer::_run_impl(
       orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
       orbitals->active_indices(), orbitals->inactive_indices());
 
-  // Attach the rotated spin-traced active 1-RDM (alpha + beta) as a payload so
-  // downstream consumers see the density in the new orbital basis. Unlike the
-  // natural-orbital localizer, QIO does not diagonalize the 1-RDM, so this
-  // payload is generally non-diagonal.
+  // Attach both spin-resolved and spin-traced active 1-RDM payloads in the new
+  // orbital basis. Unlike the natural-orbital localizer, QIO does not
+  // diagonalize the 1-RDM, so these payloads are generally non-diagonal.
   const Eigen::MatrixXd rotated_one_rdm_spin_traced = rdm_alpha + rdm_beta;
+  auto rotated_active_one_rdm = data::make_spin_diagonal_rank2_sbt_variant(
+      data::ContainerTypes::MatrixVariant(rdm_alpha),
+      data::ContainerTypes::MatrixVariant(rdm_beta), false);
   return algorithms::detail::new_aufbau_determinant_wavefunction(
       wavefunction, new_orbitals,
-      data::ContainerTypes::MatrixVariant(rotated_one_rdm_spin_traced));
+      data::ContainerTypes::MatrixVariant(rotated_one_rdm_spin_traced),
+      rotated_active_one_rdm);
 }
 
 }  // namespace qdk::chemistry::algorithms::microsoft

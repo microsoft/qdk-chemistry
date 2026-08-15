@@ -2014,7 +2014,19 @@ TEST_F(LocalizationTest, ActiveSpaceQIO) {
       qio_wfn_ptr->get_active_one_rdm_spin_traced();
   const auto* output_rdm = std::get_if<Eigen::MatrixXd>(&output_rdm_variant);
   ASSERT_NE(output_rdm, nullptr);
+  ASSERT_TRUE(qio_wfn_ptr->has_one_rdm_spin_dependent());
+  const auto* output_spin_rdm = std::get_if<SymmetryBlockedTensor<2, double>>(
+      &qio_wfn_ptr->active_one_rdm());
+  ASSERT_NE(output_spin_rdm, nullptr);
+  const auto& output_alpha =
+      output_spin_rdm->block({axes::alpha(), axes::alpha()});
+  const auto& output_beta =
+      output_spin_rdm->block({axes::beta(), axes::beta()});
+  EXPECT_NEAR(0.0, (*output_rdm - output_alpha - output_beta).norm(),
+              testing::numerical_zero_tolerance);
   const auto [nelec_a, nelec_b] = wfn_cas->get_active_num_electrons();
+  EXPECT_NEAR(static_cast<double>(nelec_a), output_alpha.trace(), 1e-8);
+  EXPECT_NEAR(static_cast<double>(nelec_b), output_beta.trace(), 1e-8);
   EXPECT_NEAR(static_cast<double>(nelec_a + nelec_b), output_rdm->trace(),
               1e-8);
 }
