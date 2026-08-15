@@ -8,7 +8,6 @@
 
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/nuclear_hessian.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
 
@@ -88,6 +87,13 @@ Args:
       .def("get_atom_pair_block", &NuclearHessian::get_atom_pair_block,
            py::arg("row_atom_index"), py::arg("column_atom_index"),
            R"(Return the 3 by 3 Hessian block coupling two atoms.)")
+      .def_static("data_type_name", &NuclearHessian::data_type_name, R"(
+Return the wire-format identifier for nuclear Hessians.
+
+Returns:
+    str: ``"nuclear_hessian"``
+
+)")
       .def("get_data_type_name", &NuclearHessian::get_data_type_name,
            R"(Return the serialized data type name.)")
       .def("get_summary", &NuclearHessian::get_summary,

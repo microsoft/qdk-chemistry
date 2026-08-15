@@ -12,6 +12,9 @@ from typing import Any
 
 import numpy as np
 
+from qdk_chemistry._core.data import DataClass as CoreDataClass
+from qdk_chemistry.data._type_name import instance_data_type_name
+
 __all__: list[str] = []
 
 _NATIVE_IS_BIG = sys.byteorder == "big"
@@ -174,11 +177,11 @@ def _item_content_hash(item: Any) -> str:
 def _type_tag(item: Any) -> str:  # noqa: PLR0911
     """Return a short type tag for an item (used in output_hashes)."""
     if isinstance(item, list):
-        if item and hasattr(item[0], "_data_type_name"):
-            return f"list[{item[0]._data_type_name}]"  # noqa: SLF001
+        if item and isinstance(item[0], CoreDataClass):
+            return f"list[{instance_data_type_name(item[0])}]"
         return "list"
-    if hasattr(item, "_data_type_name"):
-        return item._data_type_name  # noqa: SLF001
+    if isinstance(item, CoreDataClass):
+        return instance_data_type_name(item)
     if isinstance(item, bool):
         return "bool"
     if isinstance(item, int):

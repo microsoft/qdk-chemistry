@@ -5,6 +5,7 @@
 #include <pybind11/pybind11.h>
 
 #include <qdk/chemistry/data/settings.hpp>
+#include <qdk/chemistry/exceptions.hpp>
 
 namespace py = pybind11;
 
@@ -55,6 +56,9 @@ void bind_model_hamiltonians(py::module& m);
 
 PYBIND11_MODULE(_core, m) {
   m.doc() = "QDK/Chemistry C++ core bindings";
+
+  py::register_exception<qdk::chemistry::DuplicateRegistrationError>(
+      m, "DuplicateRegistrationError", PyExc_ValueError);
 
   auto data = m.def_submodule("data");
   data.doc() = R"(Data submodule)";
