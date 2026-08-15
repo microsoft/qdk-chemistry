@@ -28,7 +28,7 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
-from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
+from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer, QuantumWalkContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 
@@ -472,17 +472,27 @@ def _assert_marks_exactly_the_bins_above(container, energy_lower_bound, num_phas
     """Assert the marking holds every bin clearing the bound and no other, or refuses it."""
     phase_bin_count = 1 << num_phase_qubits
     context = f"E={energy_lower_bound} on a {phase_bin_count}-bin register"
-    expected = {
-        phase_bin
-        for phase_bin in range(phase_bin_count)
-        if container.eigenvalue_from_phase(phase_bin / phase_bin_count) >= energy_lower_bound
-    }
+    # The walk law is even about phi = 1/2, so bins k and phase_bin_count - k hold one energy.
+    # cos rounds the pair to either side of a bound that falls exactly between them, so read
+    # both off the lower bin the way the marking does.
+    mirrored = isinstance(container, QuantumWalkContainer)
+
+    def energy_of(phase_bin: int) -> float:
+        canonical = min(phase_bin, phase_bin_count - phase_bin) if mirrored else phase_bin
+        return container.eigenvalue_from_phase(canonical / phase_bin_count)
+
+    expected = {phase_bin for phase_bin in range(phase_bin_count) if energy_of(phase_bin) >= energy_lower_bound}
     if len(expected) in (0, phase_bin_count):
         with pytest.raises(ValueError, match="phase bin"):
             QPESubspaceMarking._marked_phase_bins(energy_lower_bound, container, num_phase_qubits)
         return
     bins = QPESubspaceMarking._marked_phase_bins(energy_lower_bound, container, num_phase_qubits)
-    assert {phase_bin for start, stop in bins for phase_bin in range(start, stop)} == expected, context
+    marked = {phase_bin for start, stop in bins for phase_bin in range(start, stop)}
+    assert marked == expected, context
+    # A walk eigenspace reaches the phase register as a mirrored pair, so marking one branch
+    # without the other would leave the oracle unable to restore the ancillas it releases.
+    if mirrored:
+        assert {(phase_bin_count - phase_bin) % phase_bin_count for phase_bin in marked} == marked, context
     # Sorted, non-empty and separated by at least one bin, so the ranges cannot double-flip
     # the flag: MarkAcceptedPhase applies MarkPhaseRange to each one independently.
     assert all(start < stop for start, stop in bins), context
