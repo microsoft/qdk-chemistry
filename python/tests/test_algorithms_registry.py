@@ -11,6 +11,7 @@ import pytest
 
 from qdk_chemistry._core._algorithms import ScfSolverFactory
 from qdk_chemistry.algorithms import ScfSolver, registry
+from qdk_chemistry.data import AlgorithmRef
 from qdk_chemistry.plugins import DuplicateRegistrationError
 from qdk_chemistry.plugins.qiskit import (
     QDK_CHEMISTRY_HAS_QISKIT,
@@ -677,6 +678,19 @@ class TestRegistryRegisterUnregister:
             assert replacement.registration_owner == "replacement"
         finally:
             registry.unregister("expectation_estimator", "aliased_python_algorithm")
+
+    def test_builtin_registration_resolves_nested_algorithm_ref(self):
+        """Built-in registration resolves nested algorithms without recursive construction."""
+        sparse = registry.create(
+            "state_prep",
+            "sparse_isometry",
+            dense_state_prep=AlgorithmRef("state_prep", "dense_pure_state"),
+        )
+
+        dense_ref = sparse.settings().get("dense_state_prep")
+        dense = registry.create(dense_ref.algorithm_type, dense_ref.algorithm_name)
+
+        assert dense.name() == "dense_pure_state"
 
     def test_python_factory_rejects_duplicate_alias(self):
         """Registration rejects an alias owned by another implementation."""
