@@ -399,7 +399,7 @@ class AlgorithmFactory(ABC):
                     f"algorithm with name/alias '{alias}' already exists in registry"
                 )
         self._registry[name] = generator
-        self._aliases.update({alias: name for alias in aliases})
+        self._aliases.update(dict.fromkeys(aliases, name))
 
     def unregister_instance(self, name: str) -> bool:
         """Remove an algorithm implementation from this factory.
