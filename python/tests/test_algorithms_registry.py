@@ -30,6 +30,43 @@ except ImportError:
 INTERFACE_ONLY_TYPES = {"effective_hamiltonian_constructor"}
 
 
+def test_algorithm_wrapper_forwards_remote_execution_options(monkeypatch):
+    """Remote execution options are handled outside the wrapped algorithm."""
+    algorithm = object()
+    backend = object()
+    remote_run = MagicMock(return_value="remote result")
+    monkeypatch.setattr("qdk_chemistry.remote.proxy.run", remote_run)
+
+    wrapped = registry._AlgorithmWrapper(algorithm)
+    result = wrapped.run(
+        "input",
+        keyword="value",
+        cache="cache",
+        remote=backend,
+        force_rerun=True,
+    )
+
+    assert result == "remote result"
+    remote_run.assert_called_once_with(
+        algorithm,
+        "input",
+        keyword="value",
+        cache="cache",
+        remote=backend,
+        force_rerun=True,
+    )
+
+
+def test_algorithm_wrapper_does_not_reserve_poll_interval():
+    """An algorithm can define its own poll_interval keyword argument."""
+    algorithm = MagicMock()
+    wrapped = registry._AlgorithmWrapper(algorithm)
+
+    wrapped.run("input", poll_interval=0.25)
+
+    algorithm.run.assert_called_once_with("input", poll_interval=0.25)
+
+
 class TestRegistryShowDefault:
     """Test the show_default function in the registry module."""
 

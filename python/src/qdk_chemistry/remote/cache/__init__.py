@@ -17,8 +17,10 @@ from __future__ import annotations
 
 import logging
 import pathlib
+import warnings
 from typing import Any
 
+from qdk_chemistry._core import DuplicateRegistrationError as _DuplicateRegistrationError
 from qdk_chemistry.remote.cache.base import CacheBackend
 from qdk_chemistry.remote.cache.folder import FolderCache
 from qdk_chemistry.remote.cache.tiered import TieredCache
@@ -30,18 +32,34 @@ logger = logging.getLogger(__name__)
 _CACHES: dict[str, type[CacheBackend]] = {}
 
 
+def _register_cache(name: str, cls: type[CacheBackend]) -> type[CacheBackend]:
+    """Register one cache class after validating registry ownership."""
+    if name in _CACHES:
+        raise _DuplicateRegistrationError(f"Cache backend name '{name}' is already registered")
+    for registered_name, registered_cls in _CACHES.items():
+        if registered_cls is cls:
+            raise _DuplicateRegistrationError(
+                f"Cache backend class '{cls.__module__}.{cls.__qualname__}' is already registered "
+                f"with name '{registered_name}'"
+            )
+    cls.name = name
+    _CACHES[name] = cls
+    return cls
+
+
 def register_cache(name: str):
     """Decorator to register a cache backend class.
 
     Args:
         name: The cache backend name (e.g. ``"folder"``).
 
+    Raises:
+        DuplicateRegistrationError: If the cache backend name or class is already registered.
+
     """
 
     def decorator(cls: type[CacheBackend]) -> type[CacheBackend]:
-        cls.name = name
-        _CACHES[name] = cls
-        return cls
+        return _register_cache(name, cls)
 
     return decorator
 
@@ -106,18 +124,29 @@ def available_caches() -> list[str]:
 
 def _load_plugin_caches() -> None:
     """Auto-discover cache backends from entry points."""
-    try:
-        from importlib.metadata import entry_points  # noqa: PLC0415
+    from importlib.metadata import entry_points  # noqa: PLC0415
 
-        eps = entry_points(group="qdk_chemistry.cache_backends")
-        for ep in eps:
-            cls = ep.load()
-            register_cache(ep.name)(cls)
+    from qdk_chemistry.plugins import _legacy_cache_entry_point_enabled  # noqa: PLC0415
+
+    try:
+        cache_entry_points = entry_points(group="qdk_chemistry.cache_backends")
     except Exception:  # noqa: BLE001
         logger.warning("Failed to load cache plugins", exc_info=True)
+        return
 
+    for entry_point in cache_entry_points:
+        if not _legacy_cache_entry_point_enabled(entry_point):
+            continue
+        try:
+            cache_cls = entry_point.load()
+            register_cache(entry_point.name)(cache_cls)
+        except Exception as exc:  # noqa: BLE001
+            warnings.warn(
+                f"Failed to load QDK/Chemistry cache plugin {entry_point.name!r}: {exc}",
+                UserWarning,
+                stacklevel=2,
+            )
 
-_load_plugin_caches()
 
 __all__ = [
     "available_caches",
