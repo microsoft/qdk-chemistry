@@ -36,6 +36,8 @@ import atexit
 import warnings
 from typing import TYPE_CHECKING, Any
 
+from qdk_chemistry._core import DuplicateRegistrationError as _DuplicateRegistrationError
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -472,6 +474,7 @@ def register(generator: Callable[[], Algorithm]) -> None:
             from the factory.
 
     Raises:
+        DuplicateRegistrationError: If the algorithm name or an alias is already registered.
         KeyError: If the algorithm's type is not a recognized algorithm type in the system.
 
     Examples:
@@ -635,13 +638,13 @@ def register_factory(factory: AlgorithmFactory) -> None:
         factory (AlgorithmFactory): The factory instance to register.
 
     Raises:
-        ValueError: If a factory with the same algorithm type name is already registered.
+        DuplicateRegistrationError: If a factory with the same algorithm type name is already registered.
 
     """
     algorithm_type = factory.algorithm_type_name()
     for existing_factory in __factories:
         if existing_factory.algorithm_type_name() == algorithm_type:
-            raise ValueError(f"Factory for algorithm type '{algorithm_type}' is already registered.")
+            raise _DuplicateRegistrationError(f"Factory for algorithm type '{algorithm_type}' is already registered.")
     __factories.append(factory)
 
 
