@@ -187,7 +187,7 @@ QDK Active-Space Quantum-Information Orbitals
 
 .. rubric:: Factory name: ``"qdk_active_space_qio"``
 
-Transforms active orbitals by minimizing the sum of their single-orbital entropies with gradient-free Jacobi sweeps.
+Transforms active orbitals by minimizing the sum of their single-orbital entropies with gradient-free Jacobi sweeps :cite:`Liao2024`.
 The objective uses the same entropy convention as :meth:`~qdk_chemistry.data.Wavefunction.get_single_orbital_entropies`.
 This transformation can provide an orbital basis with more compactly distributed correlation.
 
