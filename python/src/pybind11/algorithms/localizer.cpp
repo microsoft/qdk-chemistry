@@ -74,17 +74,17 @@ Returns:
   // Localizer abstract base class
   py::class_<Localizer, LocalizerBase, py::smart_holder> localizer(
       m, "OrbitalLocalizer", R"(
-Abstract base class for orbital localizers.
+Abstract base class for orbital transformations.
 
-This class defines the interface for localizing molecular orbitals.
-Localization transforms canonical molecular orbitals into localized orbitals that are spatially confined to specific regions or bonds.
-Concrete implementations should inherit from this class and implement the localize method.
+This class defines the interface for transforming selected molecular orbitals
+into localized or otherwise useful representations. Concrete implementations
+should inherit from this class and implement the ``_run_impl`` method.
 
 Examples:
     >>> # To create a custom orbital localizer, inherit from this class.
     >>> import qdk_chemistry.algorithms as alg
     >>> import qdk_chemistry.data as data
-    >>> class MyLocalizer(alg.Localizer):
+    >>> class MyLocalizer(alg.OrbitalLocalizer):
     ...     def __init__(self):
     ...         super().__init__()  # Call the base class constructor
     ...     # Implement the _run_impl method
@@ -95,14 +95,14 @@ Examples:
 
   localizer.def(py::init<>(),
                 R"(
-Create a Localizer instance.
+Create an OrbitalLocalizer instance.
 
 Default constructor for the abstract base class.
 This should typically be called from derived class constructors.
 
 Examples:
     >>> # In a derived class:
-    >>> class MyLocalizer(alg.Localizer):
+    >>> class MyLocalizer(alg.OrbitalLocalizer):
     ...     def __init__(self):
     ...         super().__init__()  # Calls this constructor
 
