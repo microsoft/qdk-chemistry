@@ -111,7 +111,6 @@ class RefTableau:
 
         Raises:
             ValueError: If data is not 2-dimensional.
-            NotRefError: If data is not in valid row echelon form.
 
         """
         self.data = np.asarray(data, dtype=np.int8)
@@ -654,7 +653,7 @@ class _BinaryEncodingSynthesizer:
             rest_entries: List of (offset, changing_controls) pairs for this chunk.
 
         Returns:
-            tuple[list[tuple], int]: A pair of (ops_list, toffoli_cost).
+            tuple[list[MatrixCompressionOp], int]: A pair of (ops_list, toffoli_cost).
 
         """
         if not rest_entries:

@@ -5,12 +5,8 @@
 namespace QDKChemistry.Utils.StatePreparation {
 
     import Std.Arrays.Subarray;
-    import Std.Canon.ApplyControlledOnBitString;
-    import Std.Measurement.MResetZ;
     import Std.StatePreparation.PreparePureStateD;
-    import Std.TableLookup.Select;
     import QDKChemistry.Utils.BinaryEncoding.MatrixCompressionOp;
-    import QDKChemistry.Utils.BinaryEncoding.ApplyMatrixCompressionOp;
     import QDKChemistry.Utils.BinaryEncoding.ApplyAdjointableCompressionOp;
 
 
