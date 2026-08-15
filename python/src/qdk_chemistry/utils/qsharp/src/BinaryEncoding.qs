@@ -46,7 +46,7 @@ namespace QDKChemistry.Utils.BinaryEncoding {
         if gate.kind == OpKindX() {
             X(qs[gate.qubits[0]]);
         } elif gate.kind == OpKindCX() {
-            CX(qs[gate.qubits[0]], qs[gate.qubits[1]]);
+            CNOT(qs[gate.qubits[0]], qs[gate.qubits[1]]);
         } elif gate.kind == OpKindSwap() {
             SWAP(qs[gate.qubits[0]], qs[gate.qubits[1]]);
         } elif gate.kind == OpKindCCX() {
