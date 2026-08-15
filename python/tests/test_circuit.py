@@ -24,6 +24,7 @@ except ImportError:
     from qsharp._native import Circuit as QdkCircuitType
     from qsharp._qsharp import QirInputData
 
+from qdk_chemistry.algorithms.state_preparation._binary_encoding_utils import MatrixCompressionType
 from qdk_chemistry.data import Circuit
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
@@ -138,7 +139,14 @@ class TestGetQsharpCircuit:
         state_prep_params = {
             "rowMap": [1, 0],
             "stateVector": [0.6, 0.0, 0.0, 0.8],
-            "expansionOps": [{"kind": "X", "qubits": [2], "controlState": 0, "lookupData": []}],
+            "expansionOps": [
+                {
+                    "kind": MatrixCompressionType.X.qsharp_code,
+                    "qubits": [2],
+                    "controlState": 0,
+                    "lookupData": [],
+                }
+            ],
             "numQubits": 4,
         }
         qsharp_factory = QsharpFactoryData(

@@ -34,18 +34,13 @@ def _bits_to_int(bits) -> int:
 def _run_synth(mat, **kwargs):
     """Test helper: construct + run synthesis, return the synth instance."""
     synth = _BinaryEncodingSynthesizer(RefTableau(mat), **kwargs)
-    n = mat.shape[0]
-    synth.synthesize(num_local_qubits=n, active_qubit_indices=list(range(n)), ancilla_start=n)
+    synth.synthesize(active_qubit_indices=list(range(mat.shape[0])))
     return synth
 
 
 def _get_ops(synth, num_local_qubits):
     """Test helper: extract ops with identity qubit mapping."""
-    return synth._to_operations(
-        num_local_qubits=num_local_qubits,
-        active_qubit_indices=list(range(num_local_qubits)),
-        ancilla_start=num_local_qubits,
-    )
+    return synth._to_operations(list(range(num_local_qubits)))
 
 
 class TestCheckRef:
@@ -620,44 +615,34 @@ class TestToGf2xOperations:
         assert type(kind) is int
 
     def test_matrix_compression_qsharp_opcodes_are_exhaustive(self):
-        """Every operation type must have one stable, contiguous Q# wire value."""
-        expected_types = [
-            MatrixCompressionType.X,
-            MatrixCompressionType.CX,
-            MatrixCompressionType.SWAP,
-            MatrixCompressionType.CCX,
-            MatrixCompressionType.SELECT,
-            MatrixCompressionType.SELECT_AND,
-        ]
-        assert list(MatrixCompressionType) == expected_types
-        assert [op_type.qsharp_code for op_type in expected_types] == list(range(len(expected_types)))
+        """Every operation type must carry a distinct opcode matching ``BinaryEncoding.qs``."""
+        expected_codes = {
+            MatrixCompressionType.X: 0,
+            MatrixCompressionType.CX: 1,
+            MatrixCompressionType.SWAP: 2,
+            MatrixCompressionType.CCX: 3,
+            MatrixCompressionType.SELECT: 4,
+            MatrixCompressionType.SELECT_AND: 5,
+        }
+        assert set(MatrixCompressionType) == set(expected_codes)
+        assert {op_type: op_type.qsharp_code for op_type in MatrixCompressionType} == expected_codes
 
     def test_to_operations_identity_mapping(self):
         """When active_qubit_indices is identity, ops stay the same."""
         mat = np.array([[1, 0, 1], [0, 1, 1], [0, 0, 0]], dtype=np.int8)
         synth = _run_synth(mat)
         ops_raw = _get_ops(synth, 3)
-        ops_xlat = synth._to_operations(
-            num_local_qubits=3,
-            active_qubit_indices=[0, 1, 2],
-            ancilla_start=3,
-        )
-        # With identity mapping and ancilla_start = num_local, should be equivalent
+        ops_xlat = synth._to_operations([0, 1, 2])
         assert len(ops_raw) == len(ops_xlat)
 
     def test_to_operations_remaps_indices(self):
-        """_to_operations must remap qubit indices through the provided map."""
+        """_to_operations must remap every qubit index through the provided map."""
         mat = np.array([[1, 0, 1], [0, 1, 1], [0, 0, 0]], dtype=np.int8)
         synth = _run_synth(mat)
-        ops = synth._to_operations(
-            num_local_qubits=3,
-            active_qubit_indices=[10, 20, 30],
-            ancilla_start=100,
-        )
-        # All qubit indices should be in the remapped space
+        ops = synth._to_operations([10, 20, 30])
         for op in ops:
             for q in op.qubits:
-                assert q in {10, 20, 30} or q >= 100
+                assert q in {10, 20, 30}
 
     def test_measurement_based_uses_select_and(self):
         """With measurement_based_uncompute, PUI blocks should emit select_and."""
@@ -674,54 +659,58 @@ class TestToGf2xOperations:
             assert MatrixCompressionType.SELECT_AND in select_types
 
 
-class TestLookupSelect:
-    """Tests for the sparse-to-dense lookup table synthesiser."""
+class TestPuiLookupBlock:
+    """Tests for the sparse-to-dense lookup block synthesiser."""
 
-    def test_empty_table(self):
-        """Empty truth table produces no ops."""
-        ops = _BinaryEncodingSynthesizer._lookup_select({}, [0], [1])
-        assert ops == []
+    @staticmethod
+    def _block(synth, rest_entries, fixed_controls=(), sbs=2):
+        return synth._synthesize_single_pui_lookup_block(sbs, list(fixed_controls), list(rest_entries))
 
-    def test_single_entry(self):
-        """Single-entry table emits one select op."""
-        table = {(1,): (1,)}
-        ops = _BinaryEncodingSynthesizer._lookup_select(table, [0], [1])
+    @pytest.fixture
+    def synth(self):
+        """A synthesizer whose settings are irrelevant to lookup-block construction."""
+        mat = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]], dtype=np.int8)
+        return _BinaryEncodingSynthesizer(RefTableau(mat))
+
+    def test_no_entries_emits_nothing(self, synth):
+        """An empty chunk produces no ops and costs nothing."""
+        assert self._block(synth, []) == ([], 0)
+
+    def test_single_entry(self, synth):
+        """A one-entry chunk emits exactly one SELECT op."""
+        ops, _ = self._block(synth, [(0, [(0, True)])])
         assert len(ops) == 1
-        assert ops[0].name == MatrixCompressionType.SELECT
+        assert ops[0].name is MatrixCompressionType.SELECT
 
-    def test_two_address_bits(self):
-        """Two address bits produce a 2^2 = 4 entry dense data table."""
-        table = {(0, 1): (1,), (1, 0): (1,)}
-        ops = _BinaryEncodingSynthesizer._lookup_select(table, [0, 1], [2])
-        assert len(ops) == 1
+    def test_address_register_and_table(self, synth):
+        """Address qubits precede data qubits and the table decodes with Q# bit significance."""
+        ops, _ = self._block(synth, [(0, [(0, True), (1, False)]), (1, [(0, False), (1, True)])])
         op = ops[0]
-        assert op.name == MatrixCompressionType.SELECT
-        # Address qubits come first, then data qubits; control_state marks the split.
+        # Address register is descending row order, so address bit i comes from qubits[i].
         assert op.qubits[: op.control_state] == [1, 0]
-        assert op.qubits[op.control_state :] == [2]
+        assert op.qubits[op.control_state :] == [2, 3]
         assert len(op.lookup_data) == 4
+        # Entry 0 has row0=1, row1=0 -> bit0 (row 1) = 0, bit1 (row 0) = 1 -> address 2.
+        assert op.lookup_data[2] == [True, False]
+        # Entry 1 has row0=0, row1=1 -> address 1.
+        assert op.lookup_data[1] == [False, True]
+        assert op.lookup_data[0] == [False, False]
+        assert op.lookup_data[3] == [False, False]
 
-    def test_data_table_correctness(self):
-        """Verify the dense Bool[][] table encodes the sparse dict correctly."""
-        # Address (1,0) → data (1,0), address (0,1) → data (0,1)
-        # After reversal: (1,0) → reversed (0,1) → addr_int=2
-        #                 (0,1) → reversed (1,0) → addr_int=1
-        table = {(1, 0): (1, 0), (0, 1): (0, 1)}
-        ops = _BinaryEncodingSynthesizer._lookup_select(table, [0, 1], [2, 3])
-        data_table = ops[0].lookup_data
-        # addr_int for (1,0): reversed to (0,1), bit0=0, bit1=1 → addr_int=2
-        assert data_table[2] == [True, False]
-        # addr_int for (0,1): reversed to (1,0), bit0=1, bit1=0 → addr_int=1
-        assert data_table[1] == [False, True]
-        # Other entries should be all-false
-        assert data_table[0] == [False, False]
-        assert data_table[3] == [False, False]
+    def test_measurement_based_uncompute_emits_select_and(self):
+        """measurement_based_uncompute switches the emitted opcode to SELECT_AND."""
+        mat = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]], dtype=np.int8)
+        synth = _BinaryEncodingSynthesizer(RefTableau(mat), measurement_based_uncompute=True)
+        ops, _ = self._block(synth, [(0, [(0, True)])])
+        assert ops[0].name is MatrixCompressionType.SELECT_AND
 
-    def test_select_and_mode(self):
-        """use_measurement_and=True emits select_and instead of select."""
-        table = {(1,): (1,)}
-        ops = _BinaryEncodingSynthesizer._lookup_select(table, [0], [1], use_measurement_and=True)
-        assert ops[0].name == MatrixCompressionType.SELECT_AND
+    def test_chunk_constant_control_is_promoted_to_fixed(self, synth):
+        """A control with the same value across every entry is folded into the fixed controls."""
+        ops, _ = self._block(synth, [(0, [(0, True), (1, True)]), (1, [(0, True), (1, False)])])
+        op = ops[0]
+        assert op.qubits[: op.control_state] == [1, 0]
+        # Row 0 is constant True, so both live addresses share bit1=1 and differ only in bit0.
+        assert op.lookup_data == [[False, False], [False, False], [False, True], [True, False]]
 
 
 class TestControlStateEndianness:
