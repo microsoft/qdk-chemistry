@@ -36,7 +36,7 @@ class ActiveSpaceQIOLocalizerSettings : public data::Settings {
     set_default("fine_samples", int64_t{201},
                 "Number of samples in the fine-refinement angle scan",
                 data::BoundConstraint<int64_t>{
-                    2, static_cast<int64_t>(std::numeric_limits<int>::max())});
+                    4, static_cast<int64_t>(std::numeric_limits<int>::max())});
     set_default(
         "improvement_tolerance", 1e-12,
         "Minimum single-orbital entropy decrease required to accept a "
