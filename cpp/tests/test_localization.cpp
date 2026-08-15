@@ -2029,6 +2029,14 @@ TEST_F(LocalizationTest, ActiveSpaceQIO) {
   EXPECT_NEAR(static_cast<double>(nelec_b), output_beta.trace(), 1e-8);
   EXPECT_NEAR(static_cast<double>(nelec_a + nelec_b), output_rdm->trace(),
               1e-8);
+
+  auto rotated_hamiltonian = hamil_ctor->run(qio_wfn_ptr->get_orbitals());
+  auto [E_rotated_cas, rotated_wfn_cas] =
+      mc_calc->run(rotated_hamiltonian, nelec_a, nelec_b);
+  const double entropy_after =
+      rotated_wfn_cas->get_single_orbital_entropies().sum();
+  EXPECT_LT(entropy_after, entropy_before - 1e-8);
+  EXPECT_NEAR(E_rotated_cas, E_cas, testing::wf_tolerance);
 }
 
 TEST_F(LocalizationTest,
