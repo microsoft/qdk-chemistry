@@ -2,6 +2,8 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <algorithm>
+#include <cctype>
 #include <cstdint>
 #include <cstdio>
 #include <filesystem>
@@ -16,6 +18,7 @@
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/utils/cube_generator.hpp>
 #include <stdexcept>
+#include <string_view>
 
 namespace qdk::chemistry::utils {
 
@@ -146,6 +149,37 @@ std::string annotate_comment(const data::BasisSet& basis_set,
   return comment.empty() ? note : comment + " [" + note + "]";
 }
 
+// Keeps a caller-supplied file-name prefix from steering the write anywhere
+// other than `output_dir`. `std::filesystem::path::operator/` discards its left
+// operand entirely when the right side is absolute, so an absolute prefix would
+// silently ignore `output_dir`; a prefix containing a separator or `..` would
+// escape it or target a directory that was never created.
+//
+// A trailing `.cube` is dropped rather than rejected. The prefix names a stem
+// that the index and the extension are appended to, so `orbital_.cube` would
+// otherwise produce `orbital_.cube0001.cube`, which is never what the caller
+// meant.
+std::string sanitize_label_prefix(const std::string& prefix) {
+  if (prefix.find('/') != std::string::npos ||
+      prefix.find('\\') != std::string::npos)
+    throw std::invalid_argument(
+        "generate_orbital_cubes: label prefix cannot contain a path "
+        "separator.");
+  if (prefix.find("..") != std::string::npos)
+    throw std::invalid_argument(
+        "generate_orbital_cubes: label prefix cannot contain '..'.");
+
+  constexpr std::string_view extension = ".cube";
+  if (prefix.size() >= extension.size() &&
+      std::equal(extension.rbegin(), extension.rend(), prefix.rbegin(),
+                 [](char a, char b) {
+                   return std::tolower(static_cast<unsigned char>(a)) ==
+                          std::tolower(static_cast<unsigned char>(b));
+                 }))
+    return prefix.substr(0, prefix.size() - extension.size());
+  return prefix;
+}
+
 }  // namespace
 
 struct CubeGenerator::Impl {
@@ -208,12 +242,13 @@ std::vector<std::string> generate_orbital_cubes(
   const auto coeffs = orbitals.coefficients();
   const auto& C_a = coeffs->block({data::axes::alpha(), data::axes::alpha()});
   const bool restricted = orbitals.is_restricted();
+  const auto stem_prefix = sanitize_label_prefix(prefix);
   std::filesystem::create_directories(output_dir);
 
   // Zero-based orbital numbering, consistent with the 0-based `indices`
   // argument and the rest of qdk-chemistry (cf. coupled_cluster frozen-orbital
-  // indices and data/symmetry spin_channel_indices). Note this differs from
-  // the Python `cubegen.py` layer, which labels files 1-based.
+  // indices and data/symmetry spin_channel_indices). The Python `cubegen.py`
+  // layer uses the same zero-based labels.
   auto index_string = [](std::size_t p) {
     char buf[32];
     std::snprintf(buf, sizeof(buf), "%04zu", p);
@@ -233,7 +268,7 @@ std::vector<std::string> generate_orbital_cubes(
   for (auto p : indices) {
     if (std::size_t(C_a.cols()) <= p)
       throw std::out_of_range("generate_orbital_cubes: index OOB.");
-    const auto stem = prefix + index_string(p);
+    const auto stem = stem_prefix + index_string(p);
     // Restricted: a single spatial cube with no spin suffix. Unrestricted:
     // separate alpha (`_a`) and beta (`_b`) cubes, mirroring `cubegen.py`.
     if (restricted) {

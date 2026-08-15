@@ -481,3 +481,50 @@ TEST(CubeGeneratorEcpTest, AgHCubeCommentRecordsRealEcpCoreCount) {
   EXPECT_NE(comment.find("28 core electrons"), std::string::npos) << comment;
   std::filesystem::remove(output);
 }
+
+// The label prefix names a stem, and the index and extension are appended to
+// it. `std::filesystem::path::operator/` discards its left operand when the
+// right side is absolute, so an unchecked prefix could steer the write out of
+// `output_dir` entirely rather than merely producing an odd file name.
+TEST(GenerateOrbitalCubesTest, RejectsLabelPrefixThatEscapesOutputDirectory) {
+  const auto orbitals = make_restricted_orbitals();
+  const auto output_dir =
+      std::filesystem::temp_directory_path() / "qdk_cube_prefix_test";
+  std::filesystem::remove_all(output_dir);
+
+  for (const std::string prefix :
+       {"/tmp/absolute_", "sub/dir_", "../escape_", "..", "a\\b_"}) {
+    EXPECT_THROW(generate_orbital_cubes(*orbitals, {0}, output_dir.string(),
+                                        single_point_grid(), prefix),
+                 std::invalid_argument)
+        << "prefix: " << prefix;
+  }
+
+  std::filesystem::remove_all(output_dir);
+}
+
+// A caller who passes a whole file name rather than a stem should get
+// `orbital_0000.cube`, not `orbital_.cube0000.cube`.
+TEST(GenerateOrbitalCubesTest, DropsTrailingCubeExtensionFromLabelPrefix) {
+  const auto orbitals = make_restricted_orbitals();
+  const auto output_dir =
+      std::filesystem::temp_directory_path() / "qdk_cube_suffix_test";
+  std::filesystem::remove_all(output_dir);
+
+  const auto paths =
+      generate_orbital_cubes(*orbitals, {0}, output_dir.string(),
+                             single_point_grid(), "orbital_.cube");
+
+  ASSERT_EQ(paths.size(), 1u);
+  EXPECT_EQ(std::filesystem::path(paths[0]).filename().string(),
+            "orbital_0000.cube");
+  EXPECT_TRUE(std::filesystem::exists(paths[0]));
+
+  // The check is case-insensitive, since the extension is not meaningful cased.
+  const auto upper = generate_orbital_cubes(*orbitals, {0}, output_dir.string(),
+                                            single_point_grid(), "mo_.CUBE");
+  EXPECT_EQ(std::filesystem::path(upper[0]).filename().string(),
+            "mo_0000.cube");
+
+  std::filesystem::remove_all(output_dir);
+}
