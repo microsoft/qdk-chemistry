@@ -66,11 +66,7 @@ def _matrix_qubit_counts(wf: Wavefunction) -> tuple[int, int]:
 
     ops, _, _ = _BinaryEncodingSynthesizer(
         RefTableau(gf2x_result.reduced_matrix),
-    ).synthesize(
-        num_local_qubits=n_system,
-        active_qubit_indices=gf2x_result.row_map,
-        ancilla_start=n_system,
-    )
+    ).synthesize(active_qubit_indices=gf2x_result.row_map)
     naive_ancilla = max(
         (
             op.control_state - 1
@@ -880,3 +876,134 @@ class TestBinaryEncodingWithQPE:
             f"by more than the {num_bits}-bit resolution ({energy_resolution:.4f}). "
             f"State prep used {state_prep_qubits} qubits ({extra_ancilla} ancilla)."
         )
+
+
+class TestCustomDenseStatePrep:
+    """Composition only accepts a nested dense prep it can actually embed.
+
+    The Q# path needs the built-in state preparation factory; the Qiskit path needs a QASM or
+    QIR representation. A custom algorithm returning a pre-built Q# circuit offers neither, and
+    must be rejected with an actionable message instead of failing inside the Qiskit conversion.
+    """
+
+    @staticmethod
+    def _register(circuit_factory):
+        """Register a throwaway dense prep returning ``circuit_factory(wavefunction)``."""
+        from qdk_chemistry.algorithms import registry  # noqa: PLC0415
+        from qdk_chemistry.algorithms.state_preparation.state_preparation import StatePreparation  # noqa: PLC0415
+        from qdk_chemistry.data import Settings  # noqa: PLC0415
+
+        class _CustomPrep(StatePreparation):
+            def __init__(self):
+                super().__init__()
+                self._settings = Settings()
+
+            def name(self):
+                return "custom_dense_prep_for_test"
+
+            def _run_impl(self, wavefunction):
+                return circuit_factory(wavefunction)
+
+        registry.register(_CustomPrep)
+        return "custom_dense_prep_for_test"
+
+    @pytest.fixture
+    def _cleanup_custom_prep(self):
+        """Unregister the throwaway algorithm even if the test fails."""
+        yield
+        from qdk_chemistry.algorithms import registry  # noqa: PLC0415
+
+        registry.unregister("state_prep", "custom_dense_prep_for_test")
+
+    @pytest.mark.usefixtures("_cleanup_custom_prep")
+    @pytest.mark.parametrize("stage", ["run", "create_dense"])
+    @pytest.mark.parametrize("binary_encoding", [False, True], ids=["no_binenc", "binenc"])
+    def test_qsharp_only_dense_circuit_is_rejected(self, ozone_wf, binary_encoding, stage):
+        """A dense prep returning only a pre-built Q# circuit is rejected by both entry points."""
+        context = get_qsharp_context()
+        context.eval("operation TestOnlyQsharpPrep() : Unit { use q = Qubit(); H(q); Reset(q); }")
+        qsharp_circuit = context.circuit("TestOnlyQsharpPrep()")
+        name = self._register(lambda _wf: Circuit(qsharp=qsharp_circuit, encoding="jordan-wigner"))
+
+        prep = create(
+            "state_prep",
+            "sparse_isometry",
+            binary_encoding=binary_encoding,
+            dense_state_prep=AlgorithmRef("state_prep", name),
+        )
+        with pytest.raises(ValueError, match="sparse isometry cannot compose"):
+            getattr(prep, stage)(ozone_wf)
+
+    @pytest.fixture(scope="class")
+    def custom_qsharp_program(self):
+        """Declare the custom Q# preparation once; the shared context rejects duplicate namespaces."""
+        context = get_qsharp_context()
+        context.eval(
+            """
+            namespace CustomDensePrep {
+                import QDKChemistry.Utils.BinaryEncoding.MatrixCompressionOp;
+                operation MakeCircuit(
+                    rowMap : Int[],
+                    stateVector : Double[],
+                    expansionOps : MatrixCompressionOp[],
+                    numQubits : Int,
+                ) : Unit {
+                    QDKChemistry.Utils.StatePreparation.MakeStatePreparationCircuit(
+                        rowMap, stateVector, expansionOps, numQubits);
+                }
+            }
+            """
+        )
+        return context.code.CustomDensePrep.MakeCircuit
+
+    @pytest.mark.usefixtures("_cleanup_custom_prep")
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+    @pytest.mark.parametrize("binary_encoding", [False, True], ids=["no_binenc", "binenc"])
+    def test_qsharp_factory_dense_circuit_is_composed(self, ozone_wf, binary_encoding, custom_qsharp_program):
+        """A dense prep written in Q# still composes, provided it is exposed as a factory."""
+        from qdk_chemistry.data.circuit import QsharpFactoryData  # noqa: PLC0415
+
+        def build(wavefunction):
+            # Delegate to the built-in preparation so the register width always matches, but hand it
+            # back under a program the Q# composition path does not recognise.
+            inner = create("state_prep", "dense_pure_state").run(wavefunction)
+            factory = QsharpFactoryData(
+                program=custom_qsharp_program,
+                parameter=dict(inner._qsharp_factory.parameter),
+            )
+            return Circuit(qsharp_factory=factory, encoding="jordan-wigner")
+
+        name = self._register(build)
+        prep = create(
+            "state_prep",
+            "sparse_isometry",
+            binary_encoding=binary_encoding,
+            dense_state_prep=AlgorithmRef("state_prep", name),
+        )
+        full_qc = prep.run(ozone_wf).get_qiskit_circuit()
+        dense_qc = prep.create_dense(ozone_wf).get_qiskit_circuit()
+        assert full_qc.num_qubits == _matrix_qubit_counts(ozone_wf)[0]
+        assert dense_qc.size() < full_qc.size(), "The isometry stage must survive composition."
+
+    @pytest.mark.usefixtures("_cleanup_custom_prep")
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+    @pytest.mark.parametrize("binary_encoding", [False, True], ids=["no_binenc", "binenc"])
+    def test_qasm_dense_circuit_is_composed(self, ozone_wf, binary_encoding):
+        """A custom dense prep is accepted whenever it exposes a QASM representation."""
+        from qiskit import qasm3  # noqa: PLC0415
+
+        def build(wavefunction):
+            # Re-emit the built-in dense preparation as QASM so the width always matches.
+            inner = create("state_prep", "dense_pure_state").run(wavefunction)
+            return Circuit(qasm=qasm3.dumps(inner.get_qiskit_circuit()), encoding="jordan-wigner")
+
+        name = self._register(build)
+
+        prep = create(
+            "state_prep",
+            "sparse_isometry",
+            binary_encoding=binary_encoding,
+            dense_state_prep=AlgorithmRef("state_prep", name),
+        )
+        circuit = prep.run(ozone_wf)
+        assert circuit.get_qiskit_circuit().num_qubits == _matrix_qubit_counts(ozone_wf)[0]

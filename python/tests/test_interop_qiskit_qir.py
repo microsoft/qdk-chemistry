@@ -67,20 +67,26 @@ def test_qir_to_qiskit_conversion():
     assert circuit2.count_ops() == {"h": 1, "x": 1, "y": 1, "cx": 1, "cz": 1, "t": 1, "s": 1, "measure": 3}
 
 
-def _qsharp_qir(source: str, entry: str) -> str:
-    """Compile a Q# snippet to QIR through the shared chemistry context."""
-    from qdk_chemistry.utils.qsharp import get_qsharp_context  # noqa: PLC0415
+@pytest.fixture(scope="module")
+def adaptive_context():
+    """Branching on a measurement needs an adaptive profile; the shared context defaults to Base."""
+    from qdk_chemistry.utils.qsharp import create_qsharp_context  # noqa: PLC0415
 
-    context = get_qsharp_context()
+    return create_qsharp_context(target_profile=TargetProfile.Adaptive_RIF)
+
+
+def _qsharp_qir(context, source: str, entry: str) -> str:
+    """Compile a Q# snippet to QIR through *context*."""
     context.eval(source)
     namespace, operation = entry.rsplit(".", 1)
     program = getattr(getattr(context.code, namespace), operation)
     return str(context.compile(program))
 
 
-def test_qir_measurement_conditioned_gate_becomes_if_block():
+def test_qir_measurement_conditioned_gate_becomes_if_block(adaptive_context):
     """A gate guarded by a measurement result must convert to a Qiskit if-block, not a bare gate."""
     qir = _qsharp_qir(
+        adaptive_context,
         """
         namespace QirCondTest {
             operation Guarded() : Unit {
@@ -104,12 +110,13 @@ def test_qir_measurement_conditioned_gate_becomes_if_block():
     assert body.count_ops() == {"x": 1}
 
 
-def test_qir_conditioned_gate_only_fires_on_matching_outcome():
+def test_qir_conditioned_gate_only_fires_on_matching_outcome(adaptive_context):
     """Simulate the branch to confirm the condition is honored rather than applied unconditionally."""
     aer = pytest.importorskip("qiskit_aer")
 
     # q[0] stays in |0>, so the measurement is deterministically Zero and the body must not run.
     qir = _qsharp_qir(
+        adaptive_context,
         """
         namespace QirCondSimTest {
             operation NeverTaken() : Unit {

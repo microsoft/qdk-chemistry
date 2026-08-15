@@ -26,20 +26,29 @@ __all__ = [
 class MatrixCompressionType(CaseInsensitiveStrEnum):
     """Supported operation types for matrix compression.
 
-    Declaration order defines the integer wire values consumed by ``BinaryEncoding.qs``.
+    Each member carries the integer discriminator consumed by ``BinaryEncoding.qs``. Q# cannot
+    compare strings in QIR-emitting code, so the wire value has to be an ``Int``; declaring it
+    alongside the name keeps the two from drifting.
     """
 
-    X = "X"
-    CX = "CX"
-    SWAP = "SWAP"
-    CCX = "CCX"
-    SELECT = "SELECT"
-    SELECT_AND = "SELECT_AND"
+    qsharp_code: int
 
-    @property
-    def qsharp_code(self) -> int:
-        """Return the integer discriminator expected by the Q# ``MatrixCompressionOp`` struct."""
-        return list(type(self)).index(self)
+    # The default keeps type checkers from demanding an opcode on value lookups such as
+    # ``MatrixCompressionType("CX")``, which go through ``EnumType.__call__`` rather than here.
+    # Every member declares its own; a missed one is caught by the opcode exhaustiveness test.
+    def __new__(cls, value: str, qsharp_code: int = 0) -> MatrixCompressionType:
+        """Build a member whose string value is the Python-facing name and that carries a Q# opcode."""
+        member = str.__new__(cls, value)
+        member._value_ = value
+        member.qsharp_code = qsharp_code
+        return member
+
+    X = "X", 0
+    CX = "CX", 1
+    SWAP = "SWAP", 2
+    CCX = "CCX", 3
+    SELECT = "SELECT", 4
+    SELECT_AND = "SELECT_AND", 5
 
 
 @dataclass
@@ -263,14 +272,12 @@ class _BinaryEncodingSynthesizer:
         self.bijection: list[tuple[int, int]] = []
 
     def synthesize(
-        self, *, num_local_qubits: int, active_qubit_indices: list[int], ancilla_start: int
+        self, *, active_qubit_indices: list[int]
     ) -> tuple[list[MatrixCompressionOp], list[tuple[int, int]], int]:
         """Run full synthesis pipeline and return circuit operations.
 
         Args:
-            num_local_qubits: Number of system (local) qubits in the circuit.
-            active_qubit_indices: Mapping from tableau row indices to global qubit indices.
-            ancilla_start: Global qubit index where ancilla qubits begin.
+            active_qubit_indices: Maps each tableau row index to its global qubit index.
 
         Returns:
             tuple[list[MatrixCompressionOp], list[tuple[int, int]], int]: A 3-tuple of (ops, bijection, dense_size).
@@ -303,11 +310,7 @@ class _BinaryEncodingSynthesizer:
             inv_perm[old_idx] = new_idx
         self.tableau.permute_columns(inv_perm)
 
-        ops = self._to_operations(
-            num_local_qubits=num_local_qubits,
-            active_qubit_indices=active_qubit_indices,
-            ancilla_start=ancilla_start,
-        )
+        ops = self._to_operations(active_qubit_indices)
         return ops, self.bijection, self.tableau.dense_size
 
     def max_batch_size(self) -> int:
@@ -679,58 +682,41 @@ class _BinaryEncodingSynthesizer:
         all_ctrl_rows = {row for row, _ in fixed_controls}
         for _, changing_controls in rest_entries:
             all_ctrl_rows.update(row for row, _ in changing_controls)
-        address_qubits = sorted(all_ctrl_rows)
         data_qubits = [sbs + offset for offset, _ in rest_entries]
 
-        # Build lookup table
+        # Build the dense lookup table. Address bit i is read from address_register[i], which is
+        # the significance order Q# SparseOneHotSelect and RefTableau.select both assume.
+        address_register = sorted(all_ctrl_rows, reverse=True)
         n_outputs = len(rest_entries)
-        table: dict[tuple[int, ...], tuple[int, ...]] = {}
+        lookup_data = [[False] * n_outputs for _ in range(1 << len(address_register))]
         for i, (_, changing_controls) in enumerate(rest_entries):
             ctrl_map = {**dict(fixed_controls), **dict(changing_controls)}
-            address = tuple(int(ctrl_map[row]) for row in address_qubits)
-            table[address] = tuple(1 if j == i else 0 for j in range(n_outputs))
+            address = sum(int(ctrl_map[row]) << bit for bit, row in enumerate(address_register))
+            lookup_data[address] = [j == i for j in range(n_outputs)]
 
-        if not table:
-            return [], 0
-
-        lookup_ops = self._lookup_select(
-            table,
-            address_qubits=address_qubits,
-            data_qubits=data_qubits,
-            use_measurement_and=self.measurement_based_uncompute,
+        op_type = MatrixCompressionType("SELECT_AND" if self.measurement_based_uncompute else "SELECT")
+        select_op = MatrixCompressionOp(
+            op_type,
+            [*address_register, *data_qubits],
+            control_state=len(address_register),
+            lookup_data=lookup_data,
         )
-        gf2x_ops = list(reversed(lookup_ops))
-        toffoli_cost = sum(
-            self._scs_toffoli_cost(op.lookup_data, root=True)
-            for op in lookup_ops
-            if op.name in (MatrixCompressionType.SELECT, MatrixCompressionType.SELECT_AND)
-        )
-        return gf2x_ops, toffoli_cost
+        return [select_op], self._scs_toffoli_cost(lookup_data, root=True)
 
-    def _to_operations(
-        self, num_local_qubits: int, active_qubit_indices: list[int], ancilla_start: int
-    ) -> list[MatrixCompressionOp]:
+    def _to_operations(self, active_qubit_indices: list[int]) -> list[MatrixCompressionOp]:
         """Convert internal circuit to reversed MatrixCompressionOp list with global qubit indices.
 
         Args:
-            num_local_qubits: Number of system (local) qubits.
-            active_qubit_indices: Mapping from local row indices to global qubit indices.
-            ancilla_start: Global qubit index where ancilla qubits begin.
+            active_qubit_indices: Maps each tableau row index to its global qubit index.
 
         Returns:
             list[MatrixCompressionOp]: Circuit operations in reversed order with remapped qubit indices.
 
         """
-
-        def map_idx(idx: int) -> int:
-            return (
-                int(active_qubit_indices[idx]) if idx < num_local_qubits else ancilla_start + (idx - num_local_qubits)
-            )
-
         ops = [
             MatrixCompressionOp(
                 op.name,
-                [map_idx(int(q)) for q in op.qubits],
+                [int(active_qubit_indices[int(q)]) for q in op.qubits],
                 control_state=op.control_state,
                 lookup_data=op.lookup_data,
             )
@@ -770,41 +756,3 @@ class _BinaryEncodingSynthesizer:
         if not left_empty:
             return split_cost + _BinaryEncodingSynthesizer._scs_toffoli_cost(left)
         return 0
-
-    @staticmethod
-    def _lookup_select(table_dict, address_qubits, data_qubits, *, use_measurement_and=False):
-        """Build dense lookup table and emit a single SELECT op.
-
-        Args:
-            table_dict: Mapping from address tuples to data tuples.
-            address_qubits: List of row indices forming the address register.
-            data_qubits: List of row indices forming the data register.
-            use_measurement_and: If True, emit SELECT_AND instead of SELECT.
-
-        Returns:
-            list[MatrixCompressionOp]: A single-element list holding the SELECT operation.
-
-        """
-        if not table_dict:
-            return []
-
-        n_address = len(address_qubits)
-        n_data = len(data_qubits)
-        n_entries = 1 << n_address
-
-        reversed_address = list(reversed(address_qubits))
-        data_table: list[list[bool]] = [[False] * n_data for _ in range(n_entries)]
-        for addr_tuple, data_tuple in table_dict.items():
-            reversed_tuple = tuple(reversed(addr_tuple))
-            addr_int = sum(int(bit) << i for i, bit in enumerate(reversed_tuple))
-            data_table[addr_int] = [bool(b) for b in data_tuple]
-
-        op_type = MatrixCompressionType("SELECT_AND") if use_measurement_and else MatrixCompressionType("SELECT")
-        return [
-            MatrixCompressionOp(
-                op_type,
-                [*reversed_address, *data_qubits],
-                control_state=len(reversed_address),
-                lookup_data=data_table,
-            )
-        ]

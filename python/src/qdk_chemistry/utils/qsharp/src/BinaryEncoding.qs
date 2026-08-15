@@ -17,8 +17,8 @@ namespace QDKChemistry.Utils.BinaryEncoding {
 
     /// A single gate produced by the matrix compression pipeline.
     ///
-    /// ``kind`` identifies X, CX, SWAP, CCX, SELECT, and SELECT_AND as 0 through 5.
-    /// These values match the declaration order of the Python ``MatrixCompressionType`` enum.
+    /// ``kind`` is one of the ``OpKind*`` opcodes below. It is an ``Int`` rather than a
+    /// ``String`` because QIR generation cannot lower string comparisons.
     /// ``qubits`` always contains qubit indices only.
     struct MatrixCompressionOp {
         kind : Int,
@@ -27,6 +27,15 @@ namespace QDKChemistry.Utils.BinaryEncoding {
         lookupData : Bool[][],
     }
 
+    /// Opcodes for ``MatrixCompressionOp.kind``, mirroring the Python ``MatrixCompressionType``
+    /// enum. Both sides declare these explicitly, so they must be changed together.
+    function OpKindX() : Int { 0 }
+    function OpKindCX() : Int { 1 }
+    function OpKindSwap() : Int { 2 }
+    function OpKindCCX() : Int { 3 }
+    function OpKindSelect() : Int { 4 }
+    function OpKindSelectAnd() : Int { 5 }
+
 
     /// Apply a single matrix-compression gate that is a plain unitary.
     ///
@@ -34,13 +43,13 @@ namespace QDKChemistry.Utils.BinaryEncoding {
     /// therefore cannot be adjoint- or control-generated. Callers that only ever emit plain
     /// gates (such as the GF2+X expansion) can use this to stay adjointable.
     operation ApplyAdjointableCompressionOp(gate : MatrixCompressionOp, qs : Qubit[]) : Unit is Adj + Ctl {
-        if gate.kind == 0 {
+        if gate.kind == OpKindX() {
             X(qs[gate.qubits[0]]);
-        } elif gate.kind == 1 {
+        } elif gate.kind == OpKindCX() {
             CX(qs[gate.qubits[0]], qs[gate.qubits[1]]);
-        } elif gate.kind == 2 {
+        } elif gate.kind == OpKindSwap() {
             SWAP(qs[gate.qubits[0]], qs[gate.qubits[1]]);
-        } elif gate.kind == 3 {
+        } elif gate.kind == OpKindCCX() {
             CCNOT(qs[gate.qubits[0]], qs[gate.qubits[1]], qs[gate.qubits[2]]);
         } else {
             fail "Unsupported adjointable matrix-compression operation.";
@@ -51,12 +60,12 @@ namespace QDKChemistry.Utils.BinaryEncoding {
     /// SparseOneHotSelect may borrow as helpers (avoids allocating new qubits).
     /// Pass an empty array when no pool is available (e.g. for GF2+X ops).
     operation ApplyMatrixCompressionOp(gate : MatrixCompressionOp, qs : Qubit[], ancillaPool : Qubit[]) : Unit is Adj {
-        if gate.kind == 4 or gate.kind == 5 {
+        if gate.kind == OpKindSelect() or gate.kind == OpKindSelectAnd() {
             let numAddr = gate.controlState;
             let selectedQubits = Subarray(gate.qubits, qs);
             let addrQubits = selectedQubits[...numAddr - 1];
             let targetQubits = selectedQubits[numAddr...];
-            SparseOneHotSelect(gate.lookupData, addrQubits, targetQubits, gate.kind == 5, ancillaPool);
+            SparseOneHotSelect(gate.lookupData, addrQubits, targetQubits, gate.kind == OpKindSelectAnd(), ancillaPool);
         } else {
             ApplyAdjointableCompressionOp(gate, qs);
         }

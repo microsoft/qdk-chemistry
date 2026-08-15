@@ -61,14 +61,38 @@ from ._binary_encoding_utils import MatrixCompressionOp, MatrixCompressionType, 
 __all__: list[str] = ["SparseIsometryStatePreparationSettings"]
 
 
+# Pre-rename settings, kept working via translation onto the nested dense preparation algorithm.
+_DEPRECATED_DENSE_METHODS = {"qdk": "dense_pure_state", "qiskit": "qiskit_regular_isometry"}
+_DEPRECATED_TRANSPILE_KEYS = ("basis_gates", "transpile", "transpile_optimization_level")
+
+
 def _is_qsharp_dense_factory(factory: QsharpFactoryData | None) -> bool:
     """Return whether a factory uses the built-in Q# dense state preparation."""
     return factory is not None and factory.program is QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit
 
 
-# Pre-rename settings, kept working via translation onto the nested dense preparation algorithm.
-_DEPRECATED_DENSE_METHODS = {"qdk": "dense_pure_state", "qiskit": "qiskit_regular_isometry"}
-_DEPRECATED_TRANSPILE_KEYS = ("basis_gates", "transpile", "transpile_optimization_level")
+def _require_composable_dense_circuit(dense_circuit: Circuit, dense_algo: "StatePreparation") -> None:
+    """Reject a nested dense circuit that neither composition path can consume.
+
+    Composition needs either the built-in Q# state preparation factory (composed in Q#) or a
+    QASM/QIR representation (composed in Qiskit). A circuit carrying only a pre-built Q# object
+    satisfies neither, so fail here rather than deep inside the Qiskit conversion.
+
+    Args:
+        dense_circuit: Circuit returned by the nested dense state preparation algorithm.
+        dense_algo: The nested algorithm instance, named in the error message.
+
+    Raises:
+        ValueError: If the circuit has no QASM or QIR representation to compose against.
+
+    """
+    if dense_circuit.qasm is None and not dense_circuit._has_qir():  # noqa: SLF001
+        raise ValueError(
+            f"dense_state_prep={dense_algo.name()!r} returned a circuit that sparse isometry cannot compose. "
+            "The nested dense algorithm must return either the built-in Q# state preparation factory "
+            "(as 'dense_pure_state' does) or a circuit with a QASM or QIR representation "
+            "(as 'qiskit_regular_isometry' does)."
+        )
 
 
 class SparseIsometryStatePreparationSettings(Settings):
@@ -355,11 +379,7 @@ class SparseIsometryStatePreparation(StatePreparation):
             RefTableau(gf2x_result.reduced_matrix),
             include_negative_controls=include_negative_controls,
             measurement_based_uncompute=measurement_based_uncompute,
-        ).synthesize(
-            num_local_qubits=n_qubits,
-            active_qubit_indices=gf2x_result.row_map,
-            ancilla_start=n_qubits,
-        )
+        ).synthesize(active_qubit_indices=gf2x_result.row_map)
 
         compressed_sv = np.zeros(2**dense_size, dtype=float)
         for dense_val, orig_col in bijection:
@@ -475,6 +495,7 @@ class SparseIsometryStatePreparation(StatePreparation):
             # another callable cannot be resolved statically by the adaptive-profile code generator.
             dense_params = QSHARP_UTILS.StatePreparation.StatePreparationParams(**factory.parameter)
             return self._compose_qsharp(dense_params, expansion_ops, embedding_map, n_qubits)
+        _require_composable_dense_circuit(dense_circuit, dense_algo)
         return self._compose_qiskit(dense_circuit, expansion_ops, embedding_map, n_qubits, dense_algo)
 
     def _compose_qsharp(
@@ -583,6 +604,8 @@ class SparseIsometryStatePreparation(StatePreparation):
             return Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op, encoding="jordan-wigner")
 
         # Qiskit path
+        _require_composable_dense_circuit(dense_circuit, dense_algo)
+
         from qiskit import QuantumCircuit, qasm3  # noqa: PLC0415
         from qiskit.compiler import transpile  # noqa: PLC0415
 
