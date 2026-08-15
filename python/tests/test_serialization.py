@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 
 import qdk_chemistry.remote.serialization as serialization_module
-from qdk_chemistry.data import AlgorithmRef, Orbitals, Settings, Structure
+from qdk_chemistry.data import AlgorithmRef, Orbitals, Structure
 from qdk_chemistry.remote.serialization import (
     FileSerializer,
     deserialize_inputs,
@@ -229,9 +229,8 @@ def test_manifest_write_is_atomic(tmp_path, monkeypatch, serializer):
 
 
 def test_settings_json_does_not_include_internal_descriptions(tmp_path):
-    settings = Settings()
-    settings.set("method", "pbe")
-    algorithm = AlgorithmRef("scf_solver", "qdk", settings=settings)
+    algorithm = AlgorithmRef("scf_solver", "qdk")
+    algorithm.settings.set("method", "pbe")
 
     serialize_inputs(
         tmp_path,
