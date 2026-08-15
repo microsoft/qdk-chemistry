@@ -911,6 +911,8 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation import EulerIntegrator  # noqa: PLC0415
 
     register(lambda: QdkExpectationEstimator())
+    # Must precede SparseIsometryStatePreparation, whose settings resolve it by name at construction.
+    register(lambda: DensePureStatePreparation())
     register(lambda: SparseIsometryStatePreparation())
     register(lambda: DenseMatrixSolver())
     register(lambda: SparseMatrixSolver())
@@ -925,7 +927,6 @@ def _register_python_algorithms():
     register(lambda: LCUBuilder())
     register(lambda: PauliSequenceMapper())
     register(lambda: ControlledPSPMapper())
-    register(lambda: DensePureStatePreparation())
     register(lambda: ControlledPauliSequenceMapper())
     register(lambda: EulerIntegrator())
     register(lambda: EulerEvolutionCircuitBuilder())
