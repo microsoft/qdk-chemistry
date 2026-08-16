@@ -146,10 +146,9 @@ Unary-iteration Phase Estimation Circuit Builder
 
 .. rubric:: Factory name: ``"qdk_unary"``
 
-Constructs a single flat chain of :math:`p` qubitized walk queries and uses unary iteration over the phase register to select which of the interleaved reflections is omitted, which realizes :math:`W^{2a-p}` from one chain :cite:`Babbush2018` :cite:`Lee2021`.
-Precision is therefore set by ``num_queries`` directly rather than by a bit count, so any positive query count is spendable instead of rounding up to the next power of two. The phase register is sized to :math:`\lceil \log_2(p+1) \rceil` and ``num_bits`` is ignored.
-
-This builder requires a qubitized walk, so ``unitary_builder`` must be an LCU builder with ``quantum_walk=True`` (its default here); there is no Trotter path.
+Constructs one flat chain of :math:`p` qubitized walk queries, using unary iteration over the phase register to select which interleaved reflection is omitted and so realize :math:`W^{2a-p}` from a single chain :cite:`Babbush2018` :cite:`Lee2021`.
+Precision comes from ``num_queries`` rather than a bit count, so any positive :math:`p` is spendable; the phase register is sized to :math:`\lceil \log_2(p+1) \rceil` and ``num_bits`` is ignored.
+Requires a qubitized walk, so ``unitary_builder`` must be an LCU builder with ``quantum_walk=True`` (its default here).
 
 **Additional settings:**
 

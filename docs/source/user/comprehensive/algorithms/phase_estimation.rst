@@ -242,21 +242,17 @@ Unary-iteration phase estimation
 
 .. rubric:: Factory name: ``"qdk_unary"``
 
-Standard QPE spends :math:`2^n - 1` queries because the controlled-:math:`U^{2^j}` ladder can only buy precision in powers of two.
-The unary-iteration construction :cite:`Babbush2018` :cite:`Lee2021` decouples the two: it applies a single flat chain of :math:`p` walk queries and uses unary iteration over the phase register to decide *which* of the interleaved reflections is skipped.
-Skipping the reflection at address :math:`a` turns the chain into :math:`W^{2a - p}`, so a phase register of :math:`\lceil \log_2(p+1) \rceil` qubits realizes every power in :math:`\{-p, -p+2, \ldots, p\}` from one query chain.
-Any positive :math:`p` is therefore spendable, rather than rounding up to the next power of two.
-
+Standard QPE spends :math:`2^n - 1` queries because the controlled-:math:`U^{2^j}` ladder buys precision only in powers of two.
+The unary-iteration construction :cite:`Babbush2018` :cite:`Lee2021` instead applies one flat chain of :math:`p` qubitized walk queries and uses unary iteration over the phase register to select *which* interleaved reflection is skipped; skipping the one at address :math:`a` turns the chain into :math:`W^{2a - p}`, so :math:`\lceil \log_2(p+1) \rceil` phase qubits reach every power in :math:`\{-p, -p+2, \ldots, p\}` and any positive :math:`p` is spendable.
 The circuit structure consists of:
 
 1. Prepare the phase register in a cosine window :math:`\sin\!\left(\frac{\pi (a+1)}{p+2}\right)`, which suppresses the spectral leakage a uniform superposition would incur :cite:`Babbush2018`
-2. Apply the :math:`p`-query chain, omitting the reflection selected by the phase register
-3. Apply an inverse Quantum Fourier Transform to the phase register
+2. Apply the :math:`p`-query chain, omitting the reflection the phase register selects
+3. Apply an inverse Quantum Fourier Transform (iQFT) to the phase register
 4. Measure all phase qubits
 
-Because the walk operator's spectrum is :math:`e^{\pm i \arccos(E/\lambda)}`, the two signs are indistinguishable from the measured bin alone; ``use_positive_sign`` selects which branch is reported as the resolved energy, and both candidates are always returned in the result's ``branching`` tuple.
-
-This method requires a qubitized walk operator, so it is only available with an LCU-based ``unitary_builder``; there is no Trotter path.
+The walk's spectrum is :math:`e^{\pm i \arccos(E/\lambda)}`, so a measured bin cannot distinguish the two signs: ``use_positive_sign`` picks which one is reported, and both are always returned in the result's ``branching`` tuple.
+Only an LCU-based ``unitary_builder`` works here; there is no Trotter path.
 
 .. rubric:: Settings
 
@@ -280,7 +276,7 @@ Nested algorithm configuration (via ``qpe_circuit_builder``):
 
 See :doc:`qpe_circuit_builder` for configuring:
 
-- ``num_queries`` — Number of walk queries :math:`p`; sets precision directly rather than through a bit count
+- ``num_queries`` — Number of walk queries :math:`p`; need not be a power of two
 - ``unitary_builder`` → ``quantum_walk`` — Required; the unary path has no Trotter equivalent
 - ``circuit_mapper`` — Circuit synthesis strategy, which must expose the block encoding's ancilla reflection
 
