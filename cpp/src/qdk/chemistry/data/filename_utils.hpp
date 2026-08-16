@@ -37,20 +37,13 @@ class DataTypeFilename {
     }
 
     std::string base = filename.substr(0, last_dot);
-
-    // Find the second-to-last dot (data type)
-    size_t second_last_dot = base.find_last_of('.');
-    if (second_last_dot == std::string::npos) {
+    const std::string expected_suffix = "." + data_type;
+    if (base.length() < expected_suffix.length() ||
+        base.compare(base.length() - expected_suffix.length(),
+                     expected_suffix.length(), expected_suffix) != 0) {
       throw std::invalid_argument("Invalid filename: Filename '" + filename +
                                   "' must have '." + data_type +
                                   ".' before the file extension");
-    }
-
-    std::string file_data_type = base.substr(second_last_dot + 1);
-    if (file_data_type != data_type) {
-      throw std::invalid_argument("Invalid filename: Filename '" + filename +
-                                  "' has wrong data type '" + file_data_type +
-                                  "', expected '" + data_type + "'");
     }
 
     return filename;
@@ -79,20 +72,13 @@ class DataTypeFilename {
     }
 
     std::string base = filename.substr(0, last_dot);
-
-    // Find the second-to-last dot (data type)
-    size_t second_last_dot = base.find_last_of('.');
-    if (second_last_dot == std::string::npos) {
+    const std::string expected_suffix = "." + data_type;
+    if (base.length() < expected_suffix.length() ||
+        base.compare(base.length() - expected_suffix.length(),
+                     expected_suffix.length(), expected_suffix) != 0) {
       throw std::invalid_argument("Invalid filename: Filename '" + filename +
                                   "' must have '." + data_type +
                                   ".' before the file extension");
-    }
-
-    std::string file_data_type = base.substr(second_last_dot + 1);
-    if (file_data_type != data_type) {
-      throw std::invalid_argument("Invalid filename: Filename '" + filename +
-                                  "' has wrong data type '" + file_data_type +
-                                  "', expected '" + data_type + "'");
     }
 
     return filename;

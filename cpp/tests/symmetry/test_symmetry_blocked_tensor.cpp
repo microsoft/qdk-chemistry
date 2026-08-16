@@ -42,6 +42,74 @@ static SBT2 make_simple_tensor() {
   return SBT2({sym, sym}, extents2(2), blocks);
 }
 
+TEST(SymmetryBlockedTensorTest, DataTypeNameIncludesRankAndScalarType) {
+  EXPECT_EQ((SymmetryBlockedTensor<2, double>::data_type_name()),
+            "symmetry_blocked_tensor_2_real");
+  EXPECT_EQ((SymmetryBlockedTensor<2, std::complex<double>>::data_type_name()),
+            "symmetry_blocked_tensor_2_complex");
+  EXPECT_EQ((SymmetryBlockedTensor<3, float>::data_type_name()),
+            "symmetry_blocked_tensor_3_real32");
+  EXPECT_EQ((SymmetryBlockedTensor<4, std::complex<float>>::data_type_name()),
+            "symmetry_blocked_tensor_4_complex32");
+}
+
+TEST(SymmetryBlockedTensorTest, ContentHashSupportsComplexVectorTensorRanks) {
+  auto sym = std::make_shared<const SymmetryProduct>(
+      SymmetryProduct({axes::spin(1, false)}));
+  std::unordered_map<SymmetryLabel, std::size_t> slot;
+  slot.emplace(SymmetryLabel({axes::alpha()}), 1);
+  const SymmetryLabel alpha({axes::alpha()});
+
+  using SBT1c = SymmetryBlockedTensor<1, std::complex<double>>;
+  Eigen::VectorXcd rank_one_data(1);
+  rank_one_data << std::complex<double>(1.5, -0.5);
+  SBT1c::BlockMap rank_one_blocks;
+  rank_one_blocks.emplace(
+      SBT1c::Labels{alpha},
+      std::make_shared<const Tensor<1, std::complex<double>>>(rank_one_data));
+  SBT1c rank_one_tensor({sym}, {slot}, rank_one_blocks);
+
+  using SBT4c = SymmetryBlockedTensor<4, std::complex<double>>;
+  Eigen::VectorXcd rank_four_data(1);
+  rank_four_data << std::complex<double>(2.0, -3.0);
+  SBT4c::BlockMap rank_four_blocks;
+  rank_four_blocks.emplace(
+      SBT4c::Labels{alpha, alpha, alpha, alpha},
+      std::make_shared<const Tensor<4, std::complex<double>>>(rank_four_data));
+  SBT4c rank_four_tensor({sym, sym, sym, sym}, {slot, slot, slot, slot},
+                         rank_four_blocks);
+
+  EXPECT_EQ(rank_one_tensor.content_hash().size(), 16u);
+  EXPECT_EQ(rank_four_tensor.content_hash().size(), 16u);
+}
+
+TEST(SymmetryBlockedTensorTest, HashValueSupportsGenericEigenTypes) {
+  Eigen::Matrix<float, 2, 2, Eigen::RowMajor> matrix;
+  matrix << 1.0F, 2.0F, 3.0F, 4.0F;
+
+  qdk::chemistry::utils::HashContext matrix_hash;
+  hash_value(matrix_hash, matrix);
+  qdk::chemistry::utils::HashContext expected_matrix_hash;
+  qdk::chemistry::utils::hash_value(expected_matrix_hash, int64_t{2});
+  qdk::chemistry::utils::hash_value(expected_matrix_hash, int64_t{2});
+  qdk::chemistry::utils::hash_value(expected_matrix_hash, 1.0F);
+  qdk::chemistry::utils::hash_value(expected_matrix_hash, 3.0F);
+  qdk::chemistry::utils::hash_value(expected_matrix_hash, 2.0F);
+  qdk::chemistry::utils::hash_value(expected_matrix_hash, 4.0F);
+  EXPECT_EQ(matrix_hash.hexdigest(), expected_matrix_hash.hexdigest());
+
+  Eigen::VectorXcf vector(2);
+  vector << std::complex<float>(1.0F, -2.0F), std::complex<float>(3.0F, -4.0F);
+
+  qdk::chemistry::utils::HashContext vector_hash;
+  hash_value(vector_hash, vector);
+  qdk::chemistry::utils::HashContext expected_vector_hash;
+  qdk::chemistry::utils::hash_value(expected_vector_hash, int64_t{2});
+  qdk::chemistry::utils::hash_value(expected_vector_hash, vector[0]);
+  qdk::chemistry::utils::hash_value(expected_vector_hash, vector[1]);
+  EXPECT_EQ(vector_hash.hexdigest(), expected_vector_hash.hexdigest());
+}
+
 TEST(SymmetryBlockedTensorTest, RestrictedAutoAliasesPartner) {
   auto sym = std::make_shared<const SymmetryProduct>(
       SymmetryProduct({axes::spin(1, /*equivalent=*/true)}));

@@ -22,8 +22,15 @@ __all__: list[str] = []
 class QpeResult(DataClass):
     """Structured output for quantum phase estimation workflows."""
 
-    # Class attribute for filename validation
-    _data_type_name = "qpe_result"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for QPE results.
+
+        Returns:
+            ``"qpe_result"``.
+
+        """
+        return "qpe_result"
 
     # Serialization version for this class
     _serialization_version = "0.2.0"
