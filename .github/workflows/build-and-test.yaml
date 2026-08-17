@@ -35,6 +35,7 @@ permissions:
   pull-requests: write
   checks: write
   statuses: write
+  actions: write
 
 jobs:
   check-up-to-date:
@@ -574,9 +575,6 @@ jobs:
     name: ${{ matrix.compiler }} - Build & test (Windows)
     runs-on: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=windows-2025-1espt, 'JobId=qdk_chemistry-win-${{ strategy.job-index }}-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
     timeout-minutes: 480
-    permissions:
-      contents: read
-      actions: write
     strategy:
       fail-fast: false
       matrix:
