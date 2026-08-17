@@ -16,6 +16,7 @@ import pytest
 
 from qdk_chemistry.data import ModelOrbitals, Orbitals
 from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix, spin_channel_vector
+from qdk_chemistry.data._type_name import class_data_type_name
 from qdk_chemistry.data.symmetry import (
     SymmetryBlockedTensorRank1,
     SymmetryBlockedTensorRank2,
@@ -1090,9 +1091,8 @@ def test_model_orbitals_pickling_and_repr():
 
 
 def test_orbitals_data_type_name():
-    """Test that Orbitals has the correct _data_type_name class attribute."""
-    assert hasattr(Orbitals, "_data_type_name")
-    assert Orbitals._data_type_name == "orbitals"
+    """Test that Orbitals exposes its static wire-format identifier."""
+    assert class_data_type_name(Orbitals) == "orbitals"
 
 
 def test_sbt_native_constructor_accepts_active_indices():
