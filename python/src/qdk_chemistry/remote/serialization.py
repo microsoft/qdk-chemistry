@@ -68,7 +68,7 @@ def _jsonable_settings_value(value: Any) -> Any:
         }
     if isinstance(value, dict):
         return {str(key): _jsonable_settings_value(item) for key, item in value.items()}
-    if isinstance(value, list | tuple):
+    if isinstance(value, (list, tuple)):
         return [_jsonable_settings_value(item) for item in value]
     return value
 
