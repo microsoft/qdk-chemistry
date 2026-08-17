@@ -52,7 +52,16 @@ class TermPartition(DataClass):
 
     """
 
-    _data_type_name = "term_partition"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for term partitions.
+
+        Returns:
+            ``"term_partition"``.
+
+        """
+        return "term_partition"
+
     _serialization_version = "0.1.0"
 
     def __init__(self, *, strategy: str) -> None:

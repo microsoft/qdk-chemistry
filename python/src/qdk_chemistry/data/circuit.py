@@ -53,8 +53,15 @@ class QsharpFactoryData:
 class Circuit(DataClass):
     """Data class for a quantum circuit."""
 
-    # Class attribute for filename validation
-    _data_type_name = "circuit"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for circuits.
+
+        Returns:
+            ``"circuit"``.
+
+        """
+        return "circuit"
 
     # Serialization version for this class
     _serialization_version = "0.1.0"

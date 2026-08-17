@@ -21,6 +21,7 @@ from qdk_chemistry.data import (
     Orbitals,
 )
 from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix
+from qdk_chemistry.data._type_name import class_data_type_name
 from qdk_chemistry.data.symmetry import (
     SymmetryProduct,
     axes,
@@ -1143,6 +1144,5 @@ class TestCholeskyHamiltonian:
 
 
 def test_hamiltonian_data_type_name():
-    """Test that Hamiltonian has the correct _data_type_name class attribute."""
-    assert hasattr(Hamiltonian, "_data_type_name")
-    assert Hamiltonian._data_type_name == "hamiltonian"
+    """Test that Hamiltonian exposes its static wire-format identifier."""
+    assert class_data_type_name(Hamiltonian) == "hamiltonian"

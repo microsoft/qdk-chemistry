@@ -50,8 +50,15 @@ class PauliProductFormulaContainer(UnitaryContainer):
     where ``step_reps = r`` is the number of repeated steps.
     """
 
-    # Class attribute for filename validation
-    _data_type_name = "pauli_product_formula_container"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for product-formula containers.
+
+        Returns:
+            ``"pauli_product_formula_container"``.
+
+        """
+        return "pauli_product_formula_container"
 
     # Serialization version for this class
     _serialization_version = "0.2.0"
