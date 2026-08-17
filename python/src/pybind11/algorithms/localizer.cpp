@@ -156,7 +156,7 @@ Internal settings object property.
 This property allows derived classes to replace the settings object with a specialized Settings subclass in their constructors.
 
 Examples:
-    >>> class MyLocalizer(alg.Localizer):
+    >>> class MyLocalizer(alg.OrbitalLocalizer):
     ...     def __init__(self):
     ...         super().__init__()
     ...         from qdk_chemistry.data import ElectronicStructureSettings
