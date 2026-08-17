@@ -99,11 +99,11 @@ GauXC::BasisSet<double> to_gauxc_basis(const data::BasisSet& qdk) {
       if (l < 0)
         throw std::invalid_argument(
             "CubeGenerator: ECP potential shells are unsupported.");
-      const auto np = static_cast<int32_t>(sh.exponents.size());
       PA alpha{}, coeff{};
-      if (static_cast<std::size_t>(np) > alpha.size())
+      if (sh.exponents.size() > alpha.size())
         throw std::invalid_argument(
             "CubeGenerator: shell exceeds gauXC's primitive limit.");
+      const auto np = static_cast<int32_t>(sh.exponents.size());
       for (int i = 0; i < np; ++i) {
         alpha.at(i) = sh.exponents[i];
         coeff.at(i) = sh.coefficients[i];
