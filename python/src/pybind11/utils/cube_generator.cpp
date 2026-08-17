@@ -48,11 +48,6 @@ void bind_cube_generator(py::module& m) {
 Regular Cartesian grid on which orbitals and densities are evaluated.
 
 All lengths are in Bohr, matching the Gaussian cube-file convention.
-
-Attributes:
-    origin: Cartesian position of the first grid point.
-    spacing: Grid step along each axis.
-    nx, ny, nz: Number of points along each axis.
 )")
       .def(py::init<>())
       .def(py::init([](const Eigen::Vector3d& origin,
@@ -84,11 +79,13 @@ Returns:
                   py::arg("nz") = 80, py::arg("margin") = 3.0)
       .def("num_points", &CubeGrid::num_points,
            "Total number of grid points (nx * ny * nz).")
-      .def_readwrite("origin", &CubeGrid::origin)
-      .def_readwrite("spacing", &CubeGrid::spacing)
-      .def_readwrite("nx", &CubeGrid::nx)
-      .def_readwrite("ny", &CubeGrid::ny)
-      .def_readwrite("nz", &CubeGrid::nz)
+      .def_readwrite("origin", &CubeGrid::origin,
+                     "Cartesian position of the first grid point, in Bohr.")
+      .def_readwrite("spacing", &CubeGrid::spacing,
+                     "Grid step along each axis, in Bohr.")
+      .def_readwrite("nx", &CubeGrid::nx, "Number of points along x.")
+      .def_readwrite("ny", &CubeGrid::ny, "Number of points along y.")
+      .def_readwrite("nz", &CubeGrid::nz, "Number of points along z.")
       .def("__repr__", [](const CubeGrid& grid) {
         return "<CubeGrid shape=(" + std::to_string(grid.nx) + ", " +
                std::to_string(grid.ny) + ", " + std::to_string(grid.nz) + ")>";
