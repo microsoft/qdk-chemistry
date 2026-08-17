@@ -8,7 +8,6 @@
 #include <cmath>
 #include <filesystem>
 #include <limits>
-#include <numbers>
 #include <numeric>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
@@ -25,6 +24,10 @@
 
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
+
+namespace {
+constexpr double kHalfPi = 1.57079632679489661923;
+}
 
 class LocalizationTest : public ::testing::Test {};
 
@@ -2315,7 +2318,7 @@ TEST_F(LocalizationTest, ActiveSpaceQIOSettings) {
   // interval contains a sample that is not period-equivalent to an endpoint.
   EXPECT_NO_THROW(settings.set("fine_samples", int64_t{51}));
   EXPECT_EQ(settings.get<int64_t>("fine_samples"), 51);
-  EXPECT_NO_THROW(settings.set("coarse_angle_step", std::numbers::pi / 2.0));
+  EXPECT_NO_THROW(settings.set("coarse_angle_step", kHalfPi));
   EXPECT_NO_THROW(settings.set("fine_samples", int64_t{4}));
   EXPECT_THROW(settings.set("fine_samples", int64_t{3}), std::invalid_argument);
   EXPECT_THROW(settings.set("fine_samples", int64_t{1}), std::invalid_argument);
