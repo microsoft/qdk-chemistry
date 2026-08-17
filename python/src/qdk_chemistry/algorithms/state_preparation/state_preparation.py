@@ -5,10 +5,36 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import warnings
+
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
-from qdk_chemistry.data import Circuit, Wavefunction
+from qdk_chemistry.data import Circuit, Settings, Wavefunction
 
 __all__: list[str] = []
+
+
+class StatePreparationSettings(Settings):
+    """Deprecated settings container for state preparation algorithms.
+
+    .. deprecated::
+        Each state preparation algorithm now owns its settings, and the transpilation keys
+        below belong to the Qiskit-backed algorithms that actually honour them. Kept so that
+        existing imports keep working; it is no longer used by any algorithm in this package.
+    """
+
+    def __init__(self):
+        """Initialize the StatePreparationSettings."""
+        warnings.warn(
+            "'StatePreparationSettings' is deprecated and will be removed in a future release; "
+            "use the settings class of the specific state preparation algorithm instead "
+            "(e.g. 'SparseIsometryStatePreparationSettings').",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        super().__init__()
+        self._set_default("basis_gates", "vector<string>", ["x", "y", "z", "cx", "cz", "id", "h", "s", "sdg", "rz"])
+        self._set_default("transpile", "bool", True)
+        self._set_default("transpile_optimization_level", "int", 0)
 
 
 class StatePreparation(Algorithm):

@@ -878,6 +878,29 @@ class TestBinaryEncodingWithQPE:
         )
 
 
+@pytest.fixture(scope="session")
+def custom_qsharp_program():
+    """Declare the custom Q# preparation once; the shared context rejects duplicate namespaces."""
+    context = get_qsharp_context()
+    context.eval(
+        """
+        namespace CustomDensePrep {
+            import QDKChemistry.Utils.BinaryEncoding.MatrixCompressionOp;
+            operation MakeCircuit(
+                rowMap : Int[],
+                stateVector : Double[],
+                expansionOps : MatrixCompressionOp[],
+                numQubits : Int,
+            ) : Unit {
+                QDKChemistry.Utils.StatePreparation.MakeStatePreparationCircuit(
+                    rowMap, stateVector, expansionOps, numQubits);
+            }
+        }
+        """
+    )
+    return context.code.CustomDensePrep.MakeCircuit
+
+
 class TestCustomDenseStatePrep:
     """Composition only accepts a nested dense prep it can actually embed.
 
@@ -933,28 +956,6 @@ class TestCustomDenseStatePrep:
         )
         with pytest.raises(ValueError, match="sparse isometry cannot compose"):
             getattr(prep, stage)(ozone_wf)
-
-    @pytest.fixture(scope="class")
-    def custom_qsharp_program(self):
-        """Declare the custom Q# preparation once; the shared context rejects duplicate namespaces."""
-        context = get_qsharp_context()
-        context.eval(
-            """
-            namespace CustomDensePrep {
-                import QDKChemistry.Utils.BinaryEncoding.MatrixCompressionOp;
-                operation MakeCircuit(
-                    rowMap : Int[],
-                    stateVector : Double[],
-                    expansionOps : MatrixCompressionOp[],
-                    numQubits : Int,
-                ) : Unit {
-                    QDKChemistry.Utils.StatePreparation.MakeStatePreparationCircuit(
-                        rowMap, stateVector, expansionOps, numQubits);
-                }
-            }
-            """
-        )
-        return context.code.CustomDensePrep.MakeCircuit
 
     @pytest.mark.usefixtures("_cleanup_custom_prep")
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")

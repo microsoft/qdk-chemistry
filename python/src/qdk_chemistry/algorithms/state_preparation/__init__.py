@@ -19,8 +19,11 @@ from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
 from qdk_chemistry.algorithms.state_preparation.state_preparation import (
     StatePreparation,
     StatePreparationFactory,
+    StatePreparationSettings,
 )
 
+# ``StatePreparationSettings`` is deprecated: it is re-exported so existing imports keep
+# working, but is intentionally omitted from ``__all__`` so ``import *`` does not pull it in.
 __all__ = [
     "DensePureStatePreparation",
     "SparseIsometryStatePreparation",
