@@ -26,15 +26,16 @@ namespace detail {
  * anchors are taken in ascending atomic-orbital index, so the result does not
  * depend on the order in which the selection finds them.
  *
- * @param block AO-by-orbital coefficient matrix for one degenerate block.
- * @param overlap Atomic-orbital overlap matrix.
+ * @param block_coefficients AO-by-orbital coefficient matrix for one
+ * degenerate block.
+ * @param ao_overlap Atomic-orbital overlap matrix.
  * @return Coefficients spanning the same subspace in deterministic
  * coordinates.
  *
  * @throws std::runtime_error if independent AO anchors cannot be found.
  */
-Eigen::MatrixXd ao_anchor_block(const Eigen::MatrixXd& block,
-                                const Eigen::MatrixXd& overlap);
+Eigen::MatrixXd ao_anchor_block(const Eigen::MatrixXd& block_coefficients,
+                                const Eigen::MatrixXd& ao_overlap);
 
 /**
  * @brief Refine a bracketed scalar minimum to an absolute argument tolerance.
@@ -66,9 +67,10 @@ std::pair<double, double> golden_section_minimum(
 class GaugeFixingLocalizerSettings : public data::Settings {
  public:
   GaugeFixingLocalizerSettings() {
-    set_default("degeneracy_tolerance", 1e-6,
-                "Occupation-number gap below which orbitals share one "
-                "degenerate block");
+    set_default(
+        "degeneracy_tolerance", 1e-6,
+        "Maximum occupation-number spread within one degenerate block",
+        data::BoundConstraint<double>{0.0, std::numeric_limits<double>::max()});
     set_default(
         "angle_samples", 32,
         "Uniform samples over [0, pi) used to bracket each plane "
@@ -78,12 +80,16 @@ class GaugeFixingLocalizerSettings : public data::Settings {
         "max_sweeps", 3,
         "Maximum number of deterministic passes over all rotation planes",
         data::BoundConstraint<int64_t>{0, std::numeric_limits<int64_t>::max()});
-    set_default("improvement_tolerance", 1e-10,
-                "Minimum coefficient-norm reduction, in Hartree, required to "
-                "accept a rotation");
-    set_default("mapper_threshold", 1e-14,
-                "Coefficient and integral threshold used by the qubit mapper "
-                "during the search");
+    set_default(
+        "improvement_tolerance", 1e-10,
+        "Minimum coefficient-norm reduction, in Hartree, required to "
+        "accept a rotation",
+        data::BoundConstraint<double>{0.0, std::numeric_limits<double>::max()});
+    set_default(
+        "mapper_threshold", 1e-14,
+        "Coefficient and integral threshold used by the qubit mapper "
+        "during the search",
+        data::BoundConstraint<double>{0.0, std::numeric_limits<double>::max()});
   }
 };
 
@@ -92,13 +98,17 @@ class GaugeFixingLocalizerSettings : public data::Settings {
  * blocks.
  *
  * Natural orbitals with equal occupations span a well-defined subspace but do
- * not have unique orbital vectors. Any orthogonal rotation inside such a
- * degenerate block spans the same subspace and leaves the exact CASCI energy
- * unchanged, yet it yields a different qubit Hamiltonian after mapping. This
- * localizer resolves that freedom deterministically: it anchors every selected
+ * not have unique orbital vectors. Any orthogonal rotation within the active
+ * space leaves the exact CASCI energy unchanged, yet it yields a different
+ * qubit Hamiltonian after mapping. Restricting the rotations to
+ * occupation-degenerate blocks additionally keeps the spin-traced 1-RDM
+ * diagonal with the same occupations, so the returned orbitals remain natural
+ * orbitals and the input 1-RDM stays truthful for them. This localizer
+ * resolves that freedom deterministically: it anchors every selected
  * degenerate block to the atomic-orbital basis, then runs coordinate-descent
  * sweeps over Givens plane rotations within each block, accepting only
- * rotations that reduce the mapped coefficient norm lambda = sum_l |h_l|.
+ * rotations that reduce the mapped coefficient norm lambda = sum_l |h_l| of
+ * the active-space Hamiltonian.
  *
  * Because the rotations stay inside degenerate blocks, the returned orbitals
  * remain natural orbitals; their occupations are unchanged and are carried on
@@ -121,17 +131,19 @@ class GaugeFixingLocalizer : public Localizer {
    *
    * @param wavefunction Wavefunction whose orbitals diagonalize its
    * spin-traced active 1-RDM.
-   * @param loc_indices_a Sorted alpha orbital indices to gauge fix; must be a
-   * subset of the active-space indices.
+   * @param loc_indices_a Sorted, duplicate-free alpha orbital indices to gauge
+   * fix; must be a subset of the active-space indices, and selecting a proper
+   * subset restricts which blocks are swept without narrowing the objective.
    * @param loc_indices_b Sorted beta orbital indices; must equal
    * @p loc_indices_a.
-   * @return Wavefunction whose active space is the selected orbitals in the
-   * chosen gauge, carrying the corresponding block of the spin-traced 1-RDM.
+   * @return Wavefunction carrying the input active space with the selected
+   * orbitals in the chosen gauge, and its unchanged spin-traced active 1-RDM.
    *
-   * @throws std::invalid_argument if the indices are unsorted, differ between
-   * spin channels, fall outside the active space, if the orbitals are
+   * @throws std::invalid_argument if the indices are unsorted, duplicated,
+   * differ between spin channels, fall outside the active space, if the
+   * degeneracy tolerance is not finite and positive, if the orbitals are
    * unrestricted or lack an overlap matrix, or if the active 1-RDM is
-   * unavailable, not real-valued, or not diagonal.
+   * unavailable, not real-valued, not square, or not diagonal.
    * @throws std::runtime_error if a degenerate block is only partly selected
    * or AO anchoring fails.
    */

@@ -4,15 +4,18 @@
 
 #include "gauge_fixing.hpp"
 
-#include <Eigen/Eigenvalues>
 #include <algorithm>
+#include <blas.hh>
 #include <cmath>
 #include <cstdint>
+#include <lapack.hh>
+#include <macis/util/transform.hpp>
+#include <numbers>
 #include <numeric>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
-#include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <unordered_map>
@@ -22,67 +25,121 @@ namespace qdk::chemistry::algorithms::microsoft {
 
 namespace detail {
 
-Eigen::MatrixXd ao_anchor_block(const Eigen::MatrixXd& block,
-                                const Eigen::MatrixXd& overlap) {
+Eigen::MatrixXd ao_anchor_block(const Eigen::MatrixXd& block_coefficients,
+                                const Eigen::MatrixXd& ao_overlap) {
   QDK_LOG_TRACE_ENTERING();
-  const Eigen::MatrixXd projected_ao = overlap * block;
+  const int64_t num_atomic_orbitals = block_coefficients.rows();
+  const int64_t block_size = block_coefficients.cols();
+
+  Eigen::MatrixXd projected_ao(num_atomic_orbitals, block_size);
+  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+             num_atomic_orbitals, block_size, num_atomic_orbitals, 1.0,
+             ao_overlap.data(), num_atomic_orbitals, block_coefficients.data(),
+             num_atomic_orbitals, 0.0, projected_ao.data(),
+             num_atomic_orbitals);
   Eigen::MatrixXd residuals = projected_ao;
 
-  std::vector<Eigen::Index> anchors;
-  anchors.reserve(static_cast<size_t>(block.cols()));
-  for (Eigen::Index column = 0; column < block.cols(); ++column) {
-    Eigen::Index anchor = 0;
+  Eigen::VectorXd anchor_vector(block_size);
+  Eigen::VectorXd deflation_weights(num_atomic_orbitals);
+  std::vector<int64_t> anchors;
+  anchors.reserve(static_cast<size_t>(block_size));
+  for (int64_t column = 0; column < block_size; ++column) {
+    int64_t anchor = 0;
     double best = -1.0;
-    for (Eigen::Index row = 0; row < residuals.rows(); ++row) {
-      const double norm = residuals.row(row).squaredNorm();
-      if (norm > best) {
+    for (int64_t row = 0; row < num_atomic_orbitals; ++row) {
+      // Rows are strided in the column-major residual block.
+      const double norm =
+          blas::dot(block_size, residuals.data() + row, num_atomic_orbitals,
+                    residuals.data() + row, num_atomic_orbitals);
+      // Symmetry-equivalent atomic orbitals tie in residual norm, and rounding
+      // resolves that tie differently for each orientation of the same
+      // subspace. Requiring a relative margin far above that rounding, and
+      // scanning in ascending index, makes the lowest atomic-orbital index
+      // win every tie -- including the near-ties of a geometry that is
+      // symmetric only to within its own convergence.
+      if (norm > best * (1.0 + 1e-8)) {
         best = norm;
         anchor = row;
       }
     }
     anchors.push_back(anchor);
 
-    Eigen::VectorXd anchor_vector = residuals.row(anchor).transpose();
-    const double anchor_norm = anchor_vector.norm();
+    blas::copy(block_size, residuals.data() + anchor, num_atomic_orbitals,
+               anchor_vector.data(), 1);
+    const double anchor_norm = blas::nrm2(block_size, anchor_vector.data(), 1);
     if (anchor_norm <= std::numeric_limits<double>::epsilon()) {
       throw std::runtime_error(
           "Unable to find independent AO anchors for a degenerate orbital "
           "block");
     }
-    anchor_vector /= anchor_norm;
-    residuals -= (residuals * anchor_vector) * anchor_vector.transpose();
+    blas::scal(block_size, 1.0 / anchor_norm, anchor_vector.data(), 1);
+    blas::gemv(blas::Layout::ColMajor, blas::Op::NoTrans, num_atomic_orbitals,
+               block_size, 1.0, residuals.data(), num_atomic_orbitals,
+               anchor_vector.data(), 1, 0.0, deflation_weights.data(), 1);
+    blas::ger(blas::Layout::ColMajor, num_atomic_orbitals, block_size, -1.0,
+              deflation_weights.data(), 1, anchor_vector.data(), 1,
+              residuals.data(), num_atomic_orbitals);
   }
 
   // Symmetric orthogonalization maps the i-th anchor onto the i-th returned
-  // orbital. Symmetry-equivalent atomic orbitals tie in residual norm to
-  // within rounding, so which of them the deflation reaches first varies
-  // across platforms; ordering the anchors by atomic-orbital index keeps that
-  // assignment, and so the returned gauge, independent of the search order.
+  // orbital, so the assignment must not depend on the order the anchors were
+  // found in either.
   std::sort(anchors.begin(), anchors.end());
 
-  Eigen::MatrixXd anchor_coefficients(block.cols(), block.cols());
+  // Columns of anchor_coefficients are the anchors' projections, so the
+  // i-th anchor row of projected_ao becomes the i-th column.
+  Eigen::MatrixXd anchor_coefficients(block_size, block_size);
   for (size_t i = 0; i < anchors.size(); ++i) {
-    anchor_coefficients.row(static_cast<Eigen::Index>(i)) =
-        projected_ao.row(anchors[i]);
+    blas::copy(
+        block_size, projected_ao.data() + anchors[i], num_atomic_orbitals,
+        anchor_coefficients.data() + static_cast<int64_t>(i) * block_size, 1);
   }
-  anchor_coefficients.transposeInPlace();
 
-  Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> gram(
-      anchor_coefficients.transpose() * anchor_coefficients);
-  if (gram.info() != Eigen::Success) {
+  Eigen::MatrixXd gram(block_size, block_size);
+  blas::syrk(blas::Layout::ColMajor, blas::Uplo::Lower, blas::Op::Trans,
+             block_size, block_size, 1.0, anchor_coefficients.data(),
+             block_size, 0.0, gram.data(), block_size);
+  Eigen::VectorXd eigenvalues(block_size);
+  if (lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, block_size,
+                   gram.data(), block_size, eigenvalues.data()) != 0) {
     throw std::runtime_error(
         "Failed to orthogonalize the AO anchors of a degenerate orbital block");
   }
-  if (gram.eigenvalues().minCoeff() <= std::numeric_limits<double>::epsilon()) {
+  // The inverse square root below amplifies rounding in the eigenvectors by
+  // the square root of the Gram condition number, so bound that condition
+  // number rather than testing the smallest eigenvalue against an absolute
+  // epsilon it would only fail on exact singularity.
+  if (eigenvalues.minCoeff() <= 1e-10 * eigenvalues.maxCoeff()) {
     throw std::runtime_error(
         "AO anchors for a degenerate orbital block are linearly dependent");
   }
 
-  const Eigen::MatrixXd orthogonalizer =
-      anchor_coefficients * gram.eigenvectors() *
-      gram.eigenvalues().cwiseInverse().cwiseSqrt().asDiagonal() *
-      gram.eigenvectors().transpose();
-  return block * orthogonalizer;
+  // orthogonalizer = anchor_coefficients * U * Lambda^{-1/2} * U^T
+  Eigen::MatrixXd scaled_eigenvectors(block_size, block_size);
+  for (int64_t j = 0; j < block_size; ++j) {
+    blas::copy(block_size, gram.data() + j * block_size, 1,
+               scaled_eigenvectors.data() + j * block_size, 1);
+    blas::scal(block_size, 1.0 / std::sqrt(eigenvalues[j]),
+               scaled_eigenvectors.data() + j * block_size, 1);
+  }
+  Eigen::MatrixXd inverse_sqrt(block_size, block_size);
+  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+             block_size, block_size, block_size, 1.0,
+             scaled_eigenvectors.data(), block_size, gram.data(), block_size,
+             0.0, inverse_sqrt.data(), block_size);
+  Eigen::MatrixXd orthogonalizer(block_size, block_size);
+  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+             block_size, block_size, block_size, 1.0,
+             anchor_coefficients.data(), block_size, inverse_sqrt.data(),
+             block_size, 0.0, orthogonalizer.data(), block_size);
+
+  Eigen::MatrixXd anchored(num_atomic_orbitals, block_size);
+  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+             num_atomic_orbitals, block_size, block_size, 1.0,
+             block_coefficients.data(), num_atomic_orbitals,
+             orthogonalizer.data(), block_size, 0.0, anchored.data(),
+             num_atomic_orbitals);
+  return anchored;
 }
 
 std::pair<double, double> golden_section_minimum(
@@ -105,6 +162,7 @@ std::pair<double, double> golden_section_minimum(
   double value_right = objective(inner_right);
 
   while (right - left > argument_tolerance) {
+    const double previous_width = right - left;
     if (value_left <= value_right) {
       right = inner_right;
       inner_right = inner_left;
@@ -117,6 +175,12 @@ std::pair<double, double> golden_section_minimum(
       value_left = value_right;
       inner_right = left + inverse_golden_ratio * (right - left);
       value_right = objective(inner_right);
+    }
+    // A tolerance below the spacing of the bracket's own floating-point
+    // representation is unreachable: the interval stops contracting while it
+    // is still wider than the request.
+    if (right - left >= previous_width) {
+      break;
     }
   }
 
@@ -133,27 +197,6 @@ std::pair<double, double> golden_section_minimum(
   return best;
 }
 
-namespace {
-
-std::shared_ptr<const data::SymmetryBlockedIndexSet> make_orbital_index_set(
-    const std::shared_ptr<data::Orbitals>& orbitals,
-    const std::vector<size_t>& selected) {
-  const std::vector<std::uint32_t> selected_u32(selected.begin(),
-                                                selected.end());
-  std::unordered_map<data::SymmetryLabel, std::vector<std::uint32_t>> indices;
-  auto symmetries = orbitals->symmetries();
-  if (symmetries && symmetries->has_axis(data::AxisName::Spin)) {
-    indices[data::axes::alpha()] = selected_u32;
-    indices[data::axes::beta()] = selected_u32;
-  } else {
-    indices[data::SymmetryLabel{}] = selected_u32;
-  }
-  return std::make_shared<const data::SymmetryBlockedIndexSet>(
-      symmetries, orbitals->mo_extents(), std::move(indices));
-}
-
-}  // namespace
-
 }  // namespace detail
 
 std::shared_ptr<data::Wavefunction> GaugeFixingLocalizer::_run_impl(
@@ -163,24 +206,25 @@ std::shared_ptr<data::Wavefunction> GaugeFixingLocalizer::_run_impl(
   QDK_LOG_TRACE_ENTERING();
   auto orbitals = wavefunction->get_orbitals();
 
-  if (!std::is_sorted(loc_indices_a.begin(), loc_indices_a.end())) {
-    throw std::invalid_argument("loc_indices_a must be sorted");
-  }
-  if (!std::is_sorted(loc_indices_b.begin(), loc_indices_b.end())) {
-    throw std::invalid_argument("loc_indices_b must be sorted");
-  }
   if (loc_indices_a != loc_indices_b) {
     throw std::invalid_argument(
         "loc_indices_a and loc_indices_b must be identical");
+  }
+  if (!std::is_sorted(loc_indices_a.begin(), loc_indices_a.end())) {
+    throw std::invalid_argument("loc_indices_a must be sorted");
+  }
+  if (std::adjacent_find(loc_indices_a.begin(), loc_indices_a.end()) !=
+      loc_indices_a.end()) {
+    throw std::invalid_argument("loc_indices_a contains duplicate indices");
+  }
+  if (loc_indices_a.empty()) {
+    return algorithms::detail::new_aufbau_determinant_wavefunction(wavefunction,
+                                                                   orbitals);
   }
   if (!orbitals->is_restricted()) {
     throw std::invalid_argument(
         "GaugeFixingLocalizer requires restricted orbitals; run a natural "
         "orbital localizer first.");
-  }
-  if (loc_indices_a.empty()) {
-    return algorithms::detail::new_aufbau_determinant_wavefunction(wavefunction,
-                                                                   orbitals);
   }
   if (!orbitals->has_overlap_matrix()) {
     throw std::invalid_argument(
@@ -206,13 +250,19 @@ std::shared_ptr<data::Wavefunction> GaugeFixingLocalizer::_run_impl(
     throw std::invalid_argument(
         "GaugeFixingLocalizer requires a real-valued active 1-RDM.");
   }
-  if (static_cast<size_t>(one_rdm->rows()) != active_indices.size()) {
+  if (static_cast<size_t>(one_rdm->rows()) != active_indices.size() ||
+      static_cast<size_t>(one_rdm->cols()) != active_indices.size()) {
     throw std::invalid_argument(
         "1-RDM dimensions do not match the orbitals' active-space size.");
   }
 
   const double degeneracy_tolerance =
       _settings->get<double>("degeneracy_tolerance");
+  if (!std::isfinite(degeneracy_tolerance) || degeneracy_tolerance <= 0.0) {
+    throw std::invalid_argument(
+        "degeneracy_tolerance must be finite and positive; otherwise the "
+        "degenerate blocks are undefined.");
+  }
   const Eigen::VectorXd occupations = one_rdm->diagonal();
   // Off-diagonal weight above the degeneracy tolerance can reorder occupations
   // by more than the tolerance, which would make the blocks meaningless.
@@ -225,13 +275,11 @@ std::shared_ptr<data::Wavefunction> GaugeFixingLocalizer::_run_impl(
         "'qdk_natural_orbitals' localizer before gauge fixing.");
   }
 
-  std::unordered_map<size_t, double> occupation_by_orbital;
-  for (size_t position = 0; position < active_indices.size(); ++position) {
-    occupation_by_orbital[active_indices[position]] =
-        occupations[static_cast<Eigen::Index>(position)];
-  }
+  // SymmetryBlockedIndexSet stores strictly increasing indices, so the active
+  // set is already ordered for lookup.
   for (size_t index : loc_indices_a) {
-    if (!occupation_by_orbital.contains(index)) {
+    if (!std::binary_search(active_indices.begin(), active_indices.end(),
+                            index)) {
       throw std::invalid_argument(
           "Every orbital to gauge fix must belong to the active space of the "
           "input wavefunction.");
@@ -259,8 +307,7 @@ std::shared_ptr<data::Wavefunction> GaugeFixingLocalizer::_run_impl(
         std::abs(occupations[static_cast<Eigen::Index>(
                      occupation_order[block_stop])] -
                  occupations[static_cast<Eigen::Index>(
-                     occupation_order[block_stop - 1])]) <
-            degeneracy_tolerance) {
+                     occupation_order[block_start])]) < degeneracy_tolerance) {
       continue;
     }
     std::vector<size_t> block;
@@ -286,6 +333,12 @@ std::shared_ptr<data::Wavefunction> GaugeFixingLocalizer::_run_impl(
   const Eigen::MatrixXd& overlap = orbitals->get_overlap_matrix();
   Eigen::MatrixXd coefficients = orbitals->coefficients()->block(
       {data::axes::alpha(), data::axes::alpha()});
+  Eigen::MatrixXd input_active_coefficients(coefficients.rows(),
+                                            active_indices.size());
+  for (size_t i = 0; i < active_indices.size(); ++i) {
+    input_active_coefficients.col(static_cast<Eigen::Index>(i)) =
+        coefficients.col(static_cast<Eigen::Index>(active_indices[i]));
+  }
 
   for (const auto& block : selected_blocks) {
     Eigen::MatrixXd block_coefficients(coefficients.rows(),
@@ -302,25 +355,44 @@ std::shared_ptr<data::Wavefunction> GaugeFixingLocalizer::_run_impl(
     }
   }
 
-  const auto active_index_set =
-      detail::make_orbital_index_set(orbitals, loc_indices_a);
-  const auto inactive_index_set = detail::make_orbital_index_set(
-      orbitals, data::spin_channel_indices(orbitals->inactive_indices(),
-                                           data::axes::alpha()));
-
   const double mapper_threshold = _settings->get<double>("mapper_threshold");
-  auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
+  // Every linear fermion-to-qubit encoding maps Majorana monomials onto Pauli
+  // words up to a unit-modulus phase, so all of them share one multiset of
+  // |h_l| and hence one lambda. Jordan-Wigner is the cheapest to build.
   const data::MajoranaMapping mapping =
-      data::MajoranaMapping::jordan_wigner(2 * loc_indices_a.size());
+      data::MajoranaMapping::jordan_wigner(2 * active_indices.size());
 
-  auto coefficient_norm = [&](const Eigen::MatrixXd& candidate) {
-    auto candidate_orbitals = std::make_shared<data::Orbitals>(
-        candidate, std::nullopt, overlap, orbitals->get_basis_set(),
-        active_index_set, inactive_index_set);
-    auto hamiltonian = hamiltonian_constructor->run(candidate_orbitals);
+  // The rotations only mix active orbitals, so the atomic-orbital integrals
+  // and the inactive space are the same for every candidate. Build the
+  // Hamiltonian once and carry each candidate as a rotation of its active
+  // molecular-orbital integrals; the selection restricts which blocks are
+  // swept, not what is minimized.
+  auto reference_orbitals = std::make_shared<data::Orbitals>(
+      coefficients, std::nullopt, overlap, orbitals->get_basis_set(),
+      orbitals->active_indices(), orbitals->inactive_indices());
+  const auto reference_hamiltonian =
+      HamiltonianConstructorFactory::create()->run(reference_orbitals);
+  const auto& [reference_one_body, reference_one_body_beta] =
+      reference_hamiltonian->get_one_body_integrals();
+  const auto& [reference_two_body, reference_two_body_aabb,
+               reference_two_body_bbbb] =
+      reference_hamiltonian->get_two_body_integrals();
+  const auto num_active = static_cast<Eigen::Index>(active_indices.size());
+
+  auto coefficient_norm = [&](const Eigen::MatrixXd& rotation) {
+    const auto n = static_cast<size_t>(num_active);
+    // Both transforms are symmetric in their index pairs, so the column-major
+    // result is also the row-major layout the mapper expects.
+    Eigen::MatrixXd one_body(num_active, num_active);
+    macis::two_index_transform(n, n, reference_one_body.data(), n,
+                               rotation.data(), n, one_body.data(), n);
+    Eigen::VectorXd two_body(reference_two_body.size());
+    macis::four_index_transform(n, n, reference_two_body.data(), n,
+                                rotation.data(), n, two_body.data(), n);
     const auto mapped = data::majorana_map_hamiltonian(
-        mapping, *hamiltonian, /*spin_symmetric=*/true, mapper_threshold,
-        mapper_threshold);
+        mapping, /*core_energy=*/0.0, one_body.data(), one_body.data(),
+        two_body.data(), two_body.data(), two_body.data(), n,
+        /*spin_symmetric=*/true, mapper_threshold, mapper_threshold);
     double norm = 0.0;
     for (const auto& coefficient : mapped.coefficients) {
       norm += std::abs(coefficient);
@@ -328,13 +400,22 @@ std::shared_ptr<data::Wavefunction> GaugeFixingLocalizer::_run_impl(
     return norm;
   };
 
-  const double norm_before = coefficient_norm(coefficients);
+  // Position of each rotatable orbital within the active-space integrals.
+  std::unordered_map<size_t, Eigen::Index> active_position;
+  for (size_t i = 0; i < active_indices.size(); ++i) {
+    active_position[active_indices[i]] = static_cast<Eigen::Index>(i);
+  }
+
+  Eigen::MatrixXd active_rotation =
+      Eigen::MatrixXd::Identity(num_active, num_active);
+  const double norm_before = coefficient_norm(active_rotation);
   double current_norm = norm_before;
   const auto angle_samples =
       static_cast<size_t>(_settings->get<int64_t>("angle_samples"));
   const double improvement_tolerance =
       _settings->get<double>("improvement_tolerance");
-  const double angle_step = M_PI / static_cast<double>(angle_samples);
+  const double angle_step =
+      std::numbers::pi / static_cast<double>(angle_samples);
   const auto max_sweeps =
       static_cast<size_t>(_settings->get<int64_t>("max_sweeps"));
 
@@ -343,17 +424,17 @@ std::shared_ptr<data::Wavefunction> GaugeFixingLocalizer::_run_impl(
     for (const auto& block : selected_blocks) {
       for (size_t i = 0; i + 1 < block.size(); ++i) {
         for (size_t j = i + 1; j < block.size(); ++j) {
-          const auto left = static_cast<Eigen::Index>(block[i]);
-          const auto right = static_cast<Eigen::Index>(block[j]);
-          Eigen::MatrixXd candidate = coefficients;
-          const Eigen::VectorXd left_column = coefficients.col(left);
-          const Eigen::VectorXd right_column = coefficients.col(right);
+          const Eigen::Index left = active_position.at(block[i]);
+          const Eigen::Index right = active_position.at(block[j]);
 
           auto plane_norm = [&](double angle) {
             const double cosine = std::cos(angle);
             const double sine = std::sin(angle);
-            candidate.col(left) = cosine * left_column + sine * right_column;
-            candidate.col(right) = cosine * right_column - sine * left_column;
+            Eigen::MatrixXd candidate = active_rotation;
+            candidate.col(left) = cosine * active_rotation.col(left) +
+                                  sine * active_rotation.col(right);
+            candidate.col(right) = cosine * active_rotation.col(right) -
+                                   sine * active_rotation.col(left);
             return coefficient_norm(candidate);
           };
 
@@ -368,20 +449,31 @@ std::shared_ptr<data::Wavefunction> GaugeFixingLocalizer::_run_impl(
             }
           }
 
-          const auto [refined_angle, refined_norm] =
-              detail::golden_section_minimum(
-                  plane_norm, best_angle - angle_step, best_angle + angle_step);
+          auto [refined_angle, refined_norm] = detail::golden_section_minimum(
+              plane_norm, best_angle - angle_step, best_angle + angle_step);
+          // The bracket can hold more than one cusp, so contraction is not
+          // guaranteed to improve on the coarse scan that placed it.
+          if (best_norm < refined_norm) {
+            refined_angle = best_angle;
+            refined_norm = best_norm;
+          }
           if (refined_norm < current_norm - improvement_tolerance) {
             // Rotations by an angle and by that angle plus pi differ only in
             // orbital sign; canonicalizing onto [0, pi) keeps the accepted
             // gauge reproducible.
-            double canonical_angle = std::fmod(refined_angle, M_PI);
+            double canonical_angle = std::fmod(refined_angle, std::numbers::pi);
             if (canonical_angle < 0.0) {
-              canonical_angle += M_PI;
+              canonical_angle += std::numbers::pi;
             }
             current_norm = plane_norm(canonical_angle);
-            coefficients.col(left) = candidate.col(left);
-            coefficients.col(right) = candidate.col(right);
+            const double cosine = std::cos(canonical_angle);
+            const double sine = std::sin(canonical_angle);
+            const Eigen::VectorXd left_column = active_rotation.col(left);
+            const Eigen::VectorXd right_column = active_rotation.col(right);
+            active_rotation.col(left) =
+                cosine * left_column + sine * right_column;
+            active_rotation.col(right) =
+                cosine * right_column - sine * left_column;
           }
         }
       }
@@ -396,25 +488,71 @@ std::shared_ptr<data::Wavefunction> GaugeFixingLocalizer::_run_impl(
       "Gauge fixing changed the mapped coefficient norm from {} to {} Hartree",
       norm_before, current_norm);
 
+  Eigen::MatrixXd anchored_active(coefficients.rows(), num_active);
+  for (size_t i = 0; i < active_indices.size(); ++i) {
+    anchored_active.col(static_cast<Eigen::Index>(i)) =
+        coefficients.col(static_cast<Eigen::Index>(active_indices[i]));
+  }
+  Eigen::MatrixXd active_coefficients(coefficients.rows(), num_active);
+  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+             coefficients.rows(), num_active, num_active, 1.0,
+             anchored_active.data(), coefficients.rows(),
+             active_rotation.data(), num_active, 0.0,
+             active_coefficients.data(), coefficients.rows());
+  for (size_t i = 0; i < active_indices.size(); ++i) {
+    coefficients.col(static_cast<Eigen::Index>(active_indices[i])) =
+        active_coefficients.col(static_cast<Eigen::Index>(i));
+  }
+
   auto gauge_fixed_orbitals = std::make_shared<data::Orbitals>(
       coefficients,
       std::nullopt,  // rotations inside a correlated active space carry no
                      // unique one-electron energies
-      overlap, orbitals->get_basis_set(), active_index_set, inactive_index_set);
+      overlap, orbitals->get_basis_set(), orbitals->active_indices(),
+      orbitals->inactive_indices());
 
-  // Rotations stay inside degenerate eigenspaces, so the RDM restricted to the
-  // selected orbitals is unchanged. Carrying it keeps the occupations
-  // available downstream and makes a second gauge-fixing run a no-op.
-  Eigen::VectorXd selected_occupations(
-      static_cast<Eigen::Index>(loc_indices_a.size()));
-  for (size_t i = 0; i < loc_indices_a.size(); ++i) {
-    selected_occupations[static_cast<Eigen::Index>(i)] =
-        occupation_by_orbital.at(loc_indices_a[i]);
+  // Rotations stay inside degenerate eigenspaces, where the spin-traced RDM
+  // is a multiple of the identity, so it survives them unchanged. The
+  // spin-resolved blocks are not, so they are rotated by the total
+  // active-space rotation the anchoring and the sweeps together applied.
+  Eigen::MatrixXd overlap_times_active(coefficients.rows(), num_active);
+  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+             coefficients.rows(), num_active, coefficients.rows(), 1.0,
+             overlap.data(), coefficients.rows(), active_coefficients.data(),
+             coefficients.rows(), 0.0, overlap_times_active.data(),
+             coefficients.rows());
+  Eigen::MatrixXd total_rotation(num_active, num_active);
+  blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+             num_active, num_active, coefficients.rows(), 1.0,
+             input_active_coefficients.data(), coefficients.rows(),
+             overlap_times_active.data(), coefficients.rows(), 0.0,
+             total_rotation.data(), num_active);
+
+  std::shared_ptr<const data::SymmetryBlockedTensorVariant<2>> active_one_rdm;
+  if (wavefunction->has_active_one_rdm()) {
+    const auto* spin_resolved =
+        std::get_if<data::SymmetryBlockedTensor<2, double>>(
+            &wavefunction->active_one_rdm());
+    if (spin_resolved) {
+      const auto n = static_cast<size_t>(num_active);
+      const Eigen::MatrixXd input_alpha =
+          spin_resolved->block({data::axes::alpha(), data::axes::alpha()});
+      const Eigen::MatrixXd input_beta =
+          spin_resolved->block({data::axes::beta(), data::axes::beta()});
+      Eigen::MatrixXd alpha(num_active, num_active);
+      Eigen::MatrixXd beta(num_active, num_active);
+      macis::two_index_transform(n, n, input_alpha.data(), n,
+                                 total_rotation.data(), n, alpha.data(), n);
+      macis::two_index_transform(n, n, input_beta.data(), n,
+                                 total_rotation.data(), n, beta.data(), n);
+      active_one_rdm = data::make_spin_diagonal_rank2_sbt_variant(
+          data::ContainerTypes::MatrixVariant(alpha),
+          data::ContainerTypes::MatrixVariant(beta), false);
+    }
   }
-  Eigen::MatrixXd selected_one_rdm = selected_occupations.asDiagonal();
   return algorithms::detail::new_aufbau_determinant_wavefunction(
       wavefunction, gauge_fixed_orbitals,
-      data::ContainerTypes::MatrixVariant(selected_one_rdm));
+      data::ContainerTypes::MatrixVariant(*one_rdm), active_one_rdm);
 }
 
 }  // namespace qdk::chemistry::algorithms::microsoft

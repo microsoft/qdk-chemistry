@@ -107,6 +107,12 @@ See :ref:`shared-qsharp-context` for worked examples of bringing your own Q# ope
 your own context.
 
 
+Other Improvements
+==================
+
+- **Gauge-fixing localizer.** ``orbital_localizer`` / ``qdk_gauge_fixing`` resolves the orbital freedom inside occupation-degenerate natural-orbital blocks deterministically, choosing the gauge that minimizes the mapped Hamiltonian coefficient 1-norm :math:`\lambda`. See :ref:`localizer-qdk-gauge-fixing`.
+
+
 Bug Fixes
 =========
 

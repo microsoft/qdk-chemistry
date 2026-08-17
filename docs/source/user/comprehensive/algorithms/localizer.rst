@@ -191,23 +191,30 @@ QDK Gauge Fixing
 .. rubric:: Factory name: ``"qdk_gauge_fixing"``
 
 Natural orbitals with equal occupation numbers span a well-defined subspace but do not have unique orbital vectors.
-Any orthogonal rotation inside such an occupation-degenerate block spans the same subspace and leaves the exact
-:term:`CASCI` energy unchanged, yet it produces a different qubit Hamiltonian after mapping.
+Any orthogonal rotation within the active space leaves the exact :term:`CASCI` energy unchanged, yet it produces a
+different qubit Hamiltonian after mapping.
+Restricting the rotations to occupation-degenerate blocks additionally keeps the active-space 1-RDM diagonal with the
+same occupation numbers, so the returned orbitals remain natural orbitals.
 This localizer resolves that freedom deterministically: it first anchors every degenerate block to the atomic-orbital
 basis, then runs coordinate-descent sweeps over Givens plane rotations inside each block, accepting only rotations
-that reduce the mapped coefficient norm :math:`\lambda = \sum_\ell |h_\ell|`.
+that reduce the mapped coefficient norm :math:`\lambda = \sum_\ell |h_\ell|` of the active-space Hamiltonian.
+:math:`\lambda` is measured before any post-mapping qubit tapering, and is the same for every linear
+fermion-to-qubit encoding, so the choice of mapping does not affect which gauge is selected.
 
 Because :math:`\lambda` sets the evolution time in :doc:`phase estimation <phase_estimation>` and the normalization of
 a linear-combination-of-unitaries block encoding, reducing it lowers quantum resource estimates without affecting the
 energy.
 Restricting the rotations to degenerate blocks also means the returned orbitals remain natural orbitals, so their
-occupation numbers are preserved and carried on the returned wavefunction.
+occupation numbers are preserved and carried on the returned wavefunction, along with the spin-resolved
+active-space 1-RDM.
 
 Choosing a gauge is a separate objective from finding the natural orbitals, so the two are composed rather than
 combined: run :ref:`QDK Natural Orbitals <localizer-qdk-natural-orbitals>` first and pass its result here.
 The input orbitals must be restricted and must diagonalize the active-space 1-RDM.
 The selected indices must be a subset of the active-space indices, and they may not split a degenerate block, because
 rotating a partly selected block would change the selected subspace and therefore the energy.
+Selecting a proper subset restricts which blocks are anchored and swept; :math:`\lambda` is always measured over the
+full active space, and the returned wavefunction carries the input active space unchanged.
 
 .. note::
    Each objective evaluation performs an integral transformation and a qubit mapping, so the cost grows with the
@@ -226,7 +233,7 @@ rotating a partly selected block would change the selected subspace and therefor
    * - ``degeneracy_tolerance``
      - float
      - ``1e-6``
-     - Occupation-number gap below which orbitals share one degenerate block
+     - Maximum occupation-number spread within one degenerate block
    * - ``angle_samples``
      - int
      - ``32``
