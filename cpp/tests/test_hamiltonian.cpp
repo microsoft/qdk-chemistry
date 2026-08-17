@@ -1083,8 +1083,8 @@ TEST_F(HamiltonianTest, CholeskyContainerRejectsMalformedThreeCenterLayout) {
                                  unrestricted_orbitals, 0.0, nullptr);
     FAIL() << "Expected malformed beta-beta three-center shape to be rejected";
   } catch (const std::invalid_argument& error) {
-    EXPECT_NE(std::string(error.what()).find(
-                  "Beta-beta three-center integrals shape"),
+    EXPECT_NE(std::string(error.what())
+                  .find("Beta-beta three-center integrals shape"),
               std::string::npos);
   }
 }
@@ -1317,9 +1317,9 @@ TEST_F(HamiltonianTest, CholeskyBasisTransformer) {
       testing::restricted_index_set(3, changed_inactive_indices));
   EXPECT_THROW(transformer->run(source, invalid_target), std::invalid_argument);
 
-  invalid_target = std::make_shared<Orbitals>(
-      target_coefficients, std::nullopt, std::make_optional(overlap), basis_set,
-      active_space, nullptr);
+  invalid_target = std::make_shared<Orbitals>(target_coefficients, std::nullopt,
+                                              std::make_optional(overlap),
+                                              basis_set, active_space, nullptr);
   EXPECT_THROW(transformer->run(source, invalid_target), std::invalid_argument);
 
   invalid_target = std::make_shared<Orbitals>(
@@ -1385,8 +1385,7 @@ TEST_F(HamiltonianTest,
   second_rotation << 1.0, 0.0, 0.0, 0.0, std::cos(second_angle),
       -std::sin(second_angle), 0.0, std::sin(second_angle),
       std::cos(second_angle);
-  const Eigen::Matrix3d source_coefficients =
-      first_rotation * second_rotation;
+  const Eigen::Matrix3d source_coefficients = first_rotation * second_rotation;
   const double target_angle = -0.35;
   Eigen::Matrix2d active_rotation;
   active_rotation << std::cos(target_angle), -std::sin(target_angle),
@@ -1430,16 +1429,15 @@ TEST_F(HamiltonianTest,
       std::make_unique<CholeskyHamiltonianContainer>(
           source_active.transpose() * one_body_ao * source_active,
           source_factors, source_orbitals, 1.25, source_fock));
-  auto transformed =
-      HamiltonianBasisTransformerFactory::create("qdk")->run(source,
-                                                              target_orbitals);
+  auto transformed = HamiltonianBasisTransformerFactory::create("qdk")->run(
+      source, target_orbitals);
   const auto& transformed_container =
       transformed->get_container<CholeskyHamiltonianContainer>();
 
-  EXPECT_TRUE(std::get<0>(transformed->get_one_body_integrals())
-                  .isApprox(target_active.transpose() * one_body_ao *
-                                target_active,
-                            1.0e-13));
+  EXPECT_TRUE(
+      std::get<0>(transformed->get_one_body_integrals())
+          .isApprox(target_active.transpose() * one_body_ao * target_active,
+                    1.0e-13));
   Eigen::MatrixXd expected_factors(4, 2);
   Eigen::Map<Eigen::Matrix2d>(expected_factors.col(0).data()) =
       target_active.transpose() * factor_0 * target_active;
