@@ -39,18 +39,14 @@ using qdk::chemistry::utils::generate_orbital_cubes;
 std::shared_ptr<BasisSet> make_hydrogen_basis(
     std::vector<double> exponents = {1.0},
     std::vector<double> coefficients = {1.0}) {
-  auto structure =
-      std::make_shared<Structure>(std::vector<Eigen::Vector3d>{{0.0, 0.0, 0.0}},
-                                  std::vector<Element>{Element::H});
+  auto structure = testing::create_hydrogen_structure();
   std::vector<Shell> shells;
   shells.emplace_back(0, OrbitalType::S, exponents, coefficients);
   return std::make_shared<BasisSet>("test", shells, structure);
 }
 
 std::shared_ptr<BasisSet> make_hydrogen_p_basis() {
-  auto structure =
-      std::make_shared<Structure>(std::vector<Eigen::Vector3d>{{0.0, 0.0, 0.0}},
-                                  std::vector<Element>{Element::H});
+  auto structure = testing::create_hydrogen_structure();
   std::vector<Shell> shells;
   shells.emplace_back(0, OrbitalType::P, std::vector<double>{1.0},
                       std::vector<double>{1.0});
@@ -58,9 +54,7 @@ std::shared_ptr<BasisSet> make_hydrogen_p_basis() {
 }
 
 std::shared_ptr<BasisSet> make_ecp_basis(std::size_t core_electrons = 2) {
-  auto structure =
-      std::make_shared<Structure>(std::vector<Eigen::Vector3d>{{0.0, 0.0, 0.0}},
-                                  std::vector<Element>{Element::H});
+  auto structure = testing::create_hydrogen_structure();
   // Valence shell: an ordinary contracted Gaussian, exactly as an ECP basis
   // stores it. The r^n projectors live in the separate ECP shell container.
   std::vector<Shell> shells;
@@ -166,10 +160,7 @@ TEST(CubeGridTest, BoundsPointCountByBackendIntLimit) {
 
 TEST(CubeGeneratorTest, EvaluatesHydrogenOrbitalAndDensity) {
   CubeGenerator generator(make_hydrogen_basis());
-  CubeGrid grid;
-  grid.origin = {0.0, 0.0, 0.0};
-  grid.spacing = {1.0, 1.0, 1.0};
-  grid.nx = grid.ny = grid.nz = 1;
+  const auto grid = single_point_grid();
 
   Eigen::VectorXd coefficients(1);
   coefficients << 1.0;
@@ -186,9 +177,7 @@ TEST(CubeGeneratorTest, EvaluatesHydrogenOrbitalAndDensity) {
 }
 
 TEST(CubeGeneratorTest, EvaluatesHydrogenOrbitalFromNamedBasis) {
-  auto structure =
-      std::make_shared<Structure>(std::vector<Eigen::Vector3d>{{0.0, 0.0, 0.0}},
-                                  std::vector<Element>{Element::H});
+  auto structure = testing::create_hydrogen_structure();
   const auto basis = BasisSet::from_basis_name("sto-3g", structure);
   ASSERT_EQ(basis->get_num_atomic_orbitals(), 1u);
 
@@ -245,9 +234,7 @@ TEST(CubeGeneratorTest, RejectsUnsupportedShells) {
   EXPECT_THROW(CubeGenerator(make_hydrogen_basis(exponents, coefficients)),
                std::invalid_argument);
 
-  auto structure =
-      std::make_shared<Structure>(std::vector<Eigen::Vector3d>{{0.0, 0.0, 0.0}},
-                                  std::vector<Element>{Element::H});
+  auto structure = testing::create_hydrogen_structure();
   std::vector<Shell> shells;
   shells.emplace_back(0, OrbitalType::S, std::vector<double>{1.0},
                       std::vector<double>{1.0}, std::vector<int>{2});
@@ -257,9 +244,7 @@ TEST(CubeGeneratorTest, RejectsUnsupportedShells) {
 }
 
 TEST(CubeGeneratorTest, AcceptsExplicitZeroRadialPowers) {
-  auto structure =
-      std::make_shared<Structure>(std::vector<Eigen::Vector3d>{{0.0, 0.0, 0.0}},
-                                  std::vector<Element>{Element::H});
+  auto structure = testing::create_hydrogen_structure();
   std::vector<Shell> shells;
   shells.emplace_back(0, OrbitalType::S, std::vector<double>{1.0},
                       std::vector<double>{1.0}, std::vector<int>{0});
