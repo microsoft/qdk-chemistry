@@ -68,7 +68,7 @@ def _jsonable_settings_value(value: Any) -> Any:
         }
     if isinstance(value, dict):
         return {str(key): _jsonable_settings_value(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, list | tuple):
         return [_jsonable_settings_value(item) for item in value]
     return value
 
@@ -161,12 +161,8 @@ class FileSerializer:
             directory: Directory to write files to.
             name: Base name for the file.
             value: Value to serialize.
-            cache: Optional shared ``CacheBackend``.  When the cache
-                reports ``is_shared`` and already contains the blob, the
-                file is **not** written and a ``"cached"`` reference is
-                emitted instead.
-            content_hash: Optional content hash for *value*.  Used for
-                the cache existence check.
+            cache: Shared cache backend used to replace existing blobs with ``"cached"`` manifest references.
+            content_hash: Optional hash used to check whether *value* is cached.
 
         Returns:
             Manifest entry describing the serialized value.
@@ -270,8 +266,7 @@ class FileSerializer:
         Args:
             directory: Directory containing the files.
             entry: Manifest entry describing the value.
-            cache: Optional ``CacheBackend`` used to resolve
-                ``"cached"`` entries that were not uploaded as files.
+            cache: Optional cache backend used to resolve ``"cached"`` entries omitted from uploaded files.
 
         Returns:
             The deserialized value.
@@ -387,13 +382,8 @@ def serialize_inputs(
         settings: Algorithm settings dictionary.
         run_hash: Optional pre-computed algorithm run hash.
         input_hashes: Optional dict mapping input names to their content hashes.
-        remote_cache: Optional cache backend coordinates (``{"name": ..., ...}``)
-            passed to the remote so it can instantiate the same cache via
-            ``get_cache()``.
-        remote_cache_backend: Optional ``CacheBackend`` instance.  When
-            ``is_shared`` is true and a DataClass blob already exists in
-            this cache, the HDF5 file is **not** written and a ``"cached"``
-            reference is emitted in the manifest instead.
+        remote_cache: Optional coordinates passed to the remote cache factory, ``get_cache()``.
+        remote_cache_backend: Shared cache backend; existing DataClass blobs become ``"cached"`` manifest references.
 
     Returns:
         List of all files created (for upload).
@@ -468,8 +458,7 @@ def deserialize_inputs(directory: str | Path, *, cache: Any = None) -> dict:
 
     Args:
         directory: Directory containing the input files.
-        cache: Optional ``CacheBackend`` used to resolve ``"cached"``
-            manifest entries that were not uploaded as files.
+        cache: Optional cache backend used to resolve ``"cached"`` entries omitted from uploaded files.
 
     Returns:
         Deserialized inputs containing ``algorithm_type``, ``algorithm_name``,
