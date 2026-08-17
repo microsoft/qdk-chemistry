@@ -63,8 +63,9 @@ class Circuit(DataClass):
         """
         return "circuit"
 
-    # Serialization version for this class
-    _serialization_version = "0.2.0"
+    # Serialization version for this class. ``num_qubits`` is purely additive, so this must
+    # stay at the minor version that predates it: the validator throws on a differing minor.
+    _serialization_version = "0.1.0"
 
     # Use keyword arguments to be future-proof
     def __init__(
