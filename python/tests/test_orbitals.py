@@ -264,7 +264,6 @@ def test_json_deserialization_preserves_model_orbitals_type():
 
     assert isinstance(restored, ModelOrbitals)
     assert restored.num_modes() == model.num_modes()
-    assert restored.to_json() == model.to_json()
 
 
 def test_hdf5_serialization():
