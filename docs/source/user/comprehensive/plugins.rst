@@ -190,12 +190,60 @@ Community-developed plugins are also welcome. See :ref:`adding-plugins` for guid
 Creating plugins
 ----------------
 
-QDK/Chemistry supports two extension mechanisms:
+An installed Python package can contribute any combination of:
 
-1. Implementing a new backend for an existing algorithm type (e.g., integrating an external quantum chemistry package)
-2. Defining an entirely new algorithm type with its own factory and implementations
+- Implementations of existing algorithm types
+- New algorithm types and their implementations
+- :class:`~qdk_chemistry.data.DataClass` types used in algorithm inputs or outputs
 
-The following sections provide comprehensive examples of each approach.
+The same plugin object can register multiple capabilities through :class:`~qdk_chemistry.plugins.PluginRegistrar`.
+
+Registration names must be unique within their registry. Registering a second algorithm, algorithm type, or data class under an existing name raises :class:`~qdk_chemistry.plugins.DuplicateRegistrationError`, a :class:`ValueError` subclass. The rejected registration does not replace the existing implementation.
+
+Automatic discovery
+~~~~~~~~~~~~~~~~~~~
+
+The preferred plugin contract is a :class:`~qdk_chemistry.plugins.base.QdkChemistryPlugin` subclass exposed through the ``qdk_chemistry.plugins`` entry-point group. For example, a plugin package declares this in its ``pyproject.toml``:
+
+.. code-block:: toml
+
+   [project.entry-points."qdk_chemistry.plugins"]
+   custom = "custom_package.plugin:CustomScfPlugin"
+
+Importing ``qdk_chemistry`` discovers the installed package and calls its ``register`` method; users do not need to import the plugin module themselves. A plugin registers its capabilities through the supplied registrar:
+
+.. code-block:: python
+
+   from qdk_chemistry.plugins import PluginRegistrar, QdkChemistryPlugin
+
+   class CustomPlugin(QdkChemistryPlugin):
+       def register(self, registrar: PluginRegistrar) -> None:
+           registrar.register_algorithm(lambda: CustomAlgorithm())
+           registrar.register_dataclass(CustomResult)
+
+Each plugin-defined ``DataClass`` used in algorithm inputs or outputs must declare a non-empty wire-format identifier in its own class body:
+
+.. code-block:: python
+
+   from qdk_chemistry.data import DataClass
+
+   class CustomResult(DataClass):
+       @staticmethod
+       def data_type_name() -> str:
+           return "custom_result"
+       ...
+
+The value returned by ``data_type_name()`` identifies the serialized format during deserialization. A canonical loader must declare this static method directly and return a non-empty string. A subclass must declare a unique identifier and register as its own loader. Registration raises ``TypeError`` when the declaration is missing or empty, and :class:`~qdk_chemistry.plugins.DuplicateRegistrationError` when another loader already owns the identifier.
+
+Register these classes explicitly with ``register_dataclass`` or pass them through the ``data_classes`` argument of ``register_algorithm``. Python return annotations are not used for discovery.
+
+The existing direct registration functions and the :class:`~qdk_chemistry.plugins.base.ChemistryPlugin` compatibility alias remain supported. New plugin packages should use :class:`~qdk_chemistry.plugins.base.QdkChemistryPlugin` and the unified entry point.
+
+.. rubric:: Naming and call order
+
+An algorithm implementation name must be unique within its algorithm type. Third-party plugins should use package- or organization-prefixed names to avoid collisions with built-in implementations and other plugins.
+
+Registration is first come, first served and does not override an existing name. Core built-ins are registered before external registrations reach each registry. Unified plugin entry points are called in the order returned by Python's entry-point discovery, followed by bundled optional integrations. Calling a registration function directly with an existing name raises :class:`~qdk_chemistry.plugins.DuplicateRegistrationError` and keeps the earlier registration unchanged. During entry-point discovery, QDK/Chemistry catches that exception, emits a ``UserWarning`` identifying the plugin that failed to register, and continues loading other plugins. Because entry-point order can vary between environments, plugins must not rely on discovery order to override another implementation.
 
 .. _adding-implementations:
 
@@ -256,7 +304,7 @@ The ``_run_impl()`` method is responsible for:
 .. rubric:: Registration
 
 Implementations are registered with the algorithm factory to enable discovery and instantiation by name.
-Registration is typically performed during module initialization:
+The plugin registrar delegates to that existing factory registry:
 
 .. tab:: Python API
 

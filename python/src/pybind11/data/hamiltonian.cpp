@@ -13,7 +13,6 @@
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -29,7 +28,6 @@ void hamiltonian_to_file_wrapper(qdk::chemistry::data::Hamiltonian& self,
   self.to_file(qdk::chemistry::python::utils::to_string_path(filename),
                format_type);
 }
-
 std::shared_ptr<qdk::chemistry::data::Hamiltonian>
 hamiltonian_from_file_wrapper(const py::object& filename,
                               const std::string& format_type) {
@@ -1406,5 +1404,11 @@ Examples:
       }));
 
   // Data type name class attribute
-  hamiltonian.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(Hamiltonian);
+  hamiltonian.def_static("data_type_name", &Hamiltonian::data_type_name, R"(
+Return the wire-format identifier for Hamiltonians.
+
+Returns:
+        str: ``"hamiltonian"``
+
+)");
 }

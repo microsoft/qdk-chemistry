@@ -10,7 +10,6 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -26,7 +25,6 @@ void basis_set_to_file_wrapper(BasisSet& self, const py::object& filename,
   self.to_file(qdk::chemistry::python::utils::to_string_path(filename),
                format_type);
 }
-
 std::shared_ptr<BasisSet> basis_set_from_file_wrapper(
     const py::object& filename, const std::string& format_type) {
   return BasisSet::from_file(
@@ -1348,5 +1346,11 @@ Type:
 )");
 
   // Data type name class attribute
-  basis_set.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(BasisSet);
+  basis_set.def_static("data_type_name", &BasisSet::data_type_name, R"(
+Return the wire-format identifier for basis sets.
+
+Returns:
+        str: ``"basis_set"``
+
+)");
 }

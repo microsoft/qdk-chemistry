@@ -15,7 +15,6 @@
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_scalar.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <string>
 #include <tuple>
 #include <variant>
@@ -878,12 +877,18 @@ class Wavefunction : public DataClass,
   static constexpr const char* DEFAULT_SECTOR = "__default__";
 
   /**
-   * @brief Get the data type name for this class
+   * @brief Get the static data type name for this class.
    * @return "wavefunction"
    */
-  std::string get_data_type_name() const override {
+  static std::string data_type_name() {
     return DATACLASS_TO_SNAKE_CASE(Wavefunction);
   }
+
+  /**
+   * @brief Get the data type name for this instance.
+   * @return "wavefunction"
+   */
+  std::string get_data_type_name() const override { return data_type_name(); }
 
   /**
    * @brief Get a summary string
