@@ -48,6 +48,9 @@ def create_statevector_from_wavefunction(wavefunction: data.Wavefunction, normal
             The dtype is always complex128, even if the wavefunction has real
             coefficients.
 
+    Raises:
+        ValueError: If the wavefunction has no active determinants.
+
     Examples:
         >>> from qiskit.quantum_info import Statevector
         >>> # Assuming we have a wavefunction already
@@ -58,6 +61,8 @@ def create_statevector_from_wavefunction(wavefunction: data.Wavefunction, normal
     """
     # Get determinants and coefficients
     determinants = wavefunction.get_active_determinants()
+    if not determinants:
+        raise ValueError("wavefunction has no active determinants to convert to a statevector.")
     coefficients = wavefunction.get_coefficients()
 
     # Size the register from the wavefunction's own encoding so it matches the

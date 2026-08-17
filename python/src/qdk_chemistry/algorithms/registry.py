@@ -410,6 +410,7 @@ def print_settings(algorithm_type: str, algorithm_name: str, characters: int = 1
 
     """
     algorithm_type = _resolve_algorithm_type(algorithm_type)
+    algorithm_name = _resolve_algorithm_name(algorithm_type, algorithm_name)
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             instance = factory.create(algorithm_name)
@@ -470,6 +471,7 @@ def inspect_settings(algorithm_type: str, algorithm_name: str) -> list[tuple[str
 
     """
     algorithm_type = _resolve_algorithm_type(algorithm_type)
+    algorithm_name = _resolve_algorithm_name(algorithm_type, algorithm_name)
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             instance = factory.create(algorithm_name)

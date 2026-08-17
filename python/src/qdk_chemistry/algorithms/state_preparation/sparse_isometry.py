@@ -171,6 +171,22 @@ class SparseIsometryStatePreparationSettings(Settings):
         values["dense_state_prep"] = AlgorithmRef("state_prep", algorithm_name, **forwarded)
         super().update(values)
 
+    def set(self, key: str, value) -> None:
+        """Apply a single setting override, translating the deprecated pre-rename keys.
+
+        ``set`` is the single-key counterpart of :meth:`update`, so it has to perform the same
+        translation; otherwise a deprecated key set this way would be rejected as unknown.
+
+        Args:
+            key (str): Setting name, possibly one of the deprecated keys.
+            value: Value to assign to ``key``.
+
+        """
+        if key == "dense_preparation_method" or key in _DEPRECATED_TRANSPILE_KEYS:
+            self.update({key: value})
+            return
+        super().set(key, value)
+
 
 class SparseIsometryStatePreparation(StatePreparation):
     """State preparation using sparse isometry with enhanced GF2 Gaussian elimination.

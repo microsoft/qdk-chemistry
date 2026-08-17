@@ -24,7 +24,7 @@ import pytest
 from qdk_chemistry import algorithms
 from qdk_chemistry.algorithms import ExpectationEstimator, QdkExpectationEstimator, state_preparation
 from qdk_chemistry.algorithms.state_preparation import SparseIsometryStatePreparation
-from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian, QubitOperator
+from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian, QubitOperator, Settings
 
 
 class TestQubitHamiltonianDeprecation:
@@ -238,9 +238,59 @@ class TestSparseIsometryDeprecatedSettings:
         with pytest.raises(ValueError, match="Unknown dense_preparation_method"):
             algorithms.create("state_prep", "sparse_isometry", dense_preparation_method="bogus")
 
+    def test_set_translates_deprecated_key_like_update(self):
+        """``set`` is the single-key counterpart of ``update`` and must translate identically."""
+        from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (  # noqa: PLC0415
+            SparseIsometryStatePreparationSettings,
+        )
+
+        settings = SparseIsometryStatePreparationSettings()
+        with pytest.warns(DeprecationWarning, match="dense_preparation_method"):
+            settings.set("dense_preparation_method", "qiskit")
+        assert settings.get("dense_state_prep").algorithm_name == "qiskit_regular_isometry"
+
+    def test_set_leaves_current_keys_untouched(self):
+        """A current key set via ``set`` must not warn and must round-trip."""
+        from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (  # noqa: PLC0415
+            SparseIsometryStatePreparationSettings,
+        )
+
+        settings = SparseIsometryStatePreparationSettings()
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            settings.set("binary_encoding", True)
+        assert settings.get("binary_encoding") is True
+
     def test_current_settings_do_not_warn(self):
         """Configuring the nested algorithm the new way must stay warning-free."""
         with warnings.catch_warnings():
             warnings.simplefilter("error", DeprecationWarning)
             prep = algorithms.create("state_prep", "sparse_isometry", binary_encoding=True)
         assert prep.settings().get("binary_encoding") is True
+
+
+class TestStatePreparationSettingsDeprecation:
+    """``StatePreparationSettings`` is no longer used, but was public and must keep importing."""
+
+    def test_import_from_package_still_works(self):
+        """The class remains importable from its original public location."""
+        from qdk_chemistry.algorithms.state_preparation import StatePreparationSettings  # noqa: PLC0415
+
+        assert issubclass(StatePreparationSettings, Settings)
+
+    def test_construction_warns_and_keeps_legacy_defaults(self):
+        """Constructing it warns but still yields the pre-rename defaults."""
+        from qdk_chemistry.algorithms.state_preparation import StatePreparationSettings  # noqa: PLC0415
+
+        with pytest.warns(DeprecationWarning, match="StatePreparationSettings"):
+            settings = StatePreparationSettings()
+        assert settings.get("transpile") is True
+        assert settings.get("transpile_optimization_level") == 0
+
+    def test_referencing_the_class_does_not_warn(self):
+        """Only construction warns; importing/referencing must stay silent."""
+        from qdk_chemistry.algorithms.state_preparation import StatePreparationSettings  # noqa: PLC0415
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            _ = StatePreparationSettings
