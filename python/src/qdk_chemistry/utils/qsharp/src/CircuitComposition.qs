@@ -10,17 +10,11 @@ namespace QDKChemistry.Utils.CircuitComposition {
     import Std.ResourceEstimation.SingleVariant;
 
     /// Returns the controlled version of `op`, taking the control register as its first argument.
-    ///
-    /// The control register is a `Qubit[]`, so the same callable covers the uncontrolled case:
-    /// passing `[]` applies `op` unconditionally.
     function MakeControlledOp<'T>(op : 'T => Unit is Adj + Ctl) : ((Qubit[], 'T) => Unit is Adj + Ctl) {
         Controlled op
     }
 
     /// Applies `op` to `target` `power` times.
-    ///
-    /// The estimator-caching intrinsics are functions, so the loop stays classically
-    /// controlled and the functors are still derivable.
     operation ApplyRepeated<'T>(
         cacheName : String,
         op : 'T => Unit is Adj + Ctl,
@@ -47,11 +41,6 @@ namespace QDKChemistry.Utils.CircuitComposition {
     }
 
     /// Adapts a control-register operation to the single-control-qubit shape phase estimation takes.
-    ///
-    /// The specializations have to be carried through rather than dropped: standard phase
-    /// estimation composes these into an adjointable circuit so amplitude amplification can
-    /// reflect about it, and a bare `=> Unit` here leaves the result with no `Adj`
-    /// specialization to invoke.
     function MakeSingleControlOp<'T>(op : (Qubit[], 'T) => Unit is Adj + Ctl) : ((Qubit, 'T) => Unit is Adj + Ctl) {
         (control, target) => op([control], target)
     }

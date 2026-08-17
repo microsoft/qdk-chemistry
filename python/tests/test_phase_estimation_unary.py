@@ -263,9 +263,7 @@ class _FixedWidthMapper:
     """A circuit mapper that reports a chosen register width and nothing else.
 
     The builder locates the reflected qubits from ``Circuit.num_qubits``, so the width a
-    mapper declares is what the width-rejection tests vary. Declaring no ``reflection_op``
-    is the other half of "nothing else", which is what makes this double as the mapper the
-    reflection-rejection test needs.
+    mapper declares is what the width-rejection tests vary.
     """
 
     def __init__(self, num_qubits: int | None) -> None:
@@ -349,15 +347,6 @@ class TestInvalidConfigurationIsRejected:
         """A width that leaves no ancilla past the system register has no reflection."""
         with pytest.raises(ValueError, match="non-empty ancilla register"):
             self._build_with_mapper(_FixedWidthMapper(declared_width))
-
-    def test_a_mapper_that_exposes_no_reflection_is_rejected(self):
-        """The schedule omits one reflection, so the mapper has to say what it reflects about.
-
-        Deriving the boundary from the Hamiltonian width instead would silently reflect over
-        whatever the mapper considers system when the two disagree.
-        """
-        with pytest.raises(ValueError, match="does not expose reflection_op"):
-            self._build_with_mapper(_FixedWidthMapper(2))
 
     def test_a_non_unary_circuit_builder_is_rejected(self):
         """The algorithm decodes a doubled phase, so it needs its own builder."""

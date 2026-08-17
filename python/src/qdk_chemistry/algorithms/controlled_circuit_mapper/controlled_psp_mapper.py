@@ -115,7 +115,8 @@ class ControlledPSPMapper(ControlledCircuitMapper):
 
         step_op = QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepOp(prepare_op, select_op, num_system)
         if use_quantum_walk:
-            step_op = QSHARP_UTILS.PrepSelPrep.MakeWalkOp(step_op, block_mapper.reflection_op(container))
+            reflection_op = QSHARP_UTILS.PrepSelPrep.MakeAncillaReflectionOp(num_system)
+            step_op = QSHARP_UTILS.PrepSelPrep.MakeWalkOp(step_op, reflection_op)
 
         controlled_op = QSHARP_UTILS.CircuitComposition.MakeControlledOp(step_op)
         repeated_op = QSHARP_UTILS.CircuitComposition.MakeRepeatedOp(

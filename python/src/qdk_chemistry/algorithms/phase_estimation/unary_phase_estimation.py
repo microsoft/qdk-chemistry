@@ -33,7 +33,7 @@ def _post_process_phase_estimation(
     use_positive_sign: bool,
     eigenvalue_from_phase: Callable[[float], float],
 ) -> QpeResult:
-    r"""Reduce measured shot counts to a walk phase fraction.
+    r"""Process the measured results from unary-iteration phase estimation into a QpeResult.
 
     Every branch phase is doubled relative to the walk phase, so a measured bin
     :math:`y` satisfies :math:`y = \pm 2\varphi \bmod 1`, where :math:`\varphi` is the walk
@@ -46,18 +46,6 @@ def _post_process_phase_estimation(
       :math:`\cos(2\pi\varphi) \le 0` and :math:`E \le 0` for every input.
     * ``True`` returns :math:`\varphi \in [0, 1/4]`, hence :math:`E \ge 0`.
 
-    The degeneracy is a property of this schedule, not of qubitization as such:
-    :cite:`Babbush2018` (Fig. 2 caption) breaks it by replacing the first
-    :math:`R \cdot W \cdot R` unit with a :math:`W` controlled on an ancilla, which
-    separates :math:`\arccos(E/\lambda)` from :math:`\arccos(E/\lambda) + \pi`. This
-    builder omits that extra controlled query in exchange for a simpler schedule and asks
-    the caller for the sign instead, which is free for ground-state work and is not for an
-    excited state of unknown sign.
-
-    What comes out is an ordinary QPE phase fraction, converted to an
-    energy by the unitary representation's ``eigenvalue_from_phase`` exactly as standard
-    QPE does.
-
     Args:
         counts: Measured bitstring counts, most-significant bit first.
         num_bits: Size of the phase register.
@@ -68,11 +56,8 @@ def _post_process_phase_estimation(
 
     Returns:
         A :class:`~qdk_chemistry.data.QpeResult` whose ``phase_fraction`` is the measured bin,
-        whose ``canonical_phase_fraction`` is the decoded walk phase, and whose ``branching``
-        holds both sign candidates. The two candidates coincide at
-        :math:`\varphi = 1/4`, where both branches give :math:`E = 0`; ``branching`` still
-        reports both, so its length names how many branches were weighed rather than how
-        many distinct values they happened to take.
+        ``canonical_phase_fraction`` is the decoded walk phase, and ``branching``
+        holds both sign candidates.
 
     """
     num_bins = 2**num_bits

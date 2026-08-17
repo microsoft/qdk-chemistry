@@ -38,7 +38,7 @@ class PSPMapperSettings(Settings):
             "prepare",
             "algorithm_ref",
             AlgorithmRef("state_prep", "dense_pure_state"),
-            "Algorithm for the PREPARE oracle state preparation. ",
+            "Algorithm for the PREPARE oracle. ",
         )
 
 
@@ -159,26 +159,8 @@ class PSPMapper(CircuitMapper):
             prepare_op = QSHARP_UTILS.PrepSelPrep.NoOpPrepare
         return prepare_op, self._build_pauli_select_op(lcu.select), lcu.select.num_target_qubits
 
-    def reflection_op(self, container: UnitaryContainer):
-        """Return the reflection a qubitization walk pairs the block encoding with.
-
-        Args:
-            container: The container held by the unitary representation.
-
-        Returns:
-            A Q# callable reflecting about the all-zero state of the ancilla register.
-
-        """
-        lcu, _ = self.resolve_lcu(container)
-        return QSHARP_UTILS.PrepSelPrep.MakeAncillaReflectionOp(lcu.select.num_target_qubits)
-
     def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
         r"""Construct the block-encoding circuit on the flat ``[system | ancilla]`` register.
-
-        Every ancilla in that register is one the PREPARE amplitudes live on, so a caller can
-        reflect about ``num_qubits - num_system`` qubits at the end of the register to turn the
-        block encoding into a walk. The reflection's own scratch qubits are allocated inside Q#
-        and never surface here.
 
         Args:
             unitary: The unitary representation containing either an
@@ -195,7 +177,8 @@ class PSPMapper(CircuitMapper):
 
         qsharp_op = QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepOp(prepare_op, select_op, num_system)
         if use_quantum_walk:
-            qsharp_op = QSHARP_UTILS.PrepSelPrep.MakeWalkOp(qsharp_op, self.reflection_op(container))
+            reflection_op = QSHARP_UTILS.PrepSelPrep.MakeAncillaReflectionOp(num_system)
+            qsharp_op = QSHARP_UTILS.PrepSelPrep.MakeWalkOp(qsharp_op, reflection_op)
 
         if container.power != 1:
             qsharp_op = QSHARP_UTILS.CircuitComposition.MakeRepeatedOp(

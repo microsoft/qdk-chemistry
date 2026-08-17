@@ -58,18 +58,15 @@ class QdkUnaryQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
             -1,
             "Number of walk queries I. The Heisenberg-limited setting for a target "
             "phase-estimation energy error epsilon is I = ceil(pi * lambda / (2 * epsilon)), "
-            "where lambda is the block-encoding 1-norm; see Lee2021 Eq. (44). This is a "
-            "one-Holevo-sigma bound on the median-shot error under the cosine window this "
-            "builder prepares, not a high-confidence guarantee, so callers needing one "
-            "should oversample. Doesn't need to be a power of two.",
+            "where lambda is the block-encoding 1-norm; see Lee2021 Eq. (45). "
+            "Doesn't need to be a power of two.",
         )
         self._set_default(
             "circuit_mapper",
             "algorithm_ref",
             AlgorithmRef("circuit_mapper", "prepare_select_prepare"),
             "Mapper producing the uncontrolled block encoding. It must lay the block encoding "
-            "out as [system | ancilla] and expose a reflection over that ancilla tail via "
-            "reflection_op, as PSPMapper does.",
+            "out as [system | ancilla].",
         )
         self.set("unitary_builder", AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True))
 
@@ -149,9 +146,8 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         Raises:
             RuntimeError: If the state preparation circuit has no Q# operation.
             ValueError: If the unitary representation is not a quantum walk, if the mapper does
-                not declare its register width, if the mapper exposes no reflection over its
-                ancilla tail, or if the block encoding has no ancilla register for the walk to
-                reflect about.
+                not declare its register width, or if the block encoding has no ancilla register
+                for the walk to reflect about.
 
         """
         unitary_builder = self._create_nested("unitary_builder")
@@ -186,13 +182,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         if num_ancilla_qubits <= 0:
             raise ValueError(f"Requires a non-empty ancilla register to reflect about, got {num_ancilla_qubits}.")
 
-        apply_reflection_factory = getattr(mapper, "reflection_op", None)
-        if apply_reflection_factory is None:
-            raise ValueError(
-                f"Circuit mapper '{type(mapper).__name__}' does not expose reflection_op, so the "
-                "walk has no reflection to omit."
-            )
-        apply_reflection = apply_reflection_factory(block_encoding_container)
+        apply_reflection = QSHARP_UTILS.PrepSelPrep.MakeAncillaReflectionOp(num_system_qubits)
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         if state_prep_op is None:
             raise RuntimeError("State preparation has no Q# operation.")

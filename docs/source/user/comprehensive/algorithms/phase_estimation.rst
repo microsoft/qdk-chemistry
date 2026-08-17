@@ -28,8 +28,7 @@ Standard QFT-based Quantum Phase Estimation
    This approach achieves all precision bits in a single circuit execution but requires more ancilla qubits and longer circuit depth.
 
 Unary-iteration Quantum Phase Estimation
-   A qubitization-only approach :cite:`Lee2021` that applies a single chain of walk queries and uses unary iteration over the phase register to select which interleaved reflection is omitted.
-   Because the query count is no longer tied to a sum of powers of two, any positive number of queries can be spent, instead of rounding up to the next power of two.
+   A qubitization-only approach :cite:`Lee2021` that allows any positive number of queries instead of rounding up to the next power of two.
 
 All three implementations share the same interface and produce :class:`~qdk_chemistry.data.QpeResult` objects with automatic phase-wrapping, energy alias detection, and full :doc:`serialization <../data/serialization>` support.
 See :doc:`../data/qpe_result` for details on the result data class.
@@ -242,9 +241,8 @@ Unary-iteration phase estimation
 
 .. rubric:: Factory name: ``"qdk_unary"``
 
-Standard QPE spends :math:`2^n - 1` queries because the controlled-:math:`U^{2^j}` ladder buys precision only in powers of two.
-The unary-iteration construction :cite:`Babbush2018` :cite:`Lee2021` instead applies one flat chain of :math:`p` qubitized walk queries and uses unary iteration over the phase register to select *which* interleaved reflection is skipped; skipping the one at address :math:`a` turns the chain into :math:`W^{2a - p}`, so :math:`\lceil \log_2(p+1) \rceil` phase qubits reach every power in :math:`\{-p, -p+2, \ldots, p\}` and any positive :math:`p` is spendable.
-The circuit structure consists of:
+Standard QPE spends :math:`2^n - 1` queries.
+The circuit structure consists of :cite:`Babbush2018` :cite:`Lee2021`:
 
 1. Prepare the phase register in a cosine window :math:`\sin\!\left(\frac{\pi (a+1)}{p+2}\right)`, which suppresses the spectral leakage a uniform superposition would incur :cite:`Babbush2018`
 2. Apply the :math:`p`-query chain, omitting the reflection the phase register selects
@@ -252,7 +250,6 @@ The circuit structure consists of:
 4. Measure all phase qubits
 
 The walk's spectrum is :math:`e^{\pm i \arccos(E/\lambda)}`, so a measured bin cannot distinguish the two signs: ``use_positive_sign`` picks which one is reported, and both are always returned in the result's ``branching`` tuple.
-Only an LCU-based ``unitary_builder`` works here; there is no Trotter path.
 
 .. rubric:: Settings
 
