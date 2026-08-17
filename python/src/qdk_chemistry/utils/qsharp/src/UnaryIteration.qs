@@ -15,15 +15,7 @@ namespace QDKChemistry.Utils.UnaryIteration {
 
     /// Unary iteration
     ///
-    /// Produces the one-hot indicator of the address register one qubit at a time, so the
-    /// indicators never have to be materialized all at once. Supports a `numActions` that is
-    /// not a power of two.
-    ///
-    /// When `numActions` is not a power of two the address register still spans
-    /// `2^AddressQubits(numActions)` values, and the surplus addresses are *not* inert: the
-    /// recursion constrains only the bits it needs, so an address `>= numActions` aliases one
-    /// of the valid actions rather than selecting none. Callers must keep the address register
-    /// supported on `0..numActions - 1`.
+    /// Produces the one-hot indicator of the address register one qubit at a time.
     ///
     /// References:
     ///   Babbush et al. Encoding Electronic Spectra in Quantum Circuits with Linear T Complexity
@@ -43,10 +35,7 @@ namespace QDKChemistry.Utils.UnaryIteration {
         }
     }
 
-    /// Applies one action per address value and exposes its active unary control.
-    ///
-    /// Carries the same restriction as `UnaryIteration`: addresses `>= numActions` alias
-    /// valid actions, so the address register must stay supported on `0..numActions - 1`.
+    /// Applies one action per address value recursively.
     operation UnaryIterationWithControl(
         address : Qubit[],
         numActions : Int,
@@ -138,8 +127,6 @@ namespace QDKChemistry.Utils.UnaryIteration {
     }
 
     /// Flips `flags[index]` for the single selected address.
-    ///
-    /// Test-only; kept `internal` so it does not widen the library's public surface.
     internal function MakeTestUnaryIterationOneHotOp(numActions : Int, addressValue : Int) : (Qubit[] => Unit) {
         return qs => {
             let numAddressQubits = AddressQubits(numActions);
@@ -154,8 +141,6 @@ namespace QDKChemistry.Utils.UnaryIteration {
     }
 
     /// Runs the one-hot iteration on a uniform superposition of every address.
-    ///
-    /// Test-only; kept `internal` so it does not widen the library's public surface.
     internal function MakeTestUnaryIterationSuperposedAddressOp(numActions : Int) : (Qubit[] => Unit) {
         return qs => {
             let numAddressQubits = AddressQubits(numActions);
@@ -170,8 +155,6 @@ namespace QDKChemistry.Utils.UnaryIteration {
     }
 
     /// Applies `Z` to the exposed unary control for every index flagged in `data`.
-    ///
-    /// Test-only; kept `internal` so it does not widen the library's public surface.
     internal function MakeTestUnaryIterationControlPhasesOp(numActions : Int, data : Bool[]) : (Qubit[] => Unit) {
         return address => {
             Fact(2^AddressQubits(numActions) == numActions, "numActions must be a power of two");

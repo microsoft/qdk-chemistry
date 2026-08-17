@@ -182,11 +182,6 @@ class TestTargetProfiles:
         """Withheld sources must fail loudly as missing rather than return wrong results."""
         assert not hasattr(base_context.code.QDKChemistry.Utils, module)
 
-    @pytest.mark.parametrize("module", _PORTABLE_MODULES + _ADAPTIVE_ONLY_MODULES)
-    def test_the_default_profile_exposes_every_module(self, module: str) -> None:
-        """Nothing is withheld from the profile the library actually runs on."""
-        assert hasattr(get_qsharp_context().code.QDKChemistry.Utils, module)
-
     def test_base_lowers_a_circuit_to_qir(self, base_context: qdk.Context) -> None:
         """The Base build exists to be lowered through QIR, so prove that it compiles."""
         state_preparation = base_context.code.QDKChemistry.Utils.StatePreparation

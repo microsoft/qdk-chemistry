@@ -17,7 +17,6 @@ import qdk
 from qdk import TargetProfile
 
 __all__ = [
-    "DEFAULT_TARGET_PROFILE",
     "QSHARP_UTILS",
     "create_qsharp_context",
     "get_qsharp_context",
@@ -27,8 +26,6 @@ __all__ = [
 
 _PROJECT_ROOT = str(Path(__file__).parent)
 _SOURCE_ROOT = Path(__file__).parent / "src"
-#: Profile the vendored Q# project is compiled for by default.
-DEFAULT_TARGET_PROFILE = TargetProfile.Adaptive_RIF
 
 #: Q# sources that are supported by ``TargetProfile.Base``.
 _BASE_PROFILE_FILES = (
@@ -71,7 +68,7 @@ _thread_local = threading.local()
 
 
 def create_qsharp_context(
-    target_profile: TargetProfile = DEFAULT_TARGET_PROFILE,
+    target_profile: TargetProfile = TargetProfile.Adaptive_RIF,
     target_name: str | None = None,
     language_features: list[str] | None = None,
     qdk_config: dict[str, int | float | str | bool] | None = None,
@@ -84,13 +81,9 @@ def create_qsharp_context(
     (for example a non-default ``target_profile``); then register it with
     :func:`set_qsharp_context` if the chemistry builders should use it too.
 
-    :param target_profile: Target profile the Q# interpreter compiles for. Defaults to
-        :data:`DEFAULT_TARGET_PROFILE`. A ``TargetProfile.Base`` context loads only the
-        Base-*correct* subset of the vendored project, which is what callers that need
-        measurement-free circuits should ask for. Sources that rely on
-        measurement-based uncompute, such as unary iteration, are withheld from it: they
-        would compile under Base and return silently wrong results, so they are made to
-        fail as undefined symbols instead.
+    :param target_profile: Target profile the Q# interpreter compiles for. Default is 
+        ``TargetProfile.Adaptive_RIF``. A ``TargetProfile.Base`` context loads only a
+        subset of the available Q# operations.
     :param target_name: Optional target machine name used to infer a compatible profile.
     :param language_features: Optional list of experimental Q# language feature flags.
     :param qdk_config: Optional configuration values exposed to Q# code via

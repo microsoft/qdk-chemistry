@@ -127,10 +127,6 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     /// # Summary
     /// Reflection about the all-zero state of the block-encoding ancillas of a flat
     /// `[systemReg | ancillaReg]` register.
-    ///
-    /// Naming the tail rather than an explicit index list keeps one definition of "the
-    /// ancillas": every caller lays its target register out as system-then-ancilla, so a
-    /// second index-based factory would only be another way to spell this same slice.
     function MakeAncillaReflectionOp(numSystemQubits : Int) : (Qubit[] => Unit is Adj + Ctl) {
         (allQubits) => Reflect(allQubits[numSystemQubits...])
     }
@@ -183,8 +179,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         }
     }
 
-    /// Circuit entry point for the singly-controlled block encoding; see
-    /// `MakePrepSelPrepCircuit` for why the oracles are passed in rather than pre-composed.
+    /// Circuit entry point for the singly-controlled block encoding
     operation MakeControlledPrepSelPrepCircuit(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
@@ -211,10 +206,6 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     /// # Summary
     /// One-system-qubit, one-ancilla block encoding used to drive block-encoding-agnostic
     /// schedules from a test.
-    ///
-    /// PREPARE is a single-ancilla `Ry` rotation; SELECT is a sign flip on the system qubit.
-    ///
-    /// Test-only; kept `internal` so it does not widen the library's public surface.
     internal function MakeTestBlockEncodingOp(theta : Double) : (Qubit[] => Unit is Adj + Ctl) {
         MakePrepSelPrepOp(
             (ancilla) => Ry(theta, ancilla[0]),
