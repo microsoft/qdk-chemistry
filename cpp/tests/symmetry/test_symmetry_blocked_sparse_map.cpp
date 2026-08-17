@@ -33,6 +33,13 @@ static SBSM make_unrestricted_sparse_map() {
   return SBSM({sym, sym, sym, sym}, {ext, ext, ext, ext}, std::move(blocks));
 }
 
+TEST(SymmetryBlockedSparseMapTest, DataTypeNameIncludesRankAndScalarType) {
+  EXPECT_EQ((SymmetryBlockedSparseMap<4, double>::data_type_name()),
+            "symmetry_blocked_sparse_map_4_real");
+  EXPECT_EQ((SymmetryBlockedSparseMap<2, float>::data_type_name()),
+            "symmetry_blocked_sparse_map_2_real32");
+}
+
 TEST(SymmetryBlockedSparseMapTest, EntriesAndLookup) {
   auto map = make_unrestricted_sparse_map();
   EXPECT_EQ(map.num_blocks(), 1u);
