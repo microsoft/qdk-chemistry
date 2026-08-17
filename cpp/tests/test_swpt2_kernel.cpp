@@ -18,6 +18,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <map>
@@ -245,6 +246,38 @@ void set_sym_eri(Eigen::VectorXd& g, int p, int q, int r, int s, int norb,
   for (const auto& e : perms) g(sw::idx4(e[0], e[1], e[2], e[3], norb)) = val;
 }
 
+// Deterministic dense test system: well-separated diagonal orbital energies
+// with small random couplings, so the second-order downfold is both nontrivial
+// and convergent. The draw order fixes the values, so all tests using a given
+// `norb` see the same Hamiltonian.
+struct RandomSystem {
+  Eigen::MatrixXd h1;
+  Eigen::VectorXd g;
+  Eigen::VectorXd eps;
+};
+
+RandomSystem random_system(int norb) {
+  RandomSystem out{Eigen::MatrixXd::Zero(norb, norb),
+                   Eigen::VectorXd::Zero(norb * norb * norb * norb),
+                   Eigen::VectorXd(2 * norb)};
+  std::mt19937 generator(0xC0FFEEu + norb);
+  std::uniform_real_distribution<double> coupling(-0.09, 0.09);
+  for (int o = 0; o < norb; ++o) {
+    const double energy = -1.0 + 0.55 * o;
+    out.h1(o, o) = energy;
+    out.eps(2 * o) = out.eps(2 * o + 1) = energy;
+  }
+  for (int p = 0; p < norb; ++p)
+    for (int q = p + 1; q < norb; ++q)
+      out.h1(p, q) = out.h1(q, p) = coupling(generator);
+  for (int p = 0; p < norb; ++p)
+    for (int q = p; q < norb; ++q)
+      for (int r = 0; r < norb; ++r)
+        for (int s = r; s < norb; ++s)
+          set_sym_eri(out.g, p, q, r, s, norb, coupling(generator));
+  return out;
+}
+
 // One ladder operator on a determinant bitmask (Jordan-Wigner ordering:
 // spin-orbitals occupied in ascending index order). Returns the sign and new
 // mask, or ok=false if the operator annihilates the state (Pauli).
@@ -257,7 +290,7 @@ Ladder apply_ladder(std::uint64_t mask, int orb, bool creation) {
   const std::uint64_t bit = std::uint64_t{1} << orb;
   const bool occupied = (mask & bit) != 0;
   if (creation == occupied) return {0, 0, false};  // Pauli
-  const int below = __builtin_popcountll(mask & (bit - 1));
+  const int below = std::popcount(mask & (bit - 1));
   return {mask ^ bit, (below & 1) ? -1 : 1, true};
 }
 // a^dag_P a_Q |mask>
@@ -630,9 +663,9 @@ TEST(Swpt2KernelTest, ProductionMatchesIndependentFockSpaceMatrix) {
         double max_error = 0.0;
         double max_correction = 0.0;
         for (std::uint64_t bra = 0; bra < 16; ++bra) {
-          if (__builtin_popcountll(bra) > 2) continue;
+          if (std::popcount(bra) > 2) continue;
           for (std::uint64_t ket = 0; ket < 16; ++ket) {
-            if (__builtin_popcountll(ket) > 2) continue;
+            if (std::popcount(ket) > 2) continue;
             const int full_bra = expand_active(bra);
             const int full_ket = expand_active(ket);
             max_error = std::max(
@@ -698,26 +731,10 @@ TEST(Swpt2KernelTest, ProductionMatchesOracleForWiderKeptSpaces) {
   const auto check = [](const std::vector<int>& active,
                         const std::vector<int>& inactive,
                         const std::vector<int>& virtuals, int norb) {
-    Eigen::MatrixXd h1 = Eigen::MatrixXd::Zero(norb, norb);
-    Eigen::VectorXd eps(2 * norb);
-    std::mt19937 generator(0xC0FFEEu + norb);
-    std::uniform_real_distribution<double> coupling(-0.09, 0.09);
-
-    for (int o = 0; o < norb; ++o) {
-      const double energy = -1.0 + 0.55 * o;
-      h1(o, o) = energy;
-      eps(2 * o) = eps(2 * o + 1) = energy;
-    }
-    for (int p = 0; p < norb; ++p)
-      for (int q = p + 1; q < norb; ++q)
-        h1(p, q) = h1(q, p) = coupling(generator);
-
-    Eigen::VectorXd g = Eigen::VectorXd::Zero(norb * norb * norb * norb);
-    for (int p = 0; p < norb; ++p)
-      for (int q = p; q < norb; ++q)
-        for (int r = 0; r < norb; ++r)
-          for (int s = r; s < norb; ++s)
-            set_sym_eri(g, p, q, r, s, norb, coupling(generator));
+    const RandomSystem system = random_system(norb);
+    const Eigen::MatrixXd& h1 = system.h1;
+    const Eigen::VectorXd& g = system.g;
+    const Eigen::VectorXd& eps = system.eps;
 
     const double core_energy = 0.17;
     const auto part = sw::make_partition(norb, active, inactive, virtuals);
@@ -758,9 +775,9 @@ TEST(Swpt2KernelTest, ProductionMatchesOracleForWiderKeptSpaces) {
       double max_error = 0.0;
       double max_correction = 0.0;
       for (std::uint64_t bra = 0; bra < active_states; ++bra) {
-        if (__builtin_popcountll(bra) > 2) continue;
+        if (std::popcount(bra) > 2) continue;
         for (std::uint64_t ket = 0; ket < active_states; ++ket) {
-          if (__builtin_popcountll(ket) > 2) continue;
+          if (std::popcount(ket) > 2) continue;
           const int full_bra = expand_active(bra);
           const int full_ket = expand_active(ket);
           max_error = std::max(
@@ -799,24 +816,10 @@ TEST(Swpt2KernelTest, GeneralDensityFoldMatchesParticleHoleForADeterminant) {
   const int norb = 5;
   const std::vector<int> occupied_so{0, 1, 2, 3};
 
-  Eigen::MatrixXd h1 = Eigen::MatrixXd::Zero(norb, norb);
-  Eigen::VectorXd eps(2 * norb);
-  std::mt19937 generator(0xC0FFEEu + norb);
-  std::uniform_real_distribution<double> coupling(-0.09, 0.09);
-  for (int o = 0; o < norb; ++o) {
-    const double energy = -1.0 + 0.55 * o;
-    h1(o, o) = energy;
-    eps(2 * o) = eps(2 * o + 1) = energy;
-  }
-  for (int p = 0; p < norb; ++p)
-    for (int q = p + 1; q < norb; ++q)
-      h1(p, q) = h1(q, p) = coupling(generator);
-  Eigen::VectorXd g = Eigen::VectorXd::Zero(norb * norb * norb * norb);
-  for (int p = 0; p < norb; ++p)
-    for (int q = p; q < norb; ++q)
-      for (int r = 0; r < norb; ++r)
-        for (int s = r; s < norb; ++s)
-          set_sym_eri(g, p, q, r, s, norb, coupling(generator));
+  const RandomSystem system = random_system(norb);
+  const Eigen::MatrixXd& h1 = system.h1;
+  const Eigen::VectorXd& g = system.g;
+  const Eigen::VectorXd& eps = system.eps;
 
   // Same determinant, expressed as an idempotent spin-traced density.
   Eigen::MatrixXd reference_density = Eigen::MatrixXd::Zero(norb, norb);
@@ -861,24 +864,10 @@ TEST(Swpt2KernelTest, TwoBodyTruncationIsExactUpToTwoActiveElectrons) {
   const std::vector<int> virtuals{4};
   const int norb = 5;
 
-  Eigen::MatrixXd h1 = Eigen::MatrixXd::Zero(norb, norb);
-  Eigen::VectorXd eps(2 * norb);
-  std::mt19937 generator(0xC0FFEEu + norb);
-  std::uniform_real_distribution<double> coupling(-0.09, 0.09);
-  for (int o = 0; o < norb; ++o) {
-    const double energy = -1.0 + 0.55 * o;
-    h1(o, o) = energy;
-    eps(2 * o) = eps(2 * o + 1) = energy;
-  }
-  for (int p = 0; p < norb; ++p)
-    for (int q = p + 1; q < norb; ++q)
-      h1(p, q) = h1(q, p) = coupling(generator);
-  Eigen::VectorXd g = Eigen::VectorXd::Zero(norb * norb * norb * norb);
-  for (int p = 0; p < norb; ++p)
-    for (int q = p; q < norb; ++q)
-      for (int r = 0; r < norb; ++r)
-        for (int s = r; s < norb; ++s)
-          set_sym_eri(g, p, q, r, s, norb, coupling(generator));
+  const RandomSystem system = random_system(norb);
+  const Eigen::MatrixXd& h1 = system.h1;
+  const Eigen::VectorXd& g = system.g;
+  const Eigen::VectorXd& eps = system.eps;
 
   const double core_energy = 0.17;
   const auto part = sw::make_partition(norb, active, {}, virtuals);
@@ -907,9 +896,9 @@ TEST(Swpt2KernelTest, TwoBodyTruncationIsExactUpToTwoActiveElectrons) {
   const auto sector_error = [&](int electrons) {
     double max_error = 0.0;
     for (std::uint64_t bra = 0; bra < 256; ++bra) {
-      if (__builtin_popcountll(bra) != electrons) continue;
+      if (std::popcount(bra) != electrons) continue;
       for (std::uint64_t ket = 0; ket < 256; ++ket) {
-        if (__builtin_popcountll(ket) != electrons) continue;
+        if (std::popcount(ket) != electrons) continue;
         max_error = std::max(
             max_error,
             std::abs(
@@ -943,24 +932,10 @@ TEST(Swpt2KernelTest, FoldingAboveTwoBodyBeatsDiscarding) {
   // electrons.
   const std::vector<int> occupied_so{0, 1, 2, 3};
 
-  Eigen::MatrixXd h1 = Eigen::MatrixXd::Zero(norb, norb);
-  Eigen::VectorXd eps(2 * norb);
-  std::mt19937 generator(0xC0FFEEu + norb);
-  std::uniform_real_distribution<double> coupling(-0.09, 0.09);
-  for (int o = 0; o < norb; ++o) {
-    const double energy = -1.0 + 0.55 * o;
-    h1(o, o) = energy;
-    eps(2 * o) = eps(2 * o + 1) = energy;
-  }
-  for (int p = 0; p < norb; ++p)
-    for (int q = p + 1; q < norb; ++q)
-      h1(p, q) = h1(q, p) = coupling(generator);
-  Eigen::VectorXd g = Eigen::VectorXd::Zero(norb * norb * norb * norb);
-  for (int p = 0; p < norb; ++p)
-    for (int q = p; q < norb; ++q)
-      for (int r = 0; r < norb; ++r)
-        for (int s = r; s < norb; ++s)
-          set_sym_eri(g, p, q, r, s, norb, coupling(generator));
+  const RandomSystem system = random_system(norb);
+  const Eigen::MatrixXd& h1 = system.h1;
+  const Eigen::VectorXd& g = system.g;
+  const Eigen::VectorXd& eps = system.eps;
 
   const double core_energy = 0.17;
   const auto part = sw::make_partition(norb, active, {}, virtuals);
@@ -1015,8 +990,7 @@ TEST(Swpt2KernelTest, FoldingAboveTwoBodyBeatsDiscarding) {
   const auto sector_states = [&](int electrons) {
     std::vector<std::uint64_t> states;
     for (std::uint64_t occupation = 0; occupation < 256; ++occupation)
-      if (__builtin_popcountll(occupation) == electrons)
-        states.push_back(occupation);
+      if (std::popcount(occupation) == electrons) states.push_back(occupation);
     return states;
   };
   // Lowest eigenvalue in a sector: what a downstream CI solver actually sees.
@@ -1088,24 +1062,10 @@ TEST(Swpt2KernelTest, OpenShellFoldStaysSpinFree) {
   const std::vector<int> virtuals{4};
   const int norb = 5;
 
-  Eigen::MatrixXd h1 = Eigen::MatrixXd::Zero(norb, norb);
-  Eigen::VectorXd eps(2 * norb);
-  std::mt19937 generator(0xC0FFEEu + norb);
-  std::uniform_real_distribution<double> coupling(-0.09, 0.09);
-  for (int o = 0; o < norb; ++o) {
-    const double energy = -1.0 + 0.55 * o;
-    h1(o, o) = energy;
-    eps(2 * o) = eps(2 * o + 1) = energy;
-  }
-  for (int p = 0; p < norb; ++p)
-    for (int q = p + 1; q < norb; ++q)
-      h1(p, q) = h1(q, p) = coupling(generator);
-  Eigen::VectorXd g = Eigen::VectorXd::Zero(norb * norb * norb * norb);
-  for (int p = 0; p < norb; ++p)
-    for (int q = p; q < norb; ++q)
-      for (int r = 0; r < norb; ++r)
-        for (int s = r; s < norb; ++s)
-          set_sym_eri(g, p, q, r, s, norb, coupling(generator));
+  const RandomSystem system = random_system(norb);
+  const Eigen::MatrixXd& h1 = system.h1;
+  const Eigen::VectorXd& g = system.g;
+  const Eigen::VectorXd& eps = system.eps;
 
   // Restricted open-shell: one doubly occupied, two singly occupied.
   Eigen::MatrixXd open_shell = Eigen::MatrixXd::Zero(norb, norb);

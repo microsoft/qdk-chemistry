@@ -221,70 +221,22 @@ the two-body density cumulant.
 
 What folding buys is a *bounded* error rather than a uniformly smaller one. Discarding is
 erratic -- sometimes accidentally near-exact, sometimes catastrophic, with nothing in the
-inputs to say which -- while folding lands in a narrow band. Measured over 64 cases spanning
-ten molecules, two basis sets, closed- and open-shell references, active spaces from 4 to 8
-electrons, and one to three folded virtuals, against full CI in the same window:
+inputs to say which -- while folding lands in a narrow band. Over a sweep of small molecules in
+minimal and double-zeta bases, closed- and open-shell, with four to eight active electrons and
+one to three folded virtuals, folding held the error against full CI in the same window to a
+few milli-:math:`E_h`, while discarding spanned two orders of magnitude and degraded sharply as
+more orbitals were folded -- the direction of practical interest. The benefit likewise grows
+with the electron count in :math:`P`, since three-body operators simply matter more as
+:math:`P` fills. Open-shell references behave at least as well as closed-shell ones: the
+spin-traced density gives each singly occupied orbital half an electron per spin, which keeps
+the emitted operator spin-free.
 
-.. list-table::
-   :header-rows: 1
-   :widths: 28 24 24 24
-
-   * - Error vs full CI
-     - median
-     - mean
-     - worst
-   * - Discarding
-     - 0.244
-     - 0.499
-     - 2.687
-   * - Folding
-     - 0.005
-     - 0.006
-     - 0.016
-
-The gap widens as more orbitals are folded, which is the direction of practical interest.
-Folding more orbitals generates more of the discarded terms, so discarding degrades sharply
-while folding stays flat:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 22 16 16 23 23
-
-   * - Folded virtuals
-     - Cases
-     - Folding loses
-     - Median, discarding
-     - Median, folding
-   * - 1
-     - 34
-     - 5
-     - 0.087
-     - 0.005
-   * - 2
-     - 19
-     - 2
-     - 0.359
-     - 0.005
-   * - 3
-     - 11
-     - 0
-     - 1.264
-     - 0.005
-
-Open-shell references behave at least as well as closed-shell ones: of 11 ROHF cases folding
-won 10 and lost none, by factors of 14 to 125. The spin-traced density gives each singly
-occupied orbital half an electron per spin, which keeps the emitted operator spin-free.
-
-Folding is nevertheless **not** a strict improvement. It lost in 7 of the 64 cases, all with a
-single folded virtual, all in multiply bonded systems (N2, CO) where the discarded terms are
-small or cancel so their reference contractions move a nearly exact answer away from full CI.
-The largest such loss was 0.011 :math:`E_h`. Correlation strength does not predict the
-direction, so there is no useful criterion to gate on, and no substitute for checking against
-a larger calculation when the answer matters.
-
-The benefit also grows with the electron count in :math:`P`. In a separate sweep over 86
-cases, folding won 17 of 18 at eight active electrons and 8 of 9 at ten, while at four
-electrons it was an even split -- three-body operators simply matter more as :math:`P` fills.
+Folding is nevertheless **not** a strict improvement. It loses occasionally, always by a small
+margin, always with a single folded virtual, and always in multiply bonded systems such as
+N2 and CO where the discarded terms are small or cancel, so their reference contractions move
+a nearly exact answer away from full CI. Correlation strength does not predict the direction,
+so there is no useful criterion to gate on, and no substitute for checking against a larger
+calculation when the answer matters.
 
 Folding also removes a spurious sensitivity to the regularizer. Discarded three-body terms
 used to leave flow and bare denominators disagreeing by 0.4 :math:`E_h` on the equilibrium
@@ -307,10 +259,6 @@ twenty-three times. Folding does not change the asymptotic scaling, which stays 
 It is therefore controlled by ``fold_above_two_body``, on by default because discarding is the
 larger error. A kept space holding at most two electrons skips the cost automatically, since
 the discarded terms have no matrix elements to contribute there.
-
-Dense four-center integrals require :math:`O(N^4)` storage, and semicanonicalizing a
-noncanonical window costs :math:`O(N^5)`. The retained commutator also grows steeply with the
-size of :math:`P`. Use it for modest dense windows rather than windows of hundreds of orbitals.
 
 Dense four-center integrals require :math:`O(N^4)` storage, and semicanonicalizing a
 noncanonical window costs :math:`O(N^5)`. The retained commutator also grows steeply with the

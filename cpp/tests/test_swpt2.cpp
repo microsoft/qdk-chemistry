@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <map>
@@ -53,7 +54,7 @@ Ladder apply_ladder(std::uint64_t mask, int orb, bool creation) {
   const std::uint64_t bit = std::uint64_t{1} << orb;
   const bool occupied = (mask & bit) != 0;
   if (creation == occupied) return {0, 0, false};  // Pauli
-  const int below = __builtin_popcountll(mask & (bit - 1));
+  const int below = std::popcount(mask & (bit - 1));
   return {mask ^ bit, (below & 1) ? -1 : 1, true};
 }
 Ladder apply_one(std::uint64_t mask, int P, int Q) {
@@ -360,17 +361,22 @@ TEST(SchriefferWolffPT2Test, CustomActiveSpaceOverridesReference) {
   // the empty external orbital 5, so the folded rest {6} stays closed-shell.
   // The result must emit over exactly P and be consumable by MACIS.
   const std::vector<std::size_t> P_custom = {3, 4, 5};
+  const auto p_indices_custom = testing::restricted_index_set(
+      orbitals->get_num_molecular_orbitals(), P_custom);
   auto swpt2 = EffectiveHamiltonianConstructorFactory::create("swpt2");
-  auto H_eff =
-      swpt2->run(reference, H_window,
-                 testing::restricted_index_set(
-                     orbitals->get_num_molecular_orbitals(), P_custom));
+  auto H_eff = swpt2->run(reference, H_window, p_indices_custom);
   ASSERT_NE(H_eff, nullptr);
 
   const auto [T_a, T_b] = H_eff->get_one_body_integrals();
   EXPECT_EQ(T_a.rows(), static_cast<Eigen::Index>(P_custom.size()));
-  const auto emitted_active = qcd::spin_channel_indices(
-      H_eff->get_orbitals()->active_indices(), qcd::axes::alpha());
+  // The output contract requires the emitted active set to be the caller's
+  // p_indices, in every spin channel and not just the alpha one.
+  const auto emitted = H_eff->get_orbitals()->active_indices();
+  for (const auto& spin : {qcd::axes::alpha(), qcd::axes::beta()})
+    EXPECT_EQ(qcd::spin_channel_indices(emitted, spin),
+              qcd::spin_channel_indices(p_indices_custom, spin));
+  const auto emitted_active =
+      qcd::spin_channel_indices(emitted, qcd::axes::alpha());
   EXPECT_EQ(
       std::vector<std::size_t>(emitted_active.begin(), emitted_active.end()),
       P_custom);
@@ -819,8 +825,7 @@ TEST(SchriefferWolffPT2Test, RejectsReferenceWithoutDensity) {
   ASSERT_FALSE(mp2_reference->has_active_one_rdm());
 
   const int norb = static_cast<int>(orbitals->get_num_molecular_orbitals());
-  auto H_window = ham->run(testing::with_active_space(
-      mp2_reference->get_orbitals(), {3, 4, 5, 6}, {0, 1, 2}));
+  auto H_window = ham->run(mp2_reference->get_orbitals());
   auto swpt2 = EffectiveHamiltonianConstructorFactory::create("swpt2");
   EXPECT_THROW(swpt2->run(mp2_reference, H_window,
                           testing::restricted_index_set(

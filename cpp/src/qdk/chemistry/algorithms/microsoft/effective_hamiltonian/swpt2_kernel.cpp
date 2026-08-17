@@ -136,22 +136,27 @@ Eigen::VectorXd rotate_two_body(const Eigen::VectorXd& two_body,
 }
 
 namespace {
-// net occupation change of a role set for a one-body a^dag_P a_Q.
-inline int net1(const std::vector<char>& role, int P, int Q) {
+// Net occupation change of a role set under a^dag_P a_Q / a^dag_P a^dag_Q a_R
+// a_S.
+inline int net_change(const std::vector<char>& role, int P, int Q) {
   return role[P] - role[Q];
 }
-// net occupation change for a two-body a^dag_P a^dag_Q a_R a_S.
-inline int net2(const std::vector<char>& role, int P, int Q, int R, int S) {
+inline int net_change(const std::vector<char>& role, int P, int Q, int R,
+                      int S) {
   return role[P] + role[Q] - role[R] - role[S];
 }
-// a term is external-off-diagonal if it changes the inactive OR virtual count.
-inline bool is_od1(const SpinOrbitalPartition& part, int P, int Q) {
-  return net1(part.is_inactive, P, Q) != 0 || net1(part.is_virtual, P, Q) != 0;
+// A term belongs to H_OD when it changes the inactive OR the virtual count;
+// tracking them separately catches inactive<->virtual excitations, which are
+// net-zero on the combined external set.
+inline bool changes_external_occupation(const SpinOrbitalPartition& part, int P,
+                                        int Q) {
+  return net_change(part.is_inactive, P, Q) != 0 ||
+         net_change(part.is_virtual, P, Q) != 0;
 }
-inline bool is_od2(const SpinOrbitalPartition& part, int P, int Q, int R,
-                   int S) {
-  return net2(part.is_inactive, P, Q, R, S) != 0 ||
-         net2(part.is_virtual, P, Q, R, S) != 0;
+inline bool changes_external_occupation(const SpinOrbitalPartition& part, int P,
+                                        int Q, int R, int S) {
+  return net_change(part.is_inactive, P, Q, R, S) != 0 ||
+         net_change(part.is_virtual, P, Q, R, S) != 0;
 }
 }  // namespace
 
@@ -160,9 +165,12 @@ inline bool is_od2(const SpinOrbitalPartition& part, int P, int Q, int R,
 // ---------------------------------------------------------------------------
 namespace {
 
-struct RetainedOperator {
-  using Operator = std::pair<int, int>;  // (spin-orbital, 1=cre / 0=ann)
+/// One ladder operator: (spin-orbital, 1 = creation / 0 = annihilation).
+using Operator = std::pair<int, int>;
+/// A product of at most two two-body operators, so at most eight ladders.
+using OperatorString = std::array<Operator, 8>;
 
+struct RetainedOperator {
   RetainedOperator(const std::vector<int>& active_so,
                    const std::vector<int>& occupied_so = {},
                    const Eigen::MatrixXd& reference_density = {})
@@ -232,13 +240,13 @@ struct RetainedOperator {
 // annihilation sits to the right of every creation and removing a pair
 // preserves the order.
 template <class Visit>
-void walk_contractions(const std::array<RetainedOperator::Operator, 8>& ops,
-                       int n, const RetainedOperator& out, int position,
+void walk_contractions(const OperatorString& ops, int n,
+                       const RetainedOperator& out, int position,
                        std::array<char, 8>& removed, int depth, double weight,
                        const Visit& visit) {
   if (position >= n) {
     if (depth == 0) return;
-    std::array<RetainedOperator::Operator, 8> remainder{};
+    OperatorString remainder{};
     int size = 0;
     for (int i = 0; i < n; ++i)
       if (!removed[i]) remainder[size++] = ops[i];
@@ -269,15 +277,14 @@ void walk_contractions(const std::array<RetainedOperator::Operator, 8>& ops,
 // is the Wick identity A = sum_S eps(S) prod(gamma) {A_S} solved for {A}, so
 // the recursion is well founded: every term drops two operators.
 template <class Sink>
-void omega_normal(const std::array<RetainedOperator::Operator, 8>& ops, int n,
-                  double coeff, const RetainedOperator& out, const Sink& sink) {
+void reference_normal_ordered(const OperatorString& ops, int n, double coeff,
+                              const RetainedOperator& out, const Sink& sink) {
   sink(ops, n, coeff);
   std::array<char, 8> removed{};
   walk_contractions(
       ops, n, out, 0, removed, 0, 1.0,
-      [&](const std::array<RetainedOperator::Operator, 8>& remainder, int size,
-          double weight) {
-        omega_normal(remainder, size, -coeff * weight, out, sink);
+      [&](const OperatorString& remainder, int size, double weight) {
+        reference_normal_ordered(remainder, size, -coeff * weight, out, sink);
       });
 }
 
@@ -286,17 +293,15 @@ void omega_normal(const std::array<RetainedOperator::Operator, 8>& ops, int n,
 // reference-normal-ordered residual: A - {A} = sum over nonempty contraction
 // sets. Unlike the particle-hole construction this needs no idempotency, so it
 // covers correlated and fractionally occupied references.
-void fold_general(const std::array<RetainedOperator::Operator, 8>& ops, int n,
-                  double coeff, RetainedOperator& out) {
+void fold_onto_density(const OperatorString& ops, int n, double coeff,
+                       RetainedOperator& out) {
   std::array<char, 8> removed{};
   walk_contractions(
       ops, n, out, 0, removed, 0, 1.0,
-      [&](const std::array<RetainedOperator::Operator, 8>& remainder, int size,
-          double weight) {
-        omega_normal(
+      [&](const OperatorString& remainder, int size, double weight) {
+        reference_normal_ordered(
             remainder, size, coeff * weight, out,
-            [&out](const std::array<RetainedOperator::Operator, 8>& term,
-                   int emitted_size, double value) {
+            [&out](const OperatorString& term, int emitted_size, double value) {
               // Anything still above two-body is the residual.
               if (emitted_size <= 4) out.add(term.data(), emitted_size, value);
             });
@@ -306,8 +311,7 @@ void fold_general(const std::array<RetainedOperator::Operator, 8>& ops, int n,
 // Vacuum normal ordering. `sink` receives every fully ordered term, including
 // those above two-body, and decides what to do with them.
 template <class Sink>
-void normalize_terms(std::array<RetainedOperator::Operator, 8> ops, int n,
-                     double coeff, const Sink& sink) {
+void normal_order(OperatorString ops, int n, double coeff, const Sink& sink) {
   for (int i = 0; i + 1 < n; ++i) {
     const int ai = ops[i].first, aa = ops[i].second;
     const int bi = ops[i + 1].first, ba = ops[i + 1].second;
@@ -315,12 +319,12 @@ void normalize_terms(std::array<RetainedOperator::Operator, 8> ops, int n,
     if (wrong) {
       auto swapped = ops;
       std::swap(swapped[i], swapped[i + 1]);
-      normalize_terms(swapped, n, -coeff, sink);
+      normal_order(swapped, n, -coeff, sink);
       if (aa != ba && ai == bi) {
         auto contracted = ops;
         std::move(contracted.begin() + i + 2, contracted.begin() + n,
                   contracted.begin() + i);
-        normalize_terms(contracted, n - 2, coeff, sink);
+        normal_order(contracted, n - 2, coeff, sink);
       }
       return;
     }
@@ -329,57 +333,51 @@ void normalize_terms(std::array<RetainedOperator::Operator, 8> ops, int n,
   sink(ops, n, coeff);
 }
 
-// A term above two-body cannot be emitted, but dropping it outright discards
-// its reference contractions, which dominate. Exchange creation/annihilation
-// roles on the reference-occupied spin-orbitals, normal-order against that
-// vacuum, and keep whatever falls to two-body; only the
-// reference-normal-ordered residual is lost. Exact for a determinant reference,
-// so the contractions must come from integer occupations.
-void fold_above_two_body(const std::array<RetainedOperator::Operator, 8>& ops,
-                         int n, double coeff, RetainedOperator& out) {
-  const auto exchange = [&out](std::array<RetainedOperator::Operator, 8> term,
-                               int size) {
+// The same fold against a reference determinant: exchange creation and
+// annihilation roles on the occupied spin-orbitals, normal-order against that
+// vacuum, and keep whatever falls to two-body. Equivalent to
+// `fold_onto_density` for an idempotent density, which is what the tests
+// cross-check; production always takes the density path.
+void fold_onto_determinant(const OperatorString& ops, int n, double coeff,
+                           RetainedOperator& out) {
+  const auto exchange = [&out](OperatorString term, int size) {
     for (int i = 0; i < size; ++i)
       if (out.is_occupied(term[i].first)) term[i].second = 1 - term[i].second;
     return term;
   };
-  const auto emit = [&out](
-                        const std::array<RetainedOperator::Operator, 8>& term,
-                        int size, double weight) {
+  const auto emit = [&out](const OperatorString& term, int size,
+                           double weight) {
     if (size <= 4) out.add(term.data(), size, weight);
   };
-  normalize_terms(exchange(ops, n), n, coeff,
-                  [&](const std::array<RetainedOperator::Operator, 8>& term,
-                      int size, double weight) {
-                    if (size > 4)
-                      return;  // the residual this approximation drops
-                    normalize_terms(exchange(term, size), size, weight, emit);
-                  });
+  normal_order(exchange(ops, n), n, coeff,
+               [&](const OperatorString& term, int size, double weight) {
+                 if (size > 4) return;  // the residual this approximation drops
+                 normal_order(exchange(term, size), size, weight, emit);
+               });
 }
 
-void normalize_retained(std::array<RetainedOperator::Operator, 8> ops, int n,
-                        double coeff, RetainedOperator& out) {
-  normalize_terms(ops, n, coeff,
-                  [&out](const std::array<RetainedOperator::Operator, 8>& term,
-                         int size, double weight) {
-                    if (size <= 4)
-                      out.add(term.data(), size, weight);
-                    else if (out.has_density)
-                      fold_general(term, size, weight, out);
-                    else if (out.folds_above_two_body)
-                      fold_above_two_body(term, size, weight, out);
-                  });
+void accumulate_normal_ordered(OperatorString ops, int n, double coeff,
+                               RetainedOperator& out) {
+  normal_order(ops, n, coeff,
+               [&out](const OperatorString& term, int size, double weight) {
+                 if (size <= 4)
+                   out.add(term.data(), size, weight);
+                 else if (out.has_density)
+                   fold_onto_density(term, size, weight, out);
+                 else if (out.folds_above_two_body)
+                   fold_onto_determinant(term, size, weight, out);
+               });
 }
 
 template <std::size_t N>
-void normalize_slots(const std::array<int, N>& values,
-                     const std::array<int, N>& is_cre,
-                     const std::vector<int>& slots, double coeff,
-                     RetainedOperator& out) {
-  std::array<RetainedOperator::Operator, 8> ops{};
+void accumulate_slots(const std::array<int, N>& values,
+                      const std::array<int, N>& is_cre,
+                      const std::vector<int>& slots, double coeff,
+                      RetainedOperator& out) {
+  OperatorString ops{};
   int size = 0;
   for (int slot : slots) ops[size++] = {values[slot], is_cre[slot]};
-  normalize_retained(ops, size, coeff, out);
+  accumulate_normal_ordered(ops, size, coeff, out);
 }
 
 // All disjoint-pair matchings (i < j) of `slots`, including the empty matching.
@@ -408,14 +406,6 @@ int perm_sign(const std::vector<int>& seq) {
     for (std::size_t j = i + 1; j < seq.size(); ++j)
       if (seq[i] > seq[j]) s = -s;
   return s;
-}
-
-bool is_two_cross_line_matching(int rA, int rB,
-                                const std::vector<std::pair<int, int>>& match) {
-  if (rA != 2 || rB != 2 || match.size() != 2) return false;
-  return std::all_of(match.begin(), match.end(), [](const auto& pair) {
-    return (pair.first < 4) != (pair.second < 4);
-  });
 }
 
 Eigen::Index integer_power(Eigen::Index base, int exponent) {
@@ -456,126 +446,17 @@ RoleLists role_lists(const SpinOrbitalPartition& part) {
   return lists;
 }
 
-// Two cross-operator contractions in A2 * B2 leave two active legs on each
-// tensor. Flattening each active pair into a row and the two external indices
-// into a column turns every Wick matching into one matrix multiplication.
-template <class A2Get, class B2Get, class Output>
-void project_two_cross_line(A2Get A2get, B2Get B2get,
-                            const SpinOrbitalPartition& part, double scale,
-                            Output& out) {
-  const RoleLists lists = role_lists(part);
-  const std::vector<int>& active_list = lists.active;
-  if (active_list.empty()) return;
-
-  constexpr int nslots = 8;
-  const std::array<int, nslots> is_cre{1, 1, 0, 0, 1, 1, 0, 0};
-  std::vector<int> slots(nslots);
-  std::iota(slots.begin(), slots.end(), 0);
-  std::vector<std::vector<std::pair<int, int>>> matches;
-  enum_matchings(slots, {}, matches);
-
-  for (const auto& match : matches) {
-    if (!is_two_cross_line_matching(2, 2, match)) continue;
-    if (std::any_of(match.begin(), match.end(), [&](const auto& pair) {
-          return is_cre[pair.first] == is_cre[pair.second];
-        }))
-      continue;
-
-    std::array<char, nslots> contracted{};
-    for (const auto& pair : match) {
-      contracted[pair.first] = 1;
-      contracted[pair.second] = 1;
-    }
-    std::vector<int> ext, ext_a, ext_b;
-    for (int slot = 0; slot < nslots; ++slot) {
-      if (contracted[slot]) continue;
-      ext.push_back(slot);
-      (slot < 4 ? ext_a : ext_b).push_back(slot);
-    }
-
-    std::vector<int> order;
-    for (const auto& pair : match) {
-      order.push_back(pair.first);
-      order.push_back(pair.second);
-    }
-    order.insert(order.end(), ext.begin(), ext.end());
-    const double prefactor = scale * perm_sign(order) / 16.0;
-
-    std::array<const std::vector<int>*, 2> external_lists{};
-    bool empty_external = false;
-    for (int pair = 0; pair < 2; ++pair) {
-      // Reference propagators: <a^dag a> is nonzero only on inactive orbitals
-      // and <a a^dag> only on virtual ones, so each contracted pair sums over
-      // that list alone.
-      external_lists[pair] =
-          is_cre[match[pair].first] ? &lists.inactive : &lists.virtuals;
-      empty_external = empty_external || external_lists[pair]->empty();
-    }
-    if (empty_external) continue;
-
-    const Eigen::Index nactive = active_list.size();
-    const Eigen::Index nrow = nactive * nactive;
-    const Eigen::Index n_external0 = external_lists[0]->size();
-    const Eigen::Index n_external1 = external_lists[1]->size();
-    const Eigen::Index ncol = n_external0 * n_external1;
-    Eigen::MatrixXd a = Eigen::MatrixXd::Zero(nrow, ncol);
-    Eigen::MatrixXd b = Eigen::MatrixXd::Zero(nrow, ncol);
-
-    for (Eigen::Index i = 0; i < nactive; ++i) {
-      for (Eigen::Index j = 0; j < nactive; ++j) {
-        const Eigen::Index row = i * nactive + j;
-        for (Eigen::Index q0 = 0; q0 < n_external0; ++q0) {
-          for (Eigen::Index q1 = 0; q1 < n_external1; ++q1) {
-            const Eigen::Index col = q0 * n_external1 + q1;
-            std::array<int, nslots> values{};
-            values[ext_a[0]] = active_list[i];
-            values[ext_a[1]] = active_list[j];
-            values[match[0].first] = values[match[0].second] =
-                (*external_lists[0])[q0];
-            values[match[1].first] = values[match[1].second] =
-                (*external_lists[1])[q1];
-            a(row, col) = A2get(values[0], values[1], values[2], values[3]);
-
-            values[ext_b[0]] = active_list[i];
-            values[ext_b[1]] = active_list[j];
-            b(row, col) = B2get(values[4], values[5], values[6], values[7]);
-          }
-        }
-      }
-    }
-
-    Eigen::MatrixXd product = Eigen::MatrixXd::Zero(nrow, nrow);
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans, nrow,
-               nrow, ncol, 1.0, a.data(), nrow, b.data(), nrow, 0.0,
-               product.data(), nrow);
-
-    for (Eigen::Index row_a = 0; row_a < nrow; ++row_a) {
-      for (Eigen::Index row_b = 0; row_b < nrow; ++row_b) {
-        const double coeff = prefactor * product(row_a, row_b);
-        if (coeff == 0.0) continue;
-        std::array<int, nslots> values{};
-        values[ext_a[0]] = active_list[row_a / nactive];
-        values[ext_a[1]] = active_list[row_a % nactive];
-        values[ext_b[0]] = active_list[row_b / nactive];
-        values[ext_b[1]] = active_list[row_b % nactive];
-        normalize_slots(values, is_cre, ext, coeff, out);
-      }
-    }
-  }
-}
-
-// All remaining nonempty matchings factor into two operand-local panels.
+// All matchings factor into two operand-local panels.
 // External active legs form the rows, cross-operator external lines form the
 // shared column, and contractions internal to one operand are reduced while
-// packing that operand's panel. The two-cross-line matching owned by the
-// specialized kernel above is excluded.
+// packing that operand's panel.
 //
 // A matching leaving more than four active legs produces a rank-three or
 // higher operator, which survives the two-body truncation only if an
 // annihilator of A coincides with a creator of B. Those channels therefore
 // enumerate the coinciding row pairs instead of forming the full product.
 template <class A2Get, class B2Get, class Output>
-void project_remaining(const Eigen::MatrixXd& A1, A2Get A2get,
+void project_matchings(const Eigen::MatrixXd& A1, A2Get A2get,
                        const Eigen::MatrixXd& B1, B2Get B2get,
                        const SpinOrbitalPartition& part, double scale,
                        Output& out) {
@@ -597,9 +478,10 @@ void project_remaining(const Eigen::MatrixXd& A1, A2Get A2get,
     std::vector<std::vector<std::pair<int, int>>> matches;
     enum_matchings(slots, {}, matches);
     for (const auto& match : matches) {
-      // The specialized kernel above owns the two-cross-line channel; every
-      // other nonempty matching is handled here.
-      if (match.empty() || is_two_cross_line_matching(rA, rB, match)) continue;
+      // With nothing contracted both commutator orderings normal-order to the
+      // same string -- every operand has an even number of legs -- so they
+      // cancel.
+      if (match.empty()) continue;
       if (std::any_of(match.begin(), match.end(), [&](const auto& pair) {
             return is_cre[pair.first] == is_cre[pair.second];
           }))
@@ -736,7 +618,7 @@ void project_remaining(const Eigen::MatrixXd& A1, A2Get A2get,
         std::array<int, 8> values{};
         assign_active_slots(values, ext_a, row_a, active_list);
         assign_active_slots(values, ext_b, row_b, active_list);
-        normalize_slots(values, is_cre, ext, coeff, out);
+        accumulate_slots(values, is_cre, ext, coeff, out);
       };
 
       if (!needs_coincidence) {
@@ -802,24 +684,25 @@ SpinBlockedTwoBody build_two_body_blocked(const Eigen::VectorXd& g, int norb) {
   b.v_aaaa = Eigen::VectorXd::Zero(size);
   b.v_abab = Eigen::VectorXd::Zero(size);
 
-  // Same-spin block: W[A,B,C,D] += 0.5 g[idx4(A,D,B,C)], then antisymmetrize
-  // over (P<->Q) and (R<->S).
-  std::vector<double> W(static_cast<std::size_t>(size), 0.0);
+  // Same-spin block: ordered[A,B,C,D] += 0.5 g[idx4(A,D,B,C)], then
+  // antisymmetrize over (P<->Q) and (R<->S).
+  std::vector<double> ordered(static_cast<std::size_t>(size), 0.0);
   for (int p = 0; p < norb; ++p)
     for (int q = 0; q < norb; ++q)
       for (int r = 0; r < norb; ++r)
         for (int s = 0; s < norb; ++s)
-          W[idx4(p, r, s, q, norb)] += 0.5 * g(idx4(p, q, r, s, norb));
+          ordered[idx4(p, r, s, q, norb)] += 0.5 * g(idx4(p, q, r, s, norb));
   for (int P = 0; P < norb; ++P)
     for (int Q = 0; Q < norb; ++Q)
       for (int R = 0; R < norb; ++R)
         for (int S = 0; S < norb; ++S)
-          b.v_aaaa(idx4(P, Q, R, S, norb)) =
-              W[idx4(P, Q, R, S, norb)] - W[idx4(Q, P, R, S, norb)] -
-              W[idx4(P, Q, S, R, norb)] + W[idx4(Q, P, S, R, norb)];
+          b.v_aaaa(idx4(P, Q, R, S, norb)) = ordered[idx4(P, Q, R, S, norb)] -
+                                             ordered[idx4(Q, P, R, S, norb)] -
+                                             ordered[idx4(P, Q, S, R, norb)] +
+                                             ordered[idx4(Q, P, S, R, norb)];
 
   // Opposite-spin block v[alpha(p), beta(q), alpha(r), beta(s)]: the cross-spin
-  // W terms vanish under (P<->Q)/(R<->S) except one.
+  // terms vanish under (P<->Q)/(R<->S) except one.
   for (int p = 0; p < norb; ++p)
     for (int q = 0; q < norb; ++q)
       for (int r = 0; r < norb; ++r)
@@ -828,19 +711,20 @@ SpinBlockedTwoBody build_two_body_blocked(const Eigen::VectorXd& g, int norb) {
   return b;
 }
 
-double so_v_from_blocked(const SpinBlockedTwoBody& b, int P, int Q, int R,
+double so_v_from_blocked(const SpinBlockedTwoBody& blocks, int P, int Q, int R,
                          int S) {
-  const int n = b.norb;
+  const int n = blocks.norb;
   const int sP = P & 1, sQ = Q & 1, sR = R & 1, sS = S & 1;
   const int p = P >> 1, q = Q >> 1, r = R >> 1, s = S >> 1;
-  if (sP == sQ && sQ == sR && sR == sS) return b.v_aaaa(idx4(p, q, r, s, n));
+  if (sP == sQ && sQ == sR && sR == sS)
+    return blocks.v_aaaa(idx4(p, q, r, s, n));
   // Sz conservation: mixed blocks are nonzero only with one alpha and one beta
   // in each creation/annihilation pair.
   if (sP + sQ != 1 || sR + sS != 1) return 0.0;
-  if (sP == 0 && sR == 0) return b.v_abab(idx4(p, q, r, s, n));   // abab
-  if (sP == 0 && sR == 1) return -b.v_abab(idx4(p, q, s, r, n));  // abba
-  if (sP == 1 && sR == 0) return -b.v_abab(idx4(q, p, r, s, n));  // baab
-  return b.v_abab(idx4(q, p, s, r, n));                           // baba
+  if (sP == 0 && sR == 0) return blocks.v_abab(idx4(p, q, r, s, n));   // abab
+  if (sP == 0 && sR == 1) return -blocks.v_abab(idx4(p, q, s, r, n));  // abba
+  if (sP == 1 && sR == 0) return -blocks.v_abab(idx4(q, p, r, s, n));  // baab
+  return blocks.v_abab(idx4(q, p, s, r, n));                           // baba
 }
 
 Eigen::MatrixXd spin_orbital_one_body(const Eigen::MatrixXd& h1a,
@@ -872,13 +756,15 @@ ActiveDownfoldResult downfold_blocked(
     return so_v_from_blocked(blk, P, Q, R, S);
   };
   const auto od_v_at = [&](int P, int Q, int R, int S) {
-    return is_od2(part, P, Q, R, S) ? v_at(P, Q, R, S) : 0.0;
+    return changes_external_occupation(part, P, Q, R, S) ? v_at(P, Q, R, S)
+                                                         : 0.0;
   };
   const auto bd_v_at = [&](int P, int Q, int R, int S) {
-    return is_od2(part, P, Q, R, S) ? 0.0 : v_at(P, Q, R, S);
+    return changes_external_occupation(part, P, Q, R, S) ? 0.0
+                                                         : v_at(P, Q, R, S);
   };
   const auto s2_at = [&](int P, int Q, int R, int S) -> double {
-    if (!is_od2(part, P, Q, R, S)) return 0.0;
+    if (!changes_external_occupation(part, P, Q, R, S)) return 0.0;
     const double vv = v_at(P, Q, R, S);
     if (vv == 0.0) return 0.0;
     const double d = eps(P) + eps(Q) - eps(R) - eps(S);
@@ -897,7 +783,7 @@ ActiveDownfoldResult downfold_blocked(
   };
   for (int P = 0; P < n_so; ++P)
     for (int Q = 0; Q < n_so; ++Q)
-      if (is_od1(part, P, Q) && f(P, Q) != 0.0) {
+      if (changes_external_occupation(part, P, Q) && f(P, Q) != 0.0) {
         const double d = eps(P) - eps(Q);
         s1(P, Q) = f(P, Q) * regularized_inverse(d, reg);
         track(f(P, Q), d);
@@ -915,7 +801,7 @@ ActiveDownfoldResult downfold_blocked(
           for (const auto& sp : spin_patterns) {
             const int P = 2 * p + sp[0], Q = 2 * q + sp[1];
             const int R = 2 * r + sp[2], S = 2 * s + sp[3];
-            if (!is_od2(part, P, Q, R, S)) continue;
+            if (!changes_external_occupation(part, P, Q, R, S)) continue;
             const double vv = v_at(P, Q, R, S);
             if (vv == 0.0) continue;
             track(vv, eps(P) + eps(Q) - eps(R) - eps(S));
@@ -926,12 +812,13 @@ ActiveDownfoldResult downfold_blocked(
   Eigen::MatrixXd bd_f = Eigen::MatrixXd::Zero(n_so, n_so);
   for (int P = 0; P < n_so; ++P)
     for (int Q = 0; Q < n_so; ++Q)
-      (is_od1(part, P, Q) ? od_f : bd_f)(P, Q) = f(P, Q);
+      (changes_external_occupation(part, P, Q) ? od_f : bd_f)(P, Q) = f(P, Q);
 
-  // Reference-occupation mean-field fold of the block-diagonal part.
-  Eigen::VectorXd nb = Eigen::VectorXd::Zero(n_so);
+  // Reference-occupation mean-field fold of the block-diagonal part. Folded
+  // occupations are integers by construction, one per occupied spin-orbital.
+  Eigen::VectorXd reference_occupation = Eigen::VectorXd::Zero(n_so);
   for (int P = 0; P < n_so; ++P)
-    if (part.is_inactive[P]) nb(P) = 1.0;
+    if (part.is_inactive[P]) reference_occupation(P) = 1.0;
 
   ActiveDownfoldResult res;
   res.active_so = active_so;
@@ -948,10 +835,11 @@ ActiveDownfoldResult downfold_blocked(
     throw std::invalid_argument(
         "downfold_blocked: active space is not spin-restricted");
   res.e = e_core;
-  for (int P = 0; P < n_so; ++P) res.e += bd_f(P, P) * nb(P);
+  for (int P = 0; P < n_so; ++P) res.e += bd_f(P, P) * reference_occupation(P);
   for (int P = 0; P < n_so; ++P)
     for (int Q = 0; Q < n_so; ++Q)
-      res.e -= 0.5 * bd_v_at(P, Q, P, Q) * nb(P) * nb(Q);
+      res.e -= 0.5 * bd_v_at(P, Q, P, Q) * reference_occupation(P) *
+               reference_occupation(Q);
 
   res.f_active = Eigen::MatrixXd::Zero(n_active_so, n_active_so);
   for (int ci = 0; ci < n_active_so; ++ci) {
@@ -959,7 +847,8 @@ ActiveDownfoldResult downfold_blocked(
     for (int cj = 0; cj < n_active_so; ++cj) {
       const int j = active_so[cj];
       double fold = 0.0;
-      for (int b = 0; b < n_so; ++b) fold += bd_v_at(i, b, b, j) * nb(b);
+      for (int b = 0; b < n_so; ++b)
+        fold += bd_v_at(i, b, b, j) * reference_occupation(b);
       res.f_active(ci, cj) = bd_f(i, j) + fold;
     }
   }
@@ -975,10 +864,8 @@ ActiveDownfoldResult downfold_blocked(
 
   // projected 1/2 [S, V] = 1/2 (project(S*V) - project(V*S)), on the fly.
   RetainedOperator comm(active_so, occupied_so, reference_density);
-  project_two_cross_line(s2_at, od_v_at, part, +0.5, comm);
-  project_two_cross_line(od_v_at, s2_at, part, -0.5, comm);
-  project_remaining(s1, s2_at, od_f, od_v_at, part, +0.5, comm);
-  project_remaining(od_f, od_v_at, s1, s2_at, part, -0.5, comm);
+  project_matchings(s1, s2_at, od_f, od_v_at, part, +0.5, comm);
+  project_matchings(od_f, od_v_at, s1, s2_at, part, -0.5, comm);
 
   res.min_denominator = std::isinf(min_denom) ? 0.0 : min_denom;
   res.max_amplitude = max_amp;

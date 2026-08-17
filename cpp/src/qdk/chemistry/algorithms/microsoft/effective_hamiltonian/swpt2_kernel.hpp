@@ -160,22 +160,23 @@ struct ActiveDownfoldResult {
 /// materialized. Intruder diagnostics still scan the couplings in O(norb^4)
 /// time but store nothing.
 ///
-/// The retained Wick contractions are evaluated from packed active/external
-/// panels through matrix products, by BLAS GEMM except in the one-line channel
-/// noted next. The one-line `S2 * V2` channel
-/// enumerates only the active-index coincidences that can survive two-body
-/// truncation, operand-internal reference contractions are reduced while
-/// packing the panels, and disconnected highest-rank products are canceled
-/// before evaluation.
+/// The retained Wick contractions are evaluated as BLAS GEMMs over packed
+/// active/external panels, reducing operand-internal reference contractions
+/// while packing. Zero-contraction products cancel between the two commutator
+/// orderings and are skipped. While terms above two-body are discarded, the
+/// one-line `S2 * V2` channel instead enumerates the active-index coincidences
+/// that survive the truncation, avoiding its rank-three output; folding those
+/// terms makes every matching contribute, so that shortcut then does not apply.
 ///
 /// `f` is the spin-orbital one-body from `spin_orbital_one_body`; `e_core` is
 /// the scalar core energy.
 ///
-/// `occupied_so` lists the active spin-orbitals occupied in the reference
-/// determinant. When given, terms above two-body are folded onto that
-/// reference rather than discarded, which is what makes the emitted operator
-/// usable for kept spaces holding more than two electrons. Leave it empty to
-/// discard them.
+/// Terms above two-body are folded onto `reference_density` (spin-traced, over
+/// the window's spatial orbitals) when it is nonempty, which is what makes the
+/// emitted operator usable for kept spaces holding more than two electrons;
+/// leave it empty to discard them. `occupied_so` selects the equivalent
+/// particle-hole fold against a reference determinant; it exists so the tests
+/// can cross-check the density path against it.
 ActiveDownfoldResult downfold_blocked(
     const Eigen::MatrixXd& f, const SpinBlockedTwoBody& blk,
     const Eigen::VectorXd& eps, const SpinOrbitalPartition& part,
