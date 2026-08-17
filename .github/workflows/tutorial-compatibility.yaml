@@ -1,7 +1,7 @@
 name: Debug Windows ARM64 Runner
 
 # Verifies the Windows ARM64 self-hosted runner image has all tools required
-# for actions/cache/save@v5 to work.
+# for actions/cache/save@v6 to work.
 # Related to: actions/cache/save@v5 failure in build-and-test.yaml
 # See: https://github.com/microsoft/qdk-chemistry/issues/593
 
@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  actions: write
 
 jobs:
   debug-arm64:
@@ -189,7 +190,51 @@ jobs:
         Write-Host "PASS: cache round-trip (tar+zstd) succeeded"
 
     # -------------------------------------------------------------------------
-    # 9. Full PATH dump
+    # 9. Real actions/cache/save + restore round-trip using the actual action
+    # -------------------------------------------------------------------------
+    - name: Create content to cache
+      shell: pwsh
+      run: |
+        $dir = Join-Path $env:RUNNER_TEMP "actions-cache-test"
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        Set-Content -Path (Join-Path $dir "canary.txt") -Value "actions-cache-${{ github.run_id }}"
+        Write-Host "Created: $dir"
+
+    - name: Save cache (actions/cache/save@v6)
+      uses: actions/cache/save@v6
+      with:
+        path: ${{ runner.temp }}/actions-cache-test
+        key: debug-arm64-cache-${{ github.run_id }}-${{ github.run_attempt }}
+
+    - name: Delete local content (simulate cold restore)
+      shell: pwsh
+      run: Remove-Item -Recurse -Force (Join-Path $env:RUNNER_TEMP "actions-cache-test")
+
+    - name: Restore cache (actions/cache/restore@v6)
+      id: cache-restore
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ runner.temp }}/actions-cache-test
+        key: debug-arm64-cache-${{ github.run_id }}-${{ github.run_attempt }}
+
+    - name: Verify restored content
+      shell: pwsh
+      run: |
+        $hit = "${{ steps.cache-restore.outputs.cache-hit }}"
+        Write-Host "cache-hit: $hit"
+        if ($hit -ne 'true') {
+          Write-Error "FAIL: cache was not restored (cache-hit=$hit)"
+          exit 1
+        }
+        $val = Get-Content (Join-Path $env:RUNNER_TEMP "actions-cache-test" "canary.txt")
+        if ($val -ne "actions-cache-${{ github.run_id }}") {
+          Write-Error "FAIL: restored content mismatch: '$val'"
+          exit 1
+        }
+        Write-Host "PASS: actions/cache save+restore round-trip succeeded"
+
+    # -------------------------------------------------------------------------
+    # 10. Full PATH dump
     # -------------------------------------------------------------------------
     - name: Dump PATH
       shell: pwsh
