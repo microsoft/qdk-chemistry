@@ -129,9 +129,7 @@ class QpeResult(DataClass):
             method: Phase estimation algorithm or workflow label.
             phase_fraction: Measured phase fraction in ``[0, 1)``.
             eigenvalue_from_phase: A callable mapping phase fraction to the Hamiltonian eigenvalue.
-            canonical_phase_fraction: Alias-resolved phase the energy is computed from. Defaults to
-                ``phase_fraction``, which is the right choice whenever the measured bin is already
-                the reported phase.
+            canonical_phase_fraction: Alias-resolved phase the energy is computed from. Defaults to ``phase_fraction``.
             branching: Alias energy candidates considered. Defaults to ``(raw_energy,)``.
             resolved_energy: Candidate picked by the algorithm's alias-resolution rule, if any.
             bits_msb_first: Optional measured bits ordered from MSB to LSB.
