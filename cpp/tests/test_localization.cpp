@@ -1927,6 +1927,81 @@ TEST_F(LocalizationTest,
       test_wavefunction.beta_electrons);
 }
 
+static std::shared_ptr<Structure> create_ethylene_structure() {
+  std::vector<Eigen::Vector3d> coordinates = {
+      {-0.6672, 0.0000, 0.0000},  {0.6672, 0.0000, 0.0000},
+      {-1.2213, -0.9290, 0.0708}, {-1.2212, 0.9290, -0.0708},
+      {1.2213, 0.9290, -0.0708},  {1.2213, -0.9290, 0.0708}};
+  for (auto& coordinate : coordinates) {
+    coordinate *= qdk::chemistry::constants::angstrom_to_bohr;
+  }
+  return std::make_shared<Structure>(
+      coordinates, std::vector<Element>{Element::C, Element::C, Element::H,
+                                        Element::H, Element::H, Element::H});
+}
+
+static std::shared_ptr<Structure> create_o2_reference_structure() {
+  std::vector<Eigen::Vector3d> coordinates = {{0.0, 0.0, 0.603262},
+                                              {0.0, 0.0, -0.603262}};
+  for (auto& coordinate : coordinates) {
+    coordinate *= qdk::chemistry::constants::angstrom_to_bohr;
+  }
+  return std::make_shared<Structure>(
+      coordinates, std::vector<Element>{Element::O, Element::O});
+}
+
+static void expect_active_space_qio_reference_entropy(
+    const std::shared_ptr<Structure>& structure, int multiplicity,
+    std::size_t num_active_electrons, std::size_t num_active_orbitals,
+    const char* basis, double expected_entropy, double entropy_tolerance) {
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("scf_type", "restricted");
+  auto [E_HF, wfn_HF] = scf_solver->run(structure, 0, multiplicity, basis);
+  (void)E_HF;
+
+  auto active_space = ActiveSpaceSelectorFactory::create("qdk_valence");
+  active_space->settings().set("num_active_electrons",
+                               static_cast<int64_t>(num_active_electrons));
+  active_space->settings().set("num_active_orbitals",
+                               static_cast<int64_t>(num_active_orbitals));
+  auto active_space_wfn = active_space->run(wfn_HF);
+  auto active_orbitals = active_space_wfn->get_orbitals();
+
+  auto hamil_ctor = HamiltonianConstructorFactory::create();
+  auto mc_calc = MultiConfigurationCalculatorFactory::create("macis_cas");
+  mc_calc->settings().set("calculate_one_rdm", true);
+  mc_calc->settings().set("calculate_two_rdm", true);
+  const auto [nelec_a, nelec_b] = active_space_wfn->get_active_num_electrons();
+  auto [E_cas, wfn_cas] =
+      mc_calc->run(hamil_ctor->run(active_orbitals), nelec_a, nelec_b);
+
+  const auto active_indices =
+      spin_channel_indices(active_orbitals->active_indices(), axes::alpha());
+  const double entropy_before = wfn_cas->get_single_orbital_entropies().sum();
+  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto qio_wfn = localizer->run(wfn_cas, active_indices, active_indices);
+
+  auto [E_rotated_cas, rotated_wfn_cas] =
+      mc_calc->run(hamil_ctor->run(qio_wfn->get_orbitals()), nelec_a, nelec_b);
+  const double entropy_after =
+      rotated_wfn_cas->get_single_orbital_entropies().sum();
+
+  EXPECT_LE(entropy_after, entropy_before + entropy_tolerance);
+  EXPECT_NEAR(entropy_after, expected_entropy, entropy_tolerance);
+  EXPECT_NEAR(E_rotated_cas, E_cas, testing::ci_energy_tolerance);
+}
+
+TEST_F(LocalizationTest, ActiveSpaceQIOReferenceEntropyClosedShell) {
+  expect_active_space_qio_reference_entropy(create_ethylene_structure(), 1, 4,
+                                            4, "def2-svp", 0.28733427, 1e-6);
+}
+
+TEST_F(LocalizationTest, ActiveSpaceQIOReferenceEntropyOpenShell) {
+  expect_active_space_qio_reference_entropy(create_o2_reference_structure(), 3,
+                                            8, 6, "cc-pvdz", 0.93445155, 1e-4);
+}
+
 TEST_F(LocalizationTest, ActiveSpaceQIO) {
   auto localizer = LocalizerFactory::create("qdk_active_space_qio");
   EXPECT_NO_THROW({ auto settings = localizer->settings(); });
