@@ -443,9 +443,15 @@ jobs:
     - name: Generate coverage statistics
       run: |
         # Extract coverage percentages
-        CPP_COVERAGE=$(grep -oP 'TOTAL.*?\K[0-9.]+(?=%)' coverage-reports/cpp_coverage.txt | tail -1 || echo "0")
-        PYTHON_COVERAGE=$(grep -oP 'TOTAL.*?\K[0-9]+(?=%)' coverage-reports/python_coverage.txt | tail -1 || echo "0")
-        PYBIND11_COVERAGE=$(grep -oP 'TOTAL.*?\K[0-9.]+(?=%)' coverage-reports/pybind11_coverage.txt | tail -1 || echo "0")
+        extract_coverage() {
+          grep '^TOTAL' "$1" 2>/dev/null | tail -1 | grep -oE '[0-9]+(\.[0-9]+)?%' | tr -d '%'
+        }
+        CPP_COVERAGE=$(extract_coverage coverage-reports/cpp_coverage.txt)
+        CPP_COVERAGE=${CPP_COVERAGE:-0}
+        PYTHON_COVERAGE=$(extract_coverage coverage-reports/python_coverage.txt)
+        PYTHON_COVERAGE=${PYTHON_COVERAGE:-0}
+        PYBIND11_COVERAGE=$(extract_coverage coverage-reports/pybind11_coverage.txt)
+        PYBIND11_COVERAGE=${PYBIND11_COVERAGE:-0}
 
         echo "CPP_COVERAGE=$CPP_COVERAGE" >> $GITHUB_ENV
         echo "PYTHON_COVERAGE=$PYTHON_COVERAGE" >> $GITHUB_ENV
