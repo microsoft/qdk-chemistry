@@ -272,9 +272,9 @@ def create_random_bitstring_matrix(
     n_beta = n_electrons - n_alpha
     rng = np.random.default_rng(seed)
 
-    hf = np.zeros(2 * n_orbitals, dtype=np.int8)
-    hf[:n_alpha] = 1
-    hf[n_orbitals : n_orbitals + n_beta] = 1
+    hf_config = Configuration.canonical_hf_configuration(n_alpha, n_beta, n_orbitals)
+    alpha_bits, beta_bits = hf_config.to_binary_strings(n_orbitals)
+    hf = np.array([int(bit) for bit in alpha_bits + beta_bits], dtype=np.int8)
 
     seen: set[bytes] = {hf.tobytes()}
     dets = [hf]
