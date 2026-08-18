@@ -70,6 +70,8 @@ class BasisSet {
   uint64_t num_atomic_orbitals;  ///< Total number of atomic orbitals
 
   std::vector<Shell> ecp_shells;  ///< Effective core potential shells
+  std::vector<int>
+      atom_ecp_electrons;  ///< Number of ECP electrons for each atom
   std::unordered_map<int, int>
       element_ecp_electrons;  ///< Map from atomic number to ECP electron number
   int n_ecp_electrons = 0;  ///< Total number of core electrons replaced by ECPs

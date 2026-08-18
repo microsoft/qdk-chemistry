@@ -2784,6 +2784,26 @@ class TestQDKChemistryPySCFBasisConversion:
         assert len(ecp_electrons) == 1
         assert ecp_electrons[0] == 28  # LANL2DZ ECP for Ag removes 28 core electrons
 
+    def test_qdk_to_pyscf_preserves_atom_specific_ecp(self):
+        """Test mixed ECP treatment for atoms of the same element."""
+        structure = Structure(
+            ["Ag", "Ag"],
+            np.array(
+                [
+                    [0.0, 0.0, 0.0],
+                    [5.0, 0.0, 0.0],
+                ]
+            ),
+        )
+        basis = BasisSet.from_index_map({0: "def2-svp", 1: "ano-rcc"}, structure)
+
+        pyscf_mol = basis_to_pyscf_mol(basis)
+
+        assert basis.get_ecp_electrons() == [28, 0]
+        assert set(pyscf_mol.ecp) == {"Ag1"}
+        assert pyscf_mol.atom_charges().tolist() == [19, 47]
+        assert pyscf_mol.nelectron == 66
+
     def test_ecp_roundtrip_conversion(self):
         """Test round-trip conversion of ECP shells and metadata: QDK -> PySCF -> QDK."""
         ag_structure = Structure(["Ag"], np.array([[0.0, 0.0, 0.0]]))

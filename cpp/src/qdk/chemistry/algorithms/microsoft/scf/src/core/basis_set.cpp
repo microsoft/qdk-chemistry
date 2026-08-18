@@ -39,8 +39,10 @@ size_t load_from_database_json(std::filesystem::path bs_path, BasisSet& basis) {
   auto& mol = *basis.mol;
   auto& shells = basis.shells;
   auto& ecp_shells = basis.ecp_shells;
+  auto& atom_ecp_electrons = basis.atom_ecp_electrons;
   auto& element_ecp_electrons = basis.element_ecp_electrons;
 
+  atom_ecp_electrons.assign(mol.n_atoms, 0);
   size_t n_ecp_electrons = 0;
   for (uint64_t i = 0; i < mol.n_atoms; ++i) {
     auto atomic_num = std::to_string(mol.atomic_nums[i]);
@@ -83,6 +85,7 @@ size_t load_from_database_json(std::filesystem::path bs_path, BasisSet& basis) {
     if (!elem.contains("ecp_potentials")) continue;
 
     auto n_core_electrons = elem["ecp_electrons"].get<int>();
+    atom_ecp_electrons[i] = n_core_electrons;
     element_ecp_electrons[mol.atomic_nums[i]] = n_core_electrons;
     mol.atomic_charges[i] = mol.atomic_nums[i] - n_core_electrons;
     n_ecp_electrons += n_core_electrons;
@@ -137,6 +140,13 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol,
       ecp_shells(input_ecp_shells),
       element_ecp_electrons(element_ecp_electrons),
       n_ecp_electrons(n_ecp_electrons) {
+  atom_ecp_electrons.resize(mol->n_atoms, 0);
+  for (size_t i = 0; i < mol->n_atoms; ++i) {
+    auto it = element_ecp_electrons.find(mol->atomic_nums[i]);
+    if (it != element_ecp_electrons.end()) {
+      atom_ecp_electrons[i] = it->second;
+    }
+  }
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
   if (mpi::get_world_size() > 1) {
     MPI_Barrier(MPI_COMM_WORLD);
@@ -431,6 +441,7 @@ nlohmann::ordered_json BasisSet::to_json() const {
        {"num_atomic_orbitals", num_atomic_orbitals},
        {"electron_shells", json_shells},
        {"ecp_shells", json_ecp_shells},
+       {"atom_ecp_electrons", atom_ecp_electrons},
        {"element_ecp_electrons", json_element_ecp_electrons}});
   return basis_set_json;
 }
@@ -568,15 +579,30 @@ std::shared_ptr<BasisSet> BasisSet::from_serialized_json(
     bs->element_ecp_electrons[atomic_num] = ecp_electrons;
   }
 
+  if (json.contains("atom_ecp_electrons")) {
+    bs->atom_ecp_electrons = json["atom_ecp_electrons"].get<std::vector<int>>();
+    if (bs->atom_ecp_electrons.size() != bs->mol->n_atoms) {
+      throw std::runtime_error(
+          "atom_ecp_electrons must contain one entry per atom.");
+    }
+  } else {
+    bs->atom_ecp_electrons.assign(bs->mol->n_atoms, 0);
+    for (size_t i = 0; i < bs->mol->n_atoms; ++i) {
+      int atomic_num = bs->mol->atomic_nums[i];
+      auto it = bs->element_ecp_electrons.find(atomic_num);
+      if (it != bs->element_ecp_electrons.end()) {
+        bs->atom_ecp_electrons[i] = it->second;
+      }
+    }
+  }
+
   // Update atomic charges, total nuclear charge, and n_electrons based on ECPs
   bs->n_ecp_electrons = 0;
   for (size_t i = 0; i < bs->mol->n_atoms; ++i) {
     int atomic_num = bs->mol->atomic_nums[i];
-    if (bs->element_ecp_electrons.count(atomic_num)) {
-      int ecp_electrons = bs->element_ecp_electrons[atomic_num];
-      bs->mol->atomic_charges[i] = atomic_num - ecp_electrons;
-      bs->n_ecp_electrons += ecp_electrons;
-    }
+    int ecp_electrons = bs->atom_ecp_electrons[i];
+    bs->mol->atomic_charges[i] = atomic_num - ecp_electrons;
+    bs->n_ecp_electrons += ecp_electrons;
   }
   bs->mol->total_nuclear_charge = std::accumulate(
       bs->mol->atomic_charges.begin(), bs->mol->atomic_charges.end(), 0);

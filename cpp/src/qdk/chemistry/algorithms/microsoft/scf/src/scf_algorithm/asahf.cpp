@@ -140,13 +140,12 @@ std::shared_ptr<BasisSet> make_atom_basis_set(size_t index,
     shell.atom_index = 0;
   }
 
-  // get element from mol to get the ecp electrons from map
   auto atomic_number = mol->atomic_nums[0];
-  if (basis_set.element_ecp_electrons.find(atomic_number) !=
-      basis_set.element_ecp_electrons.end()) {
-    ecp_electrons[atomic_number] =
-        basis_set.element_ecp_electrons.at(atomic_number);
-    total_ecp_electrons = ecp_electrons[atomic_number];
+  if (index < basis_set.atom_ecp_electrons.size()) {
+    total_ecp_electrons = basis_set.atom_ecp_electrons[index];
+    if (total_ecp_electrons > 0) {
+      ecp_electrons[atomic_number] = total_ecp_electrons;
+    }
   }
 
   // Create a new BasisSet for the atom
@@ -176,6 +175,7 @@ bool BasisEqChecker::operator()(const BasisSet& a,
   if (a.num_atomic_orbitals != b.num_atomic_orbitals) return false;
   if (a.shells.size() != b.shells.size()) return false;
   if (a.ecp_shells.size() != b.ecp_shells.size()) return false;
+  if (a.atom_ecp_electrons != b.atom_ecp_electrons) return false;
   if (a.element_ecp_electrons.size() != b.element_ecp_electrons.size())
     return false;
 
@@ -223,6 +223,10 @@ size_t BasisHasher::operator()(const BasisSet& basis) const noexcept {
   hash_value(ctx, static_cast<uint64_t>(basis.num_atomic_orbitals));
   hash_value(ctx, static_cast<uint64_t>(basis.shells.size()));
   hash_value(ctx, static_cast<uint64_t>(basis.ecp_shells.size()));
+  hash_value(ctx, static_cast<uint64_t>(basis.atom_ecp_electrons.size()));
+  for (int ecp_electrons : basis.atom_ecp_electrons) {
+    hash_value(ctx, static_cast<int64_t>(ecp_electrons));
+  }
   hash_value(ctx, static_cast<uint64_t>(basis.element_ecp_electrons.size()));
 
   // hash shells

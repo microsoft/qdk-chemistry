@@ -213,8 +213,7 @@ def basis_to_pyscf_mol(basis: BasisSet, charge: int = 0, multiplicity: int = 1) 
 
                         l_components.append([l_value, terms])
 
-                    # Store in ecp_dict using elements
-                    ecp_dict[elements[iatm]] = [ncore, l_components]
+                    ecp_dict[pyscf_symbols[iatm]] = [ncore, l_components]
 
         if ecp_dict:
             mol.ecp = ecp_dict
