@@ -95,8 +95,6 @@ namespace QDKChemistry.Utils.UnaryIteration {
         if numActions == 1 {
             action(actionOffset, ctl);
         } else {
-            // Keyed on sub-problem size, mirroring Std.TableLookup.SinglyControlledSelect, so the
-            // resource estimator costs each recursion depth once instead of walking the whole tree.
             if BeginEstimateCaching("QDKChemistry.Utils.UnaryIteration.SinglyControlledUnaryIterationWithControl", numActions) {
                 use helper = Qubit();
 

@@ -59,7 +59,8 @@ class QdkUnaryQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
             "Number of walk queries I. The Heisenberg-limited setting for a target "
             "phase-estimation energy error epsilon is I = ceil(pi * lambda / (2 * epsilon)), "
             "where lambda is the block-encoding 1-norm; see Lee2021 Eq. (45). "
-            "Doesn't need to be a power of two.",
+            "Doesn't need to be a power of two; a power of two is reduced by one, since its "
+            "extra reflection slot would otherwise cost a whole phase qubit.",
         )
         self._set_default(
             "circuit_mapper",
@@ -114,7 +115,12 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
             self._settings.set("circuit_mapper", circuit_mapper)
 
     def resolve_num_queries(self) -> tuple[int, int]:
-        """Return the configured query count and the phase-register size addressing it.
+        """Return the query count to apply and the phase-register size addressing it.
+
+        A power-of-two ``num_queries`` is reduced by one. ``p`` queries need ``p + 1``
+        reflection slots, so ``p = 2 ** k`` is the single value that spills into an extra
+        phase qubit to address one extra slot, while ``p - 1`` packs the register exactly
+        and drops a walk block.
 
         Returns:
             The number of walk blocks the schedule applies, and the number of phase qubits
@@ -127,17 +133,14 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         num_queries = int(self._settings.get("num_queries"))
         if num_queries <= 0:
             raise ValueError(f"num_queries must be a positive integer. Got {num_queries}.")
-        num_phase_qubits = num_queries.bit_length()
         if num_queries > 1 and num_queries & (num_queries - 1) == 0:
-            # p reflection slots are p + 1 wide, so p = 2^k is the one value that spills into an
-            # extra qubit for a single extra slot; p - 1 packs the register exactly.
-            Logger.warn(
-                f"num_queries={num_queries} is a power of two, so the phase register needs "
-                f"{num_phase_qubits} qubits to address {num_queries + 1} reflection slots and "
-                f"leaves {(1 << num_phase_qubits) - num_queries - 1} unused. "
-                f"num_queries={num_queries - 1} addresses its slots in {num_phase_qubits - 1} qubits exactly."
+            Logger.info(
+                f"Reducing num_queries from {num_queries} to {num_queries - 1}: addressing "
+                f"{num_queries + 1} reflection slots costs {num_queries.bit_length()} phase qubits, "
+                f"whereas {num_queries} slots fit in {num_queries.bit_length() - 1}."
             )
-        return num_queries, num_phase_qubits
+            num_queries -= 1
+        return num_queries, num_queries.bit_length()
 
     def _run_impl(
         self,

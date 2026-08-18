@@ -205,13 +205,17 @@ class TestRegisterSizeHasOneDefinition:
         They agreed by coincidence of three separate formulas before; ``PhaseRegisterSize``
         now delegates to ``AddressQubits``, and this pins the Python side to the same value.
         """
-        _, num_bits = QdkUnaryQpeCircuitBuilder(num_queries=num_queries).resolve_num_queries()
+        resolved, num_bits = QdkUnaryQpeCircuitBuilder(num_queries=num_queries).resolve_num_queries()
+        is_power_of_two = num_queries > 1 and num_queries & (num_queries - 1) == 0
+        assert resolved == (num_queries - 1 if is_power_of_two else num_queries)
+
         context = get_qsharp_context()
-        qsharp_phase_bits = context.eval(f"QDKChemistry.Utils.UnaryPhaseEstimation.PhaseRegisterSize({num_queries})")
-        qsharp_address_bits = context.eval(f"QDKChemistry.Utils.UnaryIteration.AddressQubits({num_queries + 1})")
+        qsharp_phase_bits = context.eval(f"QDKChemistry.Utils.UnaryPhaseEstimation.PhaseRegisterSize({resolved})")
+        qsharp_address_bits = context.eval(f"QDKChemistry.Utils.UnaryIteration.AddressQubits({resolved + 1})")
 
         assert num_bits == qsharp_phase_bits == qsharp_address_bits
-        assert (1 << num_bits) >= num_queries + 1
+        assert (1 << num_bits) >= resolved + 1
+        assert (1 << (num_bits - 1)) < resolved + 1, "the register must be the narrowest that addresses its slots"
 
     @pytest.mark.parametrize("num_actions", [1, 2, 3, 4, 5, 8, 9, 16, 17, 1024, 1025, 2**20, 2**29, 2**31])
     def test_address_width_is_exact_at_large_powers_of_two(self, num_actions):
