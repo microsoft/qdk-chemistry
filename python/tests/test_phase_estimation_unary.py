@@ -19,24 +19,10 @@ from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import (
     UnaryPhaseEstimation,
     _post_process_phase_estimation,
 )
+from qdk_chemistry.algorithms.state_preparation import identity_state_prep
 from qdk_chemistry.data import AlgorithmRef, QubitOperator
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
-
-
-def _identity_state_preparation(num_qubits: int) -> Circuit:
-    """A state preparation that leaves the register in ``|0...0>``."""
-    params = QSHARP_UTILS.StatePreparation.SingleReferenceParams(
-        bitStrings=[0] * num_qubits,
-        numQubits=num_qubits,
-    )
-    return Circuit(
-        qsharp_factory=QsharpFactoryData(
-            program=QSHARP_UTILS.StatePreparation.MakeSingleReferenceStateCircuit,
-            parameter=vars(params),
-        ),
-        qsharp_op=QSHARP_UTILS.StatePreparation.MakePrepareSingleReferenceStateOp(params),
-    )
 
 
 def _address_qubits(num_actions: int) -> int:
@@ -338,7 +324,7 @@ def test_the_builder_reflects_the_ancilla_tail_the_mapper_declared():
 
     builder = QdkUnaryQpeCircuitBuilder(num_queries=3)
     circuit = builder.run(
-        state_preparation=_identity_state_preparation(hamiltonian.num_qubits),
+        state_preparation=identity_state_prep(hamiltonian.num_qubits),
         qubit_hamiltonian=hamiltonian,
     )[0]
 

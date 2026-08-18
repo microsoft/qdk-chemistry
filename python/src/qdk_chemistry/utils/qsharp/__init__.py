@@ -39,6 +39,7 @@ _BASE_PROFILE_FILES = (
     "MeasurementBasis.qs",
     "Select.qs",
     "PrepSelPrep.qs",
+    "AmplitudeAmplification.qs",
 )
 
 

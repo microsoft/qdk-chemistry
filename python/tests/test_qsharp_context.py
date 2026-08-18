@@ -9,12 +9,15 @@ from __future__ import annotations
 
 import inspect
 import threading
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
 from qdk import TargetProfile
+from qdk.qsharp import Pauli
 
+import qdk_chemistry.utils.qsharp as qsharp_package
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder import (
     QdkStandardQpeCircuitBuilder,
 )
@@ -45,6 +48,7 @@ _PORTABLE_MODULES = (
     "MeasurementBasis",
     "Select",
     "PrepSelPrep",
+    "AmplitudeAmplification",
 )
 
 #: Modules withheld from ``TargetProfile.Base``. They uncompute through measurement, which
@@ -183,8 +187,16 @@ class TestTargetProfiles:
         """Withheld sources must fail loudly as missing rather than return wrong results."""
         assert not hasattr(base_context.code.QDKChemistry.Utils, module)
 
+    def test_every_vendored_module_is_classified(self) -> None:
+        """A module in neither list is silently untested, so require the split to be total."""
+        vendored = {path.stem for path in (Path(qsharp_package.__file__).parent / "src").glob("*.qs")}
+        assert vendored == set(_PORTABLE_MODULES) | set(_ADAPTIVE_ONLY_MODULES)
+
     def test_base_lowers_a_circuit_to_qir(self, base_context: qdk.Context) -> None:
         """The Base build exists to be lowered through QIR, so prove that it compiles."""
-        state_preparation = base_context.code.QDKChemistry.Utils.StatePreparation
-        qir = str(base_context.compile(state_preparation.MakeStatePreparationCircuit, [0], [1.0, 0.0], [], 1))
-        assert "define" in qir
+        utils = base_context.code.QDKChemistry.Utils
+        state_prep = utils.StatePreparation.MakeStatePreparationCircuit
+        assert "define" in str(base_context.compile(state_prep, [0], [1.0, 0.0], [], 1))
+
+        pauli_exp = utils.ControlledPauliExp.MakeRepControlledPauliExpCircuit
+        assert "define" in str(base_context.compile(pauli_exp, [[Pauli.X, Pauli.Z]], [0.5], 2, 0, [1, 2]))
