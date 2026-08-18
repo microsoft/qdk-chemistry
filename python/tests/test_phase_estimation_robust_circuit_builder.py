@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from itertools import islice
 
@@ -19,7 +20,7 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder im
     RobustPhaseEstimationCircuitSet,
     _AlgorithmSnapshot,
 )
-from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator, Settings
+from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator, RobustPhaseEstimationSchedule, Settings
 from qdk_chemistry.utils.rpe import qdrift_schedule
 
 
@@ -108,6 +109,12 @@ def test_builder_is_registered_and_does_not_build_eagerly(
     assert unitary_records == []
     assert hadamard_records == []
 
+    schedule = circuit_set.schedule
+    assert isinstance(schedule, RobustPhaseEstimationSchedule)
+    assert schedule.num_rounds == circuit_set.num_rounds
+    assert unitary_records == []
+    assert hadamard_records == []
+
 
 def test_deterministic_round_yields_one_pair_with_shot_multiplicity(
     rpe_problem: tuple[Circuit, QubitOperator],
@@ -167,6 +174,60 @@ def test_randomized_round_generates_independent_pairs_on_demand(
     assert hadamard_records[2][1] is hadamard_records[3][1]
 
 
+def test_direct_randomized_experiment_and_circuit_access_support_qre(
+    rpe_problem: tuple[Circuit, QubitOperator],
+    recording_builders: tuple[list[dict[str, object]], list[tuple[str, _FakeUnitary]]],
+) -> None:
+    """Users can materialize one seeded pair or one QRE-compatible circuit directly."""
+    from qdk.qre.application import OpenQASMApplication  # noqa: PLC0415
+
+    state_preparation, hamiltonian = rpe_problem
+    unitary_records, hadamard_records = recording_builders
+    circuit_set = QdkRobustPhaseEstimationCircuitBuilder(target_accuracy=0.5, seed=17).run(
+        state_preparation, hamiltonian
+    )
+
+    experiment = circuit_set.get_experiment(0, 1)
+
+    assert experiment.draw_index == 1
+    assert experiment.draw_seed == circuit_set.rounds[0].draw_seeds[1]
+    assert unitary_records[0]["seed"] == experiment.draw_seed
+    assert hadamard_records[0][1] is hadamard_records[1][1]
+    assert isinstance(experiment.x_circuit.get_qre_application(), OpenQASMApplication)
+
+    y_circuit = circuit_set.get_circuit(0, "y", 1)
+    assert isinstance(y_circuit.get_qre_application(), OpenQASMApplication)
+    assert unitary_records[1]["seed"] == experiment.draw_seed
+
+
+def test_direct_experiment_access_validates_round_draw_and_basis(
+    rpe_problem: tuple[Circuit, QubitOperator],
+    recording_builders: tuple[list[dict[str, object]], list[tuple[str, _FakeUnitary]]],
+) -> None:
+    """Direct access rejects invalid coordinates before constructing circuits."""
+    state_preparation, hamiltonian = rpe_problem
+    unitary_records, hadamard_records = recording_builders
+    randomized_set = QdkRobustPhaseEstimationCircuitBuilder(target_accuracy=0.5, seed=19).run(
+        state_preparation, hamiltonian
+    )
+    deterministic_set = QdkRobustPhaseEstimationCircuitBuilder(
+        target_accuracy=0.5,
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
+    ).run(state_preparation, hamiltonian)
+
+    with pytest.raises(ValueError, match="required for randomized"):
+        randomized_set.get_experiment(0)
+    with pytest.raises(IndexError, match="draw_index"):
+        randomized_set.get_experiment(0, randomized_set.rounds[0].num_draws)
+    with pytest.raises(ValueError, match="must be None"):
+        deterministic_set.get_experiment(0, 0)
+    with pytest.raises(ValueError, match="basis"):
+        randomized_set.get_circuit(0, "Z", 0)
+
+    assert unitary_records == []
+    assert hadamard_records == []
+
+
 def test_circuit_set_reiteration_replays_seeded_draws(
     rpe_problem: tuple[Circuit, QubitOperator],
     recording_builders: tuple[list[dict[str, object]], list[tuple[str, _FakeUnitary]]],
@@ -183,6 +244,25 @@ def test_circuit_set_reiteration_replays_seeded_draws(
 
     assert first.draw_seed == second.draw_seed
     assert [record["seed"] for record in unitary_records] == [first.draw_seed, first.draw_seed]
+
+
+def test_serialized_schedule_rebinds_and_replays_seeded_draw(
+    rpe_problem: tuple[Circuit, QubitOperator],
+    recording_builders: tuple[list[dict[str, object]], list[tuple[str, _FakeUnitary]]],
+) -> None:
+    """A round-tripped schedule regenerates the same draw after binding live inputs."""
+    state_preparation, hamiltonian = rpe_problem
+    unitary_records, hadamard_records = recording_builders
+    original = QdkRobustPhaseEstimationCircuitBuilder(target_accuracy=0.5, seed=23).run(state_preparation, hamiltonian)
+    restored_schedule = RobustPhaseEstimationSchedule.from_json(json.loads(json.dumps(original.schedule.to_json())))
+
+    rebound = RobustPhaseEstimationCircuitSet.from_schedule(restored_schedule, state_preparation, hamiltonian)
+    experiment = rebound.get_experiment(0, 2)
+
+    assert rebound.schedule.content_hash() == original.schedule.content_hash()
+    assert experiment.draw_seed == original.rounds[0].draw_seeds[2]
+    assert unitary_records[0]["seed"] == experiment.draw_seed
+    assert hadamard_records[0][1] is hadamard_records[1][1]
 
 
 def test_entropy_seed_is_concretized_once_per_circuit_set(

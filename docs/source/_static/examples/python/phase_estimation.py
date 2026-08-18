@@ -167,8 +167,11 @@ circuit_set = builder.run(
     qubit_hamiltonian=qubit_ham,
 )
 
-# Circuits are generated only when iterated. Each circuit is QRE-compatible.
-first_experiment = next(circuit_set.iter_round(0))
+# The lightweight schedule is serializable and contains no materialized circuits.
+print(circuit_set.schedule.get_summary())
+
+# Generate only the circuit pair needed for execution or resource estimation.
+first_experiment = circuit_set.get_experiment(round_index=0)
 x_application = first_experiment.x_circuit.get_qre_application()
 y_application = first_experiment.y_circuit.get_qre_application()
 print(first_experiment.round_index, first_experiment.circuit_multiplicity)

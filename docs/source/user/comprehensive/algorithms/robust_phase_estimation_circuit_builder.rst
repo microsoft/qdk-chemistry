@@ -89,10 +89,15 @@ Other unitary-builder categories retain their existing routing.
 Rounds and experiments
 ----------------------
 
-Each :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder.RobustPhaseEstimationRound` exposes its zero-based round index, evolution time, shots per basis, number of circuit draws, scheduled unitary sample count, circuit multiplicity, draw seeds, and exact unitary-builder configuration.
+Each :class:`~qdk_chemistry.data.RobustPhaseEstimationRound` exposes its zero-based round index, evolution time, shots per basis, number of circuit draws, scheduled unitary sample count, circuit multiplicity, draw seeds, and exact unitary-builder configuration.
 
-Iterating the circuit set yields :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder.RobustPhaseEstimationExperiment` objects.
+Iterating the circuit set yields :class:`~qdk_chemistry.data.RobustPhaseEstimationExperiment` objects.
 Each experiment contains one X-basis circuit, one Y-basis circuit, its round and draw coordinates, its concrete random seed when applicable, and the number of executions represented by each circuit.
+
+Use :meth:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder.RobustPhaseEstimationCircuitSet.get_experiment` to materialize one X/Y pair directly.
+For randomized evolution, provide the desired ``draw_index``; for deterministic evolution, omit it.
+The paired form ensures that X and Y circuits use the same unitary draw.
+When only one basis is needed, :meth:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder.RobustPhaseEstimationCircuitSet.get_circuit` returns the requested concrete circuit.
 
 For deterministic evolution, one circuit pair represents all shots in the round, so ``circuit_multiplicity`` equals ``shots_per_basis``.
 For randomized evolution, every independent draw produces one pair and ``circuit_multiplicity`` is one.
@@ -103,6 +108,9 @@ Resource estimation
 
 Every generated :class:`~qdk_chemistry.data.Circuit` supports :meth:`~qdk_chemistry.data.Circuit.get_qre_application`.
 The QRE application describes one circuit; ``circuit_multiplicity`` remains separate workload metadata that callers should include when aggregating an experiment-level estimate.
+The circuit set's :attr:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder.RobustPhaseEstimationCircuitSet.schedule` is a serializable :class:`~qdk_chemistry.data.RobustPhaseEstimationSchedule` containing rounds, seeds, multiplicities, accuracy parameters, and builder configurations without materialized circuits.
+A selected :class:`~qdk_chemistry.data.RobustPhaseEstimationExperiment` is also serializable after its X/Y pair has been materialized.
+After loading a schedule, use :meth:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder.RobustPhaseEstimationCircuitSet.from_schedule` with the live state-preparation circuit and qubit Hamiltonian to resume on-demand generation.
 
 .. tab:: Python API
 

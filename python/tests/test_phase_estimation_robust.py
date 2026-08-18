@@ -30,6 +30,7 @@ from qdk_chemistry.data import (
     Circuit,
     QuantumErrorProfile,
     QubitOperator,
+    RobustPhaseEstimationExperiment,
     Settings,
     UnitaryRepresentation,
 )
@@ -770,6 +771,34 @@ def test_robust_qpe_registered() -> None:
 
     assert create("phase_estimation", "qdk_robust").name() == "qdk_robust"
     assert create("robust_phase_estimation_circuit_builder", "qdk").name() == "qdk"
+
+
+@pytest.mark.skipif(not _has_robust_stack(), reason="requires Q# and the registered robust circuit stack")
+def test_robust_circuit_builder_direct_pair_supports_qre() -> None:
+    """A directly materialized Q# circuit pair converts to QRE applications."""
+    from qdk.qre.application import QIRApplication, QSharpApplication  # noqa: PLC0415
+
+    from qdk_chemistry.algorithms import create  # noqa: PLC0415
+
+    hamiltonian, ground_vector, _ = _ground_state_problem()
+    state_preparation = _make_state_prep(ground_vector, num_qubits=2)
+    builder = create(
+        "robust_phase_estimation_circuit_builder",
+        "qdk",
+        target_accuracy=1.0,
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
+        energy_correction="linear",
+    )
+
+    circuit_set = builder.run(state_preparation, hamiltonian)
+    experiment = circuit_set.get_experiment(round_index=0)
+
+    assert isinstance(experiment.x_circuit.get_qre_application(), QSharpApplication)
+    assert isinstance(experiment.y_circuit.get_qre_application(), QSharpApplication)
+
+    restored = RobustPhaseEstimationExperiment.from_json(experiment.to_json())
+    assert isinstance(restored.x_circuit.get_qre_application(), QIRApplication)
+    assert isinstance(restored.y_circuit.get_qre_application(), QIRApplication)
 
 
 @pytest.mark.skipif(not _has_robust_stack(), reason="requires Q# and the registered robust circuit stack")
