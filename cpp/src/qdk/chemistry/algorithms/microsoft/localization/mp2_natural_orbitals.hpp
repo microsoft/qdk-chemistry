@@ -15,14 +15,15 @@ namespace qdk::chemistry::algorithms::microsoft {
 
 /**
  * @class MP2NaturalOrbitalLocalizer
- * @brief Localizer implementation that transforms orbitals to MP2 natural
- * orbitals
+ * @brief OrbitalLocalizer implementation that transforms orbitals to MP2
+ * natural orbitals
  *
  * @deprecated Use NaturalOrbitalLocalizer (qdk_natural_orbitals) with a
  * wavefunction that already contains the active-space MP2 one-particle reduced
  * density matrix (1-RDM).
  *
- * This class provides a concrete implementation of the Localizer interface
+ * This class provides a concrete implementation of the OrbitalLocalizer
+ * interface
  * that transforms canonical molecular orbitals into natural orbitals derived
  * from second-order Møller-Plesset perturbation theory (MP2). Natural orbitals
  * are eigenfunctions of the first-order reduced density matrix.
@@ -46,7 +47,7 @@ namespace qdk::chemistry::algorithms::microsoft {
  *    orbitals.
  */
 class [[deprecated(QDK_MP2_NATURAL_ORBITAL_LOCALIZER_DEPRECATION_MESSAGE)]]
-MP2NaturalOrbitalLocalizer : public Localizer {
+MP2NaturalOrbitalLocalizer : public OrbitalLocalizer {
  public:
   /**
    * @brief Default constructor

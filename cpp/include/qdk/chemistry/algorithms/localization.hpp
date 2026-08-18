@@ -67,20 +67,23 @@ std::shared_ptr<data::Wavefunction> new_aufbau_determinant_wavefunction(
  * @brief Abstract base class for orbital localization and transformation
  * algorithms
  *
- * The Localizer class provides a common interface for various orbital
+ * @deprecated Use OrbitalLocalizer. This implementation name remains available
+ * to preserve binary compatibility.
+ *
+ * The OrbitalLocalizer type provides a common interface for various orbital
  * localization and transformation methods used in quantum chemistry.
  * Implementations transform selected molecular orbitals into alternative
  * representations, which may be spatially localized or otherwise useful for
  * analysis and downstream calculations.
  *
- * This class uses the Factory design pattern through LocalizerFactory to
+ * This class uses the Factory design pattern through OrbitalLocalizerFactory to
  * allow dynamic creation of different localization algorithms at runtime.
  *
  * Example usage:
  * @code
  * // Create a concrete localizer (e.g., PipekMezeyLocalizer)
  * auto localizer =
- * qdk::chemistry::algorithms::LocalizerFactory::create_localizer(
+ * qdk::chemistry::algorithms::OrbitalLocalizerFactory::create(
  *   "qdk_pipek_mezey");
  * // Create indices for all orbitals
  * auto all_indices = wavefunction->orbitals->get_all_mo_indices();
@@ -185,6 +188,9 @@ class Localizer
 /**
  * @brief Factory class for creating localizer instances.
  *
+ * @deprecated Use OrbitalLocalizerFactory. This implementation name remains
+ * available to preserve binary compatibility.
+ *
  * This class provides a mechanism to create localizer instances
  * based on a string key. It allows for easy extension and registration
  * of different localization implementations.
@@ -194,5 +200,21 @@ struct LocalizerFactory : public AlgorithmFactory<Localizer, LocalizerFactory> {
   static void register_default_instances();
   static std::string default_algorithm_name() { return "qdk_pipek_mezey"; }
 };
+
+/**
+ * @brief Canonical public name for the orbital localization base class.
+ *
+ * The underlying Localizer type name is retained to preserve binary
+ * compatibility with existing C++ clients.
+ */
+using OrbitalLocalizer = Localizer;
+
+/**
+ * @brief Canonical public name for the orbital localization factory.
+ *
+ * The underlying LocalizerFactory type name is retained to preserve binary
+ * compatibility with existing C++ clients.
+ */
+using OrbitalLocalizerFactory = LocalizerFactory;
 
 }  // namespace qdk::chemistry::algorithms
