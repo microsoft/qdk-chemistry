@@ -3,7 +3,8 @@
 These tests guard the backward-compatibility shims added when
 ``QubitHamiltonian`` was renamed to :class:`~qdk_chemistry.data.QubitOperator`,
 ``EnergyEstimator`` was renamed to
-:class:`~qdk_chemistry.algorithms.ExpectationEstimator`, and the
+:class:`~qdk_chemistry.algorithms.ExpectationEstimator`, ``Localizer`` was
+renamed to :class:`~qdk_chemistry.algorithms.OrbitalLocalizer`, and the
 ``"energy_estimator"`` algorithm-type key was renamed to
 ``"expectation_estimator"``, and the v1 time-evolution type keys were renamed.
 The old names must keep working while emitting a ``DeprecationWarning`` so
@@ -19,8 +20,8 @@ import numpy as np
 import pytest
 
 from qdk_chemistry import algorithms
-from qdk_chemistry.algorithms import ExpectationEstimator, QdkExpectationEstimator
-from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian, QubitOperator
+from qdk_chemistry.algorithms import ExpectationEstimator, OrbitalLocalizer, QdkExpectationEstimator
+from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian, QubitOperator, Settings
 
 
 class TestQubitHamiltonianDeprecation:
@@ -137,6 +138,42 @@ class TestEnergyEstimatorDeprecation:
         with pytest.warns(DeprecationWarning, match="energy_estimator"):
             old = algorithms.show_default("energy_estimator")
         assert old == algorithms.show_default("expectation_estimator")
+
+
+class TestLocalizerDeprecation:
+    """Deprecation of ``Localizer`` -> :class:`~qdk_chemistry.algorithms.OrbitalLocalizer`."""
+
+    def test_localizer_alias_resolves_to_orbital_localizer(self):
+        """``algorithms.Localizer`` is the same object as ``OrbitalLocalizer``."""
+        with pytest.warns(DeprecationWarning, match="Localizer"):
+            alias = algorithms.Localizer
+        assert alias is OrbitalLocalizer
+
+    def test_localizer_alias_import_warns(self):
+        """Importing the old algorithm name emits a ``DeprecationWarning``."""
+        with pytest.warns(DeprecationWarning, match="Localizer"):
+            from qdk_chemistry.algorithms import Localizer  # noqa: PLC0415
+        assert Localizer is OrbitalLocalizer
+
+    def test_deprecated_localizer_alias_supports_subclassing(self):
+        """A subclass using the old base name remains constructible."""
+        with pytest.warns(DeprecationWarning, match="Localizer"):
+            from qdk_chemistry.algorithms import Localizer  # noqa: PLC0415
+
+        class CustomLocalizer(Localizer):
+            def __init__(self):
+                super().__init__()
+                self._settings = Settings()
+
+            def _run_impl(self, wavefunction, loc_indices_a, loc_indices_b):  # noqa: ARG002
+                return wavefunction
+
+            def name(self):
+                return "custom"
+
+        localizer = CustomLocalizer()
+        assert isinstance(localizer, OrbitalLocalizer)
+        assert localizer.name() == "custom"
 
 
 @pytest.mark.parametrize(
