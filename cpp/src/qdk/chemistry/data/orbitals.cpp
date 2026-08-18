@@ -1778,6 +1778,10 @@ ModelOrbitals::ModelOrbitals(size_t basis_size,
     : Orbitals(), _num_orbitals(basis_size) {
   QDK_LOG_TRACE_ENTERING();
   _symmetries = std::move(symmetries);
+  if (!_symmetries) {
+    _symmetries =
+        std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial());
+  }
   _is_restricted = model_restricted_from_symmetries(_symmetries);
   // Full active space over all modes by default; inactive space empty.
   std::vector<size_t> all_indices(basis_size);
