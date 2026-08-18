@@ -58,8 +58,11 @@ namespace QDKChemistry.Utils.PrepSelPrep {
 
         ApplyToEachCA(X, qs);
 
-        if nAll == 2 {
-            Controlled Z([allQubits[0]], allQubits[1]);
+        if nAll <= 3 {
+            // At two or three qubits the AND ladder buys nothing: both forms cost the
+            // same one CCZ, so the ladder would spend an ancilla and a measurement for
+            // no saving. Use the ancilla-free multiply-controlled Z instead.
+            Controlled Z(allQubits[0..nAll - 2], allQubits[nAll - 1]);
         } else {
             let nAnc = nAll - 2;
             use anc = Qubit[nAnc];
