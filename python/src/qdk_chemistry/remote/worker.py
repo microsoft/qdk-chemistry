@@ -21,14 +21,27 @@ logger = logging.getLogger(__name__)
 _CACHE_MISS = object()
 
 
+def _uses_remote_cache_transport(input_dir: Path) -> bool:
+    """Return whether the job uses its shared cache for artifact transport."""
+    try:
+        manifest = json.loads((input_dir / "manifest.json").read_text())
+    except (json.JSONDecodeError, OSError):
+        return False
+    return bool(manifest.get("remote_cache_transport"))
+
+
 def _load_remote_cache(input_dir: Path) -> tuple[Any, str | None]:
     """Create the cache described by an input manifest, when available."""
     run_hash = None
+    cache_transport = False
     try:
         manifest = json.loads((input_dir / "manifest.json").read_text())
         run_hash = manifest.get("run_hash")
+        cache_transport = bool(manifest.get("remote_cache_transport"))
         cache_info = manifest.get("remote_cache")
         if not cache_info or not cache_info.get("name"):
+            if cache_transport:
+                raise RuntimeError("The remote cache transport was not configured")
             return None, run_hash
 
         from qdk_chemistry.remote.cache import get_cache  # noqa: PLC0415
@@ -36,7 +49,9 @@ def _load_remote_cache(input_dir: Path) -> tuple[Any, str | None]:
         cache_name = cache_info["name"]
         cache_config = {key: value for key, value in cache_info.items() if key != "name"}
         return get_cache(cache_name, **cache_config), run_hash
-    except Exception:  # noqa: BLE001
+    except Exception as exc:
+        if cache_transport:
+            raise RuntimeError("Failed to initialize the remote cache transport") from exc
         logger.warning("Failed to load remote cache", exc_info=True)
         return None, run_hash
 
@@ -66,7 +81,14 @@ def _get_cached_result(cache: Any, run_hash: str | None) -> Any:
         return _CACHE_MISS
 
 
-def _store_cached_result(cache: Any, run_hash: str | None, inputs: dict[str, Any], result: Any) -> None:
+def _store_cached_result(
+    cache: Any,
+    run_hash: str | None,
+    inputs: dict[str, Any],
+    result: Any,
+    *,
+    required: bool = False,
+) -> None:
     """Persist a completed result to the compute node's cache when configured."""
     if cache is None or run_hash is None:
         return
@@ -99,7 +121,9 @@ def _store_cached_result(cache: Any, run_hash: str | None, inputs: dict[str, Any
                 output_hashes=output_hashes,
             ),
         )
-    except Exception:  # noqa: BLE001
+    except Exception:
+        if required:
+            raise
         logger.warning("Failed to store cached result for run %s", run_hash, exc_info=True)
 
 
@@ -113,6 +137,7 @@ def execute_job(input_dir: str | Path, output_dir: str | Path) -> Any:
 
     input_path = Path(input_dir)
     output_path = Path(output_dir)
+    cache_transport = _uses_remote_cache_transport(input_path)
     cache, run_hash = _load_remote_cache(input_path)
     result = _get_cached_result(cache, run_hash)
 
@@ -122,7 +147,7 @@ def execute_job(input_dir: str | Path, output_dir: str | Path) -> Any:
         for key, value in inputs["settings"].items():
             algorithm.settings().set(key, value)
         result = algorithm.run(*inputs["args"], **inputs["kwargs"])
-        _store_cached_result(cache, run_hash, inputs, result)
+        _store_cached_result(cache, run_hash, inputs, result, required=cache_transport)
 
     serialize_outputs(output_path, result)
     return result

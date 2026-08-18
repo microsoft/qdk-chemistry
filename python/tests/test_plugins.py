@@ -9,6 +9,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from types import ModuleType
 from unittest.mock import MagicMock, call
 
 import pytest
@@ -26,6 +27,7 @@ from qdk_chemistry.remote.backends import base as remote_backend_registry
 from qdk_chemistry.remote.cache import FolderCache
 
 _BUNDLED_PLUGIN_AUTOLOAD_CASES = (
+    ("discovery", "QDK_CHEMISTRY_DISABLE_DISCOVERY_AUTOLOAD"),
     ("pyscf", "QDK_CHEMISTRY_DISABLE_PYSCF_AUTOLOAD"),
     ("qiskit", "QDK_CHEMISTRY_DISABLE_QISKIT_AUTOLOAD"),
     ("openfermion", "QDK_CHEMISTRY_DISABLE_OPENFERMION_AUTOLOAD"),
@@ -372,6 +374,41 @@ def test_bundled_plugin_autoload_can_be_disabled(monkeypatch, plugin_name, disab
     qdk_chemistry._load_bundled_plugin(plugin_name, disable_env_var)
 
     import_module.assert_not_called()
+
+
+def test_discovery_plugin_registers_backend_when_sdk_is_available(monkeypatch):
+    """The bundled Discovery plugin activates when its SDK can be imported."""
+    from qdk_chemistry.plugins import discovery  # noqa: PLC0415
+    from qdk_chemistry.plugins.discovery.backend import DiscoveryBackend  # noqa: PLC0415
+
+    sdk = ModuleType("azure.ai.discovery")
+    import_module = MagicMock(return_value=sdk)
+    register_remote_backend = MagicMock()
+    monkeypatch.setattr(discovery, "_loaded", False)
+    monkeypatch.setattr(discovery.importlib, "import_module", import_module)
+    monkeypatch.setattr(PluginRegistrar, "register_remote_backend", register_remote_backend)
+
+    discovery.load()
+
+    import_module.assert_called_once_with("azure.ai.discovery")
+    register_remote_backend.assert_called_once_with("discovery", DiscoveryBackend)
+    assert discovery._loaded
+
+
+def test_discovery_plugin_stays_inactive_without_sdk(monkeypatch):
+    """An absent Discovery SDK prevents backend registration."""
+    from qdk_chemistry.plugins import discovery  # noqa: PLC0415
+
+    register_remote_backend = MagicMock()
+    monkeypatch.setattr(discovery, "_loaded", False)
+    monkeypatch.setattr(discovery.importlib, "import_module", MagicMock(side_effect=ModuleNotFoundError))
+    monkeypatch.setattr(PluginRegistrar, "register_remote_backend", register_remote_backend)
+
+    with pytest.raises(ModuleNotFoundError):
+        discovery.load()
+
+    register_remote_backend.assert_not_called()
+    assert not discovery._loaded
 
 
 def test_bundled_plugin_duplicate_warns_with_disable_hint_and_propagates(monkeypatch):

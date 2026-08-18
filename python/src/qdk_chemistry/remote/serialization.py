@@ -20,6 +20,7 @@ from typing import Any, Type  # noqa: UP035
 
 from qdk_chemistry._core.data import DataClass as CoreDataClass
 from qdk_chemistry.data import AlgorithmRef, Settings
+from qdk_chemistry.data._hashing import _item_content_hash
 from qdk_chemistry.data._type_name import instance_data_type_name
 from qdk_chemistry.data.registry import (
     available_dataclasses,
@@ -151,6 +152,11 @@ class FileSerializer:
         return isinstance(value, CoreDataClass)
 
     @classmethod
+    def is_cacheable(cls, value: Any) -> bool:
+        """Check if a value can be stored in a shared cache."""
+        return cls.is_dataclass(value) or isinstance(value, list)
+
+    @classmethod
     def serialize_value(  # noqa: PLR0911
         cls,
         directory: Path,
@@ -159,6 +165,7 @@ class FileSerializer:
         *,
         cache: Any = None,
         content_hash: str | None = None,
+        seed_cache: bool = False,
     ) -> dict[str, Any]:
         """Serialize a single value, returning manifest entry.
 
@@ -172,6 +179,8 @@ class FileSerializer:
                 emitted instead.
             content_hash: Optional content hash for *value*.  Used for
                 the cache existence check.
+            seed_cache: Whether to write a missing cacheable value into the
+                shared cache instead of serializing it to a file.
 
         Returns:
             Manifest entry describing the serialized value.
@@ -190,22 +199,27 @@ class FileSerializer:
                 "settings": _jsonable_settings(settings) if settings is not None else None,
             }
 
+        # A shared cache can replace file transfer for cacheable values.
+        if (
+            cls.is_cacheable(value)
+            and cache is not None
+            and content_hash is not None
+            and getattr(cache, "is_shared", False)
+        ):
+            cached = cache.has_data(content_hash)
+            if not cached and seed_cache:
+                cache.put_data(content_hash, value)
+                cached = True
+            if cached:
+                return {
+                    "type": "cached",
+                    "dataclass_type": instance_data_type_name(value) if cls.is_dataclass(value) else "list",
+                    "content_hash": content_hash,
+                }
+
         # Handle DataClass objects - serialize to individual file
         if cls.is_dataclass(value):
             type_name = instance_data_type_name(value)
-
-            # If a shared cache already has this blob, skip the file
-            if (
-                cache is not None
-                and content_hash is not None
-                and getattr(cache, "is_shared", False)
-                and cache.has_data(content_hash)
-            ):
-                return {
-                    "type": "cached",
-                    "dataclass_type": type_name,
-                    "content_hash": content_hash,
-                }
 
             ext = cls._get_dataclass_extension(type_name)
             safe_name = name.replace("/", "_").replace("\\", "_").replace("..", "_")
@@ -238,14 +252,32 @@ class FileSerializer:
         if isinstance(value, list):
             items = []
             for i, item in enumerate(value):
-                items.append(cls.serialize_value(directory, f"{name}_item_{i}", item))
+                items.append(
+                    cls.serialize_value(
+                        directory,
+                        f"{name}_item_{i}",
+                        item,
+                        cache=cache,
+                        content_hash=_item_content_hash(item) if cls.is_cacheable(item) else None,
+                        seed_cache=seed_cache,
+                    )
+                )
             return {"type": "list", "items": items}
 
         # Handle tuples
         if isinstance(value, tuple):
             items = []
             for i, item in enumerate(value):
-                items.append(cls.serialize_value(directory, f"{name}_item_{i}", item))
+                items.append(
+                    cls.serialize_value(
+                        directory,
+                        f"{name}_item_{i}",
+                        item,
+                        cache=cache,
+                        content_hash=_item_content_hash(item) if cls.is_cacheable(item) else None,
+                        seed_cache=seed_cache,
+                    )
+                )
             return {"type": "tuple", "items": items}
 
         # Handle dicts
@@ -254,8 +286,22 @@ class FileSerializer:
             for index, (key, item) in enumerate(value.items()):
                 entries.append(
                     {
-                        "key": cls.serialize_value(directory, f"{name}_entry_{index}_key", key),
-                        "value": cls.serialize_value(directory, f"{name}_entry_{index}_value", item),
+                        "key": cls.serialize_value(
+                            directory,
+                            f"{name}_entry_{index}_key",
+                            key,
+                            cache=cache,
+                            content_hash=_item_content_hash(key) if cls.is_cacheable(key) else None,
+                            seed_cache=seed_cache,
+                        ),
+                        "value": cls.serialize_value(
+                            directory,
+                            f"{name}_entry_{index}_value",
+                            item,
+                            cache=cache,
+                            content_hash=_item_content_hash(item) if cls.is_cacheable(item) else None,
+                            seed_cache=seed_cache,
+                        ),
                     }
                 )
             return {"type": "dict", "entries": entries}
@@ -380,6 +426,7 @@ def serialize_inputs(
     input_hashes: dict[str, str] | None = None,
     remote_cache: dict[str, str] | None = None,
     remote_cache_backend: Any = None,
+    remote_cache_transport: bool = False,
 ) -> list[Path]:
     """Serialize algorithm inputs to a directory of files.
 
@@ -399,6 +446,8 @@ def serialize_inputs(
             ``is_shared`` is true and a DataClass blob already exists in
             this cache, the HDF5 file is **not** written and a ``"cached"``
             reference is emitted in the manifest instead.
+        remote_cache_transport: Whether the shared cache is the job's artifact
+            transport rather than an optional cache optimization.
 
     Returns:
         List of all files created (for upload).
@@ -421,10 +470,19 @@ def serialize_inputs(
         manifest["input_hashes"] = input_hashes
     if remote_cache is not None:
         manifest["remote_cache"] = remote_cache
+    if remote_cache_transport:
+        manifest["remote_cache_transport"] = True
 
     # Serialize settings
     for index, (key, value) in enumerate(settings.items()):
-        manifest["settings"][key] = FileSerializer.serialize_value(directory, f"setting_{index}", value)
+        manifest["settings"][key] = FileSerializer.serialize_value(
+            directory,
+            f"setting_{index}",
+            value,
+            cache=remote_cache_backend,
+            content_hash=_item_content_hash(value) if FileSerializer.is_cacheable(value) else None,
+            seed_cache=remote_cache_transport,
+        )
 
     # Serialize positional arguments
     for i, arg in enumerate(args):
@@ -435,6 +493,7 @@ def serialize_inputs(
             arg,
             cache=remote_cache_backend,
             content_hash=chash,
+            seed_cache=remote_cache_transport,
         )
         if chash and "content_hash" not in entry:
             entry["content_hash"] = chash
@@ -449,6 +508,7 @@ def serialize_inputs(
             value,
             cache=remote_cache_backend,
             content_hash=chash,
+            seed_cache=remote_cache_transport,
         )
         if chash and "content_hash" not in entry:
             entry["content_hash"] = chash
