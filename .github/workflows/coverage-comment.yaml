@@ -29,7 +29,7 @@ jobs:
     if: github.event.workflow_run.event == 'pull_request'
     steps:
     - name: Download coverage comment artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         pattern: coverage-comment-*
         path: artifacts
@@ -38,7 +38,7 @@ jobs:
 
     - name: Resolve pull request number
       id: pr
-      uses: actions/github-script@v7
+      uses: actions/github-script@v9
       with:
         script: |
           // Resolve the PR number from the GitHub API using the trusted head
@@ -65,6 +65,7 @@ jobs:
 
         comment_file="$RUNNER_TEMP/pr-comment.md"
         : > "$comment_file"
+        echo "# 📊 Coverage Summary" >> "$comment_file"
         found_report=false
 
         for dir in artifacts/coverage-comment-*/; do
@@ -76,12 +77,9 @@ jobs:
           job_label="${job_label#coverage-comment-}"
 
           {
-            echo "<details>"
-            echo "<summary>${job_label}</summary>"
+            echo "## ${job_label}"
             echo ""
             cat "$report"
-            echo ""
-            echo "</details>"
             echo ""
           } >> "$comment_file"
           found_report=true
