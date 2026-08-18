@@ -26,14 +26,16 @@ if(BUILD_STATIC)
     set(_target_file "libaec_static-targets")
 endif()
 file(READ "${CURRENT_PACKAGES_DIR}/share/libaec/${_target_file}.cmake" libaec_targets)
-string(REGEX REPLACE " (SHARED|STATIC) IMPORTED" " \\1 IMPORTED \${libaec_maybe_global}" libaec_targets "${libaec_targets}")
-file(WRITE "${CURRENT_PACKAGES_DIR}/share/libaec/${_target_file}.cmake" "set(libaec_maybe_global \"\")
+if(NOT libaec_targets MATCHES "^set\\(libaec_maybe_global")
+    string(REGEX REPLACE " (SHARED|STATIC) IMPORTED" " \\1 IMPORTED \${libaec_maybe_global}" libaec_targets "${libaec_targets}")
+    file(WRITE "${CURRENT_PACKAGES_DIR}/share/libaec/${_target_file}.cmake" "set(libaec_maybe_global \"\")
 if(CMAKE_VERSION VERSION_LESS 3.18)
     set(libaec_maybe_global \"GLOBAL\")
 endif()
 ${libaec_targets}
 "
-)
+    )
+endif()
 
 file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/include")
 
