@@ -97,7 +97,11 @@ class RobustPhaseEstimationRound(DataClass):
 
     """
 
-    _data_type_name = "robust_phase_estimation_round"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for RPE round metadata."""
+        return "robust_phase_estimation_round"
+
     _serialization_version = "0.1.0"
 
     def __init__(
@@ -143,7 +147,7 @@ class RobustPhaseEstimationRound(DataClass):
 
     def _hash_update(self, h) -> None:
         """Feed identifying round data into the hasher."""
-        _hash_str(h, self._data_type_name)
+        _hash_str(h, self.data_type_name())
         _hash_arg(h, self._payload())
 
     def get_summary(self) -> str:
@@ -202,7 +206,11 @@ class RobustPhaseEstimationExperiment(DataClass):
 
     """
 
-    _data_type_name = "robust_phase_estimation_experiment"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for materialized RPE experiments."""
+        return "robust_phase_estimation_experiment"
+
     _serialization_version = "0.1.0"
 
     def __init__(
@@ -251,7 +259,7 @@ class RobustPhaseEstimationExperiment(DataClass):
 
     def _hash_update(self, h) -> None:
         """Feed identifying experiment data into the hasher."""
-        _hash_str(h, self._data_type_name)
+        _hash_str(h, self.data_type_name())
         _hash_arg(h, self.round_index)
         _hash_arg(h, self.evolution_time)
         _hash_arg(h, self.shots_per_basis)
@@ -323,7 +331,11 @@ class RobustPhaseEstimationSchedule(DataClass):
 
     """
 
-    _data_type_name = "robust_phase_estimation_schedule"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for RPE schedules."""
+        return "robust_phase_estimation_schedule"
+
     _serialization_version = "0.1.0"
 
     def __init__(
@@ -398,7 +410,7 @@ class RobustPhaseEstimationSchedule(DataClass):
 
     def _hash_update(self, h) -> None:
         """Feed identifying schedule data into the hasher."""
-        _hash_str(h, self._data_type_name)
+        _hash_str(h, self.data_type_name())
         _hash_arg(h, self._payload())
 
     def get_summary(self) -> str:
