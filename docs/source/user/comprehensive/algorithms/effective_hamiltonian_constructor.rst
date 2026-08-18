@@ -101,69 +101,115 @@ QDK SW-PT2
 
 This is the default implementation returned by ``create("effective_hamiltonian_constructor")``.
 
-Second-order Schrieffer-Wolff (Van Vleck) downfolding. Splitting :math:`H` into a part
+Second-order Schrieffer-Wolff (Van Vleck) downfolding :cite:`Schrieffer1966,Bravyi2011` with
+diagonal generalized-Fock energy denominators.
+Splitting :math:`H` into a part
 :math:`H_{\mathrm{BD}}` that is block diagonal in the occupation of :math:`Q` and an
 occupation-changing remainder :math:`H_{\mathrm{OD}}`, the effective Hamiltonian is
 
 .. math::
 
-   H_{\mathrm{eff}} = P\left(H_{\mathrm{BD}} +
-   \tfrac{1}{2}[S,H_{\mathrm{OD}}]\right)P,
-   \qquad [F_0, S] = H_{\mathrm{OD}},
+   H_{\mathrm{eff}} = \hat P\left(H_{\mathrm{BD}} +
+   \tfrac{1}{2}[S,H_{\mathrm{OD}}]\right)\hat P.
 
-truncated to at most two-body operators. :math:`F_0` is a diagonal, spin-free generalized
-Fock operator. Enabling a denominator regularizer replaces the bare inverse denominators of
-:math:`S`, which then satisfies the commutator equation only approximately.
+The generator :math:`S` is calculated from
 
-The input Hamiltonian must be built with every orbital of the window marked active, since the
-Hamiltonian constructor folds inactive orbitals into the constant energy term and drops
-virtual orbitals. Building it over :math:`P` alone removes the :math:`P \leftrightarrow Q`
-couplings that the method needs.
+.. math::
+
+   [F_0, S] = H_{\mathrm{OD}},
+
+where :math:`F_0` -- the spin-free generalized Fock operator based on the input reference wavefunction -- is used to approximate :math:`H_{\mathrm{BD}}`, which allows for efficient computation of :math:`S`. This results in
+
+.. math::
+
+   S = \sum_{T} \frac{c_T}{\Delta_T}\,\hat{T},
+   \qquad
+   \Delta_T = \sum_{\mathrm{creations}} \varepsilon_p
+            - \sum_{\mathrm{annihilations}} \varepsilon_p,
+
+where :math:`c_T` are the coefficients of the operator terms :math:`\hat{T}` in
+:math:`H_{\mathrm{OD}} = \sum_T c_T\,\hat{T}`, and the orbital energies
+:math:`\varepsilon_p` are the diagonal elements of the generalized Fock matrix:
+
+.. math::
+   \varepsilon_p = F_{pp},\qquad F_{pq} = h_{pq}
+          + \sum_{rs} \gamma_{rs}\left[(pq|rs) - \tfrac{1}{2}(pr|sq)\right].
+
+:math:`\gamma` is the reference wavefunction's spin-traced one-particle density over
+:math:`W`. Because :math:`\gamma` is spin traced, the two spin channels share the same orbital
+energies, :math:`\varepsilon_{p\alpha} = \varepsilon_{p\beta}`, so the emitted operator
+commutes with the total spin and the active-space solve selects the spin sector.
+
+These denominators assume :math:`F` is diagonal, which holds for canonical orbitals but not in
+general. With ``semicanonicalize``, :math:`F` is diagonalized within each orbital-role block
+before the denominators are formed and the emitted operator is rotated back to the caller's
+basis, making the setting a no-op for canonical orbitals.
+
+Near-degenerate channels give a small :math:`\Delta_T` and a large amplitude, where the
+perturbative expansion stops converging. ``regularizer_sigma2`` damps them by replacing the
+bare inverse denominator with
+
+.. math::
+
+   \frac{1}{\Delta_T} \to \frac{1 - e^{-\sigma \Delta_T^2}}{\Delta_T},
+
+the :math:`\sigma^2` regularizer :cite:`Shee2021`, whose :math:`\sigma` (in :math:`E_h^{-2}`)
+is equivalently the DSRG flow parameter :cite:`Evangelista2014`. Larger :math:`\sigma`
+regularizes less, and ``0`` leaves the bare inverse.
+
+The kept space :math:`P` is defined by the ``p_indices`` argument. The reference wavefunction
+only supplies the density matrix :math:`\gamma`, and is independent of :math:`P`.
+Every orbital in :math:`Q = W \setminus P` is folded, as doubly
+occupied if its reference occupation rounds to two and as empty if it rounds to zero. Rounding
+an occupation that is far from 2 or 0 perturbs the mean field the active space feels, so
+``max_folded_occupation_deviation`` bounds how far it may stray before the downfold is
+rejected. The active space keeps whatever electrons the folded orbitals do not take.
+
+The commutator :math:`[S, H_{\mathrm{OD}}]` generates three-body terms that the emitted
+two-body operator cannot carry. With ``fold_above_two_body`` they are folded onto the reference
+density in the generalized normal-ordering sense :cite:`Kutzelnigg1997` rather than discarded,
+which matters as the active electron count grows but costs more to evaluate.
 
 Restricted HF, restricted open-shell HF, and spin-adapted CAS references are supported;
 for ROHF every singly occupied orbital must be active. Unrestricted orbitals are rejected.
-The reference and the input Hamiltonian must use the same molecular-orbital basis, and the
-Hamiltonian's inactive orbitals must be the reference core orbitals outside the window.
+The reference and the input Hamiltonian must share the same molecular-orbital basis, and the
+orbitals the Hamiltonian folded into its core energy must be exactly the reference core
+orbitals outside :math:`W`, since otherwise that core energy and :math:`\gamma` describe
+different states.
+
+The constructor logs the active regularization, the derived active electron count, the largest
+folded occupation deviation, the minimum denominator and the maximum raw amplitude
+:math:`|c_T/\Delta_T|`. It warns when a folded deviation or the folded core's excess charge is
+large, and when the amplitude exceeds one, where the perturbation series stops contracting.
+Widening the window is comparatively cheap, while enlarging the kept space is not. Dense
+four-center integrals are what limit the window size in practice.
 
 .. rubric:: Settings
 
 .. list-table::
    :header-rows: 1
-   :widths: 30 12 16 42
+   :widths: 25 15 15 45
 
    * - Setting
      - Type
      - Default
      - Description
-   * - ``denom_flow``
+   * - ``regularizer_sigma2``
      - float
      - ``1.0``
-     - Flow-parameter regularizer, :math:`1/D \to (1-e^{-sD^2})/D`, in :math:`E_h^{-2}`. ``0`` disables it.
-   * - ``denom_imaginary_shift``
-     - float
-     - ``0.0``
-     - Imaginary level shift, :math:`1/D \to D/(D^2+s^2)`, in :math:`E_h`. ``0`` disables it.
-   * - ``denom_floor``
-     - float
-     - ``1e-8``
-     - Absolute cutoff in :math:`E_h` used by unregularized denominators.
+     - Strength :math:`\sigma` of the :math:`\sigma^2` denominator regularizer, in :math:`E_h^{-2}`; ``0`` disables.
    * - ``semicanonicalize``
      - bool
      - ``True``
-     - Diagonalize the generalized Fock matrix within each orbital-role block.
+     - Diagonalize the generalized Fock matrix blockwise before forming denominators.
    * - ``fold_above_two_body``
      - bool
      - ``True``
-     - Fold the three-body terms the transformation generates onto the reference density instead of discarding them. Ignored when :math:`P` holds at most two electrons.
+     - Fold the three-body terms onto the reference density instead of discarding them.
    * - ``max_folded_occupation_deviation``
      - float
      - ``0.5``
-     - Largest deviation from an integer reference occupation allowed for a folded orbital. Must be below 1.
-
-``denom_flow`` and ``denom_imaginary_shift`` are mutually exclusive: a positive value enables
-that scheme, and setting both raises an error rather than silently applying one. With both at
-zero the unregularized inverse is used, floored by ``denom_floor``. The flow option borrows the
-DSRG damping form but does not make this a DSRG calculation.
+     - Largest deviation from an integer reference occupation allowed for a folded orbital.
 
 .. tab:: Python API
 
@@ -180,89 +226,6 @@ DSRG damping form but does not make this a DSRG calculation.
       :language: python
       :start-after: # start-cell-downfold
       :end-before: # end-cell-downfold
-
-SW-PT2 algorithm
-^^^^^^^^^^^^^^^^
-
-Each folded orbital's reference occupation is rounded to doubly occupied or empty. Rounding
-does not change the total electron count, because the active space receives whatever the
-folded orbitals do not take, and the resulting integer active electron count is logged for the
-active-space solver. Rounding does perturb the mean field the active space feels, at first
-order and without being damped by the regularizer, so both the largest folded deviation and
-the net charge the folded core carries in excess of the reference density are logged, with a
-warning when either is large. Keeping a correlated pair together on the folded side makes its
-roundings cancel.
-
-Noncanonical orbitals are semicanonicalized independently within the inactive, active, and
-virtual blocks before the denominators are formed, and the emitted operator is rotated back to
-the caller's basis.
-
-The constructor logs the active regularization, the minimum denominator, the maximum raw
-amplitude :math:`|V/\Delta|`, and whether a semicanonical rotation was applied. Small
-denominators and large amplitudes indicate sensitivity to intruder states; an amplitude above
-one, where the perturbation series stops contracting, also produces a warning. The default flow
-parameter is a policy default rather than an accuracy guarantee, so compare regularization
-choices when the logged values indicate sensitivity.
-
-This implementation emits at most two-body operators and uses diagonal
-generalized-Fock denominators. :math:`\tfrac{1}{2}[S,H_{\mathrm{OD}}]` also generates three-body
-terms, which a Hamiltonian cannot hold. Discarding them outright is not a small correction: a
-three-body operator has no matrix elements below three electrons, so it would be harmless only
-while :math:`P` holds at most two, and its cost grows with the electron count in :math:`P`.
-Folding a single valence virtual of water in a minimal basis into a six-electron kept space
-that way costs about 0.2 :math:`E_h`, more than the orbital is worth and of the opposite sign.
-
-Instead of discarding them, the terms above two-body are folded onto the reference: each is
-normal-ordered against the reference one-particle density :math:`\gamma` and whatever falls to
-two-body is kept, so only the reference-normal-ordered residual is lost rather than the whole
-term. Nothing here requires :math:`\gamma` to describe a single determinant, so open-shell,
-natural-orbital and correlated active-space references are all handled; what is neglected is
-the two-body density cumulant.
-
-What folding buys is a *bounded* error rather than a uniformly smaller one. Discarding is
-erratic -- sometimes accidentally near-exact, sometimes catastrophic, with nothing in the
-inputs to say which -- while folding lands in a narrow band. Over a sweep of small molecules in
-minimal and double-zeta bases, closed- and open-shell, with four to eight active electrons and
-one to three folded virtuals, folding held the error against full CI in the same window to a
-few milli-:math:`E_h`, while discarding spanned two orders of magnitude and degraded sharply as
-more orbitals were folded -- the direction of practical interest. The benefit likewise grows
-with the electron count in :math:`P`, since three-body operators simply matter more as
-:math:`P` fills. Open-shell references behave at least as well as closed-shell ones: the
-spin-traced density gives each singly occupied orbital half an electron per spin, which keeps
-the emitted operator spin-free.
-
-Folding is nevertheless **not** a strict improvement. It loses occasionally, always by a small
-margin, always with a single folded virtual, and always in multiply bonded systems such as
-N2 and CO where the discarded terms are small or cancel, so their reference contractions move
-a nearly exact answer away from full CI. Correlation strength does not predict the direction,
-so there is no useful criterion to gate on, and no substitute for checking against a larger
-calculation when the answer matters.
-
-Folding also removes a spurious sensitivity to the regularizer. Discarded three-body terms
-used to leave flow and bare denominators disagreeing by 0.4 :math:`E_h` on the equilibrium
-case, which looked like an intruder problem and was not; folded, they agree to about 0.002
-:math:`E_h`.
-
-Two consequences follow. The emitted operator now depends on the reference density, so its
-accuracy degrades as the active-space solution moves away from that reference. And the
-occupations are read after semicanonicalization, since that rotation mixes occupied and empty
-orbitals within the kept space.
-
-Folding is not free, and its cost depends on the reference. Reaching two-body means
-enumerating contractions that the two-body truncation would otherwise let the projection skip,
-and the enumeration prunes a branch as soon as a reference propagator vanishes. A determinant
-reference therefore costs about six to seven times the kernel time, while a correlated
-reference, whose density is dense after semicanonicalization, costs roughly sixteen to
-twenty-three times. Folding does not change the asymptotic scaling, which stays near
-:math:`O(N_{\mathrm{active}}^5)` either way; it is a constant multiplier.
-
-It is therefore controlled by ``fold_above_two_body``, on by default because discarding is the
-larger error. A kept space holding at most two electrons skips the cost automatically, since
-the discarded terms have no matrix elements to contribute there.
-
-Dense four-center integrals require :math:`O(N^4)` storage, and semicanonicalizing a
-noncanonical window costs :math:`O(N^5)`. The retained commutator also grows steeply with the
-size of :math:`P`. Use it for modest dense windows rather than windows of hundreds of orbitals.
 
 Related classes
 ---------------

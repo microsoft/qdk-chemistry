@@ -197,12 +197,10 @@ spin-adapted CAS references are supported; every singly occupied ROHF orbital
 must belong to the active space. UHF orbitals are not supported. Registered as
 ``"qdk_swpt2"``, with the aliases ``"swpt2"`` and ``"schrieffer_wolff"``.
 
-Denominator regularization is selected by setting a parameter rather than a
-mode: ``denom_flow`` (flow parameter in :math:`E_h^{-2}`, default ``1.0``) and
-``denom_imaginary_shift`` (imaginary level shift in :math:`E_h`, default ``0``)
-are mutually exclusive, and a positive value enables that scheme. Setting both
-is an error. With both at zero the unregularized inverse is used, floored by
-``denom_floor``. The flow option borrows the DSRG damping form but is not a full
+Denominator regularization is controlled by ``regularizer_sigma2`` (the
+:math:`\sigma` of the :math:`\sigma^2` regularizer, in :math:`E_h^{-2}`, default
+``1.0``), equivalently the DSRG flow parameter. Larger values regularize less and
+``0`` leaves the bare inverse. It borrows the DSRG damping form but is not a full
 DSRG calculation.
 ``semicanonicalize`` is enabled by default and diagonalizes the generalized
 Fock independently within inactive, active, and virtual orbital blocks before
@@ -243,8 +241,7 @@ Typical usage:
     import qdk_chemistry.algorithms as alg
 
     downfolder = alg.create("effective_hamiltonian_constructor", "qdk_swpt2")
-    downfolder.settings().set("denom_flow", 0.0)
-    downfolder.settings().set("denom_imaginary_shift", 0.5)
+    downfolder.settings().set("regularizer_sigma2", 0.4)
     h_eff = downfolder.run(reference, window_hamiltonian, p_indices)
 
 See Also:
@@ -255,7 +252,7 @@ See Also:
       .def(py::init<>(), R"(
 Default constructor.
 
-Initializes a Schrieffer-Wolff PT2 downfold with flow regularization enabled by
-default. Set ``denom_flow`` to 0 for unregularized second-order PT.
+Initializes a Schrieffer-Wolff PT2 downfold with sigma^2 regularization enabled
+by default. Set ``regularizer_sigma2`` to 0 for unregularized second-order PT.
 )");
 }

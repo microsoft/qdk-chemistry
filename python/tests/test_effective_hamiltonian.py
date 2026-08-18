@@ -57,18 +57,14 @@ class TestEffectiveHamiltonianConstructor:
         """Denominator/regularization settings expose their defaults and are settable."""
         constructor = algorithms.create(_TYPE, "swpt2")
         settings = constructor.settings()
-        # flow regularization is on by default at the constructor layer
-        assert settings.get("denom_floor") == pytest.approx(1e-8)
-        assert settings.get("denom_imaginary_shift") == pytest.approx(0.0)
-        assert settings.get("denom_flow") == pytest.approx(1.0)
+        # sigma^2 regularization is on by default at the constructor layer
+        assert settings.get("regularizer_sigma2") == pytest.approx(1.0)
         assert settings.get("semicanonicalize") is True
         assert settings.get("fold_above_two_body") is True
         assert settings.get("max_folded_occupation_deviation") == pytest.approx(0.5)
 
-        settings.set("denom_flow", 0.0)
-        settings.set("denom_imaginary_shift", 0.5)
-        assert constructor.settings().get("denom_flow") == pytest.approx(0.0)
-        assert constructor.settings().get("denom_imaginary_shift") == pytest.approx(0.5)
+        settings.set("regularizer_sigma2", 0.4)
+        assert constructor.settings().get("regularizer_sigma2") == pytest.approx(0.4)
 
     def test_accepts_mean_field_hf_reference(self):
         """A mean-field HF reference (no active 1-RDM) is accepted directly."""

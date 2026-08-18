@@ -8,9 +8,9 @@
 // Split H into H_BD, block diagonal in the external occupation, and the
 // occupation-changing H_OD. For
 // bare denominators, a separate diagonal generalized-Fock operator F0 defines
-// the anti-Hermitian generator through [F0, S] = H_OD. The flow and
-// imaginary-shift options instead build a regularized generator, which solves
-// that equation only approximately. In either case the implemented
+// the anti-Hermitian generator through [F0, S] = H_OD. The sigma^2 regularizer
+// instead builds a regularized generator, which solves that equation only
+// approximately. In either case the implemented
 // approximation is H_eff = H_BD + 1/2 [S, H_OD], projected onto the reference
 // external occupation and truncated to <= 2-body. The projected commutator is
 // evaluated by bounded-rank generalized-Wick contractions over external legs.
@@ -21,6 +21,16 @@
 //         + (1/4) sum_{PQRS} v[P,Q,R,S] a^dag_P a^dag_Q a_R a_S
 // with v antisymmetric under P<->Q and under R<->S. Two-body tensors are stored
 // flat in C-order (index = ((P*n_so + Q)*n_so + R)*n_so + S).
+//
+// References:
+//   Schrieffer & Wolff, Phys. Rev. 149, 491 (1966)
+//   Bravyi, DiVincenzo & Loss, Ann. Phys. 326, 2793 (2011)
+//   Kutzelnigg & Mukherjee, J. Chem. Phys. 107, 432 (1997)  [generalized
+//     normal ordering, used to fold terms above two-body]
+//   Evangelista, J. Chem. Phys. 141, 054109 (2014)          [sigma^2 / DSRG
+//     flow form of the denominator regularizer]
+//   Shee et al., J. Phys. Chem. Lett. 12, 12084 (2021)      [survey of the
+//     sigma, sigma^2 and kappa regularizers]
 
 #pragma once
 
@@ -40,17 +50,14 @@ inline std::size_t idx4(int p, int q, int r, int s, int n) {
 // Shared kernel foundations.
 // ===========================================================================
 
-/// SW energy-denominator options. Callers select one scheme by setting either
-/// the flow or the imaginary shift positive; otherwise the floor-guarded bare
-/// inverse is used.
+/// SW energy-denominator options.
 struct RegularizerOptions {
-  double denom_floor = 1e-8;  ///< hard cutoff: skip couplings with |D| < floor
-  double denom_imaginary_shift =
-      0.0;  ///< imaginary level shift: 1/D -> D/(D^2+s^2)
-  /// Smooth flow-parameter regularizer 1/D -> (1 - exp(-s*D^2))/D that damps
-  /// near-degenerate (intruder) channels; `s` is the SRG/DSRG "flow parameter"
-  /// (units of inverse energy squared). 0 disables.
-  double denom_flow = 0.0;
+  /// Sigma of the sigma^2 regularizer, 1/D -> (1 - exp(-sigma*D^2))/D, which
+  /// damps near-degenerate (intruder) channels; equivalently the SRG/DSRG flow
+  /// parameter (units of inverse energy squared). Larger values regularize
+  /// less; 0 disables, leaving the bare inverse. See Shee et al., J. Phys.
+  /// Chem. Lett. 12, 12084 (2021).
+  double sigma2 = 0.0;
 };
 
 /// Regularized inverse energy denominator.

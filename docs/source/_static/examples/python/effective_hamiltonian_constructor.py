@@ -51,13 +51,12 @@ E_scf, wfn = create("scf_solver").run(
 
 # Assign an active space to the mean-field reference
 selector = create("active_space_selector", "qdk_valence")
-selector.settings().set("num_active_electrons", 2)
-selector.settings().set("num_active_orbitals", 2)
+selector.settings().set("num_active_electrons", 6)
+selector.settings().set("num_active_orbitals", 5)
 reference = selector.run(wfn)
 
 # Build the window Hamiltonian from the pre-selection orbitals, so that every
-# orbital of W is active. Passing the reference orbitals here would restrict the
-# window to the active space and remove the P-Q couplings the downfold needs.
+# orbital of W is active.
 window_hamiltonian = create("hamiltonian_constructor").run(wfn.get_orbitals())
 
 # Keep the reference active space as P and fold the rest of the window into it

@@ -29,17 +29,18 @@ inline Eigen::Index n4(int n) {
 // occupation-change masks, and projected-commutator Wick machinery.
 // ===========================================================================
 
+// Guards the bare inverse and the raw-amplitude diagnostic against a vanishing
+// denominator. Not a physics knob, so it is fixed rather than a setting.
+constexpr double denominator_floor = 1e-8;
+
 double regularized_inverse(double delta, const RegularizerOptions& reg) {
-  if (reg.denom_flow > 0.0) {
+  if (reg.sigma2 > 0.0) {
     const double d2 = delta * delta;
-    if (reg.denom_flow * d2 < 1e-14) return reg.denom_flow * delta;
-    return (1.0 - std::exp(-reg.denom_flow * d2)) / delta;
+    // Taylor form of (1-exp(-x))/delta, which cancels catastrophically here.
+    if (reg.sigma2 * d2 < 1e-14) return reg.sigma2 * delta;
+    return (1.0 - std::exp(-reg.sigma2 * d2)) / delta;
   }
-  if (reg.denom_imaginary_shift > 0.0) {
-    return delta / (delta * delta +
-                    reg.denom_imaginary_shift * reg.denom_imaginary_shift);
-  }
-  if (std::abs(delta) < reg.denom_floor) return 0.0;
+  if (std::abs(delta) < denominator_floor) return 0.0;
   return 1.0 / delta;
 }
 
@@ -779,7 +780,7 @@ ActiveDownfoldResult downfold_blocked(
     const double ad = std::abs(delta);
     min_denom = std::min(min_denom, ad);
     max_amp =
-        std::max(max_amp, std::abs(coupling) / std::max(ad, reg.denom_floor));
+        std::max(max_amp, std::abs(coupling) / std::max(ad, denominator_floor));
   };
   for (int P = 0; P < n_so; ++P)
     for (int Q = 0; Q < n_so; ++Q)

@@ -158,15 +158,12 @@ TEST(SchriefferWolffPT2Test, FactoryRegistration) {
 TEST(SchriefferWolffPT2Test, SettingsKnobs) {
   auto ctor = EffectiveHamiltonianConstructorFactory::create("swpt2");
   auto& settings = ctor->settings();
-  // denominator knobs: flow regularization is on by default at this layer
-  EXPECT_DOUBLE_EQ(settings.get<double>("denom_floor"), 1e-8);
-  EXPECT_DOUBLE_EQ(settings.get<double>("denom_imaginary_shift"), 0.0);
-  EXPECT_DOUBLE_EQ(settings.get<double>("denom_flow"), 1.0);
+  // denominator knobs: sigma^2 regularization is on by default at this layer
+  EXPECT_DOUBLE_EQ(settings.get<double>("regularizer_sigma2"), 1.0);
   EXPECT_TRUE(settings.get<bool>("semicanonicalize"));
   EXPECT_DOUBLE_EQ(settings.get<double>("max_folded_occupation_deviation"),
                    0.5);
-  EXPECT_ANY_THROW(settings.set("denom_floor", -1.0));
-  EXPECT_ANY_THROW(settings.set("denom_flow", -1.0));
+  EXPECT_ANY_THROW(settings.set("regularizer_sigma2", -1.0));
 
   auto invalid = EffectiveHamiltonianConstructorFactory::create("swpt2");
   EXPECT_THROW(invalid->run(nullptr, nullptr,
@@ -184,7 +181,8 @@ TEST(SchriefferWolffPT2Test, SettingsKnobs) {
 // consumption path is faithful -- MACIS on the emitted effective Hamiltonian
 // reproduces an independent full-CI on the *same* integrals to machine
 // precision (so no 8-fold symmetrization / container change is needed); and
-// (2) with regularization on by default (denom_flow=1.0) the downfold recovers
+// (2) with regularization on by default (regularizer_sigma2=1.0) the downfold
+// recovers
 // correlation below the bare active-space CAS, whereas an explicitly *bare*
 // (unregularized) run does not -- this particular window splits two
 // near-degenerate virtuals (active LUMO orbital 5, folded external orbital 6)
@@ -265,23 +263,16 @@ TEST(SchriefferWolffPT2Test, DownfoldRunsEndToEndWater) {
   // keeps the active LUMO (orbital 5) while the folded external orbital 6 is a
   // *near-degenerate* virtual (eps_5=+0.47, eps_6=+0.59), so the pp-ladder
   // dressing of the active (5,5) pair has denominator 2(eps_6-eps_5) ~ 0.24 Eh
-  // and bare PT2 overshoots. The default flow regularizer is what tames it.
+  // and bare PT2 overshoots. The default sigma^2 regularizer is what tames it.
   // (Root cause is the partition splitting two near-degenerate virtuals across
   // active/external -- NOT the container/solver, and NOT the MP denominators,
   // which are exact for this canonical closed-shell reference.)
   auto swpt2_bare = EffectiveHamiltonianConstructorFactory::create("swpt2");
-  swpt2_bare->settings().set("denom_flow", 0.0);
+  swpt2_bare->settings().set("regularizer_sigma2", 0.0);
   auto H_eff_bare = swpt2_bare->run(reference, H_window, P_set);
   auto cas_bare = MultiConfigurationCalculatorFactory::create("macis_cas");
   auto [E_sw_bare, wfn_bare] = cas_bare->run(H_eff_bare, 2, 2);
   EXPECT_GT(E_sw_bare, E_sw);  // regularization lowers the energy vs bare PT2
-
-  // The two schemes regularize the same quantity, so enabling both is rejected
-  // rather than silently applying one of them.
-  auto swpt2_both = EffectiveHamiltonianConstructorFactory::create("swpt2");
-  swpt2_both->settings().set("denom_imaginary_shift", 0.5);
-  EXPECT_THROW(swpt2_both->run(reference, H_window, P_set),
-               std::invalid_argument);
 }
 
 // A mean-field HF reference (single determinant, no active 1-RDM) must work:

@@ -610,10 +610,8 @@ TEST(Swpt2KernelTest, ProductionMatchesIndependentFockSpaceMatrix) {
   const double core_energy = 0.23;
 
   sw::RegularizerOptions bare;
-  sw::RegularizerOptions shifted;
-  shifted.denom_imaginary_shift = 0.4;
-  sw::RegularizerOptions flow;
-  flow.denom_flow = 1.2;
+  sw::RegularizerOptions regularized;
+  regularized.sigma2 = 1.2;
 
   struct PartitionCase {
     std::vector<int> active;
@@ -648,7 +646,7 @@ TEST(Swpt2KernelTest, ProductionMatchesIndependentFockSpaceMatrix) {
         return static_cast<int>(full);
       };
 
-      for (const auto& reg : {bare, shifted, flow}) {
+      for (const auto& reg : {bare, regularized}) {
         const MatrixSwParts reference =
             build_matrix_sw_parts(case_h1, case_g, eps, part, core_energy, reg);
         const Eigen::MatrixXd reference_effective =
@@ -755,10 +753,10 @@ TEST(Swpt2KernelTest, ProductionMatchesOracleForWiderKeptSpaces) {
     };
 
     sw::RegularizerOptions bare;
-    sw::RegularizerOptions flow;
-    flow.denom_flow = 1.2;
+    sw::RegularizerOptions regularized;
+    regularized.sigma2 = 1.2;
 
-    for (const auto& reg : {bare, flow}) {
+    for (const auto& reg : {bare, regularized}) {
       const MatrixSwParts reference =
           build_matrix_sw_parts(h1, g, eps, part, core_energy, reg);
       const Eigen::MatrixXd reference_effective =
@@ -1472,7 +1470,7 @@ TEST(Swpt2KernelTest, SemicanonicalDownfoldIsBlockRotationInvariant) {
     const auto blocked = sw::build_two_body_blocked(g_semi, norb);
     const auto one_body = sw::spin_orbital_one_body(h_semi, h_semi, norb);
     sw::RegularizerOptions reg;
-    reg.denom_flow = 1.0;
+    reg.sigma2 = 1.0;
     const auto down =
         sw::downfold_blocked(one_body, blocked, eps, part, reg, 0.3);
     auto effective = sw::to_spatial_chemist(down, part);
