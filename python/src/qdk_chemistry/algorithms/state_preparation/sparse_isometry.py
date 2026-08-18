@@ -111,7 +111,10 @@ class SparseIsometryStatePreparationSettings(Settings):
             "binary_encoding",
             "bool",
             False,
-            "Use binary encoding instead of dense state preparation for the reduced subspace.",
+            "Use binary encoding instead of dense state preparation for the reduced subspace. "
+            "Best effort: it is applied only when it actually shrinks the dense register, i.e. when "
+            "ceil(log2(n_determinants)) is smaller than the number of rows left after GF(2) elimination. "
+            "Otherwise the standard sparse isometry is used instead.",
         )
         self._set_default(
             "include_negative_controls",
