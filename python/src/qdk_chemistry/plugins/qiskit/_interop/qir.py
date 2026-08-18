@@ -41,6 +41,9 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
         Returns:
             A Qiskit QuantumCircuit representing the same quantum operations as the QIR module.
 
+        Raises:
+            UnsupportedQIROperationError: If the entry point has no basic blocks to walk.
+
         """
         # Get qubit/result counts from entry point function attributes
         entry_point = next(filter(pyqir.is_entry_point, qir.functions))
@@ -59,7 +62,10 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
             self._circuit = QuantumCircuit()
 
         # Build the circuit
-        self._walk_blocks(entry_point.basic_blocks[0])
+        basic_blocks = entry_point.basic_blocks
+        if not basic_blocks:
+            raise UnsupportedQIROperationError("QIR entry point has no function body.")
+        self._walk_blocks(basic_blocks[0])
         return self._circuit
 
     # =========================================================================

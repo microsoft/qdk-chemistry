@@ -144,7 +144,7 @@ Binary encoding requires spare rows to compress into. When the state is already 
      - Description
    * - ``binary_encoding``
      - bool
-     - Compress the reduced subspace with binary encoding instead of preparing it directly. Default is False.
+     - Compress the reduced subspace with binary encoding instead of preparing it directly. Best effort: ``True`` requests the encoding rather than guaranteeing it, since it is skipped when :math:`m \ge n_{\mathrm{rows}}` and the standard path is used instead. Default is False.
    * - ``dense_state_prep``
      - AlgorithmRef
      - State preparation algorithm used for the dense subspace. Default is ``dense_pure_state``.
