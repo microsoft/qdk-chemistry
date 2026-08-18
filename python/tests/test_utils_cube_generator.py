@@ -16,8 +16,13 @@ try:
 except ImportError:
     PYSCF_AVAILABLE = False
 
-from qdk_chemistry.data import Orbitals, Structure
-from qdk_chemistry.utils import CubeGenerator, CubeGrid, generate_orbital_cubes
+from qdk_chemistry.data import AOType, BasisSet, Orbitals, OrbitalType, Shell, Structure
+from qdk_chemistry.utils import (
+    CubeGenerator,
+    CubeGrid,
+    generate_orbital_cubes,
+)
+from qdk_chemistry.utils.cubegen import generate_cubefiles_from_orbitals
 
 if PYSCF_AVAILABLE:
     from qdk_chemistry.plugins.pyscf.conversion import pyscf_mol_to_qdk_basis
@@ -73,6 +78,25 @@ class TestCubeGrid:
         )
         assert np.all(np.asarray(grid.origin) <= O2_COORDS.min(axis=0) - 3.0 + 1e-9)
         assert np.all(far_corner >= O2_COORDS.max(axis=0) + 3.0 - 1e-9)
+
+
+def test_pyscf_backend_rejects_cartesian_basis_before_import(tmp_path):
+    """PySCF cannot consume the Cartesian AO coefficient layout."""
+    structure = Structure(["O"], np.zeros((1, 3)))
+    shell = Shell(0, OrbitalType.D, np.array([1.0]), np.array([1.0]))
+    basis_set = BasisSet("cartesian-d", [shell], structure, AOType.Cartesian)
+    nbf = basis_set.get_num_atomic_orbitals()
+    orbitals = Orbitals(np.eye(nbf), None, None, basis_set)
+
+    with pytest.raises(ValueError, match="does not support Cartesian"):
+        generate_cubefiles_from_orbitals(
+            orbitals,
+            output_folder=tmp_path,
+            indices=[0],
+            grid_size=(2, 2, 2),
+            backend="pyscf",
+        )
+    assert list(tmp_path.iterdir()) == []
 
 
 @pytest.mark.skipif(not PYSCF_AVAILABLE, reason="PySCF not available")

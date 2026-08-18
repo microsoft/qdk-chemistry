@@ -243,6 +243,22 @@ TEST(CubeGeneratorTest, RejectsUnsupportedShells) {
       { CubeGenerator generator(radial_basis); }, std::invalid_argument);
 }
 
+TEST(CubeGeneratorTest, RejectsInvalidPrimitiveParameters) {
+  for (double exponent : {0.0, -1.0, std::numeric_limits<double>::infinity(),
+                          std::numeric_limits<double>::quiet_NaN()}) {
+    EXPECT_THROW(CubeGenerator(make_hydrogen_basis({exponent}, {1.0})),
+                 std::invalid_argument)
+        << "exponent: " << exponent;
+  }
+
+  for (double coefficient : {std::numeric_limits<double>::infinity(),
+                             std::numeric_limits<double>::quiet_NaN()}) {
+    EXPECT_THROW(CubeGenerator(make_hydrogen_basis({1.0}, {coefficient})),
+                 std::invalid_argument)
+        << "coefficient: " << coefficient;
+  }
+}
+
 TEST(CubeGeneratorTest, AcceptsExplicitZeroRadialPowers) {
   auto structure = testing::create_hydrogen_structure();
   std::vector<Shell> shells;
@@ -334,6 +350,20 @@ TEST(CubeGeneratorTest, NonEcpCubeCommentIsUnchanged) {
   std::filesystem::remove(output);
 }
 
+TEST(CubeGeneratorTest, RejectsMultilineCubeCommentsBeforeWriting) {
+  CubeGenerator generator(make_hydrogen_basis());
+  Eigen::VectorXd coefficients(1);
+  coefficients << 1.0;
+  const auto output =
+      std::filesystem::temp_directory_path() / "qdk_multiline_comment.cube";
+  std::filesystem::remove(output);
+
+  EXPECT_THROW(generator.orbital(coefficients, output.string(),
+                                 single_point_grid(), "first\ninjected"),
+               std::invalid_argument);
+  EXPECT_FALSE(std::filesystem::exists(output));
+}
+
 TEST(GenerateOrbitalCubesTest, RestrictedWritesSingleZeroBasedCube) {
   const auto orbitals = make_restricted_orbitals();
   const auto output_dir =
@@ -349,6 +379,7 @@ TEST(GenerateOrbitalCubesTest, RestrictedWritesSingleZeroBasedCube) {
             "orbital_0000.cube");
   EXPECT_TRUE(std::filesystem::exists(paths[0]));
   EXPECT_GT(std::filesystem::file_size(paths[0]), 0u);
+  EXPECT_EQ(first_line_of(paths[0]), "Orbital 0 (restricted)");
 
   std::filesystem::remove_all(output_dir);
 }
@@ -388,6 +419,18 @@ TEST(GenerateOrbitalCubesTest, RejectsOutOfRangeIndex) {
                std::out_of_range);
 
   std::filesystem::remove_all(output_dir);
+}
+
+TEST(GenerateOrbitalCubesTest, ValidatesEveryIndexBeforeCreatingOutput) {
+  const auto orbitals = make_restricted_orbitals();
+  const auto output_dir =
+      std::filesystem::temp_directory_path() / "qdk_cube_partial_batch_test";
+  std::filesystem::remove_all(output_dir);
+
+  EXPECT_THROW(generate_orbital_cubes(*orbitals, {0, 1}, output_dir.string(),
+                                      single_point_grid()),
+               std::out_of_range);
+  EXPECT_FALSE(std::filesystem::exists(output_dir));
 }
 
 // Real effective core potential coverage. Every other ECP test in this file

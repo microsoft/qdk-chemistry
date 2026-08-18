@@ -158,7 +158,8 @@ class CubeGenerator {
    *
    * @return The orbital sampled at every grid point
    *
-   * @throws std::invalid_argument if `mo_coeff` does not have `nbf` entries
+   * @throws std::invalid_argument if `mo_coeff` does not have `nbf` entries,
+   *         or a comment used for output contains a line break
    * @throws std::overflow_error if the grid exceeds the backend point limit
    */
   CubeField orbital(const Eigen::VectorXd& mo_coeff, const std::string& outfile,
@@ -188,7 +189,8 @@ class CubeGenerator {
    *
    * @return The density sampled at every grid point
    *
-   * @throws std::invalid_argument if `density_matrix` is not `nbf` by `nbf`
+   * @throws std::invalid_argument if `density_matrix` is not `nbf` by `nbf`,
+   *         or a comment used for output contains a line break
    * @throws std::overflow_error if the grid exceeds the backend point limit
    */
   CubeField density(const Eigen::MatrixXd& density_matrix,

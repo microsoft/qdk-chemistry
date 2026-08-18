@@ -9,7 +9,7 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
-from qdk_chemistry.data import Orbitals
+from qdk_chemistry.data import AOType, Orbitals
 from qdk_chemistry.data._spin_channels import spin_channel_matrix
 from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.utils import CubeGenerator, CubeGrid, Logger
@@ -54,6 +54,8 @@ def generate_cubefiles_from_orbitals(
             ``pyscf.tools.cubegen`` and is kept for comparison and for falling back if a
             difference is ever suspected. PySCF is not installed on Windows, so the
             ``"pyscf"`` backend is unavailable there and raises ``ImportError``.
+            PySCF conversion currently supports only spherical bases. Cartesian bases
+            must use the native backend.
 
             Both backends place grid points identically: the origin is the nuclear bounding
             box corner minus ``margin``, and the step is the padded extent divided by
@@ -64,7 +66,8 @@ def generate_cubefiles_from_orbitals(
         list[str] | dict[str, str]: Paths or contents of the generated cube files.
 
     Raises:
-        ValueError: If ``backend`` is not ``"native"`` or ``"pyscf"``.
+        ValueError: If ``backend`` is not ``"native"`` or ``"pyscf"``, or if
+            ``backend="pyscf"`` is requested for a Cartesian basis.
 
     """
     Logger.trace_entering()
@@ -85,6 +88,8 @@ def generate_cubefiles_from_orbitals(
             generator.orbital(coeff, grid, outfile=str(outfile_name))
 
     elif backend == "pyscf":
+        if basis_set.get_atomic_orbital_type() == AOType.Cartesian:
+            raise ValueError("The PySCF cube backend does not support Cartesian basis sets; use backend='native'.")
         # Imported lazily so that the default path, and therefore this module,
         # does not require PySCF to be installed.
         from pyscf.tools import cubegen  # noqa: PLC0415

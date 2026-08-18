@@ -22,6 +22,7 @@ function(handle_dependency NAME)
   # DOWNLOAD_EXTRACT_TIMESTAMP - Control timestamp extraction (for URL/tarball mode)
   # BUILD_TARGET - The CMake target to build
   # INSTALL_TARGET - The CMake target to install
+  # REQUIRED_HEADER - Header that a discovered package must provide
   #
   # Multi-value arguments:
   # EXPORTED_VARIABLES - Variables to export
@@ -41,6 +42,7 @@ function(handle_dependency NAME)
     SOURCE_SUBDIR
     BUILD_TARGET
     INSTALL_TARGET
+    REQUIRED_HEADER
     BUILD_ARGS
   )
   set(multiValueArgs
@@ -72,6 +74,25 @@ function(handle_dependency NAME)
     find_package(${NAME} ${ARG_FIND_PACKAGE_ARGS} QUIET)
     if(${NAME}_FOUND)
       message(STATUS "  Attempting to Discover ${NAME} - Found ${NAME}: ${${NAME}_DIR}")
+      if(ARG_REQUIRED_HEADER)
+        include(CheckIncludeFileCXX)
+        string(MAKE_C_IDENTIFIER
+               "${NAME}_${ARG_REQUIRED_HEADER}_AVAILABLE"
+               _required_header_check)
+        string(TOUPPER "${_required_header_check}" _required_header_check)
+        unset(${_required_header_check} CACHE)
+        set(_saved_cmake_required_libraries "${CMAKE_REQUIRED_LIBRARIES}")
+        set(CMAKE_REQUIRED_LIBRARIES "${ARG_INSTALL_TARGET}")
+        check_include_file_cxx("${ARG_REQUIRED_HEADER}"
+                               ${_required_header_check})
+        set(CMAKE_REQUIRED_LIBRARIES "${_saved_cmake_required_libraries}")
+        if(NOT ${_required_header_check})
+          message(STATUS
+                  "  Discovered ${NAME} is missing required header "
+                  "${ARG_REQUIRED_HEADER}")
+          set(${NAME}_FOUND FALSE)
+        endif()
+      endif()
     else()
       message(STATUS "  Attempting to Discover ${NAME} - WARNING: ${NAME} not found")
     endif()

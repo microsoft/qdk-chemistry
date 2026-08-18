@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <filesystem>
@@ -103,8 +104,20 @@ GauXC::BasisSet<double> to_gauxc_basis(const data::BasisSet& qdk) {
       if (sh.exponents.size() > alpha.size())
         throw std::invalid_argument(
             "CubeGenerator: shell exceeds gauXC's primitive limit.");
+      if (sh.exponents.size() == 0)
+        throw std::invalid_argument(
+            "CubeGenerator: shells must contain at least one primitive.");
+      if (sh.exponents.size() != sh.coefficients.size())
+        throw std::invalid_argument(
+            "CubeGenerator: shell exponent and coefficient counts differ.");
       const auto np = static_cast<int32_t>(sh.exponents.size());
       for (int i = 0; i < np; ++i) {
+        if (!std::isfinite(sh.exponents[i]) || sh.exponents[i] <= 0.0)
+          throw std::invalid_argument(
+              "CubeGenerator: shell exponents must be finite and positive.");
+        if (!std::isfinite(sh.coefficients[i]))
+          throw std::invalid_argument(
+              "CubeGenerator: shell coefficients must be finite.");
         alpha.at(i) = sh.exponents[i];
         coeff.at(i) = sh.coefficients[i];
       }
@@ -147,6 +160,12 @@ std::string annotate_comment(const data::BasisSet& basis_set,
   const std::string note = "valence-only: ECP replaces " +
                            std::to_string(core_electrons) + " core electrons";
   return comment.empty() ? note : comment + " [" + note + "]";
+}
+
+void validate_comment(const std::string& comment) {
+  if (comment.find_first_of("\r\n") != std::string::npos)
+    throw std::invalid_argument(
+        "CubeGenerator: cube comments must be a single line.");
 }
 
 // Keeps a caller-supplied file-name prefix from steering the write anywhere
@@ -210,6 +229,7 @@ CubeField CubeGenerator::orbital(const Eigen::VectorXd& C,
                                  const std::string& comment) const {
   if (C.size() != _impl->nbf)
     throw std::invalid_argument("orbital: mo_coeff length mismatch.");
+  if (!outfile.empty()) validate_comment(comment);
   auto g = to_gauxc_grid(grid);
   CubeField field(g.num_points());
   _impl->evaluator.eval_orbital(g, C.data(), field.data());
@@ -225,6 +245,7 @@ CubeField CubeGenerator::density(const Eigen::MatrixXd& D,
                                  const std::string& comment) const {
   if (D.rows() != _impl->nbf || D.cols() != _impl->nbf)
     throw std::invalid_argument("density: matrix shape mismatch.");
+  if (!outfile.empty()) validate_comment(comment);
   auto g = to_gauxc_grid(grid);
   CubeField field(g.num_points());
   _impl->evaluator.eval_density(g, D.data(), _impl->nbf, field.data());
@@ -238,11 +259,21 @@ std::vector<std::string> generate_orbital_cubes(
     const data::Orbitals& orbitals, const std::vector<std::size_t>& indices,
     const std::string& output_dir, const CubeGrid& grid,
     const std::string& prefix) {
-  CubeGenerator gen(orbitals.get_basis_set());
   const auto coeffs = orbitals.coefficients();
   const auto& C_a = coeffs->block({data::axes::alpha(), data::axes::alpha()});
   const bool restricted = orbitals.is_restricted();
   const auto stem_prefix = sanitize_label_prefix(prefix);
+  const Eigen::MatrixXd* C_b = nullptr;
+  if (!restricted)
+    C_b = &coeffs->block({data::axes::beta(), data::axes::beta()});
+
+  for (auto p : indices) {
+    if (std::size_t(C_a.cols()) <= p ||
+        (C_b != nullptr && std::size_t(C_b->cols()) <= p))
+      throw std::out_of_range("generate_orbital_cubes: index OOB.");
+  }
+
+  CubeGenerator gen(orbitals.get_basis_set());
   std::filesystem::create_directories(output_dir);
 
   // Zero-based orbital numbering, consistent with the 0-based `indices`
@@ -266,21 +297,16 @@ std::vector<std::string> generate_orbital_cubes(
   };
 
   for (auto p : indices) {
-    if (std::size_t(C_a.cols()) <= p)
-      throw std::out_of_range("generate_orbital_cubes: index OOB.");
     const auto stem = stem_prefix + index_string(p);
     // Restricted: a single spatial cube with no spin suffix. Unrestricted:
     // separate alpha (`_a`) and beta (`_b`) cubes, mirroring `cubegen.py`.
     if (restricted) {
       emit(C_a.col(p), stem + ".cube",
-           "Orbital " + std::to_string(p) + " (alpha)");
+           "Orbital " + std::to_string(p) + " (restricted)");
     } else {
-      const auto& C_b = coeffs->block({data::axes::beta(), data::axes::beta()});
-      if (std::size_t(C_b.cols()) <= p)
-        throw std::out_of_range("generate_orbital_cubes: index OOB.");
       emit(C_a.col(p), stem + "_a.cube",
            "Orbital " + std::to_string(p) + " (alpha)");
-      emit(C_b.col(p), stem + "_b.cube",
+      emit(C_b->col(p), stem + "_b.cube",
            "Orbital " + std::to_string(p) + " (beta)");
     }
   }

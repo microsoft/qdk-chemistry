@@ -136,6 +136,7 @@ handle_dependency(gauxc
   GIT_TAG 162e4562552323a871af17ae4acd73b71071bd24
   BUILD_TARGET gauxc::gauxc
   INSTALL_TARGET gauxc::gauxc
+  REQUIRED_HEADER gauxc/external/cube.hpp
   ${DEPENDENCY_BUILD_FLAGS}
   ${_gauxc_patch_args}
   FORCE_FETCH
