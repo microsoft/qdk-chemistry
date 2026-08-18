@@ -1,83 +1,99 @@
 name: Tutorial compatibility
 
+# TEMPORARY: content swapped out to test coverage-comment.yaml's artifact
+# download / PR-resolution / sticky-comment logic via workflow_dispatch,
+# since that workflow isn't registered on the default branch yet and can't
+# be dispatched on its own. Restore from tutorial-compatibility.yaml.bak
+# before merging.
 on:
-  pull_request:
-    paths:
-    - .github/workflows/tutorial-compatibility.yaml
-    - docs/source/tutorials/_versions.py
-    - docs/source/tutorials/ground_state_molecular_energies_with_qpe/**
-    - docs/source/_static/examples/data/tutorial_stretched_n2.structure.xyz
-    - docs/source/_static/examples/ground_state_qpe_lab_notebook_*.md
-    - docs/source/_static/examples/python/tutorial_*.py
-    - docs/source/_static/examples/python/tutorial_*.ipynb
-    - python/pyproject.toml
-    - python/tests/test_sample_tutorial_gs_qpe.py
   workflow_dispatch:
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+    inputs:
+      run_id:
+        description: Run ID of a completed "Build and Test" run to test against
+        required: true
+        type: string
 
 permissions:
   contents: read
+  pull-requests: write
+  actions: read
 
 jobs:
-  published-baseline:
-    name: Exact published baseline (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-        - ubuntu-latest
-        - macos-latest
-
+  comment:
+    name: Post coverage comment (test)
+    runs-on: ubuntu-latest
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v6
-
-    - name: Set up Python
-      uses: actions/setup-python@v6
+    - name: Download coverage comment artifacts
+      uses: actions/download-artifact@v4
       with:
-        python-version: '3.12'
-        cache: pip
-        cache-dependency-path: python/pyproject.toml
+        pattern: coverage-comment-*
+        path: artifacts
+        run-id: ${{ inputs.run_id }}
+        github-token: ${{ github.token }}
 
-    - name: Read tutorial package version
-      id: tutorial-version
+    - name: Resolve pull request number
+      id: pr
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const runId = ${{ inputs.run_id }};
+
+          const { data: run } = await github.rest.actions.getWorkflowRun({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            run_id: runId,
+          });
+
+          const { data: pulls } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            commit_sha: run.head_sha,
+          });
+
+          const pr = pulls.find((p) => p.state === 'open') ?? pulls[0];
+          if (!pr) {
+            core.setFailed(`Could not resolve a pull request for run ${runId} (head ${run.head_sha}).`);
+            return;
+          }
+
+          core.setOutput('number', pr.number);
+
+    - name: Build combined coverage comment
+      id: build-comment
       run: |
-        VERSION=$(python -c 'import runpy; print(runpy.run_path("docs/source/tutorials/_versions.py")["GROUND_STATE_TUTORIAL_VERSION"])')
-        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        set -euo pipefail
 
-    - name: Install published tutorial environment
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install \
-          "qdk-chemistry[jupyter]==${{ steps.tutorial-version.outputs.version }}" \
-          nbclient \
-          nbformat \
-          pytest \
-          pytest-env
-        python -m ipykernel install --user --name python3 --display-name "Python 3"
+        comment_file="$RUNNER_TEMP/pr-comment.md"
+        : > "$comment_file"
+        found_report=false
 
-    - name: Verify tutorial setup
-      env:
-        GROUND_STATE_TUTORIAL_VERSION: ${{ steps.tutorial-version.outputs.version }}
-      run: python docs/source/_static/examples/python/tutorial_qpe_setup.py
+        for dir in artifacts/coverage-comment-*/; do
+          [ -d "$dir" ] || continue
+          report="$dir/pr-comment.md"
+          [ -f "$report" ] || continue
 
-    - name: Run tutorial scripts
-      run: |
-        for example in docs/source/_static/examples/python/tutorial_*.py; do
-          if [ "$(basename "$example")" != 'tutorial_qpe_setup.py' ] && ! grep -q '# docs-example: slow' "$example"; then
-            python "$example"
-          fi
+          job_label="$(basename "$dir")"
+          job_label="${job_label#coverage-comment-}"
+
+          {
+            echo "<details>"
+            echo "<summary>${job_label}</summary>"
+            echo ""
+            cat "$report"
+            echo ""
+            echo "</details>"
+            echo ""
+          } >> "$comment_file"
+          found_report=true
         done
 
-    - name: Run exact published tutorial baselines
-      env:
-        QDK_CHEMISTRY_RUN_SLOW_TESTS: '1'
-        QDK_CHEMISTRY_RUN_TUTORIAL_SNAPSHOTS: '1'
-      run: >-
-        python -m pytest -q --strict-config --strict-markers
-        python/tests/test_sample_tutorial_gs_qpe.py -m tutorial_baseline
+        echo "comment-file=$comment_file" >> "$GITHUB_OUTPUT"
+        echo "found-report=$found_report" >> "$GITHUB_OUTPUT"
+
+    - name: Comment PR with coverage
+      if: steps.build-comment.outputs.found-report == 'true'
+      uses: marocchino/sticky-pull-request-comment@v3
+      with:
+        number_force: ${{ steps.pr.outputs.number }}
+        path: ${{ steps.build-comment.outputs.comment-file }}
+        header: coverage-report
