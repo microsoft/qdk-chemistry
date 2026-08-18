@@ -139,7 +139,7 @@ extends:
       # amd64, which provisions an x64-emulated agent on the ARM64 image.
       - job: Build_windows_aarch64_deps
         pool:
-          name: aqe-1es-Dpsd_v5-arm-pool
+          name: aqe-1es-Dpds_v6-arm-pool
           demands:
           - ImageOverride -equals windows-2025-arm64-1espt
           os: windows
@@ -164,7 +164,7 @@ extends:
           ${{ elseif and(eq(target.os, 'windows'), eq(target.arch, 'aarch64')) }}:
             dependsOn: Build_windows_aarch64_deps
             pool:
-              name: aqe-1es-Dpsd_v5-arm-pool
+              name: aqe-1es-Dpds_v6-arm-pool
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
