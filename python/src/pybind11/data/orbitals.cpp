@@ -918,7 +918,7 @@ Examples:
   orbitals.def_static(
       "from_json",
       [](const std::string &json_str) {
-        return *Orbitals::from_json(nlohmann::json::parse(json_str));
+        return Orbitals::from_json(nlohmann::json::parse(json_str));
       },
       R"(
 Load orbital data from JSON string (static method).
