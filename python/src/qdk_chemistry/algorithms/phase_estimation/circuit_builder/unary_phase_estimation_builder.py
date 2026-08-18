@@ -127,7 +127,17 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         num_queries = int(self._settings.get("num_queries"))
         if num_queries <= 0:
             raise ValueError(f"num_queries must be a positive integer. Got {num_queries}.")
-        return num_queries, num_queries.bit_length()
+        num_phase_qubits = num_queries.bit_length()
+        if num_queries > 1 and num_queries & (num_queries - 1) == 0:
+            # p reflection slots are p + 1 wide, so p = 2^k is the one value that spills into an
+            # extra qubit for a single extra slot; p - 1 packs the register exactly.
+            Logger.warn(
+                f"num_queries={num_queries} is a power of two, so the phase register needs "
+                f"{num_phase_qubits} qubits to address {num_queries + 1} reflection slots and "
+                f"leaves {(1 << num_phase_qubits) - num_queries - 1} unused. "
+                f"num_queries={num_queries - 1} addresses its slots in {num_phase_qubits - 1} qubits exactly."
+            )
+        return num_queries, num_phase_qubits
 
     def _run_impl(
         self,

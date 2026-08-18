@@ -11,6 +11,8 @@ namespace QDKChemistry.Utils.UnaryIteration {
     import Std.Diagnostics.Fact;
     import Std.Intrinsic.AND;
     import Std.Math.BitSizeI;
+    import Std.ResourceEstimation.BeginEstimateCaching;
+    import Std.ResourceEstimation.EndEstimateCaching;
 
 
     /// Unary iteration
@@ -93,29 +95,35 @@ namespace QDKChemistry.Utils.UnaryIteration {
         if numActions == 1 {
             action(actionOffset, ctl);
         } else {
-            use helper = Qubit();
+            // Keyed on sub-problem size, mirroring Std.TableLookup.SinglyControlledSelect, so the
+            // resource estimator costs each recursion depth once instead of walking the whole tree.
+            if BeginEstimateCaching("QDKChemistry.Utils.UnaryIteration.SinglyControlledUnaryIterationWithControl", numActions) {
+                use helper = Qubit();
 
-            let (most, tail) = MostAndTail(address[...n - 1]);
+                let (most, tail) = MostAndTail(address[...n - 1]);
 
-            within {
-                X(tail);
-            } apply {
-                AND(ctl, tail, helper);
+                within {
+                    X(tail);
+                } apply {
+                    AND(ctl, tail, helper);
+                }
+
+                SinglyControlledUnaryIterationWithControl(helper, most, 2^(n - 1), actionOffset, action);
+
+                CNOT(ctl, helper);
+
+                SinglyControlledUnaryIterationWithControl(
+                    helper,
+                    most,
+                    numActions - 2^(n - 1),
+                    actionOffset + 2^(n - 1),
+                    action,
+                );
+
+                Adjoint AND(ctl, tail, helper);
+
+                EndEstimateCaching();
             }
-
-            SinglyControlledUnaryIterationWithControl(helper, most, 2^(n - 1), actionOffset, action);
-
-            CNOT(ctl, helper);
-
-            SinglyControlledUnaryIterationWithControl(
-                helper,
-                most,
-                numActions - 2^(n - 1),
-                actionOffset + 2^(n - 1),
-                action,
-            );
-
-            Adjoint AND(ctl, tail, helper);
         }
     }
 

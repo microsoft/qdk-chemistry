@@ -5,7 +5,6 @@ r"""Unary-iteration phase estimation with a number of walk queries."""
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import math
 from collections.abc import Callable
 
 from qdk_chemistry.data import (
@@ -75,13 +74,11 @@ def _post_process_phase_estimation(
     phase_fraction = 2.0 * min(canonical_phase_fraction, 0.5 - canonical_phase_fraction)
     bitstring_msb_first = format(round(phase_fraction * num_bins), f"0{num_bits}b")
 
-    return QpeResult(
+    return QpeResult.from_phase_fraction(
         method=method,
         phase_fraction=phase_fraction,
-        phase_angle=phase_fraction * math.tau,
+        eigenvalue_from_phase=eigenvalue_from_phase,
         canonical_phase_fraction=canonical_phase_fraction,
-        canonical_phase_angle=canonical_phase_fraction * math.tau,
-        raw_energy=raw_energy,
         branching=tuple(sorted((raw_energy, mirror_energy))),
         resolved_energy=raw_energy,
         bits_msb_first=tuple(int(bit) for bit in bitstring_msb_first),
