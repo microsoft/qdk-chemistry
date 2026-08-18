@@ -1116,6 +1116,15 @@ TEST_F(ScfTest, SameElementAtomsPreserveDistinctEcpTreatment) {
       qdk::chemistry::utils::microsoft::convert_basis_set_to_qdk(
           *internal_basis);
   EXPECT_EQ(round_tripped.get_ecp_electrons(), std::vector<size_t>({28, 0}));
+
+  internal_basis->atom_ecp_electrons[0] = -1;
+  EXPECT_THROW(qdk::chemistry::utils::microsoft::convert_basis_set_to_qdk(
+                   *internal_basis),
+               std::runtime_error);
+  internal_basis->atom_ecp_electrons[0] = 48;
+  EXPECT_THROW(qdk::chemistry::utils::microsoft::convert_basis_set_to_qdk(
+                   *internal_basis),
+               std::runtime_error);
 }
 
 TEST_F(ScfTest, AgHEcpShellIndices) {

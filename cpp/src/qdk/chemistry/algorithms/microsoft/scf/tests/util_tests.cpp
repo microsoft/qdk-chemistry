@@ -528,6 +528,14 @@ TEST(AtomGuessTest, BasisSetMap) {
   EXPECT_EQ(shell_only_json["atom_ecp_electrons"], std::vector<int>({0}));
   EXPECT_NO_THROW(BasisSet::from_serialized_json(mol, shell_only_json));
 
+  auto invalid_ecp_json = shell_only_json;
+  invalid_ecp_json["atom_ecp_electrons"] = std::vector<int>({-1});
+  EXPECT_THROW(BasisSet::from_serialized_json(mol, invalid_ecp_json),
+               std::runtime_error);
+  invalid_ecp_json["atom_ecp_electrons"] = std::vector<int>({4});
+  EXPECT_THROW(BasisSet::from_serialized_json(mol, invalid_ecp_json),
+               std::runtime_error);
+
   // Create a different basis set (different basis name)
   auto basis4 =
       BasisSet::from_database_json(mol, "6-31g", BasisMode::PSI4, true, false);

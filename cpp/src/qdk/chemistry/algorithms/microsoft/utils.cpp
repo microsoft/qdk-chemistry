@@ -237,9 +237,23 @@ qdk::chemistry::data::BasisSet convert_basis_set_to_qdk(
     // Use basis set name as ECP name
     std::string qdk_ecp_name = basis_set.name;
 
+    if (basis_set.atom_ecp_electrons.size() != basis_set.mol->n_atoms) {
+      throw std::runtime_error(
+          "atom_ecp_electrons must contain one entry per atom.");
+    }
+
     std::vector<size_t> qdk_ecp_electrons;
     qdk_ecp_electrons.reserve(basis_set.atom_ecp_electrons.size());
-    for (int ecp_electrons : basis_set.atom_ecp_electrons) {
+    for (size_t i = 0; i < basis_set.atom_ecp_electrons.size(); ++i) {
+      int ecp_electrons = basis_set.atom_ecp_electrons[i];
+      auto atomic_num = basis_set.mol->atomic_nums[i];
+      if (ecp_electrons < 0 ||
+          static_cast<uint64_t>(ecp_electrons) > atomic_num) {
+        throw std::runtime_error(fmt::format(
+            "atom_ecp_electrons[{}] must be between 0 and the atomic number "
+            "({}), got {}.",
+            i, atomic_num, ecp_electrons));
+      }
       qdk_ecp_electrons.push_back(static_cast<size_t>(ecp_electrons));
     }
 

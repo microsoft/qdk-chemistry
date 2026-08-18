@@ -602,6 +602,12 @@ std::shared_ptr<BasisSet> BasisSet::from_serialized_json(
   for (size_t i = 0; i < bs->mol->n_atoms; ++i) {
     int atomic_num = bs->mol->atomic_nums[i];
     int ecp_electrons = bs->atom_ecp_electrons[i];
+    if (ecp_electrons < 0 || ecp_electrons > atomic_num) {
+      throw std::runtime_error(fmt::format(
+          "atom_ecp_electrons[{}] must be between 0 and the atomic number "
+          "({}), got {}.",
+          i, atomic_num, ecp_electrons));
+    }
     bs->mol->atomic_charges[i] = atomic_num - ecp_electrons;
     bs->n_ecp_electrons += ecp_electrons;
   }
