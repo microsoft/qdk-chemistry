@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import inspect
 import threading
 from typing import TYPE_CHECKING
 
@@ -20,7 +21,6 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder 
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils.qsharp import (
-    DEFAULT_TARGET_PROFILE,
     QSHARP_UTILS,
     create_qsharp_context,
     get_qsharp_context,
@@ -170,7 +170,8 @@ class TestTargetProfiles:
 
     def test_the_default_profile_is_adaptive_rif(self) -> None:
         """Adaptive_RIF is the profile the vendored project is compiled for."""
-        assert TargetProfile.Adaptive_RIF == DEFAULT_TARGET_PROFILE
+        default = inspect.signature(create_qsharp_context).parameters["target_profile"].default
+        assert default == TargetProfile.Adaptive_RIF
 
     @pytest.mark.parametrize("module", _PORTABLE_MODULES)
     def test_base_exposes_the_portable_modules(self, base_context: qdk.Context, module: str) -> None:
