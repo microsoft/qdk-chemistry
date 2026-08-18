@@ -125,12 +125,13 @@ int narrow_thread_count(T value) {
 /// @brief Thread-control API bound at link time, if CMake found one.
 BlasThreadApi linked_blas_thread_api() {
 #if defined(QDK_CHEMISTRY_BLAS_LINKED_SET_FN)
-  return {BlasVendor::QDK_CHEMISTRY_BLAS_LINKED_VENDOR,
-          [] { return narrow_thread_count(QDK_CHEMISTRY_BLAS_LINKED_GET_FN()); },
-          [](int n) {
-            QDK_CHEMISTRY_BLAS_LINKED_SET_FN(
-                static_cast<QDK_CHEMISTRY_BLAS_LINKED_TYPE>(n));
-          }};
+  return {
+      BlasVendor::QDK_CHEMISTRY_BLAS_LINKED_VENDOR,
+      [] { return narrow_thread_count(QDK_CHEMISTRY_BLAS_LINKED_GET_FN()); },
+      [](int n) {
+        QDK_CHEMISTRY_BLAS_LINKED_SET_FN(
+            static_cast<QDK_CHEMISTRY_BLAS_LINKED_TYPE>(n));
+      }};
 #else
   return {};
 #endif
@@ -144,7 +145,8 @@ BlasThreadApi linked_blas_thread_api() {
  */
 template <typename T>
 BlasThreadApi try_backend(BlasVendor vendor, const char* set_name,
-                          const char* get_name) {  using SetFn = void (*)(T);
+                          const char* get_name) {
+  using SetFn = void (*)(T);
   using GetFn = T (*)(void);
   auto set_fn = find_function<SetFn>(set_name);
   auto get_fn = find_function<GetFn>(get_name);
@@ -156,7 +158,7 @@ BlasThreadApi try_backend(BlasVendor vendor, const char* set_name,
 // Runtime probes, generated from the backend table so they keep the order CMake
 // probes at configure time.
 #define QDK_CHEMISTRY_BLAS_RUNTIME_PROBE(token, vendor, label, set_fn, get_fn, \
-                                         type)                                \
+                                         type)                                 \
   +[]() -> BlasThreadApi {                                                     \
     return try_backend<type>(BlasVendor::vendor, #set_fn, #get_fn);            \
   },
@@ -218,8 +220,8 @@ int& saved_num_threads() {
 const char* to_string(BlasVendor vendor) {
   switch (vendor) {
 #define QDK_CHEMISTRY_BLAS_VENDOR_LABEL(token, name, label, set_fn, get_fn, \
-                                        type)                              \
-  case BlasVendor::name:                                                   \
+                                        type)                               \
+  case BlasVendor::name:                                                    \
     return label;
     QDK_CHEMISTRY_BLAS_BACKEND_TABLE(QDK_CHEMISTRY_BLAS_VENDOR_LABEL)
 #undef QDK_CHEMISTRY_BLAS_VENDOR_LABEL
