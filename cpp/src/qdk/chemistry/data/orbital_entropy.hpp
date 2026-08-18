@@ -9,6 +9,18 @@
 
 namespace qdk::chemistry::data::detail {
 
+/**
+ * @brief Compute the single-orbital von Neumann entropy from diagonal RDM
+ * elements.
+ *
+ * This internal helper is shared by Wavefunction entropy evaluation and
+ * algorithms that optimize the same entropy convention.
+ *
+ * @param occ_alpha Alpha-spin occupation of the spatial orbital.
+ * @param occ_beta Beta-spin occupation of the spatial orbital.
+ * @param double_occ Alpha-beta double occupation of the spatial orbital.
+ * @return The single-orbital entropy using natural logarithms.
+ */
 inline double single_orbital_entropy(double occ_alpha, double occ_beta,
                                      double double_occ) {
   const double empty = 1.0 - occ_alpha - occ_beta + double_occ;
