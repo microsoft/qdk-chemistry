@@ -79,6 +79,12 @@ variables:
 - group: QdkChemistry
 - name: ComponentDetection.MaxDetectionThreads
   value: '16'
+# Force CodeQL to run on every queued build (override the default 24h cadence)
+# and upload the database trace log for debugging the dedicated CodeQLScan stage.
+- name: Codeql.PublishDatabaseLog
+  value: true
+- name: Codeql.Cadence
+  value: 0
 # Emit a clean, publishable version (no +local suffix) when publishing to PyPI.
 - name: QDK_CHEMISTRY_RELEASE_BUILD
   value: ${{ parameters.publishEsrp }}
@@ -170,6 +176,13 @@ extends:
           variables:
             LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
           templateContext:
+            sdl:
+              codeql:
+                compiled:
+                  ${{ if eq(target.os, 'windows') }}:
+                    enabled: true
+                  ${{ else }}:
+                    enabled: false
             outputs:
             - output: pipelineArtifact
               displayName: Upload Python $(pythonVersion) Wheels for ${{ target.os }} ${{ target.march }}
