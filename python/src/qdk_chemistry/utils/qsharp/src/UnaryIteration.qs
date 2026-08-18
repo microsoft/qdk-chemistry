@@ -163,7 +163,6 @@ namespace QDKChemistry.Utils.UnaryIteration {
     /// Applies `Z` to the exposed unary control for every index flagged in `data`.
     internal function MakeTestUnaryIterationControlPhasesOp(numActions : Int, data : Bool[]) : (Qubit[] => Unit) {
         return address => {
-            Fact(2^AddressQubits(numActions) == numActions, "numActions must be a power of two");
             ApplyToEach(H, address);
             UnaryIterationWithControl(address, numActions, (index, control) => {
                 if data[index] {

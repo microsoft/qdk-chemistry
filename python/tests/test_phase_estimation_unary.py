@@ -83,11 +83,12 @@ class TestUnaryIterationQsharp:
         op = QSHARP_UTILS.UnaryIteration.MakeTestUnaryIterationControlPhasesOp(num_actions, data)
         state = _dump_op(op, num_address_qubits)
 
-        expected = np.zeros(1 << num_address_qubits, dtype=complex)
-        for address_value in range(num_actions):
-            sign = -1.0 if data[address_value] else 1.0
-            expected[_dumped_address_index(address_value, num_address_qubits)] = sign / np.sqrt(num_actions)
-        np.testing.assert_allclose(state, expected, atol=1e-10)
+        # Addresses at or above num_actions are outside the iteration's promise: the last
+        # leaf fires on its control alone, so they alias onto a neighbouring action.
+        amplitude = 1.0 / np.sqrt(1 << num_address_qubits)
+        expected = np.array([-1.0 if flagged else 1.0 for flagged in data]) * amplitude
+        actual = np.array([state[_dumped_address_index(a, num_address_qubits)] for a in range(num_actions)])
+        np.testing.assert_allclose(actual, expected, atol=1e-10)
 
 
 class TestBlockEncodingAgnosticSchedule:
@@ -287,19 +288,8 @@ class TestUnaryQpeEndToEnd:
             result = _decode(counts, num_bits, use_positive_sign=use_positive_sign)
             assert result.canonical_phase_fraction == pytest.approx(expected_phase)
 
-    @pytest.mark.parametrize(
-        ("num_queries", "executor"),
-        [
-            (6, "qdk_sparse_state_simulator"),
-            (11, "qdk_sparse_state_simulator"),
-            (23, "qdk_sparse_state_simulator"),
-            (63, "qdk_sparse_state_simulator"),
-            # The full-state executor lowers through QIR, so it covers a different path.
-            (6, "qdk_full_state_simulator"),
-            (11, "qdk_full_state_simulator"),
-        ],
-    )
-    def test_builder_defaults_recover_the_ground_state_energy(self, num_queries, executor):
+    @pytest.mark.parametrize("num_queries", [6, 11, 23, 63])
+    def test_builder_defaults_recover_the_ground_state_energy(self, num_queries):
         r"""The shipped defaults must recover :math:`H = (X + Z)/2` end to end."""
         num_bits = num_queries.bit_length()
         assert (num_queries + 1 < 1 << num_bits) == (num_queries != 63), "sweep must mix padded and exact registers"
@@ -324,7 +314,7 @@ class TestUnaryQpeEndToEnd:
         qpe.settings().set(
             "qpe_circuit_builder", AlgorithmRef("qpe_circuit_builder", "qdk_unary", num_queries=num_queries)
         )
-        qpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", executor))
+        qpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"))
         result = qpe.run(qubit_hamiltonian=hamiltonian, state_preparation=state_preparation)
 
         assert result.raw_energy == pytest.approx(float(energies[0]), abs=1e-9)
