@@ -157,3 +157,16 @@ def test_qir_unsupported_branch_condition_raises():
     qir = str(compile_qasm_to_qir(qasm_str, target_profile=TargetProfile.Adaptive_RIF))
     with pytest.raises(UnsupportedQIROperationError, match="read a measurement result"):
         qir_ir_to_qiskit(qir)
+
+
+def test_qir_entry_point_without_body_raises():
+    """An entry point that is only declared has no blocks to walk and must fail loudly."""
+    # `declare` carries the entry-point attributes but contributes no basic blocks.
+    attributes = (
+        '{ "entry_point" "output_labeling_schema" "qir_profiles"="base_profile" '
+        '"required_num_qubits"="1" "required_num_results"="1" }'
+    )
+    qir = f"declare i64 @ENTRYPOINT__main() #0\nattributes #0 = {attributes}\n"
+
+    with pytest.raises(UnsupportedQIROperationError, match="no function body"):
+        qir_ir_to_qiskit(qir)
