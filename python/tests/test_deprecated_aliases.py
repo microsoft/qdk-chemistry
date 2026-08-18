@@ -145,19 +145,25 @@ class TestLocalizerDeprecation:
 
     def test_localizer_alias_resolves_to_orbital_localizer(self):
         """``algorithms.Localizer`` is the same object as ``OrbitalLocalizer``."""
-        with pytest.warns(DeprecationWarning, match="Localizer"):
+        with pytest.warns(
+            DeprecationWarning, match=r"'qdk_chemistry\.algorithms\.Localizer' is deprecated"
+        ):
             alias = algorithms.Localizer
         assert alias is OrbitalLocalizer
 
     def test_localizer_alias_import_warns(self):
         """Importing the old algorithm name emits a ``DeprecationWarning``."""
-        with pytest.warns(DeprecationWarning, match="Localizer"):
+        with pytest.warns(
+            DeprecationWarning, match=r"'qdk_chemistry\.algorithms\.Localizer' is deprecated"
+        ):
             from qdk_chemistry.algorithms import Localizer  # noqa: PLC0415
         assert Localizer is OrbitalLocalizer
 
     def test_deprecated_localizer_alias_supports_subclassing(self):
         """A subclass using the old base name remains constructible."""
-        with pytest.warns(DeprecationWarning, match="Localizer"):
+        with pytest.warns(
+            DeprecationWarning, match=r"'qdk_chemistry\.algorithms\.Localizer' is deprecated"
+        ):
             from qdk_chemistry.algorithms import Localizer  # noqa: PLC0415
 
         class CustomLocalizer(Localizer):
