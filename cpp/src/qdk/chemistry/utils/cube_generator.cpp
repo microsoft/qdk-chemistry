@@ -203,24 +203,20 @@ void validate_comment(const std::string& comment) {
 }
 
 // Keeps a caller-supplied file-name prefix from steering the write anywhere
-// other than `output_dir`. `std::filesystem::path::operator/` discards its left
-// operand entirely when the right side is absolute, so an absolute prefix would
-// silently ignore `output_dir`; a prefix containing a separator or `..` would
-// escape it or target a directory that was never created.
+// other than `output_dir`. Path decomposition is deliberately delegated to
+// std::filesystem so native root names such as Windows drive prefixes are
+// handled correctly.
 //
 // A trailing `.cube` is dropped rather than rejected. The prefix names a stem
 // that the index and the extension are appended to, so `orbital_.cube` would
 // otherwise produce `orbital_.cube0001.cube`, which is never what the caller
 // meant.
 std::string sanitize_label_prefix(const std::string& prefix) {
-  if (prefix.find('/') != std::string::npos ||
-      prefix.find('\\') != std::string::npos)
+  const std::filesystem::path prefix_path(prefix);
+  if (prefix_path.has_root_path() || prefix_path.has_parent_path())
     throw std::invalid_argument(
-        "generate_orbital_cubes: label prefix cannot contain a path "
-        "separator.");
-  if (prefix.find("..") != std::string::npos)
-    throw std::invalid_argument(
-        "generate_orbital_cubes: label prefix cannot contain '..'.");
+        "generate_orbital_cubes: label prefix must be a file name, not a "
+        "path.");
 
   constexpr std::string_view extension = ".cube";
   if (prefix.size() >= extension.size() &&

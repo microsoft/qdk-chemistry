@@ -216,16 +216,15 @@ class CubeGenerator {
  * @param output_dir Directory to write into. Created if it does not exist.
  * @param grid Grid on which to sample each orbital
  * @param label_prefix Stem placed before the zero-padded index in each file
- *                     name. It must be a plain name, so no path separator and
- *                     no `..`, because the result is always written inside
+ *                     name. It must be a file name with no root or parent
+ *                     path, because the result is always written inside
  *                     `output_dir`. A trailing `.cube` is dropped, since the
  *                     extension is appended after the index.
  *
  * @return The paths written, in the order they were written
  *
  * @throws std::out_of_range if any index is beyond the available orbitals
- * @throws std::invalid_argument if `label_prefix` contains a path separator
- *         or `..`
+ * @throws std::invalid_argument if `label_prefix` has a root or parent path
  */
 std::vector<std::string> generate_orbital_cubes(
     const data::Orbitals& orbitals, const std::vector<std::size_t>& indices,

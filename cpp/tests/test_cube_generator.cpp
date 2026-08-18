@@ -525,8 +525,12 @@ TEST(GenerateOrbitalCubesTest, RejectsLabelPrefixThatEscapesOutputDirectory) {
       std::filesystem::temp_directory_path() / "qdk_cube_prefix_test";
   std::filesystem::remove_all(output_dir);
 
-  for (const std::string prefix :
-       {"/tmp/absolute_", "sub/dir_", "../escape_", "..", "a\\b_"}) {
+  std::vector<std::string> prefixes{"/tmp/absolute_", "sub/dir_", "../escape_"};
+#ifdef _WIN32
+  prefixes.emplace_back("C:escape_");
+  prefixes.emplace_back("a\\b_");
+#endif
+  for (const std::string& prefix : prefixes) {
     EXPECT_THROW(generate_orbital_cubes(*orbitals, {0}, output_dir.string(),
                                         single_point_grid(), prefix),
                  std::invalid_argument)
