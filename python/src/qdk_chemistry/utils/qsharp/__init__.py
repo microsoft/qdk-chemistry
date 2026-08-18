@@ -36,7 +36,7 @@ _thread_local = threading.local()
 
 
 def create_qsharp_context(
-    target_profile: TargetProfile = TargetProfile.Base,
+    target_profile: TargetProfile = TargetProfile.Adaptive_RIF,
     target_name: str | None = None,
     language_features: list[str] | None = None,
     qdk_config: dict[str, int | float | str | bool] | None = None,
