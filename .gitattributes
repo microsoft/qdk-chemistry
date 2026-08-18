@@ -1,2 +1,4 @@
 # Normalize all text files to LF in the repo and working copy.
 * text=auto eol=lf
+
+.github/workflows/*.lock.yml linguist-generated=true
