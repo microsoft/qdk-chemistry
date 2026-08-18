@@ -569,14 +569,15 @@ def generate_active_orbital_cube_data(
             grid_size=grid_size,
             margin=margin,
             indices=result.valence_indices,
+            label_maker=lambda index: f"orbital_{index:04d}",
         ),
     )
 
     cube_data = {}
     for raw_label, cube_file in raw_cube_data.items():
-        # Cube labels number orbitals from one, while QDK/Chemistry indices start
-        # from zero, so convert before looking up occupations and entropies.
-        orbital_index = int(raw_label.split("_")[1]) - 1
+        # Cube labels use zero-based orbital indices, matching QDK/Chemistry
+        # indexing, so parse directly before looking up occupations and entropies.
+        orbital_index = int(raw_label.split("_")[1])
         position = active_position[orbital_index]
         # Add the alpha and beta occupations to report the total occupation of
         # each spatial orbital in the viewer.

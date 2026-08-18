@@ -12,7 +12,6 @@
 #include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -365,12 +364,18 @@ class BasisSet : public DataClass,
   static constexpr std::string_view custom_ecp_name = "custom_ecp";
 
   /**
-   * @brief Get the data type name for this class
+   * @brief Get the static data type name for this class.
    * @return "basis_set"
    */
-  std::string get_data_type_name() const override {
+  static std::string data_type_name() {
     return DATACLASS_TO_SNAKE_CASE(BasisSet);
   }
+
+  /**
+   * @brief Get the data type name for this instance.
+   * @return "basis_set"
+   */
+  std::string get_data_type_name() const override { return data_type_name(); }
   /**
    * @brief Get supported basis set names
    * @return Vector of supported basis set names

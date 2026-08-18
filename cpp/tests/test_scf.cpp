@@ -80,7 +80,7 @@ TEST_F(ScfTest, Factory) {
                    []() -> ScfSolverFactory::return_type {
                      return std::make_unique<TestSCF>();
                    }),
-               std::runtime_error);
+               qdk::chemistry::DuplicateRegistrationError);
   auto test_scf = ScfSolverFactory::create("test_scf");
 }
 

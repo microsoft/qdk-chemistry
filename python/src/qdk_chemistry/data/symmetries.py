@@ -46,8 +46,15 @@ class Symmetries(DataClass):
 
     """
 
-    # Class attribute for filename validation
-    _data_type_name = "symmetries"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for symmetries.
+
+        Returns:
+            ``"symmetries"``.
+
+        """
+        return "symmetries"
 
     # Serialization version for this class
     _serialization_version = "0.1.0"

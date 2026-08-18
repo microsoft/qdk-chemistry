@@ -14,6 +14,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
+from qdk_chemistry._core import DuplicateRegistrationError as _DuplicateRegistrationError
 from qdk_chemistry.data import Settings
 
 if TYPE_CHECKING:
@@ -359,12 +360,19 @@ class AlgorithmFactory(ABC):
         """
         if name is None or name == "":
             name = self.default_algorithm_name()
-        if name not in self._registry:
-            raise RuntimeError(
-                f"Algorithm '{name}' of type '{self.algorithm_type_name()}' is not registered. "
-                f"Available algorithms: {list(self._registry.keys())}"
-            )
-        return self._registry[name]()
+        generator = self._registry.get(name)
+        if generator is not None:
+            return generator()
+
+        for generator in self._registry.values():
+            instance = generator()
+            if name in instance.aliases():
+                return instance
+
+        raise RuntimeError(
+            f"Algorithm '{name}' of type '{self.algorithm_type_name()}' is not registered. "
+            f"Available algorithms: {list(self._registry.keys())}"
+        )
 
     def register_instance(self, generator: Callable[[], Algorithm]) -> None:
         """Register a new algorithm implementation in this factory.
@@ -375,15 +383,28 @@ class AlgorithmFactory(ABC):
         Args:
             generator (Callable[[], Algorithm]): A callable that returns a new instance of the algorithm.
 
-                Must return an Algorithm whose name()
-                will be used as the registration key.
+                Must return an Algorithm with unique names and aliases.
+
+        Raises:
+            DuplicateRegistrationError: If an algorithm name or alias is already registered in this factory.
 
         Examples:
             >>> factory = ScfSolverFactory()
             >>> factory.register_instance(lambda: MyCustomScf())
 
         """
-        self._registry[generator().name()] = generator
+        instance = generator()
+        name = instance.name()
+        registered_aliases = {
+            alias for registered_generator in self._registry.values() for alias in registered_generator().aliases()
+        }
+        for alias in instance.aliases():
+            if alias in registered_aliases:
+                raise _DuplicateRegistrationError(
+                    f"Algorithm factory for {self.algorithm_type_name()}: "
+                    f"algorithm with name/alias '{alias}' already exists in registry"
+                )
+        self._registry[name] = generator
 
     def unregister_instance(self, name: str) -> bool:
         """Remove an algorithm implementation from this factory.

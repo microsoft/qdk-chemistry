@@ -77,6 +77,13 @@ void bind_sbt_instance(py::module& m, const char* name) {
           "The dense numpy block stored for the given per-slot labels.")
       .def("num_blocks", &SBT::num_blocks,
            "Total number of stored blocks (including aliases).")
+      .def_static("data_type_name", &SBT::data_type_name, R"(
+      Return the wire-format identifier for this tensor specialization.
+
+      Returns:
+        str: Identifier of the form ``symmetry_blocked_tensor_2_complex``.
+
+      )")
       .def("get_data_type_name", &SBT::get_data_type_name)
       .def("get_summary", &SBT::get_summary)
       .def("__repr__", &SBT::get_summary)
