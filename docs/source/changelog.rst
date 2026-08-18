@@ -17,7 +17,6 @@ Bug fixes:
 
 - Corrected the iterative phase estimation phase convention: for :math:`U = e^{-iHt}` the energy is recovered as :math:`E = -\theta / t`, the feedback phase is negated, and ``QpeResult.bits_msb_first`` is now genuinely most-significant-bit first
 - ``QpeResult`` files written by v1 are now upgraded by ``python -m qdk_chemistry.migrate``
-- Restored ``Localizer`` as a deprecated alias of ``OrbitalLocalizer`` so existing imports and subclasses continue to work
 
 Version 2.0.0
 =============
