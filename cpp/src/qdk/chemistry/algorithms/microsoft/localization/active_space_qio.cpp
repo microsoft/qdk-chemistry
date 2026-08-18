@@ -18,6 +18,7 @@
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -146,6 +147,12 @@ double total_single_orbital_entropy(const Eigen::MatrixXd& rdm_alpha,
   return entropy;
 }
 
+struct RotationOptimizationResult {
+  Eigen::MatrixXd rotation;
+  Eigen::MatrixXd rdm_alpha;
+  Eigen::MatrixXd rdm_beta;
+};
+
 /**
  * @brief Minimize the single-orbital entropy sum by gradient-free Jacobi
  * sweeps.
@@ -155,28 +162,26 @@ double total_single_orbital_entropy(const Eigen::MatrixXd& rdm_alpha,
  * plane rotation is applied to the cached RDMs and accumulated into a single
  * unitary, which is returned.
  *
- * @param rdm_alpha Active alpha 1-RDM (dim x dim), rotated in place.
- * @param rdm_beta Active beta 1-RDM (dim x dim), rotated in place.
- * @param rdm_aabb Flattened (dim^4) alpha-beta 2-RDM block, rotated in place.
+ * @param rdm_alpha Active alpha 1-RDM (dim x dim).
+ * @param rdm_beta Active beta 1-RDM (dim x dim).
+ * @param rdm_aabb Flattened (dim^4) alpha-beta 2-RDM block.
  * @param dim Active-space dimension.
  * @param max_cycles Maximum number of Jacobi sweeps.
  * @param convergence_tolerance Sweep-to-sweep entropy-sum change to stop at.
  * @param coarse_angle_step Coarse angle-scan spacing (radians) over [0, pi/2).
  * @param fine_samples Number of samples in the fine refinement scan.
  * @param improvement_tolerance Minimum entropy decrease to accept a rotation.
- * @return The accumulated active-space rotation U (dim x dim).
+ * @return The accumulated rotation and rotated spin-resolved 1-RDMs.
  */
-Eigen::MatrixXd optimize_rotation(Eigen::MatrixXd& rdm_alpha,
-                                  Eigen::MatrixXd& rdm_beta,
-                                  std::vector<double>& rdm_aabb,
-                                  std::size_t dim, std::size_t max_cycles,
-                                  double convergence_tolerance,
-                                  double coarse_angle_step, int fine_samples,
-                                  double improvement_tolerance) {
+RotationOptimizationResult optimize_rotation(
+    Eigen::MatrixXd rdm_alpha, Eigen::MatrixXd rdm_beta,
+    std::vector<double> rdm_aabb, std::size_t dim, std::size_t max_cycles,
+    double convergence_tolerance, double coarse_angle_step, int fine_samples,
+    double improvement_tolerance) {
   Eigen::MatrixXd rotation = Eigen::MatrixXd::Identity(
       static_cast<Eigen::Index>(dim), static_cast<Eigen::Index>(dim));
   if (dim < 2) {
-    return rotation;
+    return {std::move(rotation), std::move(rdm_alpha), std::move(rdm_beta)};
   }
 
   double entropy_prev =
@@ -291,7 +296,7 @@ Eigen::MatrixXd optimize_rotation(Eigen::MatrixXd& rdm_alpha,
     }
     entropy_prev = entropy_now;
   }
-  return rotation;
+  return {std::move(rotation), std::move(rdm_alpha), std::move(rdm_beta)};
 }
 
 }  // namespace detail
@@ -434,9 +439,10 @@ std::shared_ptr<data::Wavefunction> ActiveSpaceQIOLocalizer::_run_impl(
   require_finite("convergence_tolerance", convergence_tolerance);
   require_finite("coarse_angle_step", coarse_angle_step);
   require_finite("improvement_tolerance", improvement_tolerance);
-  const Eigen::MatrixXd u = detail::optimize_rotation(
-      rdm_alpha, rdm_beta, rdm_aabb_flat, n, max_cycles, convergence_tolerance,
-      coarse_angle_step, fine_samples, improvement_tolerance);
+  auto optimization = detail::optimize_rotation(
+      std::move(rdm_alpha), std::move(rdm_beta), std::move(rdm_aabb_flat), n,
+      max_cycles, convergence_tolerance, coarse_angle_step, fine_samples,
+      improvement_tolerance);
 
   // Apply the rotation to the active orbital columns (alpha == beta basis).
   const auto& coeffs_alpha = orbitals->coefficients()->block(
@@ -447,7 +453,8 @@ std::shared_ptr<data::Wavefunction> ActiveSpaceQIOLocalizer::_run_impl(
     selected_coeffs.col(static_cast<Eigen::Index>(i)) =
         coeffs_alpha.col(static_cast<Eigen::Index>(active_indices_a[i]));
   }
-  const Eigen::MatrixXd rotated_coeffs = selected_coeffs * u;
+  const Eigen::MatrixXd rotated_coeffs =
+      selected_coeffs * optimization.rotation;
 
   Eigen::MatrixXd coeffs = coeffs_alpha;
   for (std::size_t i = 0; i < n; ++i) {
@@ -466,10 +473,12 @@ std::shared_ptr<data::Wavefunction> ActiveSpaceQIOLocalizer::_run_impl(
   // Attach both spin-resolved and spin-traced active 1-RDM payloads in the new
   // orbital basis. Unlike the natural-orbital localizer, QIO does not
   // diagonalize the 1-RDM, so these payloads are generally non-diagonal.
-  const Eigen::MatrixXd rotated_one_rdm_spin_traced = rdm_alpha + rdm_beta;
+  const Eigen::MatrixXd rotated_one_rdm_spin_traced =
+      optimization.rdm_alpha + optimization.rdm_beta;
   auto rotated_active_one_rdm = data::make_spin_diagonal_rank2_sbt_variant(
-      data::ContainerTypes::MatrixVariant(rdm_alpha),
-      data::ContainerTypes::MatrixVariant(rdm_beta), false);
+      data::ContainerTypes::MatrixVariant(std::move(optimization.rdm_alpha)),
+      data::ContainerTypes::MatrixVariant(std::move(optimization.rdm_beta)),
+      false);
   return algorithms::detail::new_aufbau_determinant_wavefunction(
       wavefunction, new_orbitals,
       data::ContainerTypes::MatrixVariant(rotated_one_rdm_spin_traced),
