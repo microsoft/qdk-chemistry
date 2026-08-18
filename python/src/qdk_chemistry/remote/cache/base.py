@@ -58,8 +58,8 @@ class CacheBackend(ABC):
         """Retrieve a DataClass object (or list) by its content hash, or ``None``."""
 
     @abstractmethod
-    def put_data(self, content_hash: str, data: DataClass | list) -> None:
-        """Store a DataClass object (or list) by its content hash."""
+    def put_data(self, content_hash: str, data: DataClass | list, *, shared_only: bool = False) -> None:
+        """Store data by content hash, optionally requiring shared storage."""
 
     @abstractmethod
     def delete_job(self, run_hash: str) -> bool:
@@ -80,13 +80,16 @@ class CacheBackend(ABC):
         """Whether this cache is reachable from both local and remote."""
         return self._is_shared
 
-    def has_data(self, content_hash: str) -> bool:
+    def has_data(self, content_hash: str, *, shared_only: bool = False) -> bool:
         """Check whether a DataClass blob exists without deserializing it.
 
         The default implementation calls :meth:`get_data` and checks for
         ``None``.  Backends that can answer this more cheaply (e.g. a
-        ``HEAD`` request or a ``glob``) should override.
+        ``HEAD`` request or a ``glob``) should override. When *shared_only*
+        is true, non-shared backends always return ``False``.
         """
+        if shared_only and not self.is_shared:
+            return False
         return self.get_data(content_hash) is not None
 
     def to_config(self) -> dict:

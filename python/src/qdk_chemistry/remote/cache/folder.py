@@ -146,8 +146,10 @@ class FolderCache(CacheBackend):
             return None
         return data if isinstance(data, list) else None
 
-    def put_data(self, content_hash: str, data: DataClass | list) -> None:
-        """Store a DataClass object (or list of them) by content hash."""
+    def put_data(self, content_hash: str, data: DataClass | list, *, shared_only: bool = False) -> None:
+        """Store data by content hash unless shared storage is required but unavailable."""
+        if shared_only and not self.is_shared:
+            return None
         self._validate_key(content_hash, "content_hash")
         if isinstance(data, list):
             return self._put_data_list(content_hash, data)
@@ -246,9 +248,11 @@ class FolderCache(CacheBackend):
             return dataclass_type.from_hdf5_file(str(path))  # type: ignore[attr-defined]
         raise ValueError(f"Unknown cached manifest node kind: {kind!r}")
 
-    def has_data(self, content_hash: str) -> bool:
+    def has_data(self, content_hash: str, *, shared_only: bool = False) -> bool:
         """Fast existence check via glob (no deserialization)."""
         self._validate_key(content_hash, "content_hash")
+        if shared_only and not self.is_shared:
+            return False
         return (
             bool(list(self._root.glob(f"{content_hash}.*.h5")))
             or bool(list(self._root.glob(f"{content_hash}.list[[]*].json")))

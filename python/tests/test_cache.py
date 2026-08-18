@@ -22,6 +22,7 @@ from qdk_chemistry.remote.cache import (
     _CACHES,
     CacheBackend,
     FolderCache,
+    TieredCache,
     get_cache,
     register_cache,
     resolve_cache,
@@ -432,6 +433,22 @@ class TestCacheRegistry:
         with pytest.raises(ValueError, match="No cache registered"):
             get_cache("does_not_exist")
 
+    def test_tiered_shared_operations_ignore_local_only_tiers(self, tmp_path, sample_orbitals):
+        """Transport checks and writes operate only on shared tiers."""
+        local = FolderCache(path=tmp_path / "local")
+        shared = FolderCache(path=tmp_path / "shared", is_shared=True)
+        cache = TieredCache([local, shared])
+        local.put_data("orbitals-hash", sample_orbitals)
+
+        assert cache.is_shared
+        assert cache.has_data("orbitals-hash")
+        assert not cache.has_data("orbitals-hash", shared_only=True)
+
+        cache.put_data("orbitals-hash", sample_orbitals, shared_only=True)
+
+        assert cache.has_data("orbitals-hash", shared_only=True)
+        assert shared.has_data("orbitals-hash")
+
     @pytest.mark.usefixtures("tmp_path")
     def test_register_custom_cache(self):
         """A custom cache class can be registered and retrieved."""
@@ -448,7 +465,7 @@ class TestCacheRegistry:
             def get_data(self, _h):
                 return None
 
-            def put_data(self, _h, d):
+            def put_data(self, _h, d, *, shared_only=False):
                 pass
 
             def delete_job(self, _h):

@@ -104,14 +104,14 @@ class TieredCache(CacheBackend):
                 return data
         return None
 
-    def put_data(self, content_hash: str, data: DataClass | list) -> None:
-        """Write-through to every tier."""
+    def put_data(self, content_hash: str, data: DataClass | list, *, shared_only: bool = False) -> None:
+        """Write through to every eligible tier."""
         for tier in self._tiers:
-            tier.put_data(content_hash, data)
+            tier.put_data(content_hash, data, shared_only=shared_only)
 
-    def has_data(self, content_hash: str) -> bool:
-        """Return ``True`` if any tier contains the blob."""
-        return any(tier.has_data(content_hash) for tier in self._tiers)
+    def has_data(self, content_hash: str, *, shared_only: bool = False) -> bool:
+        """Return ``True`` if any eligible tier contains the blob."""
+        return any(tier.has_data(content_hash, shared_only=shared_only) for tier in self._tiers)
 
     # ── Deletion ─────────────────────────────────────────────────────────
 
