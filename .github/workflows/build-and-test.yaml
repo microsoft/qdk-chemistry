@@ -435,7 +435,8 @@ jobs:
           --gcov-ignore-errors=source_not_found \
           --xml "../coverage-reports/pybind11_coverage.xml" \
           --txt "../coverage-reports/pybind11_coverage.txt" \
-          --html-details "../coverage-reports/pybind11_coverage.html"
+          --html-details "../coverage-reports/pybind11_coverage.html" \
+          2> >(grep -v 'Can not fix case of path' >&2 || true)
 
         echo "Pybind11 Coverage Summary:"
         cat ../coverage-reports/pybind11_coverage.txt
