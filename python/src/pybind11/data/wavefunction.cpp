@@ -16,7 +16,6 @@
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -29,7 +28,6 @@ py::object variant_to_python(
   return std::visit(
       [](const auto& value) -> py::object { return py::cast(value); }, var);
 }
-
 py::object variant_to_python(
     const qdk::chemistry::data::ContainerTypes::MatrixVariant& var) {
   return std::visit(
@@ -266,7 +264,10 @@ It uses variant types to support both real and complex arithmetic.
            "Check if mutual information is available")
       .def("get_mutual_information",
            &WavefunctionContainer::get_mutual_information,
-           "Get mutual information matrix for active orbitals");
+           "Get mutual information matrix for active orbitals")
+      .def("compute_s_squared", &WavefunctionContainer::compute_s_squared,
+           "Compute the expectation value of the total spin-squared operator "
+           "<S^2> from spin-dependent RDMs");
 
   // Wavefunction class
   py::class_<Wavefunction, DataClass, py::smart_holder> wavefunction(
@@ -946,6 +947,32 @@ Examples:
     >>> s2 = wf.get_two_orbital_entropies()
 )");
 
+  wavefunction.def("compute_s_squared", &Wavefunction::compute_s_squared,
+                   R"(
+Compute the expectation value of the total spin-squared operator <S^2>.
+
+Uses the spin-dependent one- and two-particle reduced density matrices (RDMs):
+
+    <S^2> = 3/4 * Tr(gamma^a + gamma^b)
+            - sum_{ij} Gamma^{ab}(i,j,j,i)
+            - 1/4 * sum_{ij} Gamma^{aa}(i,j,j,i)
+            - 1/4 * sum_{ij} Gamma^{bb}(i,j,j,i)
+            - 1/2 * sum_{ij} Gamma^{ab}(i,i,j,j)
+
+For a pure spin eigenstate, <S^2> = S(S+1).
+The alpha and beta molecular orbitals must share a common spatial basis, as in
+restricted closed-shell and restricted open-shell calculations.
+
+Returns:
+    float: The expectation value <S^2> (real-valued wavefunctions only)
+
+Raises:
+    RuntimeError: If the orbitals are unrestricted, the required spin-resolved active-space RDMs are unavailable or inconsistent, or the RDMs are complex-valued
+
+Examples:
+    >>> s_squared = wf.compute_s_squared()
+)");
+
   // RDM availability check methods
   wavefunction.def("has_one_rdm_spin_dependent",
                    &Wavefunction::has_one_rdm_spin_dependent,
@@ -1194,8 +1221,13 @@ Examples:
         return *wf_ptr;
       }));
 
-  // Data type name class attribute
-  wavefunction.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(Wavefunction);
+  wavefunction.def_static("data_type_name", &Wavefunction::data_type_name, R"(
+Return the wire-format identifier for wavefunctions.
+
+Returns:
+        str: ``"wavefunction"``
+
+)");
 
   // Bind StateVectorContainer
   py::class_<StateVectorContainer, WavefunctionContainer, py::smart_holder>(

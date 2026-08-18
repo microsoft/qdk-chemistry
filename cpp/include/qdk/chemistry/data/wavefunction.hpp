@@ -15,7 +15,6 @@
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_scalar.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <string>
 #include <tuple>
 #include <variant>
@@ -526,6 +525,30 @@ class WavefunctionContainer {
   get_active_orbital_occupations() const;
 
   /**
+   * @brief Compute the expectation value of the total spin-squared operator
+   * from the real, spin-resolved active-space 1- and 2-RDMs.
+   *
+   * Uses the QDK two-particle RDM convention
+   * \f$\Gamma(p,q,r,s)=\langle a_p^\dagger a_r^\dagger a_s a_q\rangle\f$:
+   * \f[
+   * \begin{aligned}
+   * \langle S^2 \rangle ={}& \frac{3}{4}\sum_i
+   *   \left(\gamma^\alpha_{ii}+\gamma^\beta_{ii}\right)
+   *   -\sum_{ij}\Gamma^{\alpha\beta}_{ijji} \\
+   * &-\frac{1}{4}\sum_{ij}\left(\Gamma^{\alpha\alpha}_{ijji}
+   *   +\Gamma^{\beta\beta}_{ijji}\right)
+   *   -\frac{1}{2}\sum_{ij}\Gamma^{\alpha\beta}_{iijj}.
+   * \end{aligned}
+   * \f]
+   *
+   * @return The expectation value \f$\langle S^2 \rangle\f$
+   * @throws std::runtime_error if the orbitals are unrestricted, the required
+   * spin-resolved RDM blocks are unavailable or inconsistent, or the RDMs are
+   * complex-valued.
+   */
+  double compute_s_squared() const;
+
+  /**
    * @brief Check if spin-dependent one-particle RDMs for active orbitals are
    * available
    * @return True if available
@@ -854,12 +877,18 @@ class Wavefunction : public DataClass,
   static constexpr const char* DEFAULT_SECTOR = "__default__";
 
   /**
-   * @brief Get the data type name for this class
+   * @brief Get the static data type name for this class.
    * @return "wavefunction"
    */
-  std::string get_data_type_name() const override {
+  static std::string data_type_name() {
     return DATACLASS_TO_SNAKE_CASE(Wavefunction);
   }
+
+  /**
+   * @brief Get the data type name for this instance.
+   * @return "wavefunction"
+   */
+  std::string get_data_type_name() const override { return data_type_name(); }
 
   /**
    * @brief Get a summary string
@@ -1357,6 +1386,9 @@ class Wavefunction : public DataClass,
    * @throws std::runtime_error if mutual information is not available
    */
   virtual Eigen::MatrixXd get_mutual_information() const;
+
+  /** @copydoc WavefunctionContainer::compute_s_squared */
+  double compute_s_squared() const;
 
   /**
    * @brief Check if spin-dependent one-particle RDMs are available

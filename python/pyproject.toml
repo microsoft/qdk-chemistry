@@ -110,7 +110,9 @@ test = [
   "nbformat",
   "pennylane",
   "rdkit",
-  "requests>=2.33.0"
+  "requests>=2.33.0",
+  "setuptools>=64",
+  "wheel"
 ]
 azure-quantum = ["azure-identity", "azure-quantum"]
 
@@ -275,6 +277,7 @@ metadata.version.input = "../VERSION"
 [tool.scikit-build.wheel]
 packages = ["src/qdk_chemistry"]
 install-dir = "qdk_chemistry"
+exclude = ["**/.no-stubgen"]
 
 [tool.scikit-build.cmake.define]
 BUILD_SHARED_LIBS = "OFF"
