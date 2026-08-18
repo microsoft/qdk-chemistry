@@ -292,8 +292,9 @@ def pyscf_mol_to_qdk_basis(
         for iatm in range(pyscf_mol.natm):
             atom_symbol = atom_symbols[iatm]
             element = atom_symbol.rstrip("0123456789")
-            if element in pyscf_mol._ecp:  # noqa: SLF001
-                ecp_data = pyscf_mol._ecp[element]  # noqa: SLF001
+            ecp_key = atom_symbol if atom_symbol in pyscf_mol._ecp else element  # noqa: SLF001
+            if ecp_key in pyscf_mol._ecp:  # noqa: SLF001
+                ecp_data = pyscf_mol._ecp[ecp_key]  # noqa: SLF001
                 # Structure: [ncore, [[l, [[[exp, coeff]], ...]], ...]], where the inner structure has r-power terms
                 ecp_components = ecp_data[1]
 
@@ -367,9 +368,11 @@ def pyscf_mol_to_qdk_basis(
 
                 # Extract ncore values directly from the ECP dictionary structure
                 for iatm in range(pyscf_mol.natm):
-                    element = atom_symbols[iatm].rstrip("0123456789")
-                    if element in pyscf_mol.ecp:
-                        ecp_electrons[iatm] = pyscf_mol.ecp[element][0]
+                    atom_symbol = atom_symbols[iatm]
+                    element = atom_symbol.rstrip("0123456789")
+                    ecp_key = atom_symbol if atom_symbol in pyscf_mol.ecp else element
+                    if ecp_key in pyscf_mol.ecp:
+                        ecp_electrons[iatm] = pyscf_mol.ecp[ecp_key][0]
 
                 # Validate consistency with mol.atom_nelec_core if available
                 if hasattr(pyscf_mol, "atom_nelec_core"):

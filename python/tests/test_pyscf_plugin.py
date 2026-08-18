@@ -2804,6 +2804,10 @@ class TestQDKChemistryPySCFBasisConversion:
         assert pyscf_mol.atom_charges().tolist() == [19, 47]
         assert pyscf_mol.nelectron == 66
 
+        roundtrip_basis = pyscf_mol_to_qdk_basis(pyscf_mol, structure)
+        assert roundtrip_basis.get_ecp_electrons() == [28, 0]
+        assert roundtrip_basis.get_num_ecp_shells() == basis.get_num_ecp_shells()
+
     def test_ecp_roundtrip_conversion(self):
         """Test round-trip conversion of ECP shells and metadata: QDK -> PySCF -> QDK."""
         ag_structure = Structure(["Ag"], np.array([[0.0, 0.0, 0.0]]))
@@ -2904,8 +2908,8 @@ class TestQDKChemistryPySCFBasisConversion:
 
         # Verify full structure format: [ncore, [[l, terms], ...]]
         assert isinstance(pyscf_mol_1.ecp, dict)
-        assert "Ag" in pyscf_mol_1.ecp
-        ecp_data = pyscf_mol_1.ecp["Ag"]
+        assert "Ag1" in pyscf_mol_1.ecp
+        ecp_data = pyscf_mol_1.ecp["Ag1"]
         assert isinstance(ecp_data, list)
         assert len(ecp_data) >= 2
         assert isinstance(ecp_data[0], int)  # ncore

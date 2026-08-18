@@ -199,6 +199,7 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol,
                    const std::vector<Shell>& input_shells, BasisMode mode,
                    bool pure, bool sort)
     : mol(mol), mode(mode), shells(input_shells), pure(pure) {
+  atom_ecp_electrons.resize(mol->n_atoms, 0);
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
   if (mpi::get_world_size() > 1) {
     MPI_Barrier(MPI_COMM_WORLD);
