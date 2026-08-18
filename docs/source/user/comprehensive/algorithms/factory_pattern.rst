@@ -47,9 +47,9 @@ In Python, algorithm instantiation is managed through a centralized registry mod
    * - :doc:`ScfSolver <../algorithms/scf_solver>`
      - ``"scf_solver"``
      - ``ScfSolverFactory``
-   * - :doc:`Localizer <../algorithms/localizer>`
+   * - :doc:`OrbitalLocalizer <../algorithms/localizer>`
      - ``"orbital_localizer"``
-     - ``LocalizerFactory``
+     - ``OrbitalLocalizerFactory``
    * - :doc:`ActiveSpaceSelector <../algorithms/active_space>`
      - ``"active_space_selector"``
      - ``ActiveSpaceSelectorFactory``

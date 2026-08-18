@@ -30,10 +30,11 @@ class VVHVLocalizerSettings : public IterativeOrbitalLocalizationSettings {
 };
 
 /**
- * @brief Valence Virtual - Hard Virtual (VV-HV) implementation of the Localizer
- * interface.
+ * @brief Valence Virtual - Hard Virtual (VV-HV) implementation of the
+ * OrbitalLocalizer interface.
  *
- * This class provides a concrete implementation of the Localizer interface
+ * This class provides a concrete implementation of the OrbitalLocalizer
+ * interface
  * using the VV-HV localization algorithm.
  *
  * The VV-HV algorithm partitions virtual orbitals into valence virtuals (VVs)
@@ -47,7 +48,7 @@ class VVHVLocalizerSettings : public IterativeOrbitalLocalizationSettings {
  * @note This localizer requires all orbital indices to be covered in the
  * localize call.
  */
-class VVHVLocalizer : public qdk::chemistry::algorithms::Localizer {
+class VVHVLocalizer : public qdk::chemistry::algorithms::OrbitalLocalizer {
  public:
   VVHVLocalizer() { _settings = std::make_unique<VVHVLocalizerSettings>(); };
 
