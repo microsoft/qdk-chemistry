@@ -21,7 +21,14 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder im
     RobustPhaseEstimationCircuitSet,
     _AlgorithmSnapshot,
 )
-from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator, RobustPhaseEstimationSchedule, Settings
+from qdk_chemistry.data import (
+    AlgorithmRef,
+    Circuit,
+    QubitOperator,
+    RobustPhaseEstimationRound,
+    RobustPhaseEstimationSchedule,
+    Settings,
+)
 from qdk_chemistry.utils.rpe import qdrift_schedule
 
 
@@ -143,6 +150,81 @@ def test_explicit_base_time_below_aliasing_limit_is_retained(
 
     assert circuit_set.base_time == pytest.approx(base_time)
     assert circuit_set.rounds[0].evolution_time == pytest.approx(base_time)
+
+
+@pytest.mark.parametrize("builder_name", ["trotter", "qdrift", "partially_randomized"])
+@pytest.mark.parametrize("power_strategy", ["repeat", "rescale"])
+def test_nested_unitary_power_must_be_one(
+    rpe_problem: tuple[Circuit, QubitOperator],
+    builder_name: str,
+    power_strategy: str,
+) -> None:
+    """RPE rejects every built-in unitary builder that applies an additional power."""
+    state_preparation, hamiltonian = rpe_problem
+    unitary_builder = AlgorithmRef(
+        "hamiltonian_unitary_builder",
+        builder_name,
+        power=2,
+        power_strategy=power_strategy,
+    )
+    builder = QdkRobustPhaseEstimationCircuitBuilder(target_accuracy=0.5, unitary_builder=unitary_builder)
+
+    with pytest.raises(ValueError, match="unitary_builder power must be 1"):
+        builder.run(state_preparation, hamiltonian)
+
+
+@pytest.mark.parametrize("builder_name", ["trotter", "qdrift", "partially_randomized"])
+def test_explicit_nested_unitary_power_one_is_accepted(
+    rpe_problem: tuple[Circuit, QubitOperator],
+    builder_name: str,
+) -> None:
+    """An explicit unit power preserves each built-in RPE evolution path."""
+    state_preparation, hamiltonian = rpe_problem
+    unitary_builder = AlgorithmRef("hamiltonian_unitary_builder", builder_name, power=1)
+
+    circuit_set = QdkRobustPhaseEstimationCircuitBuilder(
+        target_accuracy=0.5,
+        unitary_builder=unitary_builder,
+    ).run(state_preparation, hamiltonian)
+
+    assert all(round_data.unitary_builder_configuration.settings.get("power") == 1 for round_data in circuit_set.rounds)
+
+
+def test_rebinding_schedule_rejects_nested_unitary_power(
+    rpe_problem: tuple[Circuit, QubitOperator],
+) -> None:
+    """A serialized schedule cannot bypass the nested-power invariant."""
+    state_preparation, hamiltonian = rpe_problem
+    original = QdkRobustPhaseEstimationCircuitBuilder(target_accuracy=0.5).run(state_preparation, hamiltonian)
+    original_round = original.rounds[0]
+    invalid_round = RobustPhaseEstimationRound(
+        round_index=original_round.round_index,
+        evolution_time=original_round.evolution_time,
+        shots_per_basis=original_round.shots_per_basis,
+        num_draws=original_round.num_draws,
+        scheduled_samples=original_round.scheduled_samples,
+        circuit_multiplicity=original_round.circuit_multiplicity,
+        draw_seeds=original_round.draw_seeds,
+        unitary_builder_configuration=AlgorithmRef("hamiltonian_unitary_builder", "trotter", power=2),
+    )
+    invalid_schedule = RobustPhaseEstimationSchedule(
+        rounds=(invalid_round,),
+        lambda_norm=original.lambda_norm,
+        base_time=original.base_time,
+        target_accuracy=original.target_accuracy,
+        epsilon_rpe=original.epsilon_rpe,
+        epsilon_unitary=original.epsilon_unitary,
+        unitary_accuracy_fraction=original.unitary_accuracy_fraction,
+        error_budget_mode=original.error_budget_mode,
+        unitary_builder_category=original.unitary_builder_category,
+        energy_correction=original.energy_correction,
+        requested_seed=original.requested_seed,
+        root_seed=original.root_seed,
+        hadamard_test_circuit_builder_configuration=original.hadamard_test_circuit_builder_configuration,
+    )
+
+    with pytest.raises(ValueError, match="unitary_builder power must be 1"):
+        RobustPhaseEstimationCircuitSet.from_schedule(invalid_schedule, state_preparation, hamiltonian)
 
 
 def test_deterministic_round_yields_one_pair_with_shot_multiplicity(

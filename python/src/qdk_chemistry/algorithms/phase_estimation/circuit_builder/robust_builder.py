@@ -75,6 +75,11 @@ class _AlgorithmSnapshot:
         settings = Settings.from_json(self.settings_json)
         return settings.has(key)
 
+    def get_setting(self, key: str) -> object:
+        """Return one setting value from an independent settings copy."""
+        settings = Settings.from_json(self.settings_json)
+        return settings.get(key)
+
     def with_updates(self, **updates: object) -> _AlgorithmSnapshot:
         """Return a new snapshot with existing setting values updated."""
         ref = self.to_ref()
@@ -163,6 +168,8 @@ class RobustPhaseEstimationCircuitSet:
             A runtime circuit set that materializes circuits from ``schedule`` on demand.
 
         """
+        for round_data in schedule.rounds:
+            _validate_unitary_builder_power(_AlgorithmSnapshot.from_ref(round_data.unitary_builder_configuration))
         return cls(
             rounds=schedule.rounds,
             lambda_norm=schedule.lambda_norm,
@@ -269,6 +276,7 @@ class RobustPhaseEstimationCircuitSet:
             draw_seed = None
 
         unitary_snapshot = _AlgorithmSnapshot.from_ref(round_data.unitary_builder_configuration)
+        _validate_unitary_builder_power(unitary_snapshot)
         if draw_seed is not None and unitary_snapshot.has_setting("seed"):
             unitary_snapshot = unitary_snapshot.with_updates(seed=draw_seed)
 
@@ -333,7 +341,7 @@ class RobustPhaseEstimationCircuitBuilderSettings(Settings):
             "unitary_builder",
             "algorithm_ref",
             AlgorithmRef("hamiltonian_unitary_builder", "qdrift"),
-            "Time-evolution builder used to realize U(t); sized per round.",
+            "Time-evolution builder used to realize U(t); sized per round with power fixed at 1.",
         )
         self._set_default(
             "hadamard_test_circuit_builder",
@@ -412,7 +420,7 @@ class RobustPhaseEstimationCircuitBuilder(Algorithm):
             seed: Root random seed; ``-1`` chooses one entropy-backed seed per circuit set.
             epsilon_rpe: Optional legacy RPE energy tolerance for non-Trotter builders.
             epsilon_unitary: Optional positive Trotter sizing tolerance, with an effective Trotter default of ``0.85``.
-            unitary_builder: Optional time-evolution builder reference.
+            unitary_builder: Optional time-evolution builder reference whose ``power`` must be ``1``.
             hadamard_test_circuit_builder: Optional Hadamard-test circuit-builder reference.
 
         """
@@ -480,6 +488,7 @@ class QdkRobustPhaseEstimationCircuitBuilder(RobustPhaseEstimationCircuitBuilder
         hadamard_ref = self._settings.get("hadamard_test_circuit_builder")
         unitary_snapshot = _AlgorithmSnapshot.from_ref(unitary_ref)
         hadamard_snapshot = _AlgorithmSnapshot.from_ref(hadamard_ref)
+        _validate_unitary_builder_power(unitary_snapshot)
 
         category = self._classify_builder(unitary_snapshot)
         correction = self._select_correction(category)
@@ -653,3 +662,17 @@ class QdkRobustPhaseEstimationCircuitBuilder(RobustPhaseEstimationCircuitBuilder
     def name(self) -> str:
         """Return the QDK robust circuit-builder name."""
         return "qdk"
+
+
+def _validate_unitary_builder_power(snapshot: _AlgorithmSnapshot) -> None:
+    """Require RPE to be the sole owner of the evolution power schedule."""
+    if not snapshot.has_setting("power"):
+        return
+    power = snapshot.get_setting("power")
+    if not isinstance(power, int):
+        raise TypeError(f"unitary_builder power must be an integer, got {type(power).__name__}.")
+    if power != 1:
+        raise ValueError(
+            "Robust phase estimation controls evolution powers through its round-time schedule; "
+            f"unitary_builder power must be 1, got {power}."
+        )

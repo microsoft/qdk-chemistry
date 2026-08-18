@@ -27,7 +27,7 @@ Configuration
      - Description
    * - ``unitary_builder``
      - :class:`~qdk_chemistry.data.AlgorithmRef`
-     - Time-evolution builder used to realize each scheduled unitary.
+     - Time-evolution builder used to realize each scheduled unitary. Its ``power`` setting must be ``1`` because RPE controls powers through the round-time schedule.
    * - ``hadamard_test_circuit_builder``
      - :class:`~qdk_chemistry.data.AlgorithmRef`
      - Builder used to generate the X- and Y-basis Hadamard-test circuits.
