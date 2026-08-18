@@ -277,6 +277,13 @@ See :doc:`qpe_circuit_builder` for configuring:
 - ``unitary_builder`` → ``quantum_walk`` — Required; the unary path has no Trotter equivalent
 - ``circuit_mapper`` — Circuit synthesis strategy, which must expose the block encoding's ancilla reflection
 
+.. tab:: Python API (Unary-iteration configuration)
+
+   .. literalinclude:: ../../../_static/examples/python/phase_estimation.py
+      :language: python
+      :start-after: # start-cell-configure-unary
+      :end-before: # end-cell-configure-unary
+
 
 Phase-to-energy extraction
 ---------------------------
