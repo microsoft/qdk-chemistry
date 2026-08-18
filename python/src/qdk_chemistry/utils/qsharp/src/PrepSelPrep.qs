@@ -59,7 +59,6 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         ApplyToEachCA(X, qs);
 
         if nAll <= 3 {
-            // At two or three qubits the AND ladder buys nothing.
             Controlled Z(allQubits[0..nAll - 2], allQubits[nAll - 1]);
         } else {
             let nAnc = nAll - 2;

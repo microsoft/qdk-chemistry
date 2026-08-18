@@ -273,9 +273,7 @@ Nested algorithm configuration (via ``qpe_circuit_builder``):
 
 See :doc:`qpe_circuit_builder` for configuring:
 
-- ``num_queries`` — Number of walk queries :math:`p`; need not be a power of two, and a
-  power of two is reduced by one because its extra reflection slot would otherwise cost a
-  whole phase qubit
+- ``num_queries`` — Number of walk queries :math:`p`; need not be a power of two
 - ``unitary_builder`` → ``quantum_walk`` — Required; the unary path has no Trotter equivalent
 - ``circuit_mapper`` — Circuit synthesis strategy, which must expose the block encoding's ancilla reflection
 

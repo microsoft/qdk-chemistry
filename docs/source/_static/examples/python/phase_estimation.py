@@ -173,8 +173,7 @@ iqpe_qubitization.settings().set(
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import AlgorithmRef
 
-# num_queries is the number of walk queries. A power of two is reduced by one, since
-# its extra reflection slot would otherwise cost a whole phase qubit, so ask for 7.
+# num_queries is the number of walk queries and need not be a power of two
 qpe_unary = create("phase_estimation", "qdk_unary", shots=200)
 
 unary_circuit_builder = AlgorithmRef(

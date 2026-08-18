@@ -59,8 +59,7 @@ class QdkUnaryQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
             "Number of walk queries I. The Heisenberg-limited setting for a target "
             "phase-estimation energy error epsilon is I = ceil(pi * lambda / (2 * epsilon)), "
             "where lambda is the block-encoding 1-norm; see Lee2021 Eq. (45). "
-            "Doesn't need to be a power of two; a power of two is reduced by one, since its "
-            "extra reflection slot would otherwise cost a whole phase qubit.",
+            "Doesn't need to be a power of two.",
         )
         self._set_default(
             "circuit_mapper",
@@ -116,11 +115,6 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
 
     def resolve_num_queries(self) -> tuple[int, int]:
         """Return the query count to apply and the phase-register size addressing it.
-
-        A power-of-two ``num_queries`` is reduced by one. ``p`` queries need ``p + 1``
-        reflection slots, so ``p = 2 ** k`` is the single value that spills into an extra
-        phase qubit to address one extra slot, while ``p - 1`` packs the register exactly
-        and drops a walk block.
 
         Returns:
             The number of walk blocks the schedule applies, and the number of phase qubits
