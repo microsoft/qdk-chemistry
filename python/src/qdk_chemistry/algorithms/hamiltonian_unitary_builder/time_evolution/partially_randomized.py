@@ -653,6 +653,10 @@ class PartiallyRandomized(QDrift):
                 best_ld = ld
         return best_ld
 
+    def rpe_category(self) -> str:
+        """Return the partially randomized category used by robust phase estimation."""
+        return "partial_randomized"
+
     def name(self) -> str:
         """Return the name of the unitary builder."""
         return "partially_randomized"

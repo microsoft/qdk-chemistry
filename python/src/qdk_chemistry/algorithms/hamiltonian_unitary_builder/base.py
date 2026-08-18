@@ -37,6 +37,10 @@ class HamiltonianUnitaryBuilder(Algorithm):
         """Initialize the HamiltonianUnitaryBuilder."""
         super().__init__()
 
+    def rpe_category(self) -> str:
+        """Return the builder category used by robust phase estimation."""
+        return "deterministic_or_exact"
+
     @abstractmethod
     def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
         """Construct a UnitaryRepresentation for the given Hamiltonian.

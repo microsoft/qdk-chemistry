@@ -14,7 +14,9 @@ from math import pi
 
 import pytest
 
+from qdk_chemistry import algorithms
 from qdk_chemistry.algorithms import create
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder import (
     QdkRobustPhaseEstimationCircuitBuilder,
     RobustPhaseEstimationCircuitBuilder,
@@ -42,9 +44,14 @@ class _FakeUnitary:
 class _FakeUnitaryBuilder:
     """Record one on-demand unitary construction."""
 
-    def __init__(self, settings: Settings, records: list[dict[str, object]]) -> None:
+    def __init__(self, settings: Settings, records: list[dict[str, object]], rpe_category: str) -> None:
         self._settings = settings
         self._records = records
+        self._rpe_category = rpe_category
+
+    def rpe_category(self) -> str:
+        """Return the category of the replaced unitary builder."""
+        return self._rpe_category
 
     def run(self, qubit_hamiltonian: QubitOperator) -> _FakeUnitary:
         """Record settings and return a unitary marker."""
@@ -70,6 +77,14 @@ class _FakeHadamardBuilder:
         return Circuit(qasm="OPENQASM 3.0;\nqubit[1] q;\n")
 
 
+class _RenamedTrotter(Trotter):
+    """Trotter implementation registered under a non-built-in name."""
+
+    def name(self) -> str:
+        """Return a custom registry name."""
+        return "renamed_trotter_for_rpe_test"
+
+
 @pytest.fixture
 def rpe_problem() -> tuple[Circuit, QubitOperator]:
     """Return a minimal state-preparation circuit and Hamiltonian."""
@@ -89,7 +104,12 @@ def recording_builders(
     def create_snapshot(snapshot: _AlgorithmSnapshot):
         settings = Settings.from_json(snapshot.settings_json)
         if snapshot.algorithm_type == "hamiltonian_unitary_builder":
-            return _FakeUnitaryBuilder(settings, unitary_records)
+            categories = {
+                "trotter": "trotter",
+                "qdrift": "qdrift",
+                "partially_randomized": "partial_randomized",
+            }
+            return _FakeUnitaryBuilder(settings, unitary_records, categories[snapshot.algorithm_name])
         if snapshot.algorithm_type == "hadamard_test_circuit_builder":
             return _FakeHadamardBuilder(settings, hadamard_records)
         raise AssertionError(f"Unexpected algorithm type: {snapshot.algorithm_type}")
@@ -150,6 +170,44 @@ def test_explicit_base_time_below_aliasing_limit_is_retained(
 
     assert circuit_set.base_time == pytest.approx(base_time)
     assert circuit_set.rounds[0].evolution_time == pytest.approx(base_time)
+
+
+@pytest.mark.parametrize("epsilon_unitary", [None, 0.5])
+def test_renamed_trotter_uses_same_rpe_policy(
+    rpe_problem: tuple[Circuit, QubitOperator],
+    epsilon_unitary: float | None,
+) -> None:
+    """A custom Trotter registry name preserves category-driven RPE behavior."""
+    state_preparation, hamiltonian = rpe_problem
+    algorithms.register(_RenamedTrotter)
+    try:
+        circuit_sets = []
+        for builder_name in ("trotter", "renamed_trotter_for_rpe_test"):
+            circuit_sets.append(
+                QdkRobustPhaseEstimationCircuitBuilder(
+                    target_accuracy=0.01,
+                    epsilon_unitary=epsilon_unitary,
+                    unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", builder_name),
+                ).run(state_preparation, hamiltonian)
+            )
+    finally:
+        algorithms.unregister("hamiltonian_unitary_builder", "renamed_trotter_for_rpe_test")
+
+    builtin, renamed = circuit_sets
+    expected_unitary_accuracy = 0.85 if epsilon_unitary is None else epsilon_unitary
+    assert builtin.error_budget_mode == renamed.error_budget_mode == "independent_trotter"
+    assert builtin.epsilon_rpe == renamed.epsilon_rpe == pytest.approx(0.01)
+    assert builtin.epsilon_unitary == renamed.epsilon_unitary == pytest.approx(expected_unitary_accuracy)
+    assert builtin.unitary_accuracy_fraction == renamed.unitary_accuracy_fraction == pytest.approx(0.0)
+    assert builtin.unitary_builder_category == renamed.unitary_builder_category == "deterministic_or_exact"
+    assert builtin.num_rounds == renamed.num_rounds
+    for builtin_round, renamed_round in zip(builtin.rounds, renamed.rounds, strict=True):
+        builtin_settings = builtin_round.unitary_builder_configuration.settings
+        renamed_settings = renamed_round.unitary_builder_configuration.settings
+        assert builtin_settings is not None
+        assert renamed_settings is not None
+        assert builtin_settings.get("target_accuracy") == pytest.approx(expected_unitary_accuracy)
+        assert renamed_settings.get("target_accuracy") == pytest.approx(expected_unitary_accuracy)
 
 
 @pytest.mark.parametrize("builder_name", ["trotter", "qdrift", "partially_randomized"])

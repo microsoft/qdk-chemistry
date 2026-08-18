@@ -425,6 +425,10 @@ class QDrift(TimeEvolutionBuilder):
             ExponentiatedPauliTerm(pauli_term=dict(key), angle=angle) for key, angle in merged.items() if angle != 0.0
         ]
 
+    def rpe_category(self) -> str:
+        """Return the qDRIFT category used by robust phase estimation."""
+        return "qdrift"
+
     def name(self) -> str:
         """Return the name of the unitary builder."""
         return "qdrift"

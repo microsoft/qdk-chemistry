@@ -38,6 +38,7 @@ __all__ = [
 
 _UNSET_BUDGET_VALUE = -1.0
 _DEFAULT_TROTTER_EPSILON_UNITARY = 0.85
+_SUPPORTED_RPE_CATEGORIES = frozenset({"deterministic_or_exact", "trotter", "qdrift", "partial_randomized"})
 
 
 @dataclass(frozen=True)
@@ -490,13 +491,14 @@ class QdkRobustPhaseEstimationCircuitBuilder(RobustPhaseEstimationCircuitBuilder
         hadamard_snapshot = _AlgorithmSnapshot.from_ref(hadamard_ref)
         _validate_unitary_builder_power(unitary_snapshot)
 
-        category = self._classify_builder(unitary_snapshot)
+        declared_category = self._resolve_rpe_category(unitary_snapshot)
+        category = "deterministic_or_exact" if declared_category == "trotter" else declared_category
         correction = self._select_correction(category)
         epsilon_total = float(self._settings.get("target_accuracy"))
         fraction, epsilon_rpe, epsilon_unitary, budget_mode = self._resolve_budget(
             category,
             epsilon_total,
-            is_trotter=self._is_trotter_builder(unitary_snapshot),
+            is_trotter=declared_category == "trotter",
         )
 
         lambda_norm = float(np.sum(np.abs(np.asarray(qubit_hamiltonian.coefficients, dtype=float))))
@@ -569,18 +571,27 @@ class QdkRobustPhaseEstimationCircuitBuilder(RobustPhaseEstimationCircuitBuilder
         )
 
     @staticmethod
-    def _classify_builder(snapshot: _AlgorithmSnapshot) -> str:
-        """Classify the unitary builder from its supported settings."""
-        if snapshot.has_setting("num_random_samples"):
-            return "partial_randomized"
-        if snapshot.has_setting("num_samples"):
-            return "qdrift"
-        return "deterministic_or_exact"
-
-    @staticmethod
-    def _is_trotter_builder(snapshot: _AlgorithmSnapshot) -> bool:
-        """Return whether the snapshot names the registered Trotter builder."""
-        return snapshot.algorithm_type == "hamiltonian_unitary_builder" and snapshot.algorithm_name == "trotter"
+    def _resolve_rpe_category(snapshot: _AlgorithmSnapshot) -> str:
+        """Return and validate the unitary builder's declared RPE category."""
+        builder = snapshot.create()
+        category_resolver = getattr(builder, "rpe_category", None)
+        if not callable(category_resolver):
+            raise TypeError(
+                f"Unitary builder '{snapshot.algorithm_type}/{snapshot.algorithm_name}' must implement rpe_category()."
+            )
+        category = category_resolver()
+        if not isinstance(category, str):
+            raise TypeError(
+                f"Unitary builder '{snapshot.algorithm_type}/{snapshot.algorithm_name}' returned a non-string "
+                "RPE category."
+            )
+        if category not in _SUPPORTED_RPE_CATEGORIES:
+            supported = ", ".join(sorted(_SUPPORTED_RPE_CATEGORIES))
+            raise ValueError(
+                f"Unitary builder '{snapshot.algorithm_type}/{snapshot.algorithm_name}' returned unsupported "
+                f"RPE category {category!r}; expected one of: {supported}."
+            )
+        return category
 
     def _select_correction(self, category: str) -> str:
         """Resolve the configured phase-to-energy correction."""
