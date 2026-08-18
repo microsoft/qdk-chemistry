@@ -1,0 +1,99 @@
+name: Coverage PR Comment
+
+# Posts/updates a sticky PR comment with the coverage results produced by the
+# "Build and Test" workflow. This runs as a separate `workflow_run`-triggered
+# workflow (instead of commenting directly from build-and-test.yaml) so that it
+# always executes with the base repository's permissions and secrets, even when
+# the triggering pull_request came from a fork. Forked PRs only get a read-only
+# GITHUB_TOKEN in their own pull_request run, which is not enough to create or
+# update comments on microsoft/qdk-chemistry.
+#
+# This workflow never checks out or executes code from the triggering run, it
+# only downloads the (data-only) coverage report artifacts it produced and
+# resolves the associated PR number via the GitHub API.
+on:
+  workflow_run:
+    workflows: [Build and Test]
+    types:
+    - completed
+
+permissions:
+  contents: read
+  pull-requests: write
+  actions: read
+
+jobs:
+  comment:
+    name: Post coverage comment
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.event == 'pull_request'
+    steps:
+    - name: Download coverage comment artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: coverage-comment-*
+        path: artifacts
+        run-id: ${{ github.event.workflow_run.id }}
+        github-token: ${{ github.token }}
+
+    - name: Resolve pull request number
+      id: pr
+      uses: actions/github-script@v7
+      with:
+        script: |
+          // Resolve the PR number from the GitHub API using the trusted head
+          // SHA of the workflow run, rather than trusting any value coming
+          // from the (potentially fork-controlled) artifact contents.
+          const { data: pulls } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            commit_sha: context.payload.workflow_run.head_sha,
+          });
+
+          const pr = pulls.find((p) => p.state === 'open') ?? pulls[0];
+          if (!pr) {
+            core.setFailed('Could not resolve a pull request for this workflow run.');
+            return;
+          }
+
+          core.setOutput('number', pr.number);
+
+    - name: Build combined coverage comment
+      id: build-comment
+      run: |
+        set -euo pipefail
+
+        comment_file="$RUNNER_TEMP/pr-comment.md"
+        : > "$comment_file"
+        found_report=false
+
+        for dir in artifacts/coverage-comment-*/; do
+          [ -d "$dir" ] || continue
+          report="$dir/pr-comment.md"
+          [ -f "$report" ] || continue
+
+          job_label="$(basename "$dir")"
+          job_label="${job_label#coverage-comment-}"
+
+          {
+            echo "<details>"
+            echo "<summary>${job_label}</summary>"
+            echo ""
+            cat "$report"
+            echo ""
+            echo "</details>"
+            echo ""
+          } >> "$comment_file"
+          found_report=true
+        done
+
+        echo "comment-file=$comment_file" >> "$GITHUB_OUTPUT"
+        echo "found-report=$found_report" >> "$GITHUB_OUTPUT"
+
+    - name: Comment PR with coverage
+      if: steps.build-comment.outputs.found-report == 'true'
+      uses: marocchino/sticky-pull-request-comment@v3
+      with:
+        number_force: ${{ steps.pr.outputs.number }}
+        path: ${{ steps.build-comment.outputs.comment-file }}
+        header: coverage-report

@@ -32,10 +32,9 @@ concurrency:
 
 permissions:
   contents: read
-  pull-requests: write
+  pull-requests: read
   checks: write
   statuses: write
-  actions: write
 
 jobs:
   check-up-to-date:
@@ -497,6 +496,17 @@ jobs:
           echo '```' >> pr-comment.md
           echo "</details>" >> pr-comment.md
         fi
+
+    # Forked pull_request runs only get a read-only GITHUB_TOKEN, so the comment is
+    # posted by the separate "Coverage PR Comment" workflow_run workflow instead;
+    # see .github/workflows/coverage-comment.yaml.
+    - name: Upload coverage comment artifact
+      if: github.event_name == 'pull_request'
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-comment-${{ matrix.os-name }}-py${{ matrix.python-version }}
+        path: pr-comment.md
+        retention-days: 1
 
     - name: Add coverage to job summary
       run: |
