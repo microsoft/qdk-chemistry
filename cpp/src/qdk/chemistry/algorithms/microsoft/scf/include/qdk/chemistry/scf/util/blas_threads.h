@@ -4,18 +4,24 @@
 
 #pragma once
 
+#include <qdk/chemistry/scf/config.h>
+
 namespace qdk::chemistry::scf::util {
 
 /**
  * @brief BLAS backends whose threading can be controlled at runtime.
+ *
+ * Enumerators are generated from QDK_CHEMISTRY_BLAS_BACKEND_TABLE in
+ * scf/config.h, which CMake emits from the table it probes with.
+ * BlasVendor::Unknown means no recognized thread-control API was found.
  */
 enum class BlasVendor {
-  Unknown,    ///< No recognized thread-control API was found
-  OpenBLAS,   ///< OpenBLAS (also covers the OpenBLAS-compatible ARMPL builds)
-  IntelMKL,   ///< Intel oneMKL
-  BLIS,       ///< BLIS / AMD AOCL-BLAS
-  FlexiBLAS,  ///< FlexiBLAS dispatch layer
-  NVPL,       ///< NVIDIA Performance Libraries BLAS
+  Unknown,
+#define QDK_CHEMISTRY_BLAS_VENDOR_ENUMERATOR(token, vendor, label, set_fn, \
+                                             get_fn, type)                 \
+  vendor,
+  QDK_CHEMISTRY_BLAS_BACKEND_TABLE(QDK_CHEMISTRY_BLAS_VENDOR_ENUMERATOR)
+#undef QDK_CHEMISTRY_BLAS_VENDOR_ENUMERATOR
 };
 
 /// @brief Human readable name of a BLAS vendor.

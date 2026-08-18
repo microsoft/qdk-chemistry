@@ -14,14 +14,19 @@
 // "BLIS"). Empty when the BLAS search did not report a vendor.
 #define QDK_CHEMISTRY_BLAS_VENDOR "@QDK_CHEMISTRY_BLAS_VENDOR@"
 
-// Thread-control API that links against the configured BLAS, as probed by
-// CMake. At most one of these is defined; when none is, util/blas_threads.cpp
-// falls back to looking the API up at runtime.
-#cmakedefine QDK_CHEMISTRY_BLAS_LINKS_OPENBLAS
-#cmakedefine QDK_CHEMISTRY_BLAS_LINKS_INTELMKL
-#cmakedefine QDK_CHEMISTRY_BLAS_LINKS_BLIS
-#cmakedefine QDK_CHEMISTRY_BLAS_LINKS_FLEXIBLAS
-#cmakedefine QDK_CHEMISTRY_BLAS_LINKS_NVPL
+// Candidate BLAS thread-control APIs, in probe order, generated from the table
+// in src/CMakeLists.txt. Columns are the CMake token, the BlasVendor
+// enumerator, its display name, the setter, the getter, and the thread-count
+// type.
+#define QDK_CHEMISTRY_BLAS_BACKEND_TABLE(X) \
+@QDK_CHEMISTRY_BLAS_BACKEND_TABLE@
+
+// The row whose API links against the configured BLAS. Undefined when none
+// could be bound, in which case util/blas_threads.cpp looks it up at runtime.
+#cmakedefine QDK_CHEMISTRY_BLAS_LINKED_VENDOR @QDK_CHEMISTRY_BLAS_LINKED_VENDOR@
+#cmakedefine QDK_CHEMISTRY_BLAS_LINKED_SET_FN @QDK_CHEMISTRY_BLAS_LINKED_SET_FN@
+#cmakedefine QDK_CHEMISTRY_BLAS_LINKED_GET_FN @QDK_CHEMISTRY_BLAS_LINKED_GET_FN@
+#cmakedefine QDK_CHEMISTRY_BLAS_LINKED_TYPE @QDK_CHEMISTRY_BLAS_LINKED_TYPE@
 
 namespace qdk::chemistry::scf {
 

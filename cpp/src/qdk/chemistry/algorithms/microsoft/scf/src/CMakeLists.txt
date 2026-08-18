@@ -115,25 +115,51 @@ include(CheckFunctionExists)
 
 set(QDK_CHEMISTRY_BLAS_VENDOR "${BLAS_VENDOR}")
 
+# Candidate APIs, in probe order: a dispatch layer can also expose its
+# backend's API, so ask the dispatcher first. Single source of truth for BLAS
+# thread control: drives the configure-time probe below and, through
+# QDK_CHEMISTRY_BLAS_BACKEND_TABLE in config.h.in, the BlasVendor enumeration
+# and runtime lookup in util/blas_threads.{h,cpp}. Columns are setter, getter,
+# thread-count type, BlasVendor enumerator, display name.
+#
+# OPENBLAS also covers drop-ins such as ARM Performance Libraries. BLIS types
+# the count as dim_t, 32- or 64-bit depending on its build; the 64-bit form is
+# safe for both, as a 32-bit callee reads the low half of the argument register.
+set(_qdk_blas_backends FLEXIBLAS OPENBLAS INTELMKL BLIS NVPL)
+set(_qdk_blas_api_FLEXIBLAS
+    flexiblas_set_num_threads flexiblas_get_num_threads int FlexiBLAS "FlexiBLAS")
+set(_qdk_blas_api_OPENBLAS
+    openblas_set_num_threads openblas_get_num_threads int OpenBLAS "OpenBLAS")
+set(_qdk_blas_api_INTELMKL
+    MKL_Set_Num_Threads MKL_Get_Max_Threads int IntelMKL "Intel MKL")
+set(_qdk_blas_api_BLIS
+    bli_thread_set_num_threads bli_thread_get_num_threads std::int64_t BLIS "BLIS")
+set(_qdk_blas_api_NVPL
+    nvpl_blas_set_num_threads nvpl_blas_get_max_threads int NVPL "NVPL BLAS")
+
+# Expand the table into the X-macro consumed by config.h.in.
+set(_qdk_blas_table_lines "")
+foreach(_qdk_blas_backend IN LISTS _qdk_blas_backends)
+  list(GET _qdk_blas_api_${_qdk_blas_backend} 0 _qdk_blas_set_fn)
+  list(GET _qdk_blas_api_${_qdk_blas_backend} 1 _qdk_blas_get_fn)
+  list(GET _qdk_blas_api_${_qdk_blas_backend} 2 _qdk_blas_type)
+  list(GET _qdk_blas_api_${_qdk_blas_backend} 3 _qdk_blas_enum)
+  list(GET _qdk_blas_api_${_qdk_blas_backend} 4 _qdk_blas_label)
+  list(APPEND _qdk_blas_table_lines
+       "  X(${_qdk_blas_backend}, ${_qdk_blas_enum}, \"${_qdk_blas_label}\", ${_qdk_blas_set_fn}, ${_qdk_blas_get_fn}, ${_qdk_blas_type})")
+endforeach()
+string(JOIN " \\\n" QDK_CHEMISTRY_BLAS_BACKEND_TABLE ${_qdk_blas_table_lines})
+
 set(QDK_CHEMISTRY_BLAS_THREAD_API "AUTO" CACHE STRING
-    "BLAS thread-control API to bind: AUTO, OPENBLAS, INTELMKL, BLIS, FLEXIBLAS, NVPL or NONE")
+    "BLAS thread-control API to bind: AUTO, NONE or one of ${_qdk_blas_backends}")
 set_property(CACHE QDK_CHEMISTRY_BLAS_THREAD_API PROPERTY STRINGS
-    AUTO OPENBLAS INTELMKL BLIS FLEXIBLAS NVPL NONE)
+    AUTO ${_qdk_blas_backends} NONE)
 
 if(TARGET BLAS::BLAS)
   set(_qdk_blas_link_libs BLAS::BLAS)
 else()
   set(_qdk_blas_link_libs ${BLAS_LIBRARIES})
 endif()
-
-# Candidate APIs, in probe order: a dispatch layer can also expose its
-# backend's API, so ask the dispatcher first.
-set(_qdk_blas_backends FLEXIBLAS OPENBLAS INTELMKL BLIS NVPL)
-set(_qdk_blas_api_FLEXIBLAS flexiblas_set_num_threads flexiblas_get_num_threads)
-set(_qdk_blas_api_OPENBLAS  openblas_set_num_threads  openblas_get_num_threads)
-set(_qdk_blas_api_INTELMKL  MKL_Set_Num_Threads       MKL_Get_Max_Threads)
-set(_qdk_blas_api_BLIS      bli_thread_set_num_threads bli_thread_get_num_threads)
-set(_qdk_blas_api_NVPL      nvpl_blas_set_num_threads nvpl_blas_get_max_threads)
 
 # Sets ${out_var} to ${backend} if both halves of its API link against the
 # configured BLAS. A function, not a macro, so CMAKE_REQUIRED_* stays local.
@@ -167,11 +193,28 @@ elseif(NOT QDK_CHEMISTRY_BLAS_THREAD_API STREQUAL "NONE")
 endif()
 
 if(_qdk_blas_thread_api)
-  # Consumed by config.h.in as #cmakedefine QDK_CHEMISTRY_BLAS_LINKS_<backend>.
-  set(QDK_CHEMISTRY_BLAS_LINKS_${_qdk_blas_thread_api} TRUE)
+  # Selected row, consumed by config.h.in as QDK_CHEMISTRY_BLAS_LINKED_*.
+  list(GET _qdk_blas_api_${_qdk_blas_thread_api} 0 QDK_CHEMISTRY_BLAS_LINKED_SET_FN)
+  list(GET _qdk_blas_api_${_qdk_blas_thread_api} 1 QDK_CHEMISTRY_BLAS_LINKED_GET_FN)
+  list(GET _qdk_blas_api_${_qdk_blas_thread_api} 2 QDK_CHEMISTRY_BLAS_LINKED_TYPE)
+  list(GET _qdk_blas_api_${_qdk_blas_thread_api} 3 QDK_CHEMISTRY_BLAS_LINKED_VENDOR)
   # Already linked transitively through GauXC; name it for the symbols we call.
   target_link_libraries(chemistry PRIVATE ${_qdk_blas_link_libs})
+  # Link-time binding leaves vendor-specific symbols unresolved in the installed
+  # archive while the exported dependency is the vendor-agnostic BLAS::BLAS, so
+  # cmake/qdkConfig.cmake.in steers and verifies the consumer's BLAS search.
+  # Cache variables because this is a subdirectory scope.
+  set(QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR "${QDK_CHEMISTRY_BLAS_VENDOR}"
+      CACHE INTERNAL
+      "BLAS vendor whose thread-control symbols are bound into the library")
+  set(QDK_CHEMISTRY_BLAS_THREAD_SYMBOL "${QDK_CHEMISTRY_BLAS_LINKED_SET_FN}"
+      CACHE INTERNAL
+      "BLAS thread-control symbol bound into the library")
 else()
+  set(QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR "" CACHE INTERNAL
+      "BLAS vendor whose thread-control symbols are bound into the library")
+  set(QDK_CHEMISTRY_BLAS_THREAD_SYMBOL "" CACHE INTERNAL
+      "BLAS thread-control symbol bound into the library")
   set(_qdk_blas_thread_api "none (runtime lookup only)")
 endif()
 

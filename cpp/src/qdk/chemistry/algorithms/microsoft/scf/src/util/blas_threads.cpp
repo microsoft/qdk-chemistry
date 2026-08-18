@@ -25,40 +25,14 @@
 #include <dlfcn.h>
 #endif
 
-// The thread-control API of the BLAS this build links against, as probed by
-// CMake (see the BLAS section of ../CMakeLists.txt). At most one of the
-// QDK_CHEMISTRY_BLAS_LINKS_* macros is defined. Binding directly is both the
-// most accurate answer (it is by construction the BLAS our calls end up in)
+// The thread-control API this build links against, named by CMake (see the BLAS
+// section of ../CMakeLists.txt). Binding directly is the most accurate answer
 // and the only one that works for a statically linked BLAS, whose symbols no
 // module exports and which therefore cannot be discovered at runtime.
-#if defined(QDK_CHEMISTRY_BLAS_LINKS_OPENBLAS)
+#if defined(QDK_CHEMISTRY_BLAS_LINKED_SET_FN)
 extern "C" {
-void openblas_set_num_threads(int);
-int openblas_get_num_threads(void);
-}
-#elif defined(QDK_CHEMISTRY_BLAS_LINKS_INTELMKL)
-extern "C" {
-void MKL_Set_Num_Threads(int);
-int MKL_Get_Max_Threads(void);
-}
-#elif defined(QDK_CHEMISTRY_BLAS_LINKS_BLIS)
-// BLIS types the thread count as dim_t, which is 32- or 64-bit depending on
-// how BLIS was configured. std::int64_t is compatible with both: a 32-bit
-// callee reads the low half of the argument register, and thread counts are
-// small enough that truncating the returned value is lossless.
-extern "C" {
-void bli_thread_set_num_threads(std::int64_t);
-std::int64_t bli_thread_get_num_threads(void);
-}
-#elif defined(QDK_CHEMISTRY_BLAS_LINKS_FLEXIBLAS)
-extern "C" {
-void flexiblas_set_num_threads(int);
-int flexiblas_get_num_threads(void);
-}
-#elif defined(QDK_CHEMISTRY_BLAS_LINKS_NVPL)
-extern "C" {
-void nvpl_blas_set_num_threads(int);
-int nvpl_blas_get_max_threads(void);
+void QDK_CHEMISTRY_BLAS_LINKED_SET_FN(QDK_CHEMISTRY_BLAS_LINKED_TYPE);
+QDK_CHEMISTRY_BLAS_LINKED_TYPE QDK_CHEMISTRY_BLAS_LINKED_GET_FN(void);
 }
 #endif
 
@@ -136,94 +110,59 @@ struct BlasThreadApi {
   }
 };
 
+/**
+ * @brief Narrow a backend's thread count to int.
+ *
+ * BLIS types it as dim_t, 32- or 64-bit depending on its build; the table
+ * declares the 64-bit form, and a 32-bit callee returns its value in the low
+ * half. Thread counts are small, so keeping the low 32 bits is lossless.
+ */
+template <typename T>
+int narrow_thread_count(T value) {
+  return static_cast<int>(static_cast<std::int32_t>(value));
+}
+
 /// @brief Thread-control API bound at link time, if CMake found one.
 BlasThreadApi linked_blas_thread_api() {
-#if defined(QDK_CHEMISTRY_BLAS_LINKS_OPENBLAS)
-  return {BlasVendor::OpenBLAS, [] { return openblas_get_num_threads(); },
-          [](int n) { openblas_set_num_threads(n); }};
-#elif defined(QDK_CHEMISTRY_BLAS_LINKS_INTELMKL)
-  return {BlasVendor::IntelMKL, [] { return MKL_Get_Max_Threads(); },
-          [](int n) { MKL_Set_Num_Threads(n); }};
-#elif defined(QDK_CHEMISTRY_BLAS_LINKS_BLIS)
-  return {
-      BlasVendor::BLIS,
-      [] {
-        return static_cast<int>(
-            static_cast<std::int32_t>(bli_thread_get_num_threads()));
-      },
-      [](int n) { bli_thread_set_num_threads(static_cast<std::int64_t>(n)); }};
-#elif defined(QDK_CHEMISTRY_BLAS_LINKS_FLEXIBLAS)
-  return {BlasVendor::FlexiBLAS, [] { return flexiblas_get_num_threads(); },
-          [](int n) { flexiblas_set_num_threads(n); }};
-#elif defined(QDK_CHEMISTRY_BLAS_LINKS_NVPL)
-  return {BlasVendor::NVPL, [] { return nvpl_blas_get_max_threads(); },
-          [](int n) { nvpl_blas_set_num_threads(n); }};
+#if defined(QDK_CHEMISTRY_BLAS_LINKED_SET_FN)
+  return {BlasVendor::QDK_CHEMISTRY_BLAS_LINKED_VENDOR,
+          [] { return narrow_thread_count(QDK_CHEMISTRY_BLAS_LINKED_GET_FN()); },
+          [](int n) {
+            QDK_CHEMISTRY_BLAS_LINKED_SET_FN(
+                static_cast<QDK_CHEMISTRY_BLAS_LINKED_TYPE>(n));
+          }};
 #else
   return {};
 #endif
 }
 
-BlasThreadApi try_openblas() {
-  // Also matches OpenBLAS-compatible drop-ins such as ARM Performance
-  // Libraries' OpenBLAS interface.
-  using SetFn = void (*)(int);
-  using GetFn = int (*)(void);
-  auto set_fn = find_function<SetFn>("openblas_set_num_threads");
-  auto get_fn = find_function<GetFn>("openblas_get_num_threads");
+/**
+ * @brief Resolve one backend's thread-control API in the running process.
+ *
+ * @tparam T The type the backend uses for a thread count.
+ * @return The API, or an invalid BlasThreadApi if either half is missing.
+ */
+template <typename T>
+BlasThreadApi try_backend(BlasVendor vendor, const char* set_name,
+                          const char* get_name) {  using SetFn = void (*)(T);
+  using GetFn = T (*)(void);
+  auto set_fn = find_function<SetFn>(set_name);
+  auto get_fn = find_function<GetFn>(get_name);
   if (!set_fn || !get_fn) return {};
-  return {BlasVendor::OpenBLAS, [get_fn] { return get_fn(); },
-          [set_fn](int n) { set_fn(n); }};
+  return {vendor, [get_fn] { return narrow_thread_count(get_fn()); },
+          [set_fn](int n) { set_fn(static_cast<T>(n)); }};
 }
 
-BlasThreadApi try_mkl() {
-  // MKL_Set_Num_Threads / MKL_Get_Max_Threads are the C entry points (the
-  // lowercase spellings are the Fortran ones and take pointers).
-  using SetFn = void (*)(int);
-  using GetFn = int (*)(void);
-  auto set_fn = find_function<SetFn>("MKL_Set_Num_Threads");
-  auto get_fn = find_function<GetFn>("MKL_Get_Max_Threads");
-  if (!set_fn || !get_fn) return {};
-  return {BlasVendor::IntelMKL, [get_fn] { return get_fn(); },
-          [set_fn](int n) { set_fn(n); }};
-}
-
-BlasThreadApi try_blis() {
-  // BLIS (and AMD's AOCL-BLAS fork) types the thread count as dim_t, which is
-  // either 32- or 64-bit depending on how BLIS was configured. Calling through
-  // 64-bit prototypes is safe for both: a 32-bit callee simply reads the low
-  // half of the argument register, and the returned thread count is small
-  // enough that truncating the result is lossless.
-  using SetFn = void (*)(std::int64_t);
-  using GetFn = std::int64_t (*)(void);
-  auto set_fn = find_function<SetFn>("bli_thread_set_num_threads");
-  auto get_fn = find_function<GetFn>("bli_thread_get_num_threads");
-  if (!set_fn || !get_fn) return {};
-  return {BlasVendor::BLIS,
-          [get_fn] {
-            return static_cast<int>(static_cast<std::int32_t>(get_fn()));
-          },
-          [set_fn](int n) { set_fn(static_cast<std::int64_t>(n)); }};
-}
-
-BlasThreadApi try_flexiblas() {
-  using SetFn = void (*)(int);
-  using GetFn = int (*)(void);
-  auto set_fn = find_function<SetFn>("flexiblas_set_num_threads");
-  auto get_fn = find_function<GetFn>("flexiblas_get_num_threads");
-  if (!set_fn || !get_fn) return {};
-  return {BlasVendor::FlexiBLAS, [get_fn] { return get_fn(); },
-          [set_fn](int n) { set_fn(n); }};
-}
-
-BlasThreadApi try_nvpl() {
-  using SetFn = void (*)(int);
-  using GetFn = int (*)(void);
-  auto set_fn = find_function<SetFn>("nvpl_blas_set_num_threads");
-  auto get_fn = find_function<GetFn>("nvpl_blas_get_max_threads");
-  if (!set_fn || !get_fn) return {};
-  return {BlasVendor::NVPL, [get_fn] { return get_fn(); },
-          [set_fn](int n) { set_fn(n); }};
-}
+// Runtime probes, generated from the backend table so they keep the order CMake
+// probes at configure time.
+#define QDK_CHEMISTRY_BLAS_RUNTIME_PROBE(token, vendor, label, set_fn, get_fn, \
+                                         type)                                \
+  +[]() -> BlasThreadApi {                                                     \
+    return try_backend<type>(BlasVendor::vendor, #set_fn, #get_fn);            \
+  },
+constexpr BlasThreadApi (*kRuntimeProbes[])() = {
+    QDK_CHEMISTRY_BLAS_BACKEND_TABLE(QDK_CHEMISTRY_BLAS_RUNTIME_PROBE)};
+#undef QDK_CHEMISTRY_BLAS_RUNTIME_PROBE
 
 const BlasThreadApi& blas_thread_api() {
   static const BlasThreadApi api = [] {
@@ -236,12 +175,8 @@ const BlasThreadApi& blas_thread_api() {
       return linked;
     }
 
-    // Same fixed order as the CMake probe: a dispatch layer can also expose
-    // its backend's API, so ask the dispatcher first; the rest are mutually
-    // exclusive in practice.
-    using Probe = BlasThreadApi (*)();
-    for (const Probe probe :
-         {try_flexiblas, try_openblas, try_mkl, try_blis, try_nvpl}) {
+    // Fall back to whichever backend is loaded in this process.
+    for (const auto probe : kRuntimeProbes) {
       BlasThreadApi api = probe();
       if (api.valid()) {
         QDK_LOGGER().debug("Using {} BLAS thread control (found at runtime)",
@@ -282,16 +217,12 @@ int& saved_num_threads() {
 
 const char* to_string(BlasVendor vendor) {
   switch (vendor) {
-    case BlasVendor::OpenBLAS:
-      return "OpenBLAS";
-    case BlasVendor::IntelMKL:
-      return "Intel MKL";
-    case BlasVendor::BLIS:
-      return "BLIS";
-    case BlasVendor::FlexiBLAS:
-      return "FlexiBLAS";
-    case BlasVendor::NVPL:
-      return "NVPL BLAS";
+#define QDK_CHEMISTRY_BLAS_VENDOR_LABEL(token, name, label, set_fn, get_fn, \
+                                        type)                              \
+  case BlasVendor::name:                                                   \
+    return label;
+    QDK_CHEMISTRY_BLAS_BACKEND_TABLE(QDK_CHEMISTRY_BLAS_VENDOR_LABEL)
+#undef QDK_CHEMISTRY_BLAS_VENDOR_LABEL
     case BlasVendor::Unknown:
       break;
   }
