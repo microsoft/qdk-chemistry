@@ -24,6 +24,7 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder 
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils.qsharp import (
+    _BASE_PROFILE_FILES,
     QSHARP_UTILS,
     create_qsharp_context,
     get_qsharp_context,
@@ -36,20 +37,9 @@ if TYPE_CHECKING:
 
     import qdk
 
-#: Modules the vendored Q# project exposes under every target profile.
-_PORTABLE_MODULES = (
-    "StatePreparation",
-    "CircuitComposition",
-    "IterativePhaseEstimation",
-    "StandardPhaseEstimation",
-    "ControlledPauliExp",
-    "HadamardTest",
-    "PauliExp",
-    "MeasurementBasis",
-    "Select",
-    "PrepSelPrep",
-    "AmplitudeAmplification",
-)
+#: Modules the vendored Q# project exposes under every target profile. Derived from the
+#: shipped staging list so that list, not a copy of it, is what the classification pins.
+_PORTABLE_MODULES = tuple(Path(name).stem for name in _BASE_PROFILE_FILES)
 
 #: Modules withheld from ``TargetProfile.Base``. They uncompute through measurement, which
 #: Base cannot express, so they are made to fail as missing rather than compile and mislead.
