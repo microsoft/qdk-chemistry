@@ -17,6 +17,7 @@ from qdk_chemistry.algorithms.state_preparation._binary_encoding_utils import (
     _BinaryEncodingSynthesizer,
 )
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import gf2x_with_tracking
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
 from .test_helpers import create_random_bitstring_matrix
 
@@ -721,6 +722,7 @@ class TestControlStateEndianness:
     Qiskit path rebuilds that lookup from multi-controlled X gates, so the two must agree.
     """
 
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
     @pytest.mark.parametrize("hot_address", [0, 1, 2, 3])
     def test_select_fires_on_the_qsharp_address(self, hot_address):
         """SELECT flips its data qubit exactly on the address Q# would decode."""
