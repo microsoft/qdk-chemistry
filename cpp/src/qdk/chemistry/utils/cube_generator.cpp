@@ -79,6 +79,36 @@ const data::BasisSet& require_basis_set(
   return *basis_set;
 }
 
+template <typename Array>
+double contraction_norm(int32_t np, int l, const Array& alpha,
+                        const Array& coeff) {
+  constexpr double sqrt_pi_cubed = 5.56832799683170784528481798212;
+  double odd_double_factorial = 1.0;
+  for (int k = 1; k < 2 * l; k += 2) odd_double_factorial *= k;
+  const double df_term =
+      std::pow(2.0, l) / (sqrt_pi_cubed * odd_double_factorial);
+
+  Array normalized_coeff{};
+  for (int32_t i = 0; i < np; ++i) {
+    const double two_alpha = 2.0 * alpha[i];
+    const double primitive_norm =
+        std::sqrt(df_term * std::pow(two_alpha, l + 1) * std::sqrt(two_alpha));
+    normalized_coeff[i] = coeff[i] * primitive_norm;
+  }
+
+  double norm = 0.0;
+  for (int32_t i = 0; i < np; ++i) {
+    for (int32_t j = 0; j <= i; ++j) {
+      const double gamma = alpha[i] + alpha[j];
+      const double denominator =
+          df_term * std::pow(gamma, l + 1) * std::sqrt(gamma);
+      norm += (i == j ? 1.0 : 2.0) * normalized_coeff[i] * normalized_coeff[j] /
+              denominator;
+    }
+  }
+  return norm;
+}
+
 GauXC::BasisSet<double> to_gauxc_basis(const data::BasisSet& qdk) {
   using PA = GauXC::Shell<double>::prim_array;
   using CA = GauXC::Shell<double>::cart_array;
@@ -121,6 +151,10 @@ GauXC::BasisSet<double> to_gauxc_basis(const data::BasisSet& qdk) {
         alpha.at(i) = sh.exponents[i];
         coeff.at(i) = sh.coefficients[i];
       }
+      const double norm = contraction_norm(np, l, alpha, coeff);
+      if (!std::isfinite(norm) || norm <= 0.0)
+        throw std::invalid_argument(
+            "CubeGenerator: shell has zero or invalid contraction norm.");
       basis.emplace_back(GauXC::PrimSize(np), GauXC::AngularMomentum(l),
                          GauXC::SphericalType(l > 1 && sph), alpha, coeff,
                          center, true);

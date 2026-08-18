@@ -257,6 +257,11 @@ TEST(CubeGeneratorTest, RejectsInvalidPrimitiveParameters) {
                  std::invalid_argument)
         << "coefficient: " << coefficient;
   }
+
+  EXPECT_THROW(CubeGenerator(make_hydrogen_basis({1.0}, {0.0})),
+               std::invalid_argument);
+  EXPECT_THROW(CubeGenerator(make_hydrogen_basis({1.0, 1.0}, {1.0, -1.0})),
+               std::invalid_argument);
 }
 
 TEST(CubeGeneratorTest, AcceptsExplicitZeroRadialPowers) {
