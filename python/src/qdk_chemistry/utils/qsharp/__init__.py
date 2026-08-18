@@ -81,7 +81,7 @@ def create_qsharp_context(
     (for example a non-default ``target_profile``); then register it with
     :func:`set_qsharp_context` if the chemistry builders should use it too.
 
-    :param target_profile: Target profile the Q# interpreter compiles for. Default is 
+    :param target_profile: Target profile the Q# interpreter compiles for. Default is
         ``TargetProfile.Adaptive_RIF``. A ``TargetProfile.Base`` context loads only a
         subset of the available Q# operations.
     :param target_name: Optional target machine name used to infer a compatible profile.

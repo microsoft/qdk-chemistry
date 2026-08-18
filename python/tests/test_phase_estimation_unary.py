@@ -21,7 +21,6 @@ from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import (
 )
 from qdk_chemistry.data import AlgorithmRef, QubitOperator
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
-from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 
@@ -208,6 +207,7 @@ class TestPhaseDecoding:
         result = _decode({"10": 1}, 2, use_positive_sign=True)
         assert result.canonical_phase_fraction == pytest.approx(0.25)
         assert result.branching == pytest.approx((0.0, 0.0), abs=1e-12)
+
 
 class TestRegisterSizeHasOneDefinition:
     """The phase register width must have a single definition across Python and Q#."""
