@@ -4,6 +4,7 @@ target_sources(chemistry PRIVATE
     active_space/entropy_active_space.cpp
     active_space/occupation_active_space.cpp
     active_space/valence_active_space.cpp
+    fermionic_low_rank/fermionic_low_rank_regularizer.cpp
     localization/iterative_localizer_base.cpp
     localization/mp2_natural_orbitals.cpp
     localization/natural_orbitals.cpp

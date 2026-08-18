@@ -5,15 +5,27 @@
 # --------------------------------------------------------------------------------------------
 
 # Import C++ utilities from the compiled extension
-from qdk_chemistry._core.utils import Logger, compute_valence_space_parameters, rotate_orbitals
+from qdk_chemistry._core.utils import (
+    HamiltonianOneNorm,
+    Logger,
+    TwoBodyFragment,
+    compute_valence_space_parameters,
+    double_factorize,
+    hamiltonian_one_norm,
+    rotate_orbitals,
+)
 from qdk_chemistry.utils.enum import CaseInsensitiveStrEnum
 
 from . import model_hamiltonians
 
 __all__ = [
     "CaseInsensitiveStrEnum",
+    "HamiltonianOneNorm",
     "Logger",
+    "TwoBodyFragment",
     "compute_valence_space_parameters",
+    "double_factorize",
+    "hamiltonian_one_norm",
     "model_hamiltonians",
     "rotate_orbitals",
 ]

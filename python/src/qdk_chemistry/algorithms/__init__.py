@@ -35,6 +35,11 @@ from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
     QdkHamiltonianConstructor,
 )
+from qdk_chemistry.algorithms.hamiltonian_regularizer import (
+    BlissShift,
+    HamiltonianRegularizer,
+    rebuild_bliss_shifted_hamiltonian,
+)
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import HamiltonianUnitaryBuilder, TimeEvolutionBuilder
 from qdk_chemistry.algorithms.multi_configuration_calculator import (
     MultiConfigurationCalculator,
@@ -73,6 +78,7 @@ __all__ = [
     # Classes
     "ActiveSpaceSelector",
     "AmplitudeAmplification",
+    "BlissShift",
     "CircuitExecutor",
     "ControlledCircuitMapper",
     "DynamicalCorrelationCalculator",
@@ -83,6 +89,7 @@ __all__ = [
     "GeometryOptimizerSettings",
     "HadamardTest",
     "HamiltonianConstructor",
+    "HamiltonianRegularizer",
     "HamiltonianUnitaryBuilder",
     "MultiConfigurationCalculator",
     "MultiConfigurationScf",
@@ -124,6 +131,7 @@ __all__ = [
     "create",
     "inspect_settings",
     "print_settings",
+    "rebuild_bliss_shifted_hamiltonian",
     "register",
     "show_default",
     "unregister",
