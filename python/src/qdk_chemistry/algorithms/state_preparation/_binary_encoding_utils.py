@@ -651,7 +651,7 @@ class _BinaryEncodingSynthesizer:
             sbs: Sparse block start row index (equal to dense_size).
             fixed_controls: List of (row, polarity) pairs that are constant across the chunk.
             rest_entries: List of (offset, changing_controls) pairs for this chunk.
-        c
+
         Returns:
             tuple[list[MatrixCompressionOp], int]: A pair of (ops_list, toffoli_cost).
 
