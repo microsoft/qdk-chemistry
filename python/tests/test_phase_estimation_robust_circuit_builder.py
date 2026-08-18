@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from itertools import islice
+from math import pi
 
 import pytest
 
@@ -114,6 +115,34 @@ def test_builder_is_registered_and_does_not_build_eagerly(
     assert schedule.num_rounds == circuit_set.num_rounds
     assert unitary_records == []
     assert hadamard_records == []
+
+
+@pytest.mark.parametrize("base_time", [pi, 1.1 * pi])
+def test_explicit_base_time_rejects_aliasing_energy_interval(
+    rpe_problem: tuple[Circuit, QubitOperator],
+    base_time: float,
+) -> None:
+    """Explicit base times must distinguish every energy in the Hamiltonian norm bound."""
+    state_preparation, hamiltonian = rpe_problem
+    builder = QdkRobustPhaseEstimationCircuitBuilder(target_accuracy=0.5, base_time=base_time)
+
+    with pytest.raises(ValueError, match=r"base_time \* lambda_norm < pi"):
+        builder.run(state_preparation, hamiltonian)
+
+
+def test_explicit_base_time_below_aliasing_limit_is_retained(
+    rpe_problem: tuple[Circuit, QubitOperator],
+) -> None:
+    """A safe explicit base time remains unchanged in the generated schedule."""
+    state_preparation, hamiltonian = rpe_problem
+    base_time = pi * (1.0 - 1e-12)
+
+    circuit_set = QdkRobustPhaseEstimationCircuitBuilder(target_accuracy=0.5, base_time=base_time).run(
+        state_preparation, hamiltonian
+    )
+
+    assert circuit_set.base_time == pytest.approx(base_time)
+    assert circuit_set.rounds[0].evolution_time == pytest.approx(base_time)
 
 
 def test_deterministic_round_yields_one_pair_with_shot_multiplicity(

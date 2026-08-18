@@ -36,7 +36,7 @@ Configuration
      - Requested absolute accuracy of the final energy estimate.
    * - ``base_time``
      - float
-     - Round-zero evolution time. ``0.0`` selects it from the Hamiltonian coefficient norm.
+     - Round-zero evolution time. ``0.0`` selects :math:`\pi/(2\lambda)` from the Hamiltonian coefficient norm; an explicit positive value must satisfy :math:`\mathtt{base\_time}\,\lambda < \pi` to avoid energy aliasing.
    * - ``unitary_accuracy_fraction``
      - float
      - Legacy fraction used by non-Trotter builders. It is not supported when ``unitary_builder`` selects Trotter.

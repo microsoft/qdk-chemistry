@@ -351,7 +351,8 @@ class RobustPhaseEstimationCircuitBuilderSettings(Settings):
             "base_time",
             "double",
             0.0,
-            "Base evolution time tau. 0.0 selects pi/(2*lambda) automatically.",
+            "Base evolution time tau. 0.0 selects pi/(2*lambda) automatically; "
+            "explicit positive values must satisfy tau*lambda < pi.",
         )
         self._set_default(
             "unitary_accuracy_fraction",
@@ -405,7 +406,7 @@ class RobustPhaseEstimationCircuitBuilder(Algorithm):
 
         Args:
             target_accuracy: Requested absolute accuracy on the final energy.
-            base_time: Base evolution time; ``0.0`` selects ``pi/(2*lambda)``.
+            base_time: Round-zero time; positive values require ``base_time*lambda < pi`` and ``0.0`` is automatic.
             unitary_accuracy_fraction: Optional legacy non-Trotter fraction of ``target_accuracy``.
             energy_correction: Phase-to-energy map: ``"auto"``, ``"linear"``, or ``"qdrift_tangent"``.
             seed: Root random seed; ``-1`` chooses one entropy-backed seed per circuit set.
@@ -493,6 +494,11 @@ class QdkRobustPhaseEstimationCircuitBuilder(RobustPhaseEstimationCircuitBuilder
         base_time = float(self._settings.get("base_time"))
         if base_time <= 0.0:
             base_time = float(np.pi / (2.0 * lambda_norm)) if lambda_norm > 0.0 else 1.0
+        elif base_time * lambda_norm >= np.pi:
+            raise ValueError(
+                "base_time must satisfy base_time * lambda_norm < pi to avoid energy aliasing; "
+                f"got base_time={base_time:.6g} and lambda_norm={lambda_norm:.6g}."
+            )
 
         total_round = num_rounds(lambda_norm, epsilon_rpe)
         randomized = category in ("qdrift", "partial_randomized")
