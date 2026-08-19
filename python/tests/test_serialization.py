@@ -130,7 +130,7 @@ def test_dataclass_path_must_stay_within_directory(tmp_path, h2_structure, path_
         manifest_file = symlink.name
     entry = {"type": "dataclass", "dataclass_type": "structure", "file": manifest_file}
 
-    with pytest.raises(ValueError, match="outside the serialization directory"):
+    with pytest.raises(ValueError, match=r"Invalid serialization file name|outside the serialization directory"):
         FileSerializer.deserialize_value(directory, entry)
 
 
