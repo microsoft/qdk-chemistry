@@ -7,6 +7,10 @@ In C++, use ``OrbitalLocalizer`` and ``OrbitalLocalizerFactory`` as the
 canonical public names. The legacy ``Localizer`` and ``LocalizerFactory`` names
 remain available as deprecated source aliases. Existing binaries must be
 rebuilt because the canonical C++ class and factory symbols have changed.
+Compiler diagnostics for deprecated aliases vary, and subclassing through
+``Localizer`` may not emit a warning. Forward declarations of the legacy class
+names must be updated because an alias cannot follow a class declaration.
+
 Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.Wavefunction` instance with reference orbitals as input and produces a new :class:`~qdk_chemistry.data.Wavefunction` instance with transformed orbitals as output.
 For more information about this pattern, see the :doc:`Factory Pattern <factory_pattern>` documentation.
 
@@ -187,6 +191,57 @@ For unrestricted inputs, spin-dependent active-space 1-RDM blocks are combined i
 .. rubric:: Settings
 
 This implementation has no configurable settings.
+
+.. _localizer-qdk-active-space-qio:
+
+QDK Active-Space Quantum-Information Orbitals
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"qdk_active_space_qio"``
+
+Transforms active orbitals by minimizing the sum of their single-orbital entropies with gradient-free Jacobi sweeps :cite:`Liao2024`.
+The objective uses the same entropy convention as :meth:`~qdk_chemistry.data.Wavefunction.get_single_orbital_entropies`.
+This transformation can provide an orbital basis with more compactly distributed correlation.
+
+The input :class:`~qdk_chemistry.data.Wavefunction` must contain a restricted active orbital space and spin-dependent active-space one- and two-particle reduced density matrices.
+Open-shell restricted references are supported, but unrestricted orbitals are not.
+The selected alpha and beta indices must be identical and match the active-space indices.
+
+The localizer optimizes against the fixed input density matrices and returns a single orbital rotation.
+It does not recompute the correlated wavefunction after rotating the orbitals.
+It minimizes the quantum-information-orbital objective restricted to rotations within a fixed active space.
+It does not implement full-space QIO or QICAS, both of which mix orbitals across the active-space boundary and require a self-consistent correlated workflow.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 15 45
+
+   * - Setting
+     - Type
+     - Default
+     - Description
+   * - ``max_cycles``
+     - int
+     - ``200``
+     - Maximum number of Jacobi sweeps
+   * - ``convergence_tolerance``
+     - float
+     - ``1e-10``
+     - Sweep-to-sweep entropy change used for convergence
+   * - ``coarse_angle_step``
+     - float
+     - ``0.02``
+     - Coarse pair-rotation angle spacing in radians; valid range ``[1e-4, pi/2]``
+   * - ``fine_samples``
+     - int
+     - ``201``
+     - Number of samples used to refine the best coarse angle
+   * - ``improvement_tolerance``
+     - float
+     - ``1e-12``
+     - Minimum entropy decrease required to accept a pair rotation
 
 QDK MP2 Natural Orbitals
 ~~~~~~~~~~~~~~~~~~~~~~~~

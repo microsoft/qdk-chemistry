@@ -49,6 +49,7 @@ from qdk_chemistry.algorithms.nuclear_derivative import (
 )
 from qdk_chemistry.algorithms.orbital_localizer import (
     OrbitalLocalizer,
+    QdkActiveSpaceQIOLocalizer,
     QdkMP2NaturalOrbitalLocalizer,
     QdkNaturalOrbitalLocalizer,
     QdkPipekMezeyLocalizer,
@@ -84,6 +85,7 @@ __all__ = [
     "HadamardTest",
     "HamiltonianConstructor",
     "HamiltonianUnitaryBuilder",
+    "Localizer",
     "MultiConfigurationCalculator",
     "MultiConfigurationScf",
     "NuclearDerivativeCalculator",
@@ -92,6 +94,7 @@ __all__ = [
     "PopulationAnalyzer",
     "ProjectedMultiConfigurationCalculator",
     "QPESubspaceMarking",
+    "QdkActiveSpaceQIOLocalizer",
     "QdkAutocasActiveSpaceSelector",
     "QdkAutocasEosActiveSpaceSelector",
     "QdkExpectationEstimator",
