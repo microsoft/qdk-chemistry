@@ -207,8 +207,7 @@ class TestRegisterSizeHasOneDefinition:
         now delegates to ``AddressQubits``, and this pins the Python side to the same value.
         """
         resolved, num_bits = QdkUnaryQpeCircuitBuilder(num_queries=num_queries).resolve_num_queries()
-        is_power_of_two = num_queries > 1 and num_queries & (num_queries - 1) == 0
-        assert resolved == (num_queries - 1 if is_power_of_two else num_queries)
+        assert resolved == num_queries, "the configured query count is applied as given"
 
         context = get_qsharp_context()
         qsharp_phase_bits = context.eval(f"QDKChemistry.Utils.UnaryPhaseEstimation.PhaseRegisterSize({resolved})")
@@ -288,9 +287,13 @@ class TestUnaryQpeEndToEnd:
             result = _decode(counts, num_bits, use_positive_sign=use_positive_sign)
             assert result.canonical_phase_fraction == pytest.approx(expected_phase)
 
-    @pytest.mark.parametrize("num_queries", [6, 11, 23, 63])
+    @pytest.mark.parametrize("num_queries", [6, 8, 11, 23, 63])
     def test_builder_defaults_recover_the_ground_state_energy(self, num_queries):
-        r"""The shipped defaults must recover :math:`H = (X + Z)/2` end to end."""
+        r"""The shipped defaults must recover :math:`H = (X + Z)/2` end to end.
+
+        ``8`` is the power-of-two case: it is applied as configured rather than reduced,
+        so the schedule it runs is the one the caller asked for.
+        """
         num_bits = num_queries.bit_length()
         assert (num_queries + 1 < 1 << num_bits) == (num_queries != 63), "sweep must mix padded and exact registers"
 

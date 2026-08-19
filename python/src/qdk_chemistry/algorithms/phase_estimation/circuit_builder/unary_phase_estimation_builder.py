@@ -127,13 +127,6 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         num_queries = int(self._settings.get("num_queries"))
         if num_queries <= 0:
             raise ValueError(f"num_queries must be a positive integer. Got {num_queries}.")
-        if num_queries > 1 and num_queries & (num_queries - 1) == 0:
-            Logger.info(
-                f"Reducing num_queries from {num_queries} to {num_queries - 1}: addressing "
-                f"{num_queries + 1} reflection slots costs {num_queries.bit_length()} phase qubits, "
-                f"whereas {num_queries} slots fit in {num_queries.bit_length() - 1}."
-            )
-            num_queries -= 1
         return num_queries, num_queries.bit_length()
 
     def _run_impl(
