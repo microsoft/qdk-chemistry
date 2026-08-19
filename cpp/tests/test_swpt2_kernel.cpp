@@ -12,8 +12,6 @@
 //      2 h_dd + (dd|dd) to the core energy),
 //   * invariants (hermiticity) and the empty-external identity.
 // Each expected value is derived in a comment from the chosen input integrals.
-// (An independent OpenFermion cross-check of the full method exists as a
-//  development-time check; it is deliberately not a dependency of these tests.)
 
 #include <gtest/gtest.h>
 
@@ -58,6 +56,37 @@ Eigen::VectorXd diagonal_fock_energies(const Eigen::MatrixXd& h1,
 // Generalized-Fock diagonal: eps_p^sigma = h_pp + sum_r (pp|rr) n_r
 //                                                 - sum_r (pr|rp) n_r^sigma.
 // ---------------------------------------------------------------------------
+TEST(Swpt2KernelTest, BareInverseUsesGuardedPseudoinverse) {
+  sw::RegularizerOptions bare;
+  EXPECT_DOUBLE_EQ(sw::regularized_inverse(2.0, bare), 0.5);
+  EXPECT_DOUBLE_EQ(sw::regularized_inverse(0.5e-8, bare), 0.0);
+  EXPECT_DOUBLE_EQ(sw::regularized_inverse(sw::bare_denominator_floor, bare),
+                   1e8);
+
+  sw::RegularizerOptions regularized;
+  regularized.sigma2 = 1.0;
+  EXPECT_DOUBLE_EQ(sw::regularized_inverse(0.0, regularized), 0.0);
+  EXPECT_NEAR(sw::regularized_inverse(1e-10, regularized), 1e-10, 1e-24);
+}
+
+// (1-exp(-x))/delta cancels catastrophically as x = sigma*delta^2 -> 0, which
+// is the regime the regularizer exists for. Compare against a long double
+// evaluation of the same expression across the decades where it bites.
+TEST(Swpt2KernelTest, RegularizedInverseSurvivesDenominatorCancellation) {
+  for (double sigma2 : {1.0, 1e6}) {
+    sw::RegularizerOptions reg;
+    reg.sigma2 = sigma2;
+    for (double delta = 1e-9; delta < 10.0; delta *= 1.3) {
+      const long double wide =
+          -std::expm1l(-static_cast<long double>(sigma2) * delta * delta) /
+          delta;
+      EXPECT_NEAR(sw::regularized_inverse(delta, reg),
+                  static_cast<double>(wide), 1e-13 * std::abs(wide))
+          << "sigma2=" << sigma2 << " delta=" << delta;
+    }
+  }
+}
+
 TEST(Swpt2KernelTest, GeneralizedFockDiagonalFromDefinition) {
   const int norb = 3;  // active=[0], domo=[1], virtual=[2]
   Eigen::MatrixXd h(3, 3);
@@ -163,6 +192,8 @@ TEST(Swpt2KernelTest, EmptyExternalSpaceIsIdentity) {
   EXPECT_NEAR(emitted.core_energy, e0, 1e-12);
   EXPECT_LT((emitted.one_body - h).cwiseAbs().maxCoeff(), 1e-12);
   EXPECT_LT((emitted.two_body - g).cwiseAbs().maxCoeff(), 1e-12);
+  // No coupled channels at all, so there is no minimum denominator to report.
+  EXPECT_TRUE(std::isinf(res.min_denominator));
 }
 
 // ---------------------------------------------------------------------------
@@ -502,9 +533,8 @@ double fci_ground_energy(double e0, const Eigen::MatrixXd& f,
 }  // namespace
 
 // ---------------------------------------------------------------------------
-// Physical convergence (the defining PT property, ported from eff-ham
-// tests/downfold_op/test_toy.py::test_virtual_buffer_convergence_with_coupling):
-// the second-order downfold error must shrink as the active<->external coupling
+// Physical convergence is a defining perturbation-theory property: the
+// second-order downfold error must shrink as the active<->external coupling
 // is reduced. A closed-shell reference (spatial orbital 0 doubly occupied) with
 // a dimer partner {1} and a well-separated virtual {2}; both the one-body and
 // two-body active<->virtual couplings are scaled by lambda. Exact = full-CI
@@ -573,8 +603,10 @@ TEST(Swpt2KernelTest, VirtualExternalSpaceConvergesAsCouplingShrinks) {
   const double e_01 = residual(0.1);
   EXPECT_GT(e_04, e_02);  // error shrinks with the coupling
   EXPECT_GT(e_02, e_01);
-  EXPECT_LT(e_02, 0.6 * e_04);  // and faster than linearly (>= second order)
-  EXPECT_LT(e_01, 0.6 * e_02);
+  // Halving the coupling must at least quarter the error (0.25 exactly at
+  // second order); 0.3 leaves slack without admitting linear convergence.
+  EXPECT_LT(e_02, 0.3 * e_04);
+  EXPECT_LT(e_01, 0.3 * e_02);
 }
 
 // Independent coefficient-level validation. Build the SW transformation as

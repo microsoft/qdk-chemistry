@@ -94,10 +94,17 @@ You can discover available implementations programmatically:
       :start-after: # start-cell-list-implementations
       :end-before: # end-cell-list-implementations
 
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/effective_hamiltonian_constructor.cpp
+      :language: cpp
+      :start-after: // start-cell-list-implementations
+      :end-before: // end-cell-list-implementations
+
 QDK SW-PT2
 ~~~~~~~~~~
 
-.. rubric:: Factory name: ``"qdk_swpt2"`` (aliases ``"swpt2"``, ``"schrieffer_wolff"``)
+.. rubric:: Factory name: ``"qdk_swpt2"``
 
 This is the default implementation returned by ``create("effective_hamiltonian_constructor")``.
 
@@ -155,7 +162,17 @@ bare inverse denominator with
 
 the :math:`\sigma^2` regularizer :cite:`Shee2021`, whose :math:`\sigma` (in :math:`E_h^{-2}`)
 is equivalently the DSRG flow parameter :cite:`Evangelista2014`. Larger :math:`\sigma`
-regularizes less, and ``0`` leaves the bare inverse.
+regularizes less. Setting it to ``0`` selects a guarded bare pseudoinverse: coupled channels
+with :math:`|\Delta_T| < 10^{-8}\,E_h` are mapped to zero, while the remaining channels are
+still downfolded. The constructor logs a warning when this cutoff is used because the result
+then depends on omitting near-degenerate channels. ``0`` is a mode switch, not the
+:math:`\sigma \to 0` limit, which damps every channel away entirely.
+
+The damping is not confined to intruders. A channel keeps the fraction
+:math:`1 - e^{-\sigma \Delta_T^2}` of its bare amplitude, so at the default
+:math:`\sigma = 1\,E_h^{-2}` denominators of 0.3, 0.5, 1.0 and 2.0 :math:`E_h` retain 9%,
+22%, 63% and 98% of the second-order result. Ordinary, well-separated channels are damped
+along with the near-degenerate ones; raise :math:`\sigma` to recover them.
 
 The kept space :math:`P` is defined by the ``p_indices`` argument. The reference wavefunction
 only supplies the density matrix :math:`\gamma`, and is independent of :math:`P`.
@@ -167,49 +184,60 @@ rejected. The active space keeps whatever electrons the folded orbitals do not t
 
 The commutator :math:`[S, H_{\mathrm{OD}}]` generates three-body terms that the emitted
 two-body operator cannot carry. With ``fold_above_two_body`` they are folded onto the reference
-density in the generalized normal-ordering sense :cite:`Kutzelnigg1997` rather than discarded,
-which matters as the active electron count grows but costs more to evaluate.
+density using pair contractions formed from the spin-traced 1-RDM. This is the Gaussian-reference
+truncation of the generalized normal-ordering framework :cite:`Kutzelnigg1997`. For a determinant
+reference these are the ordinary Wick contractions, but the residual three-body operator is still
+discarded. For a correlated CAS reference the approximation additionally neglects the two-body and
+higher density cumulants. It can improve on discarding the three-body terms, especially as the
+active electron count grows, but is not a complete correlated-reference normal ordering and costs
+more to evaluate.
 
-Restricted HF, restricted open-shell HF, and spin-adapted CAS references are supported;
-for ROHF every singly occupied orbital must be active. Unrestricted orbitals are rejected.
+The reference enters only through :math:`\gamma`, so what is accepted is a property of the
+input, not of the method that produced it: any restricted orbital set works, canonical or
+not. RHF, ROHF, CAS, localized and natural orbitals all qualify, including UHF natural
+orbitals carried as restricted orbitals with their 1-RDM. Rejected are unrestricted
+orbitals, and any singly occupied orbital outside the reference active space, which could
+only be folded on an arbitrary rounding.
 The reference and the input Hamiltonian must share the same molecular-orbital basis, and the
 orbitals the Hamiltonian folded into its core energy must be exactly the reference core
 orbitals outside :math:`W`, since otherwise that core energy and :math:`\gamma` describe
 different states.
 
+.. warning::
+
+   The emitted two-body block is only **4-fold** symmetric. Hermiticity
+   :math:`(pq|rs) = (qp|sr)` and electron exchange :math:`(pq|rs) = (rs|pq)` survive the
+   transformation, but the bra swap :math:`(pq|rs) = (qp|rs)` of a genuine Coulomb integral
+   does not: the commutator is not an electron-repulsion operator. Consumers must be given
+   the full dense :math:`n^4` block; one that reads only the canonical 8-fold-unique
+   elements silently reconstructs a different operator, with no error raised.
+
 The constructor logs the active regularization, the derived active electron count, the largest
 folded occupation deviation, the minimum denominator and the maximum raw amplitude
 :math:`|c_T/\Delta_T|`. It warns when a folded deviation or the folded core's excess charge is
 large, and when the amplitude exceeds one, where the perturbation series stops contracting.
-Widening the window is comparatively cheap, while enlarging the kept space is not. Dense
-four-center integrals are what limit the window size in practice.
+
+Cost is dominated by the projected commutator, and it grows steeply with the kept space;
+building the window's dense integral block is negligible beside it. Widening the window is
+cheaper than enlarging the kept space, but not free, and memory is bounded by the window's
+dense four-center integrals. ``fold_above_two_body`` makes the downfold more expensive,
+increasingly so as the kept space grows.
 
 .. rubric:: Settings
 
-.. list-table::
-   :header-rows: 1
-   :widths: 25 15 15 45
+``regularizer_sigma2`` (float, default ``1.0``)
+   Strength :math:`\sigma` of the :math:`\sigma^2` denominator regularizer, in
+   :math:`E_h^{-2}`; ``0`` selects the guarded bare pseudoinverse.
 
-   * - Setting
-     - Type
-     - Default
-     - Description
-   * - ``regularizer_sigma2``
-     - float
-     - ``1.0``
-     - Strength :math:`\sigma` of the :math:`\sigma^2` denominator regularizer, in :math:`E_h^{-2}`; ``0`` disables.
-   * - ``semicanonicalize``
-     - bool
-     - ``True``
-     - Diagonalize the generalized Fock matrix blockwise before forming denominators.
-   * - ``fold_above_two_body``
-     - bool
-     - ``True``
-     - Fold the three-body terms onto the reference density instead of discarding them.
-   * - ``max_folded_occupation_deviation``
-     - float
-     - ``0.5``
-     - Largest deviation from an integer reference occupation allowed for a folded orbital.
+``semicanonicalize`` (bool, default ``True``)
+   Diagonalize the generalized Fock matrix blockwise before forming denominators.
+
+``fold_above_two_body`` (bool, default ``True``)
+   Approximate the three-body terms using reference-1-RDM pair contractions
+   instead of discarding them; higher density cumulants are neglected.
+
+``max_folded_occupation_deviation`` (float, default ``0.5``)
+   Largest deviation from an integer reference occupation allowed for a folded orbital.
 
 .. tab:: Python API
 
@@ -217,6 +245,13 @@ four-center integrals are what limit the window size in practice.
       :language: python
       :start-after: # start-cell-configure
       :end-before: # end-cell-configure
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/effective_hamiltonian_constructor.cpp
+      :language: cpp
+      :start-after: // start-cell-configure
+      :end-before: // end-cell-configure
 
 .. rubric:: Example
 
@@ -226,6 +261,13 @@ four-center integrals are what limit the window size in practice.
       :language: python
       :start-after: # start-cell-downfold
       :end-before: # end-cell-downfold
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/effective_hamiltonian_constructor.cpp
+      :language: cpp
+      :start-after: // start-cell-downfold
+      :end-before: // end-cell-downfold
 
 Related classes
 ---------------

@@ -22,6 +22,9 @@ inline int beta(int p) { return 2 * p + 1; }
 inline Eigen::Index n4(int n) {
   return static_cast<Eigen::Index>(n) * n * n * n;
 }
+// Measured on a folded 6-orbital kept space: 64 rows beat 8, 32, 256 and the
+// untiled path (1.24 s against 2.07 s untiled) at a fraction of the memory.
+constexpr Eigen::Index product_tile_rows = 64;
 }  // namespace
 
 // ===========================================================================
@@ -29,18 +32,14 @@ inline Eigen::Index n4(int n) {
 // occupation-change masks, and projected-commutator Wick machinery.
 // ===========================================================================
 
-// Guards the bare inverse and the raw-amplitude diagnostic against a vanishing
-// denominator. Not a physics knob, so it is fixed rather than a setting.
-constexpr double denominator_floor = 1e-8;
-
 double regularized_inverse(double delta, const RegularizerOptions& reg) {
   if (reg.sigma2 > 0.0) {
-    const double d2 = delta * delta;
-    // Taylor form of (1-exp(-x))/delta, which cancels catastrophically here.
-    if (reg.sigma2 * d2 < 1e-14) return reg.sigma2 * delta;
-    return (1.0 - std::exp(-reg.sigma2 * d2)) / delta;
+    if (delta == 0.0) return 0.0;  // the damped inverse vanishes in the limit
+    // expm1 rather than 1-exp: the difference cancels catastrophically for
+    // small sigma*delta^2, which is exactly where the regularizer works.
+    return -std::expm1(-reg.sigma2 * delta * delta) / delta;
   }
-  if (std::abs(delta) < denominator_floor) return 0.0;
+  if (std::abs(delta) < bare_denominator_floor) return 0.0;
   return 1.0 / delta;
 }
 
@@ -623,13 +622,18 @@ void project_matchings(const Eigen::MatrixXd& A1, A2Get A2get,
       };
 
       if (!needs_coincidence) {
-        Eigen::MatrixXd product = Eigen::MatrixXd::Zero(nrow_a, nrow_b);
-        blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
-                   nrow_a, nrow_b, ncol, 1.0, a.data(), nrow_a, b.data(),
-                   nrow_b, 0.0, product.data(), nrow_a);
-        for (Eigen::Index row_a = 0; row_a < nrow_a; ++row_a)
-          for (Eigen::Index row_b = 0; row_b < nrow_b; ++row_b)
-            emit(row_a, row_b, product(row_a, row_b));
+        for (Eigen::Index row_begin = 0; row_begin < nrow_a;
+             row_begin += product_tile_rows) {
+          const Eigen::Index rows =
+              std::min(product_tile_rows, nrow_a - row_begin);
+          Eigen::MatrixXd product = Eigen::MatrixXd::Zero(rows, nrow_b);
+          blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+                     rows, nrow_b, ncol, 1.0, a.data() + row_begin, nrow_a,
+                     b.data(), nrow_b, 0.0, product.data(), rows);
+          for (Eigen::Index local_row = 0; local_row < rows; ++local_row)
+            for (Eigen::Index row_b = 0; row_b < nrow_b; ++row_b)
+              emit(row_begin + local_row, row_b, product(local_row, row_b));
+        }
         continue;
       }
 
@@ -779,8 +783,8 @@ ActiveDownfoldResult downfold_blocked(
   const auto track = [&](double coupling, double delta) {
     const double ad = std::abs(delta);
     min_denom = std::min(min_denom, ad);
-    max_amp =
-        std::max(max_amp, std::abs(coupling) / std::max(ad, denominator_floor));
+    max_amp = std::max(
+        max_amp, std::abs(coupling) / std::max(ad, bare_denominator_floor));
   };
   for (int P = 0; P < n_so; ++P)
     for (int Q = 0; Q < n_so; ++Q)
@@ -868,7 +872,7 @@ ActiveDownfoldResult downfold_blocked(
   project_matchings(s1, s2_at, od_f, od_v_at, part, +0.5, comm);
   project_matchings(od_f, od_v_at, s1, s2_at, part, -0.5, comm);
 
-  res.min_denominator = std::isinf(min_denom) ? 0.0 : min_denom;
+  res.min_denominator = min_denom;
   res.max_amplitude = max_amp;
   res.e += comm.scalar;
   res.f_active += comm.one_body;

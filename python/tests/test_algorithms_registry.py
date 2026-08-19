@@ -24,7 +24,6 @@ except ImportError:
 
 # Algorithm types that ship as an interface only, with no registered implementation
 # and therefore an empty default name. Remove entries here as implementations land.
-# `effective_hamiltonian_constructor` left this set when qdk_swpt2 landed.
 INTERFACE_ONLY_TYPES: set[str] = set()
 
 

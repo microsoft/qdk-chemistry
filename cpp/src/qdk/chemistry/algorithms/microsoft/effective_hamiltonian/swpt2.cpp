@@ -191,6 +191,15 @@ void log_fold_rounding(const sw::WindowPartition& roles) {
 }
 
 void warn_on_intruders(const sw::ActiveDownfoldResult& down, bool regularized) {
+  if (!regularized && down.min_denominator < sw::bare_denominator_floor)
+    QDK_LOGGER().warn(
+        "swpt2 downfold: coupled channels with energy denominators below "
+        "{:.3g} Eh were omitted by the guarded bare pseudoinverse. The "
+        "remaining channels were downfolded, but the result depends on this "
+        "cutoff; consider enlarging the active space or setting "
+        "regularizer_sigma2.",
+        sw::bare_denominator_floor);
+
   // Warn on the RAW amplitude: the regularizer damps the operator, so a
   // regularized amplitude would hide the very channels it compensates for.
   // 1.0 is where the perturbation series stops contracting, and it sits in a
@@ -386,6 +395,11 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
 
   sw::RegularizerOptions reg;
   reg.sigma2 = _settings->get<double>("regularizer_sigma2");
+  // The bound constraint admits NaN, which would then read as "not positive"
+  // and silently select the bare path instead of the requested regularizer.
+  if (!std::isfinite(reg.sigma2))
+    throw std::invalid_argument(
+        "SchriefferWolffPT2: regularizer_sigma2 must be finite.");
   const bool regularized = reg.sigma2 > 0.0;
 
   const auto down =

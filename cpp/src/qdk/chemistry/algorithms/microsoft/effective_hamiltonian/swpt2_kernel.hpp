@@ -26,7 +26,8 @@
 //   Schrieffer & Wolff, Phys. Rev. 149, 491 (1966)
 //   Bravyi, DiVincenzo & Loss, Ann. Phys. 326, 2793 (2011)
 //   Kutzelnigg & Mukherjee, J. Chem. Phys. 107, 432 (1997)  [generalized
-//     normal ordering, used to fold terms above two-body]
+//     normal-ordering framework motivating the higher-body fold; this
+//     implementation retains 1-RDM pair contractions only]
 //   Evangelista, J. Chem. Phys. 141, 054109 (2014)          [sigma^2 / DSRG
 //     flow form of the denominator regularizer]
 //   Shee et al., J. Phys. Chem. Lett. 12, 12084 (2021)      [survey of the
@@ -36,6 +37,7 @@
 
 #include <Eigen/Dense>
 #include <cstddef>
+#include <limits>
 #include <unordered_set>
 #include <vector>
 
@@ -50,12 +52,17 @@ inline std::size_t idx4(int p, int q, int r, int s, int n) {
 // Shared kernel foundations.
 // ===========================================================================
 
+/// Fixed cutoff for the guarded bare pseudoinverse. Coupled channels below
+/// this magnitude are omitted rather than divided by a singular denominator.
+inline constexpr double bare_denominator_floor = 1e-8;
+
 /// SW energy-denominator options.
 struct RegularizerOptions {
   /// Sigma of the sigma^2 regularizer, 1/D -> (1 - exp(-sigma*D^2))/D, which
   /// damps near-degenerate (intruder) channels; equivalently the SRG/DSRG flow
   /// parameter (units of inverse energy squared). Larger values regularize
-  /// less; 0 disables, leaving the bare inverse. See Shee et al., J. Phys.
+  /// less; 0 selects a guarded bare pseudoinverse that maps coupled channels
+  /// with |D| < `bare_denominator_floor` to zero. See Shee et al., J. Phys.
   /// Chem. Lett. 12, 12084 (2021).
   double sigma2 = 0.0;
 };
@@ -157,8 +164,9 @@ struct ActiveDownfoldResult {
   /// effective two-body (the same-spin blocks are its antisymmetrization) --
   /// hence O(n_active_spatial^4), not O(n_active_so^4).
   Eigen::VectorXd v_abab;
-  double min_denominator = 0.0;  ///< smallest |Delta| over coupled channels
-  double max_amplitude = 0.0;    ///< largest raw |V/Delta| (intruder gauge)
+  /// smallest |Delta| over coupled channels; infinite when there are none
+  double min_denominator = std::numeric_limits<double>::infinity();
+  double max_amplitude = 0.0;  ///< largest raw |V/Delta| (intruder gauge)
 };
 
 /// Evaluate the downfold from the spin-blocked store, forming every
@@ -193,6 +201,12 @@ ActiveDownfoldResult downfold_blocked(
 
 /// Relabel the compact `ActiveDownfoldResult` active block to compact spatial
 /// chemist integrals for a qdk CanonicalFourCenter Hamiltonian.
+///
+/// The emitted two-body block is only 4-fold symmetric: it keeps hermiticity
+/// (pq|rs) = (qp|sr) and electron exchange (pq|rs) = (rs|pq), but the bra swap
+/// (pq|rs) = (qp|rs) of a genuine Coulomb integral is broken by the commutator.
+/// Consumers must read the full dense norb^4 block; one that walks only the
+/// canonical 8-fold-unique elements silently reconstructs a different operator.
 ActiveHamiltonian to_spatial_chemist(const ActiveDownfoldResult& down,
                                      const SpinOrbitalPartition& part);
 
