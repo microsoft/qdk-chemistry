@@ -32,7 +32,9 @@ active/inactive index sets, and molecular orbitals outside the active space.
 The active columns may differ by an orthogonal transformation. Additional
 spatial symmetry labels and unrestricted Hamiltonians are not supported.
 Source one-body integrals, three-center factors, inactive Fock matrix values,
-and the core energy must be finite.
+and the core energy must be finite. After validating overlap-matrix symmetry,
+the implementation uses its explicitly symmetrized value as the orbital
+metric.
 
 For each Cholesky factor :math:`L_Q` and recovered active-space rotation
 :math:`U`, the implementation evaluates
