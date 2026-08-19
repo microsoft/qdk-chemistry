@@ -223,9 +223,12 @@ class TestEffectiveHamiltonianConstructor:
 
         kept = case.kept_in_window
         n = len(kept)
-        window_norb = round(len(case.hamiltonian.get_two_body_integrals()[0]) ** 0.25)
+        window_one_body, _ = case.hamiltonian.get_one_body_integrals()
+        window_norb = window_one_body.shape[0]
         g = np.asarray(h_eff.get_two_body_integrals()[0]).reshape(n, n, n, n)
-        bare = np.asarray(case.hamiltonian.get_two_body_integrals()[0]).reshape((window_norb,) * 4)
+        window_g = np.asarray(case.hamiltonian.get_two_body_integrals()[0])
+        assert window_g.size == window_norb**4
+        bare = window_g.reshape((window_norb,) * 4)
         bare = bare[np.ix_(kept, kept, kept, kept)]
 
         assert np.abs(g - bare).max() > 1e-6, "the downfold must actually dress the kept space"
