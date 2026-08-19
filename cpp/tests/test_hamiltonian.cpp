@@ -1597,6 +1597,53 @@ TEST_F(HamiltonianTest,
           .isApprox(expected_factors, 1.0e-10));
 }
 
+TEST_F(HamiltonianTest, CholeskyBasisTransformerUsesSymmetrizedOverlapMetric) {
+  Eigen::MatrixXd overlap(2, 2);
+  overlap << 0.50000000005, -0.49999999986, -0.49999999995, 0.50000000005;
+  ASSERT_LT((overlap - overlap.transpose()).cwiseAbs().maxCoeff(), 1.0e-10);
+  const Eigen::MatrixXd symmetric_overlap =
+      0.5 * (overlap + overlap.transpose());
+  const Eigen::LLT<Eigen::MatrixXd> overlap_cholesky(symmetric_overlap);
+  ASSERT_EQ(overlap_cholesky.info(), Eigen::Success);
+
+  Eigen::Matrix2d source_rotation;
+  source_rotation << 0.8, -0.6, 0.6, 0.8;
+  const Eigen::MatrixXd source_coefficients =
+      overlap_cholesky.matrixU().solve(source_rotation);
+  const double angle = 0.3;
+  Eigen::Matrix2d active_rotation;
+  active_rotation << std::cos(angle), -std::sin(angle), std::sin(angle),
+      std::cos(angle);
+  const Eigen::MatrixXd target_coefficients =
+      source_coefficients * active_rotation;
+  auto basis_set =
+      testing::create_random_basis_set(2, "test-symmetrized-transform");
+  auto active_space = testing::restricted_index_set(2, {0, 1});
+  const auto make_orbitals = [&](const Eigen::MatrixXd& coefficients) {
+    return std::make_shared<Orbitals>(coefficients, std::nullopt,
+                                      std::make_optional(overlap), basis_set,
+                                      active_space, nullptr);
+  };
+  const auto make_hamiltonian = [&](std::shared_ptr<Orbitals> orbitals) {
+    return std::make_shared<Hamiltonian>(
+        std::make_unique<CholeskyHamiltonianContainer>(
+            Eigen::Matrix2d::Identity(), Eigen::MatrixXd::Ones(4, 1),
+            std::move(orbitals), 0.0, Eigen::MatrixXd{}));
+  };
+
+  auto source_orbitals = make_orbitals(source_coefficients);
+  EXPECT_NO_THROW(HamiltonianBasisTransformerFactory::create("qdk")->run(
+      make_hamiltonian(source_orbitals), make_orbitals(target_coefficients)));
+
+  Eigen::MatrixXd lower_triangle_coefficients(2, 2);
+  lower_triangle_coefficients << 1.4142135623023844, 70710.684992277616, 0.0,
+      70710.685006419750;
+  auto invalid_orbitals = make_orbitals(lower_triangle_coefficients);
+  EXPECT_THROW(HamiltonianBasisTransformerFactory::create("qdk")->run(
+                   make_hamiltonian(invalid_orbitals), invalid_orbitals),
+               std::invalid_argument);
+}
+
 TEST_F(HamiltonianTest,
        CholeskyBasisTransformerHandlesRankDeficientOverlapMetric) {
   Eigen::MatrixXd overlap = Eigen::MatrixXd::Ones(2, 2);
