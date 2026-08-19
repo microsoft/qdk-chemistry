@@ -5,6 +5,7 @@
 #include "hamiltonian.hpp"
 
 // STL Headers
+#include <cmath>
 #include <filesystem>
 #include <set>
 
@@ -82,6 +83,28 @@ bool validate_active_contiguous_indices(const std::vector<size_t>& indices,
 
   return true;
 }
+
+// Structure::calculate_nuclear_repulsion_energy() uses raw, un-ECP-adjusted
+// atomic numbers (Structure has no knowledge of any ECP information), 
+// so it's wrong whenever an ECP is in use.
+// This mirrors SCFImpl::calc_nuclear_repulsion_energy_()
+// (scf/src/scf/scf_impl.cpp), which correctly uses the ECP-adjusted
+// mol.atomic_charges built by convert_basis_set_from_qdk().
+double calculate_ecp_adjusted_nuclear_repulsion_energy(
+    const qcs::Molecule& mol) {
+  double nre = 0.0;
+  for (uint64_t i = 0; i < mol.n_atoms; ++i) {
+    for (uint64_t j = i + 1; j < mol.n_atoms; ++j) {
+      double dx = mol.coords[i][0] - mol.coords[j][0];
+      double dy = mol.coords[i][1] - mol.coords[j][1];
+      double dz = mol.coords[i][2] - mol.coords[j][2];
+      nre += static_cast<double>(mol.atomic_charges[i]) *
+             static_cast<double>(mol.atomic_charges[j]) /
+             std::sqrt(dx * dx + dy * dy + dz * dz);
+    }
+  }
+  return nre;
+}
 }  // namespace detail
 
 std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
@@ -143,9 +166,6 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
         ", Beta: " + std::to_string(nactive_beta));
   }
 
-  // Create internal Molecule
-  auto structure = basis_set->get_structure();
-
   // Create internal BasisSet (includes ECP-adjusted nuclear charges)
   auto internal_basis_set =
       utils::microsoft::convert_basis_set_from_qdk(*basis_set);
@@ -172,10 +192,22 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
                              "'. Only CPU ERI methods are supported now");
   }
 
+  // Use atomic accumulation (one shared buffer) instead of per-thread
+  // private buffers in the ERI backend.
+  bool eri_use_atomics = _settings->get<bool>("eri_use_atomics");
+  scf_config->eri.use_atomics = eri_use_atomics;
+  scf_config->k_eri.use_atomics = eri_use_atomics;
+
   // Create Integral Instance
   auto eri = qcs::ERIMultiplexer::create(*internal_basis_set, *scf_config, 0.0);
   auto int1e = std::make_unique<qcs::OneBodyIntegral>(
       internal_basis_set.get(), internal_basis_set->mol.get(), scf_config->mpi);
+
+  // ECP-adjusted nuclear repulsion energy.
+  // Uses basis set information instead of structure information.
+  const double nuclear_repulsion_energy =
+      detail::calculate_ecp_adjusted_nuclear_repulsion_energy(
+          *internal_basis_set->mol);
 
   // Compute Core Hamiltonian in AO basis
   Eigen::MatrixXd T_full(num_atomic_orbitals, num_atomic_orbitals),
@@ -313,7 +345,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
       return std::make_shared<data::Hamiltonian>(
           std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
               H_active, moeri_aaaa, orbitals,
-              structure->calculate_nuclear_repulsion_energy(), dummy_fock));
+              nuclear_repulsion_energy, dummy_fock));
     } else {
       // Use unrestricted constructor
       Eigen::MatrixXd H_active_alpha(nactive, nactive);
@@ -325,7 +357,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
       return std::make_shared<data::Hamiltonian>(
           std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
               H_active_alpha, H_active_beta, moeri_aaaa, moeri_aabb, moeri_bbbb,
-              orbitals, structure->calculate_nuclear_repulsion_energy(),
+              orbitals, nuclear_repulsion_energy,
               dummy_fock_alpha, dummy_fock_beta));
     }
   }
@@ -387,7 +419,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     return std::make_shared<data::Hamiltonian>(
         std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
             H_active, moeri_aaaa, orbitals,
-            E_inactive + structure->calculate_nuclear_repulsion_energy(),
+            E_inactive + nuclear_repulsion_energy,
             F_inactive));
 
   } else {
@@ -496,7 +528,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
         std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
             H_active_alpha, H_active_beta, moeri_aaaa, moeri_aabb, moeri_bbbb,
             orbitals,
-            E_inactive + structure->calculate_nuclear_repulsion_energy(),
+            E_inactive + nuclear_repulsion_energy,
             F_inactive_alpha, F_inactive_beta));
   }
 }
