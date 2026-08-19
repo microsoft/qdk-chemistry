@@ -20,7 +20,7 @@
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <random>
 
-#include "qdk/chemistry/algorithms/microsoft/localization/gauge_fixing.hpp"
+#include "qdk/chemistry/utils/golden_section.hpp"
 #include "testing_utilities.hpp"
 #include "ut_common.hpp"
 
@@ -1776,8 +1776,6 @@ TEST_F(LocalizationTest, NaturalOrbitals_EdgeCase) {
       std::invalid_argument);
 }
 
-namespace {
-
 /// Build the LiH valence natural-orbital wavefunction used by gauge-fixing
 /// tests, along with its active indices and active electron counts.
 struct GaugeFixingFixture {
@@ -1829,145 +1827,11 @@ double mapped_coefficient_norm(const std::shared_ptr<Orbitals>& orbitals,
   return norm;
 }
 
-}  // namespace
-
-TEST_F(LocalizationTest, GaugeFixingAoAnchoringIsRotationInvariant) {
-  // Anchoring must map every orientation of one subspace onto identical
-  // coordinates; this is the reproducibility guarantee of the localizer.
-  std::mt19937 generator(42);
-  std::normal_distribution<double> normal(0.0, 1.0);
-  Eigen::MatrixXd random_block(10, 2);
-  for (Eigen::Index i = 0; i < random_block.rows(); ++i) {
-    for (Eigen::Index j = 0; j < random_block.cols(); ++j) {
-      random_block(i, j) = normal(generator);
-    }
-  }
-  const Eigen::MatrixXd block =
-      Eigen::HouseholderQR<Eigen::MatrixXd>(random_block).householderQ() *
-      Eigen::MatrixXd::Identity(10, 2);
-  const Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(10, 10);
-  const Eigen::MatrixXd expected =
-      microsoft::detail::ao_anchor_block(block, overlap);
-
-  for (int trial = 0; trial < 8; ++trial) {
-    const double angle = 0.37 * (trial + 1);
-    Eigen::Matrix2d rotation;
-    rotation << std::cos(angle), -std::sin(angle), std::sin(angle),
-        std::cos(angle);
-    const Eigen::MatrixXd actual =
-        microsoft::detail::ao_anchor_block(block * rotation, overlap);
-    EXPECT_NEAR(0.0, (actual - expected).cwiseAbs().maxCoeff(), 1e-12);
-  }
-}
-
-TEST_F(LocalizationTest, GaugeFixingAoAnchoringSelectsTiedAnchorsReproducibly) {
-  // Symmetry-equivalent atomic orbitals tie in residual norm. Rounding
-  // resolves the tie differently for each orientation of the same subspace,
-  // and because the tied rows are not orthogonal, reaching one before the
-  // other changes which atomic orbital the *next* anchor is. Sorting the
-  // anchors afterwards cannot repair that: the selected set itself differs.
-  Eigen::MatrixXd block(3, 2);
-  block.row(0) << 1.0, 0.0;
-  block.row(1) << std::cos(std::numbers::pi / 3.0),
-      std::sin(std::numbers::pi / 3.0);
-  block.row(2) << 0.9 * std::cos(5.0 * std::numbers::pi / 6.0),
-      0.9 * std::sin(5.0 * std::numbers::pi / 6.0);
-  ASSERT_DOUBLE_EQ(block.row(0).norm(), block.row(1).norm());
-  const Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(3, 3);
-  const Eigen::MatrixXd expected =
-      microsoft::detail::ao_anchor_block(block, overlap);
-
-  for (int sample = 1; sample <= 400; ++sample) {
-    const double angle = std::numbers::pi * sample / 400.0;
-    Eigen::Matrix2d rotation;
-    rotation << std::cos(angle), -std::sin(angle), std::sin(angle),
-        std::cos(angle);
-    const Eigen::MatrixXd actual =
-        microsoft::detail::ao_anchor_block(block * rotation, overlap);
-    ASSERT_NEAR(0.0, (actual - expected).cwiseAbs().maxCoeff(), 1e-12)
-        << "anchoring depends on the input orientation at angle " << angle;
-  }
-}
-
-TEST_F(LocalizationTest, GaugeFixingAoAnchoringOrdersAnchorsByAoIndex) {
-  // Symmetry-equivalent atomic orbitals tie in residual norm, so the order in
-  // which the selection finds the anchors varies across platforms. Anchors
-  // must therefore be assigned to orbitals in atomic-orbital index order, not
-  // in the order they were found.
-  Eigen::MatrixXd block = Eigen::MatrixXd::Zero(6, 2);
-  block(5, 0) = 1.0;
-  block(1, 1) = 0.6;
-  block(3, 1) = 0.8;
-  // The selection finds AO 5 first and AO 3 second, so an assignment that
-  // followed the search order would return the columns the other way round.
-  const Eigen::MatrixXd anchored = microsoft::detail::ao_anchor_block(
-      block, Eigen::MatrixXd::Identity(6, 6));
-
-  EXPECT_NEAR(0.0, (anchored.col(0) - block.col(1)).cwiseAbs().maxCoeff(),
-              1e-12);
-  EXPECT_NEAR(0.0, (anchored.col(1) - block.col(0)).cwiseAbs().maxCoeff(),
-              1e-12);
-}
-
-TEST_F(LocalizationTest, GaugeFixingAoAnchoringUsesTheOverlapMetric) {
-  // Anchoring projects with the overlap matrix, so it must return orbitals
-  // that are orthonormal in that metric, not in the identity metric. Every
-  // other anchoring test uses an orthogonal atomic-orbital basis, which
-  // cannot distinguish the two.
-  std::mt19937 generator(7);
-  std::normal_distribution<double> normal(0.0, 1.0);
-  Eigen::MatrixXd factor(8, 8);
-  for (Eigen::Index i = 0; i < factor.rows(); ++i) {
-    for (Eigen::Index j = 0; j < factor.cols(); ++j) {
-      factor(i, j) = 0.2 * normal(generator);
-    }
-  }
-  const Eigen::MatrixXd overlap =
-      Eigen::MatrixXd::Identity(8, 8) + factor * factor.transpose();
-
-  Eigen::MatrixXd raw(8, 2);
-  for (Eigen::Index i = 0; i < raw.rows(); ++i) {
-    for (Eigen::Index j = 0; j < raw.cols(); ++j) {
-      raw(i, j) = normal(generator);
-    }
-  }
-  // Orthonormalize the block in the overlap metric.
-  Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> gram(raw.transpose() *
-                                                      overlap * raw);
-  const Eigen::MatrixXd block =
-      raw * gram.eigenvectors() *
-      gram.eigenvalues().cwiseInverse().cwiseSqrt().asDiagonal() *
-      gram.eigenvectors().transpose();
-  ASSERT_NEAR(
-      0.0,
-      (block.transpose() * overlap * block - Eigen::MatrixXd::Identity(2, 2))
-          .cwiseAbs()
-          .maxCoeff(),
-      1e-12);
-
-  const Eigen::MatrixXd expected =
-      microsoft::detail::ao_anchor_block(block, overlap);
-  EXPECT_NEAR(0.0,
-              (expected.transpose() * overlap * expected -
-               Eigen::MatrixXd::Identity(2, 2))
-                  .cwiseAbs()
-                  .maxCoeff(),
-              1e-12);
-
-  const double angle = 0.83;
-  Eigen::Matrix2d rotation;
-  rotation << std::cos(angle), -std::sin(angle), std::sin(angle),
-      std::cos(angle);
-  const Eigen::MatrixXd actual =
-      microsoft::detail::ao_anchor_block(block * rotation, overlap);
-  EXPECT_NEAR(0.0, (actual - expected).cwiseAbs().maxCoeff(), 1e-12);
-}
-
 TEST_F(LocalizationTest, GaugeFixingScalarRefinementResolvesSubgridCusp) {
   // The coefficient norm has cusps that can sit far inside one coarse grid
   // cell; refinement must resolve them to an absolute angular tolerance.
   const double expected_angle = 1e-8;
-  const auto [angle, value] = microsoft::detail::golden_section_minimum(
+  const auto [angle, value] = qdk::chemistry::utils::golden_section_minimum(
       [expected_angle](double x) { return std::abs(x - expected_angle); },
       -std::numbers::pi / 32.0, std::numbers::pi / 32.0);
 
@@ -1984,7 +1848,7 @@ TEST_F(LocalizationTest, GaugeFixingScalarRefinementKeepsTheBestSampledPoint) {
     return std::min(std::abs(x + 0.9) + 0.2, std::abs(x - 0.35));
   };
   const auto [angle, value] =
-      microsoft::detail::golden_section_minimum(objective, -1.0, 1.0);
+      qdk::chemistry::utils::golden_section_minimum(objective, -1.0, 1.0);
   EXPECT_LE(value, std::min(objective(-1.0), objective(1.0)));
   EXPECT_NEAR(objective(angle), value, 1e-15);
 }
@@ -1992,7 +1856,7 @@ TEST_F(LocalizationTest, GaugeFixingScalarRefinementKeepsTheBestSampledPoint) {
 TEST_F(LocalizationTest, GaugeFixingScalarRefinementTerminatesBelowSpacing) {
   // A tolerance finer than the bracket's own floating-point spacing cannot be
   // met; the contraction must stop rather than spin.
-  const auto [angle, value] = microsoft::detail::golden_section_minimum(
+  const auto [angle, value] = qdk::chemistry::utils::golden_section_minimum(
       [](double x) { return (x - 1.25) * (x - 1.25); }, 1.0, 2.0,
       std::numeric_limits<double>::epsilon() / 4.0);
   EXPECT_NEAR(1.25, angle, 1e-8);
@@ -2110,7 +1974,8 @@ TEST_F(LocalizationTest, GaugeFixingCarriesTheSpinResolvedActiveOneRdm) {
       spin_resolved->block({axes::beta(), axes::beta()});
 
   // The rotation is orthogonal, so it preserves the particle number in each
-  // spin channel, and the blocks must still sum to the spin-traced RDM.
+  // spin channel, and the blocks must still sum to the spin-traced RDM the
+  // wavefunction carries -- the two are rotated together or not at all.
   const auto* input = std::get_if<SymmetryBlockedTensor<2, double>>(
       &fixture.natural_wavefunction->active_one_rdm());
   ASSERT_NE(input, nullptr);
@@ -2119,7 +1984,7 @@ TEST_F(LocalizationTest, GaugeFixingCarriesTheSpinResolvedActiveOneRdm) {
       alpha.trace(), 1e-10);
   const Eigen::MatrixXd traced =
       std::get<Eigen::MatrixXd>(gauge_fixed->get_active_one_rdm_spin_traced());
-  EXPECT_NEAR(0.0, (alpha + beta - traced).cwiseAbs().maxCoeff(), 1e-10);
+  EXPECT_NEAR(0.0, (alpha + beta - traced).cwiseAbs().maxCoeff(), 1e-12);
 }
 
 TEST_F(LocalizationTest, GaugeFixingIsIdempotentAndPreservesOccupations) {
@@ -2261,16 +2126,18 @@ TEST_F(LocalizationTest, GaugeFixingRejectsInvalidIndices) {
                std::invalid_argument);
 }
 
-TEST_F(LocalizationTest, GaugeFixingRejectsNonFiniteDegeneracyTolerance) {
+TEST_F(LocalizationTest, GaugeFixingRejectsNonFiniteToleranceSettings) {
   auto fixture = make_gauge_fixing_fixture();
-  auto localizer = LocalizerFactory::create("qdk_gauge_fixing");
-  // A NaN tolerance passes every bound check but makes each comparison false,
-  // which would silently bypass the diagonality guard and the blocking.
-  localizer->settings().set("degeneracy_tolerance",
-                            std::numeric_limits<double>::quiet_NaN());
-  EXPECT_THROW(localizer->run(fixture.natural_wavefunction,
-                              fixture.active_indices, fixture.active_indices),
-               std::invalid_argument);
+  // The settings bounds cannot reject NaN, so every tolerance the algorithm
+  // branches on has to be checked before it is used.
+  for (const auto* key : {"degeneracy_tolerance", "improvement_tolerance"}) {
+    auto localizer = LocalizerFactory::create("qdk_gauge_fixing");
+    localizer->settings().set(key, std::numeric_limits<double>::quiet_NaN());
+    EXPECT_THROW(localizer->run(fixture.natural_wavefunction,
+                                fixture.active_indices, fixture.active_indices),
+                 std::invalid_argument)
+        << "NaN accepted for " << key;
+  }
 }
 
 TEST_F(LocalizationTest, GaugeFixingPreservesActiveSpaceForPartialSelection) {

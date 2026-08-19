@@ -204,9 +204,8 @@ fermion-to-qubit encoding, so the choice of mapping does not affect which gauge 
 Because :math:`\lambda` sets the evolution time in :doc:`phase estimation <phase_estimation>` and the normalization of
 a linear-combination-of-unitaries block encoding, reducing it lowers quantum resource estimates without affecting the
 energy.
-Restricting the rotations to degenerate blocks also means the returned orbitals remain natural orbitals, so their
-occupation numbers are preserved and carried on the returned wavefunction, along with the spin-resolved
-active-space 1-RDM.
+The returned wavefunction carries the occupation numbers and the spin-resolved active-space 1-RDM in the chosen
+gauge.
 
 Choosing a gauge is a separate objective from finding the natural orbitals, so the two are composed rather than
 combined: run :ref:`QDK Natural Orbitals <localizer-qdk-natural-orbitals>` first and pass its result here.
@@ -246,10 +245,6 @@ full active space, and the returned wavefunction carries the input active space 
      - float
      - ``1e-10``
      - Minimum coefficient-norm reduction, in Hartree, required to accept a rotation
-   * - ``mapper_threshold``
-     - float
-     - ``1e-14``
-     - Coefficient and integral threshold used by the qubit mapper during the search
 
 QDK MP2 Natural Orbitals
 ~~~~~~~~~~~~~~~~~~~~~~~~

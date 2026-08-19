@@ -4,61 +4,13 @@
 
 #pragma once
 
-#include <Eigen/Core>
-#include <functional>
 #include <limits>
 #include <memory>
 #include <qdk/chemistry/algorithms/localization.hpp>
 #include <qdk/chemistry/data/settings.hpp>
 #include <string>
-#include <utility>
 
 namespace qdk::chemistry::algorithms::microsoft {
-
-namespace detail {
-
-/**
- * @brief Orient one degenerate orbital block reproducibly using AO anchors.
- *
- * Selects the atomic orbitals with the largest residual projection onto the
- * block and symmetrically orthogonalizes the block against them, so that any
- * two orientations of the same subspace map onto identical coordinates. The
- * anchors are taken in ascending atomic-orbital index, so the result does not
- * depend on the order in which the selection finds them.
- *
- * @param block_coefficients AO-by-orbital coefficient matrix for one
- * degenerate block.
- * @param ao_overlap Atomic-orbital overlap matrix.
- * @return Coefficients spanning the same subspace in deterministic
- * coordinates.
- *
- * @throws std::runtime_error if independent AO anchors cannot be found.
- */
-Eigen::MatrixXd ao_anchor_block(const Eigen::MatrixXd& block_coefficients,
-                                const Eigen::MatrixXd& ao_overlap);
-
-/**
- * @brief Refine a bracketed scalar minimum to an absolute argument tolerance.
- *
- * @param objective Scalar function to minimize.
- * @param lower_bound Inclusive lower end of the bracketing interval.
- * @param upper_bound Inclusive upper end of the bracketing interval.
- * @param argument_tolerance Maximum final interval width.
- * @return The best sampled argument and its objective value.
- *
- * @throws std::invalid_argument if the interval or the tolerance is not
- * positive.
- *
- * @note Golden-section contraction is used rather than a Brent-style
- * minimizer because the coefficient norm is a sum of absolute values whose
- * minima can be cusps, where a relative, machine-epsilon-dependent stopping
- * rule leaves platform-dependent residuals.
- */
-std::pair<double, double> golden_section_minimum(
-    const std::function<double(double)>& objective, double lower_bound,
-    double upper_bound, double argument_tolerance = 1e-13);
-
-}  // namespace detail
 
 /**
  * @class GaugeFixingLocalizerSettings
@@ -67,10 +19,8 @@ std::pair<double, double> golden_section_minimum(
 class GaugeFixingLocalizerSettings : public data::Settings {
  public:
   GaugeFixingLocalizerSettings() {
-    set_default(
-        "degeneracy_tolerance", 1e-6,
-        "Maximum occupation-number spread within one degenerate block",
-        data::BoundConstraint<double>{0.0, std::numeric_limits<double>::max()});
+    set_default("degeneracy_tolerance", 1e-6,
+                "Maximum occupation-number spread within one degenerate block");
     set_default(
         "angle_samples", 32,
         "Uniform samples over [0, pi) used to bracket each plane "
@@ -80,16 +30,9 @@ class GaugeFixingLocalizerSettings : public data::Settings {
         "max_sweeps", 3,
         "Maximum number of deterministic passes over all rotation planes",
         data::BoundConstraint<int64_t>{0, std::numeric_limits<int64_t>::max()});
-    set_default(
-        "improvement_tolerance", 1e-10,
-        "Minimum coefficient-norm reduction, in Hartree, required to "
-        "accept a rotation",
-        data::BoundConstraint<double>{0.0, std::numeric_limits<double>::max()});
-    set_default(
-        "mapper_threshold", 1e-14,
-        "Coefficient and integral threshold used by the qubit mapper "
-        "during the search",
-        data::BoundConstraint<double>{0.0, std::numeric_limits<double>::max()});
+    set_default("improvement_tolerance", 1e-10,
+                "Minimum coefficient-norm reduction, in Hartree, required to "
+                "accept a rotation");
   }
 };
 
@@ -137,13 +80,13 @@ class GaugeFixingLocalizer : public Localizer {
    * @param loc_indices_b Sorted beta orbital indices; must equal
    * @p loc_indices_a.
    * @return Wavefunction carrying the input active space with the selected
-   * orbitals in the chosen gauge, and its unchanged spin-traced active 1-RDM.
+   * orbitals in the chosen gauge, and its active 1-RDM in that gauge.
    *
    * @throws std::invalid_argument if the indices are unsorted, duplicated,
-   * differ between spin channels, fall outside the active space, if the
-   * degeneracy tolerance is not finite and positive, if the orbitals are
-   * unrestricted or lack an overlap matrix, or if the active 1-RDM is
-   * unavailable, not real-valued, not square, or not diagonal.
+   * differ between spin channels, fall outside the active space, if any
+   * tolerance setting is not finite, if the orbitals are unrestricted or lack
+   * an overlap matrix, or if the active 1-RDM is unavailable, not real-valued,
+   * not square, or not diagonal.
    * @throws std::runtime_error if a degenerate block is only partly selected
    * or AO anchoring fails.
    */
