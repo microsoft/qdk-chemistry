@@ -31,6 +31,8 @@ The source and target orbitals must have the same AO basis, overlap matrix,
 active/inactive index sets, and molecular orbitals outside the active space.
 The active columns may differ by an orthogonal transformation. Additional
 spatial symmetry labels and unrestricted Hamiltonians are not supported.
+Source one-body integrals, three-center factors, inactive Fock matrix values,
+and the core energy must be finite.
 
 For each Cholesky factor :math:`L_Q` and recovered active-space rotation
 :math:`U`, the implementation evaluates
@@ -48,5 +50,7 @@ Settings
 --------
 
 ``validation_tolerance``
-   Absolute tolerance used to validate the orbital-basis relationship. It does
-   not threshold integral values. Default: ``1e-10``.
+   Absolute tolerance used to validate the orbital-basis relationship. Active
+   orbital checks are evaluated after mapping the orbitals into the AO-overlap
+   metric. The tolerance does not threshold integral values. Default:
+   ``1e-10``.
