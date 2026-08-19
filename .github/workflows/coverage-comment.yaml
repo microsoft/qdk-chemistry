@@ -28,10 +28,12 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.workflow_run.event == 'pull_request'
     steps:
-    - name: Download coverage comment artifacts
+    - name: Download coverage comment artifact
+      id: download
+      continue-on-error: true
       uses: actions/download-artifact@v8
       with:
-        pattern: coverage-comment-*
+        name: coverage-comment
         path: artifacts
         run-id: ${{ github.event.workflow_run.id }}
         github-token: ${{ github.token }}
@@ -65,25 +67,14 @@ jobs:
 
         comment_file="$RUNNER_TEMP/pr-comment.md"
         : > "$comment_file"
-        echo "# 📊 Coverage Summary" >> "$comment_file"
         found_report=false
 
-        for dir in artifacts/coverage-comment-*/; do
-          [ -d "$dir" ] || continue
-          report="$dir/pr-comment.md"
-          [ -f "$report" ] || continue
-
-          job_label="$(basename "$dir")"
-          job_label="${job_label#coverage-comment-}"
-
-          {
-            echo "## ${job_label}"
-            echo ""
-            cat "$report"
-            echo ""
-          } >> "$comment_file"
+        if [ -f artifacts/pr-comment.md ]; then
+          echo "# 📊 Coverage Summary" >> "$comment_file"
+          echo "" >> "$comment_file"
+          cat artifacts/pr-comment.md >> "$comment_file"
           found_report=true
-        done
+        fi
 
         echo "comment-file=$comment_file" >> "$GITHUB_OUTPUT"
         echo "found-report=$found_report" >> "$GITHUB_OUTPUT"

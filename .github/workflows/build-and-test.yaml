@@ -35,6 +35,7 @@ permissions:
   pull-requests: read
   checks: write
   statuses: write
+  code-quality: write
 
 jobs:
   check-up-to-date:
@@ -85,6 +86,7 @@ jobs:
           python-version: '3.13'
           cpp-test-threads: 4
           python-test-threads: 4
+          enable-coverage: true
         - os-name: Linux
           runner: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly, 'JobId=qdk_chemistry-linux-py3.14-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
           build-parallel: 32
@@ -107,6 +109,7 @@ jobs:
       CTEST_OUTPUT_ON_FAILURE: 1
       CMAKE_BUILD_PARALLEL_LEVEL: ${{ matrix.build-parallel }}
       QDK_UARCH: ${{ matrix.uarch }}
+      ENABLE_COVERAGE: ${{ matrix.enable-coverage }}
     steps:
     - name: Free up disk space (Linux)
       if: matrix.os-name == 'Linux'
@@ -284,7 +287,7 @@ jobs:
           -DCMAKE_INSTALL_PREFIX="$CMAKE_INSTALL_PREFIX" \
           -DQDK_UARCH="$QDK_UARCH" \
           -DQDK_ENABLE_OPENMP=${{ matrix.os-name == 'Linux' && 'ON' || 'OFF' }} \
-          -DQDK_CHEMISTRY_ENABLE_COVERAGE=ON \
+          -DQDK_CHEMISTRY_ENABLE_COVERAGE=${{ matrix.enable-coverage && 'ON' || 'OFF' }} \
           -DBUILD_TESTING=ON \
           -DMACIS_ENABLE_TESTS=ON
 
@@ -295,7 +298,7 @@ jobs:
       env:
         OMP_NUM_THREADS: ${{ matrix.cpp-test-threads }}
       run: |
-        mkdir -p test-results ${{ github.workspace }}/coverage-reports
+        mkdir -p test-results
         cd "$BUILD_DIR"
 
         echo "=== Running C++ Tests in Debug Mode with Coverage ==="
@@ -316,23 +319,27 @@ jobs:
 
         cd ${{ github.workspace }}
 
-        gcovr --root ${{ github.workspace }}/cpp \
-          --object-directory "${{ github.workspace }}/${BUILD_DIR}" \
-          --filter '${{ github.workspace }}/cpp/src/.*' \
-          --filter '${{ github.workspace }}/cpp/include/.*' \
-          --exclude '.*/tests/.*' \
-          --exclude '.*test.*\.cpp' \
-          --exclude '.*gtest.*' \
-          --exclude '.*gmock.*' \
-          --exclude '.*/external/.*' \
-          --html-details ${{ github.workspace }}/coverage-reports/cpp_coverage.html \
-          --xml ${{ github.workspace }}/coverage-reports/cpp_coverage.xml \
-          --txt ${{ github.workspace }}/coverage-reports/cpp_coverage.txt \
-          --merge-mode-functions=separate \
-          --gcov-ignore-parse-errors
+        if [ "$ENABLE_COVERAGE" = "true" ]; then
+          mkdir -p ${{ github.workspace }}/coverage-reports
 
-        echo "C++ Coverage Summary:"
-        cat ${{ github.workspace }}/coverage-reports/cpp_coverage.txt
+          gcovr --root ${{ github.workspace }}/cpp \
+            --object-directory "${{ github.workspace }}/${BUILD_DIR}" \
+            --filter '${{ github.workspace }}/cpp/src/.*' \
+            --filter '${{ github.workspace }}/cpp/include/.*' \
+            --exclude '.*/tests/.*' \
+            --exclude '.*test.*\.cpp' \
+            --exclude '.*gtest.*' \
+            --exclude '.*gmock.*' \
+            --exclude '.*/external/.*' \
+            --html-details ${{ github.workspace }}/coverage-reports/cpp_coverage.html \
+            --cobertura ${{ github.workspace }}/coverage-reports/cpp_coverage.cobertura.xml \
+            --txt ${{ github.workspace }}/coverage-reports/cpp_coverage.txt \
+            --merge-mode-functions=separate \
+            --gcov-ignore-parse-errors
+
+          echo "C++ Coverage Summary:"
+          cat ${{ github.workspace }}/coverage-reports/cpp_coverage.txt
+        fi
 
         if [ $CTEST_EXIT_CODE -ne 0 ]; then
           exit $CTEST_EXIT_CODE
@@ -351,7 +358,7 @@ jobs:
     - name: Install Python package
       working-directory: python
       env:
-        QDK_CHEMISTRY_ENABLE_COVERAGE: 1
+        QDK_CHEMISTRY_ENABLE_COVERAGE: ${{ matrix.enable-coverage && '1' || '0' }}
         CMAKE_BUILD_TYPE: RelWithDebInfo
       run: |
         # Remove CMake files to build Python package without picking the installed library
@@ -383,28 +390,38 @@ jobs:
       working-directory: python
       run: |
         set -e
-        mkdir -p ../test-results ../coverage-reports
+        mkdir -p ../test-results
 
         BUILD_TEMP=$(find . -type d -path './build/cp*' -print -quit)
         echo "Found build directory: $BUILD_TEMP"
 
+        COV_ARGS=()
+        if [ "$ENABLE_COVERAGE" = "true" ]; then
+          mkdir -p ../coverage-reports
+          COV_ARGS=(
+            --cov=qdk_chemistry
+            --cov-report=xml:../coverage-reports/python_coverage.xml
+            --cov-report=html:../coverage-reports/python_coverage_html
+            --cov-report=term
+          )
+        fi
+
         set +e
         set -o pipefail
         pytest \
-          --cov=qdk_chemistry \
-          --cov-report=xml:../coverage-reports/python_coverage.xml \
-          --cov-report=html:../coverage-reports/python_coverage_html \
-          --cov-report=term \
+          "${COV_ARGS[@]}" \
           --junitxml=../test-results/pytest_report.xml \
           -v \
           --tb=short \
-          2>&1 | tee ../coverage-reports/python_coverage.txt
+          2>&1 | if [ "$ENABLE_COVERAGE" = "true" ]; then tee ../coverage-reports/python_coverage.txt; else cat; fi
 
         PYTEST_EXIT_CODE=${PIPESTATUS[0]}
         set -e
 
-        echo "=== Python Test Output ==="
-        cat ../coverage-reports/python_coverage.txt
+        if [ "$ENABLE_COVERAGE" = "true" ]; then
+          echo "=== Python Test Output ==="
+          cat ../coverage-reports/python_coverage.txt
+        fi
 
         if [ $PYTEST_EXIT_CODE -ne 0 ]; then
           echo "ERROR: Python tests failed with exit code $PYTEST_EXIT_CODE"
@@ -419,6 +436,7 @@ jobs:
         fi
 
     - name: Generate Pybind11 coverage report
+      if: matrix.enable-coverage
       working-directory: python
       run: |
         PYBIND_BUILD_DIR=$(find . -wholename "./build/cp*/CMakeFiles/_core.dir" | head -1)
@@ -433,7 +451,7 @@ jobs:
           --exclude '.*external.*' \
           --gcov-ignore-errors=no_working_dir_found \
           --gcov-ignore-errors=source_not_found \
-          --xml "../coverage-reports/pybind11_coverage.xml" \
+          --cobertura "../coverage-reports/pybind11_coverage.cobertura.xml" \
           --txt "../coverage-reports/pybind11_coverage.txt" \
           --html-details "../coverage-reports/pybind11_coverage.html" \
           2> >(grep -v 'Can not fix case of path' >&2 || true)
@@ -442,6 +460,7 @@ jobs:
         cat ../coverage-reports/pybind11_coverage.txt
 
     - name: Generate coverage statistics
+      if: matrix.enable-coverage
       run: |
         # Extract coverage percentages
         extract_coverage() {
@@ -501,17 +520,56 @@ jobs:
         fi
 
     # Forked pull_request runs only get a read-only GITHUB_TOKEN, so the comment is
-    # posted by the separate "Coverage PR Comment" workflow_run workflow instead;
-    # see .github/workflows/coverage-comment.yaml.
+    # posted by the separate "Coverage PR Comment" workflow_run workflow instead.
     - name: Upload coverage comment artifact
-      if: github.event_name == 'pull_request'
+      if: github.event_name == 'pull_request' && matrix.enable-coverage
       uses: actions/upload-artifact@v7
       with:
-        name: coverage-comment-${{ matrix.os-name }}-py${{ matrix.python-version }}
+        name: coverage-comment
         path: pr-comment.md
         retention-days: 1
 
+    # Fork PRs are skipped by the action itself (no write access), not by this condition.
+    - name: Upload C++ code coverage
+      if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
+      uses: actions/upload-code-coverage@v1
+      with:
+        file: coverage-reports/cpp_coverage.cobertura.xml
+        language: C++
+        label: code-coverage/cpp
+        fail-on-error: false
+
+    - name: Upload Pybind11 code coverage
+      if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
+      uses: actions/upload-code-coverage@v1
+      with:
+        file: coverage-reports/pybind11_coverage.cobertura.xml
+        language: C++
+        label: code-coverage/pybind11
+        fail-on-error: false
+
+    - name: Upload Python code coverage
+      if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
+      uses: actions/upload-code-coverage@v1
+      with:
+        file: coverage-reports/python_coverage.xml
+        language: Python
+        label: code-coverage/python
+        fail-on-error: false
+
+    - name: Upload coverage HTML reports
+      if: matrix.enable-coverage
+      uses: actions/upload-artifact@v7
+      with:
+        name: coverage-html-reports
+        path: |
+          coverage-reports/cpp_coverage*.html
+          coverage-reports/pybind11_coverage*.html
+          coverage-reports/python_coverage_html/
+        retention-days: 14
+
     - name: Add coverage to job summary
+      if: matrix.enable-coverage
       run: |
         # Create comprehensive summary with table and detailed reports
         echo "## 📊 Coverage Summary" > coverage-summary.md
