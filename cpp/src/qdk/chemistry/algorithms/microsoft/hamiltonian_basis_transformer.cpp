@@ -4,6 +4,7 @@
 
 #include "hamiltonian_basis_transformer.hpp"
 
+#include <Eigen/Cholesky>
 #include <cmath>
 #include <optional>
 #include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
@@ -28,13 +29,19 @@ class HamiltonianBasisTransformerSettings : public data::Settings {
  public:
   HamiltonianBasisTransformerSettings() {
     set_default("validation_tolerance", 1.0e-10,
-                "Absolute tolerance for validating the orbital basis change",
+                "Tolerance for validating the orbital basis change",
                 data::BoundConstraint<double>{0.0, 1.0});
   }
 };
 
 void require(bool condition, const std::string& message) {
   if (!condition) throw std::invalid_argument(message);
+}
+
+template <class Matrix>
+void require_finite(const Eigen::MatrixBase<Matrix>& matrix,
+                    const std::string& description) {
+  require(matrix.allFinite(), description + " must be finite");
 }
 
 template <class Lhs, class Rhs>
@@ -169,6 +176,9 @@ std::shared_ptr<data::Hamiltonian> QdkHamiltonianBasisTransformer::_run_impl(
   require_close(source_orbitals->get_overlap_matrix(),
                 target_orbitals->get_overlap_matrix(), tolerance,
                 "Source and target AO overlap matrices");
+  require_close(source_orbitals->get_overlap_matrix(),
+                source_orbitals->get_overlap_matrix().transpose(), tolerance,
+                "Source AO overlap matrix symmetry");
 
   const SymmetryProduct expected_symmetry({data::axes::spin(1, true)});
   require(*source_orbitals->symmetries() == expected_symmetry &&
@@ -178,6 +188,8 @@ std::shared_ptr<data::Hamiltonian> QdkHamiltonianBasisTransformer::_run_impl(
           "symmetry");
   require_restricted(source.one_body_integrals(), expected_symmetry,
                      "Source one-body integrals");
+  require(std::isfinite(source.get_core_energy()),
+          "Source core energy must be finite");
   if (source.has_inactive_fock_matrix()) {
     require_restricted(source.inactive_fock(), expected_symmetry,
                        "Source inactive Fock matrix");
@@ -249,27 +261,50 @@ std::shared_ptr<data::Hamiltonian> QdkHamiltonianBasisTransformer::_run_impl(
   const auto& overlap = source_orbitals->get_overlap_matrix();
   const Eigen::Index nactive = source_indices.size();
   const Eigen::MatrixXd identity = Eigen::MatrixXd::Identity(nactive, nactive);
-  require_close(source_active_coefficients.transpose() * overlap *
-                    source_active_coefficients,
-                identity, tolerance, "Source active-orbital overlap");
-  require_close(target_active_coefficients.transpose() * overlap *
-                    target_active_coefficients,
-                identity, tolerance, "Target active-orbital overlap");
-  const Eigen::MatrixXd rotation = source_active_coefficients.transpose() *
-                                   overlap * target_active_coefficients;
+  Eigen::MatrixXd rotation;
+  Eigen::LLT<Eigen::MatrixXd> overlap_cholesky(overlap);
+  if (overlap_cholesky.info() == Eigen::Success) {
+    const Eigen::MatrixXd source_metric_coefficients =
+        overlap_cholesky.matrixU() * source_active_coefficients;
+    const Eigen::MatrixXd target_metric_coefficients =
+        overlap_cholesky.matrixU() * target_active_coefficients;
+    require_close(
+        source_metric_coefficients.transpose() * source_metric_coefficients,
+        identity, tolerance, "Source active-orbital overlap");
+    require_close(
+        target_metric_coefficients.transpose() * target_metric_coefficients,
+        identity, tolerance, "Target active-orbital overlap");
+    rotation =
+        source_metric_coefficients.transpose() * target_metric_coefficients;
+    require_close(source_metric_coefficients * rotation,
+                  target_metric_coefficients, tolerance,
+                  "Target active orbitals");
+  } else {
+    require_close(source_active_coefficients.transpose() * overlap *
+                      source_active_coefficients,
+                  identity, tolerance, "Source active-orbital overlap");
+    require_close(target_active_coefficients.transpose() * overlap *
+                      target_active_coefficients,
+                  identity, tolerance, "Target active-orbital overlap");
+    rotation = source_active_coefficients.transpose() * overlap *
+               target_active_coefficients;
+    require_close(source_active_coefficients * rotation,
+                  target_active_coefficients, tolerance,
+                  "Target active orbitals");
+  }
   require_close(rotation.transpose() * rotation, identity, tolerance,
                 "Recovered active-space rotation");
-  require_close(source_active_coefficients * rotation,
-                target_active_coefficients, tolerance,
-                "Target active orbitals");
 
   const auto& one_body = std::get<0>(source.get_one_body_integrals());
+  require_finite(one_body, "Source one-body integrals");
   Eigen::MatrixXd transformed_one_body =
       rotation.transpose() * one_body * rotation;
+  require_finite(transformed_one_body, "Transformed one-body integrals");
 
   std::shared_ptr<const SymmetryBlockedTensor<2>> transformed_fock;
   if (source.has_inactive_fock_matrix()) {
     const auto& fock = source.get_inactive_fock_matrix().first;
+    require_finite(fock, "Source inactive Fock matrix");
     Eigen::MatrixXd full_rotation =
         Eigen::MatrixXd::Identity(fock.rows(), fock.cols());
     for (Eigen::Index row = 0; row < nactive; ++row) {
@@ -279,11 +314,13 @@ std::shared_ptr<data::Hamiltonian> QdkHamiltonianBasisTransformer::_run_impl(
       }
     }
     Eigen::MatrixXd output = full_rotation.transpose() * fock * full_rotation;
+    require_finite(output, "Transformed inactive Fock matrix");
     transformed_fock = std::make_shared<const SymmetryBlockedTensor<2>>(
         restricted_rank2(std::move(output)));
   }
 
   const auto& factors = source.get_three_center_integrals().first;
+  require_finite(factors, "Source Cholesky factors");
   require(factors.rows() == nactive * nactive,
           "Cholesky factors must use [nactive^2, naux] storage");
   Eigen::MatrixXd transformed_factors(factors.rows(), factors.cols());
@@ -311,6 +348,7 @@ std::shared_ptr<data::Hamiltonian> QdkHamiltonianBasisTransformer::_run_impl(
     transform_factor(factor, scratch);
   }
 #endif
+  require_finite(transformed_factors, "Transformed Cholesky factors");
 
   auto transformed_three_center = restricted_rank3(
       *target_orbitals, source.three_center(), std::move(transformed_factors));

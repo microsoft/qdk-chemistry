@@ -7,6 +7,7 @@
 #include <Eigen/Dense>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <qdk/chemistry/algorithms/active_space.hpp>
@@ -1532,6 +1533,144 @@ TEST_F(HamiltonianTest, CholeskyBasisTransformerHonorsValidationTolerance) {
       coefficients, std::nullopt, std::make_optional(outside_tolerance),
       basis_set, active_space, nullptr);
   EXPECT_THROW(transformer->run(source, rejected_target),
+               std::invalid_argument);
+}
+
+TEST_F(HamiltonianTest,
+       CholeskyBasisTransformerHandlesIllConditionedOverlapMetric) {
+  Eigen::Matrix2d metric_rotation;
+  metric_rotation << 1.0, 1.0, -1.0, 1.0;
+  metric_rotation /= std::sqrt(2.0);
+  Eigen::MatrixXd overlap = metric_rotation *
+                            Eigen::Vector2d(1.0, 1.0e-10).asDiagonal() *
+                            metric_rotation.transpose();
+  const Eigen::LLT<Eigen::MatrixXd> overlap_cholesky(overlap);
+  ASSERT_EQ(overlap_cholesky.info(), Eigen::Success);
+
+  Eigen::Matrix2d source_rotation;
+  source_rotation << 0.8, -0.6, 0.6, 0.8;
+  const Eigen::MatrixXd source_coefficients =
+      overlap_cholesky.matrixU().solve(source_rotation);
+  EXPECT_GT((source_coefficients.transpose() * overlap * source_coefficients -
+             Eigen::Matrix2d::Identity())
+                .cwiseAbs()
+                .maxCoeff(),
+            1.0e-10);
+
+  const double angle = 0.3;
+  Eigen::Matrix2d active_rotation;
+  active_rotation << std::cos(angle), -std::sin(angle), std::sin(angle),
+      std::cos(angle);
+  const Eigen::MatrixXd target_coefficients =
+      source_coefficients * active_rotation;
+  auto basis_set =
+      testing::create_random_basis_set(2, "test-ill-conditioned-transform");
+  auto active_space = testing::restricted_index_set(2, {0, 1});
+  auto source_orbitals = std::make_shared<Orbitals>(
+      source_coefficients, std::nullopt, std::make_optional(overlap), basis_set,
+      active_space, nullptr);
+  auto target_orbitals = std::make_shared<Orbitals>(
+      target_coefficients, std::nullopt, std::make_optional(overlap), basis_set,
+      active_space, nullptr);
+  Eigen::Matrix2d one_body;
+  one_body << 1.2, 0.2, 0.2, 0.7;
+  Eigen::Matrix2d factor;
+  factor << 0.9, -0.1, 0.3, 0.4;
+  Eigen::MatrixXd factors(4, 1);
+  Eigen::Map<Eigen::Matrix2d>(factors.col(0).data()) = factor;
+  auto source = std::make_shared<Hamiltonian>(
+      std::make_unique<CholeskyHamiltonianContainer>(
+          one_body, factors, source_orbitals, 0.0, Eigen::MatrixXd{}));
+
+  auto transformed = HamiltonianBasisTransformerFactory::create("qdk")->run(
+      source, target_orbitals);
+  EXPECT_TRUE(
+      std::get<0>(transformed->get_one_body_integrals())
+          .isApprox(active_rotation.transpose() * one_body * active_rotation,
+                    1.0e-10));
+  Eigen::MatrixXd expected_factors(4, 1);
+  Eigen::Map<Eigen::Matrix2d>(expected_factors.col(0).data()) =
+      active_rotation.transpose() * factor * active_rotation;
+  EXPECT_TRUE(
+      std::get<0>(transformed->get_container<CholeskyHamiltonianContainer>()
+                      .get_three_center_integrals())
+          .isApprox(expected_factors, 1.0e-10));
+}
+
+TEST_F(HamiltonianTest,
+       CholeskyBasisTransformerHandlesRankDeficientOverlapMetric) {
+  Eigen::MatrixXd overlap = Eigen::MatrixXd::Ones(2, 2);
+  const Eigen::LLT<Eigen::MatrixXd> overlap_cholesky(overlap);
+  ASSERT_NE(overlap_cholesky.info(), Eigen::Success);
+  Eigen::MatrixXd source_coefficients(2, 1);
+  source_coefficients << 0.5, 0.5;
+  const Eigen::MatrixXd target_coefficients = -source_coefficients;
+  auto basis_set =
+      testing::create_random_basis_set(2, "test-rank-deficient-transform");
+  auto active_space = testing::restricted_index_set(1, {0});
+  auto source_orbitals = std::make_shared<Orbitals>(
+      source_coefficients, std::nullopt, std::make_optional(overlap), basis_set,
+      active_space, nullptr);
+  auto target_orbitals = std::make_shared<Orbitals>(
+      target_coefficients, std::nullopt, std::make_optional(overlap), basis_set,
+      active_space, nullptr);
+  auto source = std::make_shared<Hamiltonian>(
+      std::make_unique<CholeskyHamiltonianContainer>(
+          Eigen::MatrixXd::Constant(1, 1, 1.2),
+          Eigen::MatrixXd::Constant(1, 1, 0.4), source_orbitals, 0.5,
+          Eigen::MatrixXd{}));
+
+  auto transformed = HamiltonianBasisTransformerFactory::create("qdk")->run(
+      source, target_orbitals);
+  EXPECT_TRUE(std::get<0>(transformed->get_one_body_integrals())
+                  .isApprox(Eigen::MatrixXd::Constant(1, 1, 1.2)));
+  EXPECT_TRUE(
+      std::get<0>(transformed->get_container<CholeskyHamiltonianContainer>()
+                      .get_three_center_integrals())
+          .isApprox(Eigen::MatrixXd::Constant(1, 1, 0.4)));
+  EXPECT_DOUBLE_EQ(transformed->get_core_energy(), 0.5);
+
+  auto invalid_target = std::make_shared<Orbitals>(
+      0.9 * source_coefficients, std::nullopt, std::make_optional(overlap),
+      basis_set, active_space, nullptr);
+  EXPECT_THROW(HamiltonianBasisTransformerFactory::create("qdk")->run(
+                   source, invalid_target),
+               std::invalid_argument);
+}
+
+TEST_F(HamiltonianTest, CholeskyBasisTransformerRejectsNonfiniteIntegrals) {
+  const Eigen::MatrixXd coefficients = Eigen::MatrixXd::Identity(1, 1);
+  const Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(1, 1);
+  auto basis_set =
+      testing::create_random_basis_set(1, "test-nonfinite-transform");
+  auto active_space = testing::restricted_index_set(1, {0});
+  auto orbitals = std::make_shared<Orbitals>(coefficients, std::nullopt,
+                                             std::make_optional(overlap),
+                                             basis_set, active_space, nullptr);
+  auto transformer = HamiltonianBasisTransformerFactory::create("qdk");
+  const auto run = [&](Eigen::MatrixXd one_body, Eigen::MatrixXd factors,
+                       double core_energy, Eigen::MatrixXd fock) {
+    auto source = std::make_shared<Hamiltonian>(
+        std::make_unique<CholeskyHamiltonianContainer>(
+            std::move(one_body), std::move(factors), orbitals, core_energy,
+            std::move(fock)));
+    return transformer->run(std::move(source), orbitals);
+  };
+
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  const double infinity = std::numeric_limits<double>::infinity();
+  EXPECT_THROW(run(Eigen::MatrixXd::Constant(1, 1, nan),
+                   Eigen::MatrixXd::Ones(1, 1), 0.0, Eigen::MatrixXd{}),
+               std::invalid_argument);
+  EXPECT_THROW(
+      run(Eigen::MatrixXd::Ones(1, 1),
+          Eigen::MatrixXd::Constant(1, 1, infinity), 0.0, Eigen::MatrixXd{}),
+      std::invalid_argument);
+  EXPECT_THROW(run(Eigen::MatrixXd::Ones(1, 1), Eigen::MatrixXd::Ones(1, 1),
+                   0.0, Eigen::MatrixXd::Constant(1, 1, nan)),
+               std::invalid_argument);
+  EXPECT_THROW(run(Eigen::MatrixXd::Ones(1, 1), Eigen::MatrixXd::Ones(1, 1),
+                   infinity, Eigen::MatrixXd{}),
                std::invalid_argument);
 }
 
