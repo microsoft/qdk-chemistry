@@ -173,6 +173,7 @@ class TestPauliSequenceMapper:
                         )  # Z on qubit 1
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
+    @pytest.mark.usefixtures("use_base_qdk_ctx")
     def test_controlled_u_circuit_matrix(self, unitary_rep, simple_ppf_container):
         """Test that the constructed controlled-U circuit has the expected matrix."""
         mapper = ControlledPauliSequenceMapper()

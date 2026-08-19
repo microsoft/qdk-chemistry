@@ -97,6 +97,7 @@ class TestPrepareSelectMapper:
             mapper.run(unitary_rep)
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
+    @pytest.mark.usefixtures("use_base_qdk_ctx")
     @pytest.mark.parametrize(
         ("pauli_strings", "coefficients", "description"),
         [
@@ -145,6 +146,7 @@ class TestPrepareSelectMapper:
         ), f"Block encoding identity failed for: {description}"
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
+    @pytest.mark.usefixtures("use_base_qdk_ctx")
     def test_quantum_walk_eigenvalues(self):
         r"""Verify quantum walk operator eigenvalues satisfy the arccos relation.
 

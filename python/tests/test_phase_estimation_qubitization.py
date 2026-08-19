@@ -22,12 +22,16 @@ from .reference_tolerances import (
     qpe_energy_tolerance,
 )
 
+pytestmark = pytest.mark.usefixtures("qiskit_params_use_base_qdk_ctx")
+
 _builder_params = [
     pytest.param("qdk_iterative", id="qdk_iterative"),
     pytest.param(
         "qiskit_iterative",
         id="qiskit_iterative",
-        marks=pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
+        marks=[
+            pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
+        ],
     ),
 ]
 
@@ -220,6 +224,7 @@ class TestQPEWithQubitization:
     @pytest.mark.skipif(
         not QDK_CHEMISTRY_HAS_QISKIT_AER or not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit Aer not available."
     )
+    @pytest.mark.usefixtures("use_base_qdk_ctx")
     def test_standard_qpe_with_qubitization_h2(self, h2_hamiltonian):
         """Verify standard QPE with qubitization recovers H2 ground-state energy."""
         # Exact ground state from qubit Hamiltonian solver (dense diagonalization)

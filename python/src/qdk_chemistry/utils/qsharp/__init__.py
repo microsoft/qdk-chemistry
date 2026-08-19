@@ -4,15 +4,20 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+import atexit
+import shutil
+import tempfile
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
+from functools import cache
 from pathlib import Path
 
 import qdk
 from qdk import TargetProfile
 
 __all__ = [
+    "DEFAULT_TARGET_PROFILE",
     "QSHARP_UTILS",
     "create_qsharp_context",
     "get_qsharp_context",
@@ -21,6 +26,36 @@ __all__ = [
 ]
 
 _PROJECT_ROOT = str(Path(__file__).parent)
+_SOURCE_ROOT = Path(__file__).parent / "src"
+#: Profile the vendored Q# project is compiled for by default.
+DEFAULT_TARGET_PROFILE = TargetProfile.Adaptive_RIF
+
+#: Q# sources that are supported by ``TargetProfile.Base``.
+_BASE_PROFILE_FILES = (
+    "StatePreparation.qs",
+    "CircuitComposition.qs",
+    "IterativePhaseEstimation.qs",
+    "StandardPhaseEstimation.qs",
+    "ControlledPauliExp.qs",
+    "HadamardTest.qs",
+    "PauliExp.qs",
+    "MeasurementBasis.qs",
+    "Select.qs",
+    "PrepSelPrep.qs",
+)
+
+
+@cache
+def _base_project_root() -> str:
+    """Stage the Base-supported sources as a standalone Q# project and return its root."""
+    root = Path(tempfile.mkdtemp(prefix="qdk-chemistry-qsharp-base-"))
+    atexit.register(shutil.rmtree, root, ignore_errors=True)
+    shutil.copyfile(Path(_PROJECT_ROOT) / "qsharp.json", root / "qsharp.json")
+    source_dir = root / _SOURCE_ROOT.name
+    source_dir.mkdir()
+    for name in _BASE_PROFILE_FILES:
+        shutil.copyfile(_SOURCE_ROOT / name, source_dir / name)
+    return str(root)
 
 
 class _SharedContext:
@@ -36,7 +71,7 @@ _thread_local = threading.local()
 
 
 def create_qsharp_context(
-    target_profile: TargetProfile = TargetProfile.Base,
+    target_profile: TargetProfile = DEFAULT_TARGET_PROFILE,
     target_name: str | None = None,
     language_features: list[str] | None = None,
     qdk_config: dict[str, int | float | str | bool] | None = None,
@@ -50,7 +85,12 @@ def create_qsharp_context(
     :func:`set_qsharp_context` if the chemistry builders should use it too.
 
     :param target_profile: Target profile the Q# interpreter compiles for. Defaults to
-        ``TargetProfile.Base``.
+        :data:`DEFAULT_TARGET_PROFILE`. A ``TargetProfile.Base`` context loads only the
+        Base-*correct* subset of the vendored project, which is what callers that need
+        measurement-free circuits should ask for. Sources that rely on
+        measurement-based uncompute, such as unary iteration, are withheld from it: they
+        would compile under Base and return silently wrong results, so they are made to
+        fail as undefined symbols instead.
     :param target_name: Optional target machine name used to infer a compatible profile.
     :param language_features: Optional list of experimental Q# language feature flags.
     :param qdk_config: Optional configuration values exposed to Q# code via
@@ -66,6 +106,8 @@ def create_qsharp_context(
         kwargs["language_features"] = language_features
     if qdk_config is not None:
         kwargs["qdk_config"] = qdk_config
+    if target_profile == TargetProfile.Base:
+        return qdk.Context(project_root=_base_project_root(), target_profile=target_profile, **kwargs)
     return qdk.Context(project_root=_PROJECT_ROOT, target_profile=target_profile, **kwargs)
 
 

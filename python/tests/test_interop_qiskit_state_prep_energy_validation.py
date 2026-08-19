@@ -26,9 +26,10 @@ if QDK_CHEMISTRY_HAS_QISKIT_AER:
     from qiskit_aer.primitives import EstimatorV2 as AerEstimator
 
 
-pytestmark = pytest.mark.skipif(
-    not QDK_CHEMISTRY_HAS_QISKIT_AER or not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"
-)
+pytestmark = [
+    pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_AER or not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
+    pytest.mark.usefixtures("use_base_qdk_ctx"),
+]
 
 
 def test_energy_agreement_between_state_prep_methods(wavefunction_4e4o, hamiltonian_4e4o, ref_energy_4e4o):
