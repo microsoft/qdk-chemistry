@@ -12,11 +12,41 @@ allowing repeated runs with identical inputs to skip execution entirely.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+
+import numpy as np
+
+from qdk_chemistry._core.data import DataClass as CoreDataClass
+from qdk_chemistry.data._hashing import _numpy_scalar_to_python
 
 if TYPE_CHECKING:
-    from qdk_chemistry.data.base import DataClass
     from qdk_chemistry.remote.job import Job
+
+
+def _is_cache_node(value: Any) -> bool:
+    """Return whether a value can occur inside a cached list."""
+    if isinstance(value, np.generic):
+        value = _numpy_scalar_to_python(value)
+    if value is None or isinstance(value, bool | int | float | str):
+        return True
+    if isinstance(value, CoreDataClass):
+        return True
+    if isinstance(value, np.ndarray):
+        return not value.dtype.hasobject
+    if isinstance(value, list | tuple):
+        return all(_is_cache_node(item) for item in value)
+    return False
+
+
+def is_cacheable(value: Any) -> bool:
+    """Return whether a value can be stored as a cache data entry."""
+    if isinstance(value, CoreDataClass):
+        return True
+    if isinstance(value, np.ndarray):
+        return not value.dtype.hasobject
+    if isinstance(value, list):
+        return all(_is_cache_node(item) for item in value)
+    return False
 
 
 class CacheBackend(ABC):
@@ -26,9 +56,9 @@ class CacheBackend(ABC):
 
     - **get_job** / **put_job**: persist ``Job`` metadata keyed by
       the deterministic *run_hash*.
-    - **get_data** / **put_data**: content-addressed storage for
-      ``DataClass`` objects. Primitives (floats, ints, …) are stored inline
-      in the Job metadata and never touch these methods.
+        - **get_data** / **put_data**: content-addressed storage for
+            ``DataClass`` objects, NumPy arrays, and supported lists. Primitives
+            (floats, ints, …) are stored inline in Job or list metadata.
     - **delete_job** / **delete_data**: remove cached metadata or blobs.
     - **clear**: remove all entries from the cache.
 
@@ -54,11 +84,11 @@ class CacheBackend(ABC):
         """Store (or update) job metadata keyed by *run_hash*."""
 
     @abstractmethod
-    def get_data(self, content_hash: str) -> DataClass | list | None:
-        """Retrieve a DataClass object (or list) by its content hash, or ``None``."""
+    def get_data(self, content_hash: str) -> Any | None:
+        """Retrieve cached data by its content hash, or ``None``."""
 
     @abstractmethod
-    def put_data(self, content_hash: str, data: DataClass | list, *, shared_only: bool = False) -> None:
+    def put_data(self, content_hash: str, data: Any, *, shared_only: bool = False) -> None:
         """Store data by content hash, optionally requiring shared storage."""
 
     @abstractmethod

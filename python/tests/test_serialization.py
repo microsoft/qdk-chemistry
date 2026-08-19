@@ -81,6 +81,54 @@ def test_container_round_trip(tmp_path, value):
     assert type(result) is type(value)
 
 
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (np.bool_(True), True),
+        (np.int64(42), 42),
+        (np.float32(1.25), 1.25),
+        (np.longdouble(1.25), 1.25),
+        (np.str_("value"), "value"),
+    ],
+)
+def test_numpy_scalar_round_trip_as_python_primitive(tmp_path, value, expected):
+    """Round-trip NumPy scalars as their corresponding Python primitives."""
+    entry = FileSerializer.serialize_value(tmp_path, "value", value)
+
+    result = FileSerializer.deserialize_value(tmp_path, entry)
+
+    assert result == expected
+    assert type(result) is type(expected)
+
+
+def test_numpy_array_round_trip(tmp_path):
+    """Round-trip a NumPy array without changing its shape or dtype."""
+    value = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+
+    entry = FileSerializer.serialize_value(tmp_path, "value", value)
+    result = FileSerializer.deserialize_value(tmp_path, entry)
+
+    assert entry["type"] == "ndarray"
+    np.testing.assert_array_equal(result, value)
+    assert result.dtype == value.dtype
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ([1, (np.float32(2.0), np.array([3.0]))], True),
+        ([{"x": 1}], False),
+        ([object()], False),
+        (np.array([1.0]), True),
+        (np.array([object()], dtype=object), False),
+        ((1, 2), False),
+    ],
+)
+def test_cacheable_matches_supported_cache_value_graph(value, expected):
+    """Match cache eligibility to the recursive value graph accepted by cache backends."""
+    assert FileSerializer.is_cacheable(value) is expected
+
+
 def test_unsupported_value_and_type_tag_raise(tmp_path):
     """Reject unsupported Python values and manifest type tags."""
     with pytest.raises(TypeError, match="Cannot serialize"):
@@ -232,6 +280,24 @@ def test_output_round_trip_survives_file_transfer(tmp_path, sample_orbitals):
     assert all(isinstance(item, Orbitals) for item in orbitals)
 
 
+def test_numpy_algorithm_output_survives_file_transfer(tmp_path):
+    """Round-trip a NumPy scalar and array algorithm result after file transfer."""
+    source = tmp_path / "source"
+    destination = tmp_path / "destination"
+    destination.mkdir()
+    result = np.float64(-1.5), np.array([0.0, 1.0, 0.0], dtype=np.float64)
+
+    files = serialize_outputs(source, result)
+    for path in files:
+        shutil.copy2(path, destination / path.name)
+    energy, state = deserialize_outputs(destination)
+
+    assert {path.suffix for path in files} == {".json", ".npy"}
+    assert energy == -1.5
+    assert type(energy) is float
+    np.testing.assert_array_equal(state, result[1])
+
+
 class SharedCache:
     """Minimal cache fake for serialization transport tests."""
 
@@ -271,6 +337,37 @@ def test_output_round_trip_uses_shared_cache_transport(tmp_path, sample_orbitals
 
     assert files == [source / "manifest.json"]
     assert deserialize_outputs(destination, cache=cache) is sample_orbitals
+
+
+def test_numpy_array_output_uses_shared_cache_transport(tmp_path):
+    """Transfer a NumPy array output through a shared folder cache."""
+    source = tmp_path / "source"
+    destination = tmp_path / "destination"
+    destination.mkdir()
+    cache = FolderCache(path=tmp_path / "shared", is_shared=True)
+    value = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+
+    files = serialize_outputs(source, value, cache=cache, cache_transport=True)
+    shutil.copy2(source / "manifest.json", destination / "manifest.json")
+    restored = deserialize_outputs(destination, cache=cache)
+
+    assert files == [source / "manifest.json"]
+    np.testing.assert_array_equal(restored, value)
+    assert restored.dtype == value.dtype
+
+
+def test_unsupported_cache_value_graph_uses_manifest_transport(tmp_path):
+    """Serialize unsupported cache graphs without attempting a cache write."""
+    source = tmp_path / "source"
+    cache_path = tmp_path / "shared"
+    cache = FolderCache(path=cache_path, is_shared=True)
+    value = [{"x": 1}]
+
+    files = serialize_outputs(source, value, cache=cache, cache_transport=True)
+
+    assert files == [source / "manifest.json"]
+    assert deserialize_outputs(source) == value
+    assert not cache_path.exists()
 
 
 def test_input_round_trip_uses_shared_cache_transport(tmp_path, h2_structure):

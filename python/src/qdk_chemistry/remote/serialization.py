@@ -19,9 +19,11 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Any, Type  # noqa: UP035
 
+import numpy as np
+
 from qdk_chemistry._core.data import DataClass as CoreDataClass
 from qdk_chemistry.data import AlgorithmRef, Settings
-from qdk_chemistry.data._hashing import _item_content_hash
+from qdk_chemistry.data._hashing import _item_content_hash, _numpy_scalar_to_python
 from qdk_chemistry.data._type_name import instance_data_type_name
 from qdk_chemistry.data.registry import (
     available_dataclasses,
@@ -30,7 +32,7 @@ from qdk_chemistry.data.registry import (
 from qdk_chemistry.data.registry import (
     register_dataclass as _register_dataclass,
 )
-from qdk_chemistry.remote.cache.base import CacheBackend  # noqa: TC001
+from qdk_chemistry.remote.cache.base import CacheBackend, is_cacheable
 
 __all__ = [
     "FileSerializer",
@@ -44,6 +46,7 @@ __all__ = [
 ]
 
 _MANIFEST_FILENAME = "manifest.json"
+_MANIFEST_VERSION = 1
 
 
 def _atomic_write_json(path: Path, value: Any) -> None:
@@ -79,6 +82,28 @@ def _atomic_write_dataclass(path: Path, value: CoreDataClass, type_name: str) ->
     os.close(file_descriptor)
     try:
         value.to_hdf5_file(temporary_path)
+        if path.is_file():
+            return
+        if path.exists():
+            raise FileExistsError(f"Serialization file path is not a file: {path}")
+        os.replace(temporary_path, path)
+    finally:
+        Path(temporary_path).unlink(missing_ok=True)
+
+
+def _atomic_write_array(path: Path, value: np.ndarray) -> None:
+    """Write a NumPy array atomically unless its content-addressed file already exists."""
+    if value.dtype.hasobject:
+        raise TypeError("Cannot serialize NumPy arrays with object dtype")
+    if path.is_file():
+        return
+    if path.exists():
+        raise FileExistsError(f"Serialization file path is not a file: {path}")
+
+    file_descriptor, temporary_path = tempfile.mkstemp(dir=path.parent, suffix=".ndarray.npy")
+    try:
+        with os.fdopen(file_descriptor, "wb") as file:
+            np.save(file, value, allow_pickle=False)
         if path.is_file():
             return
         if path.exists():
@@ -171,10 +196,11 @@ def _jsonable_settings(settings: Settings) -> dict[str, Any]:
 class FileSerializer:
     """Handles file-based serialization of QDK Chemistry objects for remote transport.
 
-    Each DataClass object is serialized to its own .{type_name}.h5 file.
-    Primitives and simple types are stored in a JSON manifest file. Algorithm
-    references embed plain tagged settings dictionaries, recursively preserving
-    further nested algorithm references.
+    Each DataClass object is serialized to its own .{type_name}.h5 file, and
+    each NumPy array to its own .ndarray.npy file. Primitives and simple types
+    are stored in a JSON manifest file. Algorithm references embed plain tagged
+    settings dictionaries, recursively preserving further nested algorithm
+    references.
 
     Directory structure for inputs::
 
@@ -189,6 +215,7 @@ class FileSerializer:
         job_dir/
             manifest.json          # Metadata
             <content_hash>.wavefunction.h5
+            <content_hash>.ndarray.npy
             ...
 
     """
@@ -237,7 +264,7 @@ class FileSerializer:
     @classmethod
     def is_cacheable(cls, value: Any) -> bool:
         """Check if a value can be stored in a shared cache."""
-        return cls.is_dataclass(value) or isinstance(value, list)
+        return is_cacheable(value)
 
     @classmethod
     def serialize_value(  # noqa: PLR0911
@@ -268,6 +295,9 @@ class FileSerializer:
         if value is None:
             return {"type": "none", "value": None}
 
+        if isinstance(value, np.generic):
+            value = _numpy_scalar_to_python(value)
+
         if isinstance(value, AlgorithmRef):
             settings = value.settings
             return {
@@ -283,9 +313,16 @@ class FileSerializer:
                 cache.put_data(content_hash, value, shared_only=True)
                 cached = cache.has_data(content_hash, shared_only=True)
             if cached:
+                cached_type = (
+                    instance_data_type_name(value)
+                    if cls.is_dataclass(value)
+                    else "ndarray"
+                    if isinstance(value, np.ndarray)
+                    else "list"
+                )
                 return {
                     "type": "cached",
-                    "dataclass_type": instance_data_type_name(value) if cls.is_dataclass(value) else "list",
+                    "dataclass_type": cached_type,
                     "content_hash": content_hash,
                 }
 
@@ -301,6 +338,14 @@ class FileSerializer:
                 "dataclass_type": type_name,
                 "file": filename,
             }
+            if content_hash is not None:
+                entry["content_hash"] = content_hash
+            return entry
+
+        if isinstance(value, np.ndarray):
+            filename = f"{_item_content_hash(value)}.ndarray.npy"
+            _atomic_write_array(directory / filename, value)
+            entry = {"type": "ndarray", "file": filename}
             if content_hash is not None:
                 entry["content_hash"] = content_hash
             return entry
@@ -424,7 +469,7 @@ class FileSerializer:
                 )
             return data
 
-        if type_tag in ("dataclass", "list"):
+        if type_tag in ("dataclass", "ndarray", "list"):
             content_hash = entry.get("content_hash")
             if cache is not None and content_hash is not None:
                 data = cache.get_data(content_hash)
@@ -439,6 +484,10 @@ class FileSerializer:
             filepath = _manifest_file_path(directory, entry["file"])
             # All QDK Chemistry DataClass types have from_hdf5_file
             return dataclass_type.from_hdf5_file(str(filepath))  # type: ignore[attr-defined]
+
+        if type_tag == "ndarray":
+            filepath = _manifest_file_path(directory, entry["file"])
+            return np.load(filepath, allow_pickle=False)
 
         if type_tag == "bool":
             return bool(entry["value"])
@@ -476,12 +525,12 @@ def get_serialized_file_names(entry: dict[str, Any]) -> list[str]:
         entry: Serialized value entry from an input or output manifest.
 
     Returns:
-        DataClass file names in manifest order; primitive and cached entries contribute no names.
+        Artifact file names in manifest order; primitive and cached entries contribute no names.
 
     """
     type_tag = entry["type"]
 
-    if type_tag == "dataclass":
+    if type_tag in ("dataclass", "ndarray"):
         return [entry["file"]]
 
     if type_tag in ("list", "tuple"):
@@ -543,7 +592,7 @@ def serialize_inputs(
         run_hash: Optional pre-computed algorithm run hash.
         input_hashes: Optional dict mapping input names to their content hashes.
         remote_cache: Optional coordinates passed to the remote cache factory, ``get_cache()``.
-        remote_cache_backend: Shared cache backend; existing DataClass blobs become ``"cached"`` manifest references.
+        remote_cache_backend: Shared cache backend; existing cacheable values become ``"cached"`` manifest references.
         remote_cache_transport: Whether to seed shared-cache misses and use the cache as artifact transport.
 
     Returns:
@@ -555,6 +604,7 @@ def serialize_inputs(
 
     # Build manifest
     manifest: dict[str, Any] = {
+        "version": _MANIFEST_VERSION,
         "algorithm_type": algorithm_type,
         "algorithm_name": algorithm_name,
         "settings": {},
@@ -697,7 +747,7 @@ def serialize_outputs(
     directory.mkdir(parents=True, exist_ok=True)
 
     # Build manifest
-    manifest: dict[str, Any] = {"is_tuple": False, "results": []}
+    manifest: dict[str, Any] = {"version": _MANIFEST_VERSION, "is_tuple": False, "results": []}
 
     with tempfile.TemporaryDirectory(dir=directory, prefix=".serialization-") as staging_directory_name:
         staging_directory = Path(staging_directory_name)
