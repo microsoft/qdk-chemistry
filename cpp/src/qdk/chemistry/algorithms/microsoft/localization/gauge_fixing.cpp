@@ -121,8 +121,8 @@ std::shared_ptr<data::Wavefunction> GaugeFixingLocalizer::_run_impl(
   }
 
   // Blocks partition the whole active space, but only wholly selected ones may
-  // be rotated: anchoring a block whose members straddle the selection
-  // boundary would change the selected subspace, and so the energy.
+  // be rotated: selecting only part of a degenerate block would make the
+  // chosen gauge depend on the arbitrary input orientation.
   std::vector<size_t> occupation_order(active_indices.size());
   std::iota(occupation_order.begin(), occupation_order.end(), size_t{0});
   std::stable_sort(occupation_order.begin(), occupation_order.end(),
@@ -377,10 +377,8 @@ std::shared_ptr<data::Wavefunction> GaugeFixingLocalizer::_run_impl(
             const double cosine = std::cos(angle);
             const double sine = std::sin(angle);
             Eigen::MatrixXd candidate = active_rotation;
-            candidate.col(left) = cosine * active_rotation.col(left) +
-                                  sine * active_rotation.col(right);
-            candidate.col(right) = cosine * active_rotation.col(right) -
-                                   sine * active_rotation.col(left);
+            blas::rot(num_active, candidate.col(left).data(), 1,
+                      candidate.col(right).data(), 1, cosine, sine);
             return coefficient_norm(candidate);
           };
 
@@ -414,12 +412,8 @@ std::shared_ptr<data::Wavefunction> GaugeFixingLocalizer::_run_impl(
             current_norm = plane_norm(canonical_angle);
             const double cosine = std::cos(canonical_angle);
             const double sine = std::sin(canonical_angle);
-            const Eigen::VectorXd left_column = active_rotation.col(left);
-            const Eigen::VectorXd right_column = active_rotation.col(right);
-            active_rotation.col(left) =
-                cosine * left_column + sine * right_column;
-            active_rotation.col(right) =
-                cosine * right_column - sine * left_column;
+            blas::rot(num_active, active_rotation.col(left).data(), 1,
+                      active_rotation.col(right).data(), 1, cosine, sine);
           }
         }
       }
@@ -431,7 +425,8 @@ std::shared_ptr<data::Wavefunction> GaugeFixingLocalizer::_run_impl(
   }
 
   QDK_LOGGER().info(
-      "Gauge fixing changed the mapped coefficient norm from {} to {} Hartree",
+      "Coordinate-descent sweeps changed the post-anchoring mapped "
+      "coefficient norm from {} to {} Hartree",
       norm_before, current_norm);
 
   Eigen::MatrixXd anchored_active(coefficients.rows(), num_active);

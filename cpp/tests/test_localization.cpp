@@ -1899,6 +1899,22 @@ TEST_F(LocalizationTest, GaugeFixingScalarRefinementTerminatesBelowSpacing) {
   EXPECT_LT(value, 1e-15);
 }
 
+TEST_F(LocalizationTest, GaugeFixingScalarRefinementRejectsNonFiniteInputs) {
+  const auto objective = [](double x) { return x * x; };
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  const double infinity = std::numeric_limits<double>::infinity();
+
+  EXPECT_THROW(
+      qdk::chemistry::utils::golden_section_minimum(objective, nan, 1.0),
+      std::invalid_argument);
+  EXPECT_THROW(
+      qdk::chemistry::utils::golden_section_minimum(objective, -1.0, infinity),
+      std::invalid_argument);
+  EXPECT_THROW(
+      qdk::chemistry::utils::golden_section_minimum(objective, -1.0, 1.0, nan),
+      std::invalid_argument);
+}
+
 TEST_F(LocalizationTest, GaugeFixingRotatedIntegralsMatchARebuiltHamiltonian) {
   // The sweep rotates the active-space integrals instead of rebuilding the
   // Hamiltonian for every candidate. That is only valid if both routes give
@@ -2274,6 +2290,12 @@ TEST_F(LocalizationTest, GaugeFixingBoundsBlockSpreadByDegeneracyTolerance) {
       rotation.transpose() * chained_rdm * rotation;
   EXPECT_LE((rotated_rdm - chained_rdm).cwiseAbs().maxCoeff(),
             degeneracy_tolerance);
+
+  const Eigen::MatrixXd returned_rdm =
+      std::get<Eigen::MatrixXd>(gauge_fixed->get_active_one_rdm_spin_traced());
+  EXPECT_TRUE(returned_rdm.isApprox(rotated_rdm, testing::rdm_tolerance));
+  EXPECT_GT((returned_rdm - chained_rdm).cwiseAbs().maxCoeff(),
+            testing::rdm_tolerance);
 }
 
 static void expect_active_space_qio_entropy_helper_matches_wavefunction(

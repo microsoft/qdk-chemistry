@@ -32,7 +32,7 @@ class GaugeFixingLocalizerSettings : public data::Settings {
         data::BoundConstraint<int64_t>{4, std::numeric_limits<int64_t>::max()});
     set_default(
         "max_sweeps", 3,
-        "Maximum number of deterministic passes over all rotation planes",
+        "Maximum coordinate-descent passes; 0 applies AO anchoring only",
         data::BoundConstraint<int64_t>{0, std::numeric_limits<int64_t>::max()});
     set_default("improvement_tolerance", 1e-10,
                 "Minimum coefficient-norm reduction, in Hartree, required to "
@@ -49,8 +49,8 @@ class GaugeFixingLocalizerSettings : public data::Settings {
  * space leaves the exact CASCI energy unchanged, yet it yields a different
  * qubit Hamiltonian after mapping. Restricting the rotations to
  * occupation-degenerate blocks additionally keeps the spin-traced 1-RDM
- * diagonal with the same occupations, so the returned orbitals remain natural
- * orbitals and the input 1-RDM stays truthful for them. This localizer
+ * diagonal up to @c degeneracy_tolerance while preserving its occupation
+ * spectrum. This localizer
  * resolves that freedom deterministically: it anchors every selected
  * degenerate block to the atomic-orbital basis, then runs coordinate-descent
  * sweeps over Givens plane rotations within each block, accepting only
@@ -58,10 +58,10 @@ class GaugeFixingLocalizerSettings : public data::Settings {
  * the active-space Hamiltonian.
  *
  * Because the rotations stay inside degenerate blocks, the returned orbitals
- * remain natural orbitals; their occupations are unchanged and are carried on
- * the returned wavefunction. Choosing a gauge is a separate objective from
- * finding the natural orbitals, so the two are composed rather than combined:
- * run @ref NaturalOrbitalLocalizer first.
+ * remain natural up to @c degeneracy_tolerance; their occupation spectrum is
+ * unchanged and is carried on the returned wavefunction. Choosing a gauge is a
+ * separate objective from finding the natural orbitals, so the two are
+ * composed rather than combined: run @ref NaturalOrbitalLocalizer first.
  */
 class GaugeFixingLocalizer : public Localizer {
  public:

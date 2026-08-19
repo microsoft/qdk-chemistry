@@ -347,10 +347,10 @@ QDK gauge-fixing orbital localizer.
 
 Orbitals with equal occupation numbers span a well-defined subspace without
 being uniquely determined within it. This class resolves that freedom
-deterministically, choosing the orientation that minimizes the mapped
-Hamiltonian coefficient 1-norm ``lambda = sum_l |h_l|``, which sets the
-evolution time in phase estimation and the normalization of a
-linear-combination-of-unitaries block encoding.
+deterministically, using bounded coordinate-descent sweeps to reduce the mapped
+Hamiltonian coefficient 1-norm ``lambda = sum_l |h_l|``, which sets the evolution
+time in phase estimation and the normalization of a linear-combination-of-unitaries
+block encoding.
 
 .. note::
     Requires restricted orbitals, an active space, an overlap matrix, and a

@@ -92,8 +92,8 @@ class TestGaugeFixingLocalizerBindings:
         energy_after, _ = casci_solver.run(hamiltonian_constructor.run(gauge_fixed.get_orbitals()), num_alpha, num_beta)
         assert energy_after == pytest.approx(energy_before, abs=1e-9)
         np.testing.assert_allclose(
-            np.diag(np.asarray(gauge_fixed.get_active_one_rdm_spin_traced())),
-            np.diag(np.asarray(natural.get_active_one_rdm_spin_traced())),
+            np.linalg.eigvalsh(np.asarray(gauge_fixed.get_active_one_rdm_spin_traced())),
+            np.linalg.eigvalsh(np.asarray(natural.get_active_one_rdm_spin_traced())),
             atol=1e-12,
         )
 

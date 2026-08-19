@@ -193,8 +193,8 @@ QDK Gauge Fixing
 Natural orbitals with equal occupation numbers span a well-defined subspace but do not have unique orbital vectors.
 Any orthogonal rotation within the active space leaves the exact :term:`CASCI` energy unchanged, yet it produces a
 different qubit Hamiltonian after mapping.
-Restricting the rotations to occupation-degenerate blocks additionally keeps the active-space 1-RDM diagonal with the
-same occupation numbers, so the returned orbitals remain natural orbitals.
+Restricting the rotations to occupation-degenerate blocks additionally keeps the active-space 1-RDM diagonal up to
+``degeneracy_tolerance`` while preserving its occupation spectrum.
 This localizer resolves that freedom deterministically: it first anchors every degenerate block to the atomic-orbital
 basis, then runs coordinate-descent sweeps over Givens plane rotations inside each block, accepting only rotations
 that reduce the mapped coefficient norm :math:`\lambda = \sum_\ell |h_\ell|` of the active-space Hamiltonian.
@@ -211,9 +211,12 @@ Choosing a gauge is a separate objective from finding the natural orbitals, so t
 combined: run :ref:`QDK Natural Orbitals <localizer-qdk-natural-orbitals>` first and pass its result here.
 The input orbitals must be restricted and must diagonalize the active-space 1-RDM.
 The selected indices must be a subset of the active-space indices, and they may not split a degenerate block, because
-rotating a partly selected block would change the selected subspace and therefore the energy.
+selecting only part of a degenerate block would make the chosen gauge depend on the arbitrary input orientation.
 Selecting a proper subset restricts which blocks are anchored and swept; :math:`\lambda` is always measured over the
 full active space, and the returned wavefunction carries the input active space unchanged.
+
+AO anchoring canonicalizes the gauge before optimization and may not decrease :math:`\lambda` relative to the input
+orientation.
 
 .. note::
    Each objective evaluation performs an integral transformation and a qubit mapping, so the cost grows with the
@@ -244,7 +247,7 @@ full active space, and the returned wavefunction carries the input active space 
    * - ``max_sweeps``
      - int
      - ``3``
-     - Maximum number of deterministic passes over all rotation planes
+       - Maximum coordinate-descent passes; ``0`` applies AO anchoring only
    * - ``improvement_tolerance``
      - float
      - ``1e-10``

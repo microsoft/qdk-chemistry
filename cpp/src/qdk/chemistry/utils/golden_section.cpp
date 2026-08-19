@@ -14,11 +14,14 @@ std::pair<double, double> golden_section_minimum(
     const std::function<double(double)>& objective, double lower_bound,
     double upper_bound, double argument_tolerance) {
   QDK_LOG_TRACE_ENTERING();
-  if (upper_bound <= lower_bound) {
-    throw std::invalid_argument("upper_bound must be greater than lower_bound");
+  if (!std::isfinite(lower_bound) || !std::isfinite(upper_bound) ||
+      upper_bound <= lower_bound) {
+    throw std::invalid_argument(
+        "bounds must be finite and upper_bound must exceed lower_bound");
   }
-  if (argument_tolerance <= 0.0) {
-    throw std::invalid_argument("argument_tolerance must be positive");
+  if (!std::isfinite(argument_tolerance) || argument_tolerance <= 0.0) {
+    throw std::invalid_argument(
+        "argument_tolerance must be finite and positive");
   }
 
   const double inverse_golden_ratio = (std::sqrt(5.0) - 1.0) / 2.0;

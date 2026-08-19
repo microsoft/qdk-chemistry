@@ -18,8 +18,8 @@ namespace qdk::chemistry::utils {
  * @param argument_tolerance Maximum final interval width.
  * @return The best sampled argument and its objective value.
  *
- * @throws std::invalid_argument if the interval or the tolerance is not
- * positive.
+ * @throws std::invalid_argument if the bounds or tolerance are not finite, the
+ * interval is not ordered, or the tolerance is not positive.
  *
  * @note Golden-section contraction is used rather than a Brent-style
  * minimizer because an objective built from absolute values has minima at
