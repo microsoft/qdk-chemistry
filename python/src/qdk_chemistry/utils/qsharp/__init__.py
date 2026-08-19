@@ -30,6 +30,7 @@ _SOURCE_ROOT = Path(__file__).parent / "src"
 #: Q# sources that are supported by ``TargetProfile.Base``.
 _BASE_PROFILE_FILES = (
     "StatePreparation.qs",
+    "BinaryEncoding.qs",
     "CircuitComposition.qs",
     "IterativePhaseEstimation.qs",
     "StandardPhaseEstimation.qs",
