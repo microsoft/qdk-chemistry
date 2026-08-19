@@ -203,6 +203,13 @@ $gauxcSrc = "$buildDir\gauxc-src"
 git clone https://github.com/wavefunction91/gauxc.git $gauxcSrc
 git -C $gauxcSrc checkout $gauxcCommit
 
+if ($isClangCl) {
+    Write-Host "Applying GauXC clang-cl compatibility patch..."
+    Push-Location $gauxcSrc
+    try   { cmake -P "$SrcDir\cpp\cmake\patches\gauxc-clang-cl-gau2grid-stdlib.cmake" }
+    finally { Pop-Location }
+}
+
 Invoke-CMakeDep 'gauxc' $gauxcSrc @(
     '-DBUILD_TESTING=OFF',
     '-DEXCHCXX_ENABLE_LIBXC=OFF',

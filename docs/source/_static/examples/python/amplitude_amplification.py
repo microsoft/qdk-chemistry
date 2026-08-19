@@ -21,76 +21,69 @@ amplitude_amplification = create("amplitude_amplification", "qdk_base", rounds=2
 import math
 
 import numpy as np
-from qdk_chemistry.algorithms import create, phase_marking_oracle
-from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
-from qdk_chemistry.data.circuit import QsharpFactoryData
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import (
+    AlgorithmRef,
+    Configuration,
+    ModelOrbitals,
+    QubitOperator,
+    StateVectorContainer,
+    Wavefunction,
+)
 
-# 1. A two-qubit Hamiltonian
+# 1. A two-qubit Hamiltonian. Its spectrum is {+lambda, 0, 0, -lambda}, with |11> on top.
 qubit_hamiltonian = QubitOperator(
-    pauli_strings=["ZI", "IZ"], coefficients=np.array([math.pi / 4.0, math.pi / 4.0])
+    pauli_strings=["ZI", "IZ"], coefficients=np.array([-math.pi / 4.0, -math.pi / 4.0])
 )
 
-# 2. A guiding state with 0.3 amplitude on the target eigenvector |11>
-state_vector = [0.0, 0.0, 0.0, 0.0]
-state_vector[3] = 0.3
-state_vector[0] = math.sqrt(1.0 - 0.3**2)
-prep_parameters = {
-    "rowMap": [1, 0],
-    "stateVector": state_vector,
-    "expansionOps": [],
-    "numQubits": 2,
-}
-state_preparation = Circuit(
-    qsharp_factory=QsharpFactoryData(
-        program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
-        parameter=prep_parameters,
+# 2. A guiding state with 0.3 amplitude on the target eigenvector |11>.
+amplitude = 0.3
+guiding_state = Wavefunction(
+    StateVectorContainer(
+        np.array([math.sqrt(1.0 - amplitude**2), amplitude]),
+        [Configuration.from_bitstring("00"), Configuration.from_bitstring("11")],
+        ModelOrbitals(2),
+    )
+)
+state_preparation = create("state_prep", "dense_pure_state").run(guiding_state)
+
+# 3. To mark the target state, a QPE is run on the prepared register, and a flag
+# is flipped when the QPE phase lands in the desired range. The bound is halfway
+# up the band, so |11> at +lambda is marked and the rest of the spectrum is not.
+good_state_oracle = create(
+    "amplitude_amplification_oracle",
+    "qdk_qpe_subspace",
+    energy_lower_bound=qubit_hamiltonian.schatten_norm / 2,
+    qpe_circuit_builder=AlgorithmRef(
+        "qpe_circuit_builder",
+        "qdk_standard",
+        num_bits=4,
+        unitary_builder=AlgorithmRef(
+            "hamiltonian_unitary_builder", "lcu", quantum_walk=True
+        ),
+        controlled_circuit_mapper=AlgorithmRef(
+            "controlled_circuit_mapper", "prepare_select_prepare"
+        ),
     ),
-    qsharp_op=QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(prep_parameters),
-)
+).run(qubit_hamiltonian)
 
-# 3. Build a measurement-free QPE circuit. This whole circuit is the preparation that
-# gets amplified, so the phase register and its ancillas stay inside the amplified
-# register and every round reflects about the full prepared state.
-num_bits = 4
-builder = create(
-    "qpe_circuit_builder",
-    "qdk_standard",
-    num_bits=num_bits,
-    controlled_circuit_mapper=AlgorithmRef(
-        "controlled_circuit_mapper", "prepare_select_prepare"
-    ),
-    unitary_builder=AlgorithmRef(
-        "hamiltonian_unitary_builder", "lcu", quantum_walk=True
-    ),
-    measure_phase=False,
-)
-state_prep_oracle = builder.run(
-    state_preparation=state_preparation, qubit_hamiltonian=qubit_hamiltonian
-)[0]
-
-# 4. Mark the phase bins holding the target eigenvalue. QPE writes the phase phi of
-# the eigenvalue exp(2 pi i phi) into bin round(phi * 2**num_bits), so the half-open
-# window (8, 9) accepts bin 8 alone, that is phi = 0.5.
-target_phase_bins = (8, 9)
-good_state_oracle = phase_marking_oracle(state_prep_oracle, target_phase_bins)
-
-# The same window can be named by energy instead. The walk maps E to
-# phi = arccos(E / lambda) / 2 pi, with lambda the L1 norm of the Hamiltonian, and
-# marks both signs of that phase. Here it selects bin 8 again.
-good_state_oracle = phase_marking_oracle(
-    state_prep_oracle,
-    target_energy_range=(-np.inf, -0.99 * qubit_hamiltonian.schatten_norm),
-    qubit_hamiltonian=qubit_hamiltonian,
-)
-
-# 5. Amplify, then execute
+# 4. Amplify the initial state against the qpe subspace marking oracle.
 amplitude_amplification = create("amplitude_amplification", "qdk_base", rounds=2)
-circuit = amplitude_amplification.run(state_prep_oracle, good_state_oracle)
+circuit = amplitude_amplification.run(state_preparation, good_state_oracle)
 
+# 5. Run the circuit and measure. Rounds 0 and 2 side by side show what the
+# amplification bought: |11> starts at the 9% the guiding state gives it and ends
+# up dominating the shots, matching sin^2((2k+1) arcsin(0.3)).
 executor = create("circuit_executor", "qdk_sparse_state_simulator")
 shots = 400
 counts = executor.run(circuit, shots=shots).bitstring_counts
+
+unamplified = create("amplitude_amplification", "qdk_base", rounds=0).run(
+    state_preparation, good_state_oracle
+)
+before = executor.run(unamplified, shots=shots).bitstring_counts
+print(f"rounds=0: |11> in {before.get('11', 0) / shots:.0%} of shots, {before}")
+print(f"rounds=2: |11> in {counts.get('11', 0) / shots:.0%} of shots, {counts}")
 
 # end-cell-run
 ################################################################################
