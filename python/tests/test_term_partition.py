@@ -16,6 +16,7 @@ from qdk_chemistry.data import (
     LatticeGraph,
     LayeredPartition,
     QubitOperator,
+    TaperingSpecification,
     TermPartition,
 )
 from qdk_chemistry.plugins.networkx import QDK_CHEMISTRY_HAS_NETWORKX
@@ -158,7 +159,31 @@ class TestTermGrouperRegistry:
         qh = QubitOperator(["XX", "YY", "ZZ"], np.array([1.0, 2.0, 3.0]))
         out = registry.create("term_grouper", "identity").run(qh)
         assert out.term_partition.num_groups == len(qh.pauli_strings)
-        assert all(len(g) == 1 for g in out.term_partition.groups)
+
+    @pytest.mark.parametrize("strategy", ["commuting", "qubit_wise_commuting", "identity", "qubit_flip"])
+    def test_operator_metadata_survives_grouping(self, strategy):
+        """Grouping touches neither the qubits nor the mapped sector, so metadata must carry over."""
+        qh = QubitOperator(
+            ["XX", "YY", "ZZ"],
+            np.array([1.0, 2.0, 3.0]),
+            encoding="jordan-wigner",
+            fermion_mode_order="blocked",
+        )
+        out = registry.create("term_grouper", strategy).run(qh)
+
+        assert out.encoding == qh.encoding
+        assert out.fermion_mode_order == qh.fermion_mode_order
+
+    def test_qubit_flip_preserves_tapering(self):
+        """Grouping changes neither the qubits nor the mapped sector."""
+        qh = QubitOperator(
+            ["XX", "YY", "ZZ"],
+            np.array([1.0, 2.0, 3.0]),
+            tapering=TaperingSpecification(qubit_indices=(3, 1), eigenvalues=(1, -1)),
+        )
+        out = registry.create("term_grouper", "qubit_flip").run(qh)
+
+        assert out.tapering == qh.tapering
 
     def test_commuting_groups_globally_commute(self):
         # XX and YY commute (XY * YX = -ZZ * -ZZ = ZZ^2 = I; and YX * XY = ZZ),
@@ -201,6 +226,12 @@ class TestQubitFlipTermGrouper:
         out = registry.create("term_grouper", "qubit_flip").run(qh)
         assert out.term_partition.num_groups == 2
 
+    def test_same_support_with_odd_y_parity_is_separated(self):
+        """X and Y flip the same qubit but anticommute, so they cannot share a group."""
+        qh = QubitOperator(["IX", "IY"], np.array([1.0, 1.0]))
+        out = registry.create("term_grouper", "qubit_flip").run(qh)
+        assert out.term_partition.num_groups == 2
+
     def test_each_group_annihilates_the_zero_state(self):
         """Every group of a |0...0>-annihilating operator annihilates it too."""
         qh = QubitOperator(
@@ -218,7 +249,7 @@ class TestQubitFlipTermGrouper:
             assert abs(amplitude) < 1e-12
 
     def test_group_members_pairwise_commute_for_chemistry_terms(self):
-        """Members of a group flip the same qubits, so their Z parts differ evenly."""
+        """Members of a group flip the same qubits with the same Y parity, hence commute."""
         qh = QubitOperator(
             ["XXXX", "YYXX", "XXYY", "YYYY", "XYXY", "YXYX"],
             np.array([0.25, 0.25, 0.25, -0.25, 0.25, 0.25]),

@@ -17,9 +17,9 @@ except ImportError:
 from qdk_chemistry.algorithms import registry
 from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_swap_pauli_sequence_mapper import (
     ControlledSwapPauliSequenceMapper,
-    _is_vacuum_preserving,
+    _vacuum_eigenphase,
 )
-from qdk_chemistry.data import QubitOperator
+from qdk_chemistry.data import LatticeGraph, QubitOperator
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
@@ -27,11 +27,13 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
     PauliProductFormulaContainer,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
+from qdk_chemistry.utils.model_hamiltonians import create_ising_hamiltonian
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
 if QDK_CHEMISTRY_HAS_QISKIT:
-    from qiskit.quantum_info import Operator
+    from qiskit import QuantumCircuit
+    from qiskit.quantum_info import Operator, Statevector
 
 
 #: Qubit index used as the control in every mapper built by these tests.
@@ -94,14 +96,16 @@ def evolve_vacuum(ordering, time_step):
     return build_product_formula_matrix(terms, num_qubits=2) @ vacuum
 
 
+def controlled_unitary(u):
+    """Build the two-qubit control-one controlled-U, control being the most significant qubit."""
+    p_0 = np.array([[1, 0], [0, 0]], dtype=complex)
+    p_1 = np.array([[0, 0], [0, 1]], dtype=complex)
+    return np.kron(p_0, np.eye(4, dtype=complex)) + np.kron(p_1, u)
+
+
 @pytest.fixture
 def diagonal_ppf_container():
-    """Create a diagonal (Z/I-only) PauliProductFormulaContainer for testing.
-
-    Using only Z/I terms guarantees that the all-zero vacuum register is an
-    eigenstate of the evolution, so the CSWAP sandwich does not leak amplitude
-    out of the vacuum codespace and the effective operator is unitary.
-    """
+    """Diagonal (Z/I-only) product formula: the vacuum stays an eigenstate and picks up a phase."""
     terms = [
         ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.3),
         ExponentiatedPauliTerm(pauli_term={1: "Z"}, angle=0.7),
@@ -200,28 +204,13 @@ class TestControlledSwapPauliSequenceMapper:
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
     def test_cswap_sandwich_controlled_u_matrix(self, cswap_mapper, unitary_rep, diagonal_ppf_container):
-        r"""Validate the CSWAP-sandwich construction as a controlled-U matrix check.
+        r"""The sandwich equals :math:`C\text{-}U` on the codespace where the vacuum register stays :math:`|0\rangle`.
 
-        The CSWAP sandwich does not equal :math:`C\text{-}U` on the full
-        ancilla+system+vacuum Hilbert space. It equals a controlled-U only on the
-        codespace where the vacuum register stays in :math:`|0\ldots0\rangle`.
-        Because the *uncontrolled* evolution is applied to the vacuum register, the
-        target eigenphase lands on the :math:`|1\rangle` control branch (the
-        standard controlled-U convention). The effective operator on the codespace
-        (with control as the most-significant qubit) is
-
-        .. math::
-            M_{\mathrm{eff}} = e^{i\phi_0}\,|0\rangle\langle0| \otimes I
-                             + |1\rangle\langle1| \otimes U,
-
-        where :math:`e^{i\phi_0}` is the phase the evolution imprints on the vacuum
-        state :math:`U|0\ldots0\rangle = e^{i\phi_0}|0\ldots0\rangle`. It reduces to
-        the textbook :math:`C\text{-}U` exactly when :math:`\phi_0 = 0`.
-
-        This test builds the full circuit unitary, extracts the vacuum
-        :math:`|0\rangle \to |0\rangle` block, confirms it is unitary (i.e. no
-        amplitude leaks out of the codespace), and compares it to
-        :math:`M_{\mathrm{eff}}`.
+        The evolution runs *uncontrolled* on the vacuum register, so the eigenphase lands on the
+        :math:`|1\rangle` control branch, and the vacuum's own phase
+        :math:`U|0\ldots0\rangle = e^{i\phi_0}|0\ldots0\rangle` is cancelled by the mapper's
+        :math:`R_1(\phi_0)`. The codespace block must therefore be unitary (no leakage) and equal
+        the textbook :math:`C\text{-}U` up to a global phase.
         """
         circuit = cswap_mapper.run(unitary_rep)
 
@@ -244,14 +233,9 @@ class TestControlledSwapPauliSequenceMapper:
         z_1 = np.kron(pauli_z, identity)
         u = scipy.linalg.expm(-1j * angle_z1 * z_1) @ scipy.linalg.expm(-1j * angle_z0 * z_0)
 
-        # Vacuum phase e^{i phi0} = <0|U|0>.
-        vacuum_phase = u[0, 0]
-
-        # Control-one effective operator: e^{i phi0} I on the |0> branch, U on the |1> branch.
-        p_0 = np.array([[1, 0], [0, 0]], dtype=complex)
-        p_1 = np.array([[0, 0], [0, 1]], dtype=complex)
-        i_4 = np.eye(4, dtype=complex)
-        expected_matrix = vacuum_phase * np.kron(p_0, i_4) + np.kron(p_1, u)
+        # Vacuum phase e^{i phi0} = <0|U|0> is cancelled by the mapper's R1 on the control, so the
+        # codespace block is a textbook controlled-U up to a global phase.
+        expected_matrix = controlled_unitary(u)
 
         # No leakage: the codespace block must itself be unitary.
         assert np.allclose(
@@ -263,7 +247,50 @@ class TestControlledSwapPauliSequenceMapper:
 
         # The codespace block reproduces the expected controlled-U (control-one) operator.
         assert np.allclose(
-            block,
+            block / block[0, 0],
+            expected_matrix,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
+    def test_vacuum_phase_correction_preserves_the_eigenphase(self, cswap_mapper, make_two_qubit_rep):
+        r"""The kickback is the eigenphase of the system state, not the vacuum-shifted one.
+
+        For :math:`U = e^{-i 0.3 Z_0} e^{-i 0.7 Z_1}` the vacuum picks up :math:`\phi_0 = -1.0`
+        while :math:`|01\rangle` is an eigenstate with phase :math:`-0.4`. Without the correction
+        the control would register :math:`-0.4 - \phi_0 = +0.6`.
+        """
+        circuit = cswap_mapper.run(make_two_qubit_rep([({0: "Z"}, 0.3), ({1: "Z"}, 0.7)]))
+
+        prepared = QuantumCircuit(5)
+        prepared.x(0)  # system in |01>, an eigenstate of U
+        prepared.h(CONTROL_INDEX)
+        prepared.compose(circuit.get_qiskit_circuit(), inplace=True)
+
+        # Little-endian index bits q4 q3 q2 q1 q0: |01> with the control at 0 -> 1, at 1 -> 5.
+        amplitudes = Statevector(prepared).data
+        assert abs(amplitudes[1]) == pytest.approx(2**-0.5, abs=float_comparison_absolute_tolerance)
+        assert abs(amplitudes[5]) == pytest.approx(2**-0.5, abs=float_comparison_absolute_tolerance)
+        assert amplitudes[5] / amplitudes[1] == pytest.approx(np.exp(-0.4j), abs=float_comparison_absolute_tolerance)
+
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
+    def test_vacuum_phase_covers_every_repetition(self, cswap_mapper, diagonal_ppf_container):
+        """``step_reps`` copies of the step imprint ``step_reps`` times the phase."""
+        repetitions = 3
+        container = PauliProductFormulaContainer(
+            step_terms=diagonal_ppf_container.step_terms,
+            step_reps=repetitions,
+            num_qubits=2,
+        )
+        circuit = cswap_mapper.run(UnitaryRepresentation(container=container))
+
+        block = Operator(circuit.get_qiskit_circuit()).data[0:8, 0:8]
+        step = build_product_formula_matrix([(t.pauli_term, t.angle) for t in container.step_terms], 2)
+        expected_matrix = controlled_unitary(np.linalg.matrix_power(step, repetitions))
+
+        assert np.allclose(
+            block / block[0, 0],
             expected_matrix,
             atol=float_comparison_absolute_tolerance,
             rtol=float_comparison_relative_tolerance,
@@ -294,51 +321,71 @@ class TestVacuumPreservationValidation:
             cswap_mapper.run(make_two_qubit_rep([({0: "X"}, 0.3)]))
 
     def test_diagonal_evolution_is_accepted(self, cswap_mapper, unitary_rep):
-        """Pure I/Z evolutions never move the vacuum and are always valid."""
+        """Pure I/Z evolutions never move the vacuum, they only phase it."""
         circuit = cswap_mapper.run(unitary_rep)
         assert isinstance(circuit, Circuit)
 
+    def test_tolerance_setting_controls_acceptance(self, cswap_mapper, make_two_qubit_rep):
+        """``vacuum_preservation_tolerance`` decides how exactly the partners have to cancel."""
+        rep = make_two_qubit_rep([(XX, 0.5), (YY, 0.5 + 1e-7)])
+
+        with pytest.raises(ValueError, match="vacuum-preserving product formula"):
+            cswap_mapper.run(rep)
+
+        # Settings lock once an algorithm has run, so the loose tolerance needs a fresh mapper.
+        tolerant = ControlledSwapPauliSequenceMapper()
+        tolerant.settings().set("control_indices", [CONTROL_INDEX])
+        tolerant.settings().set("vacuum_preservation_tolerance", 1e-6)
+        assert isinstance(tolerant.run(rep), Circuit)
+
 
 class TestVacuumPreservingBlocks:
-    """Tests for the ``_is_vacuum_preserving`` helper."""
+    """Tests for the ``_vacuum_eigenphase`` helper."""
 
     def test_cancelling_partners_are_accepted(self):
         """Partners that cancel on the vacuum split into commuting blocks."""
         terms = [(XX, 0.5), (YY, 0.5), (Z0, -0.5), (IDENTITY, 0.5)]
-        assert _is_vacuum_preserving(terms, 1e-9)
+        assert _vacuum_eigenphase(terms, 1e-9) == pytest.approx(0.0)
 
     def test_non_commuting_block_is_rejected(self):
         """A block whose factors anticommute is not equal to the exponential of its sum."""
         terms = [(XX, 0.5), (Z0, -0.5), (YY, 0.5)]
-        assert not _is_vacuum_preserving(terms, 1e-9)
+        assert _vacuum_eigenphase(terms, 1e-9) is None
 
     def test_trailing_residual_is_rejected(self):
         """Amplitude left outside the vacuum at the end invalidates the sequence."""
-        assert not _is_vacuum_preserving([({0: "X"}, 0.3)], 1e-9)
+        assert _vacuum_eigenphase([({0: "X"}, 0.3)], 1e-9) is None
+
+    def test_diagonal_terms_set_the_eigenphase(self):
+        """Diagonal terms leave the vacuum in place and contribute -sum(angles) of phase."""
+        assert _vacuum_eigenphase([(Z0, 0.3), (IDENTITY, 0.2)], 1e-9) == pytest.approx(-0.5)
+
+    def test_tolerance_controls_amplitude_cancellation(self):
+        """Residual amplitude below ``atol`` counts as cancelled."""
+        terms = [(XX, 0.5), (YY, 0.5 + 1e-7)]
+        assert _vacuum_eigenphase(terms, 1e-9) is None
+        assert _vacuum_eigenphase(terms, 1e-6) == pytest.approx(0.0)
 
     def test_empty_sequence(self):
         """An empty product formula is trivially vacuum preserving."""
-        assert _is_vacuum_preserving([], 1e-9)
+        assert _vacuum_eigenphase([], 1e-9) == pytest.approx(0.0)
 
 
 class TestVacuumLeakageWithoutGrouping:
-    r"""Reproduce the worked example motivating the qubit-flip grouper.
+    r"""The worked example motivating the qubit-flip grouper.
 
     For the Jordan-Wigner image of
     :math:`H = a_0^\dagger a_1 + a_1^\dagger a_0 + a_0^\dagger a_0
     = \tfrac12 (XX + YY) + \tfrac12 (I - Z_0)`
-    we have :math:`H|00\rangle = 0`, so the exact :math:`e^{-iHt}` fixes the vacuum.
-    A single Trotter step at :math:`\Delta t = \pi/2` only reproduces that when the
-    ``XX``/``YY`` cancellation partners stay adjacent.
+    we have :math:`H|00\rangle = 0`, and a single Trotter step at :math:`\Delta t = \pi/2`
+    reproduces that only when the ``XX``/``YY`` cancellation partners stay adjacent.
     """
 
     def test_interleaved_ordering_leaks_half_the_vacuum(self):
         r"""``XX, Z0, YY, I`` sends :math:`|00\rangle` to a superposition with :math:`|11\rangle`.
 
-        The step yields :math:`\tfrac{1-i}{2}|00\rangle + \tfrac{-1+i}{2}|11\rangle`, so
-        :math:`|\langle 11|U|00\rangle|^2 = 1/2`. Inside the CSWAP sandwich that entangles
-        the vacuum register with the control, and the final ``ResetAll`` destroys the
-        control coherence.
+        Inside the sandwich that entangles the vacuum register with the control, and the final
+        ``ResetAll`` destroys the control coherence.
         """
         state = evolve_vacuum(INTERLEAVED_ORDERING, LEAKING_TIME_STEP)
 
@@ -382,12 +429,10 @@ class TestQubitFlipGroupingEndToEnd:
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
     def test_cswap_circuit_from_grouped_hamiltonian_is_a_controlled_unitary(self, cswap_mapper, qubit_flip_unitary):
-        r"""The CSWAP circuit built from the grouped Hamiltonian is a genuine controlled-:math:`U`.
+        r"""The pipeline ``qubit_flip`` -> ``trotter`` -> ``cswap_pauli_sequence`` yields a controlled-:math:`U`.
 
-        This is the pipeline a caller actually writes: ``qubit_flip`` grouper ->
-        ``trotter`` unitary builder -> ``cswap_pauli_sequence`` mapper. The circuit's
-        vacuum codespace block must be unitary (no leakage) and reproduce
-        :math:`e^{i\phi_0}|0\rangle\langle0| \otimes I + |1\rangle\langle1| \otimes U`.
+        The vacuum codespace block must be unitary (no leakage) and reproduce
+        :math:`|0\rangle\langle0| \otimes I + |1\rangle\langle1| \otimes U` up to a global phase.
         """
         container = qubit_flip_unitary.get_container()
         circuit = cswap_mapper.run(qubit_flip_unitary)
@@ -401,9 +446,7 @@ class TestQubitFlipGroupingEndToEnd:
         step = build_product_formula_matrix(terms, container.num_qubits)
         u = np.linalg.matrix_power(step, container.step_reps)
 
-        p_0 = np.array([[1, 0], [0, 0]], dtype=complex)
-        p_1 = np.array([[0, 0], [0, 1]], dtype=complex)
-        expected_matrix = u[0, 0] * np.kron(p_0, np.eye(4, dtype=complex)) + np.kron(p_1, u)
+        expected_matrix = controlled_unitary(u)
 
         assert np.allclose(
             block @ block.conj().T,
@@ -412,8 +455,19 @@ class TestQubitFlipGroupingEndToEnd:
             rtol=float_comparison_relative_tolerance,
         )
         assert np.allclose(
-            block,
+            block / block[0, 0],
             expected_matrix,
             atol=float_comparison_absolute_tolerance,
             rtol=float_comparison_relative_tolerance,
         )
+
+    def test_transverse_field_ising_is_rejected(self, cswap_mapper):
+        """A TFIM does not conserve particle number, so its evolution rotates the vacuum out."""
+        hamiltonian = create_ising_hamiltonian(LatticeGraph.chain(4, periodic=False), j=1.0, h=0.5)
+        grouped = registry.create("term_grouper", "qubit_flip").run(hamiltonian)
+
+        trotter = registry.create("hamiltonian_unitary_builder", "trotter")
+        trotter.settings().update({"order": 1, "num_divisions": 1, "time": END_TO_END_EVOLUTION_TIME})
+
+        with pytest.raises(ValueError, match="vacuum-preserving product formula"):
+            cswap_mapper.run(trotter.run(grouped))

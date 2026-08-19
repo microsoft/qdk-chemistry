@@ -20,25 +20,28 @@ __all__: list[str] = [
 ]
 
 
-def _is_vacuum_preserving(terms: list[tuple[dict[int, str], float]], atol: float) -> bool:
-    r"""Check whether an *ordered* product :math:`\prod_j e^{-i\theta_j P_j}` fixes :math:`|0\ldots0\rangle`.
+def _vacuum_eigenphase(terms: list[tuple[dict[int, str], float]], atol: float) -> float | None:
+    r"""Return the phase an *ordered* product :math:`\prod_j e^{-i\theta_j P_j}` imprints on the vacuum.
 
-    The product preserves the vacuum (up to a phase) when it splits into contiguous blocks in
-    which all Pauli strings pairwise commute -- so the block equals :math:`\exp(-i\sum_j \theta_j P_j)`
-    -- and whose generator :math:`\sum_j \theta_j P_j` maps the all-zero state onto a multiple of
-    itself, i.e. amplitudes cancel for every non-empty flipped-qubit set.  Blocks are cut as early
-    as possible: any coarser block contains a finer one and so inherits its non-commuting pairs.
+    That is :math:`\varphi_0` in
+    :math:`\prod_j e^{-i\theta_j P_j}|0\ldots0\rangle = e^{i\varphi_0}|0\ldots0\rangle`.
+    The vacuum stays an eigenstate when the product splits into contiguous blocks of pairwise
+    commuting strings, so each block equals :math:`\exp(-i\sum_j \theta_j P_j)`, whose
+    generator maps the all-zero state onto a multiple of itself, i.e. amplitudes cancel for every
+    non-empty flipped-qubit set.  Blocks are cut as early as possible, giving the finest valid
+    split.  The phase then comes from the diagonal (:math:`I`/:math:`Z`) terms alone.
 
     Args:
         terms: Ordered ``(pauli_map, angle)`` pairs, one per exponential factor.
         atol: Absolute tolerance used when testing amplitude cancellation.
 
     Returns:
-        ``True`` when such a split exists.
+        The imprinted phase, or ``None`` when the vacuum is not an eigenstate of the product.
 
     """
     block: list[tuple[int, int]] = []  # symplectic (X, Z) bit masks of the terms in the open block
     residual: dict[int, complex] = {}
+    diagonal = 0.0
 
     for pauli_map, angle in terms:
         x_mask = z_mask = 0
@@ -50,7 +53,7 @@ def _is_vacuum_preserving(terms: list[tuple[dict[int, str], float]], atol: float
 
         # Two Pauli strings commute iff they anticommute on an even number of qubits.
         if any(((x_mask & z) ^ (z_mask & x)).bit_count() % 2 for x, z in block):
-            return False
+            return None
         block.append((x_mask, z_mask))
 
         if x_mask:
@@ -58,11 +61,16 @@ def _is_vacuum_preserving(terms: list[tuple[dict[int, str], float]], atol: float
             residual[x_mask] = residual.get(x_mask, 0j) + angle * 1j ** (x_mask & z_mask).bit_count()
             if abs(residual[x_mask]) <= atol:
                 del residual[x_mask]
+        else:
+            # Diagonal strings act as +1 on |0...0>, so they contribute phase only.
+            diagonal += angle
 
         if not residual:
             block = []
 
-    return not block and not residual
+    if block or residual:
+        return None
+    return -diagonal
 
 
 class ControlledSwapPauliSequenceMapperSettings(ControlledCircuitMapperSettings):
@@ -93,36 +101,36 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
     controlled :math:`U(t)` without controlling every gate.  An internally allocated
     ``vacuum`` register (:math:`|0\ldots0\rangle`) is conditionally swapped with the system,
     the *uncontrolled* evolution runs on the vacuum (``step_reps`` times), and the swap is
-    uncomputed.  On the :math:`|0\rangle` branch the evolution hits the vacuum and the system
-    is untouched; on :math:`|1\rangle` the system is parked in the vacuum and evolved, so the
-    eigenphase accumulates on the :math:`|1\rangle` branch as usual.  The cost of controlling
-    every gate is traded for one layer of controlled-:math:`\mathrm{SWAP}`.
+    uncomputed.  The eigenphase accumulates on the :math:`|1\rangle` control branch, as with
+    a directly controlled evolution, for the cost of one layer of controlled-:math:`\mathrm{SWAP}`.
 
-    **Hamiltonian restriction.** Exact **only if** :math:`U|0\ldots0\rangle = \lambda|0\ldots0\rangle`
-    with :math:`|\lambda| = 1`; otherwise the vacuum leaks, the control decoheres, and the phase
-    is lost.  The :math:`|0\rangle` branch picks up a residual phase
-    :math:`\varphi_0 = \arg\lambda = -E_0 t`, where
-    :math:`E_0 = \langle 0\ldots0|H|0\ldots0\rangle`.  All fermion-to-qubit mappers supported
-    here exclude the core energy, so :math:`E_0 = 0` and that phase vanishes.
+    **Vacuum phase.** The :math:`|0\rangle` branch acquires
+    :math:`U|0\ldots0\rangle = e^{i\varphi_0}|0\ldots0\rangle` with :math:`\varphi_0 = -E_0 t`
+    and :math:`E_0 = \langle 0\ldots0|H|0\ldots0\rangle`.  Only the diagonal (:math:`I`/:math:`Z`)
+    terms of the product formula contribute, so :math:`\varphi_0` is known classically and is
+    cancelled by an :math:`R_1(\varphi_0)` on the control.  The circuit is then a genuine
+    :math:`C\text{-}U` up to a global phase for any :math:`E_0`, sector-tapered encodings included.
 
-    **Grouping requirement.** Each fermionic term annihilates the vacuum, but its individual
-    Pauli strings cannot (they are unitary) — only their weighted sum does.  A Trotterised
-    :math:`U` therefore fixes the vacuum only when strings from the same fermionic term are
-    exponentiated as one contiguous, mutually commuting block:
+    **Grouping requirement.** The vacuum must stay an eigenstate, which is what particle
+    conservation buys: :math:`H` cannot connect :math:`|0\ldots0\rangle` to any other occupation
+    number.  Leaked amplitude entangles the vacuum register with the control, and the final reset
+    destroys the control coherence.  A fermionic term annihilates the vacuum only through the
+    weighted sum of its Pauli strings, so a Trotterised :math:`U` preserves the vacuum only when
+    those strings are exponentiated as one contiguous, mutually commuting block:
 
     .. math::
 
         U|0\ldots0\rangle = e^{-it\sum_i P_i}|0\ldots0\rangle
         \approx \prod_i e^{-it P_i}|0\ldots0\rangle = |0\ldots0\rangle .
 
-    Building the product formula from a Hamiltonian grouped with the ``qubit_flip`` term
-    grouper (:class:`~qdk_chemistry.algorithms.term_grouper.QubitFlipTermGrouper`) guarantees
-    this.  The incoming formula is validated and rejected when the ordering is not vacuum
-    preserving, since the sandwich would otherwise return a silently decohered result.
-    Interleaving cancellation partners — say ``XX, Z0, YY, I`` for
-    :math:`H = \tfrac12(XX + YY) + \tfrac12(I - Z_0)` — leaks half the vacuum amplitude.
+    Grouping the Hamiltonian with the ``qubit_flip`` term grouper
+    (:class:`~qdk_chemistry.algorithms.term_grouper.QubitFlipTermGrouper`) produces that ordering.
+    The incoming formula is validated and rejected otherwise; interleaving cancellation partners,
+    say ``XX, Z0, YY, I`` for :math:`H = \tfrac12(XX + YY) + \tfrac12(I - Z_0)`, leaks half the
+    vacuum amplitude.
 
     Notes:
+        * Applies to particle-conserving Hamiltonians.
         * Currently supports only single-control-qubit scenarios.
         * Requires a ``PauliProductFormulaContainer`` for the time evolution unitary.
         * The vacuum register is allocated internally by the Q# operation.
@@ -166,7 +174,7 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
                 "ControlledSwapPauliSequenceMapper only supports PauliProductFormula container for the unitary."
             )
 
-        self._validate_vacuum_preserving(unitary_container)
+        vacuum_phase = self._vacuum_phase(unitary_container)
 
         control_indices = self._get_control_indices()
         if len(control_indices) != 1:
@@ -187,6 +195,7 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
             pauliExponents=pauli_terms,
             pauliCoefficients=angles,
             repetitions=unitary_container.step_reps,
+            vacuumPhase=vacuum_phase,
             control=control_indices[0],
             systems=target_indices,
         )
@@ -202,30 +211,31 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=controlled_unitary_op)
 
-    def _validate_vacuum_preserving(self, container: PauliProductFormulaContainer) -> None:
-        r"""Check that the product formula leaves the vacuum invariant.
+    def _vacuum_phase(self, container: PauliProductFormulaContainer) -> float:
+        r"""Return the phase the repeated evolution imprints on the vacuum register.
 
-        The sandwich evolves an internally allocated vacuum register and resets it at
-        the end.  If the evolution moves amplitude out of :math:`|0\ldots0\rangle`, the
-        vacuum stays entangled with the control and the reset destroys the control
-        coherence, silently corrupting the phase.  Safe when the terms split into
-        contiguous, mutually commuting blocks whose generators map the vacuum onto a
-        multiple of itself.
+        The vacuum must remain an eigenstate: leaked amplitude entangles the vacuum register
+        with the control, and the final reset then destroys the control coherence.
 
         Args:
             container: The Pauli product formula to validate.
 
+        Returns:
+            The phase accumulated over all ``step_reps`` repetitions.
+
         Raises:
-            ValueError: If no such split exists.
+            ValueError: If the vacuum is not an eigenstate of the product formula.
 
         """
         terms = [(term.pauli_term, term.angle) for term in container.step_terms]
-        if not _is_vacuum_preserving(terms, self._settings.get("vacuum_preservation_tolerance")):
+        phase = _vacuum_eigenphase(terms, self._settings.get("vacuum_preservation_tolerance"))
+        if phase is None:
             raise ValueError(
                 "ControlledSwapPauliSequenceMapper requires a vacuum-preserving product formula: the "
                 "Pauli terms could not be split into contiguous, mutually commuting blocks that leave "
                 "|0...0> invariant, so the CSWAP sandwich would leak the vacuum and decohere the control. "
-                "Group the Hamiltonian with the 'qubit_flip' term grouper before building the "
-                "unitary, e.g. "
+                "The mapper applies to particle-conserving Hamiltonians; group such a Hamiltonian with "
+                "the 'qubit_flip' term grouper before building the unitary, e.g. "
                 "registry.create('term_grouper', 'qubit_flip').run(qubit_hamiltonian)."
             )
+        return container.step_reps * phase

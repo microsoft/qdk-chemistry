@@ -107,22 +107,28 @@ This mapper avoids controlling every gate. It allocates an internal *vacuum* reg
 When the control is :math:`|0\rangle` the evolution hits the vacuum and the system is untouched;
 when it is :math:`|1\rangle` the system is parked in the vacuum register and evolved.
 A single layer of controlled-:math:`\mathrm{SWAP}` gates thus replaces a fully controlled circuit.
+This mapper applies to **particle-conserving** Hamiltonians only. It relies on
+:math:`|0\ldots0\rangle` staying in its own particle-number sector.
+
+The :math:`|0\rangle` branch picks up :math:`U|0\ldots0\rangle = e^{i\varphi_0}|0\ldots0\rangle`
+with :math:`\varphi_0 = -E_0 t` and :math:`E_0 = \langle 0\ldots0|H|0\ldots0\rangle`.
+Only the diagonal (:math:`I`/:math:`Z`) terms of the product formula phase the vacuum, so
+:math:`\varphi_0` is known classically. The mapper cancels it with a phase gate
+:math:`R_1(\varphi_0) = \mathrm{diag}(1, e^{i\varphi_0})` on the control, giving a genuine
+controlled-:math:`U` up to a global phase for any :math:`E_0`.
 
 .. rubric:: Why grouping is required
 
-The construction is exact **only if** the vacuum is an eigenstate of the evolution,
-:math:`U|0\ldots0\rangle = \lambda|0\ldots0\rangle`.
-Otherwise the vacuum register stays entangled with the control, and resetting it at the end
-destroys the control coherence — the phase the algorithm is trying to measure is silently lost.
+The vacuum must remain an eigenstate of the evolution, which is exactly what particle
+conservation buys: :math:`H` cannot connect :math:`|0\ldots0\rangle` to any other occupation
+number. Leaked amplitude entangles the vacuum
+register with the control, and resetting it at the end destroys the control coherence — the
+phase the algorithm is trying to measure is lost.
 
-For a molecular Hamiltonian this looks automatic: every fermionic term
-(:math:`a_p^\dagger a_q` and :math:`a_p^\dagger a_r^\dagger a_s a_q`) annihilates the vacuum, so
-:math:`H|0\ldots0\rangle = 0` once the core energy is excluded, as all supported
-:doc:`qubit mappers <qubit_mapper>` do.
-It is *not* automatic after Trotterization. A single Pauli string is unitary and can never
-annihilate a state — only the weighted **sum** of the strings coming from one fermionic term
-cancels. So the cancellation survives Trotterization only when those strings are exponentiated
-as one contiguous block:
+For a molecular Hamiltonian every fermionic term (:math:`a_p^\dagger a_q` and
+:math:`a_p^\dagger a_r^\dagger a_s a_q`) annihilates the vacuum. A single Pauli string is unitary
+and cannot, so the cancellation survives Trotterization only when the strings coming from one
+fermionic term are exponentiated as one contiguous block:
 
 .. math::
 
@@ -130,14 +136,11 @@ as one contiguous block:
    \approx \prod_i e^{-it P_i}|0\ldots0\rangle = |0\ldots0\rangle .
 
 The :ref:`qubit-flip term grouper <algorithms-term-grouper>` (factory name ``"qubit_flip"``)
-produces exactly that ordering.
-A Pauli factor *flips* a qubit when it exchanges :math:`|0\rangle` and :math:`|1\rangle`, which
-:math:`X` and :math:`Y` do and :math:`I` and :math:`Z` do not.
-The grouper puts two terms in the same group exactly when they carry :math:`X`/:math:`Y` on the
-same qubits, so terms sharing a flipped-qubit set — precisely the ones whose amplitudes can
-cancel on the vacuum — are exponentiated as one block.
-Their :math:`Z` parts then differ by even-size subsets of the shared flip set, so group members
-also pairwise commute and each group can be exponentiated term by term.
+produces that ordering. A Pauli factor *flips* a qubit when it exchanges :math:`|0\rangle` and
+:math:`|1\rangle`, which :math:`X` and :math:`Y` do and :math:`I` and :math:`Z` do not.
+Terms carrying :math:`X`/:math:`Y` on the same qubits with the same :math:`Y`-count parity form a
+group: the shared flip set is what lets their amplitudes cancel on the vacuum, and equal parity
+makes the group members commute, so each group can be exponentiated term by term.
 
 The mapper validates its input product formula and raises a :class:`ValueError` when the
 ordering is not vacuum preserving, rather than returning a wrong result.

@@ -3,9 +3,7 @@ r"""Qubit-flip term grouper: group Pauli terms that flip the same qubits.
 The **flipped-qubit set** of a Pauli string is the set of positions carrying
 :math:`X` or :math:`Y` (its :math:`XY`-support), i.e. the qubits whose
 :math:`|0\rangle` and :math:`|1\rangle` get exchanged; :math:`I` and :math:`Z`
-leave the bit value alone.  Strings sharing a flipped-qubit set differ only by
-:math:`Z`/:math:`I` factors, so they connect the same pairs of basis states and
-are the only ones whose amplitudes can cancel.  On the all-zero state,
+leave the bit value alone.  On the all-zero state,
 
 .. math::
 
@@ -13,6 +11,7 @@ are the only ones whose amplitudes can cancel.  On the all-zero state,
 
 with :math:`F` the flipped-qubit set, :math:`n_Y` the number of :math:`Y`
 factors, and :math:`b_F` the bit string with exactly the qubits in :math:`F` set.
+Groups are refined by the parity of :math:`n_Y`; see :class:`QubitFlipTermGrouper`.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -29,33 +28,39 @@ __all__ = ["QubitFlipTermGrouper"]
 
 
 class QubitFlipTermGrouper(TermGrouper):
-    r"""Group Pauli terms that flip the same set of qubits.
+    r"""Group Pauli terms that flip the same set of qubits with the same :math:`Y` parity.
 
-    Terms land in the same group when they carry :math:`X`/:math:`Y` on the same
-    qubits and differ only by :math:`Z`/:math:`I` factors; terms that flip nothing
-    (diagonal :math:`I`/:math:`Z` strings) form a single group.
+    Terms land in the same group when they carry :math:`X`/:math:`Y` on the same qubits and agree
+    on the parity of their :math:`Y` count.  Terms that flip nothing (diagonal :math:`I`/:math:`Z`
+    strings) form a single group.
 
-    Such terms connect the same pairs of basis states, so they are the only ones
-    whose amplitudes can cancel.  Keeping them contiguous lets a Trotterised
-    evolution reproduce a cancellation that the full operator has but no single
-    Pauli string can, since a unitary :math:`e^{-i\theta P}` never annihilates a
-    state while a sum of terms may:
+    Terms sharing a flipped-qubit set connect the same pairs of basis states, so they are the only
+    ones whose amplitudes can cancel.  Keeping them contiguous lets a Trotterised evolution
+    reproduce a cancellation that the full operator has but no single Pauli string can, since a
+    unitary :math:`e^{-i\theta P}` never annihilates a state while a sum of terms may:
 
     .. math::
 
         e^{-it\sum_i P_i}|\psi\rangle
         \approx \prod_i e^{-it P_i}|\psi\rangle .
 
-    This is the coarsest partition with that property, so groups stay as large as
-    possible while preserving every cancellation.
+    The parity refinement makes a group internally commuting.  Two strings sharing a flipped-qubit
+    set disagree only inside it, on positions where one carries :math:`X` and the other :math:`Y`,
+    and the count of those has parity :math:`n_Y^{(a)} + n_Y^{(b)} \bmod 2`.  Equal parity means an
+    even number of anticommuting positions.  Without it :math:`X` and :math:`Y` would share a group
+    despite anticommuting, and a symmetric Trotter formula could no longer treat the group as a
+    single exponential.
 
-    The motivating case is fermionic chemistry: each excitation
-    :math:`a_p^\dagger a_q` (or :math:`a_p^\dagger a_r^\dagger a_s a_q`) annihilates
-    the all-zero reference, yet only the *weighted sum* of its Pauli strings cancels.
-    Those strings share a flipped-qubit set, so this grouper reassembles them without
-    needing the fermionic provenance.  Their :math:`Z` parts then differ by even-size
-    subsets of the shared flip set, hence group members also pairwise commute and can
-    be exponentiated term by term.
+    The split loses no cancellation: with real (Hermitian) coefficients the even-parity terms
+    contribute :math:`\pm 1` and the odd-parity ones :math:`\pm i` to :math:`P|0\ldots0\rangle`, so
+    the two sub-sums are the real and imaginary parts of the total and vanish separately.  This is
+    the coarsest partition that preserves every cancellation and keeps groups internally commuting.
+
+    The motivating case is fermionic chemistry: each excitation :math:`a_p^\dagger a_q` (or
+    :math:`a_p^\dagger a_r^\dagger a_s a_q`) annihilates the all-zero reference, yet only the
+    *weighted sum* of its Pauli strings cancels.  Those strings share a flipped-qubit set and an
+    even :math:`Y` count -- ``XX`` and ``YY``, for instance -- so this grouper reassembles them
+    without needing the fermionic provenance.
 
     """
 
@@ -64,7 +69,7 @@ class QubitFlipTermGrouper(TermGrouper):
         return "qubit_flip"
 
     def _run_impl(self, qubit_hamiltonian: QubitOperator) -> QubitOperator:
-        """Return a copy of ``qubit_hamiltonian`` partitioned by flipped-qubit set.
+        """Return a copy of ``qubit_hamiltonian`` partitioned by flipped-qubit set and Y parity.
 
         Args:
             qubit_hamiltonian: Hamiltonian to partition.
@@ -73,14 +78,15 @@ class QubitFlipTermGrouper(TermGrouper):
             QubitOperator: New instance with a ``FlatPartition`` (strategy ``"qubit_flip"``).
 
         """
-        buckets: dict[frozenset[int], list[int]] = {}
+        buckets: dict[tuple[frozenset[int], int], list[int]] = {}
         for index, label in enumerate(qubit_hamiltonian.pauli_strings):
             # Labels follow the Qiskit convention: the rightmost character is qubit 0.
             flipped = frozenset(len(label) - position - 1 for position, axis in enumerate(label) if axis in "XY")
-            buckets.setdefault(flipped, []).append(index)
+            # Same-support strings anticommute exactly when their Y counts differ in parity.
+            buckets.setdefault((flipped, label.count("Y") % 2), []).append(index)
 
         # Order groups deterministically: the diagonal group first, then by first member.
-        ordered = sorted(buckets.items(), key=lambda item: (len(item[0]) > 0, item[1][0]))
+        ordered = sorted(buckets.items(), key=lambda item: (len(item[0][0]) > 0, item[1][0]))
         partition = FlatPartition(
             strategy="qubit_flip",
             groups=tuple(tuple(indices) for _, indices in ordered),
@@ -90,5 +96,6 @@ class QubitFlipTermGrouper(TermGrouper):
             coefficients=qubit_hamiltonian.coefficients.copy(),
             encoding=qubit_hamiltonian.encoding,
             fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
+            tapering=qubit_hamiltonian.tapering,
             term_partition=partition,
         )
