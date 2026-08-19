@@ -30,10 +30,10 @@ using qdk::chemistry::utils::Logger;
 using qdk::chemistry::utils::LogLevel;
 
 // Helper function to calculate alpha and beta electron counts
-std::pair<int, int> calculate_electron_counts(int nuclear_charge, int charge,
-                                              int multiplicity) {
+std::pair<int, int> calculate_electron_counts(int effective_nuclear_charge,
+                                              int charge, int multiplicity) {
   QDK_LOG_TRACE_ENTERING();
-  int total_electrons = nuclear_charge - charge;
+  int total_electrons = effective_nuclear_charge - charge;
   int n_alpha = (total_electrons + multiplicity - 1) / 2;
   int n_beta = total_electrons - n_alpha;
   return {n_alpha, n_beta};
@@ -108,16 +108,15 @@ ScfCalculationResult ScfSolver::_run_with_options(
     symbols[i] = structure->get_atom_symbol(i);
   }
 
-  // Compute sum of nuclear charges
-  int nuclear_charge = 0;
-  for (auto i = 0; i < structure->get_num_atoms(); ++i) {
-    nuclear_charge += structure->get_atom_nuclear_charge(i);
-  }
+  const auto effective_nuclear_charges =
+      qdk_raw_basis_set->get_effective_nuclear_charges();
+  const int effective_nuclear_charge =
+      static_cast<int>(effective_nuclear_charges.sum());
 
   // Determine the multiplicity
   if (multiplicity < 0) {
     // Default to singlet for closed shell, doublet for open-shell
-    multiplicity = ((nuclear_charge - charge) % 2 == 0) ? 1 : 2;
+    multiplicity = ((effective_nuclear_charge - charge) % 2 == 0) ? 1 : 2;
     QDK_LOGGER().warn("No multiplicity specified. Defaulting to {} ({}).",
                       multiplicity, multiplicity == 1 ? "singlet" : "doublet");
   }
@@ -174,11 +173,9 @@ ScfCalculationResult ScfSolver::_run_with_options(
   // Create Molecule object
   auto ms_mol = qdk::chemistry::utils::microsoft::convert_to_molecule(
       *structure, charge, multiplicity);
-  // update atomic charges for ECPs
-  auto ecp_electrons = qdk_raw_basis_set->get_ecp_electrons();
   for (size_t i = 0; i < ms_mol->n_atoms; ++i) {
-    int n_core_electrons = static_cast<int>(ecp_electrons[i]);
-    ms_mol->atomic_charges[i] = ms_mol->atomic_nums[i] - n_core_electrons;
+    ms_mol->atomic_charges[i] = static_cast<uint64_t>(
+        effective_nuclear_charges(static_cast<Eigen::Index>(i)));
   }
 
   // Create SCFConfig
@@ -320,8 +317,8 @@ ScfCalculationResult ScfSolver::_run_with_options(
         {data::axes::beta(), data::axes::beta()});
 
     // Calculate number of electrons
-    auto [n_alpha, n_beta] =
-        calculate_electron_counts(nuclear_charge, charge, multiplicity);
+    auto [n_alpha, n_beta] = calculate_electron_counts(effective_nuclear_charge,
+                                                       charge, multiplicity);
 
     const size_t num_atomic_orbitals = coeff_alpha.rows();
 

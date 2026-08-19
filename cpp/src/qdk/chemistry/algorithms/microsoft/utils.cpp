@@ -269,11 +269,10 @@ std::shared_ptr<qcs::BasisSet> convert_basis_set_from_qdk(
   auto mol = convert_to_molecule(*structure, 0,
                                  1);  // Default charge=0, multiplicity=1
 
-  // remove number of ecp electrons from atomic charges
-  auto ecp_electrons = qdk_basis_set.get_ecp_electrons();
+  const auto effective_charges = qdk_basis_set.get_effective_nuclear_charges();
   for (size_t i = 0; i < mol->n_atoms; ++i) {
-    int n_core_electrons = static_cast<int>(ecp_electrons[i]);
-    mol->atomic_charges[i] = mol->atomic_nums[i] - n_core_electrons;
+    mol->atomic_charges[i] =
+        static_cast<uint64_t>(effective_charges(static_cast<Eigen::Index>(i)));
   }
 
   auto basis_json = convert_to_json(qdk_basis_set);
