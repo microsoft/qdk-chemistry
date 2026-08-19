@@ -111,4 +111,5 @@ class _QSharpUtilsProxy:
         return getattr(get_qsharp_context().code.QDKChemistry.Utils, name)
 
 
+# Perform initial initialization
 QSHARP_UTILS = _QSharpUtilsProxy()
