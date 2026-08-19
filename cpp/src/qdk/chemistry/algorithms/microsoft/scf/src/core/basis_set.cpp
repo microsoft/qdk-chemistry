@@ -15,9 +15,12 @@
 #include <fstream>
 #include <iostream>
 #include <libint2.hpp>
+#include <map>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <regex>
+#include <set>
+#include <unordered_map>
 
 #include "util/macros.h"
 #include "util/mpi_vars.h"
@@ -40,7 +43,6 @@ size_t load_from_database_json(std::filesystem::path bs_path, BasisSet& basis) {
   auto& shells = basis.shells;
   auto& ecp_shells = basis.ecp_shells;
   auto& atom_ecp_electrons = basis.atom_ecp_electrons;
-  auto& element_ecp_electrons = basis.element_ecp_electrons;
 
   atom_ecp_electrons.assign(mol.n_atoms, 0);
   size_t n_ecp_electrons = 0;
@@ -86,7 +88,6 @@ size_t load_from_database_json(std::filesystem::path bs_path, BasisSet& basis) {
 
     auto n_core_electrons = elem["ecp_electrons"].get<int>();
     atom_ecp_electrons[i] = n_core_electrons;
-    element_ecp_electrons[mol.atomic_nums[i]] = n_core_electrons;
     mol.atomic_charges[i] = mol.atomic_nums[i] - n_core_electrons;
     n_ecp_electrons += n_core_electrons;
     auto ecp = elem["ecp_potentials"];
@@ -131,21 +132,28 @@ std::shared_ptr<BasisSet> BasisSet::from_database_json(
 BasisSet::BasisSet(std::shared_ptr<Molecule> mol,
                    const std::vector<Shell>& input_shells,
                    const std::vector<Shell>& input_ecp_shells,
-                   const std::unordered_map<int, int>& element_ecp_electrons,
-                   int n_ecp_electrons, BasisMode mode, bool pure, bool sort)
+                   const std::vector<int>& atom_ecp_electrons, BasisMode mode,
+                   bool pure, bool sort)
     : mol(mol),
       mode(mode),
       shells(input_shells),
       pure(pure),
       ecp_shells(input_ecp_shells),
-      element_ecp_electrons(element_ecp_electrons),
-      n_ecp_electrons(n_ecp_electrons) {
-  atom_ecp_electrons.resize(mol->n_atoms, 0);
+      atom_ecp_electrons(atom_ecp_electrons) {
+  if (atom_ecp_electrons.size() != mol->n_atoms) {
+    throw std::runtime_error(
+        "atom_ecp_electrons must contain one entry per atom.");
+  }
   for (size_t i = 0; i < mol->n_atoms; ++i) {
-    auto it = element_ecp_electrons.find(mol->atomic_nums[i]);
-    if (it != element_ecp_electrons.end()) {
-      atom_ecp_electrons[i] = it->second;
+    int atomic_num = mol->atomic_nums[i];
+    int ecp_electrons = atom_ecp_electrons[i];
+    if (ecp_electrons < 0 || ecp_electrons > atomic_num) {
+      throw std::runtime_error(fmt::format(
+          "atom_ecp_electrons[{}] must be between 0 and the atomic number "
+          "({}), got {}.",
+          i, atomic_num, ecp_electrons));
     }
+    n_ecp_electrons += ecp_electrons;
   }
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
   if (mpi::get_world_size() > 1) {
@@ -426,10 +434,27 @@ nlohmann::ordered_json BasisSet::to_json() const {
     json_ecp_shells.push_back(sh.to_json(true /*is_ecp*/));
   }
 
+  std::map<int, int> element_ecp_electrons;
+  std::set<int> nonuniform_elements;
+  for (size_t i = 0; i < atom_ecp_electrons.size(); ++i) {
+    int atomic_num = mol->atomic_nums[i];
+    int ncore = atom_ecp_electrons[i];
+    if (nonuniform_elements.contains(atomic_num)) {
+      continue;
+    }
+    auto [it, inserted] = element_ecp_electrons.emplace(atomic_num, ncore);
+    if (!inserted && it->second != ncore) {
+      element_ecp_electrons.erase(it);
+      nonuniform_elements.insert(atomic_num);
+    }
+  }
+
   std::vector<int> json_element_ecp_electrons;
-  for (const auto& [k, v] : element_ecp_electrons) {
-    json_element_ecp_electrons.push_back(k);
-    json_element_ecp_electrons.push_back(v);
+  for (const auto& [atomic_num, ncore] : element_ecp_electrons) {
+    if (ncore > 0) {
+      json_element_ecp_electrons.push_back(atomic_num);
+      json_element_ecp_electrons.push_back(ncore);
+    }
   }
 
   auto basis_set_json = nlohmann::ordered_json(
@@ -559,27 +584,6 @@ std::shared_ptr<BasisSet> BasisSet::from_serialized_json(
   }
   bs->ecp_shells = std::move(ecp_shells);
 
-  // Read element_ecp_electrons from flat list format (support both old and new
-  // keys)
-  std::vector<int> element_ecp_electrons_json;
-  if (json.contains("element_ecp_electrons")) {
-    element_ecp_electrons_json =
-        json["element_ecp_electrons"].get<std::vector<int>>();
-  } else if (json.contains("elem2ecpcore")) {
-    // Backward compatibility: support old key name
-    element_ecp_electrons_json = json["elem2ecpcore"].get<std::vector<int>>();
-  }
-
-  if (element_ecp_electrons_json.size() % 2 != 0) {
-    throw std::runtime_error(
-        "element_ecp_electrons_json expects an even number of elements.");
-  }
-  for (size_t i = 0; i < element_ecp_electrons_json.size(); i += 2) {
-    int atomic_num = element_ecp_electrons_json[i];
-    int ecp_electrons = element_ecp_electrons_json[i + 1];
-    bs->element_ecp_electrons[atomic_num] = ecp_electrons;
-  }
-
   if (json.contains("atom_ecp_electrons")) {
     bs->atom_ecp_electrons = json["atom_ecp_electrons"].get<std::vector<int>>();
     if (bs->atom_ecp_electrons.size() != bs->mol->n_atoms) {
@@ -587,11 +591,28 @@ std::shared_ptr<BasisSet> BasisSet::from_serialized_json(
           "atom_ecp_electrons must contain one entry per atom.");
     }
   } else {
+    std::vector<int> element_ecp_electrons_json;
+    if (json.contains("element_ecp_electrons")) {
+      element_ecp_electrons_json =
+          json["element_ecp_electrons"].get<std::vector<int>>();
+    } else if (json.contains("elem2ecpcore")) {
+      element_ecp_electrons_json = json["elem2ecpcore"].get<std::vector<int>>();
+    }
+    if (element_ecp_electrons_json.size() % 2 != 0) {
+      throw std::runtime_error(
+          "element_ecp_electrons expects an even number of elements.");
+    }
+    std::unordered_map<int, int> legacy_element_ecp_electrons;
+    for (size_t i = 0; i < element_ecp_electrons_json.size(); i += 2) {
+      legacy_element_ecp_electrons[element_ecp_electrons_json[i]] =
+          element_ecp_electrons_json[i + 1];
+    }
+
     bs->atom_ecp_electrons.assign(bs->mol->n_atoms, 0);
     for (size_t i = 0; i < bs->mol->n_atoms; ++i) {
       int atomic_num = bs->mol->atomic_nums[i];
-      auto it = bs->element_ecp_electrons.find(atomic_num);
-      if (it != bs->element_ecp_electrons.end()) {
+      auto it = legacy_element_ecp_electrons.find(atomic_num);
+      if (it != legacy_element_ecp_electrons.end()) {
         bs->atom_ecp_electrons[i] = it->second;
       }
     }

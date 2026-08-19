@@ -1085,6 +1085,14 @@ TEST_F(ScfTest, AgHBasisSetEcpJsonMapping) {
   EXPECT_TRUE(json.contains("electron_shells"));
   auto electron_shells_json = json["electron_shells"];
   EXPECT_GT(electron_shells_json.size(), 0);
+
+  auto internal_basis =
+      qdk::chemistry::utils::microsoft::convert_basis_set_from_qdk(*basis_set);
+  auto legacy_json = internal_basis->to_json();
+  legacy_json.erase("atom_ecp_electrons");
+  auto legacy_basis = qdk::chemistry::scf::BasisSet::from_serialized_json(
+      internal_basis->mol, legacy_json);
+  EXPECT_EQ(legacy_basis->atom_ecp_electrons, std::vector<int>({28, 0}));
 }
 
 TEST_F(ScfTest, SameElementAtomsPreserveDistinctEcpTreatment) {
@@ -1111,6 +1119,7 @@ TEST_F(ScfTest, SameElementAtomsPreserveDistinctEcpTreatment) {
             std::vector<uint64_t>({19, 47}));
   EXPECT_EQ(internal_basis->n_ecp_electrons, 28);
   EXPECT_EQ(internal_basis->mol->n_electrons, 66);
+  EXPECT_TRUE(internal_basis->to_json()["element_ecp_electrons"].empty());
 
   auto round_tripped =
       qdk::chemistry::utils::microsoft::convert_basis_set_to_qdk(

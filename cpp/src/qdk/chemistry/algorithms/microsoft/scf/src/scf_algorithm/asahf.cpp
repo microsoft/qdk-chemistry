@@ -114,7 +114,6 @@ std::shared_ptr<BasisSet> make_atom_basis_set(size_t index,
   std::vector<Shell> shells;
   std::vector<Shell> ecp_shells;
   int total_ecp_electrons = 0;
-  std::unordered_map<int, int> ecp_electrons;
 
   // Filter shells belonging to the specified atomic number
   std::copy_if(basis_set.shells.begin(), basis_set.shells.end(),
@@ -143,20 +142,16 @@ std::shared_ptr<BasisSet> make_atom_basis_set(size_t index,
   auto atomic_number = mol->atomic_nums[0];
   if (index < basis_set.atom_ecp_electrons.size()) {
     total_ecp_electrons = basis_set.atom_ecp_electrons[index];
-    if (total_ecp_electrons > 0) {
-      ecp_electrons[atomic_number] = total_ecp_electrons;
-    }
   }
 
   // Create a new BasisSet for the atom
-  auto atom_basis = std::shared_ptr<BasisSet>(
-      new BasisSet(mol, shells, ecp_shells, ecp_electrons, total_ecp_electrons,
-                   BasisMode::RAW, basis_set.pure, false));
+  auto atom_basis = std::shared_ptr<BasisSet>(new BasisSet(
+      mol, shells, ecp_shells, std::vector<int>{total_ecp_electrons},
+      BasisMode::RAW, basis_set.pure, false));
 
   // Update atomic charges, total nuclear charge, and n_electrons based on ECPs
-  if (ecp_electrons.count(atomic_number)) {
-    int ecp_elec = ecp_electrons[atomic_number];
-    mol->atomic_charges[0] = atomic_number - ecp_elec;
+  if (total_ecp_electrons > 0) {
+    mol->atomic_charges[0] = atomic_number - total_ecp_electrons;
     mol->total_nuclear_charge = mol->atomic_charges[0];
     mol->n_electrons = mol->total_nuclear_charge - mol->charge;
   }
@@ -176,8 +171,6 @@ bool BasisEqChecker::operator()(const BasisSet& a,
   if (a.shells.size() != b.shells.size()) return false;
   if (a.ecp_shells.size() != b.ecp_shells.size()) return false;
   if (a.atom_ecp_electrons != b.atom_ecp_electrons) return false;
-  if (a.element_ecp_electrons.size() != b.element_ecp_electrons.size())
-    return false;
 
   // check shells
   for (size_t i = 0; i < a.shells.size(); ++i) {
@@ -227,7 +220,6 @@ size_t BasisHasher::operator()(const BasisSet& basis) const noexcept {
   for (int ecp_electrons : basis.atom_ecp_electrons) {
     hash_value(ctx, static_cast<int64_t>(ecp_electrons));
   }
-  hash_value(ctx, static_cast<uint64_t>(basis.element_ecp_electrons.size()));
 
   // hash shells
   for (const auto& shell : basis.shells) {

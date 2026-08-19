@@ -232,8 +232,7 @@ qdk::chemistry::data::BasisSet convert_basis_set_to_qdk(
   }
 
   // Handle ECP (Effective Core Potential) information if present
-  if (basis_set.n_ecp_electrons != 0 || !basis_set.ecp_shells.empty() ||
-      !basis_set.element_ecp_electrons.empty()) {
+  if (basis_set.n_ecp_electrons != 0 || !basis_set.ecp_shells.empty()) {
     // Use basis set name as ECP name
     std::string qdk_ecp_name = basis_set.name;
 
