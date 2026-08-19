@@ -289,11 +289,7 @@ class TestUnaryQpeEndToEnd:
 
     @pytest.mark.parametrize("num_queries", [6, 8, 11, 23, 63])
     def test_builder_defaults_recover_the_ground_state_energy(self, num_queries):
-        r"""The shipped defaults must recover :math:`H = (X + Z)/2` end to end.
-
-        ``8`` is the power-of-two case: it is applied as configured rather than reduced,
-        so the schedule it runs is the one the caller asked for.
-        """
+        r"""The shipped defaults must recover :math:`H = (X + Z)/2` end to end."""
         num_bits = num_queries.bit_length()
         assert (num_queries + 1 < 1 << num_bits) == (num_queries != 63), "sweep must mix padded and exact registers"
 
