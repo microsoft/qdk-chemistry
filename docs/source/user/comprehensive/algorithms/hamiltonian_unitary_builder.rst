@@ -238,7 +238,9 @@ Each step applies :math:`H_D` and sandwiches a freshly sampled :math:`H_R` block
 For a second-order (symmetric) Trotter formula the deterministic part is applied with half-angles in a palindromic sweep around the random block; the first-order variant applies :math:`H_D` at full angle followed by :math:`H_R`.
 
 The split point is controlled by ``weight_threshold``: terms with :math:`|h_j|` at or above the threshold go into :math:`H_D`.
-Setting it to ``-1.0`` selects the split automatically (top 10% of terms by weight, or a cost-optimal split when ``target_accuracy`` is set).
+Setting it to ``-1.0`` selects the split automatically (top 10% of terms by weight, or a cost-optimal raw-rotation split when ``target_accuracy`` is set).
+The accuracy-aware objective evaluates the implemented pre-merge count for every split, including integer sample sizing, the ``num_random_samples`` floor, and the all-random single-step case.
+It does not predict duplicate-term merging because that reduction depends on the random draw and commutation pattern.
 
 When ``target_accuracy`` :math:`\epsilon` is set, the builder becomes accuracy-aware.
 The squared error budget is split in quadrature between the two parts,
@@ -281,7 +283,7 @@ Because the deterministic part removes the dominant terms from :math:`\lambda_R`
      - Order of the Trotter formula for the deterministic part (1 or 2). Default is 2.
    * - ``num_random_samples``
      - int
-     - Number of qDRIFT samples for :math:`H_R`. Acts as a per-step floor when ``target_accuracy`` is set. Default is 100.
+     - Number of qDRIFT samples for :math:`H_R`. Acts as a per-step floor when ``target_accuracy`` is set. Default is 1.
    * - ``target_accuracy``
      - float
      - Target approximation error :math:`\epsilon`. When set to 0.0 (default), automatic parameterization is disabled.

@@ -114,6 +114,10 @@ class TestPartiallyRandomizedBasics:
         builder = PartiallyRandomized()
         assert builder.type_name() == "hamiltonian_unitary_builder"
 
+    def test_default_random_sample_floor_is_one(self):
+        """Accuracy-aware sizing starts from the canonical minimum sample floor."""
+        assert PartiallyRandomized().settings().get("num_random_samples") == 1
+
     def test_can_create_via_registry(self):
         """Test that PartiallyRandomized can be created via the algorithm registry."""
         builder = create("hamiltonian_unitary_builder", "partially_randomized")
@@ -629,6 +633,16 @@ class TestPartiallyRandomizedAccuracyAwareStructure:
         r = builder._resolve_num_divisions(hamiltonian, time)
         assert builder._resolve_block_samples(random_terms, time, r) == 1000
 
+    def test_block_samples_filter_subthreshold_terms(self):
+        """Sub-threshold random coefficients do not inflate the Campbell count."""
+        builder = PartiallyRandomized(
+            target_accuracy=0.1,
+            num_random_samples=1,
+            tolerance=1e-5,
+        )
+
+        assert builder._resolve_block_samples([("X", 1e-6)], time=1e6, num_divisions=1) == 1
+
     def test_accuracy_split_clamped(self):
         """accuracy_split is clamped to (0, 1) so both budgets stay positive."""
         builder_hi = PartiallyRandomized(target_accuracy=0.05, accuracy_split=5.0)
@@ -695,8 +709,13 @@ class TestPartiallyRandomizedAccuracyAwareStructure:
             assert t1.pauli_term == t2.pauli_term
             assert t1.angle == t2.angle
 
-    def test_cost_optimal_split_selects_dominant_terms(self):
-        """Cost-optimal L_D assigns the dominant terms to H_D and the tail to H_R."""
+    @pytest.mark.parametrize(("num_random_samples", "expected_num_deterministic"), [(1, 3), (100, 23)])
+    def test_cost_optimal_split_accounts_for_sample_floor(
+        self,
+        num_random_samples: int,
+        expected_num_deterministic: int,
+    ):
+        """The raw-cost optimum responds to the configured per-step sample floor."""
         # Three dominant terms + a long tail of tiny terms.
         pauli_strings = ["XX", "YY", "ZZ"] + ["XI", "IX", "IY", "YI", "ZI"] * 4
         coefficients = [10.0, 9.0, 8.0] + [0.001] * 20
@@ -707,12 +726,101 @@ class TestPartiallyRandomizedAccuracyAwareStructure:
             accuracy_split=0.5,
             trotter_order=2,
             weight_threshold=-1.0,  # automatic -> cost-optimal
+            num_random_samples=num_random_samples,
             time=time,
         )
         terms = hamiltonian.get_real_coefficients(tolerance=1e-12, sort_by_magnitude=True)
         num_det = builder._determine_num_deterministic_cost_optimal(hamiltonian, terms, time)
-        # The three large terms belong in H_D; the tiny tail should be randomized.
-        assert num_det == 3
+        assert num_det == expected_num_deterministic
+
+    @pytest.mark.parametrize(("trotter_order", "expected_rotations"), [(1, 2), (2, 4)])
+    def test_cost_optimal_split_includes_random_sample_floor(
+        self,
+        trotter_order: int,
+        expected_rotations: int,
+    ):
+        """A tiny random tail is deterministic when its sample floor dominates cost."""
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.001])
+        builder = PartiallyRandomized(
+            target_accuracy=0.1,
+            accuracy_split=0.5,
+            trotter_order=trotter_order,
+            weight_threshold=-1.0,
+            num_random_samples=100,
+            time=1.0,
+            merge_duplicate_terms=False,
+        )
+        terms = hamiltonian.get_real_coefficients(tolerance=1e-12, sort_by_magnitude=True)
+
+        num_det = builder._determine_num_deterministic_cost_optimal(hamiltonian, terms, 1.0)
+        container = builder.run(hamiltonian).get_container()
+
+        assert num_det == 2
+        assert len(container.step_terms) == expected_rotations
+
+    def test_cost_optimal_split_reduces_noncommuting_post_merge_size(self):
+        """Floor-aware selection remains cheaper when random duplicates cannot all merge."""
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z", "Y"], coefficients=[1.0, 0.001, 0.001])
+        common = {
+            "target_accuracy": 0.1,
+            "accuracy_split": 0.5,
+            "trotter_order": 2,
+            "num_random_samples": 100,
+            "time": 1.0,
+            "seed": 7,
+            "merge_duplicate_terms": True,
+        }
+        automatic = PartiallyRandomized(weight_threshold=-1.0, **common)
+        one_deterministic = PartiallyRandomized(weight_threshold=0.5, **common)
+
+        terms = hamiltonian.get_real_coefficients(tolerance=1e-12, sort_by_magnitude=True)
+        selected = automatic._determine_num_deterministic_cost_optimal(hamiltonian, terms, 1.0)
+        automatic_size = len(automatic.run(hamiltonian).get_container().step_terms)
+        one_deterministic_size = len(one_deterministic.run(hamiltonian).get_container().step_terms)
+
+        assert selected == 3
+        assert automatic_size == 6
+        assert automatic_size < one_deterministic_size
+
+    @pytest.mark.parametrize("trotter_order", [1, 2])
+    @pytest.mark.parametrize("num_random_samples", [1, 7, 100])
+    def test_cost_optimal_split_matches_minimum_emitted_raw_count(
+        self,
+        trotter_order: int,
+        num_random_samples: int,
+    ):
+        """Automatic selection matches the smallest explicitly built raw formula."""
+        hamiltonian = QubitOperator(
+            pauli_strings=["XX", "ZI", "YX", "IZ"],
+            coefficients=[1.0, 0.3, 0.07, 0.01],
+        )
+        common = {
+            "target_accuracy": 0.1,
+            "accuracy_split": 0.5,
+            "trotter_order": trotter_order,
+            "num_random_samples": num_random_samples,
+            "time": 0.5,
+            "seed": 7,
+            "merge_duplicate_terms": False,
+        }
+        automatic = PartiallyRandomized(weight_threshold=-1.0, **common)
+        terms = hamiltonian.get_real_coefficients(tolerance=1e-12, sort_by_magnitude=True)
+        selected = automatic._determine_num_deterministic_cost_optimal(hamiltonian, terms, 0.5)
+
+        emitted_counts = []
+        for ld in range(len(terms) + 1):
+            if ld == 0:
+                threshold = abs(terms[0][1]) + 1.0
+            elif ld == len(terms):
+                threshold = 0.0
+            else:
+                threshold = (abs(terms[ld - 1][1]) + abs(terms[ld][1])) / 2.0
+            explicit = PartiallyRandomized(weight_threshold=threshold, **common)
+            emitted_counts.append(len(explicit.run(hamiltonian).get_container().step_terms))
+
+        automatic_count = len(automatic.run(hamiltonian).get_container().step_terms)
+        assert selected == emitted_counts.index(min(emitted_counts))
+        assert automatic_count == min(emitted_counts)
 
     def test_explicit_threshold_overrides_cost_optimal(self):
         """An explicit weight_threshold takes precedence over cost-optimal split."""
@@ -749,6 +857,33 @@ class TestPartiallyRandomizedOutputAccuracy:
     # Combined Trotter bias (≤ ε_D) and averaged qDRIFT error (≤ ε_R) add up to
     # at most ε_D + ε_R = sqrt(2)·ε; allow extra headroom for Monte-Carlo noise.
     TOLERANCE_FACTOR = 3
+
+    @_slow_test
+    def test_cost_optimal_automatic_split_within_tolerance(self):
+        """The floor-aware automatic mixed split preserves the channel-error target."""
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z", "Y"], coefficients=[1.0, 0.5, 0.4])
+        eps = 0.05
+        time = 0.5
+        probe = PartiallyRandomized(
+            target_accuracy=eps,
+            trotter_order=2,
+            weight_threshold=-1.0,
+            num_random_samples=1,
+            time=time,
+        )
+        terms = hamiltonian.get_real_coefficients(tolerance=1e-12, sort_by_magnitude=True)
+
+        assert probe._determine_num_deterministic_cost_optimal(hamiltonian, terms, time) == 2
+
+        err = _partial_state_trace_error(
+            hamiltonian,
+            eps=eps,
+            t=time,
+            weight_threshold=-1.0,
+            num_random_samples=1,
+            seeds=range(400),
+        )
+        assert err <= self.TOLERANCE_FACTOR * eps
 
     def test_deterministic_limit_within_epsilon(self):
         """All-deterministic split (λ_R=0): exact Trotter stays within ε."""

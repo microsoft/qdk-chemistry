@@ -29,9 +29,6 @@ import numpy as np
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionSettings
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift import QDrift
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift_error import (
-    qdrift_samples_campbell,
-)
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import (
     trotter_steps_commutator,
     trotter_steps_naive,
@@ -94,7 +91,7 @@ class PartiallyRandomizedSettings(TimeEvolutionSettings):
         self._set_default(
             "num_random_samples",
             "int",
-            100,
+            1,
             "Number of random samples for the randomized part (H_R). "
             "Acts as a per-step floor when target_accuracy is set.",
         )
@@ -219,7 +216,7 @@ class PartiallyRandomized(QDrift):
         time: float = 0.0,
         weight_threshold: float = -1.0,
         trotter_order: int = 2,
-        num_random_samples: int = 100,
+        num_random_samples: int = 1,
         target_accuracy: float = 0.0,
         accuracy_split: float = 0.5,
         trotter_error_bound: str = "commutator",
@@ -237,12 +234,12 @@ class PartiallyRandomized(QDrift):
             weight_threshold: Terms with \|h_j\| >= threshold are treated
                 deterministically with Trotter. Use -1.0 for automatic
                 determination (top 10% of terms by weight, or a cost-optimal
-                split when ``target_accuracy`` is set).
+                raw-rotation split when ``target_accuracy`` is set).
             trotter_order: Order of Trotter formula for deterministic part.
                 1 = first order, 2 = second order (symmetric). Defaults to 2.
             num_random_samples: Number of random samples for the qDRIFT-style
                 treatment of H_R. When ``target_accuracy`` is set, this acts as
-                a per-step floor on the sample count. Defaults to 100.
+                a per-step floor on the sample count. Defaults to 1.
             target_accuracy: Target accuracy ε for automatic parameterization of
                 the outer Trotter step count and the qDRIFT sample count. Use
                 ``0.0`` (default) to disable and preserve the legacy single-step
@@ -531,25 +528,26 @@ class PartiallyRandomized(QDrift):
         Returns ``num_random_samples`` when accuracy-aware sizing is disabled,
         there are no random terms, or the evolution time is zero.
         """
+        tolerance: float = self._settings.get("tolerance")
+        lambda_r = sum(abs(coeff) for _, coeff in random_terms if abs(coeff) > tolerance)
+        return self._resolve_block_samples_from_lambda(lambda_r, time, num_divisions)
+
+    def _resolve_block_samples_from_lambda(
+        self,
+        lambda_r: float,
+        time: float,
+        num_divisions: int,
+    ) -> int:
+        """Determine the per-step qDRIFT sample count from the random-tail norm."""
         num_random_samples: int = self._settings.get("num_random_samples")
         if num_random_samples <= 0:
             raise ValueError(f"num_random_samples must be a positive integer, got {num_random_samples}.")
 
         _, eps_r = self._split_accuracy()
-        if eps_r <= 0.0 or len(random_terms) == 0 or time == 0.0:
+        if eps_r <= 0.0 or lambda_r <= 0.0 or time == 0.0:
             return num_random_samples
 
-        tolerance: float = self._settings.get("tolerance")
-        h_random = QubitOperator(
-            pauli_strings=[label for label, _ in random_terms],
-            coefficients=np.array([coeff for _, coeff in random_terms]),
-        )
-        num_total = qdrift_samples_campbell(
-            hamiltonian=h_random,
-            time=time,
-            target_accuracy=eps_r,
-            weight_threshold=tolerance,
-        )
+        num_total = max(1, math.ceil(2.0 * (lambda_r * time) ** 2 / eps_r))
         per_step = math.ceil(num_total / num_divisions)
         return max(num_random_samples, per_step)
 
@@ -565,8 +563,8 @@ class PartiallyRandomized(QDrift):
 
         1. An explicit ``weight_threshold >= 0`` always wins: count the terms
            whose magnitude meets the threshold.
-        2. Otherwise, when ``target_accuracy`` is set, pick the cost-optimal
-           split ``L_D`` that minimizes the total rotation count.
+          2. Otherwise, when ``target_accuracy`` is set, pick the cost-optimal
+              split ``L_D`` that minimizes the pre-merge raw rotation count.
         3. Otherwise, fall back to the legacy heuristic (top 10% by weight).
 
         Args:
@@ -601,21 +599,23 @@ class PartiallyRandomized(QDrift):
         terms: list[tuple[str, float]],
         time: float,
     ) -> int:
-        r"""Pick the split ``L_D`` minimizing a rotation-count cost proxy.
+        r"""Pick the split ``L_D`` minimizing the implemented raw rotation count.
 
         With terms sorted by descending weight, assigning the ``L_D`` largest to
-        H_D leaves ``λ_R(L_D) = Σ_{j > L_D} |h_j|`` for the random tail. The cost
-        proxy combines the deterministic and random rotation counts
-        (:cite:`Guenther2025`, Theorem V.1):
+        H_D leaves the remaining terms in H_R. For each candidate, this method
+        applies the same integer sample sizing, per-step sample floor, and
+        all-random single-step rule used by circuit construction. It minimizes
+        the resulting pre-merge rotation count:
 
         .. math::
 
-            G(L_D) = N_\text{stage}\,L_D\,r
-                     + \frac{2\,\lambda_R(L_D)^2\,t^2}{\epsilon_R}
+            G(L_D) = r(L_D)\left[N_\text{stage}L_D + N_R(L_D)\right].
 
-        where ``r`` (≈ constant in ``L_D``) is the outer Trotter step count and
-        ``N_stage`` is 2 for second order and 1 for first order. The minimizer is
-        returned; ties favor the smaller ``L_D``.
+        Here ``N_R`` is zero for an empty random tail and otherwise includes the
+        configured ``num_random_samples`` floor. ``N_stage`` is 2 for second
+        order and 1 for first order. Ties favor the smaller ``L_D``. Exact
+        duplicate-term merging is excluded because its reduction depends on the
+        random draw and commutation pattern.
 
         Args:
             qubit_hamiltonian: The full Hamiltonian (used to size ``r``).
@@ -626,28 +626,22 @@ class PartiallyRandomized(QDrift):
             The cost-optimal number of deterministic terms (in ``[0, len(terms)]``).
 
         """
-        eps_d, eps_r = self._split_accuracy()
         order: int = self._settings.get("trotter_order")
         n_stage = 2 if order == 2 else 1
-
         num_terms = len(terms)
-        abs_coeffs = [abs(c) for _, c in terms]
-
-        # Suffix sums: lambda_r[ld] = sum of |coeff| for terms[ld:]
+        deterministic_divisions = self._resolve_num_divisions(qubit_hamiltonian, time)
         lambda_r = [0.0] * (num_terms + 1)
-        for i in range(num_terms - 1, -1, -1):
-            lambda_r[i] = lambda_r[i + 1] + abs_coeffs[i]
-
-        # r is computed from the full Hamiltonian and is ~constant in L_D.
-        num_divisions = self._resolve_num_divisions(qubit_hamiltonian, time) if eps_d > 0.0 else 1
+        for index in range(num_terms - 1, -1, -1):
+            lambda_r[index] = lambda_r[index + 1] + abs(terms[index][1])
 
         best_ld = 0
         best_cost = math.inf
         for ld in range(num_terms + 1):
-            lam_r = lambda_r[ld]
-            g_random = 2.0 * (lam_r * time) ** 2 / eps_r if (eps_r > 0.0 and lam_r > 0.0) else 0.0
-            g_det = n_stage * ld * num_divisions
-            cost = g_det + g_random
+            num_divisions = deterministic_divisions if ld > 0 else 1
+            num_block_samples = (
+                self._resolve_block_samples_from_lambda(lambda_r[ld], time, num_divisions) if ld < num_terms else 0
+            )
+            cost = num_divisions * (n_stage * ld + num_block_samples)
             if cost < best_cost:
                 best_cost = cost
                 best_ld = ld
