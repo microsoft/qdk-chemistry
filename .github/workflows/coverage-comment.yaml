@@ -72,7 +72,11 @@ jobs:
         if [ -f artifacts/pr-comment.md ]; then
           echo "# 📊 Coverage Summary" >> "$comment_file"
           echo "" >> "$comment_file"
-          cat artifacts/pr-comment.md >> "$comment_file"
+          # Artifact content can come from an untrusted fork run (e.g. a
+          # crafted source/test file name embedded in the coverage report),
+          # so neutralize @mentions and cap size before posting it under our
+          # write-capable token.
+          sed 's/@/\&#64;/g' artifacts/pr-comment.md | head -c 60000 >> "$comment_file"
           found_report=true
         fi
 

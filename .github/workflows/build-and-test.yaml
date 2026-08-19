@@ -464,7 +464,7 @@ jobs:
       run: |
         # Extract coverage percentages
         extract_coverage() {
-          grep '^TOTAL' "$1" 2>/dev/null | tail -1 | grep -oE '[0-9]+(\.[0-9]+)?%' | tr -d '%'
+          grep '^TOTAL' "$1" 2>/dev/null | tail -1 | grep -oE '[0-9]+(\.[0-9]+)?%' | head -1 | tr -d '%' || true
         }
         CPP_COVERAGE=$(extract_coverage coverage-reports/cpp_coverage.txt)
         CPP_COVERAGE=${CPP_COVERAGE:-0}
