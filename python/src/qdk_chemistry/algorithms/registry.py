@@ -261,6 +261,37 @@ def _resolve_algorithm_type(algorithm_type: str) -> str:
     return algorithm_type
 
 
+# Deprecated algorithm names keyed by ``(algorithm_type, deprecated_name)``. Using a
+# deprecated name still works but emits a DeprecationWarning.
+_DEPRECATED_NAME_ALIASES: dict[tuple[str, str], str] = {
+    ("state_prep", "sparse_isometry_gf2x"): "sparse_isometry",
+}
+
+
+def _resolve_algorithm_name(algorithm_type: str, algorithm_name: str) -> str:
+    """Map a deprecated algorithm name to its current name.
+
+    Args:
+        algorithm_type (str): The resolved algorithm type key.
+        algorithm_name (str): The requested algorithm name.
+
+    Returns:
+        str: The resolved algorithm name. A deprecated name is mapped to its replacement and
+            triggers a ``DeprecationWarning``; any other value passes through unchanged.
+
+    """
+    new_name = _DEPRECATED_NAME_ALIASES.get((algorithm_type, algorithm_name))
+    if new_name is not None:
+        warnings.warn(
+            f"Algorithm '{algorithm_name}' of type '{algorithm_type}' is deprecated and will be "
+            f"removed in a future release; use '{new_name}' instead.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        return new_name
+    return algorithm_name
+
+
 def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> Algorithm:
     """Create an algorithm instance by type and name.
 
@@ -310,12 +341,11 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
     algorithm_type = _resolve_algorithm_type(algorithm_type)
     if algorithm_name is None:
         algorithm_name = ""
+    algorithm_name = _resolve_algorithm_name(algorithm_type, algorithm_name)
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             try:
                 instance = factory.create(algorithm_name)
-                instance.settings().update(kwargs or {})
-                return _AlgorithmWrapper(instance)
             except (KeyError, RuntimeError, ValueError) as e:
                 available_algorithms = factory.available()
                 if not available_algorithms:
@@ -330,6 +360,9 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
                     "Please ensure the relevant plugins are loaded or custom algorithms are registered "
                     "ahead of calling create()."
                 ) from e
+            # Settings failures are configuration errors, not lookup failures, so they propagate as-is.
+            instance.settings().update(kwargs or {})
+            return _AlgorithmWrapper(instance)
     available_types = [factory.algorithm_type_name() for factory in __factories]
     raise KeyError(
         f"Algorithm type '{algorithm_type}' is not registered. Available algorithm types: {', '.join(available_types)}."
@@ -377,6 +410,7 @@ def print_settings(algorithm_type: str, algorithm_name: str, characters: int = 1
 
     """
     algorithm_type = _resolve_algorithm_type(algorithm_type)
+    algorithm_name = _resolve_algorithm_name(algorithm_type, algorithm_name)
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             instance = factory.create(algorithm_name)
@@ -437,6 +471,7 @@ def inspect_settings(algorithm_type: str, algorithm_name: str) -> list[tuple[str
 
     """
     algorithm_type = _resolve_algorithm_type(algorithm_type)
+    algorithm_name = _resolve_algorithm_name(algorithm_type, algorithm_name)
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             instance = factory.create(algorithm_name)
@@ -871,7 +906,7 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.propagator import MagnusPropagator  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import DenseMatrixSolver, SparseMatrixSolver  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper  # noqa: PLC0415
-    from qdk_chemistry.algorithms.state_preparation import SparseIsometryGF2XStatePreparation  # noqa: PLC0415
+    from qdk_chemistry.algorithms.state_preparation import SparseIsometryStatePreparation  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation.dense_pure_state import DensePureStatePreparation  # noqa: PLC0415
     from qdk_chemistry.algorithms.term_grouper import (  # noqa: PLC0415
         FullCommutingTermGrouper,
@@ -884,7 +919,9 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation import EulerIntegrator  # noqa: PLC0415
 
     register(lambda: QdkExpectationEstimator())
-    register(lambda: SparseIsometryGF2XStatePreparation())
+    # Must precede SparseIsometryStatePreparation, whose settings resolve it by name at construction.
+    register(lambda: DensePureStatePreparation())
+    register(lambda: SparseIsometryStatePreparation())
     register(lambda: DenseMatrixSolver())
     register(lambda: SparseMatrixSolver())
     register(lambda: QdkQubitMapper())
@@ -899,7 +936,6 @@ def _register_python_algorithms():
     register(lambda: PauliSequenceMapper())
     register(lambda: PSPMapper())
     register(lambda: ControlledPSPMapper())
-    register(lambda: DensePureStatePreparation())
     register(lambda: ControlledPauliSequenceMapper())
     register(lambda: EulerIntegrator())
     register(lambda: EulerEvolutionCircuitBuilder())
