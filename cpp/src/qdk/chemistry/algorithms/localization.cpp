@@ -197,7 +197,7 @@ std::unique_ptr<OrbitalLocalizer> make_vvhv_localizer() {
   return std::make_unique<microsoft::VVHVLocalizer>();
 }
 
-void LocalizerFactory::register_default_instances() {
+void OrbitalLocalizerFactory::register_default_instances() {
   QDK_LOG_TRACE_ENTERING();
 
   OrbitalLocalizerFactory::register_instance(&make_pipek_mezey_localizer);

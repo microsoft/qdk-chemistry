@@ -22,8 +22,11 @@
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 static_assert(std::is_same_v<OrbitalLocalizer, Localizer>);
 static_assert(std::is_same_v<OrbitalLocalizerFactory, LocalizerFactory>);
+#pragma GCC diagnostic pop
 
 class LocalizationTest : public ::testing::Test {};
 
