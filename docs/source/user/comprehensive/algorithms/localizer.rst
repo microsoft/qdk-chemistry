@@ -229,6 +229,10 @@ full active space, and the returned wavefunction carries the input active space 
      - Type
      - Default
      - Description
+   * - ``hamiltonian_constructor``
+     - :class:`~qdk_chemistry.data.AlgorithmRef`
+     - ``AlgorithmRef("hamiltonian_constructor", "qdk")``
+     - Hamiltonian constructor used to define the mapped coefficient-norm objective
    * - ``degeneracy_tolerance``
      - float
      - ``1e-6``

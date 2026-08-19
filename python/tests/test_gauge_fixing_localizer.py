@@ -14,7 +14,7 @@ from qdk_chemistry.algorithms import (
     QdkGaugeFixingLocalizer,
     create,
 )
-from qdk_chemistry.data import Structure
+from qdk_chemistry.data import AlgorithmRef, Structure
 from qdk_chemistry.data._spin_channels import spin_channel_indices
 from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.utils import compute_valence_space_parameters
@@ -42,9 +42,18 @@ class TestGaugeFixingLocalizerBindings:
 
     def test_settings_from_create_kwargs(self):
         """Test that create() keyword arguments configure the settings."""
-        localizer = create("orbital_localizer", "qdk_gauge_fixing", max_sweeps=1)
+        localizer = create(
+            "orbital_localizer",
+            "qdk_gauge_fixing",
+            max_sweeps=1,
+            hamiltonian_constructor=AlgorithmRef("hamiltonian_constructor", "qdk", eri_method="incore"),
+        )
         assert localizer.settings().get("max_sweeps") == 1
         assert localizer.settings().get("angle_samples") == 32
+        constructor_ref = localizer.settings().get("hamiltonian_constructor")
+        assert constructor_ref.algorithm_type == "hamiltonian_constructor"
+        assert constructor_ref.algorithm_name == "qdk"
+        assert constructor_ref.settings.get("eri_method") == "incore"
 
     def test_angle_samples_lower_bound(self):
         """Test that fewer than four angular samples is rejected by the settings constraint."""
@@ -71,7 +80,9 @@ class TestGaugeFixingLocalizerBindings:
         hamiltonian_constructor = create("hamiltonian_constructor", "qdk")
         casci_solver = create("multi_configuration_calculator", "macis_cas", calculate_one_rdm=True)
         _, casci_wavefunction = casci_solver.run(
-            hamiltonian_constructor.run(valence_wavefunction.get_orbitals()), num_alpha, num_beta
+            hamiltonian_constructor.run(valence_wavefunction.get_orbitals()),
+            num_alpha,
+            num_beta,
         )
         natural = create("orbital_localizer", "qdk_natural_orbitals").run(casci_wavefunction, indices, indices)
         energy_before, _ = casci_solver.run(hamiltonian_constructor.run(natural.get_orbitals()), num_alpha, num_beta)

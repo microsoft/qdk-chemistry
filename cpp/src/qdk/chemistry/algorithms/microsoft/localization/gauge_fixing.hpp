@@ -19,6 +19,10 @@ namespace qdk::chemistry::algorithms::microsoft {
 class GaugeFixingLocalizerSettings : public data::Settings {
  public:
   GaugeFixingLocalizerSettings() {
+    set_default("hamiltonian_constructor",
+                data::AlgorithmRef("hamiltonian_constructor", "qdk"),
+                "Hamiltonian constructor used to define the mapped "
+                "coefficient-norm objective");
     set_default("degeneracy_tolerance", 1e-6,
                 "Maximum occupation-number spread within one degenerate block");
     set_default(

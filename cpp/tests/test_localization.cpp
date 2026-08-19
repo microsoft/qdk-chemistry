@@ -57,6 +57,14 @@ TEST_F(LocalizationTest, LocalizationSelector_MetaData) {
   EXPECT_NO_THROW({ auto settings = selector->settings(); });
 }
 
+TEST_F(LocalizationTest, GaugeFixingHamiltonianConstructorDefault) {
+  auto localizer = LocalizerFactory::create("qdk_gauge_fixing");
+  const auto constructor_ref =
+      localizer->settings().get<AlgorithmRef>("hamiltonian_constructor");
+  EXPECT_EQ(constructor_ref.get_algorithm_type(), "hamiltonian_constructor");
+  EXPECT_EQ(constructor_ref.get_algorithm_name(), "qdk");
+}
+
 TEST_F(LocalizationTest, Factory) {
   auto available_localizers = LocalizerFactory::available();
   // Lower bound rather than an exact count: adding future localizers should not
@@ -1826,6 +1834,19 @@ GaugeFixingFixture make_gauge_fixing_fixture() {
   auto natural = LocalizerFactory::create("qdk_natural_orbitals")
                      ->run(wfn_cas, active_indices, active_indices);
   return {natural, active_indices, num_alpha, num_beta};
+}
+
+TEST_F(LocalizationTest, GaugeFixingUsesConfiguredHamiltonianConstructor) {
+  auto fixture = make_gauge_fixing_fixture();
+  auto localizer = LocalizerFactory::create("qdk_gauge_fixing");
+  localizer->settings().set(
+      "hamiltonian_constructor",
+      AlgorithmRef("hamiltonian_constructor",
+                   "_nonexistent_gauge_fixing_hamiltonian_constructor"));
+
+  EXPECT_THROW(localizer->run(fixture.natural_wavefunction,
+                              fixture.active_indices, fixture.active_indices),
+               std::runtime_error);
 }
 
 /// Jordan-Wigner mapped coefficient norm of the orbitals' active space.

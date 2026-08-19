@@ -313,8 +313,10 @@ std::shared_ptr<data::Wavefunction> GaugeFixingLocalizer::_run_impl(
   auto reference_orbitals = std::make_shared<data::Orbitals>(
       coefficients, std::nullopt, overlap, orbitals->get_basis_set(),
       orbitals->active_indices(), orbitals->inactive_indices());
+  auto hamiltonian_constructor =
+      _create_nested<HamiltonianConstructorFactory>("hamiltonian_constructor");
   const auto reference_hamiltonian =
-      HamiltonianConstructorFactory::create()->run(reference_orbitals);
+      hamiltonian_constructor->run(reference_orbitals);
   const auto& [reference_one_body, reference_one_body_beta] =
       reference_hamiltonian->get_one_body_integrals();
   const auto& [reference_two_body, reference_two_body_aabb,
