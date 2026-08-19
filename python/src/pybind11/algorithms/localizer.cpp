@@ -9,6 +9,7 @@
 #include <qdk/chemistry.hpp>
 
 #include "factory_bindings.hpp"
+#include "qdk/chemistry/algorithms/microsoft/localization/active_space_qio.hpp"
 #include "qdk/chemistry/algorithms/microsoft/localization/gauge_fixing.hpp"
 #include "qdk/chemistry/algorithms/microsoft/localization/mp2_natural_orbitals.hpp"
 #include "qdk/chemistry/algorithms/microsoft/localization/natural_orbitals.hpp"
@@ -344,42 +345,19 @@ Initializes a natural orbital transformer with default settings.
       m, "QdkGaugeFixingLocalizer", R"(
 QDK gauge-fixing orbital localizer.
 
-Natural orbitals with equal occupation numbers span a well-defined subspace but
-do not have unique orbital vectors. Any orthogonal rotation inside such an
-occupation-degenerate block spans the same subspace and leaves the exact CASCI
-energy unchanged, yet it produces a different qubit Hamiltonian after mapping.
-
-This class resolves that freedom deterministically: it anchors every selected
-degenerate block to the atomic-orbital basis, then runs coordinate-descent
-sweeps over Givens plane rotations within each block, accepting only rotations
-that reduce the mapped coefficient norm ``lambda = sum_l |h_l|``. Because
-``lambda`` sets the evolution time in phase estimation and the normalization of
-a linear-combination-of-unitaries block encoding, reducing it lowers quantum
-resource estimates without affecting the energy.
-
-Rotations stay inside degenerate blocks, so the returned orbitals remain natural
-orbitals; their occupations are unchanged and are carried on the returned
-wavefunction.
+Orbitals with equal occupation numbers span a well-defined subspace without
+being uniquely determined within it. This class resolves that freedom
+deterministically, choosing the orientation that minimizes the mapped
+Hamiltonian coefficient 1-norm ``lambda = sum_l |h_l|``, which sets the
+evolution time in phase estimation and the normalization of a
+linear-combination-of-unitaries block encoding.
 
 .. note::
     Requires restricted orbitals, an active space, an overlap matrix, and a
     spin-traced active 1-RDM that is diagonal in the input orbital basis, which
-    is what :class:`QdkNaturalOrbitalLocalizer` produces.
-    Requires ``loc_indices_a == loc_indices_b``, and those indices must be a
-    subset of the active-space indices that does not split a degenerate block.
-
-Typical usage:
-
-.. code-block:: python
-
-    import qdk_chemistry.algorithms as alg
-
-    # Choosing a gauge is a separate objective from finding natural orbitals,
-    # so the two localizers are composed.
-    natural = alg.create("orbital_localizer", "qdk_natural_orbitals").run(
-        wavefunction, valence_indices, valence_indices)
-    gauge_fixed = alg.create("orbital_localizer", "qdk_gauge_fixing").run(
-        natural, selected_indices, selected_indices)
+    is what :class:`QdkNaturalOrbitalLocalizer` produces. Requires
+    ``loc_indices_a == loc_indices_b``, and those indices must be a subset of
+    the active-space indices that does not split a degenerate block.
 
 See Also:
     :class:`OrbitalLocalizer`
@@ -390,6 +368,34 @@ See Also:
 Default constructor.
 
 Initializes a gauge-fixing localizer with default settings.
+
+)");
+
+  // Bind concrete microsoft::ActiveSpaceQIOLocalizer implementation
+  py::class_<microsoft::ActiveSpaceQIOLocalizer, Localizer, py::smart_holder>(
+      m, "QdkActiveSpaceQIOLocalizer", R"(
+QDK quantum-information orbital (QIO) active-space localizer.
+
+Rotates restricted active orbitals to minimize the total single-orbital entropy
+using gradient-free Jacobi sweeps.
+
+This class minimizes the QIO objective restricted to rotations within a fixed
+active space. It does not implement full-space QIO or QICAS, both of which mix
+orbitals across the active-space boundary.
+
+.. note::
+    Requires a restricted active orbital space, matching alpha and beta
+    localization indices, and spin-dependent active-space 1- and 2-RDMs.
+
+See Also:
+    :class:`OrbitalLocalizer`
+    :class:`qdk_chemistry.data.Wavefunction`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes a quantum-information orbital localizer with default settings.
 
 )");
 
