@@ -77,13 +77,12 @@ extensions = [
     "sphinx.ext.autosummary",  # Create summary tables for modules/classes
     "sphinx.ext.intersphinx",  # Link to other projects' documentation
     "sphinx.ext.viewcode",  # Add links to view source code
+    "sphinx.ext.napoleon",  # Support for Google-style and NumPy-style docstrings
     # Additional extensions
     "sphinx_autodoc_typehints",  # Better support for Python type annotations
     "sphinx_inline_tabs",  # Support for tabbed content in docs
     # C++ documentation
     "breathe",  # Bridge between Sphinx and Doxygen
-    # Enable Google-style docstrings parsing
-    "sphinx.ext.napoleon",  # Support for Google-style and NumPy-style docstrings
     "sphinx.ext.todo",  # Support for listing to-dos
     "sphinx.ext.graphviz",  # Support for Graphviz diagrams
     "sphinxcontrib.bibtex",  # Support for bibliographic references
@@ -341,9 +340,10 @@ def normalize_autodoc_docstring(app, what, name, obj, options, lines):
     """Rewrite internal module references that appear inside docstrings."""
     for idx, line in enumerate(lines):
         rewritten = _rewrite_internal_module_path(line)
-        # Escape '*args' and '**kwargs' in pybind11 auto-generated signature
-        # lines so Sphinx/reST does not treat them as emphasis/bold markup.
+        # Escape starred parameter names so Sphinx/reST does not treat them as
+        # emphasis/bold markup.
         # Negative lookbehind avoids double-escaping already-escaped instances.
+        rewritten = re.sub(r"(?<!\\)(\*{1,2})(\w+):", r"\\\1\2:", rewritten)
         rewritten = re.sub(r"(?<!\\)\*\*kwargs", r"\\**kwargs", rewritten)
         rewritten = re.sub(r"(?<![\\*])\*args", r"\\*args", rewritten)
         if rewritten != line:
