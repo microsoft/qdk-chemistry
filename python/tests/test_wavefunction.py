@@ -27,6 +27,7 @@ from qdk_chemistry.data import (
     WavefunctionType,
 )
 from qdk_chemistry.data._spin_channels import spin_channel_matrix
+from qdk_chemistry.data._type_name import class_data_type_name
 from qdk_chemistry.data.symmetry import (
     AxisName,
     SymmetryBlockedScalarCount,
@@ -1485,9 +1486,10 @@ class TestCCContainer:
         assert container.has_t2_amplitudes()
         assert wf.get_active_num_electrons() == (2, 2)
 
-    """Test that Wavefunction has the correct _data_type_name class attribute."""
-    assert hasattr(Wavefunction, "_data_type_name")
-    assert Wavefunction._data_type_name == "wavefunction"
+
+def test_wavefunction_data_type_name():
+    """Test that Wavefunction exposes its static wire-format identifier."""
+    assert class_data_type_name(Wavefunction) == "wavefunction"
 
 
 class TestWavefunctionTruncate:

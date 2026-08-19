@@ -110,7 +110,9 @@ test = [
   "nbformat",
   "pennylane",
   "rdkit",
-  "requests>=2.33.0"
+  "requests>=2.33.0",
+  "setuptools>=64",
+  "wheel"
 ]
 
 [project.urls]

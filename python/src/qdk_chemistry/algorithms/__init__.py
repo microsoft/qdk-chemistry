@@ -21,7 +21,8 @@ from qdk_chemistry.algorithms.active_space_selector import (
     QdkOccupationActiveSpaceSelector,
     QdkValenceActiveSpaceSelector,
 )
-from qdk_chemistry.algorithms.amplitude_amplification import AmplitudeAmplification, phase_marking_oracle
+from qdk_chemistry.algorithms.amplitude_amplification.amplitude_amplification import AmplitudeAmplification
+from qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace import QPESubspaceMarking
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.controlled_circuit_mapper.base import ControlledCircuitMapper
 from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator, QdkMP2Calculator
@@ -51,6 +52,7 @@ from qdk_chemistry.algorithms.nuclear_derivative import (
 )
 from qdk_chemistry.algorithms.orbital_localizer import (
     OrbitalLocalizer,
+    QdkActiveSpaceQIOLocalizer,
     QdkMP2NaturalOrbitalLocalizer,
     QdkNaturalOrbitalLocalizer,
     QdkPipekMezeyLocalizer,
@@ -58,6 +60,7 @@ from qdk_chemistry.algorithms.orbital_localizer import (
 )
 from qdk_chemistry.algorithms.phase_estimation.base import PhaseEstimation
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import QpeCircuitBuilder
+from qdk_chemistry.algorithms.population_analysis import PopulationAnalyzer, QdkPopulationAnalyzer
 from qdk_chemistry.algorithms.projected_multi_configuration_calculator import (
     ProjectedMultiConfigurationCalculator,
     QdkMacisPmc,
@@ -90,7 +93,10 @@ __all__ = [
     "NuclearDerivativeCalculator",
     "OrbitalLocalizer",
     "PhaseEstimation",
+    "PopulationAnalyzer",
     "ProjectedMultiConfigurationCalculator",
+    "QPESubspaceMarking",
+    "QdkActiveSpaceQIOLocalizer",
     "QdkAutocasActiveSpaceSelector",
     "QdkAutocasEosActiveSpaceSelector",
     "QdkExpectationEstimator",
@@ -104,6 +110,7 @@ __all__ = [
     "QdkNuclearDerivativeCalculator",
     "QdkOccupationActiveSpaceSelector",
     "QdkPipekMezeyLocalizer",
+    "QdkPopulationAnalyzer",
     "QdkQubitMapper",
     "QdkScfSolver",
     "QdkSchriefferWolffPT2Constructor",
@@ -122,7 +129,6 @@ __all__ = [
     "available",
     "create",
     "inspect_settings",
-    "phase_marking_oracle",
     "print_settings",
     "register",
     "show_default",

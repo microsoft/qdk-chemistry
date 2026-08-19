@@ -118,12 +118,18 @@ class SymmetryBlockedIndexSet
   // ---- DataClass interface ------------------------------------------------
 
   /**
-   * @brief @ref DataClass type identifier.
+   * @brief Static @ref DataClass type identifier.
    * @return The stable string @c "symmetry_blocked_index_set".
    */
-  std::string get_data_type_name() const override {
+  static std::string data_type_name() {
     return DATACLASS_TO_SNAKE_CASE(SymmetryBlockedIndexSet);
   }
+
+  /**
+   * @brief @ref DataClass type identifier for this instance.
+   * @return The stable string @c "symmetry_blocked_index_set".
+   */
+  std::string get_data_type_name() const override { return data_type_name(); }
   /**
    * @brief Single-line human-readable summary of the contained labels.
    * @return A short diagnostic string suitable for logging.
