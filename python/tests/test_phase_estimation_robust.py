@@ -105,6 +105,14 @@ class _FakeUnitaryBuilder:
         """Return the category of the replaced unitary builder."""
         return self._rpe_category
 
+    def rpe_target_accuracy(self, epsilon_unitary: float) -> float:
+        """Map an RPE unitary tolerance using the replaced builder's contract."""
+        if self._rpe_category != "partial_randomized":
+            return epsilon_unitary
+        split = float(self._settings.get("accuracy_split"))
+        split = min(max(split, 1e-6), 1.0 - 1e-6)
+        return epsilon_unitary / (np.sqrt(split) + np.sqrt(1.0 - split))
+
     def run(self, qubit_hamiltonian: QubitOperator) -> _FakeUnitary:
         """Record one build and return its configured time and seed."""
         record = self._settings.to_dict()
@@ -375,6 +383,27 @@ def test_non_trotter_explicit_fraction_retains_clamping() -> None:
     assert budget_mode == "fraction"
 
 
+def test_partial_builder_retains_explicit_legacy_fraction() -> None:
+    """An explicit legacy fraction still selects the fractional PR budget route."""
+    hamiltonian = QubitOperator(pauli_strings=["Z"], coefficients=[1.0])
+    builder = _make_builder(
+        target_accuracy=0.1,
+        unitary_builder_name="partially_randomized",
+        unitary_accuracy_fraction=0.25,
+    )
+
+    circuit_set = builder.run(_DUMMY_STATE_PREPARATION, hamiltonian)
+
+    assert circuit_set.unitary_accuracy_fraction == pytest.approx(0.25)
+    assert circuit_set.epsilon_rpe == pytest.approx(0.075)
+    assert circuit_set.epsilon_unitary == pytest.approx(0.025)
+    assert circuit_set.error_budget_mode == "fraction"
+    for round_data in circuit_set.rounds:
+        settings = round_data.unitary_builder_configuration.settings
+        assert settings is not None
+        assert settings.get("target_accuracy") == pytest.approx(0.025 / np.sqrt(2.0))
+
+
 def test_trotter_uses_independent_default_tolerances() -> None:
     """Trotter uses the full energy target for RPE and an independent unitary tolerance."""
     target_accuracy = 1e-2
@@ -432,8 +461,9 @@ def test_trotter_rejects_legacy_or_nonpositive_tolerances(
         builder.run(_DUMMY_STATE_PREPARATION, hamiltonian)
 
 
-def test_partial_builder_receives_unitary_budget() -> None:
-    """Every partially randomized round exposes the unitary target accuracy and independent seeds."""
+@pytest.mark.parametrize("epsilon_unitary", [None, 0.5])
+def test_partial_builder_receives_independent_unitary_budget(epsilon_unitary: float | None) -> None:
+    """Partially randomized rounds receive a normalized independent unitary budget."""
     hamiltonian = QubitOperator(pauli_strings=["ZZ", "XX"], coefficients=[0.5, 0.5])
     epsilon_total = 1e-2
     builder = _make_builder(
@@ -441,18 +471,47 @@ def test_partial_builder_receives_unitary_budget() -> None:
         unitary_builder_name="partially_randomized",
         energy_correction="linear",
         seed=5,
+        epsilon_unitary=epsilon_unitary,
     )
 
     circuit_set = builder.run(_DUMMY_STATE_PREPARATION, hamiltonian)
 
-    epsilon_unitary = 0.5 * epsilon_total
+    outer_epsilon_unitary = 0.85 if epsilon_unitary is None else epsilon_unitary
+    nested_target_accuracy = outer_epsilon_unitary / np.sqrt(2.0)
+    assert circuit_set.epsilon_rpe == pytest.approx(epsilon_total)
+    assert circuit_set.epsilon_unitary == pytest.approx(outer_epsilon_unitary)
+    assert circuit_set.unitary_accuracy_fraction == pytest.approx(0.0)
+    assert circuit_set.error_budget_mode == "independent_partial_randomized"
     for round_data in circuit_set.rounds:
         ref = round_data.unitary_builder_configuration
         assert ref.settings is not None
-        assert ref.settings.get("target_accuracy") == pytest.approx(epsilon_unitary)
+        assert ref.settings.get("target_accuracy") == pytest.approx(nested_target_accuracy)
         assert not ref.settings.has("num_samples")
         assert round_data.num_draws == round_data.shots_per_basis
         assert len(set(round_data.draw_seeds)) == round_data.shots_per_basis
+
+
+@pytest.mark.parametrize(
+    ("epsilon_unitary", "message"),
+    [
+        (0.0, "epsilon_unitary must be positive"),
+        (-0.5, "epsilon_unitary must be positive"),
+        (np.sin(np.pi / 3.0), "epsilon_unitary must be smaller"),
+    ],
+)
+def test_partial_builder_rejects_invalid_independent_unitary_budget(
+    epsilon_unitary: float,
+    message: str,
+) -> None:
+    """Independent PR routing rejects nonpositive and branch-unsafe tolerances."""
+    builder = _make_builder(
+        target_accuracy=0.1,
+        unitary_builder_name="partially_randomized",
+        epsilon_unitary=epsilon_unitary,
+    )
+
+    with pytest.raises(ValueError, match=message):
+        builder.run(_DUMMY_STATE_PREPARATION, QubitOperator(pauli_strings=["Z"], coefficients=[1.0]))
 
 
 @pytest.mark.parametrize(("unitary_name", "randomized"), [("trotter", False), ("qdrift", True)])

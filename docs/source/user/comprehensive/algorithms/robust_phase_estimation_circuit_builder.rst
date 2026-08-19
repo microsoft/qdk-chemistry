@@ -39,13 +39,13 @@ Configuration
      - Round-zero evolution time. ``0.0`` selects :math:`\pi/(2\lambda)` from the Hamiltonian coefficient norm; an explicit positive value must satisfy :math:`\mathtt{base\_time}\,\lambda < \pi` to avoid energy aliasing.
    * - ``unitary_accuracy_fraction``
      - float
-     - Legacy fraction used by non-Trotter builders. It is not supported when ``unitary_builder`` selects Trotter.
+     - Legacy fraction used by non-Trotter builders. Partially randomized evolution uses it only when explicitly set; it is not supported for Trotter.
    * - ``epsilon_rpe``
      - float
-     - Legacy explicit RPE energy tolerance for non-Trotter builders. Trotter always uses ``target_accuracy`` as its RPE tolerance.
+     - Explicit RPE energy tolerance for non-Trotter builders. Set it together with ``epsilon_unitary``. Trotter and default partially randomized evolution use ``target_accuracy``.
    * - ``epsilon_unitary``
      - float
-     - Independent positive Trotter sizing tolerance. When omitted, Trotter uses ``0.85``.
+     - Positive full-unitary tolerance. Trotter and default partially randomized evolution use an independent value of ``0.85`` when omitted.
    * - ``energy_correction``
      - str
      - Phase-to-energy map: ``"auto"``, ``"linear"``, or ``"qdrift_tangent"``.
@@ -53,10 +53,10 @@ Configuration
      - int
      - Root random seed. ``-1`` chooses one entropy-backed seed when the circuit set is created.
 
-Trotter accuracy routing
-------------------------
+Independent unitary-accuracy routing
+------------------------------------
 
-When ``unitary_builder`` selects the registered Trotter implementation, the builder uses independent quantities with different units:
+When ``unitary_builder`` selects Trotter or partially randomized evolution, the default route uses independent quantities with different units:
 
 .. math::
 
@@ -64,10 +64,30 @@ When ``unitary_builder`` selects the registered Trotter implementation, the buil
   \qquad
   \epsilon_u = \mathtt{epsilon\_unitary}.
 
-The default ``epsilon_unitary`` is ``0.85``. It is dimensionless and controls Trotter step sizing; it is not added to the energy-valued ``target_accuracy``.
+The default ``epsilon_unitary`` is ``0.85``. It is dimensionless and controls unitary sizing; it is not added to the energy-valued ``target_accuracy``.
 ``unitary_accuracy_fraction`` and explicit ``epsilon_rpe`` are rejected for Trotter.
+For partially randomized evolution, setting ``unitary_accuracy_fraction`` explicitly retains the legacy fractional route, while setting both ``epsilon_rpe`` and ``epsilon_unitary`` selects an explicit paired budget.
 
-For ``0 < epsilon_unitary < sin(pi/3)``, exact eigenstate input, and a valid per-round Trotter operator bound, the automatic ladder gives
+The partially randomized builder divides its own ``target_accuracy`` :math:`\eta` in quadrature using ``accuracy_split`` :math:`s`.
+RPE maps the full-unitary tolerance to
+
+.. math::
+
+  \eta = \frac{\epsilon_u}{\sqrt{s}+\sqrt{1-s}},
+  \qquad
+  \epsilon_D=\sqrt{s}\,\eta,
+  \qquad
+  \epsilon_R=\sqrt{1-s}\,\eta,
+
+so the conservative additive channel bound satisfies :math:`\epsilon_D+\epsilon_R=\epsilon_u`.
+Since the longest RPE evolution has :math:`t_{\max}=O(1/\epsilon_{\mathrm{total}})` and :math:`\epsilon_R` is independent of the requested energy accuracy, the Campbell random-sample budget scales as
+
+.. math::
+
+  N_R=O\!\left(\frac{\lambda_R^2t_{\max}^2}{\epsilon_R}\right)
+     =O\!\left(\epsilon_{\mathrm{total}}^{-2}\right).
+
+For ``0 < epsilon_unitary < sin(pi/3)``, exact eigenstate input, and a valid per-round full-evolution error bound, the automatic ladder gives
 
 .. math::
 
@@ -77,6 +97,7 @@ For ``0 < epsilon_unitary < sin(pi/3)``, exact eigenstate input, and a valid per
   < \mathtt{target\_accuracy}.
 
 Any positive ``epsilon_unitary`` is accepted as a Trotter step-sizing input, but values at or above ``sin(pi/3)`` do not carry this uniform branch guarantee.
+Partially randomized evolution requires ``epsilon_unitary < sin(pi/3)`` for its independent route.
 Other unitary-builder categories retain their existing routing.
 
 .. tab:: Python API

@@ -41,6 +41,10 @@ class HamiltonianUnitaryBuilder(Algorithm):
         """Return the builder category used by robust phase estimation."""
         return "deterministic_or_exact"
 
+    def rpe_target_accuracy(self, epsilon_unitary: float) -> float:
+        """Map an RPE full-unitary tolerance to this builder's target accuracy."""
+        return epsilon_unitary
+
     @abstractmethod
     def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
         """Construct a UnitaryRepresentation for the given Hamiltonian.

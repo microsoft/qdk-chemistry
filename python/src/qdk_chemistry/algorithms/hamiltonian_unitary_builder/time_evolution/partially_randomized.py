@@ -657,6 +657,12 @@ class PartiallyRandomized(QDrift):
         """Return the partially randomized category used by robust phase estimation."""
         return "partial_randomized"
 
+    def rpe_target_accuracy(self, epsilon_unitary: float) -> float:
+        """Map an additive RPE tolerance to the builder's quadrature target."""
+        split = float(self._settings.get("accuracy_split"))
+        split = min(max(split, ACCURACY_SPLIT_MIN), ACCURACY_SPLIT_MAX)
+        return epsilon_unitary / (math.sqrt(split) + math.sqrt(1.0 - split))
+
     def name(self) -> str:
         """Return the name of the unitary builder."""
         return "partially_randomized"

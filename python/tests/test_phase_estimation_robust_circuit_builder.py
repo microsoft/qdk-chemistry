@@ -9,13 +9,16 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from itertools import islice
+from itertools import islice, pairwise
 from math import pi
 
 import pytest
 
 from qdk_chemistry import algorithms
 from qdk_chemistry.algorithms import create
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized import (
+    PartiallyRandomized,
+)
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder import (
     QdkRobustPhaseEstimationCircuitBuilder,
@@ -52,6 +55,14 @@ class _FakeUnitaryBuilder:
     def rpe_category(self) -> str:
         """Return the category of the replaced unitary builder."""
         return self._rpe_category
+
+    def rpe_target_accuracy(self, epsilon_unitary: float) -> float:
+        """Map an RPE unitary tolerance using the replaced builder's contract."""
+        if self._rpe_category != "partial_randomized":
+            return epsilon_unitary
+        split = float(self._settings.get("accuracy_split"))
+        split = min(max(split, 1e-6), 1.0 - 1e-6)
+        return epsilon_unitary / ((split**0.5) + ((1.0 - split) ** 0.5))
 
     def run(self, qubit_hamiltonian: QubitOperator) -> _FakeUnitary:
         """Record settings and return a unitary marker."""
@@ -208,6 +219,48 @@ def test_renamed_trotter_uses_same_rpe_policy(
         assert renamed_settings is not None
         assert builtin_settings.get("target_accuracy") == pytest.approx(expected_unitary_accuracy)
         assert renamed_settings.get("target_accuracy") == pytest.approx(expected_unitary_accuracy)
+
+
+def test_default_partial_randomized_random_cost_scales_quadratically(
+    rpe_problem: tuple[Circuit, QubitOperator],
+) -> None:
+    """Default PR sample growth follows the expected inverse-square RPE scaling."""
+    state_preparation, _ = rpe_problem
+    hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+    random_rotation_counts: list[int] = []
+
+    for target_accuracy in (0.1, 0.05, 0.025, 0.0125):
+        circuit_set = QdkRobustPhaseEstimationCircuitBuilder(
+            target_accuracy=target_accuracy,
+            seed=7,
+            unitary_builder=AlgorithmRef(
+                "hamiltonian_unitary_builder",
+                "partially_randomized",
+                weight_threshold=0.75,
+                num_random_samples=1,
+                trotter_order=2,
+            ),
+        ).run(state_preparation, hamiltonian)
+        final_round = circuit_set.rounds[-1]
+        settings = final_round.unitary_builder_configuration.settings
+        assert settings is not None
+        partial_builder = PartiallyRandomized(**settings.to_dict())
+        terms = hamiltonian.get_real_coefficients(tolerance=1e-12, sort_by_magnitude=True)
+        random_terms = terms[1:]
+        num_divisions = partial_builder._resolve_num_divisions(hamiltonian, final_round.evolution_time)
+        block_samples = partial_builder._resolve_block_samples(
+            random_terms,
+            final_round.evolution_time,
+            num_divisions,
+        )
+
+        assert circuit_set.epsilon_rpe == pytest.approx(target_accuracy)
+        assert circuit_set.epsilon_unitary == pytest.approx(0.85)
+        assert settings.get("target_accuracy") == pytest.approx(0.85 / (2.0**0.5))
+        random_rotation_counts.append(num_divisions * block_samples)
+
+    ratios = [current / previous for previous, current in pairwise(random_rotation_counts)]
+    assert all(3.5 < ratio < 4.5 for ratio in ratios)
 
 
 @pytest.mark.parametrize("builder_name", ["trotter", "qdrift", "partially_randomized"])

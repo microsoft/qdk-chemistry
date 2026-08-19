@@ -321,7 +321,7 @@ class RobustPhaseEstimationSchedule(DataClass):
         base_time: Evolution time used for round zero.
         target_accuracy: Requested absolute accuracy of the final energy estimate.
         epsilon_rpe: Energy tolerance used to determine the number of RPE rounds.
-        epsilon_unitary: Resolved accuracy parameter supplied to the unitary builder.
+        epsilon_unitary: Resolved full-evolution tolerance before builder-specific mapping.
         unitary_accuracy_fraction: Resolved legacy non-Trotter accuracy-budget fraction.
         error_budget_mode: Mode used to resolve RPE and unitary accuracy parameters.
         unitary_builder_category: Category of the configured unitary builder.

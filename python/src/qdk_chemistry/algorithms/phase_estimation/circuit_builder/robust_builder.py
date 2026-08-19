@@ -37,7 +37,7 @@ __all__ = [
 ]
 
 _UNSET_BUDGET_VALUE = -1.0
-_DEFAULT_TROTTER_EPSILON_UNITARY = 0.85
+_DEFAULT_RPE_EPSILON_UNITARY = 0.85
 _SUPPORTED_RPE_CATEGORIES = frozenset({"deterministic_or_exact", "trotter", "qdrift", "partial_randomized"})
 
 
@@ -122,7 +122,7 @@ class RobustPhaseEstimationCircuitSet:
     """Energy tolerance used to determine the number of RPE rounds."""
 
     epsilon_unitary: float
-    """Resolved accuracy parameter supplied to the unitary builder."""
+    """Resolved full-evolution tolerance before builder-specific mapping."""
 
     unitary_accuracy_fraction: float
     """Resolved legacy fraction used to partition non-Trotter accuracy budgets."""
@@ -367,19 +367,20 @@ class RobustPhaseEstimationCircuitBuilderSettings(Settings):
             "unitary_accuracy_fraction",
             "double",
             _UNSET_BUDGET_VALUE,
-            "Optional legacy fraction of target_accuracy assigned to the unitary builder; unsupported for Trotter.",
+            "Optional legacy fraction of target_accuracy assigned to a non-Trotter unitary builder; "
+            "omitted partially randomized builders use an independent unitary tolerance.",
         )
         self._set_default(
             "epsilon_rpe",
             "double",
             _UNSET_BUDGET_VALUE,
-            "Optional legacy RPE energy tolerance for non-Trotter builders. Set together with epsilon_unitary.",
+            "Optional explicit RPE energy tolerance for non-Trotter builders. Set together with epsilon_unitary.",
         )
         self._set_default(
             "epsilon_unitary",
             "double",
             _UNSET_BUDGET_VALUE,
-            "Independent positive Trotter sizing tolerance; omitted Trotter values resolve to 0.85.",
+            "Positive full-unitary tolerance. Trotter and partially randomized builders default to 0.85.",
         )
         self._set_default(
             "energy_correction",
@@ -419,8 +420,8 @@ class RobustPhaseEstimationCircuitBuilder(Algorithm):
             unitary_accuracy_fraction: Optional legacy non-Trotter fraction of ``target_accuracy``.
             energy_correction: Phase-to-energy map: ``"auto"``, ``"linear"``, or ``"qdrift_tangent"``.
             seed: Root random seed; ``-1`` chooses one entropy-backed seed per circuit set.
-            epsilon_rpe: Optional legacy RPE energy tolerance for non-Trotter builders.
-            epsilon_unitary: Optional positive Trotter sizing tolerance, with an effective Trotter default of ``0.85``.
+            epsilon_rpe: Optional explicit RPE energy tolerance for non-Trotter builders.
+            epsilon_unitary: Optional unitary tolerance; Trotter and partially randomized builders default to ``0.85``.
             unitary_builder: Optional time-evolution builder reference whose ``power`` must be ``1``.
             hadamard_test_circuit_builder: Optional Hadamard-test circuit-builder reference.
 
@@ -491,7 +492,8 @@ class QdkRobustPhaseEstimationCircuitBuilder(RobustPhaseEstimationCircuitBuilder
         hadamard_snapshot = _AlgorithmSnapshot.from_ref(hadamard_ref)
         _validate_unitary_builder_power(unitary_snapshot)
 
-        declared_category = self._resolve_rpe_category(unitary_snapshot)
+        unitary_builder = unitary_snapshot.create()
+        declared_category = self._resolve_rpe_category(unitary_snapshot, unitary_builder)
         category = "deterministic_or_exact" if declared_category == "trotter" else declared_category
         correction = self._select_correction(category)
         epsilon_total = float(self._settings.get("target_accuracy"))
@@ -499,6 +501,11 @@ class QdkRobustPhaseEstimationCircuitBuilder(RobustPhaseEstimationCircuitBuilder
             category,
             epsilon_total,
             is_trotter=declared_category == "trotter",
+        )
+        nested_epsilon_unitary = self._resolve_rpe_target_accuracy(
+            unitary_snapshot,
+            unitary_builder,
+            epsilon_unitary,
         )
 
         lambda_norm = float(np.sum(np.abs(np.asarray(qubit_hamiltonian.coefficients, dtype=float))))
@@ -524,7 +531,7 @@ class QdkRobustPhaseEstimationCircuitBuilder(RobustPhaseEstimationCircuitBuilder
             if category == "qdrift" and unitary_snapshot.has_setting("num_samples"):
                 updates["num_samples"] = int(samples)
             elif unitary_snapshot.has_setting("target_accuracy"):
-                updates["target_accuracy"] = float(epsilon_unitary)
+                updates["target_accuracy"] = nested_epsilon_unitary
             if not randomized and requested_seed >= 0 and unitary_snapshot.has_setting("seed"):
                 updates["seed"] = requested_seed + round_index
             round_snapshot = unitary_snapshot.with_updates(**updates)
@@ -571,9 +578,8 @@ class QdkRobustPhaseEstimationCircuitBuilder(RobustPhaseEstimationCircuitBuilder
         )
 
     @staticmethod
-    def _resolve_rpe_category(snapshot: _AlgorithmSnapshot) -> str:
+    def _resolve_rpe_category(snapshot: _AlgorithmSnapshot, builder: Algorithm) -> str:
         """Return and validate the unitary builder's declared RPE category."""
-        builder = snapshot.create()
         category_resolver = getattr(builder, "rpe_category", None)
         if not callable(category_resolver):
             raise TypeError(
@@ -592,6 +598,34 @@ class QdkRobustPhaseEstimationCircuitBuilder(RobustPhaseEstimationCircuitBuilder
                 f"RPE category {category!r}; expected one of: {supported}."
             )
         return category
+
+    @staticmethod
+    def _resolve_rpe_target_accuracy(
+        snapshot: _AlgorithmSnapshot,
+        builder: Algorithm,
+        epsilon_unitary: float,
+    ) -> float:
+        """Map and validate the RPE unitary tolerance for a nested builder."""
+        target_resolver = getattr(builder, "rpe_target_accuracy", None)
+        if target_resolver is None:
+            return epsilon_unitary
+        if not callable(target_resolver):
+            raise TypeError(
+                f"Unitary builder '{snapshot.algorithm_type}/{snapshot.algorithm_name}' defines a non-callable "
+                "rpe_target_accuracy attribute."
+            )
+        target_accuracy = target_resolver(epsilon_unitary)
+        if not isinstance(target_accuracy, int | float) or not np.isfinite(target_accuracy):
+            raise TypeError(
+                f"Unitary builder '{snapshot.algorithm_type}/{snapshot.algorithm_name}' returned an invalid "
+                "RPE target accuracy."
+            )
+        if target_accuracy < 0.0:
+            raise ValueError(
+                f"Unitary builder '{snapshot.algorithm_type}/{snapshot.algorithm_name}' returned a negative "
+                "RPE target accuracy."
+            )
+        return float(target_accuracy)
 
     def _select_correction(self, category: str) -> str:
         """Resolve the configured phase-to-energy correction."""
@@ -625,9 +659,23 @@ class QdkRobustPhaseEstimationCircuitBuilder(RobustPhaseEstimationCircuitBuilder
             if explicit_unitary != _UNSET_BUDGET_VALUE and explicit_unitary <= 0.0:
                 raise ValueError("epsilon_unitary must be positive for Trotter RPE.")
             epsilon_unitary = (
-                _DEFAULT_TROTTER_EPSILON_UNITARY if explicit_unitary == _UNSET_BUDGET_VALUE else explicit_unitary
+                _DEFAULT_RPE_EPSILON_UNITARY if explicit_unitary == _UNSET_BUDGET_VALUE else explicit_unitary
             )
             return 0.0, epsilon_total, epsilon_unitary, "independent_trotter"
+
+        if (
+            category == "partial_randomized"
+            and configured_fraction == _UNSET_BUDGET_VALUE
+            and explicit_rpe == _UNSET_BUDGET_VALUE
+        ):
+            if explicit_unitary != _UNSET_BUDGET_VALUE and explicit_unitary <= 0.0:
+                raise ValueError("epsilon_unitary must be positive for partially randomized RPE.")
+            epsilon_unitary = (
+                _DEFAULT_RPE_EPSILON_UNITARY if explicit_unitary == _UNSET_BUDGET_VALUE else explicit_unitary
+            )
+            if epsilon_unitary >= np.sin(np.pi / 3.0):
+                raise ValueError("epsilon_unitary must be smaller than sin(pi/3) for branch-safe RPE.")
+            return 0.0, epsilon_total, epsilon_unitary, "independent_partial_randomized"
 
         fraction = 0.5 if configured_fraction == _UNSET_BUDGET_VALUE else min(max(configured_fraction, 0.0), 1.0)
         has_explicit_budget = explicit_rpe > 0.0 or explicit_unitary > 0.0
