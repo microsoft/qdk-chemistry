@@ -46,7 +46,7 @@ steps:
   displayName: Restore/save vcpkg dependency cache
   inputs:
     key: >-
-      "windows-vcpkg-x64-windows-static-md-v1" | "$(MSVC_TOOLSET)" |
+      "windows-vcpkg-x64-windows-static-md-v1x" | "$(MSVC_TOOLSET)" |
       vcpkg.json |
       vcpkg-configuration.json |
       vcpkg-overlay/**/* |
@@ -58,7 +58,7 @@ steps:
   displayName: Restore/save C++ deps install cache
   inputs:
     key: >-
-      "windows-deps-install-msvc-x64-windows-static-md-v2" | "$(MSVC_TOOLSET)" |
+      "windows-deps-install-msvc-x64-windows-static-md-v2x" | "$(MSVC_TOOLSET)" |
       cpp/manifest/qdk-chemistry/cgmanifest.json |
       external/macis/manifest/cgmanifest.json |
       cpp/cmake/patches/**/* |
