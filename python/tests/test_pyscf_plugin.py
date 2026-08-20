@@ -2818,6 +2818,26 @@ class TestQDKChemistryPySCFBasisConversion:
         assert roundtrip_basis.get_ecp_electrons() == [28, 0]
         assert roundtrip_basis.get_num_ecp_shells() == basis.get_num_ecp_shells()
 
+    def test_qdk_to_pyscf_preserves_uniform_element_ecp_key(self):
+        """Test uniform ECP treatment retains the conventional element key."""
+        structure = Structure(
+            ["Ag", "Ag"],
+            np.array(
+                [
+                    [0.0, 0.0, 0.0],
+                    [5.0, 0.0, 0.0],
+                ]
+            ),
+        )
+        basis = BasisSet.from_index_map({0: "def2-svp", 1: "def2-svp"}, structure)
+
+        pyscf_mol = basis_to_pyscf_mol(basis)
+
+        assert basis.get_ecp_electrons() == [28, 28]
+        assert set(pyscf_mol.ecp) == {"Ag"}
+        assert pyscf_mol.atom_charges().tolist() == [19, 19]
+        assert pyscf_mol.nelectron == 38
+
     def test_ecp_roundtrip_conversion(self):
         """Test round-trip conversion of ECP shells and metadata: QDK -> PySCF -> QDK."""
         ag_structure = Structure(["Ag"], np.array([[0.0, 0.0, 0.0]]))
@@ -2918,8 +2938,8 @@ class TestQDKChemistryPySCFBasisConversion:
 
         # Verify full structure format: [ncore, [[l, terms], ...]]
         assert isinstance(pyscf_mol_1.ecp, dict)
-        assert "Ag1" in pyscf_mol_1.ecp
-        ecp_data = pyscf_mol_1.ecp["Ag1"]
+        assert "Ag" in pyscf_mol_1.ecp
+        ecp_data = pyscf_mol_1.ecp["Ag"]
         assert isinstance(ecp_data, list)
         assert len(ecp_data) >= 2
         assert isinstance(ecp_data[0], int)  # ncore

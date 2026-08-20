@@ -169,6 +169,7 @@ def basis_to_pyscf_mol(basis: BasisSet, charge: int = 0, multiplicity: int = 1) 
     if basis.has_ecp_shells() and basis.has_ecp_electrons():
         # Build PySCF ECP structure from QDK ECP shells
         ecp_dict = {}
+        ecp_data_by_atom = {}
         ecp_electrons = basis.get_ecp_electrons()
 
         for iatm in range(natoms):
@@ -213,7 +214,21 @@ def basis_to_pyscf_mol(basis: BasisSet, charge: int = 0, multiplicity: int = 1) 
 
                         l_components.append([l_value, terms])
 
-                    ecp_dict[pyscf_symbols[iatm]] = [ncore, l_components]
+                    ecp_data_by_atom[iatm] = [ncore, l_components]
+
+        atom_indices_by_element: dict[str, list[int]] = {}
+        for iatm, element in enumerate(elements):
+            atom_indices_by_element.setdefault(element, []).append(iatm)
+
+        for element, atom_indices in atom_indices_by_element.items():
+            element_ecp_data = [ecp_data_by_atom.get(iatm) for iatm in atom_indices]
+            first_ecp_data = element_ecp_data[0]
+            if first_ecp_data is not None and all(ecp_data == first_ecp_data for ecp_data in element_ecp_data):
+                ecp_dict[element] = first_ecp_data
+            else:
+                for iatm, ecp_data in zip(atom_indices, element_ecp_data, strict=True):
+                    if ecp_data is not None:
+                        ecp_dict[pyscf_symbols[iatm]] = ecp_data
 
         if ecp_dict:
             mol.ecp = ecp_dict
