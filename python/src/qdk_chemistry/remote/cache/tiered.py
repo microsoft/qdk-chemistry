@@ -30,7 +30,6 @@ from typing import TYPE_CHECKING, Any
 from qdk_chemistry.remote.cache.base import CacheBackend
 
 if TYPE_CHECKING:
-    from qdk_chemistry.data.base import DataClass
     from qdk_chemistry.remote.job import Job
 
 
@@ -119,9 +118,9 @@ class TieredCache(CacheBackend):
         for tier in self._tiers:
             tier.put_job(run_hash, job)
 
-    # ── DataClass blobs ──────────────────────────────────────────────────
+    # ── Data blobs ───────────────────────────────────────────────────────
 
-    def get_data(self, content_hash: str) -> DataClass | list | None:
+    def get_data(self, content_hash: str) -> Any | None:
         """Check each tier in order; backfill faster tiers on a hit."""
         for i, tier in enumerate(self._tiers):
             data = tier.get_data(content_hash)
@@ -131,14 +130,14 @@ class TieredCache(CacheBackend):
                 return data
         return None
 
-    def put_data(self, content_hash: str, data: DataClass | list) -> None:
-        """Write-through to every tier."""
+    def put_data(self, content_hash: str, data: Any, *, shared_only: bool = False) -> None:
+        """Write through to every eligible tier."""
         for tier in self._tiers:
-            tier.put_data(content_hash, data)
+            tier.put_data(content_hash, data, shared_only=shared_only)
 
-    def has_data(self, content_hash: str) -> bool:
-        """Return ``True`` if any tier contains the blob."""
-        return any(tier.has_data(content_hash) for tier in self._tiers)
+    def has_data(self, content_hash: str, *, shared_only: bool = False) -> bool:
+        """Return ``True`` if any eligible tier contains the blob."""
+        return any(tier.has_data(content_hash, shared_only=shared_only) for tier in self._tiers)
 
     # ── Deletion ─────────────────────────────────────────────────────────
 

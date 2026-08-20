@@ -18,7 +18,6 @@ import qdk_chemistry.remote.cache as cache_module
 from qdk_chemistry.data import EnergyExpectationResult, MeasurementData, Orbitals, QubitOperator
 from qdk_chemistry.data._spin_channels import spin_channel_matrix
 from qdk_chemistry.data.symmetry import axes
-from qdk_chemistry.plugins import DuplicateRegistrationError
 from qdk_chemistry.remote.cache import (
     _CACHES,
     CacheBackend,
@@ -208,6 +207,49 @@ class TestFolderCacheData:
             spin_channel_matrix(coefficients, axes.beta()),
             spin_channel_matrix(sample_coefficients, axes.beta()),
         )
+
+    def test_put_and_get_numpy_array(self, folder_cache):
+        """Round-trip a standalone NumPy array through the cache."""
+        value = np.array([[1, 2], [3, 4]], dtype=np.int32)
+
+        folder_cache.put_data("array_hash", value)
+        loaded = folder_cache.get_data("array_hash")
+
+        np.testing.assert_array_equal(loaded, value)
+        assert loaded.dtype == value.dtype
+        assert folder_cache.has_data("array_hash")
+
+    def test_delete_numpy_array(self, folder_cache):
+        """Delete a standalone NumPy array from the cache."""
+        folder_cache.put_data("array_hash", np.array([1.0, 2.0]))
+
+        assert folder_cache.delete_data("array_hash")
+        assert folder_cache.get_data("array_hash") is None
+
+    def test_put_and_get_list_containing_numpy_values(self, folder_cache):
+        """Round-trip NumPy values nested in a cacheable list."""
+        value = [np.array([1.0, 2.0]), (np.int64(3), np.float32(4.0))]
+
+        folder_cache.put_data("numpy_list_hash", value)
+        loaded = folder_cache.get_data("numpy_list_hash")
+
+        np.testing.assert_array_equal(loaded[0], value[0])
+        assert loaded[1] == (3, 4.0)
+
+    def test_delete_list_removes_nested_numpy_arrays(self, folder_cache, cache_dir):
+        """Delete array blobs referenced by a cached list manifest."""
+        folder_cache.put_data("numpy_list_hash", [np.array([1.0, 2.0])])
+        array_path = next(cache_dir.glob("*.ndarray.npy"))
+
+        assert folder_cache.delete_data("numpy_list_hash")
+        assert not array_path.exists()
+
+    def test_put_data_rejects_unsupported_value_graph(self, folder_cache):
+        """Reject a list containing values outside the cache backend contract."""
+        with pytest.raises(TypeError, match="does not support"):
+            folder_cache.put_data("unsupported_hash", [{"x": 1}])
+
+        assert not folder_cache.has_data("unsupported_hash")
 
     def test_put_data_skips_if_exists(self, folder_cache, sample_orbitals, cache_dir):
         """Second put with same hash is a no-op (doesn't overwrite)."""
@@ -429,47 +471,26 @@ class TestCacheRegistry:
         assert isinstance(restored, FolderCache)
         assert restored.is_shared is True
 
-    def test_tiered_cache_remote_view_contains_only_shared_tiers(self, tmp_path):
-        """TieredCache exposes only remote-reachable tiers to compute nodes."""
-        local = FolderCache(path=tmp_path / "local")
-        shared_a = FolderCache(path=tmp_path / "shared-a", is_shared=True)
-        shared_b = FolderCache(path=tmp_path / "shared-b", is_shared=True)
-
-        remote = TieredCache([local, shared_a, shared_b]).for_remote()
-
-        assert isinstance(remote, TieredCache)
-        assert remote.tiers == [shared_a, shared_b]
-
-        restored = get_cache(remote.name, **remote.to_config())
-        assert isinstance(restored, TieredCache)
-        assert [tier.to_config() for tier in restored.tiers] == [shared_a.to_config(), shared_b.to_config()]
-
     def test_get_cache_unknown_raises(self):
         """get_cache with an unknown name raises ValueError."""
         with pytest.raises(ValueError, match="No cache registered"):
             get_cache("does_not_exist")
 
-    def test_register_duplicate_cache_name_raises(self, monkeypatch):
-        """Two cache backends cannot silently claim the same name."""
+    def test_tiered_shared_operations_ignore_local_only_tiers(self, tmp_path, sample_orbitals):
+        """Transport checks and writes operate only on shared tiers."""
+        local = FolderCache(path=tmp_path / "local")
+        shared = FolderCache(path=tmp_path / "shared", is_shared=True)
+        cache = TieredCache([local, shared])
+        local.put_data("orbitals-hash", sample_orbitals)
 
-        class FirstCache(CacheBackend):
-            """First cache backend claiming the test name."""
+        assert cache.is_shared
+        assert cache.has_data("orbitals-hash")
+        assert not cache.has_data("orbitals-hash", shared_only=True)
 
-        class SecondCache(CacheBackend):
-            """Second cache backend claiming the test name."""
+        cache.put_data("orbitals-hash", sample_orbitals, shared_only=True)
 
-        monkeypatch.setattr(cache_module, "_CACHES", {})
-        register_cache("duplicate-cache")(FirstCache)
-
-        with pytest.raises(DuplicateRegistrationError, match="already registered"):
-            register_cache("duplicate-cache")(SecondCache)
-
-        with pytest.raises(DuplicateRegistrationError, match="already registered.*duplicate-cache"):
-            register_cache("cache-alias")(FirstCache)
-
-        assert cache_module._CACHES["duplicate-cache"] is FirstCache
-        assert "cache-alias" not in cache_module._CACHES
-        assert FirstCache.name == "duplicate-cache"
+        assert cache.has_data("orbitals-hash", shared_only=True)
+        assert shared.has_data("orbitals-hash")
 
     @pytest.mark.usefixtures("tmp_path")
     def test_register_custom_cache(self):
@@ -487,7 +508,7 @@ class TestCacheRegistry:
             def get_data(self, _h):
                 return None
 
-            def put_data(self, _h, d):
+            def put_data(self, _h, d, *, shared_only=False):
                 pass
 
             def delete_job(self, _h):

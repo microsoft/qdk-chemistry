@@ -7,10 +7,12 @@
 
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
 
 from qdk_chemistry._core._algorithms import ScfSolverFactory
 from qdk_chemistry.algorithms import ScfSolver, registry
+from qdk_chemistry.data import AlgorithmRef
 from qdk_chemistry.plugins import DuplicateRegistrationError
 from qdk_chemistry.plugins.qiskit import (
     QDK_CHEMISTRY_HAS_QISKIT,
@@ -319,6 +321,46 @@ class TestRegistryCachingWarnings:
             result = algorithm.run("input", cache=tmp_path, option=True)
 
         assert result == (("input",), {"option": True})
+
+    def test_cache_round_trip_numpy_scalar_and_array_result(self, tmp_path):
+        """Cache an algorithm result containing a NumPy scalar and array."""
+
+        class NumpyResultAlgorithm:
+            calls = 0
+
+            def hash(self):
+                """Return a stable run hash."""
+                return "numpy_result"
+
+            def run(self):
+                """Return a NumPy scalar and array result."""
+                self.calls += 1
+                return np.float32(1.25), np.array([1.0, 2.0], dtype=np.float32)
+
+            def type_name(self):
+                """Return the test algorithm type."""
+                return "test_algorithm"
+
+            def name(self):
+                """Return the test algorithm name."""
+                return "numpy_result"
+
+            def settings(self):
+                """Return empty algorithm settings."""
+                settings = MagicMock()
+                settings.to_dict.return_value = {}
+                return settings
+
+        implementation = NumpyResultAlgorithm()
+        algorithm = registry._AlgorithmWrapper(implementation)
+
+        algorithm.run(cache=tmp_path)
+        energy, state = algorithm.run(cache=tmp_path)
+
+        assert implementation.calls == 1
+        assert energy == 1.25
+        assert type(energy) is float
+        np.testing.assert_array_equal(state, np.array([1.0, 2.0], dtype=np.float32))
 
 
 class TestRegistryAvailable:
@@ -714,6 +756,69 @@ class TestRegistryRegisterUnregister:
             assert replacement.registration_owner == "replacement"
         finally:
             registry.unregister("expectation_estimator", "aliased_python_algorithm")
+
+    def test_python_factory_alias_lookup_only_constructs_selected_algorithm(self):
+        """Alias lookup does not construct unrelated registered algorithms."""
+        construction_counts = {"first": 0, "second": 0}
+
+        class FirstAlgorithm:
+            """Unrelated algorithm whose construction count is tracked."""
+
+            def __init__(self):
+                construction_counts["first"] += 1
+
+            def type_name(self):
+                return "expectation_estimator"
+
+            def name(self):
+                return "first_counted_algorithm"
+
+            def aliases(self):
+                return [self.name(), "first_counted_alias"]
+
+            def settings(self):
+                return MagicMock()
+
+        class SecondAlgorithm(FirstAlgorithm):
+            """Algorithm selected by alias."""
+
+            def __init__(self):
+                construction_counts["second"] += 1
+
+            def name(self):
+                return "second_counted_algorithm"
+
+            def aliases(self):
+                return [self.name(), "second_counted_alias"]
+
+        registry.register(FirstAlgorithm)
+        registry.register(SecondAlgorithm)
+        try:
+            counts_after_registration = construction_counts.copy()
+
+            selected = registry.create("expectation_estimator", "second_counted_alias")
+
+            assert selected.name() == "second_counted_algorithm"
+            assert construction_counts == {
+                "first": counts_after_registration["first"],
+                "second": counts_after_registration["second"] + 1,
+            }
+        finally:
+            registry.unregister("expectation_estimator", "first_counted_algorithm")
+            registry.unregister("expectation_estimator", "second_counted_algorithm")
+
+    def test_builtin_registration_resolves_nested_algorithm_ref(self):
+        """Built-in registration resolves nested algorithms without recursive construction."""
+        sparse = registry.create(
+            "state_prep",
+            "sparse_isometry",
+            dense_state_prep=AlgorithmRef("state_prep", "dense_pure_state"),
+        )
+
+        dense_ref = sparse.settings().get("dense_state_prep")
+        dense = registry.create(dense_ref.algorithm_type, dense_ref.algorithm_name)
+
+        assert dense.name() == "dense_pure_state"
 
     def test_python_factory_rejects_duplicate_alias(self):
         """Registration rejects an alias owned by another implementation."""

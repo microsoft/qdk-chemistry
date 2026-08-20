@@ -257,6 +257,17 @@ def test_json_serialization():
         Path(filename).unlink(missing_ok=True)
 
 
+def test_json_deserialization_preserves_model_orbitals_type():
+    """Generic JSON deserialization preserves the concrete orbitals type."""
+    model = ModelOrbitals(4)
+
+    restored = Orbitals.from_json(model.to_json())
+
+    assert isinstance(restored, ModelOrbitals)
+    assert restored.num_modes() == model.num_modes()
+    assert restored.to_json() == model.to_json()
+
+
 def test_hdf5_serialization():
     """Test HDF5 serialization and deserialization."""
     coeffs = np.array([[0.9, 0.1], [0.1, -0.9], [0.0, 0.0]])

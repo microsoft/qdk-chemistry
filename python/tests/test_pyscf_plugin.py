@@ -2543,6 +2543,16 @@ class TestQDKChemistryPySCFBasisConversion:
             coords[0], [0.0, 0.0, 0.0], rtol=float_comparison_relative_tolerance, atol=plain_text_tolerance
         )
 
+    def test_qdk_to_pyscf_preserves_diffuse_exponent(self):
+        """Small valid exponents must not be rounded to zero."""
+        exponent = 1e-9
+        shell = Shell(0, OrbitalType.S, np.array([exponent]), np.array([1.0]))
+        qdk_basis = BasisSet("diffuse", [shell], self.he_structure)
+
+        pyscf_mol = basis_to_pyscf_mol(qdk_basis)
+
+        assert pyscf_mol.bas_exp(0)[0] == pytest.approx(exponent)
+
     def test_qdk_to_pyscf_conversion_water(self):
         """Test converting QDK/Chemistry basis set to PySCF for water."""
         qdk_basis = self.create_simple_basis_set(self.h2o_structure)
