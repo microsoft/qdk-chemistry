@@ -31,10 +31,10 @@ using qdk::chemistry::utils::Logger;
 using qdk::chemistry::utils::LogLevel;
 
 // Helper function to calculate alpha and beta electron counts
-std::pair<int, int> calculate_electron_counts(int effective_nuclear_charge,
-                                              int charge, int multiplicity) {
+std::pair<int, int> calculate_electron_counts(
+    int total_effective_nuclear_charge, int charge, int multiplicity) {
   QDK_LOG_TRACE_ENTERING();
-  int total_electrons = effective_nuclear_charge - charge;
+  int total_electrons = total_effective_nuclear_charge - charge;
   int n_alpha = (total_electrons + multiplicity - 1) / 2;
   int n_beta = total_electrons - n_alpha;
   return {n_alpha, n_beta};
@@ -112,14 +112,14 @@ ScfCalculationResult ScfSolver::_run_with_options(
   const auto effective_nuclear_charges =
       utils::microsoft::to_integral_nuclear_charges(
           qdk_raw_basis_set->get_effective_nuclear_charges());
-  const int effective_nuclear_charge = static_cast<int>(
+  const int total_effective_nuclear_charge = static_cast<int>(
       std::accumulate(effective_nuclear_charges.begin(),
                       effective_nuclear_charges.end(), std::uint64_t{0}));
 
   // Determine the multiplicity
   if (multiplicity < 0) {
     // Default to singlet for closed shell, doublet for open-shell
-    multiplicity = ((effective_nuclear_charge - charge) % 2 == 0) ? 1 : 2;
+    multiplicity = ((total_effective_nuclear_charge - charge) % 2 == 0) ? 1 : 2;
     QDK_LOGGER().warn("No multiplicity specified. Defaulting to {} ({}).",
                       multiplicity, multiplicity == 1 ? "singlet" : "doublet");
   }
@@ -319,8 +319,8 @@ ScfCalculationResult ScfSolver::_run_with_options(
         {data::axes::beta(), data::axes::beta()});
 
     // Calculate number of electrons
-    auto [n_alpha, n_beta] = calculate_electron_counts(effective_nuclear_charge,
-                                                       charge, multiplicity);
+    auto [n_alpha, n_beta] = calculate_electron_counts(
+        total_effective_nuclear_charge, charge, multiplicity);
 
     const size_t num_atomic_orbitals = coeff_alpha.rows();
 
