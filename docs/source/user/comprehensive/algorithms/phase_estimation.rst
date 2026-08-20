@@ -249,7 +249,7 @@ The circuit structure consists of :cite:`Babbush2018` :cite:`Lee2021`:
 3. Apply an inverse Quantum Fourier Transform (iQFT) to the phase register
 4. Measure all phase qubits
 
-The walk's spectrum is :math:`e^{\pm i \arccos(E/\lambda)}`, so a measured bin cannot distinguish the two signs: ``use_positive_sign`` picks which one is reported, and both are always returned in the result's ``branching`` tuple.
+The walk's spectrum is :math:`e^{\pm i \arccos(E/\lambda)}`, so a measured bin cannot distinguish the two signs: ``resolve_positive_branch`` picks which one is reported, and both are always returned in the result's ``branching`` tuple.
 
 .. rubric:: Settings
 
@@ -265,9 +265,9 @@ Direct settings on :class:`~qdk_chemistry.algorithms.phase_estimation.unary_phas
    * - ``shots``
      - int
      - Total measurement shots for the full circuit. Default is 3.
-   * - ``use_positive_sign``
+   * - ``resolve_positive_branch``
      - bool
-     - Which branch of the walk's conjugate eigenphase pair to report as the resolved energy. Default is ``True``.
+     - Which branch of the walk's conjugate eigenphase pair to report as the resolved energy. Default is ``False``.
 
 Nested algorithm configuration (via ``qpe_circuit_builder``):
 

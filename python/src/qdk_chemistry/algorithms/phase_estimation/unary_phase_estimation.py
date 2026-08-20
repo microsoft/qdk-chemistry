@@ -24,12 +24,17 @@ __all__: list[str] = [
     "UnaryPhaseEstimationSettings",
 ]
 
+# Unary iteration threads a callable through a recursive Q# operation, which cannot be
+# defunctionalized, so the circuit never lowers to QIR. Only the sparse-state simulator
+# interprets Q# directly and can run it.
+_SUPPORTED_CIRCUIT_EXECUTOR = "qdk_sparse_state_simulator"
+
 
 def _post_process_phase_estimation(
     counts: dict[str, int],
     num_bits: int,
     method: str,
-    use_positive_sign: bool,
+    resolve_positive_branch: bool,
     eigenvalue_from_phase: Callable[[float], float],
 ) -> QpeResult:
     r"""Process the measured results from unary-iteration phase estimation into a QpeResult.
@@ -38,7 +43,7 @@ def _post_process_phase_estimation(
     :math:`y` satisfies :math:`y = \pm 2\varphi \bmod 1`, where :math:`\varphi` is the walk
     phase fraction of :math:`E = \lambda \cos(2\pi\varphi)`. Since :math:`\varphi` and
     :math:`1/2 - \varphi` are observationally identical and map to :math:`E` and :math:`-E`,
-    the two eigenvalue signs cannot be distinguished, and ``use_positive_sign`` supplies the
+    the two eigenvalue signs cannot be distinguished, and ``resolve_positive_branch`` supplies the
     missing information:
 
     * ``False`` (the default) returns :math:`\varphi \in [1/4, 1/2]`, hence
@@ -49,7 +54,7 @@ def _post_process_phase_estimation(
         counts: Measured bitstring counts, most-significant bit first.
         num_bits: Size of the phase register.
         method: Phase estimation algorithm label recorded on the result.
-        use_positive_sign: ``True`` selects the non-negative eigenvalue branch,
+        resolve_positive_branch: ``True`` selects the non-negative eigenvalue branch,
             ``False`` the non-positive one, as wanted for a ground state.
         eigenvalue_from_phase: A callable mapping a walk phase fraction to a Hamiltonian eigenvalue.
 
@@ -64,10 +69,12 @@ def _post_process_phase_estimation(
     for bitstring, count in counts.items():
         measured = int(bitstring, 2) / num_bins
         folded = min(measured, (-measured) % 1.0) / 2.0
-        canonical = folded if use_positive_sign else 0.5 - folded
+        canonical = folded if resolve_positive_branch else 0.5 - folded
         canonical_counts[canonical] = canonical_counts.get(canonical, 0) + count
 
-    canonical_phase_fraction = max(canonical_counts, key=canonical_counts.__getitem__)
+    # Ties are broken toward the smaller phase fraction so that equal counts decode
+    # to the same phase regardless of the order the shots arrive in.
+    canonical_phase_fraction = max(canonical_counts, key=lambda phase: (canonical_counts[phase], -phase))
     raw_energy = eigenvalue_from_phase(canonical_phase_fraction)
     mirror_energy = eigenvalue_from_phase(0.5 - canonical_phase_fraction)
 
@@ -95,11 +102,11 @@ class UnaryPhaseEstimationSettings(PhaseEstimationSettings):
         self._set_default(
             "shots",
             "int",
-            100,
+            3,
             "The number of shots to execute the circuit.",
         )
         self._set_default(
-            "use_positive_sign",
+            "resolve_positive_branch",
             "bool",
             False,
             "Whether the doubled measured phase resolves to a positive eigenvalue rather than a negative one.",
@@ -110,12 +117,12 @@ class UnaryPhaseEstimationSettings(PhaseEstimationSettings):
 class UnaryPhaseEstimation(PhaseEstimation):
     """Phase estimation using unary iteration over an arbitrary-length query schedule."""
 
-    def __init__(self, shots: int = 100, use_positive_sign: bool = False) -> None:
+    def __init__(self, shots: int = 3, resolve_positive_branch: bool = False) -> None:
         """Initialize the unary-iteration phase estimation routine.
 
         Args:
             shots: The number of shots to execute the circuit.
-            use_positive_sign: ``True`` selects the non-negative eigenvalue branch,
+            resolve_positive_branch: ``True`` selects the non-negative eigenvalue branch,
                 ``False`` (the default) the non-positive one, as wanted for a ground state.
 
         """
@@ -123,7 +130,7 @@ class UnaryPhaseEstimation(PhaseEstimation):
         super().__init__()
         self._settings = UnaryPhaseEstimationSettings()
         self._settings.set("shots", shots)
-        self._settings.set("use_positive_sign", use_positive_sign)
+        self._settings.set("resolve_positive_branch", resolve_positive_branch)
 
     def _run_impl(
         self,
@@ -143,11 +150,17 @@ class UnaryPhaseEstimation(PhaseEstimation):
             A QpeResult object containing the results of the phase estimation.
 
         Raises:
-            TypeError: If the configured circuit builder is not a unary-iteration builder.
+            TypeError: If the configured circuit builder is not a unary-iteration builder,
+                or if the configured circuit executor is not the sparse-state simulator.
 
         """
         Logger.trace_entering()
         circuit_executor = self._create_nested("circuit_executor")
+        if circuit_executor.name() != _SUPPORTED_CIRCUIT_EXECUTOR:
+            raise TypeError(
+                f"Unary-iteration phase estimation only supports the '{_SUPPORTED_CIRCUIT_EXECUTOR}' "
+                f"circuit executor, but got '{circuit_executor.name()}' instead."
+            )
         circuit_builder = self._create_nested("qpe_circuit_builder")
         if not isinstance(circuit_builder, QdkUnaryQpeCircuitBuilder):
             raise TypeError(
@@ -172,7 +185,7 @@ class UnaryPhaseEstimation(PhaseEstimation):
             counts,
             num_bits,
             method=self.name(),
-            use_positive_sign=self._settings.get("use_positive_sign"),
+            resolve_positive_branch=self._settings.get("resolve_positive_branch"),
             eigenvalue_from_phase=container.eigenvalue_from_phase,
         )
 

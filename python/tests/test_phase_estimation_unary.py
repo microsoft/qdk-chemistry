@@ -46,10 +46,10 @@ def _dump_op(op, num_qubits: int) -> np.ndarray:
     return np.array(dump_operation_on_state(op, num_qubits, context=get_qsharp_context()))
 
 
-def _decode(counts: dict[str, int], num_bits: int, *, use_positive_sign: bool = False):
+def _decode(counts: dict[str, int], num_bits: int, *, resolve_positive_branch: bool = False):
     """Run the decoder against a walk whose block encoding has ``lambda = 1``."""
     return _post_process_phase_estimation(
-        counts, num_bits, "qdk_unary", use_positive_sign, lambda phase: float(np.cos(2 * np.pi * phase))
+        counts, num_bits, "qdk_unary", resolve_positive_branch, lambda phase: float(np.cos(2 * np.pi * phase))
     )
 
 
@@ -167,12 +167,12 @@ class TestPhaseWindowState:
 class TestPhaseDecoding:
     """Decoding of the doubled measured phase."""
 
-    @pytest.mark.parametrize("use_positive_sign", [True, False])
-    def test_dominant_phase_merges_conjugate_counts(self, use_positive_sign):
+    @pytest.mark.parametrize("resolve_positive_branch", [True, False])
+    def test_dominant_phase_merges_conjugate_counts(self, resolve_positive_branch):
         """Conjugate bins are summed before the winner is selected."""
         counts = {"010": 3, "110": 3, "001": 5}  # 2/8 and 6/8 are conjugates, 1/8 is a separate bin
-        result = _decode(counts, 3, use_positive_sign=use_positive_sign)
-        expected = 0.125 if use_positive_sign else 0.375
+        result = _decode(counts, 3, resolve_positive_branch=resolve_positive_branch)
+        expected = 0.125 if resolve_positive_branch else 0.375
         assert result.canonical_phase_fraction == pytest.approx(expected)
         # The reported bin and its fraction name the folded phase, so both branches agree.
         assert result.bitstring_msb_first == "010"
@@ -183,17 +183,30 @@ class TestPhaseDecoding:
         """The flag picks a branch of a sign ambiguity; it must not change the magnitude."""
         for value in range(1 << num_bits):
             counts = {format(value, f"0{num_bits}b"): 1}
-            positive = _decode(counts, num_bits, use_positive_sign=True)
-            negative = _decode(counts, num_bits, use_positive_sign=False)
+            positive = _decode(counts, num_bits, resolve_positive_branch=True)
+            negative = _decode(counts, num_bits, resolve_positive_branch=False)
             assert 0.0 <= positive.canonical_phase_fraction <= 0.25
             assert positive.canonical_phase_fraction + negative.canonical_phase_fraction == pytest.approx(0.5)
             assert positive.raw_energy == pytest.approx(-negative.raw_energy)
 
     def test_branching_is_still_two_candidates_at_the_degenerate_phase(self):
         """The half-way bin is the one that collapses, so pin it directly."""
-        result = _decode({"10": 1}, 2, use_positive_sign=True)
+        result = _decode({"10": 1}, 2, resolve_positive_branch=True)
         assert result.canonical_phase_fraction == pytest.approx(0.25)
         assert result.branching == pytest.approx((0.0, 0.0), abs=1e-12)
+
+    @pytest.mark.parametrize("resolve_positive_branch", [True, False])
+    def test_tied_counts_decode_independently_of_shot_order(self, resolve_positive_branch):
+        """Bins that tie on counts must not decode differently just because they arrived in a different order."""
+        tied = {"001": 4, "011": 4}
+        forward = _decode(tied, 3, resolve_positive_branch=resolve_positive_branch)
+        reversed_order = _decode(dict(reversed(tied.items())), 3, resolve_positive_branch=resolve_positive_branch)
+
+        assert forward.canonical_phase_fraction == pytest.approx(reversed_order.canonical_phase_fraction)
+        assert forward.bitstring_msb_first == reversed_order.bitstring_msb_first
+        # The tie is broken toward the smaller phase fraction of the two candidates.
+        expected = 0.0625 if resolve_positive_branch else 0.3125
+        assert forward.canonical_phase_fraction == pytest.approx(expected)
 
 
 class TestRegisterSizeHasOneDefinition:
@@ -266,9 +279,9 @@ class TestUnaryQpeEndToEnd:
         assert set(np.unique(measured).tolist()) == {ground_bin, excited_bin}
         assert np.mean(measured == excited_bin) == pytest.approx(np.sin(system_angle / 2) ** 2, abs=0.12)
 
-    @pytest.mark.parametrize("use_positive_sign", [True, False])
+    @pytest.mark.parametrize("resolve_positive_branch", [True, False])
     @pytest.mark.parametrize("k", [1, 2, 3])
-    def test_decoder_recovers_the_walk_phase(self, k, use_positive_sign):
+    def test_decoder_recovers_the_walk_phase(self, k, resolve_positive_branch):
         """The measured bin, run through the decoder, returns the walk phase.
 
         The two eigenvectors carry conjugate phases ``+-phi`` and land in
@@ -280,11 +293,11 @@ class TestUnaryQpeEndToEnd:
         num_bits = num_queries.bit_length()
 
         walk_phase = k / (2 * num_states)
-        expected_phase = walk_phase if use_positive_sign else 0.5 - walk_phase
+        expected_phase = walk_phase if resolve_positive_branch else 0.5 - walk_phase
         for system_state in (0, 1):
             measured_bin = self._measure(num_queries, k, system_state * np.pi)
             counts = {format(measured_bin, f"0{num_bits}b"): 1}
-            result = _decode(counts, num_bits, use_positive_sign=use_positive_sign)
+            result = _decode(counts, num_bits, resolve_positive_branch=resolve_positive_branch)
             assert result.canonical_phase_fraction == pytest.approx(expected_phase)
 
     @pytest.mark.parametrize("num_queries", [6, 8, 11, 23, 63])
