@@ -334,6 +334,9 @@ jobs:
             --html-details ${{ github.workspace }}/coverage-reports/cpp_coverage.html \
             --cobertura ${{ github.workspace }}/coverage-reports/cpp_coverage.cobertura.xml \
             --txt ${{ github.workspace }}/coverage-reports/cpp_coverage.txt \
+            --markdown ${{ github.workspace }}/coverage-reports/cpp_coverage.md \
+            --markdown-heading-level 5 \
+            --markdown-title 'C++ Coverage Report' \
             --merge-mode-functions=separate \
             --gcov-ignore-parse-errors
 
@@ -453,6 +456,9 @@ jobs:
           --gcov-ignore-errors=source_not_found \
           --cobertura "../coverage-reports/pybind11_coverage.cobertura.xml" \
           --txt "../coverage-reports/pybind11_coverage.txt" \
+          --markdown "../coverage-reports/pybind11_coverage.md" \
+          --markdown-heading-level 5 \
+          --markdown-title 'Pybind11 Coverage Report' \
           --html-details "../coverage-reports/pybind11_coverage.html" \
           2> >(grep -v 'Can not fix case of path' >&2 || true)
 
@@ -492,9 +498,8 @@ jobs:
         echo "<details>" >> pr-comment.md
         echo "<summary>C++ Coverage Details</summary>" >> pr-comment.md
         echo "" >> pr-comment.md
-        echo '```' >> pr-comment.md
-        cat coverage-reports/cpp_coverage.txt >> pr-comment.md
-        echo '```' >> pr-comment.md
+        # gcovr's markdown writer renders a real GFM table
+        cat coverage-reports/cpp_coverage.md >> pr-comment.md
         echo "</details>" >> pr-comment.md
         echo "" >> pr-comment.md
 
@@ -503,19 +508,18 @@ jobs:
           echo "<summary>Python Coverage Details</summary>" >> pr-comment.md
           echo "" >> pr-comment.md
           echo '```' >> pr-comment.md
-          tail -50 coverage-reports/python_coverage.txt >> pr-comment.md
+          # coverage.py has no native markdown writer; strip backticks
+          tail -50 coverage-reports/python_coverage.txt | tr -d '`' >> pr-comment.md
           echo '```' >> pr-comment.md
           echo "</details>" >> pr-comment.md
           echo "" >> pr-comment.md
         fi
 
-        if [ -f coverage-reports/pybind11_coverage.txt ]; then
+        if [ -f coverage-reports/pybind11_coverage.md ]; then
           echo "<details>" >> pr-comment.md
           echo "<summary>Pybind11 Coverage Details</summary>" >> pr-comment.md
           echo "" >> pr-comment.md
-          echo '```' >> pr-comment.md
-          cat coverage-reports/pybind11_coverage.txt >> pr-comment.md
-          echo '```' >> pr-comment.md
+          cat coverage-reports/pybind11_coverage.md >> pr-comment.md
           echo "</details>" >> pr-comment.md
         fi
 
@@ -590,9 +594,7 @@ jobs:
         echo "<details>" >> coverage-summary.md
         echo "<summary>C++ Coverage Details</summary>" >> coverage-summary.md
         echo "" >> coverage-summary.md
-        echo '```' >> coverage-summary.md
-        cat coverage-reports/cpp_coverage.txt >> coverage-summary.md
-        echo '```' >> coverage-summary.md
+        cat coverage-reports/cpp_coverage.md >> coverage-summary.md
         echo "</details>" >> coverage-summary.md
         echo "" >> coverage-summary.md
 
@@ -601,19 +603,17 @@ jobs:
           echo "<summary>Python Coverage Details</summary>" >> coverage-summary.md
           echo "" >> coverage-summary.md
           echo '```' >> coverage-summary.md
-          tail -50 coverage-reports/python_coverage.txt >> coverage-summary.md
+          tail -50 coverage-reports/python_coverage.txt | tr -d '`' >> coverage-summary.md
           echo '```' >> coverage-summary.md
           echo "</details>" >> coverage-summary.md
           echo "" >> coverage-summary.md
         fi
 
-        if [ -f coverage-reports/pybind11_coverage.txt ]; then
+        if [ -f coverage-reports/pybind11_coverage.md ]; then
           echo "<details>" >> coverage-summary.md
           echo "<summary>Pybind11 Coverage Details</summary>" >> coverage-summary.md
           echo "" >> coverage-summary.md
-          echo '```' >> coverage-summary.md
-          cat coverage-reports/pybind11_coverage.txt >> coverage-summary.md
-          echo '```' >> coverage-summary.md
+          cat coverage-reports/pybind11_coverage.md >> coverage-summary.md
           echo "</details>" >> coverage-summary.md
         fi
 
