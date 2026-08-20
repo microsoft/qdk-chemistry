@@ -25,14 +25,10 @@ matplotlib.use("Agg")
 
 import platform as plt
 import tempfile
-from collections.abc import Iterator
-from functools import cache
 from pathlib import Path
 
 import numpy as np
 import pytest
-import qdk
-from qdk import TargetProfile
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
@@ -44,7 +40,6 @@ from qdk_chemistry.data import (
     StateVectorContainer,
     Wavefunction,
 )
-from qdk_chemistry.utils.qsharp import create_qsharp_context, use_qsharp_context
 
 from .test_helpers import create_test_orbitals
 
@@ -78,19 +73,6 @@ if build_dir.exists():
                 break
         if lib_dir_found:
             break
-
-
-@cache
-def _base_qsharp_context() -> qdk.Context:
-    """Build the ``TargetProfile.Base`` context once and share it across tests."""
-    return create_qsharp_context(TargetProfile.Base)
-
-
-@pytest.fixture
-def use_base_qdk_ctx() -> Iterator[qdk.Context]:
-    """Route the library's shared context to a ``TargetProfile.Base`` build."""
-    with use_qsharp_context(_base_qsharp_context()) as context:
-        yield context
 
 
 @pytest.fixture

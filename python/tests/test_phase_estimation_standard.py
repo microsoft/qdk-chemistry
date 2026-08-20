@@ -190,7 +190,6 @@ _builder_params = [
 
 
 @pytest.mark.parametrize("builder_name", _builder_params)
-@pytest.mark.usefixtures("use_base_qdk_ctx")
 def test_standard_phase_estimation_extracts_phase_and_energy(
     two_qubit_phase_problem: PhaseEstimationProblem,
     builder_name: str,
@@ -214,7 +213,6 @@ def test_standard_phase_estimation_extracts_phase_and_energy(
 
 
 @pytest.mark.parametrize("builder_name", _builder_params)
-@pytest.mark.usefixtures("use_base_qdk_ctx")
 def test_standard_phase_estimation_four_qubit(
     four_qubit_phase_problem: PhaseEstimationProblem,
     builder_name: str,
@@ -250,7 +248,6 @@ def test_standard_phase_estimation_four_qubit(
         ),
     ],
 )
-@pytest.mark.usefixtures("use_base_qdk_ctx")
 def test_standard_qpe_initialization(builder_name: str) -> None:
     """Test StandardPhaseEstimation initialization with circuit builder."""
     shots = 100

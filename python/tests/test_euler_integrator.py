@@ -127,7 +127,6 @@ def test_euler_integrator_eigenvalue_remains_constant() -> None:
     not QDK_CHEMISTRY_HAS_QISKIT_AER or not QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME,
     reason="Qiskit Aer or IBM Runtime not available",
 )
-@pytest.mark.usefixtures("use_base_qdk_ctx")
 def test_euler_integrator_with_device_backend() -> None:
     """Run EulerIntegrator with a device_backend_name string."""
     partition = FlatPartition(strategy="commuting", groups=[[0]])

@@ -28,7 +28,6 @@ if QDK_CHEMISTRY_HAS_QISKIT_AER:
 
 pytestmark = [
     pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_AER or not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
-    pytest.mark.usefixtures("use_base_qdk_ctx"),
 ]
 
 

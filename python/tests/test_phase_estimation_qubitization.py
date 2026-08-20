@@ -143,7 +143,6 @@ class TestQPEWithQubitization:
         )
 
     @pytest.mark.parametrize("builder_name", _builder_params)
-    @pytest.mark.usefixtures("use_base_qdk_ctx")
     def test_iterative_qpe_with_qubitization_h2(self, builder_name, h2_hamiltonian):
         """Verify QPE with qubitization recovers H2 ground-state energy.
 
@@ -223,7 +222,6 @@ class TestQPEWithQubitization:
     @pytest.mark.skipif(
         not QDK_CHEMISTRY_HAS_QISKIT_AER or not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit Aer not available."
     )
-    @pytest.mark.usefixtures("use_base_qdk_ctx")
     def test_standard_qpe_with_qubitization_h2(self, h2_hamiltonian):
         """Verify standard QPE with qubitization recovers H2 ground-state energy."""
         # Exact ground state from qubit Hamiltonian solver (dense diagonalization)
