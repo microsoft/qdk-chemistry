@@ -49,6 +49,17 @@ _MANIFEST_FILENAME = "manifest.json"
 _MANIFEST_VERSION = 1
 
 
+def _load_manifest(path: Path) -> dict[str, Any]:
+    """Load a manifest and validate its schema version."""
+    with path.open(encoding="utf-8") as file:
+        manifest = json.load(file)
+
+    version = manifest.get("version")
+    if not isinstance(version, int) or isinstance(version, bool) or version != _MANIFEST_VERSION:
+        raise ValueError(f"Unsupported manifest version {version!r}; expected {_MANIFEST_VERSION}")
+    return manifest
+
+
 def _atomic_write_json(path: Path, value: Any) -> None:
     """Write JSON to *path* atomically via a sibling temporary file."""
     temporary_path: Path | None = None
@@ -93,8 +104,8 @@ def _atomic_write_dataclass(path: Path, value: CoreDataClass, type_name: str) ->
 
 def _atomic_write_array(path: Path, value: np.ndarray) -> None:
     """Write a NumPy array atomically unless its content-addressed file already exists."""
-    if value.dtype.hasobject:
-        raise TypeError("Cannot serialize NumPy arrays with object dtype")
+    if value.dtype.hasobject or value.dtype.fields is not None:
+        raise TypeError("Cannot serialize NumPy arrays with object or structured dtype")
     if path.is_file():
         return
     if path.exists():
@@ -694,9 +705,7 @@ def deserialize_inputs(directory: str | Path, *, cache: CacheBackend | None = No
     """
     directory = Path(directory)
     manifest_path = directory / _MANIFEST_FILENAME
-
-    with open(manifest_path) as f:
-        manifest = json.load(f)
+    manifest = _load_manifest(manifest_path)
 
     # Deserialize settings
     settings = {}
@@ -796,9 +805,7 @@ def deserialize_outputs(directory: str | Path, *, cache: CacheBackend | None = N
     """
     directory = Path(directory)
     manifest_path = directory / _MANIFEST_FILENAME
-
-    with open(manifest_path) as f:
-        manifest = json.load(f)
+    manifest = _load_manifest(manifest_path)
 
     results = [FileSerializer.deserialize_value(directory, entry, cache=cache) for entry in manifest["results"]]
 
@@ -821,8 +828,7 @@ def get_input_files(directory: str | Path) -> list[Path]:
     manifest_path = directory / _MANIFEST_FILENAME
     if not manifest_path.is_file():
         return []
-    with open(manifest_path, encoding="utf-8") as file:
-        manifest = json.load(file)
+    manifest = _load_manifest(manifest_path)
     entries = [
         entry
         for values in (manifest["settings"].values(), manifest["args"], manifest["kwargs"].values())
@@ -845,6 +851,5 @@ def get_output_files(directory: str | Path) -> list[Path]:
     manifest_path = directory / _MANIFEST_FILENAME
     if not manifest_path.is_file():
         return []
-    with open(manifest_path, encoding="utf-8") as file:
-        manifest = json.load(file)
+    manifest = _load_manifest(manifest_path)
     return _get_manifest_files(directory, manifest["results"])

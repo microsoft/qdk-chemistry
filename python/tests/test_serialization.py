@@ -113,6 +113,14 @@ def test_numpy_array_round_trip(tmp_path):
     assert result.dtype == value.dtype
 
 
+def test_numpy_array_rejects_structured_dtype(tmp_path):
+    """Reject arrays whose structured dtype is unsupported by the wire format."""
+    value = np.array([(1, 2.0)], dtype=[("index", np.int64), ("value", np.float64)])
+
+    with pytest.raises(TypeError, match="structured dtype"):
+        FileSerializer.serialize_value(tmp_path, "value", value)
+
+
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
@@ -262,6 +270,51 @@ def test_input_round_trip(tmp_path, h2_structure):
     assert restored["input_hashes"] == {"arg_0": "structure-hash"}
     assert restored["remote_cache"] == {"name": "shared"}
     assert restored["remote_cache_transport"] is False
+
+
+@pytest.mark.parametrize("manifest_type", ["inputs", "outputs"])
+def test_manifest_includes_version(tmp_path, manifest_type):
+    """Version input and output manifest schemas."""
+    if manifest_type == "inputs":
+        serialize_inputs(tmp_path, (), {}, "test_algorithm", "plugin", {})
+    else:
+        serialize_outputs(tmp_path, 42)
+
+    manifest = json.loads((tmp_path / "manifest.json").read_text())
+    assert manifest["version"] == 1
+
+
+@pytest.mark.parametrize("manifest_type", ["inputs", "outputs"])
+@pytest.mark.parametrize(
+    "version",
+    [
+        pytest.param(None, id="missing"),
+        pytest.param(0, id="older"),
+        pytest.param(2, id="newer"),
+        pytest.param("1", id="string"),
+        pytest.param(True, id="boolean"),
+    ],
+)
+def test_manifest_readers_require_supported_version(tmp_path, manifest_type, version):
+    """Reject manifests whose schema version is absent or unsupported."""
+    if manifest_type == "inputs":
+        serialize_inputs(tmp_path, (), {}, "test_algorithm", "plugin", {})
+        readers = (deserialize_inputs, get_input_files)
+    else:
+        serialize_outputs(tmp_path, 42)
+        readers = (deserialize_outputs, get_output_files)
+
+    manifest_path = tmp_path / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    if version is None:
+        del manifest["version"]
+    else:
+        manifest["version"] = version
+    manifest_path.write_text(json.dumps(manifest))
+
+    for reader in readers:
+        with pytest.raises(ValueError, match=r"Unsupported manifest version .*expected 1"):
+            reader(tmp_path)
 
 
 def test_output_round_trip_survives_file_transfer(tmp_path, sample_orbitals):
