@@ -54,13 +54,10 @@ class CacheBackend(ABC):
 
     Implementations must provide these operations:
 
-    - **get_job** / **put_job**: persist ``Job`` metadata keyed by
-      the deterministic *run_hash*.
-        - **get_data** / **put_data**: content-addressed storage for
-            ``DataClass`` objects, NumPy arrays, and supported lists. Primitives
-            (floats, ints, …) are stored inline in Job or list metadata.
-    - **delete_job** / **delete_data**: remove cached metadata or blobs.
-    - **clear**: remove all entries from the cache.
+    - ``get_job`` and ``put_job`` persist ``Job`` metadata by run hash.
+    - ``get_data`` and ``put_data`` store supported values by content hash.
+    - ``delete_job`` and ``delete_data`` remove cached metadata or blobs.
+    - ``clear`` removes all cache entries.
 
     Args:
         is_shared: Set to ``True`` when the backing store is reachable
