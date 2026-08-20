@@ -9,7 +9,7 @@ Overview
 --------
 
 Create the builder through the ``"robust_phase_estimation_circuit_builder"`` factory type with implementation name ``"qdk"``.
-Its ``run`` method accepts a state-preparation :class:`~qdk_chemistry.data.Circuit` and a :class:`~qdk_chemistry.data.QubitOperator`, and returns a :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder.RobustPhaseEstimationCircuitSet`.
+Its ``run`` method accepts a state-preparation :class:`~qdk_chemistry.data.Circuit` and a :class:`~qdk_chemistry.data.QubitOperator`, and returns a :class:`~qdk_chemistry.data.RobustPhaseEstimationCircuitSet`.
 
 Unlike the eager ``list[Circuit]`` returned by :doc:`QpeCircuitBuilder <qpe_circuit_builder>`, this collection generates one X/Y Hadamard-test circuit pair at a time.
 This keeps memory bounded when an experiment requires independent randomized circuit draws.
@@ -115,10 +115,10 @@ Each :class:`~qdk_chemistry.data.RobustPhaseEstimationRound` exposes its zero-ba
 Iterating the circuit set yields :class:`~qdk_chemistry.data.RobustPhaseEstimationExperiment` objects.
 Each experiment contains one X-basis circuit, one Y-basis circuit, its round and draw coordinates, its concrete random seed when applicable, and the number of executions represented by each circuit.
 
-Use :meth:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder.RobustPhaseEstimationCircuitSet.get_experiment` to materialize one X/Y pair directly.
+Use :meth:`~qdk_chemistry.data.RobustPhaseEstimationCircuitSet.get_experiment` to materialize one X/Y pair directly.
 For randomized evolution, provide the desired ``draw_index``; for deterministic evolution, omit it.
 The paired form ensures that X and Y circuits use the same unitary draw.
-When only one basis is needed, :meth:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder.RobustPhaseEstimationCircuitSet.get_circuit` returns the requested concrete circuit.
+When only one basis is needed, :meth:`~qdk_chemistry.data.RobustPhaseEstimationCircuitSet.get_circuit` returns the requested concrete circuit.
 
 For deterministic evolution, one circuit pair represents all shots in the round, so ``circuit_multiplicity`` equals ``shots_per_basis``.
 For randomized evolution, every independent draw produces one pair and ``circuit_multiplicity`` is one.
@@ -129,9 +129,12 @@ Resource estimation
 
 Every generated :class:`~qdk_chemistry.data.Circuit` supports :meth:`~qdk_chemistry.data.Circuit.get_qre_application`.
 The QRE application describes one circuit; ``circuit_multiplicity`` remains separate workload metadata that callers should include when aggregating an experiment-level estimate.
-The circuit set's :attr:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder.RobustPhaseEstimationCircuitSet.schedule` is a serializable :class:`~qdk_chemistry.data.RobustPhaseEstimationSchedule` containing rounds, seeds, multiplicities, accuracy parameters, and builder configurations without materialized circuits.
+A :class:`~qdk_chemistry.data.RobustPhaseEstimationCircuitSet` is an immutable :class:`~qdk_chemistry.data.DataClass` that can be saved to JSON or HDF5.
+It stores its :attr:`~qdk_chemistry.data.RobustPhaseEstimationCircuitSet.schedule`, state-preparation circuit, and qubit Hamiltonian without materializing any X/Y circuit pairs.
+Loading preserves these inputs and the nested builder configurations; on-demand generation can resume directly when the configured builders support the restored circuit representation.
 A selected :class:`~qdk_chemistry.data.RobustPhaseEstimationExperiment` is also serializable after its X/Y pair has been materialized.
-After loading a schedule, use :meth:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder.RobustPhaseEstimationCircuitSet.from_schedule` with the live state-preparation circuit and qubit Hamiltonian to resume on-demand generation.
+For a Q# factory-backed state preparation, serialization preserves QIR for resource estimation but cannot reconstruct the live Q# callable needed to build new Hadamard-test circuits.
+Use :meth:`~qdk_chemistry.data.RobustPhaseEstimationCircuitSet.from_schedule` with the loaded schedule, original live state-preparation circuit, and qubit Hamiltonian to resume on-demand generation.
 
 .. tab:: Python API
 

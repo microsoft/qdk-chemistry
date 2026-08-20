@@ -34,6 +34,7 @@ from qdk_chemistry.data import (
     Circuit,
     QuantumErrorProfile,
     QubitOperator,
+    RobustPhaseEstimationCircuitSet,
     RobustPhaseEstimationExperiment,
     Settings,
     UnitaryRepresentation,
@@ -991,6 +992,21 @@ def test_robust_circuit_builder_direct_pair_supports_qre() -> None:
     restored = RobustPhaseEstimationExperiment.from_json(experiment.to_json())
     assert isinstance(restored.x_circuit.get_qre_application(), QIRApplication)
     assert isinstance(restored.y_circuit.get_qre_application(), QIRApplication)
+
+    restored_set = RobustPhaseEstimationCircuitSet.from_json(circuit_set.to_json())
+    assert restored_set.content_hash() == circuit_set.content_hash()
+    assert isinstance(restored_set.state_preparation.get_qre_application(), QIRApplication)
+    with pytest.raises(ValueError, match="not a Q# callable"):
+        restored_set.get_experiment(round_index=0)
+
+    rebound = RobustPhaseEstimationCircuitSet.from_schedule(
+        restored_set.schedule,
+        state_preparation,
+        hamiltonian,
+    )
+    rebound_experiment = rebound.get_experiment(round_index=0)
+    assert isinstance(rebound_experiment.x_circuit.get_qre_application(), QSharpApplication)
+    assert isinstance(rebound_experiment.y_circuit.get_qre_application(), QSharpApplication)
 
 
 @pytest.mark.skipif(not _has_robust_stack(), reason="requires Q# and the registered robust circuit stack")

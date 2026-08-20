@@ -28,15 +28,13 @@ from qdk_chemistry.data import (
     QpeResult,
     QuantumErrorProfile,
     QubitOperator,
+    RobustPhaseEstimationCircuitSet,
     Settings,
 )
 from qdk_chemistry.utils import Logger
 
 from .base import PhaseEstimation
-from .circuit_builder.robust_builder import (
-    RobustPhaseEstimationCircuitBuilder,
-    RobustPhaseEstimationCircuitSet,
-)
+from .circuit_builder.robust_builder import RobustPhaseEstimationCircuitBuilder
 
 __all__: list[str] = ["RobustPhaseEstimation", "RobustPhaseEstimationSettings"]
 

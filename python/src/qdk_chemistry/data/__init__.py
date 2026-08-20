@@ -123,6 +123,7 @@ from qdk_chemistry.data.qpe_result import QpeResult
 from qdk_chemistry.data.qubit_operator import QubitHamiltonian, QubitOperator
 from qdk_chemistry.data.registry import available_dataclasses, get_dataclass_type, register_dataclass
 from qdk_chemistry.data.robust_phase_estimation import (
+    RobustPhaseEstimationCircuitSet,
     RobustPhaseEstimationExperiment,
     RobustPhaseEstimationRound,
     RobustPhaseEstimationSchedule,
@@ -183,6 +184,7 @@ __all__ = [
     "QuantumErrorProfile",
     "QubitHamiltonian",
     "QubitOperator",
+    "RobustPhaseEstimationCircuitSet",
     "RobustPhaseEstimationExperiment",
     "RobustPhaseEstimationRound",
     "RobustPhaseEstimationSchedule",

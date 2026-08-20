@@ -8,8 +8,6 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -18,21 +16,20 @@ from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
     QubitOperator,
-    RobustPhaseEstimationExperiment,
+    RobustPhaseEstimationCircuitSet,
     RobustPhaseEstimationRound,
     RobustPhaseEstimationSchedule,
     Settings,
 )
-
-if TYPE_CHECKING:
-    from collections.abc import Iterator
+from qdk_chemistry.data.robust_phase_estimation import (
+    _AlgorithmConfiguration as _AlgorithmSnapshot,
+)
 
 __all__ = [
     "QdkRobustPhaseEstimationCircuitBuilder",
     "RobustPhaseEstimationCircuitBuilder",
     "RobustPhaseEstimationCircuitBuilderFactory",
     "RobustPhaseEstimationCircuitBuilderSettings",
-    "RobustPhaseEstimationCircuitSet",
 ]
 
 _UNSET_BUDGET_VALUE = -1.0
@@ -56,297 +53,6 @@ def _qdrift_schedule(total_rounds: int, round_index: int) -> tuple[int, int]:
     shots = int(np.ceil(np.e * (11 + 4 * (total_rounds - round_index))))
     samples = 2 ** (2 * round_index + 1)
     return shots, samples
-
-
-@dataclass(frozen=True)
-class _AlgorithmSnapshot:
-    """Immutable snapshot of an algorithm reference and its nested settings."""
-
-    algorithm_type: str
-    """Registry type of the snapshotted algorithm."""
-
-    algorithm_name: str
-    """Registered implementation name of the snapshotted algorithm."""
-
-    settings_json: str
-    """Serialized settings used to reconstruct independent algorithm instances."""
-
-    @classmethod
-    def from_ref(cls, ref: AlgorithmRef) -> _AlgorithmSnapshot:
-        """Capture an algorithm reference without retaining mutable settings."""
-        if ref.settings is None:
-            raise ValueError(
-                f"Cannot snapshot unresolved algorithm reference '{ref.algorithm_type}/{ref.algorithm_name}'."
-            )
-        return cls(ref.algorithm_type, ref.algorithm_name, ref.settings.to_json())
-
-    def to_ref(self) -> AlgorithmRef:
-        """Reconstruct an independent algorithm reference."""
-        return AlgorithmRef(
-            self.algorithm_type,
-            self.algorithm_name,
-            settings=Settings.from_json(self.settings_json),
-        )
-
-    def has_setting(self, key: str) -> bool:
-        """Return whether the snapshotted settings contain ``key``."""
-        settings = Settings.from_json(self.settings_json)
-        return settings.has(key)
-
-    def get_setting(self, key: str) -> object:
-        """Return one setting value from an independent settings copy."""
-        settings = Settings.from_json(self.settings_json)
-        return settings.get(key)
-
-    def with_updates(self, **updates: object) -> _AlgorithmSnapshot:
-        """Return a new snapshot with existing setting values updated."""
-        ref = self.to_ref()
-        if ref.settings is None:
-            raise RuntimeError("Algorithm snapshot unexpectedly has no settings.")
-        for key, value in updates.items():
-            if not ref.settings.has(key):
-                raise ValueError(
-                    f"Algorithm '{self.algorithm_type}/{self.algorithm_name}' does not define setting '{key}'."
-                )
-            ref.settings.set(key, value)
-        return self.from_ref(ref)
-
-    def create(self) -> Algorithm:
-        """Create a fresh configured algorithm from this snapshot."""
-        from qdk_chemistry.algorithms import create  # noqa: PLC0415
-
-        settings = Settings.from_json(self.settings_json)
-        return create(self.algorithm_type, self.algorithm_name, **settings.to_dict())
-
-
-@dataclass(frozen=True)
-class RobustPhaseEstimationCircuitSet:
-    """Re-iterable robust phase estimation circuit collection that generates pairs on demand."""
-
-    rounds: tuple[RobustPhaseEstimationRound, ...]
-    """Resolved round schedule in execution order."""
-
-    lambda_norm: float
-    """One-norm of the qubit Hamiltonian coefficients."""
-
-    base_time: float
-    """Evolution time used for round zero."""
-
-    target_accuracy: float
-    """Requested absolute accuracy of the final energy estimate."""
-
-    epsilon_rpe: float
-    """Energy tolerance used to determine the number of RPE rounds."""
-
-    epsilon_unitary: float
-    """Resolved full-evolution tolerance before builder-specific mapping."""
-
-    unitary_accuracy_fraction: float
-    """Resolved legacy fraction used to partition non-Trotter accuracy budgets."""
-
-    error_budget_mode: str
-    """Mode used to resolve the RPE and unitary accuracy parameters."""
-
-    unitary_builder_category: str
-    """Category of the configured unitary builder."""
-
-    energy_correction: str
-    """Resolved phase-to-energy conversion method."""
-
-    requested_seed: int
-    """Root seed requested in the builder settings, where ``-1`` requests entropy."""
-
-    root_seed: int | None
-    """Concrete root seed for randomized draws, or ``None`` for deterministic evolution."""
-
-    _state_preparation: Circuit = field(repr=False)
-    """Trial-state circuit retained for on-demand circuit generation."""
-
-    _qubit_hamiltonian: QubitOperator = field(repr=False)
-    """Qubit Hamiltonian retained for on-demand unitary construction."""
-
-    _hadamard_builder_snapshot: _AlgorithmSnapshot = field(repr=False)
-    """Hadamard-test builder configuration retained for circuit generation."""
-
-    @classmethod
-    def from_schedule(
-        cls,
-        schedule: RobustPhaseEstimationSchedule,
-        state_preparation: Circuit,
-        qubit_hamiltonian: QubitOperator,
-    ) -> RobustPhaseEstimationCircuitSet:
-        """Bind a serialized schedule to live inputs for on-demand circuit generation.
-
-        Args:
-            schedule: Serialized RPE workload recipe.
-            state_preparation: Circuit preparing the trial state.
-            qubit_hamiltonian: Qubit Hamiltonian used to build scheduled unitaries.
-
-        Returns:
-            A runtime circuit set that materializes circuits from ``schedule`` on demand.
-
-        """
-        for round_data in schedule.rounds:
-            _validate_unitary_builder_power(_AlgorithmSnapshot.from_ref(round_data.unitary_builder_configuration))
-        return cls(
-            rounds=schedule.rounds,
-            lambda_norm=schedule.lambda_norm,
-            base_time=schedule.base_time,
-            target_accuracy=schedule.target_accuracy,
-            epsilon_rpe=schedule.epsilon_rpe,
-            epsilon_unitary=schedule.epsilon_unitary,
-            unitary_accuracy_fraction=schedule.unitary_accuracy_fraction,
-            error_budget_mode=schedule.error_budget_mode,
-            unitary_builder_category=schedule.unitary_builder_category,
-            energy_correction=schedule.energy_correction,
-            requested_seed=schedule.requested_seed,
-            root_seed=schedule.root_seed,
-            _state_preparation=state_preparation,
-            _qubit_hamiltonian=qubit_hamiltonian,
-            _hadamard_builder_snapshot=_AlgorithmSnapshot.from_ref(
-                schedule.hadamard_test_circuit_builder_configuration
-            ),
-        )
-
-    @property
-    def num_rounds(self) -> int:
-        """Return the number of RPE rounds."""
-        return len(self.rounds)
-
-    @property
-    def final_samples(self) -> int:
-        """Return the unitary sample count scheduled for the final round."""
-        return self.rounds[-1].scheduled_samples if self.rounds else 1
-
-    @property
-    def hadamard_test_circuit_builder_configuration(self) -> AlgorithmRef:
-        """Return an independent copy of the Hadamard-test circuit-builder configuration."""
-        return self._hadamard_builder_snapshot.to_ref()
-
-    @property
-    def schedule(self) -> RobustPhaseEstimationSchedule:
-        """Return a serializable schedule containing no materialized circuits."""
-        return RobustPhaseEstimationSchedule(
-            rounds=self.rounds,
-            lambda_norm=self.lambda_norm,
-            base_time=self.base_time,
-            target_accuracy=self.target_accuracy,
-            epsilon_rpe=self.epsilon_rpe,
-            epsilon_unitary=self.epsilon_unitary,
-            unitary_accuracy_fraction=self.unitary_accuracy_fraction,
-            error_budget_mode=self.error_budget_mode,
-            unitary_builder_category=self.unitary_builder_category,
-            energy_correction=self.energy_correction,
-            requested_seed=self.requested_seed,
-            root_seed=self.root_seed,
-            hadamard_test_circuit_builder_configuration=self.hadamard_test_circuit_builder_configuration,
-        )
-
-    def __iter__(self) -> Iterator[RobustPhaseEstimationExperiment]:
-        """Generate every circuit pair on demand in round and draw order."""
-        for round_data in self.rounds:
-            yield from self._iter_round(round_data)
-
-    def iter_round(self, round_index: int) -> Iterator[RobustPhaseEstimationExperiment]:
-        """Generate circuit pairs on demand for one round.
-
-        Args:
-            round_index: Zero-based round index.
-
-        Returns:
-            Iterator over the round's circuit-pair experiments.
-
-        Raises:
-            IndexError: If ``round_index`` is outside the circuit set.
-
-        """
-        if round_index < 0 or round_index >= len(self.rounds):
-            raise IndexError(f"round_index must be in [0, {len(self.rounds) - 1}], got {round_index}.")
-        yield from self._iter_round(self.rounds[round_index])
-
-    def get_experiment(self, round_index: int, draw_index: int | None = None) -> RobustPhaseEstimationExperiment:
-        """Generate one X/Y circuit pair for execution or resource estimation.
-
-        Args:
-            round_index: Zero-based round index.
-            draw_index: Zero-based randomized draw index. Use ``None`` for deterministic evolution.
-
-        Returns:
-            The requested circuit-pair experiment and its execution metadata.
-
-        Raises:
-            IndexError: If ``round_index`` or ``draw_index`` is outside the circuit set.
-            ValueError: If ``draw_index`` does not match the round's deterministic or randomized schedule.
-
-        """
-        if round_index < 0 or round_index >= len(self.rounds):
-            raise IndexError(f"round_index must be in [0, {len(self.rounds) - 1}], got {round_index}.")
-        round_data = self.rounds[round_index]
-        if round_data.draw_seeds:
-            if draw_index is None:
-                raise ValueError("draw_index is required for randomized evolution.")
-            if draw_index < 0 or draw_index >= len(round_data.draw_seeds):
-                raise IndexError(f"draw_index must be in [0, {len(round_data.draw_seeds) - 1}], got {draw_index}.")
-            draw_seed = round_data.draw_seeds[draw_index]
-        else:
-            if draw_index is not None:
-                raise ValueError("draw_index must be None for deterministic evolution.")
-            draw_seed = None
-
-        unitary_snapshot = _AlgorithmSnapshot.from_ref(round_data.unitary_builder_configuration)
-        _validate_unitary_builder_power(unitary_snapshot)
-        if draw_seed is not None and unitary_snapshot.has_setting("seed"):
-            unitary_snapshot = unitary_snapshot.with_updates(seed=draw_seed)
-
-        unitary_builder = unitary_snapshot.create()
-        unitary = unitary_builder.run(self._qubit_hamiltonian)
-
-        x_builder = self._hadamard_builder_snapshot.with_updates(test_basis="X").create()
-        x_circuit = x_builder.run(self._state_preparation, unitary)
-        y_builder = self._hadamard_builder_snapshot.with_updates(test_basis="Y").create()
-        y_circuit = y_builder.run(self._state_preparation, unitary)
-
-        return RobustPhaseEstimationExperiment(
-            round_index=round_data.round_index,
-            evolution_time=round_data.evolution_time,
-            shots_per_basis=round_data.shots_per_basis,
-            draw_index=draw_index,
-            draw_seed=draw_seed,
-            circuit_multiplicity=round_data.circuit_multiplicity,
-            x_circuit=x_circuit,
-            y_circuit=y_circuit,
-            unitary_builder_configuration=unitary_snapshot.to_ref(),
-        )
-
-    def get_circuit(self, round_index: int, basis: str, draw_index: int | None = None) -> Circuit:
-        """Generate one concrete X- or Y-basis circuit.
-
-        Args:
-            round_index: Zero-based round index.
-            basis: Hadamard-test basis, either ``"X"`` or ``"Y"``.
-            draw_index: Zero-based randomized draw index. Use ``None`` for deterministic evolution.
-
-        Returns:
-            The requested concrete circuit, suitable for execution or QRE.
-
-        Raises:
-            ValueError: If ``basis`` is not ``"X"`` or ``"Y"``.
-
-        """
-        normalized_basis = basis.upper()
-        if normalized_basis not in ("X", "Y"):
-            raise ValueError(f"basis must be 'X' or 'Y', got {basis!r}.")
-        experiment = self.get_experiment(round_index, draw_index)
-        return experiment.x_circuit if normalized_basis == "X" else experiment.y_circuit
-
-    def _iter_round(self, round_data: RobustPhaseEstimationRound) -> Iterator[RobustPhaseEstimationExperiment]:
-        if round_data.draw_seeds:
-            draw_indices: tuple[int | None, ...] = tuple(range(len(round_data.draw_seeds)))
-        else:
-            draw_indices = (None,)
-
-        for draw_index in draw_indices:
-            yield self.get_experiment(round_data.round_index, draw_index)
 
 
 class RobustPhaseEstimationCircuitBuilderSettings(Settings):
@@ -576,7 +282,7 @@ class QdkRobustPhaseEstimationCircuitBuilder(RobustPhaseEstimationCircuitBuilder
                 )
             )
 
-        return RobustPhaseEstimationCircuitSet(
+        schedule = RobustPhaseEstimationSchedule(
             rounds=tuple(rounds),
             lambda_norm=lambda_norm,
             base_time=base_time,
@@ -589,9 +295,12 @@ class QdkRobustPhaseEstimationCircuitBuilder(RobustPhaseEstimationCircuitBuilder
             energy_correction=correction,
             requested_seed=requested_seed,
             root_seed=root_seed,
-            _state_preparation=state_preparation,
-            _qubit_hamiltonian=qubit_hamiltonian,
-            _hadamard_builder_snapshot=hadamard_snapshot,
+            hadamard_test_circuit_builder_configuration=hadamard_snapshot.to_ref(),
+        )
+        return RobustPhaseEstimationCircuitSet(
+            schedule=schedule,
+            state_preparation=state_preparation,
+            qubit_hamiltonian=qubit_hamiltonian,
         )
 
     @staticmethod
@@ -742,13 +451,4 @@ class QdkRobustPhaseEstimationCircuitBuilder(RobustPhaseEstimationCircuitBuilder
 
 def _validate_unitary_builder_power(snapshot: _AlgorithmSnapshot) -> None:
     """Require RPE to be the sole owner of the evolution power schedule."""
-    if not snapshot.has_setting("power"):
-        return
-    power = snapshot.get_setting("power")
-    if not isinstance(power, int):
-        raise TypeError(f"unitary_builder power must be an integer, got {type(power).__name__}.")
-    if power != 1:
-        raise ValueError(
-            "Robust phase estimation controls evolution powers through its round-time schedule; "
-            f"unitary_builder power must be 1, got {power}."
-        )
+    snapshot.validate_unit_power()

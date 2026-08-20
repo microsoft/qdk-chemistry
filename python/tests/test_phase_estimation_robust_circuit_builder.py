@@ -11,6 +11,7 @@ import json
 from dataclasses import dataclass
 from itertools import islice, pairwise
 from math import ceil, e, pi
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -36,6 +37,12 @@ from qdk_chemistry.data import (
     RobustPhaseEstimationSchedule,
     Settings,
 )
+from qdk_chemistry.data import (
+    RobustPhaseEstimationCircuitSet as DataRobustPhaseEstimationCircuitSet,
+)
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -170,6 +177,8 @@ def test_builder_is_registered_and_does_not_build_eagerly(
     circuit_set = builder.run(state_preparation, hamiltonian)
 
     assert isinstance(builder, RobustPhaseEstimationCircuitBuilder)
+    assert RobustPhaseEstimationCircuitSet is DataRobustPhaseEstimationCircuitSet
+    assert RobustPhaseEstimationCircuitSet.__module__ == "qdk_chemistry.data.robust_phase_estimation"
     assert isinstance(circuit_set, RobustPhaseEstimationCircuitSet)
     assert circuit_set.num_rounds > 0
     hadamard_ref = builder.settings().get("hadamard_test_circuit_builder")
@@ -514,6 +523,33 @@ def test_serialized_schedule_rebinds_and_replays_seeded_draw(
     assert experiment.draw_seed == original.rounds[0].draw_seeds[2]
     assert unitary_records[0]["seed"] == experiment.draw_seed
     assert hadamard_records[0][1] is hadamard_records[1][1]
+
+
+@pytest.mark.parametrize("suffix", ["json", "hdf5"])
+def test_serialized_circuit_set_remains_lazy_and_generates_on_demand(
+    tmp_path: Path,
+    suffix: str,
+    rpe_problem: tuple[Circuit, QubitOperator],
+    recording_builders: tuple[list[dict[str, object]], list[tuple[str, _FakeUnitary]]],
+) -> None:
+    """A loaded circuit-builder output retains inputs and materializes only on request."""
+    state_preparation, hamiltonian = rpe_problem
+    unitary_records, hadamard_records = recording_builders
+    original = QdkRobustPhaseEstimationCircuitBuilder(target_accuracy=0.5, seed=11).run(state_preparation, hamiltonian)
+    filename = tmp_path / f"sample.robust_phase_estimation_circuit_set.{suffix}"
+
+    original.to_file(filename, suffix)
+    restored = RobustPhaseEstimationCircuitSet.from_file(filename, suffix)
+
+    assert restored.content_hash() == original.content_hash()
+    assert unitary_records == []
+    assert hadamard_records == []
+
+    experiment = restored.get_experiment(0, 0)
+
+    assert experiment.draw_seed == restored.rounds[0].draw_seeds[0]
+    assert len(unitary_records) == 1
+    assert [basis for basis, _ in hadamard_records] == ["X", "Y"]
 
 
 def test_entropy_seed_is_concretized_once_per_circuit_set(

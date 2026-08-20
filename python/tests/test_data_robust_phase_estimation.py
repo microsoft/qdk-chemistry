@@ -7,12 +7,15 @@
 
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
     DataClass,
+    QubitOperator,
+    RobustPhaseEstimationCircuitSet,
     RobustPhaseEstimationExperiment,
     RobustPhaseEstimationRound,
     RobustPhaseEstimationSchedule,
@@ -71,6 +74,55 @@ def _schedule() -> RobustPhaseEstimationSchedule:
             "hadamard_test_circuit_builder", "qdk", test_basis="X"
         ),
     )
+
+
+def _circuit_set() -> RobustPhaseEstimationCircuitSet:
+    """Create a representative serializable lazy circuit set."""
+    return RobustPhaseEstimationCircuitSet.from_schedule(
+        _schedule(),
+        Circuit(qasm="OPENQASM 3.0;\nqubit[1] q;\n"),
+        QubitOperator(pauli_strings=["Z"], coefficients=np.asarray([2.5])),
+    )
+
+
+def test_circuit_set_is_immutable_data_class() -> None:
+    """The circuit-builder output is immutable data with a guarded wire type."""
+    circuit_set = _circuit_set()
+
+    assert isinstance(circuit_set, DataClass)
+    assert circuit_set.data_type_name() == "robust_phase_estimation_circuit_set"
+    with pytest.raises(AttributeError, match="Cannot modify immutable"):
+        circuit_set.state_preparation = Circuit(qasm="OPENQASM 3.0;\nqubit[1] q;\n")
+
+
+@pytest.mark.parametrize("suffix", ["json", "hdf5"])
+def test_circuit_set_file_roundtrip(tmp_path: Path, suffix: str) -> None:
+    """The lazy algorithm output preserves its schedule and source inputs across files."""
+    circuit_set = _circuit_set()
+    filename = tmp_path / f"sample.robust_phase_estimation_circuit_set.{suffix}"
+
+    circuit_set.to_file(filename, suffix)
+    restored = RobustPhaseEstimationCircuitSet.from_file(filename, suffix)
+
+    assert restored.content_hash() == circuit_set.content_hash()
+    assert restored.schedule.content_hash() == circuit_set.schedule.content_hash()
+    assert restored.state_preparation.get_qasm() == circuit_set.state_preparation.get_qasm()
+    assert restored.qubit_hamiltonian.content_hash() == circuit_set.qubit_hamiltonian.content_hash()
+
+
+def test_circuit_set_serialization_guards_type_and_version(tmp_path: Path) -> None:
+    """Circuit-set files reject the wrong data type and incompatible versions."""
+    circuit_set = _circuit_set()
+    filename = tmp_path / "sample.robust_phase_estimation_circuit_set.json"
+    circuit_set.to_json_file(filename)
+
+    with pytest.raises(ValueError, match="robust_phase_estimation_schedule"):
+        RobustPhaseEstimationSchedule.from_json_file(filename)
+
+    payload = circuit_set.to_json()
+    payload["version"] = "999.0.0"
+    with pytest.raises(RuntimeError, match="version"):
+        RobustPhaseEstimationCircuitSet.from_json(payload)
 
 
 def test_schedule_is_immutable_data_class_without_circuits() -> None:
