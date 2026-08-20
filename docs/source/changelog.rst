@@ -4,6 +4,22 @@ Changelog
 
 For detailed release notes with code examples and feature walkthroughs, see the :doc:`release-notes/index` section.
 
+Unreleased
+==========
+
+Breaking changes:
+
+- C++ ``Localizer`` and ``LocalizerFactory`` were renamed to
+  ``OrbitalLocalizer`` and ``OrbitalLocalizerFactory``. Deprecated source
+  aliases remain for common included-header usage, but existing binaries must
+  be rebuilt and forward declarations of the old class names must be updated.
+
+Deprecated aliases:
+
+- Python ``qdk_chemistry.algorithms.Localizer`` is available again as a
+  deprecated alias of ``OrbitalLocalizer`` for source-snapshot compatibility.
+  Access, including through a wildcard import, emits a ``DeprecationWarning``.
+
 Version 2.1.0
 =============
 

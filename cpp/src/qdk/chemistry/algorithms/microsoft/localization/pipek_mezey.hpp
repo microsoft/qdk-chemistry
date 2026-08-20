@@ -11,12 +11,14 @@
 namespace qdk::chemistry::algorithms::microsoft {
 
 /**
- * @brief Default Pipek-Mezey implementation of the Localizer interface.
+ * @brief Default Pipek-Mezey implementation of the OrbitalLocalizer interface.
  *
- * This class provides a concrete implementation of the Localizer interface
+ * This class provides a concrete implementation of the OrbitalLocalizer
+ * interface
  * using the Pipek-Mezey localization algorithm as the default method.
- * It inherits from the base `qdk::chemistry::algorithms::Localizer` class and
- * implements the `localize` method to perform orbital localization.
+ * It inherits from the base
+ * `qdk::chemistry::algorithms::OrbitalLocalizer` class and implements the
+ * `localize` method to perform orbital localization.
  *
  * The Pipek-Mezey algorithm maximizes the sum of squares of atomic orbital
  * populations on atoms, resulting in orbitals that are more localized to
@@ -25,7 +27,8 @@ namespace qdk::chemistry::algorithms::microsoft {
  *
  * @see PipekMezeyLocalization for the underlying algorithm implementation
  */
-class PipekMezeyLocalizer : public qdk::chemistry::algorithms::Localizer {
+class PipekMezeyLocalizer
+    : public qdk::chemistry::algorithms::OrbitalLocalizer {
  public:
   PipekMezeyLocalizer() {
     _settings = std::make_unique<IterativeOrbitalLocalizationSettings>();

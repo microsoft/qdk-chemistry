@@ -167,7 +167,7 @@ std::shared_ptr<data::Wavefunction> new_aufbau_determinant_wavefunction(
 }
 }  // namespace detail
 
-std::unique_ptr<Localizer> make_pipek_mezey_localizer() {
+std::unique_ptr<OrbitalLocalizer> make_pipek_mezey_localizer() {
   QDK_LOG_TRACE_ENTERING();
 
   return std::make_unique<microsoft::PipekMezeyLocalizer>();
@@ -179,39 +179,40 @@ std::unique_ptr<Localizer> make_pipek_mezey_localizer() {
 // warning at this facade site only.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-std::unique_ptr<Localizer> make_mp2_natural_orbital_localizer() {
+std::unique_ptr<OrbitalLocalizer> make_mp2_natural_orbital_localizer() {
   QDK_LOG_TRACE_ENTERING();
 
   return std::make_unique<microsoft::MP2NaturalOrbitalLocalizer>();
 }
 #pragma GCC diagnostic pop
 
-std::unique_ptr<Localizer> make_natural_orbital_localizer() {
+std::unique_ptr<OrbitalLocalizer> make_natural_orbital_localizer() {
   QDK_LOG_TRACE_ENTERING();
 
   return std::make_unique<microsoft::NaturalOrbitalLocalizer>();
 }
 
-std::unique_ptr<Localizer> make_active_space_qio_localizer() {
+std::unique_ptr<OrbitalLocalizer> make_active_space_qio_localizer() {
   QDK_LOG_TRACE_ENTERING();
 
   return std::make_unique<microsoft::ActiveSpaceQIOLocalizer>();
 }
 
-std::unique_ptr<Localizer> make_vvhv_localizer() {
+std::unique_ptr<OrbitalLocalizer> make_vvhv_localizer() {
   QDK_LOG_TRACE_ENTERING();
 
   return std::make_unique<microsoft::VVHVLocalizer>();
 }
 
-void LocalizerFactory::register_default_instances() {
+void OrbitalLocalizerFactory::register_default_instances() {
   QDK_LOG_TRACE_ENTERING();
 
-  LocalizerFactory::register_instance(&make_pipek_mezey_localizer);
-  LocalizerFactory::register_instance(&make_mp2_natural_orbital_localizer);
-  LocalizerFactory::register_instance(&make_natural_orbital_localizer);
-  LocalizerFactory::register_instance(&make_active_space_qio_localizer);
-  LocalizerFactory::register_instance(&make_vvhv_localizer);
+  OrbitalLocalizerFactory::register_instance(&make_pipek_mezey_localizer);
+  OrbitalLocalizerFactory::register_instance(
+      &make_mp2_natural_orbital_localizer);
+  OrbitalLocalizerFactory::register_instance(&make_natural_orbital_localizer);
+  OrbitalLocalizerFactory::register_instance(&make_active_space_qio_localizer);
+  OrbitalLocalizerFactory::register_instance(&make_vvhv_localizer);
 }
 
 }  // namespace qdk::chemistry::algorithms

@@ -58,7 +58,7 @@ class RecordingMultiConfigurationCalculator
   }
 };
 
-class RecordingLocalizer : public Localizer {
+class RecordingLocalizer : public OrbitalLocalizer {
  public:
   std::string name() const override {
     return "_test_nuclear_derivative_recording_localizer";
@@ -394,11 +394,13 @@ TEST(NuclearDerivativeCalculatorTest,
       []() -> MultiConfigurationCalculatorFactory::return_type {
         return std::make_unique<RecordingMultiConfigurationCalculator>();
       });
-  [[maybe_unused]] ScopedFactoryRegistration<LocalizerFactory> localizer_guard(
+  [[maybe_unused]]
+  ScopedFactoryRegistration<OrbitalLocalizerFactory> localizer_guard(
       "_test_nuclear_derivative_recording_localizer");
-  LocalizerFactory::register_instance([]() -> LocalizerFactory::return_type {
-    return std::make_unique<RecordingLocalizer>();
-  });
+  OrbitalLocalizerFactory::register_instance(
+      []() -> OrbitalLocalizerFactory::return_type {
+        return std::make_unique<RecordingLocalizer>();
+      });
 
   auto structure = testing::create_hydrogen_structure();
   auto scf_solver = ScfSolverFactory::create();

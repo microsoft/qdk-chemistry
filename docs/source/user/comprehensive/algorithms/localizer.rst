@@ -2,6 +2,15 @@ Orbital localization
 ====================
 
 The :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` algorithm in QDK/Chemistry performs various orbital transformations to create localized or otherwise transformed molecular orbitals.
+
+In C++, use ``OrbitalLocalizer`` and ``OrbitalLocalizerFactory`` as the
+canonical public names. The legacy ``Localizer`` and ``LocalizerFactory`` names
+remain available as deprecated source aliases. Existing binaries must be
+rebuilt because the canonical C++ class and factory symbols have changed.
+Compiler diagnostics for deprecated aliases vary, and subclassing through
+``Localizer`` may not emit a warning. Forward declarations of the legacy class
+names must be updated because an alias cannot follow a class declaration.
+
 Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.Wavefunction` instance with reference orbitals as input and produces a new :class:`~qdk_chemistry.data.Wavefunction` instance with transformed orbitals as output.
 For more information about this pattern, see the :doc:`Factory Pattern <factory_pattern>` documentation.
 

@@ -314,7 +314,7 @@ ReferenceOrbitals localize_reference_orbitals(const data::Settings& settings,
         seed_wavefunction, reference.orbitals);
   }
 
-  auto localizer = create_from_ref<LocalizerFactory>(
+  auto localizer = create_from_ref<OrbitalLocalizerFactory>(
       settings.get<data::AlgorithmRef>("orbital_localizer"));
   const auto loc_ai = reference.orbitals->active_indices();
   auto loc_indices_a = data::spin_channel_indices(loc_ai, data::axes::alpha());

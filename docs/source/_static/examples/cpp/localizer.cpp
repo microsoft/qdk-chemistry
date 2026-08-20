@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-// Localizer usage examples.
+// OrbitalLocalizer usage examples.
 // --------------------------------------------------------------------------------------------
 // start-cell-create
 #include <iostream>
@@ -12,7 +12,7 @@ using namespace qdk::chemistry::algorithms;
 using namespace qdk::chemistry::data;
 
 // Create a Pipek-Mezey localizer using the factory
-auto localizer = LocalizerFactory::create("qdk_pipek_mezey");
+auto localizer = OrbitalLocalizerFactory::create("qdk_pipek_mezey");
 // end-cell-create
 // --------------------------------------------------------------------------------------------
 
@@ -57,7 +57,7 @@ H   -0.758602    0.000000    0.504284
 
   // --------------------------------------------------------------------------------------------
   // start-cell-list-implementations
-  auto names = LocalizerFactory::available();
+  auto names = OrbitalLocalizerFactory::available();
   for (const auto& name : names) {
     std::cout << name << std::endl;
   }

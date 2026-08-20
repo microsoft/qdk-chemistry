@@ -323,7 +323,8 @@ std::shared_ptr<data::Wavefunction> ActiveSpaceQIOLocalizer::_run_impl(
   }
 
   // Empty selection is a no-op, but still returns the standard single-reference
-  // (Aufbau determinant) carrier for consistency with the Localizer contract.
+  // (Aufbau determinant) carrier for consistency with the orbital-localizer
+  // contract.
   if (loc_indices_a.empty()) {
     return algorithms::detail::new_aufbau_determinant_wavefunction(wavefunction,
                                                                    orbitals);
