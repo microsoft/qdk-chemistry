@@ -155,8 +155,7 @@ jobs:
           libgfortran5 \
           pkg-config \
           doxygen \
-          graphviz \
-          gcovr
+          graphviz
 
     - name: Install macOS system packages
       if: matrix.os-name == 'macOS'
@@ -170,11 +169,14 @@ jobs:
           boost \
           hdf5 \
           graphviz \
-          gcovr \
           nlohmann-json \
           bison \
           flex \
           googletest
+
+    - name: Install gcovr
+      if: matrix.enable-coverage
+      run: python -m pip install 'gcovr>=8.4'
 
     - name: Cache Doxygen (macOS)
       if: matrix.os-name == 'macOS'
