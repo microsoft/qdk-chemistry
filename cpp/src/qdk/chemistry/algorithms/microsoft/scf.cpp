@@ -10,6 +10,7 @@
 #include <qdk/chemistry/scf/util/gauxc_registry.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
+#include <numeric>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
@@ -109,9 +110,11 @@ ScfCalculationResult ScfSolver::_run_with_options(
   }
 
   const auto effective_nuclear_charges =
-      qdk_raw_basis_set->get_effective_nuclear_charges();
-  const int effective_nuclear_charge =
-      static_cast<int>(effective_nuclear_charges.sum());
+      utils::microsoft::to_integral_nuclear_charges(
+          qdk_raw_basis_set->get_effective_nuclear_charges());
+  const int effective_nuclear_charge = static_cast<int>(
+      std::accumulate(effective_nuclear_charges.begin(),
+                      effective_nuclear_charges.end(), std::uint64_t{0}));
 
   // Determine the multiplicity
   if (multiplicity < 0) {
@@ -174,8 +177,7 @@ ScfCalculationResult ScfSolver::_run_with_options(
   auto ms_mol = qdk::chemistry::utils::microsoft::convert_to_molecule(
       *structure, charge, multiplicity);
   for (size_t i = 0; i < ms_mol->n_atoms; ++i) {
-    ms_mol->atomic_charges[i] = static_cast<uint64_t>(
-        effective_nuclear_charges(static_cast<Eigen::Index>(i)));
+    ms_mol->atomic_charges[i] = effective_nuclear_charges[i];
   }
 
   // Create SCFConfig
