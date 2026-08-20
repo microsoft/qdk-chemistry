@@ -182,9 +182,7 @@ _builder_params = [
     pytest.param(
         "qiskit_standard",
         id="qiskit_standard",
-        marks=[
-            pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
-        ],
+        marks=pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
     ),
 ]
 
@@ -242,9 +240,7 @@ def test_standard_phase_estimation_four_qubit(
         pytest.param(
             "qiskit_standard",
             id="qiskit_standard",
-            marks=[
-                pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
-            ],
+            marks=pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
         ),
     ],
 )

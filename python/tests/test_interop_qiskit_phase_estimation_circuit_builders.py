@@ -27,9 +27,7 @@ if QDK_CHEMISTRY_HAS_QISKIT:
         QiskitStandardQpeCircuitBuilder,
     )
 
-pytestmark = [
-    pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
-]
+pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 
 
 @dataclass(frozen=True)

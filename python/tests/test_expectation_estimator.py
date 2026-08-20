@@ -280,11 +280,9 @@ def test_estimator_fewer_shots(wavefunction_4e4o):
         "qdk_sparse_state_simulator",
         pytest.param(
             "qiskit_aer_simulator",
-            marks=[
-                pytest.mark.skipif(
-                    not QDK_CHEMISTRY_HAS_QISKIT_AER or not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit Aer not available"
-                ),
-            ],
+            marks=pytest.mark.skipif(
+                not QDK_CHEMISTRY_HAS_QISKIT_AER or not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit Aer not available"
+            ),
         ),
     ],
     ids=["qdk-full-state", "qdk-sparse-state", "qiskit-aer"],
