@@ -11,6 +11,7 @@ import pytest
 
 from qdk_chemistry._core._algorithms import ScfSolverFactory
 from qdk_chemistry.algorithms import ScfSolver, registry
+from qdk_chemistry.data import AlgorithmRef
 from qdk_chemistry.plugins import DuplicateRegistrationError
 from qdk_chemistry.plugins.qiskit import (
     QDK_CHEMISTRY_HAS_QISKIT,
@@ -677,6 +678,69 @@ class TestRegistryRegisterUnregister:
             assert replacement.registration_owner == "replacement"
         finally:
             registry.unregister("expectation_estimator", "aliased_python_algorithm")
+
+    def test_python_factory_alias_lookup_only_constructs_selected_algorithm(self):
+        """Alias lookup does not construct unrelated registered algorithms."""
+        construction_counts = {"first": 0, "second": 0}
+
+        class FirstAlgorithm:
+            """Unrelated algorithm whose construction count is tracked."""
+
+            def __init__(self):
+                construction_counts["first"] += 1
+
+            def type_name(self):
+                return "expectation_estimator"
+
+            def name(self):
+                return "first_counted_algorithm"
+
+            def aliases(self):
+                return [self.name(), "first_counted_alias"]
+
+            def settings(self):
+                return MagicMock()
+
+        class SecondAlgorithm(FirstAlgorithm):
+            """Algorithm selected by alias."""
+
+            def __init__(self):
+                construction_counts["second"] += 1
+
+            def name(self):
+                return "second_counted_algorithm"
+
+            def aliases(self):
+                return [self.name(), "second_counted_alias"]
+
+        registry.register(FirstAlgorithm)
+        registry.register(SecondAlgorithm)
+        try:
+            counts_after_registration = construction_counts.copy()
+
+            selected = registry.create("expectation_estimator", "second_counted_alias")
+
+            assert selected.name() == "second_counted_algorithm"
+            assert construction_counts == {
+                "first": counts_after_registration["first"],
+                "second": counts_after_registration["second"] + 1,
+            }
+        finally:
+            registry.unregister("expectation_estimator", "first_counted_algorithm")
+            registry.unregister("expectation_estimator", "second_counted_algorithm")
+
+    def test_builtin_registration_resolves_nested_algorithm_ref(self):
+        """Built-in registration resolves nested algorithms without recursive construction."""
+        sparse = registry.create(
+            "state_prep",
+            "sparse_isometry",
+            dense_state_prep=AlgorithmRef("state_prep", "dense_pure_state"),
+        )
+
+        dense_ref = sparse.settings().get("dense_state_prep")
+        dense = registry.create(dense_ref.algorithm_type, dense_ref.algorithm_name)
+
+        assert dense.name() == "dense_pure_state"
 
     def test_python_factory_rejects_duplicate_alias(self):
         """Registration rejects an alias owned by another implementation."""
