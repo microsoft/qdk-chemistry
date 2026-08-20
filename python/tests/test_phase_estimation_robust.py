@@ -23,8 +23,12 @@ import pytest
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder import (
     QdkRobustPhaseEstimationCircuitBuilder,
     _AlgorithmSnapshot,
+    _num_rounds,
 )
-from qdk_chemistry.algorithms.phase_estimation.robust_phase_estimation import RobustPhaseEstimation
+from qdk_chemistry.algorithms.phase_estimation.robust_phase_estimation import (
+    RobustPhaseEstimation,
+    _rpe_angle_update,
+)
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
@@ -34,7 +38,6 @@ from qdk_chemistry.data import (
     Settings,
     UnitaryRepresentation,
 )
-from qdk_chemistry.utils.rpe import num_rounds
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -56,6 +59,109 @@ _PAULI = {
     "Y": np.array([[0, -1j], [1j, 0]], dtype=complex),
     "Z": np.array([[1, 0], [0, -1]], dtype=complex),
 }
+
+
+def test_rpe_angle_update_picks_alias_closest_to_previous() -> None:
+    """Phase reconstruction selects the alias nearest the previous estimate."""
+    measured_phase = 0.4
+    assert _rpe_angle_update(3.3, measured_phase, round_index=1) == pytest.approx((measured_phase + 2 * np.pi) / 2)
+    assert _rpe_angle_update(0.0, measured_phase, round_index=1) == pytest.approx(measured_phase / 2)
+
+
+def test_rpe_angle_update_round_zero_returns_measured_phase() -> None:
+    """The base round has no aliases and retains its measured phase."""
+    assert _rpe_angle_update(0.0, 0.3, round_index=0) == pytest.approx(0.3)
+
+
+def test_rpe_angle_update_rejects_negative_round() -> None:
+    """Phase reconstruction rejects a negative round index."""
+    with pytest.raises(ValueError, match="round_index"):
+        _rpe_angle_update(0.0, 0.1, round_index=-1)
+
+
+def test_resolve_energy_inverts_linear_phase() -> None:
+    """Linear phase-to-energy conversion preserves the sign convention."""
+    base_time = np.pi / 2
+    energy = RobustPhaseEstimation._resolve_energy(
+        -0.75 * base_time,
+        base_time,
+        0,
+        1.0,
+        1,
+        correction="linear",
+    )
+    assert energy == pytest.approx(0.75)
+
+
+def test_resolve_energy_rejects_nonpositive_time() -> None:
+    """Phase-to-energy conversion requires a positive base time."""
+    with pytest.raises(ValueError, match="base_time"):
+        RobustPhaseEstimation._resolve_energy(0.1, 0.0, 0, 1.0, 1, correction="linear")
+
+
+def _qdrift_forward_phase(energy: float, lambda_norm: float, evolution_time: float, num_samples: int) -> float:
+    """Return the expected qDRIFT signal phase for one eigenenergy."""
+    step_angle = lambda_norm * evolution_time / num_samples
+    return -num_samples * np.arctan((energy / lambda_norm) * np.tan(step_angle))
+
+
+@pytest.mark.parametrize("energy", [0.5, -0.5, 0.123])
+def test_resolve_energy_inverts_qdrift_phase(energy: float) -> None:
+    """The qDRIFT tangent correction removes the finite-sample phase bias."""
+    lambda_norm, base_time, num_samples = 1.0, 0.3, 8
+    phase = _qdrift_forward_phase(energy, lambda_norm, base_time, num_samples)
+    recovered = RobustPhaseEstimation._resolve_energy(
+        phase,
+        base_time,
+        0,
+        lambda_norm,
+        num_samples,
+        correction="qdrift_tangent",
+    )
+    assert recovered == pytest.approx(energy, abs=1e-9)
+
+
+def test_qdrift_correction_beats_linear_and_bias_shrinks() -> None:
+    """Tangent correction removes qDRIFT bias that shrinks with sample count."""
+    energy, lambda_norm, base_time = 0.6, 1.0, 0.5
+    linear_errors: list[float] = []
+    for num_samples in (2, 8, 32, 128):
+        phase = _qdrift_forward_phase(energy, lambda_norm, base_time, num_samples)
+        corrected = RobustPhaseEstimation._resolve_energy(
+            phase,
+            base_time,
+            0,
+            lambda_norm,
+            num_samples,
+            correction="qdrift_tangent",
+        )
+        linear_error = abs((-phase / base_time) - energy)
+        assert abs(corrected - energy) < linear_error
+        linear_errors.append(linear_error)
+    assert linear_errors == sorted(linear_errors, reverse=True)
+
+
+@pytest.mark.parametrize("energy", [0.75, 0.25, -0.6, 1.1])
+def test_rpe_math_recovers_energy_from_ideal_signal(energy: float) -> None:
+    """Ideal geometric-ladder phases reconstruct the corresponding eigenenergy."""
+    lambda_norm = 1.5
+    base_time = np.pi / (2 * lambda_norm)
+    total_rounds = _num_rounds(lambda_norm, epsilon=1e-3)
+    theta = 0.0
+    for round_index in range(total_rounds + 1):
+        evolution_time = (2**round_index) * base_time
+        measured_phase = float(np.angle(np.exp(-1j * energy * evolution_time)))
+        theta = _rpe_angle_update(theta, measured_phase, round_index)
+
+    recovered = RobustPhaseEstimation._resolve_energy(
+        theta,
+        base_time,
+        total_rounds,
+        lambda_norm,
+        1,
+        correction="linear",
+    )
+    assert recovered == pytest.approx(energy, abs=1e-3)
 
 
 def _dense_from_pauli(pauli_strings: list[str], coefficients: list[float]) -> np.ndarray:
@@ -212,11 +318,12 @@ def _install_test_stack(
     expectation: Callable[[object, str], float],
     *,
     use_real_unitary_builder: bool = False,
+    resolution: int = 2_000_000,
 ) -> tuple[list[dict[str, object]], _FakeExecutor]:
     """Install fake circuit/execution boundaries around the real RPE orchestration."""
     contexts: dict[int, tuple[str, object]] = {}
     unitary_records: list[dict[str, object]] = []
-    executor = _FakeExecutor(contexts, expectation)
+    executor = _FakeExecutor(contexts, expectation, resolution=resolution)
     original_create = _AlgorithmSnapshot.create
 
     def create_snapshot(snapshot: _AlgorithmSnapshot):
@@ -310,6 +417,18 @@ def test_driver_uses_explicit_base_time(monkeypatch: pytest.MonkeyPatch) -> None
     assert result.metadata["base_time"] == pytest.approx(np.pi / 4)
 
 
+def test_driver_handles_empty_counts(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Empty executor counts contribute a guarded zero expectation."""
+    hamiltonian = QubitOperator(pauli_strings=["Z"], coefficients=[1.0])
+    builder = _make_builder(target_accuracy=0.5, energy_correction="linear")
+    driver = RobustPhaseEstimation()
+    _install_test_stack(monkeypatch, driver, builder, _ideal_expectation(0.2), resolution=0)
+
+    result = driver.run(state_preparation=_DUMMY_STATE_PREPARATION, qubit_hamiltonian=hamiltonian)
+
+    assert result.resolved_energy == pytest.approx(0.0)
+
+
 def test_robust_phase_estimation_name() -> None:
     """The robust estimator retains its registered name."""
     assert RobustPhaseEstimation().name() == "qdk_robust"
@@ -347,7 +466,7 @@ def test_non_trotter_product_budget_meets_target_accuracy(monkeypatch: pytest.Mo
     result = driver.run(state_preparation=_DUMMY_STATE_PREPARATION, qubit_hamiltonian=hamiltonian)
 
     metadata = result.metadata
-    final_round = num_rounds(1.0, epsilon_rpe)
+    final_round = _num_rounds(1.0, epsilon_rpe)
     final_time = (2**final_round) * np.pi / 2.0
     exact_energy_bound = phase_error / final_time
     propagated_energy_bound = (2.0 / np.pi) * epsilon_rpe * phase_error
@@ -416,7 +535,7 @@ def test_trotter_uses_independent_default_tolerances() -> None:
     assert circuit_set.epsilon_unitary == pytest.approx(0.85)
     assert circuit_set.unitary_accuracy_fraction == pytest.approx(0.0)
     assert circuit_set.error_budget_mode == "independent_trotter"
-    assert circuit_set.num_rounds == num_rounds(1.0, target_accuracy) + 1
+    assert circuit_set.num_rounds == _num_rounds(1.0, target_accuracy) + 1
     for round_data in circuit_set.rounds:
         ref = round_data.unitary_builder_configuration
         assert ref.settings is not None
@@ -728,7 +847,7 @@ def test_independent_tolerances_bound_noncommuting_trotter_ground_energy(
 
     result = driver.run(state_preparation=_DUMMY_STATE_PREPARATION, qubit_hamiltonian=hamiltonian)
 
-    final_round = num_rounds(lambda_norm, epsilon_rpe)
+    final_round = _num_rounds(lambda_norm, epsilon_rpe)
     final_time = (2**final_round) * np.pi / (2.0 * lambda_norm)
     ladder_bound = np.arcsin(epsilon_unitary) / final_time
     product_bound = (2.0 / np.pi) * epsilon_rpe * np.arcsin(epsilon_unitary)
@@ -766,7 +885,7 @@ def test_product_budget_reaches_one_millihartree_for_h2_sto3g(monkeypatch: pytes
 
     result = driver.run(state_preparation=_DUMMY_STATE_PREPARATION, qubit_hamiltonian=hamiltonian)
 
-    final_round = num_rounds(lambda_norm, epsilon_rpe)
+    final_round = _num_rounds(lambda_norm, epsilon_rpe)
     final_time = (2**final_round) * np.pi / (2.0 * lambda_norm)
     ladder_bound = np.arcsin(epsilon_unitary) / final_time
     product_bound = (2.0 / np.pi) * epsilon_rpe * np.arcsin(epsilon_unitary)

@@ -31,13 +31,6 @@ from qdk_chemistry.data import (
     Settings,
 )
 from qdk_chemistry.utils import Logger
-from qdk_chemistry.utils.rpe import (
-    energy_from_rpe_angle,
-    expectation_from_counts,
-    qdrift_phase_to_energy,
-    rpe_angle_update,
-    wrap_to_principal,
-)
 
 from .base import PhaseEstimation
 from .circuit_builder.robust_builder import (
@@ -46,6 +39,29 @@ from .circuit_builder.robust_builder import (
 )
 
 __all__: list[str] = ["RobustPhaseEstimation", "RobustPhaseEstimationSettings"]
+
+
+def _wrap_to_principal(angle: float) -> float:
+    """Wrap an angle into the principal interval ``[-pi, pi)``."""
+    return float((angle + np.pi) % (2 * np.pi) - np.pi)
+
+
+def _rpe_angle_update(previous_angle: float, measured_phase: float, round_index: int) -> float:
+    """Select the measured-phase alias closest to the previous RPE estimate."""
+    if round_index < 0:
+        raise ValueError(f"round_index must be non-negative, received {round_index}.")
+    scale = 2**round_index
+    best_candidate = measured_phase / scale
+    best_diff = (best_candidate - previous_angle + np.pi) % (2 * np.pi) - np.pi
+    best_distance = abs(float(best_diff))
+    for alias_index in range(1, scale):
+        candidate = (measured_phase + 2 * np.pi * alias_index) / scale
+        diff = (candidate - previous_angle + np.pi) % (2 * np.pi) - np.pi
+        distance = abs(float(diff))
+        if distance < best_distance:
+            best_distance = distance
+            best_candidate = candidate
+    return float(best_candidate)
 
 
 class RobustPhaseEstimationSettings(Settings):
@@ -200,13 +216,20 @@ class RobustPhaseEstimation(PhaseEstimation):
                     shots=experiment.circuit_multiplicity,
                     noise=noise,
                 )
-                real_accumulator += expectation_from_counts(real_data.bitstring_counts)
-                imag_accumulator += expectation_from_counts(imag_data.bitstring_counts)
+                basis_expectations: list[float] = []
+                for execution_data in (real_data, imag_data):
+                    counts = execution_data.bitstring_counts
+                    num_zero = int(counts.get("0", 0))
+                    num_one = int(counts.get("1", 0))
+                    total = num_zero + num_one
+                    basis_expectations.append((num_zero - num_one) / total if total else 0.0)
+                real_accumulator += basis_expectations[0]
+                imag_accumulator += basis_expectations[1]
 
             real_part = real_accumulator / float(round_data.num_draws)
             imag_part = imag_accumulator / float(round_data.num_draws)
             measured_phase = float(np.angle(complex(real_part, imag_part)))
-            theta = rpe_angle_update(theta, measured_phase, round_data.round_index)
+            theta = _rpe_angle_update(theta, measured_phase, round_data.round_index)
             Logger.debug(
                 f"Round {round_data.round_index}: shots={round_data.shots_per_basis}, "
                 f"samples={round_data.scheduled_samples}, phi={measured_phase:.6f}, theta={theta:.6f}."
@@ -297,14 +320,22 @@ class RobustPhaseEstimation(PhaseEstimation):
         correction: str,
     ) -> float:
         """Map the recovered per-base-time phase to an energy."""
+        if base_time <= 0.0:
+            raise ValueError(f"base_time must be positive, received {base_time}.")
         if correction != "qdrift_tangent":
-            return energy_from_rpe_angle(theta, base_time)
+            return -_wrap_to_principal(theta) / base_time
         # Apply the qDRIFT tangent de-biasing at the final (largest-time) round,
         # using the unwrapped phase consistent with the principal per-base phase.
-        principal = wrap_to_principal(theta)
+        if final_samples < 1:
+            raise ValueError(f"final_samples must be at least 1, received {final_samples}.")
+        principal = _wrap_to_principal(theta)
         final_time = (2**total_rounds) * base_time
         final_phase = principal * (2**total_rounds)
-        return qdrift_phase_to_energy(final_phase, final_time, lambda_norm, final_samples)
+        step_angle = lambda_norm * final_time / final_samples
+        denominator = np.tan(step_angle)
+        if lambda_norm == 0.0 or abs(denominator) < 1e-12:
+            return -final_phase / final_time
+        return float(-lambda_norm * np.tan(final_phase / final_samples) / denominator)
 
     def name(self) -> str:
         """Return the name of the phase estimation algorithm."""

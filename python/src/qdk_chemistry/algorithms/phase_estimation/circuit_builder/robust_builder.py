@@ -23,7 +23,6 @@ from qdk_chemistry.data import (
     RobustPhaseEstimationSchedule,
     Settings,
 )
-from qdk_chemistry.utils.rpe import num_rounds, qdrift_schedule
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -39,6 +38,24 @@ __all__ = [
 _UNSET_BUDGET_VALUE = -1.0
 _DEFAULT_RPE_EPSILON_UNITARY = 0.85
 _SUPPORTED_RPE_CATEGORIES = frozenset({"deterministic_or_exact", "trotter", "qdrift", "partial_randomized"})
+
+
+def _num_rounds(lambda_norm: float, epsilon: float) -> int:
+    """Return the number of RPE time-doubling rounds after the base round."""
+    if epsilon <= 0.0:
+        raise ValueError(f"epsilon must be positive, received {epsilon}.")
+    if lambda_norm < 0.0:
+        raise ValueError(f"lambda_norm must be non-negative, received {lambda_norm}.")
+    if lambda_norm <= epsilon:
+        return 0
+    return int(np.ceil(np.log2(lambda_norm / epsilon)))
+
+
+def _qdrift_schedule(total_rounds: int, round_index: int) -> tuple[int, int]:
+    """Return the per-basis shot count and qDRIFT sample count for one round."""
+    shots = int(np.ceil(np.e * (11 + 4 * (total_rounds - round_index))))
+    samples = 2 ** (2 * round_index + 1)
+    return shots, samples
 
 
 @dataclass(frozen=True)
@@ -518,14 +535,14 @@ class QdkRobustPhaseEstimationCircuitBuilder(RobustPhaseEstimationCircuitBuilder
                 f"got base_time={base_time:.6g} and lambda_norm={lambda_norm:.6g}."
             )
 
-        total_round = num_rounds(lambda_norm, epsilon_rpe)
+        total_round = _num_rounds(lambda_norm, epsilon_rpe)
         randomized = category in ("qdrift", "partial_randomized")
         requested_seed = int(self._settings.get("seed"))
         root_seed = self._resolve_root_seed(requested_seed) if randomized else None
 
         rounds: list[RobustPhaseEstimationRound] = []
         for round_index in range(total_round + 1):
-            shots, samples = qdrift_schedule(total_round, round_index)
+            shots, samples = _qdrift_schedule(total_round, round_index)
             evolution_time = float((2**round_index) * base_time)
             updates: dict[str, object] = {"time": evolution_time}
             if category == "qdrift" and unitary_snapshot.has_setting("num_samples"):

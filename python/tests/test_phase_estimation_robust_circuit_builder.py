@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from itertools import islice, pairwise
-from math import pi
+from math import ceil, e, pi
 
 import pytest
 
@@ -25,6 +25,8 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder im
     RobustPhaseEstimationCircuitBuilder,
     RobustPhaseEstimationCircuitSet,
     _AlgorithmSnapshot,
+    _num_rounds,
+    _qdrift_schedule,
 )
 from qdk_chemistry.data import (
     AlgorithmRef,
@@ -34,7 +36,6 @@ from qdk_chemistry.data import (
     RobustPhaseEstimationSchedule,
     Settings,
 )
-from qdk_chemistry.utils.rpe import qdrift_schedule
 
 
 @dataclass(frozen=True)
@@ -102,6 +103,34 @@ def rpe_problem() -> tuple[Circuit, QubitOperator]:
     state_preparation = Circuit(qasm="OPENQASM 3.0;\nqubit[1] q;\n")
     hamiltonian = QubitOperator(pauli_strings=["Z"], coefficients=[1.0])
     return state_preparation, hamiltonian
+
+
+@pytest.mark.parametrize(
+    ("lambda_norm", "epsilon", "expected"),
+    [(1.0, 1.0, 0), (0.5, 1.0, 0), (8.0, 1.0, 3), (10.0, 1.0, 4)],
+)
+def test_num_rounds(lambda_norm: float, epsilon: float, expected: int) -> None:
+    """The builder resolves the expected number of time-doubling rounds."""
+    assert _num_rounds(lambda_norm, epsilon) == expected
+
+
+def test_num_rounds_rejects_nonpositive_epsilon() -> None:
+    """RPE scheduling requires a positive energy tolerance."""
+    with pytest.raises(ValueError, match="epsilon"):
+        _num_rounds(1.0, 0.0)
+
+
+def test_qdrift_schedule_formula_and_monotonicity() -> None:
+    """RPE shots decrease while qDRIFT samples increase over the ladder."""
+    total_rounds = 5
+    schedules = [_qdrift_schedule(total_rounds, round_index) for round_index in range(total_rounds + 1)]
+    shots = [schedule[0] for schedule in schedules]
+    samples = [schedule[1] for schedule in schedules]
+
+    assert schedules[0] == (ceil(e * (11 + 4 * total_rounds)), 2)
+    assert shots == sorted(shots, reverse=True)
+    assert samples == sorted(samples)
+    assert all(samples[round_index] == 2 ** (2 * round_index + 1) for round_index in range(total_rounds + 1))
 
 
 @pytest.fixture
@@ -355,7 +384,7 @@ def test_deterministic_round_yields_one_pair_with_shot_multiplicity(
 
     experiments = list(circuit_set.iter_round(0))
 
-    expected_shots, expected_samples = qdrift_schedule(circuit_set.num_rounds - 1, 0)
+    expected_shots, expected_samples = _qdrift_schedule(circuit_set.num_rounds - 1, 0)
     assert round_zero.shots_per_basis == expected_shots
     assert round_zero.scheduled_samples == expected_samples
     assert round_zero.num_draws == 1
