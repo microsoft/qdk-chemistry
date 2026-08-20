@@ -32,17 +32,12 @@ See :ref:`release-v2.0.0` for full details and migration guidance.
 - Fermion-to-qubit mapping carried as data (``MajoranaMapping``), including a Verstraete-Cirac encoding
 - Explicit Pauli term grouping and generalized expectation estimation
 - Composable standard and iterative phase-estimation circuit builders
-- On-demand robust phase-estimation circuit builder with round, draw, seed, and multiplicity metadata for shared QRE and execution workflows
-- Robust phase estimation derives independent reproducible executor seeds per round, draw, and measurement basis, preventing repeated one-shot simulator streams in randomized evolution and X/Y stream reuse in deterministic evolution
 - QDK Quantum Resource Estimator integration for generated circuits (``Circuit.estimate`` / ``get_qre_application``)
 - Algorithm result caching and data-file migration tooling
 - Windows build support with CI
 
 Breaking changes:
 
-- Robust phase estimation with Trotter and partially randomized unitary builders now defaults each to ``epsilon_rpe = target_accuracy`` and an independent dimensionless ``epsilon_unitary`` of ``0.85``. Partially randomized evolution maps that full-unitary tolerance through its quadrature split, restoring inverse-square random-sample scaling; explicit fractional and paired budgets remain supported. Trotter callers must replace ``unitary_accuracy_fraction`` or explicit ``epsilon_rpe`` with ``target_accuracy`` plus an optional positive ``epsilon_unitary``.
-- The automatic partially randomized split now minimizes the implemented pre-merge rotation count, including integer sample sizing, the configured per-step sample floor, and all-random and all-deterministic limits.
-- The partially randomized ``num_random_samples`` default is now ``1``; accuracy-aware mode increases it automatically from the Campbell bound, while callers can still request a larger floor explicitly.
 - Wavefunction containers consolidated from five classes into two: ``SlaterDeterminantContainer``, ``CasWavefunctionContainer``, and ``SciWavefunctionContainer`` (structurally identical apart from a type tag) merge into ``StateVectorContainer``, distinguished by a stored sector; ``MP2Container`` and ``CoupledClusterContainer`` merge into ``AmplitudeContainer``, distinguished by an ``AmplitudeType`` tag. ``Wavefunction.get_container_type()`` now returns ``"state_vector"`` / ``"amplitude"`` (old names remain as deprecated aliases)
 - Serialization schema bumped from ``0.1.0`` to ``0.2.0`` for the ``Orbitals`` / ``ModelOrbitals``, ``CanonicalFourCenterHamiltonianContainer`` / ``SparseHamiltonianContainer`` / ``CholeskyHamiltonianContainer``, ``Wavefunction`` / ``StateVectorContainer``, ``QpeResult``, and ``UnitaryRepresentation`` data classes; ``AmplitudeContainer`` and the top-level ``Hamiltonian`` are unchanged. Upgrade supported files with ``python -m qdk_chemistry.migrate``; v1 ``TimeEvolutionUnitary`` files must be regenerated because they do not store the scale required by v2
 - Expectation estimator no longer auto-groups terms
