@@ -715,6 +715,7 @@ def _register_cpp_factories():
     be called by users.
     """
     from qdk_chemistry._core._algorithms import (  # noqa: PLC0415
+        ActiveSpaceOptimizerFactory,
         ActiveSpaceSelectorFactory,
         DynamicalCorrelationCalculatorFactory,
         EffectiveHamiltonianConstructorFactory,
@@ -724,6 +725,7 @@ def _register_cpp_factories():
         MultiConfigurationCalculatorFactory,
         MultiConfigurationScfFactory,
         NuclearDerivativeCalculatorFactory,
+        OrbitalOptimizerFactory,
         PopulationAnalyzerFactory,
         ProjectedMultiConfigurationCalculatorFactory,
         ScfSolverFactory,
@@ -731,6 +733,7 @@ def _register_cpp_factories():
     )
 
     register_factory(ActiveSpaceSelectorFactory)
+    register_factory(ActiveSpaceOptimizerFactory)
     register_factory(DynamicalCorrelationCalculatorFactory)
     register_factory(EffectiveHamiltonianConstructorFactory)
     register_factory(GeometryOptimizerFactory)
@@ -739,6 +742,7 @@ def _register_cpp_factories():
     register_factory(MultiConfigurationCalculatorFactory)
     register_factory(MultiConfigurationScfFactory)
     register_factory(NuclearDerivativeCalculatorFactory)
+    register_factory(OrbitalOptimizerFactory)
     register_factory(PopulationAnalyzerFactory)
     register_factory(ProjectedMultiConfigurationCalculatorFactory)
     register_factory(ScfSolverFactory)

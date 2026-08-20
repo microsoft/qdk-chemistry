@@ -3,6 +3,7 @@
 // license information.
 
 #include <qdk/chemistry/algorithms/active_space.hpp>
+#include <qdk/chemistry/algorithms/active_space_optimization.hpp>
 #include <qdk/chemistry/algorithms/algorithm_defaults.hpp>
 #include <qdk/chemistry/algorithms/dynamical_correlation_calculator.hpp>
 #include <qdk/chemistry/algorithms/effective_hamiltonian.hpp>
@@ -12,6 +13,7 @@
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/mcscf.hpp>
 #include <qdk/chemistry/algorithms/nuclear_derivative.hpp>
+#include <qdk/chemistry/algorithms/orbital_optimization.hpp>
 #include <qdk/chemistry/algorithms/pmc.hpp>
 #include <qdk/chemistry/algorithms/population_analysis.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
@@ -40,6 +42,7 @@ std::shared_ptr<data::Settings> resolve_algorithm_defaults(
   if (type == NAME::algorithm_type_name()) return try_factory<NAME>(name);
   REGISTER_FACTORY_SETTINGS_INIT(ScfSolverFactory)
   REGISTER_FACTORY_SETTINGS_INIT(ActiveSpaceSelectorFactory)
+  REGISTER_FACTORY_SETTINGS_INIT(ActiveSpaceOptimizerFactory)
   REGISTER_FACTORY_SETTINGS_INIT(HamiltonianConstructorFactory)
   REGISTER_FACTORY_SETTINGS_INIT(PopulationAnalyzerFactory)
   REGISTER_FACTORY_SETTINGS_INIT(MultiConfigurationCalculatorFactory)
@@ -49,6 +52,7 @@ std::shared_ptr<data::Settings> resolve_algorithm_defaults(
   REGISTER_FACTORY_SETTINGS_INIT(GeometryOptimizerFactory)
   REGISTER_FACTORY_SETTINGS_INIT(MultiConfigurationScfFactory)
   REGISTER_FACTORY_SETTINGS_INIT(NuclearDerivativeCalculatorFactory)
+  REGISTER_FACTORY_SETTINGS_INIT(OrbitalOptimizerFactory)
   REGISTER_FACTORY_SETTINGS_INIT(LocalizerFactory)
   REGISTER_FACTORY_SETTINGS_INIT(StabilityCheckerFactory)
 
