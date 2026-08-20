@@ -247,7 +247,7 @@ orientation.
    * - ``max_sweeps``
      - int
      - ``3``
-       - Maximum coordinate-descent passes; ``0`` applies AO anchoring only
+     - Maximum coordinate-descent passes; ``0`` applies AO anchoring only
    * - ``improvement_tolerance``
      - float
      - ``1e-10``
