@@ -19,7 +19,7 @@ from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_swap_pauli_se
     ControlledSwapPauliSequenceMapper,
     _vacuum_eigenphase,
 )
-from qdk_chemistry.data import LatticeGraph, QubitOperator
+from qdk_chemistry.data import LatticeGraph, MajoranaMapping, QubitOperator
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
@@ -30,6 +30,7 @@ from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils.model_hamiltonians import create_ising_hamiltonian
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+from .test_helpers import create_nontrivial_test_hamiltonian
 
 if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit import QuantumCircuit
@@ -64,6 +65,17 @@ INTERLEAVED_ORDERING = [(XX, 0.5), (Z0, -0.5), (YY, 0.5), (IDENTITY, 0.5)]
 END_TO_END_PAULI_STRINGS = ["XX", "YY", "IZ", "ZI"]
 END_TO_END_COEFFICIENTS = [0.5, 0.5, -0.5, 0.5]
 END_TO_END_EVOLUTION_TIME = 0.5
+
+#: Absolute tolerance the mapper uses when testing amplitude cancellation.
+VACUUM_PRESERVATION_TOLERANCE = 1e-9
+
+#: Fermion-to-qubit mappings the qubit-flip reconstruction is expected to hold for.
+FERMION_TO_QUBIT_MAPPINGS = {
+    "jordan-wigner": MajoranaMapping.jordan_wigner,
+    "bravyi-kitaev": MajoranaMapping.bravyi_kitaev,
+    "bravyi-kitaev-tree": MajoranaMapping.bravyi_kitaev_tree,
+    "parity": MajoranaMapping.parity,
+}
 
 
 def build_pauli_matrix(pauli_term, num_qubits):
@@ -162,6 +174,25 @@ def qubit_flip_unitary():
     trotter = registry.create("hamiltonian_unitary_builder", "trotter")
     trotter.settings().update({"order": 1, "num_divisions": 1, "time": END_TO_END_EVOLUTION_TIME})
     return trotter.run(grouped)
+
+
+@pytest.fixture
+def make_mapped_unitary():
+    """Return a factory running molecular Hamiltonian -> qubit mapping -> ``qubit_flip`` -> Trotter."""
+
+    def _make(mapping_name):
+        hamiltonian = create_nontrivial_test_hamiltonian()
+        num_spin_orbitals = 2 * hamiltonian.get_one_body_integrals()[0].shape[0]
+        mapping = FERMION_TO_QUBIT_MAPPINGS[mapping_name](num_spin_orbitals)
+
+        qubit_hamiltonian = registry.create("qubit_mapper", "qdk").run(hamiltonian, mapping)
+        grouped = registry.create("term_grouper", "qubit_flip").run(qubit_hamiltonian)
+
+        trotter = registry.create("hamiltonian_unitary_builder", "trotter")
+        trotter.settings().update({"order": 1, "num_divisions": 1, "time": END_TO_END_EVOLUTION_TIME})
+        return trotter.run(grouped)
+
+    return _make
 
 
 class TestControlledSwapPauliSequenceMapper:
@@ -471,3 +502,44 @@ class TestQubitFlipGroupingEndToEnd:
 
         with pytest.raises(ValueError, match="vacuum-preserving product formula"):
             cswap_mapper.run(trotter.run(grouped))
+
+
+class TestQubitFlipAcrossFermionToQubitMappings:
+    """The qubit-flip reconstruction must not be specific to Jordan-Wigner.
+
+    The fermionic provenance of the Pauli strings is discarded by the mapping, so ``qubit_flip``
+    recovers the vacuum-annihilating groups from Pauli structure alone.  Whether that
+    reconstruction is faithful depends on the encoding placing every string of a fermionic term
+    on a common flipped-qubit set, which these tests pin down for the supported mappings.
+    """
+
+    @pytest.mark.parametrize("mapping_name", list(FERMION_TO_QUBIT_MAPPINGS))
+    def test_grouped_product_formula_is_vacuum_preserving(self, make_mapped_unitary, mapping_name):
+        """A particle-conserving molecular Hamiltonian survives Trotterisation under every mapping."""
+        container = make_mapped_unitary(mapping_name).get_container()
+        terms = [(term.pauli_term, term.angle) for term in container.step_terms]
+
+        assert _vacuum_eigenphase(terms, VACUUM_PRESERVATION_TOLERANCE) is not None
+
+    @pytest.mark.parametrize("mapping_name", list(FERMION_TO_QUBIT_MAPPINGS))
+    def test_predicted_phase_matches_the_evolved_vacuum(self, make_mapped_unitary, mapping_name):
+        """The classically predicted phase equals the one the product formula actually imprints."""
+        container = make_mapped_unitary(mapping_name).get_container()
+        terms = [(term.pauli_term, term.angle) for term in container.step_terms]
+
+        vacuum = np.zeros(2**container.num_qubits, dtype=complex)
+        vacuum[0] = 1.0
+        evolved = build_product_formula_matrix(terms, container.num_qubits) @ vacuum
+
+        phase = _vacuum_eigenphase(terms, VACUUM_PRESERVATION_TOLERANCE)
+        assert np.allclose(evolved[1:], 0.0, atol=float_comparison_absolute_tolerance)
+        assert np.isclose(evolved[0], np.exp(1j * phase), atol=float_comparison_absolute_tolerance)
+
+    @pytest.mark.parametrize("mapping_name", list(FERMION_TO_QUBIT_MAPPINGS))
+    def test_mapper_accepts_the_grouped_unitary(self, make_mapped_unitary, mapping_name):
+        """The full pipeline builds a circuit instead of rejecting the ordering."""
+        unitary = make_mapped_unitary(mapping_name)
+        mapper = ControlledSwapPauliSequenceMapper()
+        mapper.settings().set("control_indices", [unitary.get_num_qubits()])
+
+        assert isinstance(mapper.run(unitary), Circuit)
