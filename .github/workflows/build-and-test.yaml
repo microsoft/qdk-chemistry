@@ -438,7 +438,7 @@ jobs:
         echo "Pybind11 Coverage Summary:"
         cat ../coverage-reports/pybind11_coverage.txt
 
-    - name: Generate coverage statistics
+    - name: Generate coverage report
       if: matrix.enable-coverage
       run: |
         # Extract coverage percentages
@@ -452,49 +452,47 @@ jobs:
         PYBIND11_COVERAGE=$(extract_coverage coverage-reports/pybind11_coverage.txt)
         PYBIND11_COVERAGE=${PYBIND11_COVERAGE:-0}
 
-        echo "CPP_COVERAGE=$CPP_COVERAGE" >> $GITHUB_ENV
-        echo "PYTHON_COVERAGE=$PYTHON_COVERAGE" >> $GITHUB_ENV
-        echo "PYBIND11_COVERAGE=$PYBIND11_COVERAGE" >> $GITHUB_ENV
-
-        # Create simple PR comment with just statistics
-        echo "| Component | Coverage |" > pr-comment.md
-        echo "|-----------|----------|" >> pr-comment.md
-        echo "| C++ Library | ${CPP_COVERAGE}% |" >> pr-comment.md
-        echo "| Python Package | ${PYTHON_COVERAGE}% |" >> pr-comment.md
+        report=coverage-reports/coverage-report.md
+        echo "| Component | Coverage |" > "$report"
+        echo "|-----------|----------|" >> "$report"
+        echo "| C++ Library | ${CPP_COVERAGE}% |" >> "$report"
+        echo "| Python Package | ${PYTHON_COVERAGE}% |" >> "$report"
         if [ "$PYBIND11_COVERAGE" != "0" ]; then
-          echo "| Pybind11 Bindings | ${PYBIND11_COVERAGE}% |" >> pr-comment.md
+          echo "| Pybind11 Bindings | ${PYBIND11_COVERAGE}% |" >> "$report"
         fi
-        echo "" >> pr-comment.md
+        echo "" >> "$report"
 
-        echo "#### Detailed Coverage Reports" >> pr-comment.md
-        echo "" >> pr-comment.md
-        echo "<details>" >> pr-comment.md
-        echo "<summary>C++ Coverage Details</summary>" >> pr-comment.md
-        echo "" >> pr-comment.md
+        echo "#### Detailed Coverage Reports" >> "$report"
+        echo "" >> "$report"
+        echo "<details>" >> "$report"
+        echo "<summary>C++ Coverage Details</summary>" >> "$report"
+        echo "" >> "$report"
         # gcovr's markdown writer renders a real GFM table
-        cat coverage-reports/cpp_coverage.md >> pr-comment.md
-        echo "</details>" >> pr-comment.md
-        echo "" >> pr-comment.md
+        cat coverage-reports/cpp_coverage.md >> "$report"
+        echo "</details>" >> "$report"
+        echo "" >> "$report"
 
         if [ -f coverage-reports/python_coverage.txt ]; then
-          echo "<details>" >> pr-comment.md
-          echo "<summary>Python Coverage Details</summary>" >> pr-comment.md
-          echo "" >> pr-comment.md
-          echo '```' >> pr-comment.md
+          echo "<details>" >> "$report"
+          echo "<summary>Python Coverage Details</summary>" >> "$report"
+          echo "" >> "$report"
+          echo '```' >> "$report"
           # coverage.py has no native markdown writer; strip backticks
-          tail -50 coverage-reports/python_coverage.txt | tr -d '`' >> pr-comment.md
-          echo '```' >> pr-comment.md
-          echo "</details>" >> pr-comment.md
-          echo "" >> pr-comment.md
+          tail -50 coverage-reports/python_coverage.txt | tr -d '`' >> "$report"
+          echo '```' >> "$report"
+          echo "</details>" >> "$report"
+          echo "" >> "$report"
         fi
 
         if [ -f coverage-reports/pybind11_coverage.md ]; then
-          echo "<details>" >> pr-comment.md
-          echo "<summary>Pybind11 Coverage Details</summary>" >> pr-comment.md
-          echo "" >> pr-comment.md
-          cat coverage-reports/pybind11_coverage.md >> pr-comment.md
-          echo "</details>" >> pr-comment.md
+          echo "<details>" >> "$report"
+          echo "<summary>Pybind11 Coverage Details</summary>" >> "$report"
+          echo "" >> "$report"
+          cat coverage-reports/pybind11_coverage.md >> "$report"
+          echo "</details>" >> "$report"
         fi
+
+        cp "$report" pr-comment.md
 
     # Forked pull_request runs only get a read-only GITHUB_TOKEN, so the comment is
     # posted by the separate "Coverage PR Comment" workflow_run workflow instead.
@@ -548,50 +546,11 @@ jobs:
     - name: Add coverage to job summary
       if: matrix.enable-coverage
       run: |
-        # Create comprehensive summary with table and detailed reports
-        echo "## 📊 Coverage Summary" > coverage-summary.md
-        echo "" >> coverage-summary.md
-        echo "| Component | Coverage |" >> coverage-summary.md
-        echo "|-----------|----------|" >> coverage-summary.md
-        echo "| C++ Library | ${CPP_COVERAGE}% |" >> coverage-summary.md
-        echo "| Python Package | ${PYTHON_COVERAGE}% |" >> coverage-summary.md
-        if [ "$PYBIND11_COVERAGE" != "0" ]; then
-          echo "| Pybind11 Bindings | ${PYBIND11_COVERAGE}% |" >> coverage-summary.md
-        fi
-        echo "" >> coverage-summary.md
-        echo "---" >> coverage-summary.md
-        echo "" >> coverage-summary.md
-
-        echo "### Detailed Coverage Reports" >> coverage-summary.md
-        echo "" >> coverage-summary.md
-        echo "<details>" >> coverage-summary.md
-        echo "<summary>C++ Coverage Details</summary>" >> coverage-summary.md
-        echo "" >> coverage-summary.md
-        cat coverage-reports/cpp_coverage.md >> coverage-summary.md
-        echo "</details>" >> coverage-summary.md
-        echo "" >> coverage-summary.md
-
-        if [ -f coverage-reports/python_coverage.txt ]; then
-          echo "<details>" >> coverage-summary.md
-          echo "<summary>Python Coverage Details</summary>" >> coverage-summary.md
-          echo "" >> coverage-summary.md
-          echo '```' >> coverage-summary.md
-          tail -50 coverage-reports/python_coverage.txt | tr -d '`' >> coverage-summary.md
-          echo '```' >> coverage-summary.md
-          echo "</details>" >> coverage-summary.md
-          echo "" >> coverage-summary.md
-        fi
-
-        if [ -f coverage-reports/pybind11_coverage.md ]; then
-          echo "<details>" >> coverage-summary.md
-          echo "<summary>Pybind11 Coverage Details</summary>" >> coverage-summary.md
-          echo "" >> coverage-summary.md
-          cat coverage-reports/pybind11_coverage.md >> coverage-summary.md
-          echo "</details>" >> coverage-summary.md
-        fi
-
-        # Add to job summary
-        cat coverage-summary.md >> $GITHUB_STEP_SUMMARY
+        {
+          echo "## 📊 Coverage Summary"
+          echo ""
+          cat coverage-reports/coverage-report.md
+        } >> "$GITHUB_STEP_SUMMARY"
 
     - name: Build documentation
       if: matrix.python-version == '3.13'
