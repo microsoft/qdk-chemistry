@@ -798,8 +798,6 @@ TEST_F(ScfTest, AgHDef2SvpWithEcp) {
               testing::scf_energy_tolerance);
   EXPECT_NEAR(mean_field_ansatz.calculate_energy(), -146.62430815169887,
               testing::scf_energy_tolerance);
-  EXPECT_NEAR(mean_field_ansatz.calculate_energy(), -146.62430815169887,
-              testing::scf_energy_tolerance);
 
   // Check electron count - with ECP, should have 20 valence electrons
   auto [occupations_alpha, occupations_beta] =

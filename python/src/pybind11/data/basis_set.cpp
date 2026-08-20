@@ -852,6 +852,9 @@ Get nuclear charges adjusted for ECP core electrons.
 Returns:
     numpy.ndarray: Effective nuclear charge for each atom
 
+Raises:
+    RuntimeError: If no structure is associated with this basis set
+
 Examples:
     >>> charges = basis_set.get_effective_nuclear_charges()
 )");
@@ -863,6 +866,9 @@ Calculate nuclear repulsion using ECP-adjusted nuclear charges.
 
 Returns:
     float: Effective nuclear repulsion energy in atomic units (Hartree)
+
+Raises:
+    RuntimeError: If no structure is associated with this basis set
 
 Examples:
     >>> energy = basis_set.calculate_effective_nuclear_repulsion_energy()
