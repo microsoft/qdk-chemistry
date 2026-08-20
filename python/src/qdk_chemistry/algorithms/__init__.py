@@ -31,6 +31,10 @@ from qdk_chemistry.algorithms.expectation_estimator.expectation_estimator import
 from qdk_chemistry.algorithms.expectation_estimator.qdk import QdkExpectationEstimator
 from qdk_chemistry.algorithms.geometry_optimization import GeometryOptimizer, GeometryOptimizerSettings
 from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTest
+from qdk_chemistry.algorithms.hamiltonian_basis_transformer import (
+    HamiltonianBasisTransformer,
+    QdkHamiltonianBasisTransformer,
+)
 from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
     QdkHamiltonianConstructor,
@@ -83,6 +87,7 @@ __all__ = [
     "GeometryOptimizer",
     "GeometryOptimizerSettings",
     "HadamardTest",
+    "HamiltonianBasisTransformer",
     "HamiltonianConstructor",
     "HamiltonianUnitaryBuilder",
     "MultiConfigurationCalculator",
@@ -97,6 +102,7 @@ __all__ = [
     "QdkAutocasActiveSpaceSelector",
     "QdkAutocasEosActiveSpaceSelector",
     "QdkExpectationEstimator",
+    "QdkHamiltonianBasisTransformer",
     "QdkHamiltonianConstructor",
     "QdkMP2Calculator",
     "QdkMP2NaturalOrbitalLocalizer",

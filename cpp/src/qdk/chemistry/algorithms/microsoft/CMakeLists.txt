@@ -11,6 +11,7 @@ target_sources(chemistry PRIVATE
     localization/active_space_qio.cpp
     localization/vvhv.cpp
     hamiltonian.cpp
+    hamiltonian_basis_transformer.cpp
     cholesky_hamiltonian.cpp
     macis_asci.cpp
     macis_base.cpp
