@@ -1,80 +1,85 @@
-"""QDK/Chemistry plugins for external quantum chemistry software integration.
+"""Plugin registration and discovery for QDK/Chemistry extensions.
 
-Plugins are bridge modules that connect QDK/Chemistry with external quantum chemistry
-software packages. They implement QDK/Chemistry's algorithm interfaces (such as
-:class:`~qdk_chemistry.algorithms.ScfSolver`, etc.) while internally using the external library
-to perform the actual calculations. This allows users to leverage specialized capabilities
-from established quantum chemistry packages while maintaining a consistent QDK/Chemistry API.
+Plugins connect QDK/Chemistry to optional chemistry packages, quantum software,
+and other extensions while preserving the library's common interfaces. An
+extension can contribute:
 
-Purpose and Benefits
+* implementations of existing algorithm types or entirely new algorithm types;
+* data classes used by algorithm inputs and outputs.
+
+External plugins
+----------------
+An installed package exposes a :class:`QdkChemistryPlugin` subclass through the
+``qdk_chemistry.plugins`` entry-point group:
+
+.. code-block:: toml
+
+    [project.entry-points."qdk_chemistry.plugins"]
+    custom = "custom_package.plugin:CustomPlugin"
+
+Importing :mod:`qdk_chemistry` discovers each entry point and calls its
+:meth:`QdkChemistryPlugin.register` method with a :class:`PluginRegistrar`. The
+registrar provides access to the standard QDK/Chemistry registries without
+requiring application code to import the plugin package directly.
+
+.. code-block:: python
+
+    from qdk_chemistry.plugins import PluginRegistrar, QdkChemistryPlugin
+
+    class CustomPlugin(QdkChemistryPlugin):
+         def register(self, registrar: PluginRegistrar) -> None:
+              registrar.register_algorithm(lambda: CustomAlgorithm())
+
+Bundled integrations
 --------------------
-Plugins serve several key purposes:
+QDK/Chemistry also includes integrations for:
 
-1. **Extended Functionality**: Leverage specialized capabilities from established quantum
-   chemistry packages (e.g., PySCF's diverse DFT functionals, orbital localization methods).
+* :mod:`qdk_chemistry.plugins.pyscf` for electronic-structure algorithms;
+* :mod:`qdk_chemistry.plugins.qiskit` for circuit construction, mapping, and execution;
+* :mod:`qdk_chemistry.plugins.openfermion` for operator conversion and qubit mapping;
+* :mod:`qdk_chemistry.plugins.networkx` for graph-coloring term grouping; and
+* :mod:`qdk_chemistry.plugins.geometric` for molecular geometry optimization.
 
-2. **Automatic Format Conversion**: Handle conversion between QDK/Chemistry data structures
-   (e.g., :class:`~qdk_chemistry.data.Structure`, :class:`~qdk_chemistry.data.Orbitals`,
-   :class:`~qdk_chemistry.data.Hamiltonian`) and external library formats automatically.
-
-3. **Registry Integration**: Plugin implementations are automatically registered with
-   QDK/Chemistry's algorithm registry system, making them available through the
-   :func:`~qdk_chemistry.algorithms.create` factory function.
-
-4. **Consistent Interface**: Provide a uniform API for different backend implementations,
-   allowing users to easily switch between different computational engines without
-   changing their workflow code.
-
-Available Plugins
------------------
-Currently available plugin packages:
-
-* :mod:`qdk_chemistry.plugins.pyscf`: PySCF integration providing SCF solvers, coupled
-  cluster calculators, orbital localization, active space selection (AVAS), and
-  stability analysis.
-
-* :mod:`qdk_chemistry.plugins.qiskit`: Qiskit integration providing qubit mapping,
-  circuit execution, energy estimation, and state preparation.
-
-* :mod:`qdk_chemistry.plugins.openfermion`: OpenFermion integration providing qubit mapping,
-  operator conversion, and quantum circuit interoperability.
-
-Using Plugins
--------------
-Plugins are used by importing the plugin module (which auto-registers implementations)
-and then creating instances through the registry or directly:
-
-Examples:
-    >>> # Import the plugin to register its implementations
-    >>> import qdk_chemistry.plugins.pyscf
-    >>> # Create a PySCF SCF solver through the registry
-    >>> from qdk_chemistry.algorithms import create
-    >>> scf_solver = create("scf_solver", "pyscf")
-    >>> # Configure and use like any other algorithm
-    >>> scf_solver.settings()["max_iterations"] = 50
-    >>> energy, orbitals = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
-
-    >>> # Import the OpenFermion plugin to register its implementations
-    >>> import qdk_chemistry.plugins.openfermion  # noqa: F401
-    >>> # Create an OpenFermion qubit mapper through the registry
-    >>> from qdk_chemistry.data import MajoranaMapping
-    >>> mapper = create("qubit_mapper", "openfermion")
-    >>> mapping = MajoranaMapping.jordan_wigner(num_modes=n_spin_orbitals)
-    >>> qubit_hamiltonian = mapper.run(hamiltonian, mapping)
-
-Notes:
-    Plugin modules may have additional dependencies beyond core QDK/Chemistry.
-    For example, the PySCF plugin requires the `pyscf` package to be installed
-    separately.
-
-See Also:
-    :mod:`qdk_chemistry.algorithms`: Algorithm base classes and registry system
-    :mod:`qdk_chemistry.plugins.pyscf`: PySCF integration plugin
-    :mod:`qdk_chemistry.plugins.qiskit`: Qiskit integration plugin
-    :mod:`qdk_chemistry.plugins.openfermion`: OpenFermion integration plugin
-
+Bundled integrations are loaded automatically when their optional dependencies
+are available. Their implementations can then be created through the standard
+algorithm registry, for example ``create("scf_solver", "pyscf")``.
 """
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+
+from __future__ import annotations
+
+import warnings
+
+from qdk_chemistry._core import DuplicateRegistrationError
+from qdk_chemistry.plugins.base import ChemistryPlugin, PluginRegistrar, QdkChemistryPlugin
+
+DuplicateRegistrationError.__module__ = __name__
+
+
+def _load_plugins() -> None:
+    """Load plugins advertised through the unified entry-point group."""
+    from importlib.metadata import entry_points  # noqa: PLC0415
+
+    for entry_point in entry_points(group="qdk_chemistry.plugins"):
+        try:
+            plugin_type = entry_point.load()
+            if not isinstance(plugin_type, type) or not issubclass(plugin_type, QdkChemistryPlugin):
+                raise TypeError("entry point must resolve to a QdkChemistryPlugin subclass")
+            plugin = plugin_type()
+            if plugin.api_version != QdkChemistryPlugin.api_version:
+                raise ValueError(
+                    f"unsupported plugin API version {plugin.api_version}; expected {QdkChemistryPlugin.api_version}"
+                )
+            plugin.register(PluginRegistrar())
+        except Exception as exc:  # noqa: BLE001
+            warnings.warn(
+                f"Failed to load QDK/Chemistry plugin {entry_point.name!r}: {exc}",
+                UserWarning,
+                stacklevel=2,
+            )
+
+
+__all__ = ["ChemistryPlugin", "DuplicateRegistrationError", "PluginRegistrar", "QdkChemistryPlugin"]

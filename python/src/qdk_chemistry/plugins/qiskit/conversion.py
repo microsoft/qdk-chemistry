@@ -9,11 +9,19 @@ representations, particularly for quantum circuit simulation and state preparati
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import numpy as np
 
-from qdk_chemistry import data
+if TYPE_CHECKING:
+    from qiskit import QuantumCircuit
 
-__all__ = ["create_statevector_from_wavefunction"]
+    from qdk_chemistry import data
+    from qdk_chemistry.algorithms.state_preparation._binary_encoding_utils import MatrixCompressionOp
+
+__all__ = ["apply_matrix_compression_ops", "create_statevector_from_wavefunction"]
 
 
 def create_statevector_from_wavefunction(wavefunction: data.Wavefunction, normalize: bool = True) -> np.ndarray:
@@ -22,13 +30,11 @@ def create_statevector_from_wavefunction(wavefunction: data.Wavefunction, normal
     This function converts a QDK Chemistry wavefunction into a dense statevector
     representation suitable for use with Qiskit quantum circuit simulators.
 
-    The encoding uses a little-endian qubit ordering convention where each spatial
-    orbital is mapped to two qubits (one for alpha spin, one for beta spin):
-    - Lower qubits (0 to num_orbitals-1): alpha spin orbitals
-    - Upper qubits (num_orbitals to 2*num_orbitals-1): beta spin orbitals
-
-    Each determinant in the wavefunction is mapped to its corresponding basis state
-    index, and the wavefunction coefficient is placed at that index in the statevector.
+    The register uses ``num_modes * bits_per_mode`` qubits with little-endian
+    ordering. A standard spin-half wavefunction (``bits_per_mode == 2``) maps each
+    spatial orbital to two qubits — alpha on the lower half, beta on the upper half —
+    for ``2 * num_active_orbitals`` qubits; a spinless subspace (``bits_per_mode == 1``)
+    uses one qubit per mode. Each determinant's coefficient is placed at its basis-state index.
 
     Args:
         wavefunction: The wavefunction to convert to statevector representation.
@@ -38,9 +44,12 @@ def create_statevector_from_wavefunction(wavefunction: data.Wavefunction, normal
             Default is True.
 
     Returns:
-        numpy.ndarray: Dense complex statevector of size 2^(2*num_active_orbitals).
+        numpy.ndarray: Dense complex statevector of size 2^(num_modes * bits_per_mode).
             The dtype is always complex128, even if the wavefunction has real
             coefficients.
+
+    Raises:
+        ValueError: If the wavefunction has no active determinants.
 
     Examples:
         >>> from qiskit.quantum_info import Statevector
@@ -50,19 +59,21 @@ def create_statevector_from_wavefunction(wavefunction: data.Wavefunction, normal
         >>> print(f"Statevector dimension: {len(sv_array)}")
 
     """
-    orbitals = wavefunction.get_orbitals()
-    indices, _ = orbitals.get_active_space_indices()
+    # Get determinants and coefficients
+    determinants = wavefunction.get_active_determinants()
+    if not determinants:
+        raise ValueError("wavefunction has no active determinants to convert to a statevector.")
+    coefficients = wavefunction.get_coefficients()
 
-    num_orbs = len(indices)
-    num_qubits = num_orbs * 2
+    # Size the register from the wavefunction's own encoding so it matches the
+    # determinant bit-width. For standard spin-half wavefunctions this equals
+    # 2 * num_active_orbitals; reduced spinless subspaces use one qubit per mode.
+    config_set = wavefunction.get_configuration_set()
+    num_qubits = config_set.num_modes() * determinants[0].bits_per_mode()
     dim = 1 << num_qubits  # 2^num_qubits
 
     # Initialize statevector as complex array
     statevector = np.zeros(dim, dtype=np.complex128)
-
-    # Get determinants and coefficients
-    determinants = wavefunction.get_active_determinants()
-    coefficients = wavefunction.get_coefficients()
 
     coeffs_array = np.array(coefficients)
 
@@ -131,3 +142,70 @@ def _configuration_to_statevector_index(configuration: data.Configuration, n_bit
             index |= 1 << i
 
     return index
+
+
+def apply_matrix_compression_ops(
+    circuit: QuantumCircuit,
+    ops: list[MatrixCompressionOp],
+) -> None:
+    """Apply matrix compression operations to a Qiskit QuantumCircuit.
+
+    Supports all :class:`~qdk_chemistry.algorithms.state_preparation._binary_encoding_utils.MatrixCompressionType`
+    operations: X, CX, SWAP, CCX, SELECT, and SELECT_AND.
+
+    Args:
+        circuit: Qiskit QuantumCircuit to append gates to (modified in place).
+        ops: List of MatrixCompressionOp to apply.
+
+    """
+    for op in ops:
+        name = op.name.upper()
+        if name == "X":
+            circuit.x(op.qubits[0])
+        elif name == "CX":
+            circuit.cx(op.qubits[0], op.qubits[1])
+        elif name == "SWAP":
+            circuit.swap(op.qubits[0], op.qubits[1])
+        elif name == "CCX":
+            circuit.ccx(op.qubits[0], op.qubits[1], op.qubits[2])
+        elif name in ("SELECT", "SELECT_AND"):
+            # SELECT_AND differs from SELECT only in how Q# uncomputes its helper ancilla;
+            # the ancilla-free decomposition below realizes the same unitary for both.
+            _apply_select_to_circuit(circuit, op)
+        else:
+            raise ValueError(f"Unsupported MatrixCompressionOp: {op.name}")
+
+
+def _apply_select_to_circuit(
+    circuit: QuantumCircuit,
+    op: MatrixCompressionOp,
+) -> None:
+    """Decompose a SELECT/SELECT_AND operation into multi-controlled X gates.
+
+    Args:
+        circuit: Qiskit QuantumCircuit to append gates to.
+        op: A SELECT or SELECT_AND MatrixCompressionOp.
+
+    Notes:
+        SELECT and SELECT_AND denote the same address-controlled write and are decomposed
+        identically here. They diverge only in the Q# implementation, where SELECT_AND
+        uncomputes the recursion's helper ancilla by measurement plus a classically
+        controlled correction instead of a Toffoli. That correction restores the same state,
+        so the two agree as unitaries on the address and target qubits. This decomposition
+        allocates no helper ancilla, so there is nothing to uncompute and no measurement is
+        emitted; ``measurement_based_uncompute`` therefore has no effect on Qiskit output.
+
+    """
+    from qiskit.circuit.library import XGate  # noqa: PLC0415
+
+    num_addr = op.control_state
+    addr_qubits = op.qubits[:num_addr]
+    target_qubits = op.qubits[num_addr:]
+
+    for row_idx, row in enumerate(op.lookup_data):
+        if not any(row):
+            continue
+        for bit_idx, bit in enumerate(row):
+            if bit:
+                gate = XGate().control(num_addr, ctrl_state=row_idx)
+                circuit.append(gate, [*addr_qubits, target_qubits[bit_idx]])

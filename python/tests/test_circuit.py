@@ -12,6 +12,7 @@ from pathlib import Path
 
 import h5py
 import pytest
+from qdk import TargetProfile
 from qdk.openqasm import circuit as openqasm_circuit
 from qdk.openqasm import compile as openqasm_compile
 
@@ -23,6 +24,7 @@ except ImportError:
     from qsharp._native import Circuit as QdkCircuitType
     from qsharp._qsharp import QirInputData
 
+from qdk_chemistry.algorithms.state_preparation._binary_encoding_utils import MatrixCompressionType
 from qdk_chemistry.data import Circuit
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
@@ -50,7 +52,7 @@ def simple_qasm() -> str:
 @pytest.fixture
 def simple_qir(simple_qasm) -> str:
     """The QIR representation of the simple QASM string."""
-    return str(openqasm_compile(simple_qasm))
+    return str(openqasm_compile(simple_qasm, target_profile=TargetProfile.Base))
 
 
 class TestCircuitConstruction:
@@ -68,7 +70,7 @@ class TestCircuitConstruction:
         c[0] = measure q[0];
         c[1] = measure q[1];
         """
-        qir = openqasm_compile(qasm)
+        qir = openqasm_compile(qasm, target_profile=TargetProfile.Base)
         qsharp_circuit = openqasm_circuit(qasm)
         circuit = Circuit(qasm=qasm, qir=qir, qsharp=qsharp_circuit)
         assert circuit.qasm is not None
@@ -137,7 +139,14 @@ class TestGetQsharpCircuit:
         state_prep_params = {
             "rowMap": [1, 0],
             "stateVector": [0.6, 0.0, 0.0, 0.8],
-            "expansionOps": [[2]],
+            "expansionOps": [
+                {
+                    "kind": MatrixCompressionType.X.qsharp_code,
+                    "qubits": [2],
+                    "controlState": 0,
+                    "lookupData": [],
+                }
+            ],
             "numQubits": 4,
         }
         qsharp_factory = QsharpFactoryData(
@@ -459,7 +468,8 @@ class TestCircuitEstimate:
 
     def test_estimate_raises_with_qir_only(self):
         """Test that estimate raises when only QIR representation is available."""
-        qir = openqasm_compile("""
+        qir = openqasm_compile(
+            """
             OPENQASM 3.0;
             include "stdgates.inc";
             qubit[2] q;
@@ -468,7 +478,9 @@ class TestCircuitEstimate:
             cx q[0], q[1];
             c[0] = measure q[0];
             c[1] = measure q[1];
-        """)
+            """,
+            target_profile=TargetProfile.Base,
+        )
         circuit = Circuit(qir=qir)
         with pytest.raises(RuntimeError, match="Cannot estimate resources"):
             circuit.estimate()
@@ -517,7 +529,8 @@ class TestGetQreApplication:
         """Test that get_qre_application works with QIR-only circuit."""
         from qdk.qre.application import QIRApplication  # noqa: PLC0415
 
-        qir = openqasm_compile("""
+        qir = openqasm_compile(
+            """
             OPENQASM 3.0;
             include "stdgates.inc";
             qubit[2] q;
@@ -526,7 +539,9 @@ class TestGetQreApplication:
             cx q[0], q[1];
             c[0] = measure q[0];
             c[1] = measure q[1];
-        """)
+            """,
+            target_profile=TargetProfile.Base,
+        )
         circuit = Circuit(qir=qir)
         app = circuit.get_qre_application()
         assert isinstance(app, QIRApplication)

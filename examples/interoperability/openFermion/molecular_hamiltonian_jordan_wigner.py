@@ -11,7 +11,7 @@ Demonstrates the round-trip workflow:
    via the OpenFermion plugin, then convert to an OpenFermion ``QubitOperator``
    for exact diagonalisation.
 2. OpenFermion → QDK/Chemistry: take that ``QubitOperator`` and convert it back
-   to a QDK ``QubitHamiltonian``.
+   to a QDK ``QubitOperator``.
 
 This example is adapted from the introduction to OpenFermion tutorial:
 https://quantumai.google/openfermion/tutorials/intro_to_openfermion
@@ -83,14 +83,14 @@ qdk_qubit_ham = mapper.run(active_hamiltonian, mapping)
 Logger.info("=== QDK → OpenFermion (Jordan-Wigner) ===")
 Logger.info(f"  Pauli terms: {len(qdk_qubit_ham.pauli_strings)}")
 
-# Convert QDK QubitHamiltonian → OpenFermion QubitOperator and diagonalise.
+# Convert QDK QubitOperator → OpenFermion QubitOperator and diagonalise.
 qop = qubit_hamiltonian_to_qubit_operator(qdk_qubit_ham)
 sparse = of.linalg.get_sparse_operator(qop)
 energy, _ = of.linalg.get_ground_state(sparse)
 Logger.info(f"  Ground-state energy: {energy: .15f} Hartree")
 
 ########################################################################################
-# 4. OpenFermion → QDK: convert the QubitOperator back to a QDK QubitHamiltonian
+# 4. OpenFermion → QDK: convert the QubitOperator back to a QDK QubitOperator
 ########################################################################################
 qdk_qubit_ham_rt = qubit_operator_to_qubit_hamiltonian(qop, encoding="jordan-wigner")
 

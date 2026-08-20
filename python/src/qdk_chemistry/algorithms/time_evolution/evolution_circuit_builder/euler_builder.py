@@ -24,7 +24,7 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolut
 from qdk_chemistry.algorithms.propagator.base import Propagator
 from qdk_chemistry.data import (
     Circuit,
-    QubitHamiltonian,
+    QubitOperator,
     TimeDependentQubitHamiltonian,
     UnitaryRepresentation,
 )
@@ -156,7 +156,7 @@ class EulerEvolutionCircuitBuilder(EvolutionCircuitBuilder):
 
     def _create_time_step_evolution(
         self,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
         time: float,
     ) -> UnitaryRepresentation:
         """Create the time-evolution unitary for one step.

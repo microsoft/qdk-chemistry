@@ -120,15 +120,14 @@ def run_iterative_exact_qpe(
 
     Args:
         state_prep_circuit: Trial-state preparation circuit.
-        qubit_hamiltonian: Qubit Hamiltonian describing the system.
         pauli_operator: Sparse Pauli operator describing the Hamiltonian.
         precision: Number of IQPE iterations to perform.
         evolution_time: Evolution time ``t`` used for a single application of ``U``.
         synthesis: Matrix exponential synthesizer employed by Qiskit.
 
     Returns:
-        Tuple ``(bits, phase_fraction)`` with the measured bits (MSB to LSB) and
-        the resulting phase fraction.
+        Tuple ``(bits, phase_fraction)`` with the measured bits in execution order
+        (LSB first, MSB last) and the resulting phase fraction.
 
     Notes:
         This routine runs the iterativeqpe with the exact evolution
@@ -227,7 +226,7 @@ E_sparse, sparse_wavefunction = pmc.run(
     active_hamiltonian, list(top_configurations.keys())
 )
 
-sparse_state_prep = create("state_prep", algorithm_name="sparse_isometry_gf2x")
+sparse_state_prep = create("state_prep", algorithm_name="sparse_isometry")
 state_prep = sparse_state_prep.run(sparse_wavefunction).get_qiskit_circuit()
 state_prep = transpile(
     state_prep,
@@ -271,34 +270,22 @@ def _energy_from_phase(phase_fraction: float) -> float:
     return angle / T_TIME
 
 
-def _resolve_energy(raw_energy: float, reference: float) -> tuple[list[float], float]:
-    period = 2 * np.pi / T_TIME
-    candidates = sorted(
-        {s * raw_energy + period * k for k in range(-2, 3) for s in (1, -1)}
-    )
-    return candidates, min(candidates, key=lambda e: abs(e - reference))
-
-
 result = QpeResult.from_phase_fraction(
     method="iterative_exact",
     phase_fraction=phase_fraction,
     eigenvalue_from_phase=_energy_from_phase,
-    bits_msb_first=bits,
+    # ``bits`` come back in execution order (LSB first), so reverse them to get MSB first.
+    bits_msb_first=bits[::-1],
 )
 
-raw_energy = result.raw_energy
-candidate_energies, resolved_energy = _resolve_energy(raw_energy, casci_energy)
-estimated_total_energy = resolved_energy + core_energy
+estimated_electronic_energy = result.raw_energy
+estimated_total_energy = estimated_electronic_energy + core_energy
 
 Logger.info(f"Measured bits (MSB → LSB): {list(result.bits_msb_first or [])}")
 Logger.info(
     f"Phase fraction φ (measured): {result.phase_fraction:.6f} (angle = {result.phase_angle:.6f} rad)"
 )
-Logger.info(f"Raw energy_from_phase output: {raw_energy:+.8f} Hartree")
-Logger.info("Candidate energies (alias checks):")
-for energy in candidate_energies:
-    Logger.info(f"  E = {energy:+.8f} Hartree")
-Logger.info(f"Estimated electronic energy: {resolved_energy:.8f} Hartree")
+Logger.info(f"Estimated electronic energy: {estimated_electronic_energy:.8f} Hartree")
 Logger.info(f"Estimated total energy: {estimated_total_energy:.8f} Hartree")
 Logger.info(f"Reference total energy (CASCI): {casci_energy:.8f} Hartree")
 iterative_energy_error = estimated_total_energy - casci_energy

@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <memory>
 #include <qdk/chemistry/data/orbitals.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <stdexcept>
@@ -20,7 +21,7 @@
 
 using namespace qdk::chemistry::data;
 
-namespace {
+namespace qdk::chemistry::tests::test_support {
 
 // Spin (S_z) symmetry; equivalent=true is restricted, false is unrestricted.
 std::shared_ptr<const SymmetryProduct> spin_sym(bool equivalent) {
@@ -56,7 +57,12 @@ std::shared_ptr<const SymmetryBlockedIndexSet> spin_iset(
       spin_sym(equivalent), ext, std::move(indices));
 }
 
-}  // namespace
+}  // namespace qdk::chemistry::tests::test_support
+
+namespace test_support = qdk::chemistry::tests::test_support;
+using test_support::spin_iset;
+using test_support::spin_sym;
+using test_support::trivial_iset;
 
 class ModelOrbitalsTest : public ::testing::Test {
  protected:
@@ -99,13 +105,18 @@ TEST_F(ModelOrbitalsTest, RestrictedActiveSpaceConstructor) {
 
   // Check active space (alpha == beta for a single channel).
   EXPECT_TRUE(model.has_active_space());
-  auto [alpha_active, beta_active] = model.get_active_space_indices();
+  auto alpha_active =
+      spin_channel_indices(model.active_indices(), axes::alpha());
+  auto beta_active = spin_channel_indices(model.active_indices(), axes::beta());
   EXPECT_EQ(active_indices, alpha_active);
   EXPECT_EQ(active_indices, beta_active);
 
   // Check inactive space.
   EXPECT_TRUE(model.has_inactive_space());
-  auto [alpha_inactive, beta_inactive] = model.get_inactive_space_indices();
+  auto alpha_inactive =
+      spin_channel_indices(model.inactive_indices(), axes::alpha());
+  auto beta_inactive =
+      spin_channel_indices(model.inactive_indices(), axes::beta());
   EXPECT_EQ(inactive_indices, alpha_inactive);
   EXPECT_EQ(inactive_indices, beta_inactive);
 }
@@ -130,15 +141,19 @@ TEST_F(ModelOrbitalsTest, UnrestrictedActiveSpaceConstructor) {
 
   // Check active space.
   EXPECT_TRUE(model.has_active_space());
-  auto [retrieved_alpha_active, retrieved_beta_active] =
-      model.get_active_space_indices();
+  auto retrieved_alpha_active =
+      spin_channel_indices(model.active_indices(), axes::alpha());
+  auto retrieved_beta_active =
+      spin_channel_indices(model.active_indices(), axes::beta());
   EXPECT_EQ(alpha_active, retrieved_alpha_active);
   EXPECT_EQ(beta_active, retrieved_beta_active);
 
   // Check inactive space.
   EXPECT_TRUE(model.has_inactive_space());
-  auto [retrieved_alpha_inactive, retrieved_beta_inactive] =
-      model.get_inactive_space_indices();
+  auto retrieved_alpha_inactive =
+      spin_channel_indices(model.inactive_indices(), axes::alpha());
+  auto retrieved_beta_inactive =
+      spin_channel_indices(model.inactive_indices(), axes::beta());
   EXPECT_EQ(alpha_inactive, retrieved_alpha_inactive);
   EXPECT_EQ(beta_inactive, retrieved_beta_inactive);
 }
@@ -178,7 +193,9 @@ TEST_F(ModelOrbitalsTest, DefaultActiveSpace) {
   ModelOrbitals model(basis_size);
   EXPECT_TRUE(model.has_active_space());
 
-  auto [alpha_active, beta_active] = model.get_active_space_indices();
+  auto alpha_active =
+      spin_channel_indices(model.active_indices(), axes::alpha());
+  auto beta_active = spin_channel_indices(model.active_indices(), axes::beta());
   EXPECT_EQ(basis_size, alpha_active.size());
   EXPECT_EQ(basis_size, beta_active.size());
 
@@ -195,14 +212,16 @@ TEST_F(ModelOrbitalsTest, ThrowingMethods) {
   const size_t basis_size = 3;
   ModelOrbitals model(basis_size);
 
-  EXPECT_THROW(model.get_coefficients(), std::runtime_error);
-  EXPECT_THROW(model.get_energies(), std::runtime_error);
+  EXPECT_THROW(model.coefficients(), std::runtime_error);
+  EXPECT_THROW(model.energies(), std::runtime_error);
   EXPECT_THROW(model.get_overlap_matrix(), std::runtime_error);
   EXPECT_THROW(model.get_basis_set(), std::runtime_error);
-  EXPECT_THROW(model.get_coefficients_alpha(), std::runtime_error);
-  EXPECT_THROW(model.get_coefficients_beta(), std::runtime_error);
-  EXPECT_THROW(model.get_energies_alpha(), std::runtime_error);
-  EXPECT_THROW(model.get_energies_beta(), std::runtime_error);
+  EXPECT_THROW(model.coefficients()->block({axes::alpha(), axes::alpha()}),
+               std::runtime_error);
+  EXPECT_THROW(model.coefficients()->block({axes::beta(), axes::beta()}),
+               std::runtime_error);
+  EXPECT_THROW(model.energies()->block({axes::alpha()}), std::runtime_error);
+  EXPECT_THROW(model.energies()->block({axes::beta()}), std::runtime_error);
   EXPECT_THROW(model.get_overlap_matrix(), std::runtime_error);
 
   Eigen::VectorXd occupations = Eigen::VectorXd::Ones(basis_size);
@@ -311,18 +330,26 @@ TEST_F(ModelOrbitalsTest, JSONRoundTrip) {
             reconstructed->get_num_molecular_orbitals());
   EXPECT_EQ(original.is_restricted(), reconstructed->is_restricted());
 
-  auto [orig_alpha_active, orig_beta_active] =
-      original.get_active_space_indices();
-  auto [recon_alpha_active, recon_beta_active] =
-      reconstructed->get_active_space_indices();
+  auto orig_alpha_active =
+      spin_channel_indices(original.active_indices(), axes::alpha());
+  auto orig_beta_active =
+      spin_channel_indices(original.active_indices(), axes::beta());
+  auto recon_alpha_active =
+      spin_channel_indices(reconstructed->active_indices(), axes::alpha());
+  auto recon_beta_active =
+      spin_channel_indices(reconstructed->active_indices(), axes::beta());
 
   EXPECT_EQ(orig_alpha_active, recon_alpha_active);
   EXPECT_EQ(orig_beta_active, recon_beta_active);
 
-  auto [orig_alpha_inactive, orig_beta_inactive] =
-      original.get_inactive_space_indices();
-  auto [recon_alpha_inactive, recon_beta_inactive] =
-      reconstructed->get_inactive_space_indices();
+  auto orig_alpha_inactive =
+      spin_channel_indices(original.inactive_indices(), axes::alpha());
+  auto orig_beta_inactive =
+      spin_channel_indices(original.inactive_indices(), axes::beta());
+  auto recon_alpha_inactive =
+      spin_channel_indices(reconstructed->inactive_indices(), axes::alpha());
+  auto recon_beta_inactive =
+      spin_channel_indices(reconstructed->inactive_indices(), axes::beta());
 
   EXPECT_EQ(orig_alpha_inactive, recon_alpha_inactive);
   EXPECT_EQ(orig_beta_inactive, recon_beta_inactive);
@@ -372,11 +399,16 @@ TEST_F(ModelOrbitalsTest, LargerSystem) {
   EXPECT_EQ(basis_size, model.get_num_atomic_orbitals());
   EXPECT_EQ(basis_size, model.get_num_molecular_orbitals());
 
-  auto [alpha_active, beta_active] = model.get_active_space_indices();
+  auto alpha_active =
+      spin_channel_indices(model.active_indices(), axes::alpha());
+  auto beta_active = spin_channel_indices(model.active_indices(), axes::beta());
   EXPECT_EQ(active_indices, alpha_active);
   EXPECT_EQ(active_indices, beta_active);
 
-  auto [alpha_inactive, beta_inactive] = model.get_inactive_space_indices();
+  auto alpha_inactive =
+      spin_channel_indices(model.inactive_indices(), axes::alpha());
+  auto beta_inactive =
+      spin_channel_indices(model.inactive_indices(), axes::beta());
   EXPECT_EQ(inactive_indices, alpha_inactive);
   EXPECT_EQ(inactive_indices, beta_inactive);
 
@@ -398,8 +430,8 @@ TEST_F(ModelOrbitalsTest, InheritanceBehavior) {
   EXPECT_EQ(basis_size, orbitals_ptr->get_num_molecular_orbitals());
   EXPECT_TRUE(orbitals_ptr->is_restricted());
 
-  EXPECT_THROW(orbitals_ptr->get_coefficients(), std::runtime_error);
-  EXPECT_THROW(orbitals_ptr->get_energies(), std::runtime_error);
+  EXPECT_THROW(orbitals_ptr->coefficients(), std::runtime_error);
+  EXPECT_THROW(orbitals_ptr->energies(), std::runtime_error);
 }
 
 TEST_F(ModelOrbitalsTest, CopyAndMoveSemantics) {
@@ -417,9 +449,14 @@ TEST_F(ModelOrbitalsTest, CopyAndMoveSemantics) {
             copy.get_num_molecular_orbitals());
   EXPECT_EQ(original.is_restricted(), copy.is_restricted());
 
-  auto [orig_alpha_active, orig_beta_active] =
-      original.get_active_space_indices();
-  auto [copy_alpha_active, copy_beta_active] = copy.get_active_space_indices();
+  auto orig_alpha_active =
+      spin_channel_indices(original.active_indices(), axes::alpha());
+  auto orig_beta_active =
+      spin_channel_indices(original.active_indices(), axes::beta());
+  auto copy_alpha_active =
+      spin_channel_indices(copy.active_indices(), axes::alpha());
+  auto copy_beta_active =
+      spin_channel_indices(copy.active_indices(), axes::beta());
   EXPECT_EQ(orig_alpha_active, copy_alpha_active);
   EXPECT_EQ(orig_beta_active, copy_beta_active);
 

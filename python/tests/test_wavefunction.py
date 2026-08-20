@@ -26,6 +26,8 @@ from qdk_chemistry.data import (
     Wavefunction,
     WavefunctionType,
 )
+from qdk_chemistry.data._spin_channels import spin_channel_matrix
+from qdk_chemistry.data._type_name import class_data_type_name
 from qdk_chemistry.data.symmetry import (
     AxisName,
     SymmetryBlockedScalarCount,
@@ -98,7 +100,7 @@ class TestWavefunction:
         assert orbitals is not None
 
         # Should be the same orbital object
-        alpha_coeffs, _ = orbitals.get_coefficients()
+        alpha_coeffs = spin_channel_matrix(orbitals.coefficients(), axes.alpha())
         assert alpha_coeffs.shape == (3, 2)
 
     def test_wavefunction_electron_counts(self, cas_wavefunction):
@@ -1033,7 +1035,7 @@ class TestWavefunctionSerialization:
             Wavefunction.from_hdf5_file("non_existent.wavefunction.h5")
 
 
-class TestWavefunctionRdmIntegraion:
+class TestWavefunctionRdmIntegration:
     """Test integration of RDMs within the Wavefunction class."""
 
     def test_rdm_n2_singlet_6_6(self):
@@ -1106,6 +1108,9 @@ class TestWavefunctionRdmIntegraion:
             rtol=float_comparison_relative_tolerance,
             atol=scf_orbital_tolerance,
         )
+
+        # N2 ground state is a closed-shell singlet, so <S^2> = 0.
+        assert wfn.compute_s_squared() == pytest.approx(0.0, abs=rdm_tolerance)
 
     def test_rdm_o2_triplet_6_6(self):
         """Test RDM retrieval for O2 triplet 6e 6o wavefunction."""
@@ -1186,6 +1191,9 @@ class TestWavefunctionRdmIntegraion:
             rtol=float_comparison_relative_tolerance,
             atol=scf_orbital_tolerance,
         )
+
+        # O2 ground state is a triplet (M_S=1), so <S^2> = S(S+1) = 2.0.
+        assert wfn.compute_s_squared() == pytest.approx(2.0, abs=rdm_tolerance)
 
     def test_sci_hdf5_roundtrip(self, tmp_path):
         symbols = ["C", "C", "H", "H", "H", "H"]
@@ -1478,9 +1486,10 @@ class TestCCContainer:
         assert container.has_t2_amplitudes()
         assert wf.get_active_num_electrons() == (2, 2)
 
-    """Test that Wavefunction has the correct _data_type_name class attribute."""
-    assert hasattr(Wavefunction, "_data_type_name")
-    assert Wavefunction._data_type_name == "wavefunction"
+
+def test_wavefunction_data_type_name():
+    """Test that Wavefunction exposes its static wire-format identifier."""
+    assert class_data_type_name(Wavefunction) == "wavefunction"
 
 
 class TestWavefunctionTruncate:

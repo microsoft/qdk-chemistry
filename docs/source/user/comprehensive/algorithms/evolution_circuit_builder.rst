@@ -63,7 +63,7 @@ The :class:`~qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.b
      - Total evolution time :math:`T`. Default: ``1.0``.
    * - ``dt``
      - float
-     - Time step for evolution discretization. Each step is passed to the propagator. Default: ``0.0`` (invalid; user must set).
+     - Time step for evolution discretization. Must be nonzero, match the sign of ``total_time``, and not exceed it in magnitude. Default: ``0.0`` (invalid; user must set).
 
 Once configured, the builder can be executed:
 
@@ -118,7 +118,7 @@ To accomplish this, the :class:`~qdk_chemistry.algorithms.time_evolution.evoluti
 
    Default: :class:`~qdk_chemistry.data.AlgorithmRef` to ``"hamiltonian_unitary_builder"`` with method ``"trotter"``
 
-   The evolution builder (typically :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`) produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` of the time-evolution operator from a :class:`~qdk_chemistry.data.QubitHamiltonian`.
+   The evolution builder (typically :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`) produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` of the time-evolution operator from a :class:`~qdk_chemistry.data.QubitOperator`.
 
 **Nested Algorithm 3: Circuit Mapper**
    Reference setting: ``"circuit_mapper"``

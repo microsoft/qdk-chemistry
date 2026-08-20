@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import h5py
-from qdk import qsharp
+from qdk import TargetProfile, qsharp
 from qdk.estimator import EstimatorParams, EstimatorResult
 from qdk.openqasm import OutputSemantics
 from qdk.openqasm import circuit as openqasm_circuit
@@ -53,8 +53,15 @@ class QsharpFactoryData:
 class Circuit(DataClass):
     """Data class for a quantum circuit."""
 
-    # Class attribute for filename validation
-    _data_type_name = "circuit"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for circuits.
+
+        Returns:
+            ``"circuit"``.
+
+        """
+        return "circuit"
 
     # Serialization version for this class
     _serialization_version = "0.1.0"
@@ -160,12 +167,15 @@ class Circuit(DataClass):
                 Logger.warn("Both QIR and QASM representations are available. Return QIR.")
             return self.qir
         if self._qsharp_factory and self.qir is None:
-            compiled_qir = qsharp.compile(self._qsharp_factory.program, *self._qsharp_factory.parameter.values())
+            context = getattr(self._qsharp_factory.program, "_qdk_context", qsharp)
+            compiled_qir = context.compile(self._qsharp_factory.program, *self._qsharp_factory.parameter.values())
             # Cache the compiled qir if qir is not already set
             object.__setattr__(self, "qir", compiled_qir)
             return compiled_qir
         if self.qasm:
-            return openqasm_compile(self.qasm, output_semantics=OutputSemantics.OpenQasm)
+            return openqasm_compile(
+                self.qasm, output_semantics=OutputSemantics.OpenQasm, target_profile=TargetProfile.Base
+            )
 
         raise RuntimeError("The QIR representation of the quantum circuit is not set.")
 
@@ -193,7 +203,8 @@ class Circuit(DataClass):
                 Logger.warn("Both Q# and QASM representations are available. Return Q# circuit.")
             return self.qsharp
         if self._qsharp_factory and self.qsharp is None:
-            return qsharp.circuit(
+            context = getattr(self._qsharp_factory.program, "_qdk_context", qsharp)
+            return context.circuit(
                 self._qsharp_factory.program,
                 *self._qsharp_factory.parameter.values(),
                 prune_classical_qubits=prune_classical_qubits,
@@ -220,11 +231,13 @@ class Circuit(DataClass):
 
         """
         if self._qsharp_factory is not None:
-            return qsharp.estimate(
+            context = getattr(self._qsharp_factory.program, "_qdk_context", qsharp)
+            logical_counts = context.logical_counts(
                 self._qsharp_factory.program,
-                params,
                 *self._qsharp_factory.parameter.values(),
             )
+            return logical_counts.estimate(params)
+
         if self.qasm is not None:
             return openqasm_estimate(self.qasm, params)
 

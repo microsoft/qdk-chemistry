@@ -7,6 +7,7 @@
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/config.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <unordered_map>
@@ -48,8 +49,11 @@ _sort_entropies_and_indices(std::shared_ptr<data::Wavefunction> wavefunction,
 
   // get orbitals which have entropies
   auto orbitals = wavefunction->get_orbitals();
-  const auto& [active_space_indices, active_space_indices_beta] =
-      orbitals->get_active_space_indices();
+  const auto active_ai = orbitals->active_indices();
+  const auto active_space_indices =
+      data::spin_channel_indices(active_ai, data::axes::alpha());
+  const auto active_space_indices_beta =
+      data::spin_channel_indices(active_ai, data::axes::beta());
 
   // sanity checks
   if (active_space_indices != active_space_indices_beta) {
@@ -128,8 +132,8 @@ std::shared_ptr<data::Orbitals> new_orbitals(
 
     // check that provided active alpha indices are a subset of wavefunction
     // active orbitals
-    const auto& [wavefunction_active_indices_a, wavefunction_active_indices_b] =
-        orbitals->get_active_space_indices();
+    const auto wavefunction_active_indices_a = data::spin_channel_indices(
+        orbitals->active_indices(), data::axes::alpha());
     for (const auto& idx : active_space_indices_a) {
       if (std::find(wavefunction_active_indices_a.begin(),
                     wavefunction_active_indices_a.end(),
@@ -168,8 +172,11 @@ std::shared_ptr<data::Orbitals> new_orbitals(
 
     // check that provided active alpha & beta indices are subsets of
     // wavefunction active orbitals
-    const auto& [wavefunction_active_indices_a, wavefunction_active_indices_b] =
-        orbitals->get_active_space_indices();
+    const auto active_ai = orbitals->active_indices();
+    const auto wavefunction_active_indices_a =
+        data::spin_channel_indices(active_ai, data::axes::alpha());
+    const auto wavefunction_active_indices_b =
+        data::spin_channel_indices(active_ai, data::axes::beta());
     for (const auto& idx : active_space_indices_a) {
       if (std::find(wavefunction_active_indices_a.begin(),
                     wavefunction_active_indices_a.end(),
@@ -331,12 +338,12 @@ std::shared_ptr<data::Wavefunction> new_wavefunction(
 
   // Get the old active space indices from the original wavefunction
   const auto& old_orbitals = wavefunction->get_orbitals();
-  const auto& [old_active_indices_a, old_active_indices_b] =
-      old_orbitals->get_active_space_indices();
+  const auto old_active_indices_a = data::spin_channel_indices(
+      old_orbitals->active_indices(), data::axes::alpha());
 
   // Get the new active space indices
-  const auto& [new_active_indices_a, new_active_indices_b] =
-      new_orbitals->get_active_space_indices();
+  const auto new_active_indices_a = data::spin_channel_indices(
+      new_orbitals->active_indices(), data::axes::alpha());
 
   // Get the expected active electron count
   const auto& [expected_nelec_a, expected_nelec_b] =
@@ -353,32 +360,8 @@ std::shared_ptr<data::Wavefunction> new_wavefunction(
   } else {
     // Multi-determinant wavefunction - create aufbau occupations in old space,
     // then truncate
-    std::string aufbau_string(old_active_indices_a.size(), '0');
-
-    size_t nalpha_filled = 0;
-    size_t nbeta_filled = 0;
-
-    for (size_t i = 0; i < old_active_indices_a.size(); ++i) {
-      if (nalpha_filled < expected_nelec_a && nbeta_filled < expected_nelec_b) {
-        // Doubly occupy
-        aufbau_string[i] = '2';
-        nalpha_filled++;
-        nbeta_filled++;
-      } else if (nalpha_filled < expected_nelec_a) {
-        // Alpha only
-        aufbau_string[i] = 'u';
-        nalpha_filled++;
-      } else if (nbeta_filled < expected_nelec_b) {
-        // Beta only
-        aufbau_string[i] = 'd';
-        nbeta_filled++;
-      } else {
-        // Unoccupied
-        aufbau_string[i] = '0';
-      }
-    }
-
-    auto aufbau_det = data::Configuration::from_spin_half_string(aufbau_string);
+    auto aufbau_det = data::Configuration::canonical_hf_configuration(
+        expected_nelec_a, expected_nelec_b, old_active_indices_a.size());
     // Now truncate the aufbau determinant to the new active space
     truncated_det = _extract_active_orbitals(aufbau_det, old_active_indices_a,
                                              new_active_indices_a);

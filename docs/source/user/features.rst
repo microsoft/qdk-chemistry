@@ -25,7 +25,7 @@ Phase estimation algorithms extract energy eigenvalues from a quantum state by m
 QDK/Chemistry provides several phase estimation approaches, including:
 
 Iterative Quantum Phase Estimation (:term:`IQPE`)
-   Kitaev's algorithm using a single ancilla qubit with sequential MSB-to-LSB bit extraction and adaptive feedback phase correction.
+   Kitaev's algorithm using a single ancilla qubit with sequential LSB-to-MSB bit extraction and adaptive feedback phase correction.
    Particularly suited to near-term hardware due to its low ancilla requirements and configurable shots-per-bit precision.
 
 Standard QFT-based Quantum Phase Estimation (:term:`QPE`)
@@ -74,7 +74,7 @@ Parity Transformation :cite:`Seeley2012`
 
 QDK/Chemistry provides both a native qubit mapper implementation and integration with external libraries through plugins.
 See :doc:`comprehensive/algorithms/qubit_mapper` for available implementations and usage details.
-QDK/Chemistry also provides :doc:`Pauli operator arithmetic <comprehensive/data/pauli_operator>` for building and manipulating qubit Hamiltonians using natural mathematical notation.
+QDK/Chemistry also provides :doc:`Pauli operator arithmetic <comprehensive/data/pauli_operator>` for building and manipulating qubit operators using natural mathematical notation.
 
 .. _qubit-mapper-highlights:
 
@@ -100,13 +100,13 @@ This generally involves the following steps:
    Starting from a qubit-mapped Hamiltonian, this task generally involves grouping Pauli terms into sets of mutually commuting operators that can be measured simultaneously.
    QDK/Chemistry provides utilities for Pauli grouping by qubit-wise commutativity via the ``term_grouper`` algorithm
    (e.g., ``registry.create("term_grouper", "qubit_wise_commuting")``), which attaches a
-   :class:`~qdk_chemistry.data.FlatPartition` to a :class:`~qdk_chemistry.data.QubitHamiltonian` for downstream consumers.
+   :class:`~qdk_chemistry.data.FlatPartition` to a :class:`~qdk_chemistry.data.QubitOperator` for downstream consumers.
 2. **Circuit Execution and Measurement**:
    Given the state preparation circuit and the decomposed operator, quantum circuits are executed on quantum hardware or simulators to obtain measurement outcomes.
 3. **Classical Post-Processing**:
    The measurement results are processed classically to estimate the expectation value of the operator.
 
-See :doc:`comprehensive/algorithms/energy_estimator` for further details about available observable sampling methods and implementations.
+See :doc:`comprehensive/algorithms/expectation_estimator` for further details about available observable sampling methods and implementations.
 
 
 Model Hamiltonians
@@ -119,7 +119,7 @@ Fermionic Models
    Hückel (tight-binding), Hubbard, and Pariser-Parr-Pople (:term:`PPP`) models return :class:`~qdk_chemistry.data.Hamiltonian` objects compatible with all QDK/Chemistry algorithms, including :doc:`qubit mapping <comprehensive/algorithms/qubit_mapper>` and :doc:`multi-configuration methods <comprehensive/algorithms/mc_calculator>`.
 
 Spin Models
-   Ising and Heisenberg models return :class:`~qdk_chemistry.data.QubitHamiltonian` objects directly, bypassing the fermion-to-qubit mapping step.
+   Ising and Heisenberg models return :class:`~qdk_chemistry.data.QubitOperator` objects directly, bypassing the fermion-to-qubit mapping step.
 
 All builders operate on a :doc:`LatticeGraph <comprehensive/data/lattice_graph>` that defines site connectivity, with built-in support for common lattice topologies (chain, square, triangular, honeycomb, kagome) and custom geometries.
 Parameters accept either scalars (uniform) or per-site/per-bond arrays for inhomogeneous systems.
@@ -257,6 +257,15 @@ Adaptive Sampling Configuration Interaction (:term:`ASCI`)
    This enables treatment of active spaces that would be intractable for conventional :term:`CASCI`. See the :ref:`ASCI Algorithm <asci-algorithm>` section for details.
 
 
+Nuclear Derivatives and Geometry Optimization
+"""""""""""""""""""""""""""""""""""""""""""""
+
+Nuclear derivative calculators evaluate the energy, its gradient with respect to nuclear coordinates, and optionally the nuclear Hessian, for any electronic structure method exposed through the algorithm registry.
+
+Geometry optimizers build on these derivatives to relax a molecular structure to a stationary point, returning the converged energy, the optimized structure, and optionally a Hessian and the converged wavefunction.
+Both minimizations and transition-state searches are supported, and the derivative engine is selected through settings, so the same optimizer drives any registered nuclear derivative calculator.
+
+
 Community Open Source Software Dependencies
 -------------------------------------------
 
@@ -315,6 +324,10 @@ PySCF Plugin
 Qiskit Plugin
    Enables interoperability between QDK/Chemistry and the Qiskit quantum computing framework
    See the `Qiskit documentation <https://qiskit.org/documentation/getting_started.html>`_ for guidance on citing Qiskit.
+
+geomeTRIC Plugin
+   Provides molecular geometry optimization in translation-rotation internal coordinates, driven by QDK/Chemistry's nuclear derivative calculators.
+   See the `geomeTRIC repository <https://github.com/leeping/geomeTRIC>`_ for guidance on citing geomeTRIC.
 
 
 Visual Studio Code Integration

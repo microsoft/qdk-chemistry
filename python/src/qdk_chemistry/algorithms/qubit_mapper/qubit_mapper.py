@@ -17,19 +17,19 @@ from qdk_chemistry.utils import Logger
 if TYPE_CHECKING:  # Only needed for type annotations; avoid importing into module namespace
     from collections.abc import Sequence
 
-    from qdk_chemistry.data import Hamiltonian, MajoranaMapping, QubitHamiltonian
+    from qdk_chemistry.data import Hamiltonian, MajoranaMapping, QubitOperator
 
 __all__: list[str] = []
 
 
 def _taper_qubits(
-    qubit_hamiltonian: QubitHamiltonian,
+    qubit_hamiltonian: QubitOperator,
     qubit_indices: Sequence[int],
     eigenvalues: Sequence[int],
-) -> QubitHamiltonian:
+) -> QubitOperator:
     import numpy as np  # noqa: PLC0415
 
-    from qdk_chemistry.data import QubitHamiltonian  # noqa: PLC0415
+    from qdk_chemistry.data import QubitOperator  # noqa: PLC0415
 
     qubit_indices = list(qubit_indices)
     eigenvalues = list(eigenvalues)
@@ -81,7 +81,7 @@ def _taper_qubits(
     assert new_nq >= 1, "Tapering all qubits should have been rejected above"
 
     if not new_strings:
-        return QubitHamiltonian(
+        return QubitOperator(
             pauli_strings=["I" * new_nq],
             coefficients=np.array([0.0]),
             encoding=qubit_hamiltonian.encoding,
@@ -103,7 +103,7 @@ def _taper_qubits(
         final_strings = ["I" * new_nq]
         final_coeffs = [0.0]
 
-    return QubitHamiltonian(
+    return QubitOperator(
         pauli_strings=final_strings,
         coefficients=np.array(final_coeffs),
         encoding=qubit_hamiltonian.encoding,
@@ -126,7 +126,7 @@ class QubitMapperSettings(Settings):
 
 
 class QubitMapper(Algorithm):
-    """Abstract base class for mapping a Hamiltonian to a QubitHamiltonian.
+    """Abstract base class for mapping a Hamiltonian to a QubitOperator.
 
     .. rubric:: How backends use the MajoranaMapping
 
@@ -182,8 +182,8 @@ class QubitMapper(Algorithm):
         self,
         hamiltonian: Hamiltonian,
         mapping: MajoranaMapping,
-    ) -> QubitHamiltonian:
-        """Map a fermionic Hamiltonian to a qubit Hamiltonian.
+    ) -> QubitOperator:
+        """Map a fermionic Hamiltonian to a qubit operator.
 
         Delegates entirely to ``_run_impl``.  Each backend is
         responsible for handling tapering (if ``mapping.tapering`` is set).
@@ -193,14 +193,14 @@ class QubitMapper(Algorithm):
             mapping: The Majorana-to-Pauli encoding (may include tapering).
 
         Returns:
-            QubitHamiltonian with encoding and tapering metadata set.
+            QubitOperator with encoding and tapering metadata set.
 
         """
         self._settings.lock()
         return self._run_impl(hamiltonian, mapping)
 
     @staticmethod
-    def _taper_result(qh: QubitHamiltonian, mapping: MajoranaMapping) -> QubitHamiltonian:
+    def _taper_result(qh: QubitOperator, mapping: MajoranaMapping) -> QubitOperator:
         """Apply post-mapping tapering if the mapping specifies it.
 
         Convenience helper for backends.  If ``mapping.tapering`` is
@@ -208,21 +208,21 @@ class QubitMapper(Algorithm):
         the result with the mapping's final encoding name.
 
         Args:
-            qh: The untapered qubit Hamiltonian from the base mapping.
+            qh: The untapered qubit operator from the base mapping.
             mapping: The original mapping (with tapering metadata).
 
         Returns:
-            QubitHamiltonian: Tapered and relabelled, or *qh* unchanged.
+            QubitOperator: Tapered and relabelled, or *qh* unchanged.
 
         """
         tapering = mapping.tapering
         if tapering is None:
             return qh
 
-        from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian  # noqa: PLC0415
+        from qdk_chemistry.data.qubit_operator import QubitOperator  # noqa: PLC0415
 
         tapered = _taper_qubits(qh, tapering.qubit_indices, tapering.eigenvalues)
-        result = QubitHamiltonian(
+        result = QubitOperator(
             pauli_strings=tapered.pauli_strings,
             coefficients=tapered.coefficients,
             encoding=mapping.name,
@@ -237,8 +237,8 @@ class QubitMapper(Algorithm):
         self,
         hamiltonian: Hamiltonian,
         mapping: MajoranaMapping,
-    ) -> QubitHamiltonian:
-        """Construct a QubitHamiltonian from a Hamiltonian using the given mapping.
+    ) -> QubitOperator:
+        """Construct a QubitOperator from a Hamiltonian using the given mapping.
 
         Implementations receive the **full** mapping, which may include
         tapering.  Each backend handles tapering — typically by stripping
@@ -260,7 +260,7 @@ class QubitMapper(Algorithm):
             mapping: The Majorana-to-Pauli encoding (may include tapering).
 
         Returns:
-           QubitHamiltonian: An instance of the QubitHamiltonian.
+           QubitOperator: An instance of the QubitOperator.
 
         """
 

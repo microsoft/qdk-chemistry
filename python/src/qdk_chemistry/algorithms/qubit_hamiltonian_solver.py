@@ -30,11 +30,11 @@ class QubitHamiltonianSolver(base.Algorithm):
         return "qubit_hamiltonian_solver"
 
     @abstractmethod
-    def _run_impl(self, qubit_hamiltonian: data.QubitHamiltonian) -> tuple[float, np.ndarray]:
+    def _run_impl(self, qubit_hamiltonian: data.QubitOperator) -> tuple[float, np.ndarray]:
         """Solve a qubit Hamiltonian.
 
         Args:
-            qubit_hamiltonian: The :class:`~qdk_chemistry.data.QubitHamiltonian`.
+            qubit_hamiltonian: The :class:`~qdk_chemistry.data.QubitOperator`.
 
         Returns:
             tuple[float, np.ndarray]: The ground state energy and corresponding eigenstate.
@@ -80,11 +80,11 @@ class SparseMatrixSolver(QubitHamiltonianSolver):
         self._settings.set("tol", tol)
         self._settings.set("max_m", max_m)
 
-    def _run_impl(self, qubit_hamiltonian: data.QubitHamiltonian) -> tuple[float, np.ndarray]:
+    def _run_impl(self, qubit_hamiltonian: data.QubitOperator) -> tuple[float, np.ndarray]:
         """Solve a qubit Hamiltonian using sparse matrix methods.
 
         Args:
-            qubit_hamiltonian: The :class:`~qdk_chemistry.data.QubitHamiltonian`.
+            qubit_hamiltonian: The :class:`~qdk_chemistry.data.QubitOperator`.
 
         Returns:
             tuple[float, np.ndarray]: The ground state energy and corresponding eigenstate.
@@ -109,11 +109,11 @@ class DenseMatrixSolver(QubitHamiltonianSolver):
         """Initialize the DenseMatrixSolver."""
         super().__init__()
 
-    def _run_impl(self, qubit_hamiltonian: data.QubitHamiltonian) -> tuple[float, np.ndarray]:
+    def _run_impl(self, qubit_hamiltonian: data.QubitOperator) -> tuple[float, np.ndarray]:
         """Solve a qubit Hamiltonian using dense matrix methods.
 
         Args:
-            qubit_hamiltonian: The :class:`~qdk_chemistry.data.QubitHamiltonian`.
+            qubit_hamiltonian: The :class:`~qdk_chemistry.data.QubitOperator`.
 
         Returns:
             tuple[float, np.ndarray]: The ground state energy and corresponding eigenstate.

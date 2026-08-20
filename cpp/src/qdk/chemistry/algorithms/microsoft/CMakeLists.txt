@@ -8,6 +8,7 @@ target_sources(chemistry PRIVATE
     localization/mp2_natural_orbitals.cpp
     localization/natural_orbitals.cpp
     localization/pipek_mezey.cpp
+    localization/active_space_qio.cpp
     localization/vvhv.cpp
     hamiltonian.cpp
     cholesky_hamiltonian.cpp
@@ -17,6 +18,7 @@ target_sources(chemistry PRIVATE
     macis_pmc.cpp
     mp2.cpp
     scf.cpp
+    stabilized_scf.cpp
     stability.cpp
     utils.cpp
 )

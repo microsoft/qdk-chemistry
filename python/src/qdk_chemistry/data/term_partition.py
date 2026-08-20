@@ -1,13 +1,13 @@
-"""Term-partition metadata for :class:`~qdk_chemistry.data.QubitHamiltonian`.
+"""Term-partition metadata for :class:`~qdk_chemistry.data.QubitOperator`.
 
 A :class:`TermPartition` records how the Pauli terms of a
-:class:`~qdk_chemistry.data.QubitHamiltonian` are organised into algorithm-
+:class:`~qdk_chemistry.data.QubitOperator` are organised into algorithm-
 relevant subsets.  Concrete subclasses include :class:`FlatPartition`
 (single-level groups) and :class:`LayeredPartition` (group → layer
 hierarchy).
 
 The partition stores **indices** into
-:attr:`~qdk_chemistry.data.QubitHamiltonian.pauli_strings` so that it
+:attr:`~qdk_chemistry.data.QubitOperator.pauli_strings` so that it
 serialises trivially and remains small.
 
 Lifecycle
@@ -16,7 +16,7 @@ Lifecycle
 * The partition is *optional* metadata.  ``term_partition is None`` means the
   partition has not been computed for this Hamiltonian.
 * Transformations that change the term ordering or qubit support
-  (for example :meth:`~qdk_chemistry.data.QubitHamiltonian.to_interleaved`)
+  (for example :meth:`~qdk_chemistry.data.QubitOperator.to_interleaved`)
   must reset the partition to ``None`` on the new Hamiltonian.
 * Algorithms that consume a partition should treat its presence as an explicit
   signal to exploit it (for example, by applying schedule-level Suzuki
@@ -52,7 +52,16 @@ class TermPartition(DataClass):
 
     """
 
-    _data_type_name = "term_partition"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for term partitions.
+
+        Returns:
+            ``"term_partition"``.
+
+        """
+        return "term_partition"
+
     _serialization_version = "0.1.0"
 
     def __init__(self, *, strategy: str) -> None:
@@ -136,7 +145,7 @@ class FlatPartition(TermPartition):
     (for example, qubit-wise commuting groups for measurement basis selection).
 
     The ``groups`` field is a tuple of groups; each group is a tuple of term
-    indices into :attr:`~qdk_chemistry.data.QubitHamiltonian.pauli_strings`.
+    indices into :attr:`~qdk_chemistry.data.QubitOperator.pauli_strings`.
 
     Raises:
         TypeError: If ``groups`` is not a sequence of sequences of integers.
@@ -207,7 +216,7 @@ class LayeredPartition(TermPartition):
 
     The ``groups`` field is a nested tuple ``(group, layer, term_index)``:
     outer = groups, middle = layers within a group, inner = term indices into
-    :attr:`~qdk_chemistry.data.QubitHamiltonian.pauli_strings`.
+    :attr:`~qdk_chemistry.data.QubitOperator.pauli_strings`.
 
     Raises:
         TypeError: If ``groups`` is not the expected nested-sequence shape.

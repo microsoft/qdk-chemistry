@@ -11,7 +11,7 @@ without executing them, enabling standalone resource estimation and circuit prev
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian
+from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -77,7 +77,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
     ) -> list[Circuit]:
         """Build IQPE iteration circuits.
 
@@ -125,7 +125,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
     def _create_iteration_circuit(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitOperator,
         *,
         iteration: int,
         total_iterations: int,
@@ -136,7 +136,8 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         Args:
             state_preparation: Trial-state preparation circuit that prepares the initial state on the system qubits.
             qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
-            iteration: Current iteration index (0-based), where 0 corresponds to the most-significant bit.
+            iteration: Current iteration index (0-based); iteration 0 uses the largest power and
+                measures the least-significant bit.
             total_iterations: Total number of phase bits to measure across all iterations.
             phase_correction: Feedback phase angle to apply before controlled unitary, defaults to 0.0.
 

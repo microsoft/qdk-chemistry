@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 from qdk_chemistry.data import Orbitals, Wavefunction
+from qdk_chemistry.data.symmetry import SymmetryLabel, axes
 from qdk_chemistry.utils.cubegen import generate_cubefiles_from_orbitals
 
 
@@ -63,7 +64,7 @@ def generate_cube_data_with_info(
             "Unrestricted orbitals have separate alpha/beta channels that require different handling."
         )
 
-    energies = orbitals.get_energies_alpha()
+    energies = orbitals.energies().block([SymmetryLabel([axes.alpha()])])
 
     cube_data_raw = generate_cubefiles_from_orbitals(
         orbitals=orbitals,
@@ -74,7 +75,7 @@ def generate_cube_data_with_info(
 
     cube_data_with_info: dict[str, dict] = {}
     for raw_label, cube_str in cube_data_raw.items():
-        idx = int(raw_label.split("_")[1]) - 1
+        idx = int(raw_label.split("_")[1])
         cube_data_with_info[orbital_label(idx, n_occupied)] = {
             "data": cube_str,
             "info": {
@@ -132,12 +133,13 @@ def generate_cube_data_with_correlation_info(
         )
 
     if indices is None:
-        indices, _ = orbitals.get_active_space_indices()
-        indices = list(indices)
+        indices = list(orbitals.active_indices().indices(SymmetryLabel([axes.alpha()])))
 
     # Occupations and entropies are indexed by active-space position.
     # Build a lookup from MO index to position for direct access.
-    active_indices, _ = orbitals.get_active_space_indices()
+    active_indices = list(
+        orbitals.active_indices().indices(SymmetryLabel([axes.alpha()]))
+    )
     invalid = [i for i in indices if i not in active_indices]
     if invalid:
         raise ValueError(
@@ -161,9 +163,9 @@ def generate_cube_data_with_correlation_info(
 
     cube_data_with_info: dict[str, dict] = {}
     for raw_label, cube_str in cube_data_raw.items():
-        mo_idx = int(raw_label.split("_")[1]) - 1
+        mo_idx = int(raw_label.split("_")[1])
         pos = mo_to_pos[mo_idx]
-        cube_data_with_info[f"MO {mo_idx + 1}"] = {
+        cube_data_with_info[f"MO {mo_idx}"] = {
             "data": cube_str,
             "info": {
                 "Occupation": f"{float(occ_alpha[pos]) + float(occ_beta[pos]):.3f}",

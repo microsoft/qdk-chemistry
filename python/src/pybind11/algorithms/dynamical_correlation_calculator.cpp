@@ -10,6 +10,7 @@
 #include <qdk/chemistry.hpp>
 
 #include "factory_bindings.hpp"
+#include "qdk/chemistry/algorithms/microsoft/mp2.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::algorithms;
@@ -157,6 +158,38 @@ Examples:
   ...         from qdk_chemistry.data import ElectronicStructureSettings
   ...         self._settings = ElectronicStructureSettings()
         )");
+
+  // Bind concrete microsoft::MP2Calculator implementation
+  py::class_<microsoft::MP2Calculator, DynamicalCorrelationCalculator,
+             py::smart_holder>(m, "QdkMP2Calculator", R"(
+QDK implementation of the MP2 dynamical correlation calculator.
+
+Computes the second-order Møller-Plesset (MP2) correlation energy and the T1/T2
+amplitudes from a reference :class:`~qdk_chemistry.data.Ansatz`, automatically
+selecting the restricted (RMP2) or unrestricted (UMP2) formulation from the
+reference wavefunction. The MP2 ket wavefunction is returned in an
+:class:`~qdk_chemistry.data.AmplitudeContainer`.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+
+    calculator = alg.create("dynamical_correlation_calculator", "qdk_mp2_calculator")
+    total_energy, ket_wavefunction, _ = calculator.run(ansatz)
+
+See Also:
+    :class:`DynamicalCorrelationCalculator`
+    :class:`qdk_chemistry.data.Ansatz`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes an MP2 calculator with default settings.
+
+)");
 
   // Factory bindings
   bind_algorithm_factory<DynamicalCorrelationCalculatorFactory,

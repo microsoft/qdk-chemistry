@@ -80,6 +80,7 @@ In addition to the native implementations packaged within QDK/Chemistry, plugins
 - `PySCF <https://pyscf.org/>`_ — Python-based quantum chemistry
 - `Qiskit <https://www.ibm.com/quantum/qiskit>`_ — Quantum algorithm primitives
 - `OpenFermion <https://quantumai.google/openfermion>`_ — Quantum algorithm primitives
+- `geomeTRIC <https://github.com/leeping/geomeTRIC>`_ — Molecular geometry optimization
 
 These plugins are enabled automatically when the corresponding package is installed.
 
@@ -113,7 +114,9 @@ Alternatively, you can install them directly:
 
 .. note::
 
-   The ``qiskit-extras`` extra is not currently supported on Python 3.14.
+   On Python 3.14, ``qiskit-aer`` is omitted from ``qiskit-extras`` on Linux ARM64
+   (aarch64), because Qiskit does not yet publish a Python 3.14 wheel for that
+   platform. All other platforms install the full set.
 
 **Checking what is loaded:**
 
@@ -187,12 +190,60 @@ Community-developed plugins are also welcome. See :ref:`adding-plugins` for guid
 Creating plugins
 ----------------
 
-QDK/Chemistry supports two extension mechanisms:
+An installed Python package can contribute any combination of:
 
-1. Implementing a new backend for an existing algorithm type (e.g., integrating an external quantum chemistry package)
-2. Defining an entirely new algorithm type with its own factory and implementations
+- Implementations of existing algorithm types
+- New algorithm types and their implementations
+- :class:`~qdk_chemistry.data.DataClass` types used in algorithm inputs or outputs
 
-The following sections provide comprehensive examples of each approach.
+The same plugin object can register multiple capabilities through :class:`~qdk_chemistry.plugins.PluginRegistrar`.
+
+Registration names must be unique within their registry. Registering a second algorithm, algorithm type, or data class under an existing name raises :class:`~qdk_chemistry.plugins.DuplicateRegistrationError`, a :class:`ValueError` subclass. The rejected registration does not replace the existing implementation.
+
+Automatic discovery
+~~~~~~~~~~~~~~~~~~~
+
+The preferred plugin contract is a :class:`~qdk_chemistry.plugins.base.QdkChemistryPlugin` subclass exposed through the ``qdk_chemistry.plugins`` entry-point group. For example, a plugin package declares this in its ``pyproject.toml``:
+
+.. code-block:: toml
+
+   [project.entry-points."qdk_chemistry.plugins"]
+   custom = "custom_package.plugin:CustomScfPlugin"
+
+Importing ``qdk_chemistry`` discovers the installed package and calls its ``register`` method; users do not need to import the plugin module themselves. A plugin registers its capabilities through the supplied registrar:
+
+.. code-block:: python
+
+   from qdk_chemistry.plugins import PluginRegistrar, QdkChemistryPlugin
+
+   class CustomPlugin(QdkChemistryPlugin):
+       def register(self, registrar: PluginRegistrar) -> None:
+           registrar.register_algorithm(lambda: CustomAlgorithm())
+           registrar.register_dataclass(CustomResult)
+
+Each plugin-defined ``DataClass`` used in algorithm inputs or outputs must declare a non-empty wire-format identifier in its own class body:
+
+.. code-block:: python
+
+   from qdk_chemistry.data import DataClass
+
+   class CustomResult(DataClass):
+       @staticmethod
+       def data_type_name() -> str:
+           return "custom_result"
+       ...
+
+The value returned by ``data_type_name()`` identifies the serialized format during deserialization. A canonical loader must declare this static method directly and return a non-empty string. A subclass must declare a unique identifier and register as its own loader. Registration raises ``TypeError`` when the declaration is missing or empty, and :class:`~qdk_chemistry.plugins.DuplicateRegistrationError` when another loader already owns the identifier.
+
+Register these classes explicitly with ``register_dataclass`` or pass them through the ``data_classes`` argument of ``register_algorithm``. Python return annotations are not used for discovery.
+
+The existing direct registration functions and the :class:`~qdk_chemistry.plugins.base.ChemistryPlugin` compatibility alias remain supported. New plugin packages should use :class:`~qdk_chemistry.plugins.base.QdkChemistryPlugin` and the unified entry point.
+
+.. rubric:: Naming and call order
+
+An algorithm implementation name must be unique within its algorithm type. Third-party plugins should use package- or organization-prefixed names to avoid collisions with built-in implementations and other plugins.
+
+Registration is first come, first served and does not override an existing name. Core built-ins are registered before external registrations reach each registry. Unified plugin entry points are called in the order returned by Python's entry-point discovery, followed by bundled optional integrations. Calling a registration function directly with an existing name raises :class:`~qdk_chemistry.plugins.DuplicateRegistrationError` and keeps the earlier registration unchanged. During entry-point discovery, QDK/Chemistry catches that exception, emits a ``UserWarning`` identifying the plugin that failed to register, and continues loading other plugins. Because entry-point order can vary between environments, plugins must not rely on discovery order to override another implementation.
 
 .. _adding-implementations:
 
@@ -253,7 +304,7 @@ The ``_run_impl()`` method is responsible for:
 .. rubric:: Registration
 
 Implementations are registered with the algorithm factory to enable discovery and instantiation by name.
-Registration is typically performed during module initialization:
+The plugin registrar delegates to that existing factory registry:
 
 .. tab:: Python API
 
@@ -282,7 +333,7 @@ Defining a new algorithm type
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When the required functionality does not correspond to an existing algorithm category, a new algorithm type can be defined.
-This section demonstrates the complete process using a geometry optimizer as an example.
+This section demonstrates the complete process using a molecular descriptor calculator as an example.
 
 .. rubric:: Interface design
 
@@ -291,9 +342,9 @@ The first step is to specify the algorithm's interface:
 Input type
    The data the algorithm operates on (e.g., ``Structure``)
 Output type
-   The data the algorithm produces (e.g., optimized ``Structure``)
+   The data the algorithm produces (e.g., a floating-point molecular descriptor)
 Configuration
-   Required settings (e.g., convergence thresholds, iteration limits)
+   Required settings (e.g., whether to normalize the descriptor)
 
 .. rubric:: Settings class definition
 
@@ -303,15 +354,15 @@ Define a settings class containing all configuration parameters:
 
    .. literalinclude:: ../../_static/examples/python/custom_plugin.py
       :language: python
-      :start-after: # start-cell-geometry-settings
-      :end-before: # end-cell-geometry-settings
+      :start-after: # start-cell-descriptor-settings
+      :end-before: # end-cell-descriptor-settings
 
 .. tab:: C++ API
 
    .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
       :language: cpp
-      :start-after: // start-cell-geometry-settings
-      :end-before: // end-cell-geometry-settings
+      :start-after: // start-cell-descriptor-settings
+      :end-before: // end-cell-descriptor-settings
 
 .. rubric:: Base class definition
 
@@ -321,15 +372,15 @@ Define an abstract base class specifying the interface for all implementations:
 
    .. literalinclude:: ../../_static/examples/python/custom_plugin.py
       :language: python
-      :start-after: # start-cell-geometry-base-class
-      :end-before: # end-cell-geometry-base-class
+      :start-after: # start-cell-descriptor-base-class
+      :end-before: # end-cell-descriptor-base-class
 
 .. tab:: C++ API
 
    .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
       :language: cpp
-      :start-after: // start-cell-geometry-base-class
-      :end-before: // end-cell-geometry-base-class
+      :start-after: // start-cell-descriptor-base-class
+      :end-before: // end-cell-descriptor-base-class
 
 .. rubric:: Factory definition
 
@@ -339,15 +390,15 @@ The factory manages implementation registration and provides instance creation:
 
    .. literalinclude:: ../../_static/examples/python/custom_plugin.py
       :language: python
-      :start-after: # start-cell-geometry-factory
-      :end-before: # end-cell-geometry-factory
+      :start-after: # start-cell-descriptor-factory
+      :end-before: # end-cell-descriptor-factory
 
 .. tab:: C++ API
 
    .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
       :language: cpp
-      :start-after: // start-cell-geometry-factory
-      :end-before: // end-cell-geometry-factory
+      :start-after: // start-cell-descriptor-factory
+      :end-before: // end-cell-descriptor-factory
 
 .. rubric:: Concrete implementations
 
@@ -357,22 +408,22 @@ Implement the algorithm by inheriting from the base class:
 
    .. literalinclude:: ../../_static/examples/python/custom_plugin.py
       :language: python
-      :start-after: # start-cell-geometry-implementations
-      :end-before: # end-cell-geometry-implementations
+      :start-after: # start-cell-descriptor-implementations
+      :end-before: # end-cell-descriptor-implementations
 
 .. tab:: C++ API
 
    .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
       :language: cpp
-      :start-after: // start-cell-geometry-implementations
-      :end-before: // end-cell-geometry-implementations
+      :start-after: // start-cell-descriptor-implementations
+      :end-before: // end-cell-descriptor-implementations
 
 Additional implementations follow the same pattern:
 
 .. literalinclude:: ../../_static/examples/python/custom_plugin.py
    :language: python
-   :start-after: # start-cell-steepest-descent
-   :end-before: # end-cell-steepest-descent
+   :start-after: # start-cell-mass-descriptor
+   :end-before: # end-cell-mass-descriptor
 
 .. rubric:: Registration
 
@@ -382,15 +433,15 @@ Register the factory and all implementations:
 
    .. literalinclude:: ../../_static/examples/python/custom_plugin.py
       :language: python
-      :start-after: # start-cell-geometry-registration
-      :end-before: # end-cell-geometry-registration
+      :start-after: # start-cell-descriptor-registration
+      :end-before: # end-cell-descriptor-registration
 
 .. tab:: C++ API
 
    .. literalinclude:: ../../_static/examples/cpp/custom_plugin.cpp
       :language: cpp
-      :start-after: // start-cell-geometry-registration
-      :end-before: // end-cell-geometry-registration
+      :start-after: // start-cell-descriptor-registration
+      :end-before: // end-cell-descriptor-registration
 
 .. rubric:: Usage
 
@@ -398,8 +449,8 @@ Following registration, the new algorithm type is accessible through the standar
 
 .. literalinclude:: ../../_static/examples/python/custom_plugin.py
    :language: python
-   :start-after: # start-cell-geometry-usage
-   :end-before: # end-cell-geometry-usage
+   :start-after: # start-cell-descriptor-usage
+   :end-before: # end-cell-descriptor-usage
 
 For additional information on the factory pattern and settings system, refer to the
 :doc:`factory pattern <algorithms/factory_pattern>` and :doc:`settings <algorithms/settings>` documentation.

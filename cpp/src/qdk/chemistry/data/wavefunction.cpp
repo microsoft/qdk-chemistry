@@ -11,11 +11,11 @@
 #include <map>
 #include <memory>
 #include <numeric>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <sstream>
 #include <stdexcept>
 #include <tuple>
@@ -25,6 +25,7 @@
 #include "hdf5_error_handling.hpp"
 #include "hdf5_serialization.hpp"
 #include "json_serialization.hpp"
+#include "orbital_entropy.hpp"
 
 namespace qdk::chemistry::data {
 namespace detail {
@@ -326,7 +327,9 @@ WavefunctionContainer::get_active_two_rdm_spin_traced() const {
     auto bbbb = extract(axes::beta(), axes::beta(), axes::beta(), axes::beta());
     auto two_rdm_ss_part = detail::add_vector_variants(aaaa, bbbb);
     auto two_rdm_spin_bbaa = detail::transpose_ijkl_klij_vector_variant(
-        aabb, get_orbitals()->get_active_space_indices().first.size());
+        aabb,
+        spin_channel_indices(get_orbitals()->active_indices(), axes::alpha())
+            .size());
     auto two_rdm_os_part =
         detail::add_vector_variants(aabb, *two_rdm_spin_bbaa);
 
@@ -598,31 +601,11 @@ Eigen::VectorXd WavefunctionContainer::get_single_orbital_entropies() const {
   };
 
   // Source: Boguslawski & Tecmer (2015). doi:10.1002/qua.24832
-  // s1_i  = - \sum_alpha \omega_i,alpha * ln(omega_i,alpha)
   Eigen::VectorXd s1_entropies = Eigen::VectorXd::Zero(norbs);
   for (std::size_t i = 0; i < norbs; ++i) {
-    // omega_1 = 1 - \gamma_{ii} - \gamma_{\bar{i}\bar{i}} +
-    // \Gamma_{i\bar{i}i\bar{i}}
-    auto ordm1 = 1 - one_rdm_aa(i, i) - one_rdm_bb(i, i) +
-                 get_active_two_rdm_element(i, i, i, i);
-    if (ordm1 > 0) {
-      s1_entropies(i) -= ordm1 * std::log(ordm1);
-    }
-    // omega_2 = \gamma_{ii} - \Gamma_{i\bar{i}i\bar{i}}
-    auto ordm2 = one_rdm_aa(i, i) - get_active_two_rdm_element(i, i, i, i);
-    if (ordm2 > 0) {
-      s1_entropies(i) -= ordm2 * std::log(ordm2);
-    }
-    // omega_3 = \gamma_{\bar{i}\bar{i}} - \Gamma_{i\bar{i}i\bar{i}}
-    auto ordm3 = one_rdm_bb(i, i) - get_active_two_rdm_element(i, i, i, i);
-    if (ordm3 > 0) {
-      s1_entropies(i) -= ordm3 * std::log(ordm3);
-    }
-    // omega_4 = \Gamma_{i\bar{i}i\bar{i}}
-    auto ordm4 = get_active_two_rdm_element(i, i, i, i);
-    if (ordm4 > 0) {
-      s1_entropies(i) -= ordm4 * std::log(ordm4);
-    }
+    s1_entropies(i) =
+        detail::single_orbital_entropy(one_rdm_aa(i, i), one_rdm_bb(i, i),
+                                       get_active_two_rdm_element(i, i, i, i));
   }
   // Cache the result
   _entropies.single_orbital = s1_entropies;
@@ -700,6 +683,118 @@ Eigen::MatrixXd WavefunctionContainer::get_mutual_information() const {
       "Mutual information is not available. Provide it at construction time, "
       "or provide both single-orbital entropies (or RDMs) and two-orbital "
       "entropies.");
+}
+
+namespace detail {
+struct SSquaredRdmBlocks {
+  const Eigen::MatrixXd& one_aa;
+  const Eigen::MatrixXd& one_bb;
+  const Eigen::VectorXd& two_aaaa;
+  const Eigen::VectorXd& two_aabb;
+  const Eigen::VectorXd& two_bbbb;
+  std::size_t norbs;
+};
+
+SSquaredRdmBlocks s_squared_rdm_blocks(
+    const SymmetryBlockedTensorVariant<2>& one_rdm,
+    const SymmetryBlockedTensorVariant<4>& two_rdm) {
+  if (std::holds_alternative<SymmetryBlockedTensor<2, std::complex<double>>>(
+          one_rdm) ||
+      std::holds_alternative<SymmetryBlockedTensor<4, std::complex<double>>>(
+          two_rdm)) {
+    throw std::runtime_error("Complex <S^2> calculation not yet implemented");
+  }
+
+  const auto& one = std::get<SymmetryBlockedTensor<2, double>>(one_rdm);
+  const auto& two = std::get<SymmetryBlockedTensor<4, double>>(two_rdm);
+  const auto alpha = axes::alpha();
+  const auto beta = axes::beta();
+  const SymmetryBlockedTensor<2, double>::Labels aa{alpha, alpha};
+  const SymmetryBlockedTensor<2, double>::Labels bb{beta, beta};
+  const SymmetryBlockedTensor<4, double>::Labels aaaa{alpha, alpha, alpha,
+                                                      alpha};
+  const SymmetryBlockedTensor<4, double>::Labels aabb{alpha, alpha, beta, beta};
+  const SymmetryBlockedTensor<4, double>::Labels bbbb{beta, beta, beta, beta};
+
+  if (!one.has_block(aa) || !one.has_block(bb) || !two.has_block(aaaa) ||
+      !two.has_block(aabb) || !two.has_block(bbbb)) {
+    throw std::runtime_error(
+        "Computing <S^2> requires the aa and bb 1-RDM blocks and the aaaa, "
+        "aabb, and bbbb 2-RDM blocks");
+  }
+
+  const std::size_t norbs = one.extents()[0].at(alpha);
+  const auto extents_match = [&](const auto& tensor) {
+    return std::all_of(tensor.extents().begin(), tensor.extents().end(),
+                       [&](const auto& extents) {
+                         return extents.at(alpha) == norbs &&
+                                extents.at(beta) == norbs;
+                       });
+  };
+  if (!extents_match(one) || !extents_match(two)) {
+    throw std::runtime_error(
+        "Computing <S^2> requires matching alpha and beta 1-RDM and 2-RDM "
+        "extents");
+  }
+
+  return {one.block(aa),   one.block(bb),   two.block(aaaa),
+          two.block(aabb), two.block(bbbb), norbs};
+}
+}  // namespace detail
+
+double WavefunctionContainer::compute_s_squared() const {
+  QDK_LOG_TRACE_ENTERING();
+
+  // <S^2> = 3/4 * Tr(gamma^a + gamma^b)
+  //       - sum_{ij} Gamma^{aabb}(i,j,j,i)
+  //       - 1/4 * sum_{ij} Gamma^{aaaa}(i,j,j,i)
+  //       - 1/4 * sum_{ij} Gamma^{bbbb}(i,j,j,i)
+  //       - 1/2 * sum_{ij} Gamma^{aabb}(i,i,j,j)
+  //
+  // Uses QDK convention: Gamma(p,q,r,s) = <a†_p a†_r a_s a_q>
+  // Flat index: p*n^3 + q*n^2 + r*n + s
+
+  if (get_orbitals()->is_unrestricted()) {
+    throw std::runtime_error(
+        "Computing <S^2> for unrestricted orbitals is not supported because "
+        "the alpha and beta molecular orbitals do not share a common spatial "
+        "basis");
+  }
+
+  const SymmetryBlockedTensorVariant<2>* one_rdm;
+  const SymmetryBlockedTensorVariant<4>* two_rdm;
+  try {
+    one_rdm = &active_one_rdm();
+    two_rdm = &active_two_rdm();
+  } catch (const std::runtime_error& error) {
+    throw std::runtime_error(
+        "Cannot compute <S^2>: spin-resolved active-space 1- and 2-RDMs are "
+        "required (" +
+        std::string(error.what()) + ")");
+  }
+
+  const auto rdms = detail::s_squared_rdm_blocks(*one_rdm, *two_rdm);
+  const std::size_t norbs2 = rdms.norbs * rdms.norbs;
+  const std::size_t norbs3 = norbs2 * rdms.norbs;
+  double aaaa_ijji = 0.0;
+  double aabb_ijji = 0.0;
+  double aabb_iijj = 0.0;
+  double bbbb_ijji = 0.0;
+  for (std::size_t i = 0; i < rdms.norbs; ++i) {
+    for (std::size_t j = 0; j < rdms.norbs; ++j) {
+      const auto ijji = static_cast<Eigen::Index>(i * norbs3 + j * norbs2 +
+                                                  j * rdms.norbs + i);
+      const auto iijj = static_cast<Eigen::Index>(i * norbs3 + i * norbs2 +
+                                                  j * rdms.norbs + j);
+      aaaa_ijji += rdms.two_aaaa(ijji);
+      aabb_ijji += rdms.two_aabb(ijji);
+      aabb_iijj += rdms.two_aabb(iijj);
+      bbbb_ijji += rdms.two_bbbb(ijji);
+    }
+  }
+
+  return 0.75 * (rdms.one_aa.trace() + rdms.one_bb.trace()) - aabb_ijji -
+         0.25 * (aaaa_ijji + bbbb_ijji) - 0.5 * aabb_iijj;
 }
 
 void WavefunctionContainer::_clear_rdms() const {
@@ -879,7 +974,7 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
 
       if (has_any) {
         if (container_type == "state_vector" || container_type == "cas" ||
-            container_type == "sci") {
+            container_type == "sci" || container_type == "sd") {
           return std::make_unique<StateVectorContainer>(
               coefficients, determinants, orbitals,
               std::move(one_rdm_spin_traced), std::move(two_rdm_spin_traced),
@@ -899,7 +994,7 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
     // implemented (bypassing the version gate above), existing cas/sci files
     // will load through this path without additional changes.
     if (container_type == "state_vector" || container_type == "cas" ||
-        container_type == "sci") {
+        container_type == "sci" || container_type == "sd") {
       return std::make_unique<StateVectorContainer>(
           coefficients, determinants, orbitals, std::nullopt, std::nullopt,
           sector, entropies, type);
@@ -907,7 +1002,7 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
       throw std::runtime_error(
           "Unrecognized container_type '" + container_type +
           "' in WavefunctionContainer::from_json. Expected 'state_vector', "
-          "'cas', or 'sci'.");
+          "'cas', 'sci', or 'sd'.");
     }
   } catch (const std::exception& e) {
     throw std::runtime_error("JSON error: " + std::string(e.what()));
@@ -919,33 +1014,33 @@ WavefunctionType WavefunctionContainer::get_type() const {
   return _type;
 }
 
-namespace {
+namespace detail {
 constexpr const char* kNotDeterminantExpansionMessage =
     "This wavefunction container is not a determinant/coefficient expansion, "
     "so determinant and coefficient accessors are not available.";
-}  // namespace
+}  // namespace detail
 
 const ContainerTypes::VectorVariant& WavefunctionContainer::get_coefficients()
     const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(kNotDeterminantExpansionMessage);
+  throw std::runtime_error(detail::kNotDeterminantExpansionMessage);
 }
 
 ContainerTypes::ScalarVariant WavefunctionContainer::get_coefficient(
     const Configuration&) const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(kNotDeterminantExpansionMessage);
+  throw std::runtime_error(detail::kNotDeterminantExpansionMessage);
 }
 
 const ContainerTypes::DeterminantVector&
 WavefunctionContainer::get_active_determinants() const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(kNotDeterminantExpansionMessage);
+  throw std::runtime_error(detail::kNotDeterminantExpansionMessage);
 }
 
 size_t WavefunctionContainer::size() const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(kNotDeterminantExpansionMessage);
+  throw std::runtime_error(detail::kNotDeterminantExpansionMessage);
 }
 
 // Wavefunction implementations
@@ -1088,8 +1183,8 @@ Configuration Wavefunction::get_active_determinant(
     return total_determinant;
   }
 
-  auto [alpha_active, beta_active] = orbitals->get_active_space_indices();
-  const auto& active_indices = alpha_active;
+  const auto active_indices =
+      spin_channel_indices(orbitals->active_indices(), axes::alpha());
 
   if (active_indices.empty()) {
     // Empty active space - return empty configuration
@@ -1122,12 +1217,12 @@ Configuration Wavefunction::get_total_determinant(
     return active_determinant;
   }
 
-  auto [alpha_inactive, beta_inactive] = orbitals->get_inactive_space_indices();
-  auto [alpha_active, beta_active] = orbitals->get_active_space_indices();
+  const auto inactive_indices =
+      spin_channel_indices(orbitals->inactive_indices(), axes::alpha());
+  const auto active_indices =
+      spin_channel_indices(orbitals->active_indices(), axes::alpha());
   auto [alpha_virtual, beta_virtual] = orbitals->get_virtual_space_indices();
 
-  const auto& inactive_indices = alpha_inactive;
-  const auto& active_indices = alpha_active;
   const auto& virtual_indices = alpha_virtual;
 
   size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
@@ -1352,6 +1447,11 @@ bool Wavefunction::has_two_rdm_spin_traced() const {
   return _container->has_two_rdm_spin_traced();
 }
 
+double Wavefunction::compute_s_squared() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->compute_s_squared();
+}
+
 // Cache management
 void Wavefunction::_clear_caches() const {
   QDK_LOG_TRACE_ENTERING();
@@ -1432,8 +1532,8 @@ void Wavefunction::to_json_file(const std::string& filename) const {
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_write_suffix(
-      filename, DATACLASS_TO_SNAKE_CASE(Wavefunction));
+  DataTypeFilename::validate_write_suffix(filename,
+                                          Wavefunction::data_type_name());
   _to_json_file(filename);
 }
 
@@ -1443,7 +1543,8 @@ std::shared_ptr<Wavefunction> Wavefunction::from_json_file(
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_read_suffix(filename, "wavefunction");
+  DataTypeFilename::validate_read_suffix(filename,
+                                         Wavefunction::data_type_name());
   return _from_json_file(filename);
 }
 
@@ -1526,8 +1627,8 @@ void Wavefunction::to_hdf5_file(const std::string& filename) const {
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_write_suffix(
-      filename, DATACLASS_TO_SNAKE_CASE(Wavefunction));
+  DataTypeFilename::validate_write_suffix(filename,
+                                          Wavefunction::data_type_name());
   _to_hdf5_file(filename);
 }
 
@@ -1537,7 +1638,8 @@ std::shared_ptr<Wavefunction> Wavefunction::from_hdf5_file(
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_read_suffix(filename, "wavefunction");
+  DataTypeFilename::validate_read_suffix(filename,
+                                         Wavefunction::data_type_name());
   return _from_hdf5_file(filename);
 }
 
@@ -1909,7 +2011,7 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
 
       if (has_any) {
         if (container_type == "state_vector" || container_type == "cas" ||
-            container_type == "sci") {
+            container_type == "sci" || container_type == "sd") {
           return std::make_unique<StateVectorContainer>(
               coefficients, determinants, orbitals,
               std::move(one_rdm_spin_traced), std::move(two_rdm_spin_traced),
@@ -1920,14 +2022,14 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
     }
 
     if (container_type == "state_vector" || container_type == "cas" ||
-        container_type == "sci") {
+        container_type == "sci" || container_type == "sd") {
       return std::make_unique<StateVectorContainer>(
           coefficients, determinants, orbitals, std::nullopt, std::nullopt,
           sector, entropies, type);
     } else {
       throw std::runtime_error(
           "Did not expect to get here for containers other than "
-          "state_vector/cas/sci. Expected delegation to container-specific "
+          "state_vector/cas/sci/sd. Expected delegation to container-specific "
           "methods.");
     }
   } catch (const H5::Exception& e) {

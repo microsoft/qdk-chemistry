@@ -10,7 +10,6 @@
 #include <qdk/chemistry/algorithms/algorithm_defaults.hpp>
 #include <qdk/chemistry/data/settings.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <sstream>
 
 #include "filename_utils.hpp"
@@ -94,7 +93,9 @@ void Settings::set(const std::string& key, const SettingValue& value) {
   if (std::holds_alternative<AlgorithmRef>(value)) {
     const auto& existing = std::get<AlgorithmRef>(settings_[key]);
     const auto& incoming = std::get<AlgorithmRef>(value);
-    if (incoming.get_algorithm_type() != existing.get_algorithm_type()) {
+    if (incoming.get_algorithm_type() != existing.get_algorithm_type() &&
+        algorithm_ref_type_change_allowed_.find(key) ==
+            algorithm_ref_type_change_allowed_.end()) {
       throw std::invalid_argument(
           "Algorithm type for setting '" + key + "' is fixed to '" +
           existing.get_algorithm_type() + "' and cannot be changed to '" +
@@ -1361,7 +1362,7 @@ void Settings::to_json_file(const std::string& filename) const {
   }
   // Validate filename has correct data type suffix
   std::string validated_filename = DataTypeFilename::validate_write_suffix(
-      filename, DATACLASS_TO_SNAKE_CASE(Settings));
+      filename, Settings::data_type_name());
 
   _to_json_file(validated_filename);
 }
@@ -1373,8 +1374,8 @@ std::shared_ptr<Settings> Settings::from_json_file(
     throw std::invalid_argument("Filename cannot be empty");
   }
   // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_read_suffix(filename, "settings");
+  std::string validated_filename = DataTypeFilename::validate_read_suffix(
+      filename, Settings::data_type_name());
 
   return _from_json_file(validated_filename);
 }
@@ -1421,7 +1422,7 @@ void Settings::to_hdf5_file(const std::string& filename) const {
   }
   // Validate filename has correct data type suffix
   std::string validated_filename = DataTypeFilename::validate_write_suffix(
-      filename, DATACLASS_TO_SNAKE_CASE(Settings));
+      filename, Settings::data_type_name());
 
   _to_hdf5_file(validated_filename);
 }
@@ -1433,8 +1434,8 @@ std::shared_ptr<Settings> Settings::from_hdf5_file(
     throw std::invalid_argument("Filename cannot be empty");
   }
   // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_read_suffix(filename, "settings");
+  std::string validated_filename = DataTypeFilename::validate_read_suffix(
+      filename, Settings::data_type_name());
 
   return _from_hdf5_file(validated_filename);
 }

@@ -23,7 +23,10 @@ import pathlib
 import tempfile
 from typing import TYPE_CHECKING, Any
 
+from qdk_chemistry._core.data import DataClass as CoreDataClass
 from qdk_chemistry.data._hashing import _item_content_hash
+from qdk_chemistry.data._type_name import instance_data_type_name
+from qdk_chemistry.data.registry import get_dataclass_type
 from qdk_chemistry.remote.cache.base import CacheBackend
 
 if TYPE_CHECKING:
@@ -31,34 +34,9 @@ if TYPE_CHECKING:
     from qdk_chemistry.remote.job import Job
 
 
-_dataclass_type_cache: dict[str, type[DataClass]] = {}
-
-
 def _resolve_dataclass_type(type_name: str) -> type[DataClass] | None:
-    """Find the DataClass subclass whose ``_data_type_name`` matches *type_name*."""
-    cached = _dataclass_type_cache.get(type_name)
-    if cached is not None:
-        return cached
-
-    import qdk_chemistry.data  # noqa: PLC0415, F401 — ensure all subclasses are imported
-    from qdk_chemistry._core.data import DataClass as _CppBase  # noqa: PLC0415
-    from qdk_chemistry.data.base import DataClass as _PyBase  # noqa: PLC0415
-
-    # Walk both the Python and C++ DataClass hierarchies since C++ types
-    # (Orbitals, Wavefunction, …) inherit from the pybind11 base, not the
-    # Python base.
-    stack = list(_PyBase.__subclasses__()) + list(_CppBase.__subclasses__())
-    seen: set[int] = set()
-    while stack:
-        cls = stack.pop()
-        if id(cls) in seen:
-            continue
-        seen.add(id(cls))
-        if getattr(cls, "_data_type_name", None) == type_name:
-            _dataclass_type_cache[type_name] = cls  # type: ignore[assignment]
-            return cls  # type: ignore[return-value]
-        stack.extend(cls.__subclasses__())
-    return None
+    """Find the DataClass loader whose wire-format identifier matches *type_name*."""
+    return get_dataclass_type(type_name)
 
 
 class FolderCache(CacheBackend):
@@ -173,7 +151,7 @@ class FolderCache(CacheBackend):
         self._validate_key(content_hash, "content_hash")
         if isinstance(data, list):
             return self._put_data_list(content_hash, data)
-        type_name = data._data_type_name  # noqa: SLF001
+        type_name = instance_data_type_name(data)
         filepath = self._root / f"{content_hash}.{type_name}.h5"
         if filepath.exists():
             return None  # already cached
@@ -186,7 +164,7 @@ class FolderCache(CacheBackend):
         if not self._is_homogeneous_dataclass_list(data_list):
             return self._put_generic_data_list(content_hash, data_list)
 
-        type_name = data_list[0]._data_type_name  # noqa: SLF001
+        type_name = instance_data_type_name(data_list[0])
         manifest_path = self._root / f"{content_hash}.list[{type_name}].json"
         if manifest_path.exists():
             return None
@@ -213,13 +191,13 @@ class FolderCache(CacheBackend):
         """Return whether *data_list* can use the legacy homogeneous-list manifest."""
         if not data_list:
             return False
-        if not hasattr(data_list[0], "_data_type_name"):
+        if not isinstance(data_list[0], CoreDataClass):
             return False
-        type_name = data_list[0]._data_type_name  # noqa: SLF001
+        type_name = instance_data_type_name(data_list[0])
         for item in data_list:
-            if not hasattr(item, "_data_type_name"):
+            if not isinstance(item, CoreDataClass):
                 return False
-            if item._data_type_name != type_name:  # noqa: SLF001
+            if instance_data_type_name(item) != type_name:
                 return False
         return True
 
@@ -233,13 +211,13 @@ class FolderCache(CacheBackend):
             }
         if data is None or isinstance(data, bool | int | float | str):
             return {"kind": "primitive", "value": data}
-        if hasattr(data, "_data_type_name"):
+        if isinstance(data, CoreDataClass):
             item_hash = _item_content_hash(data)
             self.put_data(item_hash, data)
             return {
                 "kind": "dataclass",
                 "hash": item_hash,
-                "type": data._data_type_name,  # noqa: SLF001
+                "type": instance_data_type_name(data),
             }
         raise TypeError(
             "FolderCache only supports caching DataClass objects, primitives, and nested lists/tuples containing them"
@@ -393,7 +371,7 @@ class FolderCache(CacheBackend):
         """Write *data* to *path* atomically via temp file + os.replace."""
         # Temp file must match the <hash>.<type>.h5 naming convention
         # expected by DataClass.to_hdf5_file.
-        type_name = data._data_type_name  # noqa: SLF001
+        type_name = instance_data_type_name(data)
         fd, tmp = tempfile.mkstemp(dir=self._root, prefix="tmp_", suffix=f".{type_name}.h5")
         os.close(fd)
         try:

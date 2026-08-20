@@ -10,6 +10,7 @@
 #include <memory>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <unordered_map>
 
@@ -85,8 +86,14 @@ TEST(OrbitalsSbtTest, ActiveInactiveVectorsReflectIndices) {
   auto orbitals = std::make_shared<Orbitals>(
       c, std::nullopt, std::nullopt, basis, spin_index_set(5, {1, 2}, {1, 2}),
       spin_index_set(5, {0}, {0}));
-  auto [active_alpha, active_beta] = orbitals->get_active_space_indices();
-  auto [inactive_alpha, inactive_beta] = orbitals->get_inactive_space_indices();
+  auto active_alpha =
+      spin_channel_indices(orbitals->active_indices(), axes::alpha());
+  auto active_beta =
+      spin_channel_indices(orbitals->active_indices(), axes::beta());
+  auto inactive_alpha =
+      spin_channel_indices(orbitals->inactive_indices(), axes::alpha());
+  auto inactive_beta =
+      spin_channel_indices(orbitals->inactive_indices(), axes::beta());
   EXPECT_EQ(active_alpha, std::vector<size_t>({1, 2}));
   EXPECT_EQ(active_beta, std::vector<size_t>({1, 2}));
   EXPECT_EQ(inactive_alpha, std::vector<size_t>({0}));
