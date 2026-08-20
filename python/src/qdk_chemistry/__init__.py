@@ -147,10 +147,8 @@ def _load_bundled_plugin(plugin_name: str, disable_env_var: str) -> None:
 def _import_plugins() -> None:
     """Import pre-packaged plugins after module initialization."""
     from qdk_chemistry.plugins import _load_plugins  # noqa: PLC0415
-    from qdk_chemistry.remote.cache import _load_plugin_caches  # noqa: PLC0415
 
     _load_plugins()
-    _load_plugin_caches()
     for plugin_name, disable_env_var in _BUNDLED_PLUGIN_AUTOLOAD:
         _load_bundled_plugin(plugin_name, disable_env_var)
 
@@ -227,15 +225,6 @@ def _update_stub_references(stub_file: Path) -> None:
             stub_file.write_text(content, encoding="utf-8")
     except (OSError, PermissionError):
         pass  # Skip files that can't be read/written
-
-
-def __getattr__(name: str):
-    """Load compatibility exports on first access."""
-    if name == "DuplicateRegistrationError":
-        from qdk_chemistry.plugins import DuplicateRegistrationError  # noqa: PLC0415
-
-        return DuplicateRegistrationError
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def _generate_stubs_on_first_import() -> None:

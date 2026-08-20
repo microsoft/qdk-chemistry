@@ -205,7 +205,7 @@ Registration names must be unique within their registry. Registering a second al
 Automatic discovery
 ~~~~~~~~~~~~~~~~~~~
 
-The preferred plugin contract is a :class:`~qdk_chemistry.plugins.base.QdkChemistryPlugin` subclass exposed through the ``qdk_chemistry.plugins`` entry-point group. For example, a plugin package declares this in its ``pyproject.toml``:
+The plugin contract is a :class:`~qdk_chemistry.plugins.base.QdkChemistryPlugin` subclass exposed through the ``qdk_chemistry.plugins`` entry-point group. A plugin package declares this in its ``pyproject.toml``:
 
 .. code-block:: toml
 
@@ -239,15 +239,13 @@ Each plugin-defined ``DataClass`` used in algorithm inputs or outputs must decla
 
 The value returned by ``data_type_name()`` identifies the serialized format during remote and cache deserialization. A canonical loader must declare this static method directly and return a non-empty string. A subclass must declare a unique identifier and register as its own loader. Registration raises ``TypeError`` when the declaration is missing or empty, and :class:`~qdk_chemistry.plugins.DuplicateRegistrationError` when another loader already owns the identifier.
 
-Register these classes explicitly with ``register_dataclass`` or pass them through the ``data_classes`` argument of ``register_algorithm``. Python return annotations are not used for discovery.
-
-The existing direct registration functions, the :class:`~qdk_chemistry.plugins.base.ChemistryPlugin` compatibility alias, and the ``qdk_chemistry.cache_backends`` entry-point group remain supported. New plugin packages should use :class:`~qdk_chemistry.plugins.base.QdkChemistryPlugin` and the unified entry point.
+Register these classes with :meth:`~qdk_chemistry.plugins.base.PluginRegistrar.register_dataclass` or pass them through the ``data_classes`` argument of :meth:`~qdk_chemistry.plugins.base.PluginRegistrar.register_algorithm`. Python return annotations are not used for discovery.
 
 .. rubric:: Naming and call order
 
 An algorithm implementation name must be unique within its algorithm type; remote backend and cache backend names must be unique within their respective registries. Third-party plugins should use package- or organization-prefixed names to avoid collisions with built-in implementations and other plugins.
 
-Registration is first come, first served and does not override an existing name. Core built-ins are registered before external registrations reach each registry. Unified plugin entry points are then called in the order returned by Python's entry-point discovery, followed by supported legacy entry points and bundled optional internal integrations. Calling a registration function directly with an existing name raises :class:`~qdk_chemistry.plugins.DuplicateRegistrationError` and keeps the earlier registration unchanged. During entry-point discovery, QDK/Chemistry catches that exception, emits a ``UserWarning`` identifying the plugin that failed to register, and continues loading other plugins. Because entry-point order can vary between environments, plugins must not rely on discovery order to override another implementation.
+Registration is first come, first served and does not override an existing name. Core built-ins are registered before external registrations reach each registry. Unified plugin entry points are called in the order returned by Python's entry-point discovery, followed by bundled optional integrations. If a plugin reuses an existing name, registration raises :class:`~qdk_chemistry.plugins.DuplicateRegistrationError` and keeps the earlier implementation unchanged. During entry-point discovery, QDK/Chemistry catches that exception, emits a ``UserWarning`` identifying the plugin that failed to register, and continues loading other plugins. Because entry-point order can vary between environments, plugins must not rely on discovery order to override another implementation.
 
 .. _adding-remote-backends:
 

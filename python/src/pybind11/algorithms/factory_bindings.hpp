@@ -178,8 +178,7 @@ Args:
         The instance must implement the required algorithm interface.
 
 Raises:
-  DuplicateRegistrationError: If a name or alias is already registered.
-  RuntimeError: If type validation fails.
+    RuntimeError: If name conflicts exist or type validation fails
 
 Examples:
     >>> def create_custom():
@@ -206,8 +205,7 @@ Args:
     func (callable): Function that returns an algorithm instance
 
 Raises:
-  DuplicateRegistrationError: If a name or alias is already registered.
-  RuntimeError: If type validation fails.
+    RuntimeError: If registration fails due to name conflicts or type validation
 
 )");
   }

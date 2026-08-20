@@ -51,7 +51,7 @@ doxygen: Doxyfile
 	doxygen $(DOXYGEN_OPTIONS) Doxyfile > $(DOXYGEN_DEBUG) 2>&1
 	@echo "** Doxygen XML documentation generated."
 	@echo "** Saved output to $(DOXYGEN_DEBUG)."
-	@count=$$(grep -E -i "(^|[[:space:]])(warning|error):" $(DOXYGEN_DEBUG) | wc -l); \
+	@count=$$(grep -E -i "warning|error" $(DOXYGEN_DEBUG) | wc -l); \
 	echo "** Found $$count warnings/errors in the Doxygen output."
 	@echo
 

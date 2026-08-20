@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import logging
 import pathlib
-import warnings
 from typing import Any
 
 from qdk_chemistry._core import DuplicateRegistrationError as _DuplicateRegistrationError
@@ -124,28 +123,18 @@ def available_caches() -> list[str]:
 
 def _load_plugin_caches() -> None:
     """Auto-discover cache backends from entry points."""
-    from importlib.metadata import entry_points  # noqa: PLC0415
-
-    from qdk_chemistry.plugins import _legacy_cache_entry_point_enabled  # noqa: PLC0415
-
     try:
-        cache_entry_points = entry_points(group="qdk_chemistry.cache_backends")
+        from importlib.metadata import entry_points  # noqa: PLC0415
+
+        eps = entry_points(group="qdk_chemistry.cache_backends")
+        for ep in eps:
+            cls = ep.load()
+            register_cache(ep.name)(cls)
     except Exception:  # noqa: BLE001
         logger.warning("Failed to load cache plugins", exc_info=True)
-        return
 
-    for entry_point in cache_entry_points:
-        if not _legacy_cache_entry_point_enabled(entry_point):
-            continue
-        try:
-            cache_cls = entry_point.load()
-            register_cache(entry_point.name)(cache_cls)
-        except Exception as exc:  # noqa: BLE001
-            warnings.warn(
-                f"Failed to load QDK/Chemistry cache plugin {entry_point.name!r}: {exc}",
-                UserWarning,
-                stacklevel=2,
-            )
+
+_load_plugin_caches()
 
 
 __all__ = [

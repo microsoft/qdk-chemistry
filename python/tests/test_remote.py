@@ -200,7 +200,11 @@ class TestInputSerialization:
             settings={"/": h2_structure, "_": helium},
         )
 
-        assert len({path.name for path in files}) == 5
+        assert {path.name for path in files} == {
+            "manifest.json",
+            f"{h2_structure.content_hash()}.structure.h5",
+            f"{helium.content_hash()}.structure.h5",
+        }
         result = deserialize_inputs(tmp_path / "job")
         for values in (result["settings"], result["kwargs"]):
             np.testing.assert_array_equal(values["/"].get_coordinates(), h2_structure.get_coordinates())
@@ -399,8 +403,7 @@ class TestOutputSerialization:
 
         assert {path.name for path in files} == {
             "manifest.json",
-            "result_item_0.orbitals.h5",
-            "result_item_1.orbitals.h5",
+            f"{sample_orbitals.content_hash()}.orbitals.h5",
         }
         for path in files:
             shutil.copy2(path, destination_dir / path.name)
@@ -529,9 +532,7 @@ def test_worker_executes_transferred_nested_dataclasses(tmp_path, monkeypatch, h
 
     assert {path.name for path in files} == {
         "manifest.json",
-        "setting_0.structure.h5",
-        "arg_0_item_0.structure.h5",
-        "arg_0_item_1.structure.h5",
+        f"{h2_structure.content_hash()}.structure.h5",
     }
     for path in files:
         shutil.copy2(path, input_dir / path.name)

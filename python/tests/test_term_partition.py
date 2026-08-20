@@ -19,7 +19,6 @@ from qdk_chemistry.data import (
     TermPartition,
 )
 from qdk_chemistry.plugins.networkx import QDK_CHEMISTRY_HAS_NETWORKX
-from qdk_chemistry.remote.serialization import deserialize_outputs, serialize_outputs
 from qdk_chemistry.utils.model_hamiltonians import (
     create_heisenberg_hamiltonian,
     create_ising_hamiltonian,
@@ -79,23 +78,6 @@ class TestLayeredPartition:
         """All indices flattens in order."""
         p = LayeredPartition(strategy="x", groups=[[[0, 1], [2]], [[3, 4]]])
         assert p.all_indices() == [0, 1, 2, 3, 4]
-
-
-@pytest.mark.parametrize(
-    "partition",
-    [
-        FlatPartition(strategy="commuting", groups=((0, 1), (2,))),
-        LayeredPartition(strategy="geometry_coloring", groups=(((0,), (1,)), ((2,),))),
-    ],
-)
-def test_remote_round_trip_restores_partition_subtype(tmp_path, partition):
-    """The term-partition loader restores the encoded concrete type."""
-    serialize_outputs(tmp_path, partition)
-
-    restored = deserialize_outputs(tmp_path)
-
-    assert type(restored) is type(partition)
-    assert restored == partition
 
 
 # ---------------------------------------------------------------------------
