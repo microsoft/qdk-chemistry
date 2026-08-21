@@ -1,0 +1,40 @@
+# exachem-gauxc-mpi.patch
+# ----------------------------------------------------------------------------------------------------------------------
+# Let ExaChem's SCF/GauXC glue compile against a GauXC built WITHOUT MPI (GAUXC_ENABLE_MPI=OFF), so we can reuse the
+# GauXC shipped in the qdk-chemistry-runtime base image instead of rebuilding it from source.
+#
+# Verified against ExaChem 45c192e + the base image's GauXC headers:
+#   scf_gauxc.cpp constructs GauXC's runtime env with an MPI communicator
+#   unconditionally (DeviceRuntimeEnvironment(comm, pool) / RuntimeEnvironment(comm)).
+#   GauXC declares those ctors via its own GAUXC_MPI_CODE(...) macro, which
+#   expands to its args only when GAUXC_HAS_MPI is defined (else to nothing).
+#   The base GauXC is MPI-off (gauxc_config.hpp `#undef GAUXC_HAS_MPI`), so the
+#   comm-passing calls don't compile there.
+#   -> Wrap the comm arg(s) in GAUXC_MPI_CODE(...) so the SAME source compiles
+#      against both MPI-on and MPI-off GauXC (macro is in scope transitively).
+#
+# Semantic note: with MPI-off GauXC every rank sees comm_size()==1, so the XC grid is NOT distributed (each rank
+# computes the full VXC). Results are unchanged, and for the coupled-cluster (HF reference) workloads this image targets
+# the GauXC XC integrator is not invoked at run time. Only a DFT / sNK run would lose XC-phase scaling across ranks --
+# an acceptable trade for skipping the GauXC(+CUTLASS) source build and reusing the arch-matched binary.
+#
+# Apply: git -C <exachem-src> apply exachem-gauxc-mpi.patch
+# ----------------------------------------------------------------------------------------------------------------------
+diff --git a/exachem/scf/scf_gauxc.cpp b/exachem/scf/scf_gauxc.cpp
+index 2eb6896..2e8fde7 100644
+--- a/exachem/scf/scf_gauxc.cpp
++++ b/exachem/scf/scf_gauxc.cpp
+@@ -88,10 +88,10 @@ SCFGauxc<T>::setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env,
+   auto lb_exec_space  = exec_space_map.at(xc_space_str);
+   auto int_exec_space = exec_space_map.at(xc_space_str);
+   auto gauxc_rt       = txt_utils::strequal_case(xc_space_str, "device")
+-                          ? GauXC::DeviceRuntimeEnvironment(ec.pg().comm(), gauxc_gpu_pool)
+-                          : GauXC::RuntimeEnvironment(ec.pg().comm());
++                          ? GauXC::DeviceRuntimeEnvironment(GAUXC_MPI_CODE(ec.pg().comm(), ) gauxc_gpu_pool)
++                          : GauXC::RuntimeEnvironment(GAUXC_MPI_CODE(ec.pg().comm()));
+ #else
+-  auto gauxc_rt       = GauXC::RuntimeEnvironment(ec.pg().comm());
++  auto gauxc_rt       = GauXC::RuntimeEnvironment(GAUXC_MPI_CODE(ec.pg().comm()));
+   auto lb_exec_space  = GauXC::ExecutionSpace::Host;
+   auto int_exec_space = GauXC::ExecutionSpace::Host;
+ #endif
