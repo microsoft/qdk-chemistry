@@ -459,7 +459,7 @@ def print_iqpe_settings(
     print("IQPE settings:")
     print(f"  Trial determinants: {problem.trial_state.num_determinants}")
     print(f"  Trial fidelity: {problem.trial_state.fidelity:.12f}")
-    print(f"  Compute qubits: {problem.mapping.num_compute_qubits}")
+    print(f"  Compute qubits: {problem.mapping.qubit_hamiltonian.num_qubits}")
     print("  Readout ancillas: 1")
     print(f"  Phase bits: {problem.num_phase_bits}")
     print(f"  Shots per bit: {problem.shots_per_bit}")
@@ -525,7 +525,7 @@ def run_iqpe_workflow(
     )
     print(
         f"Built {len(problem.iteration_circuits)} IQPE iteration circuits "
-        f"for {problem.mapping.num_compute_qubits} compute qubits."
+        f"for {problem.mapping.qubit_hamiltonian.num_qubits} compute qubits."
     )
     print(
         f"Reference phase: {problem.evolution_time.reference_phase_fraction:.12f}; "

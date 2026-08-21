@@ -10,52 +10,19 @@ verifies the mapped ground-state energy in the fixed-electron-number sector.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 import numpy as np
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Hamiltonian, MajoranaMapping, QubitOperator
+from qdk_chemistry.data import MajoranaMapping, QubitOperator
 from qdk_chemistry.data.symmetry import SymmetryLabel, axes
 from qdk_chemistry.utils import Logger
 from tutorial_choose_active_space import (
     ActiveSpaceResult,
     run_active_space_workflow,
 )
-
-
-@dataclass
-class QubitMappingResult:
-    """Selected-space Hamiltonian and its Jordan--Wigner representation.
-
-    Attributes:
-        active_space_result: Molecular model and gauge-fixed selected orbitals.
-        active_hamiltonian: Fermionic Hamiltonian for the selected orbital space.
-        qubit_hamiltonian: Weighted Pauli representation of the active Hamiltonian.
-        num_active_spatial_orbitals: Selected spatial-orbital count.
-        num_active_spin_orbitals: Twice the spatial count for alpha/beta spin.
-        num_compute_qubits: Qubits in the mapped occupation register.
-        num_pauli_terms: Terms retained by the mapper at its configured threshold.
-        core_energy: Nuclear and frozen-inactive contribution, in Hartree, omitted
-            from the qubit Hamiltonian and added back classically.
-        num_fixed_electron_states: Basis states in the physical alpha/beta sector.
-        mapped_active_energy: Lowest mapped eigenvalue in that sector, in Hartree.
-        mapped_total_energy: Active eigenvalue plus core energy, in Hartree.
-        mapping_energy_difference: Mapped total minus selected-space CASCI energy;
-            this should be zero to numerical precision.
-    """
-
-    active_space_result: ActiveSpaceResult
-    active_hamiltonian: Hamiltonian
-    qubit_hamiltonian: QubitOperator
-    num_active_spatial_orbitals: int
-    num_active_spin_orbitals: int
-    num_compute_qubits: int
-    num_pauli_terms: int
-    core_energy: float
-    num_fixed_electron_states: int
-    mapped_active_energy: float
-    mapped_total_energy: float
-    mapping_energy_difference: float
 
 
 def run_qubit_mapping_workflow() -> QubitMappingResult:
@@ -71,6 +38,7 @@ def run_qubit_mapping_workflow() -> QubitMappingResult:
 
     ################################################################################
     # start-cell-active-hamiltonian
+    # Active-space Hamiltonian
     selected_orbitals = active_space_result.refined_orbitals
     hamiltonian_constructor = create("hamiltonian_constructor", "qdk")
     active_hamiltonian = hamiltonian_constructor.run(selected_orbitals)
@@ -83,6 +51,7 @@ def run_qubit_mapping_workflow() -> QubitMappingResult:
 
     ################################################################################
     # start-cell-count-qubits
+    # Qubit count
     # Count one spin channel to obtain spatial orbitals, then include both spins.
     alpha_channel = SymmetryLabel([axes.alpha()])
     num_active_spatial_orbitals = len(
@@ -94,6 +63,7 @@ def run_qubit_mapping_workflow() -> QubitMappingResult:
 
     ################################################################################
     # start-cell-map-hamiltonian
+    # Jordan-Wigner mapping
     mapping = MajoranaMapping.jordan_wigner(num_modes=num_active_spin_orbitals)
     qubit_mapper = create(
         "qubit_mapper",
@@ -106,12 +76,12 @@ def run_qubit_mapping_workflow() -> QubitMappingResult:
     # The mapper returns a weighted Pauli sum whose string length is the
     # compute-register size.
     num_compute_qubits = qubit_hamiltonian.num_qubits
-    num_pauli_terms = len(qubit_hamiltonian.pauli_strings)
     # end-cell-map-hamiltonian
     ################################################################################
 
     ################################################################################
     # start-cell-validate-mapping
+    # Mapping validation
     num_alpha, num_beta = (
         active_space_result.refined_casci_wavefunction.get_active_num_electrons()
     )
@@ -136,29 +106,96 @@ def run_qubit_mapping_workflow() -> QubitMappingResult:
         :, fixed_electron_basis_indices
     ].toarray()
     mapped_active_energy = float(np.linalg.eigvalsh(fixed_electron_matrix)[0])
-    mapped_total_energy = core_energy + mapped_active_energy
-    mapping_energy_difference = mapped_total_energy - active_space_result.refined_energy
     # end-cell-validate-mapping
     ################################################################################
 
     return QubitMappingResult(
         active_space_result=active_space_result,
-        active_hamiltonian=active_hamiltonian,
         qubit_hamiltonian=qubit_hamiltonian,
-        num_active_spatial_orbitals=num_active_spatial_orbitals,
-        num_active_spin_orbitals=num_active_spin_orbitals,
-        num_compute_qubits=num_compute_qubits,
-        num_pauli_terms=num_pauli_terms,
         core_energy=core_energy,
         num_fixed_electron_states=len(fixed_electron_basis_indices),
         mapped_active_energy=mapped_active_energy,
-        mapped_total_energy=mapped_total_energy,
-        mapping_energy_difference=mapping_energy_difference,
     )
 
 
+def main() -> None:
+    """Run the mapping workflow and print its lab-notebook evidence."""
+    # Change ``off`` to ``info`` to see detailed QDK/Chemistry calculation logs.
+    Logger.set_global_level(Logger.LogLevel.off)
+    result = run_qubit_mapping_workflow()
+    print_qubit_mapping_results(result)
+
+
 ################################################################################
-# start-cell-pauli-preview-helpers
+# Students can stop reading here. The definitions below package mapping results
+# for later chapters and support the compact Pauli-term preview. The final two
+# lines run the student-facing main() function when this file is executed.
+################################################################################
+
+
+@dataclass
+class QubitMappingResult:
+    """Selected-space Hamiltonian and its Jordan--Wigner representation.
+
+    Attributes:
+        active_space_result: Molecular model and gauge-fixed selected orbitals.
+        qubit_hamiltonian: Weighted Pauli representation of the active Hamiltonian.
+        core_energy: Nuclear and frozen-inactive contribution, in Hartree, omitted
+            from the qubit Hamiltonian and added back classically.
+        num_fixed_electron_states: Basis states in the physical alpha/beta sector.
+        mapped_active_energy: Lowest mapped eigenvalue in that sector, in Hartree.
+    """
+
+    active_space_result: ActiveSpaceResult
+    qubit_hamiltonian: QubitOperator
+    core_energy: float
+    num_fixed_electron_states: int
+    mapped_active_energy: float
+
+
+def print_qubit_mapping_results(result: QubitMappingResult) -> None:
+    """Print mapping evidence for the cumulative lab notebook.
+
+    Args:
+        result: Completed mapping workflow.
+    """
+    num_active_spatial_orbitals = len(result.active_space_result.refined_indices)
+    num_active_spin_orbitals = 2 * num_active_spatial_orbitals
+    num_compute_qubits = result.qubit_hamiltonian.num_qubits
+    num_pauli_terms = len(result.qubit_hamiltonian.pauli_strings)
+    mapped_total_energy = result.core_energy + result.mapped_active_energy
+    mapping_energy_difference = (
+        mapped_total_energy - result.active_space_result.refined_energy
+    )
+
+    print(f"Active spatial orbitals: {num_active_spatial_orbitals}")
+    print(f"Active spin orbitals: {num_active_spin_orbitals}")
+    print(f"Predicted Jordan-Wigner compute qubits: {num_active_spin_orbitals}")
+    print(f"Mapped compute qubits: {num_compute_qubits}")
+    print(f"Pauli terms: {num_pauli_terms}")
+    print(f"Fermion mode ordering: {result.qubit_hamiltonian.fermion_mode_order}")
+    print_representative_pauli_terms(result.qubit_hamiltonian)
+
+    num_alpha, num_beta = (
+        result.active_space_result.refined_casci_wavefunction.get_active_num_electrons()
+    )
+    print(
+        f"Fixed-electron-number subspace: {num_alpha} alpha, {num_beta} beta electrons "
+        f"({result.num_fixed_electron_states} basis states)"
+    )
+    print(
+        f"Core energy stored outside the qubit Hamiltonian: {result.core_energy:.12f} Hartree"
+    )
+    print(
+        f"Mapped active-space ground-state energy: {result.mapped_active_energy:.12f} Hartree"
+    )
+    print(f"Mapped selected-space total energy: {mapped_total_energy:.12f} Hartree")
+    print(
+        f"CASCI algorithmic reference: {result.active_space_result.refined_energy:.12f} Hartree"
+    )
+    print(f"Mapping validation difference: {mapping_energy_difference:.3e} Hartree")
+
+
 def format_pauli_string(pauli_string: str) -> str:
     """Format one QDK Pauli label with explicit qubit indices.
 
@@ -233,10 +270,6 @@ def representative_pauli_terms(
         + diagonal_terms[:num_diagonal_terms]
         + off_diagonal_terms[:num_off_diagonal_terms]
     )
-    # end-cell-pauli-preview-helpers
-
-
-################################################################################
 
 
 def print_representative_pauli_terms(qubit_operator: QubitOperator) -> None:
@@ -280,56 +313,6 @@ def print_representative_pauli_terms(qubit_operator: QubitOperator) -> None:
                 )
             print(f"    {coefficient_text} * {format_pauli_string(pauli_string)}")
     print(f"  ... {len(qubit_operator.pauli_strings) - len(terms)} additional terms")
-
-
-def print_qubit_mapping_results(result: QubitMappingResult) -> None:
-    """Print mapping evidence for the cumulative lab notebook.
-
-    Args:
-        result: Completed mapping workflow.
-    """
-    print(f"Active spatial orbitals: {result.num_active_spatial_orbitals}")
-    print(f"Active spin orbitals: {result.num_active_spin_orbitals}")
-    print(f"Predicted Jordan-Wigner compute qubits: {result.num_active_spin_orbitals}")
-    print(f"Mapped compute qubits: {result.num_compute_qubits}")
-    print(f"Pauli terms: {result.num_pauli_terms}")
-    print(f"Fermion mode ordering: {result.qubit_hamiltonian.fermion_mode_order}")
-    print_representative_pauli_terms(result.qubit_hamiltonian)
-
-    ################################################################################
-    # start-cell-core-energy
-    num_alpha, num_beta = (
-        result.active_space_result.refined_casci_wavefunction.get_active_num_electrons()
-    )
-    print(
-        f"Fixed-electron-number subspace: {num_alpha} alpha, {num_beta} beta electrons "
-        f"({result.num_fixed_electron_states} basis states)"
-    )
-    print(
-        f"Core energy stored outside the qubit Hamiltonian: {result.core_energy:.12f} Hartree"
-    )
-    print(
-        f"Mapped active-space ground-state energy: {result.mapped_active_energy:.12f} Hartree"
-    )
-    print(
-        f"Mapped selected-space total energy: {result.mapped_total_energy:.12f} Hartree"
-    )
-    print(
-        f"CASCI algorithmic reference: {result.active_space_result.refined_energy:.12f} Hartree"
-    )
-    print(
-        f"Mapping validation difference: {result.mapping_energy_difference:.3e} Hartree"
-    )
-    # end-cell-core-energy
-    ################################################################################
-
-
-def main() -> None:
-    """Run the mapping workflow and print its lab-notebook evidence."""
-    # Change ``off`` to ``info`` to see detailed QDK/Chemistry calculation logs.
-    Logger.set_global_level(Logger.LogLevel.off)
-    result = run_qubit_mapping_workflow()
-    print_qubit_mapping_results(result)
 
 
 if __name__ == "__main__":

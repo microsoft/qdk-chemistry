@@ -50,10 +50,10 @@ def run_active_space_workflow() -> ActiveSpaceResult:
         gauge-fixed selected orbitals needed by mapping, state
         preparation, and visualization.
     """
-    # Hartree-Fock reference
     ################################################################################
     # docs:xyz ../data/tutorial_stretched_n2.structure.xyz
     # start-cell-hartree-fock
+    # Hartree-Fock reference
     structure = create_stretched_n2_structure()
     charge = 0
     spin_multiplicity = 1
@@ -69,9 +69,9 @@ def run_active_space_workflow() -> ActiveSpaceResult:
     # end-cell-hartree-fock
     ################################################################################
 
-    # Initial valence space
     ################################################################################
     # start-cell-valence-space
+    # Initial valence space
     num_valence_electrons, num_valence_orbitals = compute_valence_space_parameters(
         hartree_fock_wavefunction, charge
     )
@@ -95,9 +95,9 @@ def run_active_space_workflow() -> ActiveSpaceResult:
     # end-cell-valence-space
     ################################################################################
 
-    # Initial valence-space CASCI
     ################################################################################
     # start-cell-initial-casci
+    # Initial valence-space CASCI
     hamiltonian_constructor = create("hamiltonian_constructor")
     casci_solver = create(
         "multi_configuration_calculator",
@@ -122,9 +122,9 @@ def run_active_space_workflow() -> ActiveSpaceResult:
     # end-cell-initial-casci
     ################################################################################
 
-    # Natural orbitals
     ################################################################################
     # start-cell-natural-orbitals
+    # Natural orbitals
     # Rotate the valence orbitals using the CASCI one-particle RDM so each
     # natural orbital has a well-defined correlated occupation.
     natural_orbital_localizer = create("orbital_localizer", "qdk_natural_orbitals")
@@ -153,9 +153,9 @@ def run_active_space_workflow() -> ActiveSpaceResult:
     # end-cell-natural-orbitals
     ################################################################################
 
-    # Active-space refinement and gauge fixing
     ################################################################################
     # start-cell-refine
+    # Active-space refinement and gauge fixing
     # autoCAS uses the RDM-derived orbital entropies to retain the orbitals that
     # carry the strongest correlation in a smaller active space.
     autocas_selector = create("active_space_selector", "qdk_autocas_eos")
@@ -204,9 +204,9 @@ def run_active_space_workflow() -> ActiveSpaceResult:
     # end-cell-refine
     ################################################################################
 
-    # Selected-space CASCI
     ################################################################################
     # start-cell-final-casci
+    # Selected-space CASCI
     refined_hamiltonian = hamiltonian_constructor.run(refined_orbitals)
     refined_energy, refined_casci_wavefunction = casci_solver.run(
         refined_hamiltonian,

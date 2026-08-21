@@ -311,24 +311,23 @@ def test_tutorial_map_n2_to_qubits_results():
 
     result = tutorial_module.run_qubit_mapping_workflow()
     assert result.active_space_result.refined_indices == list(range(4, 10))
-    assert result.num_active_spatial_orbitals == 6
-    assert result.num_active_spin_orbitals == 12
-    assert result.num_compute_qubits == 12
-    assert result.num_pauli_terms == len(result.qubit_hamiltonian.pauli_strings) > 0
+    assert len(result.active_space_result.refined_indices) == 6
+    assert result.qubit_hamiltonian.num_qubits == 12
+    assert len(result.qubit_hamiltonian.pauli_strings) > 0
     assert result.qubit_hamiltonian.encoding == "jordan-wigner"
     assert result.qubit_hamiltonian.fermion_mode_order.value == "blocked"
     assert result.num_fixed_electron_states == 400
-    assert abs(result.mapped_total_energy - result.active_space_result.refined_energy) < 1e-10
-    assert abs(result.mapping_energy_difference) < 1e-10
+    mapped_total_energy = result.core_energy + result.mapped_active_energy
+    assert abs(mapped_total_energy - result.active_space_result.refined_energy) < 1e-10
 
     if _RUN_TUTORIAL_SNAPSHOTS:
-        assert result.num_pauli_terms == 247
+        assert len(result.qubit_hamiltonian.pauli_strings) == 247
         assert abs(result.core_energy - (-99.117775726922)) < 1e-7
         assert abs(result.mapped_active_energy - (-9.653276065987)) < 1e-7
 
     preview_terms = tutorial_module.representative_pauli_terms(result.qubit_hamiltonian)
     assert len(preview_terms) == 8
-    assert preview_terms[0][0] == "I" * result.num_compute_qubits
+    assert preview_terms[0][0] == "I" * result.qubit_hamiltonian.num_qubits
     assert all(set(pauli_string).issubset({"I", "Z"}) for pauli_string, _ in preview_terms[1:4])
     assert all("X" in pauli_string or "Y" in pauli_string for pauli_string, _ in preview_terms[4:])
     assert tutorial_module.format_pauli_string("IXYI") == "Y(qubit 1) X(qubit 2)"
@@ -405,7 +404,7 @@ def test_tutorial_run_iqpe_configuration(capsys):
             problem.mapping.qubit_hamiltonian,
             0.0,
         )
-    assert problem.mapping.num_compute_qubits == 12
+    assert problem.mapping.qubit_hamiltonian.num_qubits == 12
     assert problem.trial_state.num_determinants == 4
     assert 0.0 < problem.trial_state.fidelity < 1.0
     assert problem.num_phase_bits == 6
@@ -425,7 +424,7 @@ def test_tutorial_run_iqpe_configuration(capsys):
     phase_converter = PauliProductFormulaContainer(
         step_terms=[],
         step_reps=1,
-        num_qubits=problem.mapping.num_compute_qubits,
+        num_qubits=problem.mapping.qubit_hamiltonian.num_qubits,
         scale=problem.evolution_time.time_hartree_inverse,
     )
     assert (
