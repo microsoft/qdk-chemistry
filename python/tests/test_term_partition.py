@@ -135,7 +135,7 @@ class TestTermGrouperRegistry:
     @pytest.mark.parametrize("strategy", ["commuting", "qubit_wise_commuting", "identity", "vacuum_annihilating"])
     def test_returns_new_hamiltonian_with_partition(self, strategy):
         """Returns new hamiltonian with partition."""
-        qh = QubitOperator(["XX", "YY", "ZZ"], np.array([1.0, 2.0, 3.0]))
+        qh = QubitOperator(["XX", "YY", "ZZ"], np.array([1.0, 1.0, 3.0]))
         grouper = registry.create("term_grouper", strategy)
         out = grouper.run(qh)
         assert out is not qh
@@ -145,8 +145,8 @@ class TestTermGrouperRegistry:
     def test_partition_indices_cover_all_terms_exactly_once(self):
         """Partition indices cover all terms exactly once."""
         qh = QubitOperator(
-            ["XIII", "IXII", "IIXI", "IIIX", "ZIII", "IZII"],
-            np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]),
+            ["XXII", "YYII", "IIXX", "IIYY", "ZIII", "IZII"],
+            np.array([0.5, 0.5, 0.25, 0.25, 0.5, 0.6]),
         )
         for strategy in ("commuting", "qubit_wise_commuting", "identity", "vacuum_annihilating"):
             grouper = registry.create("term_grouper", strategy)
@@ -166,7 +166,7 @@ class TestTermGrouperRegistry:
         """Grouping touches neither the qubits nor the mapped sector, so metadata must carry over."""
         qh = QubitOperator(
             ["XX", "YY", "ZZ"],
-            np.array([1.0, 2.0, 3.0]),
+            np.array([1.0, 1.0, 3.0]),
             encoding="jordan-wigner",
             fermion_mode_order="blocked",
         )
@@ -179,7 +179,7 @@ class TestTermGrouperRegistry:
         """Grouping changes neither the qubits nor the mapped sector."""
         qh = QubitOperator(
             ["XX", "YY", "ZZ"],
-            np.array([1.0, 2.0, 3.0]),
+            np.array([1.0, 1.0, 3.0]),
             tapering=TaperingSpecification(qubit_indices=(3, 1), eigenvalues=(1, -1)),
         )
         out = registry.create("term_grouper", "vacuum_annihilating").run(qh)
@@ -223,15 +223,15 @@ class TestVacuumAnnihilatingTermGrouper:
 
     def test_terms_flipping_different_qubits_are_separated(self):
         """Terms flipping different qubits cannot cancel each other on |0...0>."""
-        qh = QubitOperator(["XIII", "IIXI"], np.array([1.0, 1.0]))
+        qh = QubitOperator(["XXII", "YYII", "IIXX", "IIYY"], np.array([1.0, 1.0, 1.0, 1.0]))
         out = registry.create("term_grouper", "vacuum_annihilating").run(qh)
-        assert out.term_partition.num_groups == 2
+        assert out.term_partition.groups == ((0, 1), (2, 3))
 
     def test_same_support_with_odd_y_parity_is_separated(self):
         """X and Y flip the same qubit but anticommute, so they cannot share a group."""
-        qh = QubitOperator(["IX", "IY"], np.array([1.0, 1.0]))
+        qh = QubitOperator(["IX", "IX", "IY", "IY"], np.array([1.0, -1.0, 1.0, -1.0]))
         out = registry.create("term_grouper", "vacuum_annihilating").run(qh)
-        assert out.term_partition.num_groups == 2
+        assert out.term_partition.groups == ((0, 1), (2, 3))
 
     def test_each_group_annihilates_the_zero_state(self):
         """Every group of a |0...0>-annihilating operator annihilates it too."""
@@ -253,7 +253,7 @@ class TestVacuumAnnihilatingTermGrouper:
         """Members of a group flip the same qubits with the same Y parity, hence commute."""
         qh = QubitOperator(
             ["XXXX", "YYXX", "XXYY", "YYYY", "XYXY", "YXYX"],
-            np.array([0.25, 0.25, 0.25, -0.25, 0.25, 0.25]),
+            np.array([0.25, 0.25, 0.25, 0.25, 0.25, -0.25]),
         )
         out = registry.create("term_grouper", "vacuum_annihilating").run(qh)
 
@@ -269,19 +269,34 @@ class TestVacuumAnnihilatingTermGrouper:
 
         assert out.term_partition.groups == ((0, 1), (2, 3))
 
-    def test_terms_that_cannot_cancel_are_left_in_their_own_group(self):
+    def test_terms_that_cannot_cancel_raise(self):
         """Unbalanced coefficients leave a remainder that no grouping can annihilate."""
         qh = QubitOperator(["XX", "YY", "XX"], np.array([0.5, 0.5, 0.25]))
+
+        with pytest.raises(ValueError, match="uncancelled vacuum amplitude"):
+            registry.create("term_grouper", "vacuum_annihilating").run(qh)
+
+    def test_diagonal_group_may_leave_a_vacuum_phase(self):
+        """Diagonal terms only phase the vacuum, which a consumer can correct for."""
+        qh = QubitOperator(["ZI", "IZ", "II"], np.array([0.5, 0.5, 3.0]))
         out = registry.create("term_grouper", "vacuum_annihilating").run(qh)
 
-        assert out.term_partition.groups == ((0, 1), (2,))
+        assert out.term_partition.groups == ((0, 1, 2),)
+
+    @pytest.mark.parametrize("coefficients", [[0.5, 0.5j], [0.5, np.inf], [0.5, np.nan]])
+    def test_non_real_or_non_finite_coefficients_raise(self, coefficients):
+        """Vacuum amplitudes are compared against a real tolerance."""
+        qh = QubitOperator(["XX", "YY"], np.array(coefficients))
+
+        with pytest.raises(ValueError, match="finite, real coefficients"):
+            registry.create("term_grouper", "vacuum_annihilating").run(qh)
 
     def test_tolerance_is_configurable(self):
         """``tolerance`` decides how exactly the coefficients have to cancel."""
         qh = QubitOperator(["XX", "YY", "XX", "YY"], np.array([0.5, 0.5 + 1e-7, 0.25, 0.25]))
 
-        strict = registry.create("term_grouper", "vacuum_annihilating")
-        assert strict.run(qh).term_partition.groups == ((0, 1, 2, 3),)
+        with pytest.raises(ValueError, match="uncancelled vacuum amplitude"):
+            registry.create("term_grouper", "vacuum_annihilating").run(qh)
 
         tolerant = registry.create("term_grouper", "vacuum_annihilating", tolerance=1e-6)
         assert tolerant.run(qh).term_partition.groups == ((0, 1), (2, 3))
@@ -289,13 +304,13 @@ class TestVacuumAnnihilatingTermGrouper:
     def test_group_order_is_deterministic_with_the_diagonal_group_first(self):
         """Group order drives the Trotter sequence, so it must not depend on dict ordering."""
         qh = QubitOperator(
-            ["IIXI", "IZII", "XIII", "IIXI", "IIII"],
-            np.array([1.0, 2.0, 3.0, 4.0, 5.0]),
+            ["IIXI", "IZII", "XIII", "IIXI", "IIII", "XIII"],
+            np.array([1.0, 2.0, 3.0, -1.0, 5.0, -3.0]),
         )
         out = registry.create("term_grouper", "vacuum_annihilating").run(qh)
 
         # Diagonal (I/Z-only) terms first, then the remaining groups by first member index.
-        assert out.term_partition.groups == ((1, 4), (0, 3), (2,))
+        assert out.term_partition.groups == ((1, 4), (0, 3), (2, 5))
 
     def test_input_operator_is_not_mutated(self):
         """The grouper returns a new operator and leaves the input untouched."""

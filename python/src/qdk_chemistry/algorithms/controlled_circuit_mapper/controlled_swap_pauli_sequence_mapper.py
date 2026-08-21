@@ -113,7 +113,7 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
     and :math:`E_0 = \langle 0\ldots0|H|0\ldots0\rangle`.  Only the diagonal (:math:`I`/:math:`Z`)
     terms of the product formula contribute, so :math:`\varphi_0` is known classically and is
     cancelled by an :math:`R_1(\varphi_0)` on the control.  The circuit is then a genuine
-    :math:`C\text{-}U` up to a global phase for any :math:`E_0`, sector-tapered encodings included.
+    :math:`C\text{-}U` up to a global phase for any :math:`E_0`.
 
     **Grouping requirement.** The vacuum must stay an eigenstate, which is what particle
     conservation buys: :math:`H` cannot connect :math:`|0\ldots0\rangle` to any other occupation

@@ -74,6 +74,19 @@ class TestPauliProductFormulaContainer:
         with pytest.raises(ValueError, match="step_reps must be a positive integer"):
             PauliProductFormulaContainer(step_terms=step_terms, step_reps=step_reps, num_qubits=2)
 
+    @pytest.mark.parametrize("step_reps", [1.5, 2.0, True, "2", None])
+    def test_non_integer_step_reps_raises(self, step_terms, step_reps):
+        """A repetition count that is not an integer would only fail later, inside Q#."""
+        with pytest.raises(TypeError, match="step_reps must be an integer"):
+            PauliProductFormulaContainer(step_terms=step_terms, step_reps=step_reps, num_qubits=2)
+
+    def test_numpy_integer_step_reps_is_normalised(self, step_terms):
+        """Integers read back from HDF5 attributes are numpy scalars."""
+        container = PauliProductFormulaContainer(step_terms=step_terms, step_reps=np.int64(3), num_qubits=2)
+
+        assert container.step_reps == 3
+        assert isinstance(container.step_reps, int)
+
     def test_update_ordering(self, container):
         """Test setting a new valid evolution ordering."""
         updated_container = container.reorder_terms([1, 2, 0])

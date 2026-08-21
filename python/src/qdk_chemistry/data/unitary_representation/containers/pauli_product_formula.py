@@ -79,14 +79,18 @@ class PauliProductFormulaContainer(UnitaryContainer):
             scale: The evolution time used for eigenvalue-phase conversion.
 
         Raises:
+            TypeError: If ``step_reps`` is not an integer.
             ValueError: If ``step_reps`` is not positive.
 
         """
+        # bool is an int subclass, but True as a repetition count is always a mistake.
+        if isinstance(step_reps, bool) or not isinstance(step_reps, int | np.integer):
+            raise TypeError(f"step_reps must be an integer, got {type(step_reps).__name__}.")
         if step_reps <= 0:
             raise ValueError(f"step_reps must be a positive integer, got {step_reps}.")
 
         self.step_terms = step_terms
-        self.step_reps = step_reps
+        self.step_reps = int(step_reps)
         self._num_qubits = num_qubits
         self.scale = scale
         super().__init__()

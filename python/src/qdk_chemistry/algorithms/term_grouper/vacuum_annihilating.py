@@ -21,6 +21,8 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
+
 from qdk_chemistry.algorithms.term_grouper.base import TermGrouper, TermGrouperSettings
 from qdk_chemistry.data import FlatPartition, QubitOperator
 
@@ -58,9 +60,10 @@ class VacuumAnnihilatingTermGrouper(TermGrouper):
 
         \sum_{j \in g} c_j\, P_j\, |0\ldots0\rangle = 0 .
 
-    Terms left over at the end of a flipped-qubit set cannot cancel and are emitted as their own
-    group; diagonal (:math:`I`/:math:`Z`) strings never move the vacuum and form a single group
-    that only phases it.
+    Terms left over at the end of a flipped-qubit set cannot cancel, so the operator does not
+    annihilate the vacuum and grouping fails with a :class:`ValueError`.  Diagonal
+    (:math:`I`/:math:`Z`) strings never move the vacuum and form a single group that only phases
+    it, which a consumer can correct for, so their sum is left unconstrained.
 
     Groups are additionally restricted to a single :math:`Y`-count parity, which makes their
     members commute: two strings sharing a flipped-qubit set disagree only inside it, on
@@ -93,17 +96,29 @@ class VacuumAnnihilatingTermGrouper(TermGrouper):
         Returns:
             QubitOperator: New instance with a ``FlatPartition`` (strategy ``"vacuum_annihilating"``).
 
+        Raises:
+            ValueError: If a coefficient is not a finite real number.
+            ValueError: If terms flipping the same qubits do not cancel on the vacuum.
+
         """
         tolerance = self._settings.get("tolerance")
         flipped_qubits = str.maketrans("IXYZ", "0110")
 
-        buckets: dict[tuple[int, int], list[tuple[int, complex]]] = {}
+        coefficients = np.asarray(qubit_hamiltonian.coefficients)
+        if np.any(np.iscomplex(coefficients)) or not np.all(np.isfinite(coefficients)):
+            raise ValueError(
+                "VacuumAnnihilatingTermGrouper requires finite, real coefficients, since vacuum "
+                "amplitudes are compared against a real cancellation tolerance."
+            )
+
+        buckets: dict[tuple[int, int], list[tuple[int, float]]] = {}
         for index, label in enumerate(qubit_hamiltonian.pauli_strings):
             # Labels follow the Qiskit convention: the rightmost character is qubit 0.
             flipped = int(label.translate(flipped_qubits), 2)
             n_y = label.count("Y")
             # Same-support strings anticommute exactly when their Y counts differ in parity.
-            amplitude = complex(qubit_hamiltonian.coefficients[index]) * 1j**n_y
+            # Within one parity i^{n_Y} is a common factor of 1 or i times this sign.
+            amplitude = float(coefficients[index].real) * (-1) ** (n_y // 2)
             buckets.setdefault((flipped, n_y % 2), []).append((index, amplitude))
 
         diagonal: tuple[int, ...] = ()
@@ -113,17 +128,22 @@ class VacuumAnnihilatingTermGrouper(TermGrouper):
                 diagonal = tuple(index for index, _ in entries)
                 continue
             current: list[int] = []
-            pending: list[complex] = []
+            pending: list[float] = []
             for index, amplitude in entries:
                 current.append(index)
                 pending.append(amplitude)
                 # Resummed rather than accumulated so badly scaled coefficients still cancel exactly.
-                total = complex(math.fsum(c.real for c in pending), math.fsum(c.imag for c in pending))
-                if abs(total) <= tolerance:
+                if abs(math.fsum(pending)) <= tolerance:
                     groups.append(tuple(current))
                     current, pending = [], []
             if current:
-                groups.append(tuple(current))
+                qubits = [qubit for qubit in range(flipped.bit_length()) if flipped >> qubit & 1]
+                raise ValueError(
+                    f"VacuumAnnihilatingTermGrouper cannot group terms {current}: they flip qubits "
+                    f"{qubits} and leave an uncancelled vacuum amplitude of {math.fsum(pending):.3g}. "
+                    "The Hamiltonian does not annihilate |0...0> in this encoding, so no ordering of "
+                    "its Pauli strings preserves the vacuum under Trotterisation."
+                )
 
         ordered = ([diagonal] if diagonal else []) + sorted(groups, key=lambda group: group[0])
         partition = FlatPartition(strategy="vacuum_annihilating", groups=tuple(ordered))

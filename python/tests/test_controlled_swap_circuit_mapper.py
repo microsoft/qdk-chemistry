@@ -19,7 +19,7 @@ from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_swap_pauli_se
     ControlledSwapPauliSequenceMapper,
     _vacuum_eigenphase,
 )
-from qdk_chemistry.data import LatticeGraph, MajoranaMapping, QubitOperator, TaperingSpecification
+from qdk_chemistry.data import LatticeGraph, MajoranaMapping, QubitOperator, Symmetries
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
@@ -488,31 +488,18 @@ class TestVacuumAnnihilatingGroupingEndToEnd:
             rtol=float_comparison_relative_tolerance,
         )
 
-    def test_transverse_field_ising_is_rejected(self, cswap_mapper):
-        """A TFIM does not conserve particle number, so its evolution rotates the vacuum out."""
+    def test_transverse_field_ising_is_rejected(self):
+        """A TFIM does not conserve particle number, so its X terms have nothing to cancel against."""
         hamiltonian = create_ising_hamiltonian(LatticeGraph.chain(4, periodic=False), j=1.0, h=0.5)
-        grouped = registry.create("term_grouper", "vacuum_annihilating").run(hamiltonian)
 
-        trotter = registry.create("hamiltonian_unitary_builder", "trotter")
-        trotter.settings().update({"order": 1, "num_divisions": 1, "time": 0.5})
-
-        with pytest.raises(ValueError, match="vacuum-preserving product formula"):
-            cswap_mapper.run(trotter.run(grouped))
+        with pytest.raises(ValueError, match="uncancelled vacuum amplitude"):
+            registry.create("term_grouper", "vacuum_annihilating").run(hamiltonian)
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
-    def test_cswap_circuit_from_tapered_hamiltonian_is_a_controlled_unitary(self, cswap_mapper):
-        r"""A tapered (SCBK-style) Hamiltonian keeps its metadata and its vacuum phase corrected.
-
-        Sector tapering leaves a constant behind, so :math:`E_0 \ne 0` and the :math:`|0\rangle`
-        branch acquires a phase the mapper has to cancel.
-        """
-        hamiltonian = QubitOperator(
-            ["ZI", "IZ", "II"],
-            np.array([0.5, 0.5, 3.0]),
-            tapering=TaperingSpecification(qubit_indices=(2, 3), eigenvalues=(1, -1)),
-        )
+    def test_nonzero_vacuum_energy_still_yields_a_controlled_unitary(self, cswap_mapper):
+        r"""An operator with :math:`E_0 \ne 0` phases the :math:`|0\rangle` branch, which the mapper cancels."""
+        hamiltonian = QubitOperator(["ZI", "IZ", "II"], np.array([0.5, 0.5, 3.0]))
         grouped = registry.create("term_grouper", "vacuum_annihilating").run(hamiltonian)
-        assert grouped.tapering == hamiltonian.tapering
 
         trotter = registry.create("hamiltonian_unitary_builder", "trotter")
         trotter.settings().update({"order": 1, "num_divisions": 1, "time": 0.5})
@@ -531,6 +518,21 @@ class TestVacuumAnnihilatingGroupingEndToEnd:
             atol=float_comparison_absolute_tolerance,
             rtol=float_comparison_relative_tolerance,
         )
+
+    def test_symmetry_conserving_bravyi_kitaev_is_rejected(self):
+        """Qubit tapering moves the reference off |0...0>, so the CSWAP sandwich does not apply.
+
+        SCBK fixes the symmetry sectors and drops the corresponding qubits, so the all-zero state
+        of the tapered register is an occupation-number state inside the retained sector rather
+        than the fermionic vacuum, and the Hamiltonian connects it to other states.
+        """
+        hamiltonian = create_nontrivial_test_hamiltonian()
+        num_spin_orbitals = 2 * hamiltonian.get_one_body_integrals()[0].shape[0]
+        mapping = MajoranaMapping.symmetry_conserving_bravyi_kitaev(num_spin_orbitals, Symmetries(1, 1))
+        qubit_hamiltonian = registry.create("qubit_mapper", "qdk").run(hamiltonian, mapping)
+
+        with pytest.raises(ValueError, match="uncancelled vacuum amplitude"):
+            registry.create("term_grouper", "vacuum_annihilating").run(qubit_hamiltonian)
 
 
 class TestVacuumAnnihilatingAcrossFermionToQubitMappings:

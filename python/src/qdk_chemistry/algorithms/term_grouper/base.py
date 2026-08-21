@@ -10,7 +10,7 @@ from abc import abstractmethod
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import QubitOperator, Settings
 
-__all__ = ["TermGrouper", "TermGrouperFactory"]
+__all__ = ["TermGrouper", "TermGrouperFactory", "TermGrouperSettings"]
 
 
 class TermGrouperSettings(Settings):
