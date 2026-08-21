@@ -123,7 +123,7 @@ echo "==> HDF5: cflags='${HDF5_CFLAGS}' libs='${HDF5_LIBS}'"
 # TAMM's CMSB superbuild always tries find_package(Eigen3 CONFIG) first and only clones its own copy (from
 # gitlab.com) if that fails. Ubuntu's apt-installed libeigen3-dev isn't always on CMake's default CONFIG search
 # path, so point at it explicitly -- this also avoids depending on gitlab.com being reachable from CI runners.
-EIGEN3_CONFIG="$(find /usr -maxdepth 6 -name 'Eigen3Config.cmake' 2>/dev/null | head -1)"
+EIGEN3_CONFIG="$(find /usr -maxdepth 6 -name 'Eigen3Config.cmake' -print -quit 2>/dev/null || true)"
 if [ -z "${EIGEN3_CONFIG}" ]; then
   echo "ERROR: Eigen3Config.cmake not found under /usr (expected from apt's libeigen3-dev)." >&2
   exit 1
