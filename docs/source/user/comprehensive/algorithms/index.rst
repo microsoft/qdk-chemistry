@@ -15,6 +15,7 @@ All algorithms follow a :doc:`factory pattern <factory_pattern>` design, allowin
    expectation_estimator
    hamiltonian_constructor
    localizer
+   orbital_optimizer
    mc_calculator
    mcscf
    pmc
@@ -52,6 +53,9 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
    * - :doc:`OrbitalLocalizer <localizer>`
      - Orbital transformations
      - Orbitals → Orbitals
+   * - :doc:`OrbitalOptimizer <orbital_optimizer>`
+     - Objective-driven orbital proposals that may change subspace projectors
+     - Wavefunction → Orbitals
    * - :doc:`ActiveSpaceSelector <active_space>`
      - Active space identification
      - Wavefunction → Wavefunction

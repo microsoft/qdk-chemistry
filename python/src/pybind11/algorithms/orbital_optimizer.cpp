@@ -45,10 +45,10 @@ Orbital optimizers may rotate orbitals across inactive, active, and virtual
 subspace boundaries. Concrete implementations define the objective and allowed
 rotation blocks.
 
-The input is a correlated :class:`Wavefunction` (the objective depends on its
-density matrices), but the result carries rotated :class:`Orbitals`, not a
-wavefunction. The rotated orbitals are a proposal that must be re-solved in the
-new basis.
+The input is a correlated :class:`~qdk_chemistry.data.Wavefunction` (the
+objective depends on its density matrices), but the result carries rotated
+:class:`~qdk_chemistry.data.Orbitals`, not a wavefunction. The rotated orbitals
+are a proposal that must be re-solved in the new basis.
 )");
 
   optimizer.def(py::init<>());
