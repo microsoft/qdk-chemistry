@@ -239,11 +239,11 @@ def basis_to_pyscf_mol(basis: BasisSet, charge: int = 0, multiplicity: int = 1) 
         ecp_name = basis.get_ecp_name()
         ecp_electrons = basis.get_ecp_electrons()
         ecp_dict = {}
-        atom_indices_by_element: dict[str, list[int]] = {}
+        named_ecp_indices_by_element: dict[str, list[int]] = {}
         for iatm, element in enumerate(elements):
-            atom_indices_by_element.setdefault(element, []).append(iatm)
+            named_ecp_indices_by_element.setdefault(element, []).append(iatm)
 
-        for element, atom_indices in atom_indices_by_element.items():
+        for element, atom_indices in named_ecp_indices_by_element.items():
             element_ecp_electrons = [ecp_electrons[iatm] for iatm in atom_indices]
             if element_ecp_electrons[0] > 0 and all(
                 ncore == element_ecp_electrons[0] for ncore in element_ecp_electrons
