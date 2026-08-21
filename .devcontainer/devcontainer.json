@@ -74,4 +74,3 @@
     "postCreateCommand": "bash .devcontainer/scripts/post_create.sh",
     "remoteUser": "vscode"
 }
-
