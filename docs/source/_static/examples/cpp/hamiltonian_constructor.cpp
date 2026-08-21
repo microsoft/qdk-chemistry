@@ -61,9 +61,15 @@ std::cout << hamiltonian->get_summary() << std::endl;
 // --------------------------------------------------------------------------------------------
 // start-cell-x2c
 // Build a spin-free one-electron X2C Hamiltonian from all-electron orbitals.
-auto x2c_constructor = HamiltonianConstructorFactory::create("qdk_x2c");
-x2c_constructor->settings().set("xuncontract", true);
+auto x2c_constructor = HamiltonianConstructorFactory::create("qdk");
+x2c_constructor->settings().set("integral_dressing", "x2c_1e");
 auto x2c_hamiltonian = x2c_constructor->run(orbitals);
+
+// The same integral dressing can be combined with Cholesky storage.
+auto x2c_cholesky_constructor =
+    HamiltonianConstructorFactory::create("qdk_cholesky");
+x2c_cholesky_constructor->settings().set("integral_dressing", "x2c_1e");
+auto x2c_cholesky_hamiltonian = x2c_cholesky_constructor->run(orbitals);
 // end-cell-x2c
 // --------------------------------------------------------------------------------------------
 

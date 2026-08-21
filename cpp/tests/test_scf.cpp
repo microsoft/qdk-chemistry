@@ -84,6 +84,14 @@ TEST_F(ScfTest, Factory) {
   auto test_scf = ScfSolverFactory::create("test_scf");
 }
 
+TEST_F(ScfTest, RejectsHamiltonianIntegralDressing) {
+  for (const std::string solver_name : {"qdk", "qdk_stabilized"}) {
+    auto solver = ScfSolverFactory::create(solver_name);
+    EXPECT_THROW(solver->settings().set("integral_dressing", "x2c_1e"),
+                 SettingNotFound);
+  }
+}
+
 TEST_F(ScfTest, StabilizedScfSolverPassthrough) {
   auto water = testing::create_water_structure();
   auto regular_scf_solver = ScfSolverFactory::create("qdk");

@@ -15,11 +15,53 @@
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
+#include "scalar_relativistic_hamiltonian.hpp"
 #include "utils.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
 
 namespace qcs = qdk::chemistry::scf;
+
+std::pair<std::shared_ptr<qcs::BasisSet>, Eigen::MatrixXd>
+detail::build_one_body_ao(const data::BasisSet& basis_set,
+                          const std::string& integral_dressing) {
+  const bool use_x2c =
+      integral_dressing == "x2c_1e" || integral_dressing == "x2c_1e_contracted";
+  if (use_x2c &&
+      basis_set.get_atomic_orbital_type() == data::AOType::Cartesian) {
+    throw std::invalid_argument("X2C-1e currently supports spherical AOs only");
+  }
+
+  auto internal_basis_set =
+      utils::microsoft::convert_basis_set_from_qdk(basis_set);
+  const auto mpi = qcs::mpi_default_input();
+
+  if (use_x2c) {
+    return {internal_basis_set,
+            build_x2c_one_body_ao(internal_basis_set,
+                                  integral_dressing == "x2c_1e")};
+  }
+  if (!integral_dressing.empty()) {
+    throw std::invalid_argument("Unsupported integral dressing '" +
+                                integral_dressing + "'");
+  }
+
+  const size_t dimension = basis_set.get_num_atomic_orbitals();
+  auto int1e = std::make_unique<qcs::OneBodyIntegral>(
+      internal_basis_set.get(), internal_basis_set->mol.get(), mpi);
+  Eigen::MatrixXd kinetic(dimension, dimension);
+  Eigen::MatrixXd potential(dimension, dimension);
+  int1e->kinetic_integral(kinetic.data());
+  int1e->nuclear_integral(potential.data());
+  Eigen::MatrixXd one_body_ao = kinetic + potential;
+
+  if (!internal_basis_set->ecp_shells.empty()) {
+    Eigen::MatrixXd ecp = Eigen::MatrixXd::Zero(dimension, dimension);
+    int1e->ecp_integral(ecp.data());
+    one_body_ao += ecp;
+  }
+  return {std::move(internal_basis_set), std::move(one_body_ao)};
+}
 
 std::shared_ptr<data::Hamiltonian> detail::construct_canonical_hamiltonian(
     std::shared_ptr<data::Orbitals> orbitals,
@@ -405,25 +447,8 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   utils::microsoft::initialize_backend();
 
   auto basis_set = orbitals->get_basis_set();
-  auto internal_basis_set =
-      utils::microsoft::convert_basis_set_from_qdk(*basis_set);
-  const size_t num_atomic_orbitals = basis_set->get_num_atomic_orbitals();
-  const auto mpi = qcs::mpi_default_input();
-  auto int1e = std::make_unique<qcs::OneBodyIntegral>(
-      internal_basis_set.get(), internal_basis_set->mol.get(), mpi);
-
-  Eigen::MatrixXd kinetic(num_atomic_orbitals, num_atomic_orbitals);
-  Eigen::MatrixXd potential(num_atomic_orbitals, num_atomic_orbitals);
-  int1e->kinetic_integral(kinetic.data());
-  int1e->nuclear_integral(potential.data());
-  Eigen::MatrixXd one_body_ao = kinetic + potential;
-
-  if (!internal_basis_set->ecp_shells.empty()) {
-    Eigen::MatrixXd ecp =
-        Eigen::MatrixXd::Zero(num_atomic_orbitals, num_atomic_orbitals);
-    int1e->ecp_integral(ecp.data());
-    one_body_ao += ecp;
-  }
+  auto [internal_basis_set, one_body_ao] = detail::build_one_body_ao(
+      *basis_set, _settings->get<std::string>("integral_dressing"));
 
   return detail::construct_canonical_hamiltonian(
       std::move(orbitals), internal_basis_set, one_body_ao,

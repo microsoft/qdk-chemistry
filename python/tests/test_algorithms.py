@@ -32,6 +32,7 @@ from qdk_chemistry.data import (
     Configuration,
     Hamiltonian,
     Orbitals,
+    SettingNotFoundError,
     Settings,
     StabilityResult,
     StateVectorContainer,
@@ -672,6 +673,19 @@ class TestAlgorithmClasses:
         # Test that the correct instance is created
         scf_solver = algorithms.create("scf_solver", key)
         assert isinstance(scf_solver, MockScfSolver)
+
+    @pytest.mark.parametrize(
+        ("algorithm_type", "algorithm_name"),
+        [
+            ("scf_solver", "qdk"),
+            ("scf_solver", "qdk_stabilized"),
+            ("orbital_localizer", "qdk_pipek_mezey"),
+        ],
+    )
+    def test_non_hamiltonian_algorithms_reject_integral_dressing(self, algorithm_type, algorithm_name):
+        """Verify integral dressing cannot be configured on unsupported algorithms."""
+        with pytest.raises(SettingNotFoundError, match="integral_dressing"):
+            algorithms.create(algorithm_type, algorithm_name, integral_dressing="x2c_1e")
 
     def test_hamiltonian_constructor_registration(self):
         """Test that Hamiltonian constructor can be registered and used."""

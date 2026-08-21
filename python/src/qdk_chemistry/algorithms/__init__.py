@@ -33,7 +33,6 @@ from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTest
 from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
     QdkHamiltonianConstructor,
-    QdkScalarRelativisticHamiltonianConstructor,
 )
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import HamiltonianUnitaryBuilder, TimeEvolutionBuilder
 from qdk_chemistry.algorithms.multi_configuration_calculator import (
@@ -103,7 +102,6 @@ __all__ = [
     "QdkOccupationActiveSpaceSelector",
     "QdkPipekMezeyLocalizer",
     "QdkQubitMapper",
-    "QdkScalarRelativisticHamiltonianConstructor",
     "QdkScfSolver",
     "QdkStabilityChecker",
     "QdkStabilizedScfSolver",

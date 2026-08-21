@@ -16,11 +16,15 @@ import pytest
 from qdk_chemistry import algorithms
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import (
+    AOType,
+    BasisSet,
     CanonicalFourCenterHamiltonianContainer,
     CholeskyHamiltonianContainer,
     Hamiltonian,
     ModelOrbitals,
     Orbitals,
+    OrbitalType,
+    Shell,
     Structure,
 )
 from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix
@@ -1165,9 +1169,18 @@ def test_hamiltonian_data_type_name():
     assert Hamiltonian._data_type_name == "hamiltonian"
 
 
+def create_x2c_constructor(name="qdk", integral_dressing="x2c_1e"):
+    """Create a native Hamiltonian constructor configured for X2C-1e."""
+    return algorithms.create(
+        "hamiltonian_constructor",
+        name,
+        integral_dressing=integral_dressing,
+    )
+
+
 @pytest.fixture(scope="module")
 def x2c_hamiltonian():
-    """Run SCF and the default X2C constructor once for the module."""
+    """Run SCF and decontracted X2C-1e once for the module."""
     mol = Structure(
         ["O", "H", "H"],
         np.array(
@@ -1183,23 +1196,60 @@ def x2c_hamiltonian():
     orbitals = wfn.get_orbitals()
 
     h_nr = algorithms.create("hamiltonian_constructor", "qdk").run(orbitals)
-    h_x2c = algorithms.create("hamiltonian_constructor", "qdk_x2c").run(orbitals)
+    h_x2c = create_x2c_constructor().run(orbitals)
     return h_nr, h_x2c
 
 
 @pytest.fixture(scope="module")
 def x2c_unrestricted_hamiltonian():
-    """Run QDK UHF and the default X2C constructor for triplet O2."""
+    """Run QDK UHF and decontracted X2C-1e for triplet O2."""
     molecule = Structure(["O", "O"], np.array([[0.0, 0.0, 0.0], [2.3, 0.0, 0.0]]))
     scf_solver = algorithms.create("scf_solver", "qdk")
     scf_solver.settings().set("method", "hf")
     scf_solver.settings().set("scf_type", "unrestricted")
     _, wavefunction = scf_solver.run(molecule, 0, 3, "cc-pvdz")
-    return algorithms.create("hamiltonian_constructor", "qdk_x2c").run(wavefunction.get_orbitals())
+    return create_x2c_constructor().run(wavefunction.get_orbitals())
+
+
+@pytest.fixture(scope="module")
+def x2c_cholesky_hamiltonian(x2c_hamiltonian):
+    """Build X2C-1e with Cholesky storage from the shared water orbitals."""
+    _, canonical_x2c = x2c_hamiltonian
+    return create_x2c_constructor("qdk_cholesky").run(canonical_x2c.get_orbitals())
 
 
 class TestX2CHamiltonian:
-    """Test Hamiltonians produced by the scalar-relativistic constructor."""
+    """Test Hamiltonians produced by the X2C-1e integral dressing options."""
+
+    def test_shared_settings(self):
+        """Verify canonical and Cholesky constructors expose integral dressing."""
+        for name in ("qdk", "qdk_cholesky"):
+            constructor = algorithms.create("hamiltonian_constructor", name)
+            assert constructor.settings().get("integral_dressing") == ""
+            for integral_dressing in ("x2c_1e", "x2c_1e_contracted"):
+                constructor.settings().set("integral_dressing", integral_dressing)
+
+    def test_cholesky_storage(self, x2c_hamiltonian, x2c_cholesky_hamiltonian):
+        """Verify X2C-1e can be combined with Cholesky ERI storage."""
+        _, canonical_x2c = x2c_hamiltonian
+        assert x2c_cholesky_hamiltonian.get_container_type() == "cholesky"
+        canonical_one_body, _ = canonical_x2c.get_one_body_integrals()
+        cholesky_one_body, _ = x2c_cholesky_hamiltonian.get_one_body_integrals()
+        np.testing.assert_allclose(cholesky_one_body, canonical_one_body, atol=scf_energy_tolerance)
+
+    def test_cartesian_basis_rejected(self):
+        """Verify both X2C-1e modes reject Cartesian AOs before conversion."""
+        structure = Structure(["O"], np.zeros((1, 3)))
+        basis = BasisSet(
+            "cartesian-d",
+            [Shell(0, OrbitalType.D, np.array([1.0]), np.array([1.0]))],
+            structure,
+            AOType.Cartesian,
+        )
+        orbitals = Orbitals(np.eye(6), np.zeros(6), np.eye(6), basis)
+        for integral_dressing in ("x2c_1e", "x2c_1e_contracted"):
+            with pytest.raises(ValueError, match="X2C-1e currently supports spherical AOs only"):
+                create_x2c_constructor(integral_dressing=integral_dressing).run(orbitals)
 
     def test_has_integrals(self, x2c_hamiltonian):
         """Verify the X2C result contains orbitals and one- and two-body integrals."""
@@ -1220,7 +1270,7 @@ class TestX2CHamiltonian:
         assert hamiltonian.is_unrestricted()
         one_body_alpha, one_body_beta = hamiltonian.get_one_body_integrals()
         # Generated with exact QDK cc-pVDZ shells, QDK's speed of light, and
-        # QDK UHF coefficients. The default xuncontract=True is used.
+        # QDK UHF coefficients. The integral_dressing="x2c_1e" path is used.
         np.testing.assert_allclose(np.trace(one_body_alpha), -267.86977556398796, rtol=0.0, atol=scf_energy_tolerance)
         np.testing.assert_allclose(np.trace(one_body_beta), -267.86977556398790, rtol=0.0, atol=scf_energy_tolerance)
         assert np.linalg.norm(one_body_alpha - one_body_beta) > 1e-6

@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
+#include <numeric>
 #include <optional>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/dynamical_correlation_calculator.hpp>
@@ -26,6 +27,8 @@
 #include <sstream>
 #include <stdexcept>
 
+#include "qdk/chemistry/algorithms/microsoft/scalar_relativistic_hamiltonian.hpp"
+#include "qdk/chemistry/algorithms/microsoft/utils.hpp"
 #include "ut_common.hpp"
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
@@ -121,7 +124,8 @@ auto run_restricted_o2 = [](const std::string& factory_name = "qdk") {
 };
 
 // Helper lambda to run unrestricted O2 triplet calculation
-auto run_unrestricted_o2 = [](const std::string& factory_name = "qdk") {
+auto run_unrestricted_o2 = [](const std::string& factory_name = "qdk",
+                              const std::string& integral_dressing = "") {
   std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
                                               Eigen::Vector3d(2.3, 0.0, 0.0)};
   std::vector<std::string> symbols = {"O", "O"};
@@ -137,12 +141,21 @@ auto run_unrestricted_o2 = [](const std::string& factory_name = "qdk") {
   auto uhf_orbitals = uhf_wavefunction->get_orbitals();
 
   auto ham_factory = HamiltonianConstructorFactory::create(factory_name);
+  ham_factory->settings().set("integral_dressing", integral_dressing);
   if (factory_name == "qdk_cholesky") {
     ham_factory->settings().set("store_ao_cholesky_vectors", true);
   }
   auto uhf_hamiltonian = ham_factory->run(uhf_orbitals);
 
   return std::make_tuple(uhf_energy, uhf_hamiltonian);
+};
+
+auto make_x2c_constructor = [](const std::string& factory_name = "qdk",
+                               const std::string& integral_dressing =
+                                   "x2c_1e") {
+  auto constructor = HamiltonianConstructorFactory::create(factory_name);
+  constructor->settings().set("integral_dressing", integral_dressing);
+  return constructor;
 };
 
 class TestHamiltonianConstructor : public HamiltonianConstructor {
@@ -2716,15 +2729,13 @@ TEST_F(HamiltonianTest, DataTypeName) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// X2C (scalar-relativistic) HamiltonianConstructor tests
-//
-// These mirror the NR HamiltonianConstructorTest tests above, exercising
-// the "qdk_x2c" factory through the same interfaces.
+// X2C-1e integral dressing tests
 // ══════════════════════════════════════════════════════════════════════════
 
 // Helper: run water SCF + build both NR and X2C Hamiltonians
 auto run_water_nr_and_x2c = [](const std::string& basis = "sto-3g",
-                               bool xuncontract = true) {
+                               const std::string& integral_dressing =
+                                   "x2c_1e") {
   std::vector<Eigen::Vector3d> coords = {{0.0, -0.1432247636, 0.0},
                                          {1.6380335020, 1.1363366135, 0.0},
                                          {-1.6380335020, 1.1363366135, 0.0}};
@@ -2739,35 +2750,24 @@ auto run_water_nr_and_x2c = [](const std::string& basis = "sto-3g",
   auto ham_nr = HamiltonianConstructorFactory::create("qdk");
   auto h_nr = ham_nr->run(orbitals);
 
-  auto ham_x2c = HamiltonianConstructorFactory::create("qdk_x2c");
-  ham_x2c->settings().set("xuncontract", xuncontract);
+  auto ham_x2c = make_x2c_constructor("qdk", integral_dressing);
   auto h_x2c = ham_x2c->run(orbitals);
 
   return std::make_tuple(energy, h_nr, h_x2c, orbitals);
 };
 
-TEST_F(HamiltonianConstructorTest, X2CFactory) {
-  // X2C constructor is registered alongside the NR one
-  auto available = HamiltonianConstructorFactory::available();
-  bool found = false;
-  for (const auto& name : available) {
-    if (name == "qdk_x2c") found = true;
-  }
-  EXPECT_TRUE(found);
-
-  auto x2c = HamiltonianConstructorFactory::create("qdk_x2c");
-  EXPECT_EQ(x2c->name(), "qdk_x2c");
-}
-
 TEST_F(HamiltonianConstructorTest, X2CDefaultSettings) {
-  auto x2c = HamiltonianConstructorFactory::create("qdk_x2c");
-  EXPECT_EQ(x2c->settings().get<std::string>("eri_method"), "direct");
-  EXPECT_EQ(x2c->settings().get<bool>("xuncontract"), true);
-  EXPECT_ANY_THROW(x2c->settings().set("eri_method", "unsupported"));
+  for (const std::string factory_name : {"qdk", "qdk_cholesky"}) {
+    auto constructor = HamiltonianConstructorFactory::create(factory_name);
+    EXPECT_EQ(constructor->settings().get<std::string>("integral_dressing"),
+              "");
+    EXPECT_ANY_THROW(
+        constructor->settings().set("integral_dressing", "unsupported"));
+  }
 }
 
 TEST_F(HamiltonianConstructorTest, X2CEdgeCases) {
-  auto x2c = HamiltonianConstructorFactory::create("qdk_x2c");
+  auto x2c = make_x2c_constructor();
 
   // Throw if restricted orbitals have empty active space
   EXPECT_THROW(
@@ -2806,7 +2806,7 @@ TEST_F(HamiltonianConstructorTest, X2CNonContiguousActiveSpace) {
       testing::restricted_index_set(4, active_indices),
       testing::restricted_index_set(4, {}));
 
-  auto x2c = HamiltonianConstructorFactory::create("qdk_x2c");
+  auto x2c = make_x2c_constructor();
   EXPECT_NO_THROW({
     auto hamiltonian = x2c->run(orbitals);
     EXPECT_TRUE(hamiltonian->has_one_body_integrals());
@@ -2843,7 +2843,7 @@ TEST_F(HamiltonianConstructorTest, X2CNonContiguousInactiveSpace) {
       testing::restricted_index_set(5, active_indices),
       testing::restricted_index_set(5, inactive_indices));
 
-  auto x2c = HamiltonianConstructorFactory::create("qdk_x2c");
+  auto x2c = make_x2c_constructor();
   EXPECT_NO_THROW({
     auto hamiltonian = x2c->run(orbitals);
     EXPECT_TRUE(hamiltonian->has_one_body_integrals());
@@ -2867,9 +2867,8 @@ TEST_F(HamiltonianConstructorTest, X2CNearLinearDependenceIsFinite) {
       testing::restricted_index_set(2, {0, 1}),
       testing::restricted_index_set(2, {}));
 
-  for (bool xuncontract : {false, true}) {
-    auto x2c = HamiltonianConstructorFactory::create("qdk_x2c");
-    x2c->settings().set("xuncontract", xuncontract);
+  for (const std::string integral_dressing : {"x2c_1e_contracted", "x2c_1e"}) {
+    auto x2c = make_x2c_constructor("qdk", integral_dressing);
     auto hamiltonian = x2c->run(orbitals);
     auto [one_body_alpha, one_body_beta] =
         hamiltonian->get_one_body_integrals();
@@ -2883,57 +2882,113 @@ TEST_F(HamiltonianConstructorTest, X2CRejectsEffectiveCorePotentials) {
   scf->settings().set("method", "hf");
   auto [energy, wavefunction] =
       scf->run(testing::create_agh_structure(), 0, 1, "def2-svp");
-  auto x2c = HamiltonianConstructorFactory::create("qdk_x2c");
+  auto x2c = make_x2c_constructor();
   EXPECT_THROW(x2c->run(wavefunction->get_orbitals()), std::invalid_argument);
 }
 
-TEST_F(HamiltonianConstructorTest, X2CAsymmetricUnrestrictedInactiveSpaces) {
-  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d::Zero()};
-  std::vector<std::string> symbols = {"H"};
-  Structure structure(coordinates, symbols);
-  std::vector<Shell> shells;
-  for (double exponent : {1.0, 0.5, 0.2}) {
-    shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{exponent},
-                              std::vector<double>{1.0}));
-  }
-  auto basis_set =
-      std::make_shared<BasisSet>("asymmetric-inactive", shells, structure);
-  Eigen::MatrixXd alpha = Eigen::MatrixXd::Identity(3, 3);
-  Eigen::MatrixXd beta = Eigen::MatrixXd::Identity(3, 3);
-  beta.col(1).swap(beta.col(2));
+TEST_F(HamiltonianConstructorTest, X2CRejectsCartesianAtomicOrbitals) {
+  Structure structure(std::vector<Eigen::Vector3d>{Eigen::Vector3d::Zero()},
+                      std::vector<std::string>{"O"});
+  std::vector<Shell> shells{Shell(0, OrbitalType::D, std::vector<double>{1.0},
+                                  std::vector<double>{1.0})};
+  auto basis_set = std::make_shared<BasisSet>("cartesian", shells, structure,
+                                              AOType::Cartesian);
   auto orbitals = std::make_shared<Orbitals>(
-      alpha, beta, std::nullopt, std::nullopt, std::nullopt, basis_set,
-      testing::unrestricted_index_set(3, {0, 1}, {0, 1}),
-      testing::unrestricted_index_set(3, {}, {2}));
+      Eigen::MatrixXd::Identity(6, 6), std::nullopt, std::nullopt, basis_set,
+      testing::restricted_index_set(6, {0, 1, 2, 3, 4, 5}),
+      testing::restricted_index_set(6, {}));
 
-  auto x2c = HamiltonianConstructorFactory::create("qdk_x2c");
-  x2c->settings().set("xuncontract", false);
-  EXPECT_NO_THROW(x2c->run(orbitals));
+  for (const std::string integral_dressing : {"x2c_1e", "x2c_1e_contracted"}) {
+    auto x2c = make_x2c_constructor("qdk", integral_dressing);
+    EXPECT_THROW(x2c->run(orbitals), std::invalid_argument);
+  }
+}
+
+TEST_F(HamiltonianConstructorTest, X2CDecontractionUsesExactExponentKeys) {
+  qdk::chemistry::utils::microsoft::initialize_backend();
+  Structure structure(std::vector<Eigen::Vector3d>{Eigen::Vector3d::Zero()},
+                      std::vector<std::string>{"H"});
+
+  auto decontract = [&](const std::vector<double>& exponents) {
+    std::vector<Shell> shells;
+    for (const double exponent : exponents) {
+      shells.emplace_back(0, OrbitalType::S, std::vector<double>{exponent},
+                          std::vector<double>{1.0});
+    }
+    BasisSet basis_set("exponent-keys", shells, structure);
+    auto internal =
+        qdk::chemistry::utils::microsoft::convert_basis_set_from_qdk(basis_set);
+    return microsoft::detail::decontract_basis(internal);
+  };
+
+  const auto exact_duplicates = decontract({1.0, 1.0});
+  EXPECT_EQ(exact_duplicates.basis->num_atomic_orbitals, 1u);
+  EXPECT_EQ(exact_duplicates.contraction.rows(), 1);
+  EXPECT_EQ(exact_duplicates.contraction.cols(), 2);
+
+  const auto near_distinct = decontract({1.0, 1.0000000004});
+  EXPECT_EQ(near_distinct.basis->num_atomic_orbitals, 2u);
+  EXPECT_EQ(near_distinct.contraction.rows(), 2);
+  EXPECT_EQ(near_distinct.contraction.cols(), 2);
+}
+
+TEST_F(HamiltonianConstructorTest, X2CRestrictedOpenShellOrbitals) {
+  auto scf = ScfSolverFactory::create("qdk");
+  scf->settings().set("method", "hf");
+  scf->settings().set("scf_type", "restricted");
+  auto [energy, wavefunction] =
+      scf->run(testing::create_oh_structure(), 0, 2, "sto-3g");
+  auto rohf_orbitals = wavefunction->get_orbitals();
+  ASSERT_TRUE(rohf_orbitals->is_restricted());
+
+  const size_t num_orbitals = rohf_orbitals->get_num_molecular_orbitals();
+  std::vector<size_t> all_orbitals(num_orbitals);
+  std::iota(all_orbitals.begin(), all_orbitals.end(), 0);
+  auto explicit_rohf_orbitals = std::make_shared<Orbitals>(
+      rohf_orbitals->coefficients()->block({axes::alpha(), axes::alpha()}),
+      rohf_orbitals->energies()->block({axes::alpha()}),
+      rohf_orbitals->get_overlap_matrix(), rohf_orbitals->get_basis_set(),
+      testing::spin_index_set(num_orbitals, all_orbitals, all_orbitals, true),
+      testing::spin_index_set(num_orbitals, {}, {}, true));
+
+  auto x2c = make_x2c_constructor();
+  EXPECT_NO_THROW(x2c->run(explicit_rohf_orbitals));
 }
 
 TEST_F(HamiltonianConstructorTest, X2CAbsoluteOneBodyReferences) {
   // Generated with PySCF using exact QDK basis shells, QDK's speed of light,
   // and QDK SCF orbital coefficients.
-  for (const auto& [xuncontract, expected_trace] :
-       std::vector<std::pair<bool, double>>{{false, -70.927717075213437},
-                                            {true, -70.925731550323121}}) {
-    auto [energy, h_nr, h_x2c, orbitals] =
-        run_water_nr_and_x2c("sto-3g", xuncontract);
-    auto [one_body_alpha, one_body_beta] = h_x2c->get_one_body_integrals();
-    EXPECT_NEAR(one_body_alpha.trace(), expected_trace,
-                testing::scf_energy_tolerance);
-    EXPECT_NEAR(one_body_beta.trace(), expected_trace,
-                testing::scf_energy_tolerance);
+  for (const std::string factory_name : {"qdk", "qdk_cholesky"}) {
+    for (const auto& [integral_dressing, expected_trace] :
+         std::vector<std::pair<std::string, double>>{
+             {"x2c_1e_contracted", -70.927717075213437},
+             {"x2c_1e", -70.925731550323121}}) {
+      auto [energy, h_nr, h_x2c, orbitals] =
+          run_water_nr_and_x2c("sto-3g", integral_dressing);
+      if (factory_name == "qdk_cholesky") {
+        auto constructor =
+            make_x2c_constructor(factory_name, integral_dressing);
+        h_x2c = constructor->run(orbitals);
+      }
+      auto [one_body_alpha, one_body_beta] = h_x2c->get_one_body_integrals();
+      EXPECT_NEAR(one_body_alpha.trace(), expected_trace,
+                  testing::scf_energy_tolerance);
+      EXPECT_NEAR(one_body_beta.trace(), expected_trace,
+                  testing::scf_energy_tolerance);
+      EXPECT_EQ(h_x2c->get_container_type(),
+                factory_name == "qdk" ? "canonical_four_center" : "cholesky");
+    }
   }
 }
 
 TEST_F(HamiltonianConstructorTest, X2CUnrestrictedO2Reference) {
-  auto [energy, h_x2c] = run_unrestricted_o2("qdk_x2c");
+  auto [energy, h_x2c] = run_unrestricted_o2("qdk", "x2c_1e");
   ASSERT_TRUE(h_x2c->is_unrestricted());
 
   auto [one_body_alpha, one_body_beta] = h_x2c->get_one_body_integrals();
   // Generated with PySCF using exact QDK cc-pVDZ shells, QDK's speed of light,
-  // and QDK UHF orbital coefficients. The default xuncontract=true is used.
+  // and QDK UHF orbital coefficients. The default
+  // integral_dressing="x2c_1e" path is used.
   EXPECT_NEAR(one_body_alpha.trace(), -267.86977556398796,
               testing::scf_energy_tolerance);
   EXPECT_NEAR(one_body_beta.trace(), -267.86977556398790,
@@ -2958,8 +3013,7 @@ TEST_F(HamiltonianConstructorTest, X2CUnrestrictedSpinChannelProjection) {
       identity, std::nullopt, std::nullopt, basis_set,
       testing::restricted_index_set(3, {0, 1, 2}),
       testing::restricted_index_set(3, {}));
-  auto restricted_x2c = HamiltonianConstructorFactory::create("qdk_x2c");
-  restricted_x2c->settings().set("xuncontract", false);
+  auto restricted_x2c = make_x2c_constructor("qdk", "x2c_1e_contracted");
   auto restricted_hamiltonian = restricted_x2c->run(restricted_orbitals);
   auto [reference_one_body, reference_beta] =
       restricted_hamiltonian->get_one_body_integrals();
@@ -2970,8 +3024,7 @@ TEST_F(HamiltonianConstructorTest, X2CUnrestrictedSpinChannelProjection) {
       identity, permutation, std::nullopt, std::nullopt, std::nullopt,
       basis_set, testing::unrestricted_index_set(3, {0, 1, 2}, {0, 1, 2}),
       testing::unrestricted_index_set(3, {}, {}));
-  auto unrestricted_x2c = HamiltonianConstructorFactory::create("qdk_x2c");
-  unrestricted_x2c->settings().set("xuncontract", false);
+  auto unrestricted_x2c = make_x2c_constructor("qdk", "x2c_1e_contracted");
   auto unrestricted_hamiltonian = unrestricted_x2c->run(unrestricted_orbitals);
   auto [one_body_alpha, one_body_beta] =
       unrestricted_hamiltonian->get_one_body_integrals();
@@ -3007,12 +3060,19 @@ TEST_F(HamiltonianConstructorTest, X2CRestrictedWater) {
 }
 
 TEST_F(HamiltonianConstructorTest, X2CERIUnchanged) {
-  // X2C-1e only modifies one-body integrals; ERIs should be identical to NR
-  auto [energy, h_nr, h_x2c, orbitals] = run_water_nr_and_x2c("sto-3g");
+  for (const std::string factory_name : {"qdk", "qdk_cholesky"}) {
+    auto [energy, h_nr, h_x2c, orbitals] = run_water_nr_and_x2c("sto-3g");
+    if (factory_name == "qdk_cholesky") {
+      auto nr_constructor = HamiltonianConstructorFactory::create(factory_name);
+      h_nr = nr_constructor->run(orbitals);
+      auto x2c_constructor = make_x2c_constructor(factory_name);
+      h_x2c = x2c_constructor->run(orbitals);
+    }
 
-  auto [eri_nr, a1, b1] = h_nr->get_two_body_integrals();
-  auto [eri_x2c, a2, b2] = h_x2c->get_two_body_integrals();
-  EXPECT_NEAR((eri_x2c - eri_nr).norm(), 0.0, 1e-12);
+    auto [eri_nr, a1, b1] = h_nr->get_two_body_integrals();
+    auto [eri_x2c, a2, b2] = h_x2c->get_two_body_integrals();
+    EXPECT_NEAR((eri_x2c - eri_nr).norm(), 0.0, 1e-12);
+  }
 }
 
 TEST_F(HamiltonianConstructorTest, X2CCoreEnergyUnchanged) {

@@ -12,9 +12,17 @@ namespace qdk::chemistry::scf {
 class BasisSet;
 }
 
+namespace qdk::chemistry::data {
+class BasisSet;
+}
+
 namespace qdk::chemistry::algorithms::microsoft {
 
 namespace detail {
+
+std::pair<std::shared_ptr<qdk::chemistry::scf::BasisSet>, Eigen::MatrixXd>
+build_one_body_ao(const data::BasisSet& basis_set,
+                  const std::string& integral_dressing);
 
 std::shared_ptr<data::Hamiltonian> construct_canonical_hamiltonian(
     std::shared_ptr<data::Orbitals> orbitals,
@@ -26,20 +34,33 @@ std::shared_ptr<data::Hamiltonian> construct_canonical_hamiltonian(
 class HamiltonianSettings : public qdk::chemistry::data::Settings {
  public:
   HamiltonianSettings() {
+    set_default("integral_dressing", std::string(""),
+                "One-electron integral dressing: '' for nonrelativistic, "
+                "'x2c_1e' for decontracted X2C-1e, or "
+                "'x2c_1e_contracted' for X2C-1e in the contracted basis",
+                data::ListConstraint<std::string>{{std::vector<std::string>{
+                    "", "x2c_1e", "x2c_1e_contracted"}}});
+  }
+  ~HamiltonianSettings() override = default;
+};
+
+class CanonicalHamiltonianSettings : public HamiltonianSettings {
+ public:
+  CanonicalHamiltonianSettings() {
     set_default("eri_method", std::string("direct"),
                 "ERI evaluation method: 'direct' computes integrals "
                 "on-the-fly, 'incore' stores all integrals in memory",
                 data::ListConstraint<std::string>{
                     {std::vector<std::string>{"direct", "incore"}}});
   }
-  ~HamiltonianSettings() override = default;
+  ~CanonicalHamiltonianSettings() override = default;
 };
 
 class HamiltonianConstructor
     : public qdk::chemistry::algorithms::HamiltonianConstructor {
  public:
   HamiltonianConstructor() {
-    _settings = std::make_unique<HamiltonianSettings>();
+    _settings = std::make_unique<CanonicalHamiltonianSettings>();
   };
   ~HamiltonianConstructor() override = default;
 

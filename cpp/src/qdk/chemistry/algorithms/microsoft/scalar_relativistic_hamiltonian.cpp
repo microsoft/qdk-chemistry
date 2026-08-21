@@ -7,6 +7,7 @@
 #include <qdk/chemistry/scf/util/int1e.h>
 
 #include <array>
+#include <blas.hh>
 #include <cmath>
 #include <cstdint>
 #include <functional>
@@ -14,6 +15,7 @@
 #include <map>
 #include <qdk/chemistry/constants.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -26,28 +28,45 @@ namespace qdk::chemistry::algorithms::microsoft {
 
 namespace qcs = qdk::chemistry::scf;
 
-namespace detail_x2c {
+namespace detail {
 
 namespace {
 
+// Canonical-orthogonalization cutoff for the modified Dirac metric.
 constexpr double metric_linear_dependence_threshold = 1e-9;
+// Pseudoinverse cutoff for the projected electronic overlap.
 constexpr double overlap_linear_dependence_threshold = 1e-14;
-constexpr double exponent_rounding_factor = 1e9;
 
-void symmetric_eigendecomposition(Eigen::MatrixXd& matrix,
-                                  Eigen::VectorXd& eigenvalues,
-                                  const std::string& context) {
-  const int64_t dimension = matrix.rows();
-  eigenvalues.resize(dimension);
-  const int64_t info =
-      lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, dimension,
-                   matrix.data(), dimension, eigenvalues.data());
-  if (info != 0) {
-    throw std::runtime_error("X2C eigendecomposition failed for " + context +
-                             " (info=" + std::to_string(info) + ")");
-  }
+/** @brief Multiply two column-major dense matrices with BLAS. */
+Eigen::MatrixXd matrix_product(const Eigen::MatrixXd& left,
+                               const Eigen::MatrixXd& right) {
+  Eigen::MatrixXd result(left.rows(), right.cols());
+  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+             left.rows(), right.cols(), left.cols(), 1.0, left.data(),
+             left.rows(), right.data(), right.rows(), 0.0, result.data(),
+             result.rows());
+  return result;
 }
 
+/** @brief Compute `left.transpose() * right` with BLAS. */
+Eigen::MatrixXd transpose_left_product(const Eigen::MatrixXd& left,
+                                       const Eigen::MatrixXd& right) {
+  Eigen::MatrixXd result(left.cols(), right.cols());
+  blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+             left.cols(), right.cols(), left.rows(), 1.0, left.data(),
+             left.rows(), right.data(), right.rows(), 0.0, result.data(),
+             result.rows());
+  return result;
+}
+
+/** @brief Compute `transform.transpose() * matrix * transform` with BLAS. */
+Eigen::MatrixXd congruence_transform(const Eigen::MatrixXd& matrix,
+                                     const Eigen::MatrixXd& transform) {
+  const Eigen::MatrixXd intermediate = matrix_product(matrix, transform);
+  return transpose_left_product(transform, intermediate);
+}
+
+/** @brief Return indices whose values exceed a strict numerical cutoff. */
 std::vector<Eigen::Index> indices_above(const Eigen::VectorXd& values,
                                         double threshold) {
   std::vector<Eigen::Index> indices;
@@ -57,6 +76,7 @@ std::vector<Eigen::Index> indices_above(const Eigen::VectorXd& values,
   return indices;
 }
 
+/** @brief Validate the dimensions, finiteness, and symmetry of X2C inputs. */
 void validate_x2c_inputs(const Eigen::MatrixXd& overlap,
                          const Eigen::MatrixXd& kinetic,
                          const Eigen::MatrixXd& potential,
@@ -82,12 +102,14 @@ void validate_x2c_inputs(const Eigen::MatrixXd& overlap,
   }
 }
 
+/** @brief Return the number of AO components represented by a shell. */
 size_t shell_size(const qcs::Shell& shell, bool pure) {
   const size_t angular_momentum = shell.angular_momentum;
   return pure ? 2 * angular_momentum + 1
               : (angular_momentum + 1) * (angular_momentum + 2) / 2;
 }
 
+/** @brief Compute the first AO offset of every shell. */
 std::vector<size_t> shell_offsets(const std::vector<qcs::Shell>& shells,
                                   bool pure) {
   std::vector<size_t> offsets(shells.size());
@@ -99,11 +121,7 @@ std::vector<size_t> shell_offsets(const std::vector<qcs::Shell>& shells,
   return offsets;
 }
 
-double rounded_exponent(double exponent) {
-  return std::round(exponent * exponent_rounding_factor) /
-         exponent_rounding_factor;
-}
-
+/** @brief Construct the spin-free X2C-1e Hamiltonian from AO integrals. */
 Eigen::MatrixXd compute_x2c_hamiltonian(const Eigen::MatrixXd& overlap,
                                         const Eigen::MatrixXd& kinetic,
                                         const Eigen::MatrixXd& potential,
@@ -145,7 +163,8 @@ Eigen::MatrixXd compute_x2c_hamiltonian(const Eigen::MatrixXd& overlap,
     dirac_eigenvectors = std::move(generalized_dirac);
   } else if (generalized_info > dirac_dimension) {
     Eigen::VectorXd metric_eigenvalues;
-    symmetric_eigendecomposition(metric, metric_eigenvalues, "Dirac metric");
+    utils::microsoft::symmetric_eigendecomposition(metric, metric_eigenvalues,
+                                                   "X2C Dirac metric");
     const auto retained_metric_indices =
         indices_above(metric_eigenvalues, metric_linear_dependence_threshold);
     if (retained_metric_indices.empty()) {
@@ -162,12 +181,13 @@ Eigen::MatrixXd compute_x2c_hamiltonian(const Eigen::MatrixXd& overlap,
     }
 
     Eigen::MatrixXd orthogonal_dirac =
-        orthogonalizer.transpose() * dirac * orthogonalizer;
+        congruence_transform(dirac, orthogonalizer);
     orthogonal_dirac =
         0.5 * (orthogonal_dirac + orthogonal_dirac.transpose()).eval();
-    symmetric_eigendecomposition(orthogonal_dirac, dirac_eigenvalues,
-                                 "orthogonalized Dirac Hamiltonian");
-    dirac_eigenvectors = orthogonalizer * orthogonal_dirac;
+    utils::microsoft::symmetric_eigendecomposition(
+        orthogonal_dirac, dirac_eigenvalues,
+        "orthogonalized X2C Dirac Hamiltonian");
+    dirac_eigenvectors = matrix_product(orthogonalizer, orthogonal_dirac);
   } else {
     throw std::runtime_error(
         "X2C generalized eigendecomposition failed (info=" +
@@ -194,12 +214,13 @@ Eigen::MatrixXd compute_x2c_hamiltonian(const Eigen::MatrixXd& overlap,
   }
 
   Eigen::MatrixXd projected_overlap =
-      large_components.transpose() * overlap * large_components;
+      congruence_transform(overlap, large_components);
   projected_overlap =
       0.5 * (projected_overlap + projected_overlap.transpose()).eval();
   Eigen::VectorXd projected_overlap_eigenvalues;
-  symmetric_eigendecomposition(projected_overlap, projected_overlap_eigenvalues,
-                               "projected electronic overlap");
+  utils::microsoft::symmetric_eigendecomposition(
+      projected_overlap, projected_overlap_eigenvalues,
+      "X2C projected electronic overlap");
   const auto retained_overlap_indices = indices_above(
       projected_overlap_eigenvalues, overlap_linear_dependence_threshold);
   if (retained_overlap_indices.empty()) {
@@ -216,11 +237,14 @@ Eigen::MatrixXd compute_x2c_hamiltonian(const Eigen::MatrixXd& overlap,
         std::sqrt(projected_overlap_eigenvalues(index));
   }
 
+  const Eigen::MatrixXd overlap_projection =
+      transpose_left_product(large_components, overlap);
   const Eigen::MatrixXd back_transform =
-      projected_overlap_inverse_sqrt * large_components.transpose() * overlap;
-  Eigen::MatrixXd hamiltonian = back_transform.transpose() *
-                                electronic_energies.asDiagonal() *
-                                back_transform;
+      matrix_product(projected_overlap_inverse_sqrt, overlap_projection);
+  Eigen::MatrixXd weighted_back_transform = back_transform;
+  weighted_back_transform.array().colwise() *= electronic_energies.array();
+  Eigen::MatrixXd hamiltonian =
+      transpose_left_product(back_transform, weighted_back_transform);
   hamiltonian = 0.5 * (hamiltonian + hamiltonian.transpose()).eval();
   if (!hamiltonian.allFinite()) {
     throw std::runtime_error("X2C produced non-finite one-electron integrals");
@@ -228,25 +252,20 @@ Eigen::MatrixXd compute_x2c_hamiltonian(const Eigen::MatrixXd& overlap,
   return hamiltonian;
 }
 
-struct DecontractedBasis {
-  std::shared_ptr<qcs::BasisSet> basis;
-  Eigen::MatrixXd contraction;
-};
+}  // namespace
 
 DecontractedBasis decontract_basis(
     const std::shared_ptr<qcs::BasisSet>& contracted_basis) {
   using AtomAngularMomentum = std::pair<uint64_t, uint64_t>;
-  using ExponentMap = std::map<double, double, std::greater<double>>;
+  using ExponentSet = std::set<double, std::greater<double>>;
 
-  std::map<AtomAngularMomentum, ExponentMap> grouped_exponents;
+  std::map<AtomAngularMomentum, ExponentSet> grouped_exponents;
   std::map<AtomAngularMomentum, std::array<double, 3>> origins;
   for (const auto& shell : contracted_basis->shells) {
     const AtomAngularMomentum key{shell.atom_index, shell.angular_momentum};
     origins[key] = shell.O;
     for (size_t primitive = 0; primitive < shell.contraction; ++primitive) {
-      grouped_exponents[key].try_emplace(
-          rounded_exponent(shell.exponents[primitive]),
-          shell.exponents[primitive]);
+      grouped_exponents[key].insert(shell.exponents[primitive]);
     }
   }
 
@@ -255,7 +274,7 @@ DecontractedBasis decontract_basis(
       primitive_shell_indices;
   for (const auto& [key, exponents] : grouped_exponents) {
     const auto [atom_index, angular_momentum] = key;
-    for (const auto& [rounded, exponent] : exponents) {
+    for (const double exponent : exponents) {
       qcs::Shell shell{};
       shell.atom_index = atom_index;
       shell.O = origins.at(key);
@@ -264,7 +283,7 @@ DecontractedBasis decontract_basis(
       shell.exponents[0] = exponent;
       shell.coefficients[0] = 1.0;
       primitive_shell_indices.emplace(
-          std::make_tuple(atom_index, angular_momentum, rounded),
+          std::make_tuple(atom_index, angular_momentum, exponent),
           uncontracted_shells.size());
       uncontracted_shells.push_back(shell);
     }
@@ -290,9 +309,9 @@ DecontractedBasis decontract_basis(
         shell_size(contracted_shell, contracted_basis->pure);
     for (size_t primitive = 0; primitive < contracted_shell.contraction;
          ++primitive) {
-      const auto key = std::make_tuple(
-          contracted_shell.atom_index, contracted_shell.angular_momentum,
-          rounded_exponent(contracted_shell.exponents[primitive]));
+      const auto key = std::make_tuple(contracted_shell.atom_index,
+                                       contracted_shell.angular_momentum,
+                                       contracted_shell.exponents[primitive]);
       const size_t uncontracted_shell_index = primitive_shell_indices.at(key);
       const double primitive_coefficient =
           uncontracted_basis->shells[uncontracted_shell_index].coefficients[0];
@@ -309,19 +328,22 @@ DecontractedBasis decontract_basis(
   return {std::move(uncontracted_basis), std::move(contraction)};
 }
 
+namespace {
+
+/** @brief Compute X2C-1e integrals, optionally in a decontracted basis. */
 Eigen::MatrixXd compute_x2c_one_electron(
     const std::shared_ptr<qcs::BasisSet>& internal_basis_set,
-    const qcs::ParallelConfig& mpi, bool xuncontract) {
+    const qcs::ParallelConfig& mpi, bool decontract) {
   if (!internal_basis_set->ecp_shells.empty() ||
       internal_basis_set->n_ecp_electrons != 0) {
     throw std::invalid_argument(
-        "The X2C Hamiltonian constructor does not support effective core "
-        "potentials; use an all-electron basis set");
+        "The X2C-1e approximation does not support effective core potentials; "
+        "use an all-electron basis set");
   }
 
   std::shared_ptr<qcs::BasisSet> working_basis = internal_basis_set;
   Eigen::MatrixXd contraction;
-  if (xuncontract) {
+  if (decontract) {
     auto decontracted = decontract_basis(internal_basis_set);
     working_basis = std::move(decontracted.basis);
     contraction = std::move(decontracted.contraction);
@@ -341,8 +363,8 @@ Eigen::MatrixXd compute_x2c_one_electron(
 
   Eigen::MatrixXd hamiltonian =
       compute_x2c_hamiltonian(overlap, kinetic, potential, pvp);
-  if (xuncontract) {
-    hamiltonian = contraction.transpose() * hamiltonian * contraction;
+  if (decontract) {
+    hamiltonian = congruence_transform(hamiltonian, contraction);
     hamiltonian = 0.5 * (hamiltonian + hamiltonian.transpose()).eval();
   }
   if (!hamiltonian.allFinite()) {
@@ -353,23 +375,12 @@ Eigen::MatrixXd compute_x2c_one_electron(
 
 }  // namespace
 
-}  // namespace detail_x2c
-
-std::shared_ptr<data::Hamiltonian>
-ScalarRelativisticHamiltonianConstructor::_run_impl(
-    std::shared_ptr<data::Orbitals> orbitals) const {
-  QDK_LOG_TRACE_ENTERING();
-  utils::microsoft::initialize_backend();
-
-  auto basis_set = orbitals->get_basis_set();
-  auto internal_basis_set =
-      utils::microsoft::convert_basis_set_from_qdk(*basis_set);
-  const auto mpi = qcs::mpi_default_input();
-  Eigen::MatrixXd one_body_ao = detail_x2c::compute_x2c_one_electron(
-      internal_basis_set, mpi, _settings->get<bool>("xuncontract"));
-  return detail::construct_canonical_hamiltonian(
-      std::move(orbitals), internal_basis_set, one_body_ao,
-      _settings->get<std::string>("eri_method"));
+Eigen::MatrixXd build_x2c_one_body_ao(
+    const std::shared_ptr<qcs::BasisSet>& internal_basis_set, bool decontract) {
+  return compute_x2c_one_electron(internal_basis_set, qcs::mpi_default_input(),
+                                  decontract);
 }
+
+}  // namespace detail
 
 }  // namespace qdk::chemistry::algorithms::microsoft

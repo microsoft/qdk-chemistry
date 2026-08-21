@@ -13,5 +13,4 @@ implementations so that consumers can import them directly from
 from qdk_chemistry._core._algorithms import (
     HamiltonianConstructor,  # noqa: F401 - re-export
     QdkHamiltonianConstructor,  # noqa: F401 - re-export
-    QdkScalarRelativisticHamiltonianConstructor,  # noqa: F401 - re-export
 )

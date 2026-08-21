@@ -122,18 +122,23 @@ The native QDK/Chemistry implementation for Hamiltonian construction. Transforms
    * - ``eri_method``
      - string
      - Method for computing electron repulsion integrals ("direct" or "incore")
+    * - ``integral_dressing``
+       - string
+       - One-electron integral dressing ("", "x2c_1e", or "x2c_1e_contracted"). Default: ""
 
-QDK Spin-Free X2C
-~~~~~~~~~~~~~~~~~
+Spin-Free X2C-1e Option
+~~~~~~~~~~~~~~~~~~~~~~~
 
-.. rubric:: Factory name: ``"qdk_x2c"``
+.. rubric:: Setting: ``integral_dressing="x2c_1e"`` or ``integral_dressing="x2c_1e_contracted"``
 
-The spin-free exact-two-component implementation applies scalar-relativistic corrections to the one-electron Hamiltonian using the exact-decoupling formulation and its corrected Schrödinger-picture transformation :cite:`Kutzelnigg2005,Liu2009X2C`.
-It constructs the modified Dirac Hamiltonian from the :term:`AO` overlap, kinetic, nuclear-attraction, and spin-free :math:`\boldsymbol{p}V\boldsymbol{p}` integrals, selects its electronic states, and projects their energies back into the original AO metric.
+Both the ``"qdk"`` and ``"qdk_cholesky"`` constructors can apply spin-free exact-two-component scalar-relativistic corrections to the one-electron Hamiltonian using the exact-decoupling formulation and its corrected Schrödinger-picture transformation :cite:`Kutzelnigg2005,Liu2009X2C`.
+The X2C-1e path constructs the modified Dirac Hamiltonian from the :term:`AO` overlap, kinetic, nuclear-attraction, and spin-free :math:`\boldsymbol{p}V\boldsymbol{p}` integrals, selects its electronic states, and projects their energies back into the original AO metric.
 
 This implementation uses the X2C-1e approximation: the two-electron integrals are not picture-change transformed, and spin-orbit terms are not included.
-Effective core potentials are not supported; provide an all-electron relativistic basis set.
-By default, contracted basis functions are decontracted for the X2C transformation and the resulting one-electron Hamiltonian is then exactly recontracted.
+Only all-electron relativistic basis sets are supported; effective core potentials are not supported.
+Cartesian atomic orbitals are not currently supported.
+With ``integral_dressing="x2c_1e"``, contracted basis functions are decontracted for the X2C transformation and the resulting one-electron Hamiltonian is then exactly recontracted.
+Use ``integral_dressing="x2c_1e_contracted"`` to perform the X2C transformation directly in the supplied contracted basis.
 
 .. tab:: Python API
 
@@ -148,22 +153,6 @@ By default, contracted basis functions are decontracted for the X2C transformati
          :language: cpp
          :start-after: // start-cell-x2c
          :end-before: // end-cell-x2c
-
-.. rubric:: Settings
-
-.. list-table::
-   :header-rows: 1
-   :widths: 25 25 50
-
-   * - Setting
-     - Type
-     - Description
-   * - ``eri_method``
-     - string
-     - Method for computing electron repulsion integrals ("direct" or "incore")
-   * - ``xuncontract``
-     - bool
-     - Whether to decontract the orbital basis for the X2C transformation and exactly recontract the result. Default: true
 
 QDK Cholesky
 ~~~~~~~~~~~~
@@ -195,6 +184,9 @@ Four-center integrals are lazily computed from the three-center integrals on dem
    * - ``store_ao_cholesky_vectors``
      - bool
      - Whether to store the AO three-center integrals in a ``CholeskyHamiltonianContainer`` in addition to the MO three-center integrals, which are always saved. Default: false
+    * - ``integral_dressing``
+       - string
+       - One-electron integral dressing ("", "x2c_1e", or "x2c_1e_contracted"). Default: ""
 
 Related classes
 ---------------

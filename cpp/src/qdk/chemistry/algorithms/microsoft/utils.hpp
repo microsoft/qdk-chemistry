@@ -7,9 +7,11 @@
 #include <qdk/chemistry/scf/core/basis_set.h>
 #include <qdk/chemistry/scf/core/molecule.h>
 
+#include <Eigen/Core>
 #include <libint2.hpp>  // for Shell class
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <string>
 
 namespace qdk::chemistry::utils::microsoft {
 
@@ -41,6 +43,17 @@ void initialize_backend();
  * have been executed to ensure proper resource management.
  */
 void finalize_backend();
+
+/**
+ * @brief Diagonalize a real symmetric matrix in place with checked LAPACK
+ * error handling.
+ * @param matrix On input, the symmetric matrix; on output, its eigenvectors.
+ * @param eigenvalues The eigenvalues in ascending order.
+ * @param context Description included in an error message if LAPACK fails.
+ */
+void symmetric_eigendecomposition(Eigen::MatrixXd& matrix,
+                                  Eigen::VectorXd& eigenvalues,
+                                  const std::string& context);
 
 /**
  * @brief Convert a Molecule to a qdk::chemistry::data::Structure
