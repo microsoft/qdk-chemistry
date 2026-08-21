@@ -15,7 +15,10 @@ from __future__ import annotations
 import json
 import pathlib
 from datetime import datetime, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from qdk_chemistry.remote.backends.base import JobStatus, RemoteBackend
 
 __all__ = ["Job"]
 
@@ -185,12 +188,79 @@ class Job:
         jobs.sort(key=lambda j: j.submitted_at or "")
         return jobs
 
+    # ── Backend interaction ──────────────────────────────────────────────
+
+    def _get_backend(self) -> RemoteBackend:
+        """Create and connect a backend from the persisted configuration."""
+        from qdk_chemistry.remote.backends import get_backend  # noqa: PLC0415
+
+        backend = get_backend(self.backend, **self.backend_config)
+        backend.connect()
+        return backend
+
+    def check(self) -> JobStatus:
+        """Query the backend, persist the latest status, and return it."""
+        backend = self._get_backend()
+        try:
+            job_status = backend.check(self.backend_state)
+        finally:
+            backend.disconnect()
+
+        if (self.status or "").lower() == "retrieved" or self.output_hashes is not None:
+            self.status = "retrieved"
+            job_status.status = "retrieved"
+        else:
+            self.status = job_status.status
+        if self.file_path is not None:
+            self.save()
+        return job_status
+
+    def cancel(self) -> None:
+        """Cancel the backend job and persist its canceled status."""
+        backend = self._get_backend()
+        try:
+            backend.cancel(self.backend_state)
+        finally:
+            backend.disconnect()
+
+        self.status = "canceled"
+        if self.file_path is not None:
+            self.save()
+
+    def fetch(self, local_dir: str | pathlib.Path | None = None) -> Any:
+        """Download results, persist their hashes, and return the result."""
+        backend = self._get_backend()
+        try:
+            result = backend.fetch(self.backend_state, local_dir=local_dir)
+        finally:
+            backend.disconnect()
+
+        self.status = "retrieved"
+        try:
+            from qdk_chemistry.data._hashing import collect_content_hashes  # noqa: PLC0415
+
+            self.output_hashes = collect_content_hashes(result)
+        except Exception:  # noqa: BLE001
+            pass
+        if self.file_path is not None:
+            self.save()
+        return result
+
     # ── Conveniences ─────────────────────────────────────────────────────
 
     @property
     def is_terminal(self) -> bool:
         """Whether the job has reached a final state."""
-        return (self.status or "").lower() in ("succeeded", "failed", "canceled", "cancelled", "retrieved")
+        from qdk_chemistry.remote.backends.base import JobStatus  # noqa: PLC0415
+
+        return JobStatus.is_terminal_status(self.status)
+
+    @property
+    def is_successful(self) -> bool:
+        """Whether the job completed successfully."""
+        from qdk_chemistry.remote.backends.base import JobStatus  # noqa: PLC0415
+
+        return JobStatus.is_successful_status(self.status)
 
     def __repr__(self) -> str:
         """Return a developer-friendly string representation."""

@@ -19,6 +19,7 @@ import logging
 import pathlib
 from typing import Any
 
+from qdk_chemistry._core import DuplicateRegistrationError as _DuplicateRegistrationError
 from qdk_chemistry.remote.cache.base import CacheBackend
 from qdk_chemistry.remote.cache.folder import FolderCache
 from qdk_chemistry.remote.cache.tiered import TieredCache
@@ -30,18 +31,34 @@ logger = logging.getLogger(__name__)
 _CACHES: dict[str, type[CacheBackend]] = {}
 
 
+def _register_cache(name: str, cls: type[CacheBackend]) -> type[CacheBackend]:
+    """Register one cache class after validating registry ownership."""
+    if name in _CACHES:
+        raise _DuplicateRegistrationError(f"Cache backend name '{name}' is already registered")
+    for registered_name, registered_cls in _CACHES.items():
+        if registered_cls is cls:
+            raise _DuplicateRegistrationError(
+                f"Cache backend class '{cls.__module__}.{cls.__qualname__}' is already registered "
+                f"with name '{registered_name}'"
+            )
+    cls.name = name
+    _CACHES[name] = cls
+    return cls
+
+
 def register_cache(name: str):
     """Decorator to register a cache backend class.
 
     Args:
         name: The cache backend name (e.g. ``"folder"``).
 
+    Raises:
+        DuplicateRegistrationError: If the cache backend name or class is already registered.
+
     """
 
     def decorator(cls: type[CacheBackend]) -> type[CacheBackend]:
-        cls.name = name
-        _CACHES[name] = cls
-        return cls
+        return _register_cache(name, cls)
 
     return decorator
 
@@ -118,6 +135,7 @@ def _load_plugin_caches() -> None:
 
 
 _load_plugin_caches()
+
 
 __all__ = [
     "available_caches",

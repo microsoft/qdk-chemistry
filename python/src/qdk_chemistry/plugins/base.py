@@ -65,6 +65,28 @@ class PluginRegistrar:
 
         register_dataclass(dataclass_type)
 
+    def register_remote_backend(self, name: str, backend_type: Type[Any]) -> None:  # noqa: UP006
+        """Register a remote execution backend.
+
+        Raises:
+            DuplicateRegistrationError: If the backend name or class is already registered.
+
+        """
+        from qdk_chemistry.remote.backends import register_backend  # noqa: PLC0415
+
+        register_backend(name)(backend_type)
+
+    def register_cache_backend(self, name: str, backend_type: Type[Any]) -> None:  # noqa: UP006
+        """Register a cache backend.
+
+        Raises:
+            DuplicateRegistrationError: If the cache name or class is already registered.
+
+        """
+        from qdk_chemistry.remote.cache import register_cache  # noqa: PLC0415
+
+        register_cache(name)(backend_type)
+
 
 class QdkChemistryPlugin(ABC):
     """Base class for plugins discovered through ``qdk_chemistry.plugins``."""

@@ -69,18 +69,21 @@ class _AlgorithmWrapper:
         self,
         *args: Any,
         cache: Any = None,
+        remote: Any = None,
         force_rerun: bool = False,
         **kwargs: Any,
     ) -> Any:
-        """Execute the algorithm with optional caching.
+        """Execute the algorithm with optional caching and remote execution.
 
-        Without ``cache`` this is equivalent to calling
-        the underlying ``algorithm.run()`` directly.
+        Without cache or remote options this is equivalent to calling the
+        underlying ``algorithm.run()`` directly.
 
         Args:
             *args: Positional arguments for the algorithm.
             cache: Cache backend — a :class:`CacheBackend`, a path
                 (``str`` / ``Path`` → :class:`FolderCache`), or ``None``.
+                Remote compute nodes use only backends marked as shared.
+            remote: Remote backend name or instance, or ``None`` for local execution.
             force_rerun: If ``True``, skip the cache lookup and re-execute,
                 overwriting any previously cached result.
             **kwargs: Keyword arguments for the algorithm.
@@ -89,6 +92,18 @@ class _AlgorithmWrapper:
             The algorithm result.
 
         """
+        if remote is not None:
+            from qdk_chemistry.remote.proxy import run as remote_run  # noqa: PLC0415
+
+            return remote_run(
+                self._algo,
+                *args,
+                cache=cache,
+                remote=remote,
+                force_rerun=force_rerun,
+                **kwargs,
+            )
+
         if cache is None:
             return self._algo.run(*args, **kwargs)
 
