@@ -2931,8 +2931,29 @@ class TestQDKChemistryPySCFBasisConversion:
         # Create QDK Structure
         structure = Structure(symbols=["Ag", "H"], coordinates=mol1.atom_coords())
 
+        # Run native QDK SCF once and compare its ECP-adjusted quantities with PySCF
+        qdk_scf = algorithms.create("scf_solver", "qdk")
+        qdk_energy, qdk_wavefunction = qdk_scf.run(structure, 0, 1, "def2-svp")
+        qdk_native_basis = qdk_wavefunction.get_orbitals().get_basis_set()
+
+        np.testing.assert_allclose(qdk_native_basis.get_effective_nuclear_charges(), mol1.atom_charges())
+        assert np.isclose(
+            qdk_native_basis.calculate_effective_nuclear_repulsion_energy(),
+            mol1.energy_nuc(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        # Allow small numerical differences between the independent QDK and PySCF integral engines.
+        assert np.isclose(qdk_energy, energy1, rtol=float_comparison_relative_tolerance, atol=10 * scf_energy_tolerance)
+
         # Convert PySCF Mole to QDK BasisSet
         qdk_basis = pyscf_mol_to_qdk_basis(mol1, structure, basis_name="def2-svp")
+        assert not np.isclose(
+            structure.calculate_nuclear_repulsion_energy(),
+            qdk_basis.calculate_effective_nuclear_repulsion_energy(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
 
         # Convert QDK BasisSet back to PySCF Mole
         mol2 = basis_to_pyscf_mol(qdk_basis)

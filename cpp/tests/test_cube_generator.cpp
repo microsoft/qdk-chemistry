@@ -54,7 +54,9 @@ std::shared_ptr<BasisSet> make_hydrogen_p_basis() {
 }
 
 std::shared_ptr<BasisSet> make_ecp_basis(std::size_t core_electrons = 2) {
-  auto structure = testing::create_hydrogen_structure();
+  auto structure =
+      std::make_shared<Structure>(std::vector<Eigen::Vector3d>{{0.0, 0.0, 0.0}},
+                                  std::vector<Element>{Element::Ag});
   // Valence shell: an ordinary contracted Gaussian, exactly as an ECP basis
   // stores it. The r^n projectors live in the separate ECP shell container.
   std::vector<Shell> shells;

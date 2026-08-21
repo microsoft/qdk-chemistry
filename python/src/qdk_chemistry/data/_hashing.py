@@ -20,6 +20,19 @@ __all__: list[str] = []
 _NATIVE_IS_BIG = sys.byteorder == "big"
 
 
+def _numpy_scalar_to_python(value: Any) -> Any:
+    """Convert supported NumPy scalars to JSON-safe Python primitives."""
+    if isinstance(value, np.bool_):
+        return bool(value)
+    if isinstance(value, np.integer):
+        return int(value)
+    if isinstance(value, np.floating):
+        return float(value)
+    if isinstance(value, np.generic):
+        return value.item()
+    return value
+
+
 def _hash_bytes(h: "hashlib._Hash", data: bytes) -> None:
     """Feed raw bytes into the hasher."""
     h.update(data)
@@ -176,6 +189,7 @@ def _item_content_hash(item: Any) -> str:
 
 def _type_tag(item: Any) -> str:  # noqa: PLR0911
     """Return a short type tag for an item (used in output_hashes)."""
+    item = _numpy_scalar_to_python(item)
     if isinstance(item, list):
         if item and isinstance(item[0], CoreDataClass):
             return f"list[{instance_data_type_name(item[0])}]"
@@ -228,6 +242,6 @@ def collect_content_hashes(result: Any) -> list[dict[str, Any]]:
             "type": tag,
         }
         if _is_primitive(tag):
-            entry["value"] = item
+            entry["value"] = _numpy_scalar_to_python(item)
         entries.append(entry)
     return entries
