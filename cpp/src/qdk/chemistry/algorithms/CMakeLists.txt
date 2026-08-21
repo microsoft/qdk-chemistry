@@ -11,8 +11,8 @@ target_sources(chemistry PRIVATE
     population_analysis.cpp
     qdk_nuclear_derivative.cpp
     dynamical_correlation_calculator.cpp
-    geometry_optimization.cpp
     effective_hamiltonian.cpp
+    geometry_optimization.cpp
     scf.cpp
     stability.cpp
 )

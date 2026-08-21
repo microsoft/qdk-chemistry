@@ -8,6 +8,7 @@
 #include <qdk/chemistry/algorithms/effective_hamiltonian.hpp>
 
 #include "factory_bindings.hpp"
+#include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/swpt2.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::algorithms;
@@ -180,4 +181,89 @@ Returns:
       EffectiveHamiltonianConstructorFactory, EffectiveHamiltonianConstructor,
       EffectiveHamiltonianConstructorBase>(
       m, "EffectiveHamiltonianConstructorFactory");
+
+  py::class_<microsoft::SchriefferWolffPT2Constructor,
+             EffectiveHamiltonianConstructor, py::smart_holder>(
+      m, "QdkSchriefferWolffPT2Constructor", R"(
+Second-order Schrieffer-Wolff (Van Vleck) effective-Hamiltonian downfold.
+
+Computes ``H_eff = H_BD + 1/2 [S, H_OD]``, truncated to ``<= 2``-body, folding
+the window's external space ``Q`` onto its kept space ``P``. With bare
+denominators, the generator solves ``[F0, S] = H_OD`` for a diagonal
+generalized-Fock ``F0``. ``regularizer_sigma2`` instead builds a regularized
+generator, which solves that equation only approximately.
+The reference and window must use the same restricted MO basis, however it was
+produced: RHF, ROHF, CAS, localized and natural orbitals all qualify, including
+UHF natural orbitals carried as restricted orbitals with their 1-RDM.
+Unrestricted orbitals are not supported, and every singly occupied orbital must
+lie in the reference active space. The factory name is ``"qdk_swpt2"``.
+
+Denominator regularization is controlled by ``regularizer_sigma2`` (the
+:math:`\sigma` of the :math:`\sigma^2` regularizer, in :math:`E_h^{-2}`, default
+``1.0``), equivalently the DSRG flow parameter. Larger values regularize less and
+``0`` selects a guarded bare pseudoinverse. Coupled channels with
+:math:`|\Delta| < 10^{-8}\,E_h` are mapped to zero while the remaining channels
+are downfolded, and the constructor logs a warning when this occurs. The
+regularizer borrows the DSRG damping form but is not a full DSRG calculation.
+``semicanonicalize`` is enabled by default and diagonalizes the generalized
+Fock independently within inactive, active, and virtual orbital blocks before
+forming denominators; the emitted Hamiltonian is rotated back to the original
+reference basis. ROHF uses the spin-traced density and common spin-free
+orbital energies, preserving spin symmetry while the active solve selects the
+desired spin sector.
+
+``fold_above_two_body`` is enabled by default. The transformation generates
+three-body terms that a Hamiltonian cannot hold; folding uses pair contractions
+from the reference 1-RDM and keeps what falls to two-body instead of discarding
+it outright. For a Gaussian reference these are the ordinary Wick contractions,
+but the residual three-body operator is still discarded. For a correlated CAS
+reference the approximation additionally neglects the two-body and higher
+density cumulants. It can reduce the truncation error when the kept space holds
+more than two electrons, but makes the downfold more expensive, increasingly so
+as the kept space grows. It is ignored when the kept space holds at most two
+electrons, where a three-body operator has no matrix elements to contribute.
+
+The emitted two-body block is only 4-fold symmetric: hermiticity
+``(pq|rs) == (qp|sr)`` and electron exchange ``(pq|rs) == (rs|pq)`` hold, but the
+bra swap ``(pq|rs) == (qp|rs)`` of a genuine Coulomb integral does not. Consumers
+must be given the full dense ``norb**4`` block; one that reads only the canonical
+8-fold-unique elements silently reconstructs a different operator.
+
+The active regularization, minimum denominator, maximum raw intruder amplitude,
+and semicanonicalization status are logged when construction completes. A
+warning is also logged when the raw amplitude exceeds one, where the
+perturbation series stops contracting.
+
+The kept space ``P`` is a required ``run()`` argument (``p_indices``): a
+:class:`~qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet` of window
+(spatial) orbital indices. The reference wavefunction supplies
+the density over ``W``; ``P`` selects which orbitals are kept and need not
+coincide with the reference active space. A folded external orbital has its
+reference occupation rounded to doubly occupied or empty, bounded by
+``max_folded_occupation_deviation``. Rounding never changes the total electron
+count, because the active space receives whatever the folded orbitals do not
+take; the derived active electron count is logged and is the value to pass to
+the active-space solver.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+
+    downfolder = alg.create("effective_hamiltonian_constructor", "qdk_swpt2")
+    downfolder.settings().set("regularizer_sigma2", 0.4)
+    h_eff = downfolder.run(reference, window_hamiltonian, p_indices)
+
+See Also:
+    :class:`EffectiveHamiltonianConstructor`
+    :class:`qdk_chemistry.data.Wavefunction`
+    :class:`qdk_chemistry.data.Hamiltonian`
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes a Schrieffer-Wolff PT2 downfold with sigma^2 regularization enabled
+by default. Set ``regularizer_sigma2`` to 0 for unregularized second-order PT.
+)");
 }

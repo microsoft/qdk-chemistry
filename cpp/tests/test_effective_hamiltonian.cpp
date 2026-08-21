@@ -86,7 +86,9 @@ TEST(EffectiveHamiltonianConstructorTest, MetaData) {
 }
 
 TEST(EffectiveHamiltonianConstructorTest, Factory) {
-  EXPECT_TRUE(EffectiveHamiltonianConstructorFactory::available().empty());
+  const auto built_in = EffectiveHamiltonianConstructorFactory::available();
+  EXPECT_NE(std::find(built_in.begin(), built_in.end(), "qdk_swpt2"),
+            built_in.end());
   EXPECT_THROW(
       EffectiveHamiltonianConstructorFactory::create("nonexistent_constructor"),
       std::runtime_error);
