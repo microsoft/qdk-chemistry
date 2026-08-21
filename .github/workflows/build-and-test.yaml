@@ -104,9 +104,6 @@ jobs:
       QSHARP_PYTHON_TELEMETRY: 'false'
       CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
       CPP_DEPS_PREFIX: ${{ github.workspace }}/cpp_deps_install
-      # ExaChem/TAMM (Linux only): final ExaChem + TAMM install (this is what's added to PATH for the Python tests).
-      # Open MPI/BLAS++/LAPACK++ are not built separately for ExaChem -- MPI comes from apt, and BLAS++/LAPACK++
-      # are already built into CPP_DEPS_PREFIX above (for MACIS) and reused directly.
       EXACHEM_INSTALL_PREFIX: ${{ github.workspace }}/exachem_install
       CTEST_OUTPUT_ON_FAILURE: 1
       CMAKE_BUILD_PARALLEL_LEVEL: ${{ matrix.build-parallel }}
@@ -171,10 +168,6 @@ jobs:
           fi
         done
 
-        # gfortran, libnuma-dev, nlohmann-json3-dev, openmpi-bin/libopenmpi-dev below are only needed to build
-        # ExaChem/TAMM (the TAMM/CMSB superbuild + its MPI runtime); libgfortran5 above is a runtime-only lib,
-        # not the compiler itself. Ubuntu 24.04's libopenmpi-dev (Open MPI 4.1.6) already ships working Fortran
-        # bindings (mpifort), so Open MPI is installed from apt rather than built from source.
         sudo apt-get update
         sudo apt-get install -y \
           build-essential \
@@ -284,12 +277,6 @@ jobs:
           cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
           ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/install_cpp_dependencies.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh') }}
 
-    # ExaChem/TAMM (Linux only): builds the ExaChem binary so the ExaChem CCSD plugin's integration tests
-    # (python/tests/test_exachem_ccsd_integration.py) can actually run instead of self-skipping. The MPI runtime
-    # comes from apt (see "Install Linux system packages" above); LibInt2/GauXC/BLAS++/LAPACK++ are reused from
-    # this job's own CPP_DEPS_PREFIX rather than rebuilt. See .devcontainer/scripts/exachem/install_exachem.sh for
-    # the full rationale.
-    #
     # TODO: this currently builds (and, after the first run, restores from cache) on every Linux job regardless of
     # whether slow tests will actually run, to make initial CI bring-up/debugging easier. Once this is verified
     # working end-to-end, gate it behind the same condition used for QDK_CHEMISTRY_RUN_SLOW_TESTS below (only build
@@ -303,7 +290,7 @@ jobs:
           ${{ env.EXACHEM_INSTALL_PREFIX }}
         key: >-
           exachem-${{ runner.os }}-${{ matrix.uarch }}-
-          ${{ hashFiles('.devcontainer/scripts/exachem/**') }}-
+          ${{ hashFiles('.pipelines/install-scripts/exachem/**') }}-
           ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/install_cpp_dependencies.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh') }}
 
     - name: Install ExaChem + TAMM (Linux)
@@ -314,7 +301,8 @@ jobs:
         MARCH: ${{ matrix.uarch }}
         JOBS: ${{ matrix.build-parallel }}
       run: |
-        bash ${{ github.workspace }}/.devcontainer/scripts/exachem/install_exachem.sh
+        bash ${{ github.workspace }}/.pipelines/install-scripts/exachem/install_exachem.sh \
+          ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json
 
     - name: Save ExaChem cache
       if: matrix.os-name == 'Linux' && steps.cache-exachem.outputs.cache-hit != 'true'
@@ -324,7 +312,7 @@ jobs:
           ${{ env.EXACHEM_INSTALL_PREFIX }}
         key: >-
           exachem-${{ runner.os }}-${{ matrix.uarch }}-
-          ${{ hashFiles('.devcontainer/scripts/exachem/**') }}-
+          ${{ hashFiles('.pipelines/install-scripts/exachem/**') }}-
           ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/install_cpp_dependencies.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh') }}
 
     - name: Add ExaChem/MPI to PATH (Linux)
