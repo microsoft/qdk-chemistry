@@ -25,7 +25,7 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-: "${CPP_DEPS_PREFIX:?CPP_DEPS_PREFIX must be set to qdk-chemistry's cached C++ deps prefix (provides LibInt2/GauXC/BLAS++/LAPACK++)}"
+: "${CPP_DEPS_PREFIX:?CPP_DEPS_PREFIX must be set to the cached qdk-chemistry C++ deps prefix (provides LibInt2/GauXC/BLAS++/LAPACK++)}"
 
 if ! command -v mpicc >/dev/null 2>&1; then
   echo "ERROR: mpicc not found on PATH. Install an MPI runtime (e.g. 'sudo apt-get install -y openmpi-bin libopenmpi-dev') before running this script." >&2
