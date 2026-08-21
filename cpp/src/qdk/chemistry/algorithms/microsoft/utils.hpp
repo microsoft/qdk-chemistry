@@ -13,6 +13,7 @@
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <string>
+#include <vector>
 
 namespace qdk::chemistry::utils::microsoft {
 
@@ -180,12 +181,5 @@ size_t factorial(size_t n);
  * @return The binomial coefficient C(n, k), or 0 if k > n.
  */
 size_t binomial_coefficient(size_t n, size_t k);
-
-/**
- * @brief Check whether a sorted index sequence is contiguous.
- * @param indices Sorted, unique orbital indices
- * @return true when the sequence is empty, has one element, or has no gaps
- */
-bool indices_are_contiguous(const std::vector<size_t>& indices);
 
 }  // namespace qdk::chemistry::utils::microsoft

@@ -38,8 +38,8 @@ detail::build_one_body_ao(const data::BasisSet& basis_set,
 
   if (use_x2c) {
     return {internal_basis_set,
-            build_x2c_one_body_ao(internal_basis_set,
-                                  integral_dressing == "x2c_1e")};
+            detail::build_x2c_one_body_ao(internal_basis_set,
+                                          integral_dressing == "x2c_1e")};
   }
   if (!integral_dressing.empty()) {
     throw std::invalid_argument("Unsupported integral dressing '" +
@@ -101,14 +101,14 @@ std::shared_ptr<data::Hamiltonian> detail::construct_canonical_hamiltonian(
 
   // Validate alpha active orbitals and check contiguity
   bool alpha_space_is_contiguous =
-      utils::microsoft::indices_are_contiguous(active_indices_alpha);
+      detail::indices_are_contiguous(active_indices_alpha);
 
   // Validate beta active orbitals (if different from alpha) and check
   // contiguity
   bool beta_space_is_contiguous = true;
   if (active_indices_beta != active_indices_alpha) {
     beta_space_is_contiguous =
-        utils::microsoft::indices_are_contiguous(active_indices_beta);
+        detail::indices_are_contiguous(active_indices_beta);
   } else {
     beta_space_is_contiguous = alpha_space_is_contiguous;
   }
@@ -292,7 +292,7 @@ std::shared_ptr<data::Hamiltonian> detail::construct_canonical_hamiltonian(
 
     // Determine whether the inactive space is contiguous
     bool inactive_space_is_contiguous =
-        utils::microsoft::indices_are_contiguous(inactive_indices);
+        detail::indices_are_contiguous(inactive_indices);
 
     // Compute the inactive density matrix
     Eigen::MatrixXd D_inactive =
@@ -345,11 +345,11 @@ std::shared_ptr<data::Hamiltonian> detail::construct_canonical_hamiltonian(
 
     // Determine whether the alpha inactive space is contiguous
     bool alpha_inactive_is_contiguous =
-        utils::microsoft::indices_are_contiguous(inactive_indices_alpha);
+        detail::indices_are_contiguous(inactive_indices_alpha);
 
     // Determine whether the beta inactive space is contiguous
     bool beta_inactive_is_contiguous =
-        utils::microsoft::indices_are_contiguous(inactive_indices_beta);
+        detail::indices_are_contiguous(inactive_indices_beta);
 
     // Compute separate alpha and beta inactive density matrices
     Eigen::MatrixXd D_inactive_alpha =

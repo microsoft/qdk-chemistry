@@ -492,15 +492,4 @@ size_t binomial_coefficient(size_t n, size_t k) {
   return result;
 }
 
-bool indices_are_contiguous(const std::vector<size_t>& indices) {
-  QDK_LOG_TRACE_ENTERING();
-  for (size_t i = 1; i < indices.size(); ++i) {
-    if (indices[i] != indices[i - 1] + 1) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
 }  // namespace qdk::chemistry::utils::microsoft

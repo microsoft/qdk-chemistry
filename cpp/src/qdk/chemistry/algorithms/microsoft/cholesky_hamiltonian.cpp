@@ -623,14 +623,14 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
 
   // Validate alpha active orbitals and check contiguity
   bool alpha_space_is_contiguous =
-      utils::microsoft::indices_are_contiguous(active_indices_alpha);
+      detail::indices_are_contiguous(active_indices_alpha);
 
   // Validate beta active orbitals (if different from alpha) and check
   // contiguity
   bool beta_space_is_contiguous = true;
   if (active_indices_beta != active_indices_alpha) {
     beta_space_is_contiguous =
-        utils::microsoft::indices_are_contiguous(active_indices_beta);
+        detail::indices_are_contiguous(active_indices_beta);
   } else {
     beta_space_is_contiguous = alpha_space_is_contiguous;
   }
@@ -798,7 +798,7 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
 
     // Determine whether the inactive space is contiguous
     bool inactive_space_is_contiguous =
-        utils::microsoft::indices_are_contiguous(inactive_indices);
+        detail::indices_are_contiguous(inactive_indices);
 
     // Compute the inactive density matrix
     Eigen::MatrixXd D_inactive =
@@ -856,11 +856,11 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
 
     // Determine whether the alpha inactive space is contiguous
     bool alpha_inactive_is_contiguous =
-        utils::microsoft::indices_are_contiguous(inactive_indices_alpha);
+        detail::indices_are_contiguous(inactive_indices_alpha);
 
     // Determine whether the beta inactive space is contiguous
     bool beta_inactive_is_contiguous =
-        utils::microsoft::indices_are_contiguous(inactive_indices_beta);
+        detail::indices_are_contiguous(inactive_indices_beta);
 
     // Compute separate alpha and beta inactive density matrices
     Eigen::MatrixXd D_inactive_alpha =

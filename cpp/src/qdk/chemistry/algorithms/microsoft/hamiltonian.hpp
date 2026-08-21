@@ -4,9 +4,11 @@
 
 #pragma once
 
+#include <cstddef>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/settings.hpp>
+#include <vector>
 
 namespace qdk::chemistry::scf {
 class BasisSet;
@@ -19,6 +21,16 @@ class BasisSet;
 namespace qdk::chemistry::algorithms::microsoft {
 
 namespace detail {
+
+/**
+ * @brief Check whether sorted, unique orbital indices contain no gaps.
+ * @param indices Sorted, unique orbital indices.
+ * @return True when the sequence is empty or contiguous.
+ */
+inline bool indices_are_contiguous(const std::vector<std::size_t>& indices) {
+  return indices.empty() ||
+         indices.back() - indices.front() + 1 == indices.size();
+}
 
 std::pair<std::shared_ptr<qdk::chemistry::scf::BasisSet>, Eigen::MatrixXd>
 build_one_body_ao(const data::BasisSet& basis_set,
