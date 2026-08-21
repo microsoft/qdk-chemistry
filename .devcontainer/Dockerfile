@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y locales && \
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US:en \
     LC_ALL=en_US.UTF-8 \
-    LD_LIBRARY_PATH=/usr/local/lib:${LD_LIBRARY_PATH} \
+    LD_LIBRARY_PATH=/usr/local/lib \
     PATH=/usr/local/bin:${PATH}
 
 # Create a non-root user with sudo privileges
@@ -94,12 +94,27 @@ USER $USERNAME
 # Setup bash prompt
 RUN echo 'export PS1="\[\033[1;34m\]\u@qdk-dev:\w$ \[\033[0m\]"' >> ~/.bashrc
 
+# Use Microsoft's public package proxies by default. Override these build
+# arguments to use different registries.
+ARG NPM_CONFIG_REGISTRY=https://packagefeedproxy.microsoft.io/npm/
+ENV NPM_CONFIG_REGISTRY=${NPM_CONFIG_REGISTRY}
+
+ARG PIP_INDEX_URL=https://packagefeedproxy.microsoft.io/pypi/simple
+ENV PIP_INDEX_URL=${PIP_INDEX_URL}
+
 # Create the Python virtual environment.
 ENV VIRTUAL_ENV=/home/$USERNAME/qdk_chemistry_venv \
     PATH=/home/$USERNAME/qdk_chemistry_venv/bin:$PATH
 
+# The post-create editable install disables build isolation so its persistent
+# CMake cache uses stable tool paths. Preinstall python/pyproject.toml's
+# [build-system].requires here; --check-build-dependencies detects any drift.
 RUN python -m venv "$VIRTUAL_ENV" \
-    && pip install --no-cache-dir --upgrade pip setuptools wheel \
+    && python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
+    && python -m pip install --no-cache-dir \
+    "scikit-build-core>=0.10.0" \
+    "pybind11>=2.13.6" \
+    "numpy>=2.0.0,<2.4.0" \
     && echo "source $VIRTUAL_ENV/bin/activate" >> ~/.bashrc
 
 # Set the safe CMAKE_BUILD_PARALLEL_LEVEL for interactive shells

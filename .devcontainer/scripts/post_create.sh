@@ -1,7 +1,7 @@
 #!/bin/bash
 # Post-create step: install QDK Chemistry from the mounted source.
 set -euo pipefail
-source "$HOME/qdk_chemistry_venv/bin/activate"
+source "${VIRTUAL_ENV:?}/bin/activate"
 
 # Set a memory-/core-aware CMAKE_BUILD_PARALLEL_LEVEL (unless already set) so the
 # initial build below does not oversubscribe CPU or OOM on constrained machines.
@@ -13,10 +13,15 @@ source /usr/local/share/qdk/parallelism.sh
 cmake -S cpp -B cpp/build -G Ninja \
     -DCMAKE_INSTALL_PREFIX="$HOME/.local" \
     -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-RelWithDebInfo}" \
+    -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
     -DCMAKE_DISABLE_FIND_PACKAGE_macis=ON
 cmake --build cpp/build
 cmake --install cpp/build
 
 # Install python library
 cd ./python
-pip install -v .[all]
+pip install -v \
+    --no-build-isolation \
+    --check-build-dependencies \
+    -C build-dir="build/{wheel_tag}" \
+    -e '.[all]'
