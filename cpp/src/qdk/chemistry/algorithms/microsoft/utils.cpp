@@ -151,6 +151,28 @@ qdk::chemistry::data::Structure convert_to_structure(
   return qdk::chemistry::data::Structure(coordinates, elements);
 }
 
+std::vector<std::uint64_t> to_integral_nuclear_charges(
+    const Eigen::VectorXd& nuclear_charges) {
+  constexpr double integral_charge_tolerance = 1e-12;
+  const Eigen::VectorXd rounded_charges =
+      nuclear_charges.array().round().matrix();
+
+  if (!nuclear_charges.allFinite() || (rounded_charges.array() < 0.0).any() ||
+      ((nuclear_charges - rounded_charges).array().abs() >
+       integral_charge_tolerance)
+          .any()) {
+    throw std::invalid_argument(
+        "Nuclear charges must be finite, nonnegative, and integral.");
+  }
+
+  std::vector<std::uint64_t> integral_charges;
+  integral_charges.reserve(static_cast<std::size_t>(rounded_charges.size()));
+  for (Eigen::Index i = 0; i < rounded_charges.size(); ++i) {
+    integral_charges.push_back(static_cast<std::uint64_t>(rounded_charges(i)));
+  }
+  return integral_charges;
+}
+
 std::shared_ptr<qcs::Molecule> convert_to_molecule(
     const qdk::chemistry::data::Structure& structure, int64_t charge,
     int64_t multiplicity) {
@@ -158,13 +180,14 @@ std::shared_ptr<qcs::Molecule> convert_to_molecule(
 
   // Convert the Structure to a Molecule
   const auto& coordinates = structure.get_coordinates();
-  const auto& nuclear_charges = structure.get_nuclear_charges();
+  const auto nuclear_charges =
+      to_integral_nuclear_charges(structure.get_nuclear_charges());
 
   auto molecule_ptr = std::make_shared<qcs::Molecule>();
   auto& molecule = *molecule_ptr;
   molecule.n_atoms = static_cast<uint64_t>(coordinates.rows());
-  molecule.total_nuclear_charge =
-      std::accumulate(nuclear_charges.begin(), nuclear_charges.end(), 0u);
+  molecule.total_nuclear_charge = std::accumulate(
+      nuclear_charges.begin(), nuclear_charges.end(), std::uint64_t{0});
   molecule.charge = charge;
   molecule.multiplicity = multiplicity;
   molecule.n_electrons = molecule.total_nuclear_charge - molecule.charge;
@@ -279,11 +302,10 @@ std::shared_ptr<qcs::BasisSet> convert_basis_set_from_qdk(
   auto mol = convert_to_molecule(*structure, 0,
                                  1);  // Default charge=0, multiplicity=1
 
-  // remove number of ecp electrons from atomic charges
-  auto ecp_electrons = qdk_basis_set.get_ecp_electrons();
+  const auto effective_charges = to_integral_nuclear_charges(
+      qdk_basis_set.get_effective_nuclear_charges());
   for (size_t i = 0; i < mol->n_atoms; ++i) {
-    int n_core_electrons = static_cast<int>(ecp_electrons[i]);
-    mol->atomic_charges[i] = mol->atomic_nums[i] - n_core_electrons;
+    mol->atomic_charges[i] = effective_charges[i];
   }
 
   auto basis_json = convert_to_json(qdk_basis_set);
