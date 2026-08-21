@@ -38,8 +38,12 @@ def cosine_window_state(num_queries: int) -> list[float]:
         Real amplitudes normalized to unit norm, zero-padded to a whole number of qubits.
 
     """
-    dimension = 1 << int(num_queries).bit_length()
-    num_states = num_queries + 1
+    num_queries_int = int(num_queries)
+    if num_queries_int <= 0 or num_queries_int != num_queries:
+        raise ValueError(f"num_queries must be a positive integer. Got {num_queries}.")
+
+    dimension = 1 << num_queries_int.bit_length()
+    num_states = num_queries_int + 1
     amplitudes = np.sin(np.pi * (np.arange(num_states) + 1) / (num_states + 1))
     padded = np.zeros(dimension)
     padded[:num_states] = amplitudes / np.linalg.norm(amplitudes)
