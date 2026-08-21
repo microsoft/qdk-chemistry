@@ -155,7 +155,7 @@ def basis_to_pyscf_mol(basis: BasisSet, charge: int = 0, multiplicity: int = 1) 
             exponents = shell.exponents
             coefficients = shell.coefficients
             for j in range(len(exponents)):
-                shell_rec += f"{exponents[j]:16.8f} {coefficients[j]:16.8f}\n"
+                shell_rec += f"{exponents[j]:.17g} {coefficients[j]:.17g}\n"
             atom_basis.append(pyscf.gto.parse(shell_rec))
         basis_dict[pyscf_symbols[i]] = atom_basis
 
