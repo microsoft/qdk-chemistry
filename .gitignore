@@ -20,6 +20,8 @@ eggs/
 .eggs/
 install/
 install-*/
+!/.pipelines/install-scripts/
+!/.pipelines/install-scripts/**
 lib/
 lib64/
 parts/
