@@ -140,7 +140,10 @@ COMMON_CMAKE_ARGS=(
 echo "=== Building TAMM (${TAMM_COMMIT}) ==="
 git clone "${TAMM_REPO}" "${BUILD_ROOT}/TAMM"
 git -C "${BUILD_ROOT}/TAMM" checkout "${TAMM_COMMIT}"
-CC=gcc CXX=g++ FC=gfortran cmake -S "${BUILD_ROOT}/TAMM" -B "${BUILD_ROOT}/TAMM/build" -GNinja \
+# Use the default Unix Makefiles generator, not Ninja: CMSB's CMakeBuild_External sub-build invokes
+# "<generator-tool> install DESTDIR=<stage>", which make(1) accepts as a variable override but ninja rejects as
+# an unknown target.
+CC=gcc CXX=g++ FC=gfortran cmake -S "${BUILD_ROOT}/TAMM" -B "${BUILD_ROOT}/TAMM/build" \
   -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" \
   "${COMMON_CMAKE_ARGS[@]}" \
   -DBUILD_LibInt2=OFF \
@@ -170,7 +173,7 @@ git -C "${BUILD_ROOT}/exachem" apply --verbose "${SCRIPT_DIR}/patches/exachem-se
 git -C "${BUILD_ROOT}/exachem" apply --verbose "${SCRIPT_DIR}/patches/exachem-gauxc-mpi.patch"
 git -C "${BUILD_ROOT}/exachem" apply --verbose "${SCRIPT_DIR}/patches/exachem-libint2-deprecated.patch"
 
-CC=gcc CXX=g++ FC=gfortran cmake -S "${BUILD_ROOT}/exachem" -B "${BUILD_ROOT}/exachem/build" -GNinja \
+CC=gcc CXX=g++ FC=gfortran cmake -S "${BUILD_ROOT}/exachem" -B "${BUILD_ROOT}/exachem/build" \
   -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" \
   "${COMMON_CMAKE_ARGS[@]}" \
   -DTAMM_EXTRA_LIBS="${HDF5_LIBS} -ldl -lm"
