@@ -236,7 +236,26 @@ def basis_to_pyscf_mol(basis: BasisSet, charge: int = 0, multiplicity: int = 1) 
             mol.qdk_ecp_name = basis.get_ecp_name()
     elif basis.has_ecp_electrons():
         # Fallback: only ECP name available, no shells
-        mol.ecp = basis.get_ecp_name()
+        ecp_name = basis.get_ecp_name()
+        ecp_electrons = basis.get_ecp_electrons()
+        ecp_dict = {}
+        atom_indices_by_element: dict[str, list[int]] = {}
+        for iatm, element in enumerate(elements):
+            atom_indices_by_element.setdefault(element, []).append(iatm)
+
+        for element, atom_indices in atom_indices_by_element.items():
+            element_ecp_electrons = [ecp_electrons[iatm] for iatm in atom_indices]
+            if element_ecp_electrons[0] > 0 and all(
+                ncore == element_ecp_electrons[0] for ncore in element_ecp_electrons
+            ):
+                ecp_dict[element] = ecp_name
+            else:
+                for iatm, ncore in zip(atom_indices, element_ecp_electrons, strict=True):
+                    if ncore > 0:
+                        ecp_dict[pyscf_symbols[iatm]] = ecp_name
+
+        mol.ecp = ecp_dict
+        mol.qdk_ecp_name = ecp_name
 
     mol.build()
 

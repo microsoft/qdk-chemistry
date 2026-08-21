@@ -2838,6 +2838,33 @@ class TestQDKChemistryPySCFBasisConversion:
         assert pyscf_mol.atom_charges().tolist() == [19, 19]
         assert pyscf_mol.nelectron == 38
 
+    def test_qdk_to_pyscf_preserves_atom_specific_named_ecp(self):
+        """Test mixed ECP metadata without explicit ECP shells."""
+        structure = Structure(
+            ["Ag", "Ag"],
+            np.array(
+                [
+                    [0.0, 0.0, 0.0],
+                    [5.0, 0.0, 0.0],
+                ]
+            ),
+        )
+        orbital_basis = BasisSet.from_index_map({0: "lanl2dz", 1: "lanl2dz"}, structure)
+        basis = BasisSet(
+            "lanl2dz",
+            orbital_basis.get_shells(),
+            "lanl2dz",
+            [],
+            [28, 0],
+            structure,
+        )
+
+        pyscf_mol = basis_to_pyscf_mol(basis)
+
+        assert set(pyscf_mol.ecp) == {"Ag1"}
+        assert pyscf_mol.atom_charges().tolist() == [19, 47]
+        assert pyscf_mol.nelectron == 66
+
     def test_ecp_roundtrip_conversion(self):
         """Test round-trip conversion of ECP shells and metadata: QDK -> PySCF -> QDK."""
         ag_structure = Structure(["Ag"], np.array([[0.0, 0.0, 0.0]]))
