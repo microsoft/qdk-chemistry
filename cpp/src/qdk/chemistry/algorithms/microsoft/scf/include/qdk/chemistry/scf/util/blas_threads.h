@@ -8,13 +8,8 @@
 
 namespace qdk::chemistry::scf::util {
 
-/**
- * @brief BLAS backends whose threading can be controlled at runtime.
- *
- * Enumerators are generated from QDK_CHEMISTRY_BLAS_BACKEND_TABLE in
- * scf/config.h, which CMake emits from the table it probes with.
- * BlasVendor::Unknown means no recognized thread-control API was found.
- */
+/// @brief BLAS backends whose threading can be controlled at runtime.
+/// Enumerators come from QDK_CHEMISTRY_BLAS_BACKEND_TABLE in scf/config.h.
 enum class BlasVendor {
   Unknown,
 #define QDK_CHEMISTRY_BLAS_VENDOR_ENUMERATOR(token, vendor, label, set_fn, \
@@ -27,50 +22,29 @@ enum class BlasVendor {
 /// @brief Human readable name of a BLAS vendor.
 const char* to_string(BlasVendor vendor);
 
-/**
- * @brief BLAS backend whose thread count this build controls (resolved once,
- * on first use).
- *
- * The backend is bound at link time, where CMake could probe one against the
- * configured BLAS.
- *
- * @return The bound vendor, or BlasVendor::Unknown when no supported
- *         thread-control API is available, in which case ScopedBlasThreads is
- *         a no-op.
- */
+/// @brief BLAS backend whose thread count this build controls, bound at link
+/// time by CMake. Unknown means ScopedBlasThreads is a no-op.
 BlasVendor detected_blas_vendor();
 
-/**
- * @brief Current BLAS thread count.
- *
- * Exposed for diagnostics and to let tests verify that ScopedBlasThreads
- * pins and restores the count; production code should use ScopedBlasThreads
- * rather than managing the count itself.
- *
- * @return Number of threads, or 0 if the BLAS backend cannot report it.
- */
+/// @brief Current BLAS thread count, or 0 if the backend cannot report it.
+/// For diagnostics and tests; production code should use ScopedBlasThreads.
 int get_blas_num_threads();
 
 /**
  * @brief RAII guard that pins BLAS to a single thread while active and
  * restores the previous count once the outermost guard exits.
  *
- * Motivation: GauXC's OpenMP-parallel grid loop calls BLAS from many threads
- * at once. If BLAS is also multi-threaded, those threads collide inside the
- * BLAS backend's own shared worker pool, oversubscribing the machine and, for
- * some backends, corrupting results. Pinning BLAS to a single thread for the
- * duration of such a region avoids that.
+ * GauXC's OpenMP-parallel grid loop calls BLAS from many threads at once; if
+ * BLAS is also multi-threaded those threads collide inside its shared worker
+ * pool, oversubscribing the machine and, for some backends, corrupting results.
  *
- * The BLAS thread count is process-global state, so this guard uses a shared,
- * mutex-protected nesting depth instead of per-instance state: only the first
- * guard to start changes it, and only the last one to finish restores it. This
- * keeps concurrent/recursive use safe, and is why the count is not
- * configurable: a nested guard could not be honored without overriding the
- * count an enclosing one relies on.
+ * The count is process-global, so nesting is tracked by a shared,
+ * mutex-protected depth: the first guard pins, the last restores. That is also
+ * why the count is not configurable -- a nested guard could not be honored
+ * without overriding the count an enclosing one relies on.
  *
- * The guard is a no-op if the BLAS backend exposes no thread-control API (a
- * one-time warning is logged), or cannot report its current count, which would
- * leave nothing to restore.
+ * A no-op if the backend exposes no thread-control API (warned once) or cannot
+ * report its current count.
  */
 class ScopedBlasThreads {
  public:

@@ -14,11 +14,10 @@ set(QDK_CHEMISTRY_ENABLE_DFTD3 "@QDK_CHEMISTRY_ENABLE_DFTD3@" CACHE BOOL "Enable
 # Always Required Dependencies
 include(CMakeFindDependencyMacro)
 
-# When the SCF BLAS thread-control API was bound at link time, the installed
-# archive references vendor-specific symbols (e.g. openblas_set_num_threads)
-# while the exported dependency is the vendor-agnostic BLAS::BLAS. Steer the
-# search below to the same provider, or a machine with several BLAS
-# installations may pick a different one and fail to link.
+# The installed archive references vendor-specific symbols (e.g.
+# openblas_set_num_threads) while the exported dependency is the
+# vendor-agnostic BLAS::BLAS. Steer the search below to the same provider, or a
+# machine with several BLAS installations may pick another and fail to link.
 set(QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR "@QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR@")
 set(QDK_CHEMISTRY_BLAS_THREAD_SYMBOLS "@QDK_CHEMISTRY_BLAS_THREAD_SYMBOLS@")
 if(QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR AND NOT BLAS_PREFERENCE_LIST)
@@ -71,9 +70,8 @@ list(REMOVE_AT CMAKE_MODULE_PATH 0)
 
 # Check the bound symbols rather than comparing vendor names: BLAS_VENDOR is
 # only set when the linalg FindBLAS module performs the search, so it is empty
-# whenever another module found BLAS first. Failing here beats an unresolved
-# symbol at link time. Every bound symbol is checked, because the library calls
-# both halves of the thread-control API and either one missing fails the link.
+# whenever another module found BLAS first. Both halves are checked because the
+# library calls both, and either one missing fails the link.
 if(QDK_CHEMISTRY_BLAS_THREAD_SYMBOLS)
   include(CheckFunctionExists)
 

@@ -102,29 +102,21 @@ install(
   COMPONENT qdk_chemistry_resources
 )
 
-###############################################################################
-# Detect the BLAS thread-control API (see util/blas_threads.cpp)
-###############################################################################
-#
-# Each BLAS backend spells that API differently, so ask the configured BLAS
-# which one links instead of assuming OpenBLAS. Binding here is the only way to
-# reach the BLAS our own calls go to: a symbol found in the running process may
-# belong to a different BLAS, and a statically linked one exports nothing.
-
+# Detect the BLAS thread-control API (see util/blas_threads.cpp). Each backend
+# spells it differently, so ask the configured BLAS which one links instead of
+# assuming OpenBLAS. Link-time binding is the only way to reach the BLAS our own
+# calls go to: an in-process symbol may belong to a different BLAS, and a
+# statically linked one exports nothing.
 include(CheckFunctionExists)
 
 set(QDK_CHEMISTRY_BLAS_VENDOR "${BLAS_VENDOR}")
 
-# Candidate APIs, in probe order: a dispatch layer can also expose its
-# backend's API, so ask the dispatcher first. Single source of truth for BLAS
-# thread control: drives the configure-time probe below and, through
-# QDK_CHEMISTRY_BLAS_BACKEND_TABLE in config.h.in, the BlasVendor enumeration
-# in util/blas_threads.h. Columns are setter, getter, thread-count type,
-# BlasVendor enumerator, display name.
-#
+# Candidate APIs, in probe order: a dispatch layer can also expose its backend's
+# API, so ask the dispatcher first. Single source of truth -- drives the probe
+# below and, via QDK_CHEMISTRY_BLAS_BACKEND_TABLE, the BlasVendor enumeration.
+# Columns are setter, getter, thread-count type, enumerator, display name.
 # OPENBLAS also covers drop-ins such as ARM Performance Libraries. BLIS types
-# the count as dim_t, 32- or 64-bit depending on its build; the 64-bit form is
-# safe for both, as a 32-bit callee reads the low half of the argument register.
+# the count as dim_t, whose width the probe below resolves from blis.h.
 set(_qdk_blas_backends FLEXIBLAS OPENBLAS INTELMKL BLIS NVPL)
 set(_qdk_blas_api_FLEXIBLAS
     flexiblas_set_num_threads flexiblas_get_num_threads int FlexiBLAS "FlexiBLAS")
@@ -176,8 +168,7 @@ function(qdk_check_blas_thread_api backend out_var)
   endif()
 endfunction()
 
-# Pick at most one backend; empty means ScopedBlasThreads is a no-op, since a
-# backend can only be bound here.
+# Pick at most one backend; empty means ScopedBlasThreads is a no-op.
 set(_qdk_blas_thread_api "")
 if(QDK_CHEMISTRY_BLAS_THREAD_API STREQUAL "AUTO")
   foreach(_qdk_blas_backend IN LISTS _qdk_blas_backends)
@@ -193,6 +184,46 @@ elseif(NOT QDK_CHEMISTRY_BLAS_THREAD_API STREQUAL "NONE")
     "Expected AUTO, NONE or one of: ${_qdk_blas_backends}.")
 endif()
 
+# BLIS's dim_t is 32- or 64-bit depending on its build, and declaring the wrong
+# width is an ABI mismatch (GCC LTO: -Wlto-type-mismatch), so read it from
+# blis.h and decline the backend rather than guess when the header is missing.
+if(_qdk_blas_thread_api STREQUAL "BLIS")
+  include(CheckTypeSize)
+  include(CMakePushCheckState)
+
+  set(_qdk_blis_dim_t_type "")
+  foreach(_qdk_blis_header blis.h blis/blis.h)
+    if(NOT _qdk_blis_dim_t_type)
+      cmake_push_check_state(RESET)
+      set(CMAKE_REQUIRED_INCLUDES ${BLAS_INCLUDE_DIRS})
+      set(CMAKE_REQUIRED_QUIET TRUE)
+      set(CMAKE_EXTRA_INCLUDE_FILES ${_qdk_blis_header})
+      unset(QDK_CHEMISTRY_BLIS_DIM_T CACHE)
+      unset(HAVE_QDK_CHEMISTRY_BLIS_DIM_T CACHE)
+      check_type_size("dim_t" QDK_CHEMISTRY_BLIS_DIM_T LANGUAGE CXX)
+      cmake_pop_check_state()
+
+      if(QDK_CHEMISTRY_BLIS_DIM_T EQUAL 8)
+        set(_qdk_blis_dim_t_type "std::int64_t")
+      elseif(QDK_CHEMISTRY_BLIS_DIM_T EQUAL 4)
+        set(_qdk_blis_dim_t_type "std::int32_t")
+      endif()
+    endif()
+  endforeach()
+
+  if(_qdk_blis_dim_t_type)
+    list(REMOVE_AT _qdk_blas_api_BLIS 2)
+    list(INSERT _qdk_blas_api_BLIS 2 "${_qdk_blis_dim_t_type}")
+  else()
+    message(WARNING
+      "BLIS thread control disabled: could not determine sizeof(dim_t) from "
+      "blis.h (looked in '${BLAS_INCLUDE_DIRS}'). Declaring a fixed width "
+      "would be an ABI mismatch. Point BLAS_INCLUDE_DIRS at the directory "
+      "containing blis.h to enable it.")
+    set(_qdk_blas_thread_api "")
+  endif()
+endif()
+
 if(_qdk_blas_thread_api)
   # Selected row, consumed by config.h.in as QDK_CHEMISTRY_BLAS_LINKED_*.
   list(GET _qdk_blas_api_${_qdk_blas_thread_api} 0 QDK_CHEMISTRY_BLAS_LINKED_SET_FN)
@@ -201,10 +232,10 @@ if(_qdk_blas_thread_api)
   list(GET _qdk_blas_api_${_qdk_blas_thread_api} 3 QDK_CHEMISTRY_BLAS_LINKED_VENDOR)
   # Already linked transitively through GauXC; name it for the symbols we call.
   target_link_libraries(chemistry PRIVATE ${_qdk_blas_link_libs})
-  # Link-time binding leaves vendor-specific symbols unresolved in the installed
-  # archive while the exported dependency is the vendor-agnostic BLAS::BLAS, so
-  # cmake/qdkConfig.cmake.in steers and verifies the consumer's BLAS search.
-  # Cache variables because this is a subdirectory scope.
+  # The installed archive references vendor-specific symbols while the exported
+  # dependency is the vendor-agnostic BLAS::BLAS, so cmake/qdkConfig.cmake.in
+  # steers and verifies the consumer's BLAS search. Cache variables because this
+  # is a subdirectory scope.
   set(QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR "${QDK_CHEMISTRY_BLAS_VENDOR}"
       CACHE INTERNAL
       "BLAS vendor whose thread-control symbols are bound into the library")

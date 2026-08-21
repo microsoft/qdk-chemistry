@@ -10,10 +10,10 @@
 #include <mutex>
 #include <qdk/chemistry/utils/logger.hpp>
 
-// The thread-control API this build links against, named by CMake (see the BLAS
-// section of ../CMakeLists.txt). Binding here is the only way to reach the BLAS
-// our own calls go to: a symbol found in the running process may belong to a
-// different BLAS, and a statically linked one exports nothing to find.
+// Thread-control API this build links against, named by CMake (see the BLAS
+// section of ../CMakeLists.txt). Link-time binding is the only way to reach the
+// BLAS our own calls go to: a symbol found in the running process may belong to
+// a different BLAS, and a statically linked one exports nothing to find.
 #if defined(QDK_CHEMISTRY_BLAS_LINKED_SET_FN)
 extern "C" {
 void QDK_CHEMISTRY_BLAS_LINKED_SET_FN(QDK_CHEMISTRY_BLAS_LINKED_TYPE);
@@ -30,8 +30,8 @@ namespace {
 #endif
 
 // Raw `BLAS_VENDOR` string from the CMake BLAS search (e.g. "OpenBLAS",
-// "IntelMKL", "ReferenceBLAS"), used only to make the "no thread-control API"
-// warning below actionable. sizeof > 1 means the string is not empty.
+// "IntelMKL"), used only to make the warning below actionable. sizeof > 1
+// means the string is not empty.
 constexpr const char* kConfiguredBlasVendor =
     sizeof(QDK_CHEMISTRY_BLAS_VENDOR) > 1 ? QDK_CHEMISTRY_BLAS_VENDOR
                                           : "unknown";
@@ -48,13 +48,9 @@ struct BlasThreadApi {
   }
 };
 
-/**
- * @brief Narrow a backend's thread count to int.
- *
- * BLIS types it as dim_t, 32- or 64-bit depending on its build; the table
- * declares the 64-bit form, and a 32-bit callee returns its value in the low
- * half. Thread counts are small, so keeping the low 32 bits is lossless.
- */
+/// @brief Narrow a backend's thread count to int. BLIS types it as dim_t, whose
+/// width CMake resolves from blis.h; thread counts are small, so this is
+/// lossless for either width.
 template <typename T>
 int narrow_thread_count(T value) {
   return static_cast<int>(static_cast<std::int32_t>(value));
@@ -96,12 +92,9 @@ const BlasThreadApi& blas_thread_api() {
   return api;
 }
 
-/**
- * @brief Shared state backing ScopedBlasThreads.
- *
- * The BLAS thread count is process-global, so this is too. `saved` is
- * meaningful only while `depth > 0`; both are touched only under `mutex`.
- */
+/// @brief Shared state backing ScopedBlasThreads. The BLAS thread count is
+/// process-global, so this is too; `saved` is meaningful only while
+/// `depth > 0`, and both are touched only under `mutex`.
 struct BlasThreadState {
   std::mutex mutex;
   int depth = 0;
@@ -143,8 +136,7 @@ ScopedBlasThreads::ScopedBlasThreads() {
   BlasThreadState& state = blas_thread_state();
   std::lock_guard<std::mutex> lock(state.mutex);
   if (state.depth == 0) {
-    // Decline rather than guess: a backend that cannot report leaves nothing
-    // to restore on exit.
+    // Decline rather than guess: nothing to restore on exit.
     const int current = api.get_num_threads();
     if (current < 1) return;
     state.saved = current;

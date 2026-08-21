@@ -10,19 +10,15 @@
 #cmakedefine QDK_CHEMISTRY_ENABLE_PCM
 #cmakedefine QDK_CHEMISTRY_ENABLE_DFTD3
 
-// BLAS backend selected at configure time (e.g. "OpenBLAS", "IntelMKL",
-// "BLIS"). Empty when the BLAS search did not report a vendor.
+// BLAS backend from the configure-time search; empty if none was reported.
 #define QDK_CHEMISTRY_BLAS_VENDOR "@QDK_CHEMISTRY_BLAS_VENDOR@"
 
-// Candidate BLAS thread-control APIs, in probe order, generated from the table
-// in src/CMakeLists.txt. Columns are the CMake token, the BlasVendor
-// enumerator, its display name, the setter, the getter, and the thread-count
-// type.
+// Candidate thread-control APIs, in probe order, from the table in
+// src/CMakeLists.txt. Columns: token, enumerator, label, setter, getter, type.
 #define QDK_CHEMISTRY_BLAS_BACKEND_TABLE(X) \
 @QDK_CHEMISTRY_BLAS_BACKEND_TABLE@
 
-// The row whose API links against the configured BLAS. Undefined when none
-// could be bound, in which case ScopedBlasThreads is a no-op.
+// The row bound at link time; undefined when none, making the guard a no-op.
 #cmakedefine QDK_CHEMISTRY_BLAS_LINKED_VENDOR @QDK_CHEMISTRY_BLAS_LINKED_VENDOR@
 #cmakedefine QDK_CHEMISTRY_BLAS_LINKED_SET_FN @QDK_CHEMISTRY_BLAS_LINKED_SET_FN@
 #cmakedefine QDK_CHEMISTRY_BLAS_LINKED_GET_FN @QDK_CHEMISTRY_BLAS_LINKED_GET_FN@

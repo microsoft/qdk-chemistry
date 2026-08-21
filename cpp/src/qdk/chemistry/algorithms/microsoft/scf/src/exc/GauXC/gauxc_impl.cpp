@@ -296,8 +296,7 @@ void GAUXC::free_device_buffer_async_(cudaStream_t stream) {
 void GAUXC::build_XC(const double* D, double* XC, double* xc_energy) {
   QDK_LOG_TRACE_ENTERING();
 
-  // GauXC parallelizes over grid batches with OpenMP and calls BLAS from
-  // each thread; pin BLAS to one thread to avoid nested threading.
+  // Pin BLAS to one thread: GauXC calls it from every OpenMP grid thread.
   util::ScopedBlasThreads blas_thread_guard;
 
   // Allocate a large temporary buffer
@@ -356,8 +355,7 @@ void GAUXC::build_XC(const double* D, double* XC, double* xc_energy) {
 void GAUXC::get_gradients(const double* D, double* dXC) {
   QDK_LOG_TRACE_ENTERING();
 
-  // GauXC parallelizes over grid batches with OpenMP and calls BLAS from
-  // each thread; pin BLAS to one thread to avoid nested threading.
+  // Pin BLAS to one thread: GauXC calls it from every OpenMP grid thread.
   util::ScopedBlasThreads blas_thread_guard;
 
   // Allocate a large temporary buffer
@@ -406,8 +404,7 @@ void GAUXC::get_gradients(const double* D, double* dXC) {
 void GAUXC::build_snK(const double* D, double* K) {
   QDK_LOG_TRACE_ENTERING();
 
-  // GauXC parallelizes over grid batches with OpenMP and calls BLAS from
-  // each thread; pin BLAS to one thread to avoid nested threading.
+  // Pin BLAS to one thread: GauXC calls it from every OpenMP grid thread.
   util::ScopedBlasThreads blas_thread_guard;
 
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
@@ -443,8 +440,7 @@ void GAUXC::eval_fxc_contraction(const double* D, const double* tD,
 
   AutoTimer __timer("polarizability::  GAUXC::eval_fxc_contraction");
 
-  // GauXC parallelizes over grid batches with OpenMP and calls BLAS from
-  // each thread; pin BLAS to one thread to avoid nested threading.
+  // Pin BLAS to one thread: GauXC calls it from every OpenMP grid thread.
   util::ScopedBlasThreads blas_thread_guard;
 
   // Allocate a large temporary buffer
