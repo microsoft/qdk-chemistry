@@ -342,6 +342,13 @@ class TestVacuumPreservationValidation:
         tolerant.settings().set("vacuum_preservation_tolerance", 1e-6)
         assert isinstance(tolerant.run(rep), Circuit)
 
+    def test_sub_tolerance_prefix_does_not_hide_exact_cancellation(self, cswap_mapper, make_two_qubit_rep):
+        """An approximately-zero prefix must not close before its exact cancelling partner."""
+        x0 = {0: "X"}
+        terms = [(x0, 0.75e-9), (x0, 0.75e-9), (x0, -1.5e-9)]
+
+        assert isinstance(cswap_mapper.run(make_two_qubit_rep(terms)), Circuit)
+
     def test_tolerance_is_budgeted_over_the_repetitions(self, cswap_mapper, make_two_qubit_rep):
         """A residual that is harmless once leaks ``step_reps`` times over, so the budget scales."""
         terms = [(XX, 0.5), (YY, 0.5 + 1e-10)]

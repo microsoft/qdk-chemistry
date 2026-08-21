@@ -307,10 +307,7 @@ class TestVacuumAnnihilatingTermGrouper:
         qh = QubitOperator(["XX", "XX", "XX"], np.array([0.75e-9, 0.75e-9, -1.5e-9]))
         out = registry.create("term_grouper", "vacuum_annihilating").run(qh)
 
-        assert sorted(index for group in out.term_partition.groups for index in group) == [0, 1, 2]
-        # Closing an approximately-zero prefix must not leave a group that fails the contract.
-        for group in out.term_partition.groups:
-            assert abs(sum(float(out.coefficients[index].real) for index in group)) <= 1e-9
+        assert out.term_partition.groups == ((0, 1, 2),)
 
     def test_catastrophic_cancellation_is_accepted(self):
         """The set sums to zero exactly, which a running subtraction would lose."""

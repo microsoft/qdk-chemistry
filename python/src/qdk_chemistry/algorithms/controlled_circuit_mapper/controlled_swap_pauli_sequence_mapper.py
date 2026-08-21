@@ -30,8 +30,9 @@ def _vacuum_eigenphase(terms: list[tuple[dict[int, str], float]], atol: float) -
     The vacuum stays an eigenstate when the product splits into contiguous blocks of pairwise
     commuting strings, so each block equals :math:`\exp(-i\sum_j \theta_j P_j)`, whose
     generator maps the all-zero state onto a multiple of itself, i.e. amplitudes cancel for every
-    non-empty flipped-qubit set.  Blocks are cut as early as possible, giving the finest valid
-    split.  The phase then comes from the diagonal (:math:`I`/:math:`Z`) terms alone.
+    non-empty flipped-qubit set.  Exact cancellations close a block immediately; otherwise a block
+    closes at the first non-commuting boundary or at the end, where its residual is charged against
+    ``atol``.  The phase then comes from the diagonal (:math:`I`/:math:`Z`) terms alone.
 
     Args:
         terms: Ordered ``(pauli_map, angle)`` pairs, one per exponential factor.
@@ -47,6 +48,13 @@ def _vacuum_eigenphase(terms: list[tuple[dict[int, str], float]], atol: float) -
     leaked: list[float] = []
     diagonal: list[float] = []
 
+    def close_block() -> bool:
+        """Charge whatever the open block still leaves outstanding against the shared budget."""
+        for pending in contributions.values():
+            residual = complex(math.fsum(c.real for c in pending), math.fsum(c.imag for c in pending))
+            leaked.append(abs(residual))
+        return math.fsum(leaked) <= atol
+
     for pauli_map, angle in terms:
         x_mask = z_mask = 0
         for qubit, axis in pauli_map.items():
@@ -57,7 +65,10 @@ def _vacuum_eigenphase(terms: list[tuple[dict[int, str], float]], atol: float) -
 
         # Two Pauli strings commute iff they anticommute on an even number of qubits.
         if any(((x_mask & z) ^ (z_mask & x)).bit_count() % 2 for x, z in block):
-            return None
+            if not close_block():
+                return None
+            block.clear()
+            contributions.clear()
         block.append((x_mask, z_mask))
 
         if x_mask:
@@ -65,20 +76,17 @@ def _vacuum_eigenphase(terms: list[tuple[dict[int, str], float]], atol: float) -
             pending = contributions.setdefault(x_mask, [])
             pending.append(angle * 1j ** (x_mask & z_mask).bit_count())
             residual = complex(math.fsum(c.real for c in pending), math.fsum(c.imag for c in pending))
-            if abs(residual) <= atol:
-                # Every closed set may leak, so the budget covers their sum rather than each in turn.
-                leaked.append(abs(residual))
-                if math.fsum(leaked) > atol:
-                    return None
+            # Tolerance is charged when the complete block closes, not at a prefix boundary.
+            if residual == 0.0:
                 del contributions[x_mask]
         else:
             # Diagonal strings act as +1 on |0...0>, so they contribute phase only.
             diagonal.append(angle)
 
         if not contributions:
-            block = []
+            block.clear()
 
-    if block or contributions:
+    if not close_block():
         return None
     return -math.fsum(diagonal)
 
