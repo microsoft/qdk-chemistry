@@ -28,6 +28,7 @@ from qdk.openqasm import estimate as openqasm_estimate
 from qdk_chemistry.data._hashing import _hash_optional, _hash_str, _hash_uint
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.utils import Logger
+from qdk_chemistry.utils.qsharp import get_qsharp_context
 
 try:
     from qdk._interpreter import QirInputData
@@ -316,6 +317,12 @@ class Circuit(DataClass):
             if self.qasm:
                 Logger.warn("Both QIR and QASM representations are available. Convert from QIR.")
             result = qir_ir_to_qiskit(str(self.get_qir()))
+            if result.num_clbits > 0 and (profile := get_qsharp_context().get_target_profile()) != TargetProfile.Base:
+                Logger.warn(
+                    f"The {profile} target profile produced a circuit with {result.num_clbits} classical bits. "
+                    f"Classically controlled operations might fail; consider switching to the Base profile "
+                    f"with use_qsharp_context(create_qsharp_context(TargetProfile.Base))."
+                )
         elif self.qasm:
             result = qasm3.loads(self.qasm)
         else:
