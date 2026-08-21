@@ -14,6 +14,9 @@ iqpe = create("phase_estimation", "qdk_iterative")
 
 # Or create the standard QFT-based variant
 qpe = create("phase_estimation", "qdk_standard")
+
+# Or create robust phase estimation for a geometric Hadamard-test schedule
+rpe = create("phase_estimation", "qdk_robust")
 # end-cell-create
 ################################################################################
 
@@ -53,6 +56,26 @@ qpe = create("phase_estimation", "qdk_standard")
 qpe.settings().set("shots", 100)
 qpe.settings().set("qpe_circuit_builder", qpe_circuit_builder)
 # end-cell-configure-standard
+################################################################################
+
+################################################################################
+# start-cell-configure-robust
+# Configure robust phase estimation through its dedicated circuit builder
+robust_circuit_builder = AlgorithmRef(
+    "robust_phase_estimation_circuit_builder",
+    "qdk",
+    target_accuracy=1e-3,
+    epsilon_unitary=0.85,  # Independent dimensionless Trotter sizing tolerance (default: 0.85).
+    seed=42,
+    unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", order=2),
+)
+rpe = create("phase_estimation", "qdk_robust")
+rpe.settings().set("robust_phase_estimation_circuit_builder", robust_circuit_builder)
+rpe.settings().set(
+    "circuit_executor",
+    AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=42),
+)
+# end-cell-configure-robust
 ################################################################################
 
 ################################################################################
@@ -130,12 +153,46 @@ print(result.get_summary())
 ################################################################################
 
 ################################################################################
+# start-cell-robust-circuit-set
+# Build the same on-demand circuit collection used by robust phase estimation
+builder = create(
+    "robust_phase_estimation_circuit_builder",
+    "qdk",
+    target_accuracy=1e-3,
+    seed=42,
+    unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", order=2),
+)
+circuit_set = builder.run(
+    state_preparation=circuit,
+    qubit_hamiltonian=qubit_ham,
+)
+
+# The lightweight schedule is serializable and contains no materialized circuits.
+print(circuit_set.schedule.get_summary())
+
+# Generate only the circuit pair needed for execution or resource estimation.
+first_experiment = circuit_set.get_experiment(round_index=0)
+x_application = first_experiment.x_circuit.get_qre_application()
+y_application = first_experiment.y_circuit.get_qre_application()
+print(first_experiment.round_index, first_experiment.circuit_multiplicity)
+print(x_application, y_application)
+
+# Full millihartree execution is expensive. Set this to True to execute the same
+# re-iterable set while preserving its schedule and random draws.
+run_full_rpe = False
+if run_full_rpe:
+    rpe_result = rpe.execute_circuit_set(circuit_set)
+    print(rpe_result.get_summary())
+# end-cell-robust-circuit-set
+################################################################################
+
+################################################################################
 # start-cell-list-implementations
 from qdk_chemistry.algorithms import registry
 
 # List all registered phase estimation implementations
 implementations = registry.available("phase_estimation")
-print(implementations)  # e.g. ['qdk_iterative', 'qdk_standard']
+print(implementations)  # e.g. ['qdk_iterative', 'qdk_standard', 'qdk_robust']
 # end-cell-list-implementations
 ################################################################################
 
