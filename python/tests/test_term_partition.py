@@ -301,6 +301,21 @@ class TestVacuumAnnihilatingTermGrouper:
         tolerant = registry.create("term_grouper", "vacuum_annihilating", tolerance=1e-6)
         assert tolerant.run(qh).term_partition.groups == ((0, 1), (2, 3))
 
+    def test_tiny_prefixes_do_not_strand_a_remainder(self):
+        """The flip set cancels exactly, so splitting on a sub-tolerance prefix must not reject it."""
+        qh = QubitOperator(["XX", "XX", "XX"], np.array([0.75e-9, 0.75e-9, -1.5e-9]))
+        out = registry.create("term_grouper", "vacuum_annihilating").run(qh)
+
+        assert sorted(index for group in out.term_partition.groups for index in group) == [0, 1, 2]
+
+    @pytest.mark.parametrize("tolerance", [-1e-9, np.inf, np.nan])
+    def test_invalid_tolerance_raises(self, tolerance):
+        """An infinite tolerance would certify every term on its own."""
+        qh = QubitOperator(["XX", "YY"], np.array([0.5, 0.5]))
+
+        with pytest.raises(ValueError, match="tolerance must be finite and non-negative"):
+            registry.create("term_grouper", "vacuum_annihilating", tolerance=tolerance).run(qh)
+
     def test_group_order_is_deterministic_with_the_diagonal_group_first(self):
         """Group order drives the Trotter sequence, so it must not depend on dict ordering."""
         qh = QubitOperator(

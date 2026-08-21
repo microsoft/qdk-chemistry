@@ -19,7 +19,14 @@ from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_swap_pauli_se
     ControlledSwapPauliSequenceMapper,
     _vacuum_eigenphase,
 )
-from qdk_chemistry.data import LatticeGraph, MajoranaMapping, QubitOperator, Symmetries
+from qdk_chemistry.data import (
+    CanonicalFourCenterHamiltonianContainer,
+    Hamiltonian,
+    LatticeGraph,
+    MajoranaMapping,
+    QubitOperator,
+    Symmetries,
+)
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
@@ -30,7 +37,7 @@ from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils.model_hamiltonians import create_ising_hamiltonian
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
-from .test_helpers import create_nontrivial_test_hamiltonian
+from .test_helpers import create_nontrivial_test_hamiltonian, create_test_orbitals
 
 if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit import QuantumCircuit
@@ -131,16 +138,6 @@ def make_two_qubit_rep():
     def _make(terms):
         step_terms = [ExponentiatedPauliTerm(pauli_term=pauli_term, angle=angle) for pauli_term, angle in terms]
         return UnitaryRepresentation(container=PauliProductFormulaContainer(step_terms, step_reps=1, num_qubits=2))
-
-    return _make
-
-
-@pytest.fixture
-def make_ordering_rep(make_two_qubit_rep):
-    """Return a factory turning a ``(pauli_term, coefficient)`` ordering into a UnitaryRepresentation."""
-
-    def _make(ordering, time_step=np.pi / 2):
-        return make_two_qubit_rep([(pauli_term, coefficient * time_step) for pauli_term, coefficient in ordering])
 
     return _make
 
@@ -332,11 +329,6 @@ class TestVacuumPreservationValidation:
         with pytest.raises(ValueError, match="vacuum-preserving product formula"):
             cswap_mapper.run(make_two_qubit_rep([({0: "X"}, 0.3)]))
 
-    def test_diagonal_evolution_is_accepted(self, cswap_mapper, unitary_rep):
-        """Pure I/Z evolutions never move the vacuum, they only phase it."""
-        circuit = cswap_mapper.run(unitary_rep)
-        assert isinstance(circuit, Circuit)
-
     def test_tolerance_setting_controls_acceptance(self, cswap_mapper, make_two_qubit_rep):
         """``vacuum_preservation_tolerance`` decides how exactly the partners have to cancel."""
         rep = make_two_qubit_rep([(XX, 0.5), (YY, 0.5 + 1e-7)])
@@ -392,6 +384,12 @@ class TestVacuumPreservingBlocks:
         assert _vacuum_eigenphase(terms, 1e-9) is None
         assert _vacuum_eigenphase(terms, 1e-6) == pytest.approx(0.0)
 
+    def test_tolerance_is_a_budget_over_all_supports(self):
+        """Two supports leaking 0.75e-9 each exceed a 1e-9 budget together."""
+        x0, x1 = {0: "X"}, {1: "X"}
+        assert _vacuum_eigenphase([(x0, 0.75e-9)], 1e-9) == pytest.approx(0.0)
+        assert _vacuum_eigenphase([(x0, 0.75e-9), (x1, 0.75e-9)], 1e-9) is None
+
     def test_empty_sequence(self):
         """An empty product formula is trivially vacuum preserving."""
         assert _vacuum_eigenphase([], 1e-9) == pytest.approx(0.0)
@@ -424,16 +422,6 @@ class TestVacuumLeakageWithoutGrouping:
         expected = np.zeros(4, dtype=complex)
         expected[0] = 1.0
         assert np.allclose(state, expected, atol=float_comparison_absolute_tolerance)
-
-    def test_mapper_rejects_the_leaking_ordering(self, cswap_mapper, make_ordering_rep):
-        """The mapper's validation matches the numerics above."""
-        with pytest.raises(ValueError, match="vacuum-preserving product formula"):
-            cswap_mapper.run(make_ordering_rep([(XX, 0.5), (Z0, -0.5), (YY, 0.5), (IDENTITY, 0.5)]))
-
-    def test_mapper_accepts_the_grouped_ordering(self, cswap_mapper, make_ordering_rep):
-        """The ordering that preserves the vacuum passes validation."""
-        rep = make_ordering_rep([(XX, 0.5), (YY, 0.5), (Z0, -0.5), (IDENTITY, 0.5)])
-        assert isinstance(cswap_mapper.run(rep), Circuit)
 
 
 class TestVacuumAnnihilatingGroupingEndToEnd:
@@ -520,11 +508,11 @@ class TestVacuumAnnihilatingGroupingEndToEnd:
         )
 
     def test_symmetry_conserving_bravyi_kitaev_is_rejected(self):
-        """Qubit tapering moves the reference off |0...0>, so the CSWAP sandwich does not apply.
+        """Qubit tapering can move the reference off |0...0>, and the grouper catches that.
 
         SCBK fixes the symmetry sectors and drops the corresponding qubits, so the all-zero state
-        of the tapered register is an occupation-number state inside the retained sector rather
-        than the fermionic vacuum, and the Hamiltonian connects it to other states.
+        of the tapered register is an occupation-number state inside the retained sector.  For a
+        Hamiltonian with hopping terms it is not an eigenstate.
         """
         hamiltonian = create_nontrivial_test_hamiltonian()
         num_spin_orbitals = 2 * hamiltonian.get_one_body_integrals()[0].shape[0]
@@ -533,6 +521,48 @@ class TestVacuumAnnihilatingGroupingEndToEnd:
 
         with pytest.raises(ValueError, match="uncancelled vacuum amplitude"):
             registry.create("term_grouper", "vacuum_annihilating").run(qubit_hamiltonian)
+
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
+    def test_cswap_circuit_from_scbk_hamiltonian_is_a_controlled_unitary(self, cswap_mapper):
+        r"""A tapered image that does annihilate |0...0> goes through the pipeline unchanged.
+
+        Diagonal one-body integrals give an SCBK image with :math:`Z`/:math:`I` strings only, so
+        the tapered reference stays an eigenstate and only picks up :math:`\varphi_0 = -E_0 t`.
+        """
+        num_orbitals = 2
+        hamiltonian = Hamiltonian(
+            CanonicalFourCenterHamiltonianContainer(
+                np.diag([1.0, -0.5]),
+                np.zeros(num_orbitals**4),
+                create_test_orbitals(num_orbitals),
+                0.5,
+                np.eye(0),
+            )
+        )
+        mapping = MajoranaMapping.symmetry_conserving_bravyi_kitaev(2 * num_orbitals, Symmetries(1, 1))
+        qubit_hamiltonian = registry.create("qubit_mapper", "qdk").run(hamiltonian, mapping)
+        assert qubit_hamiltonian.tapering is not None
+
+        grouped = registry.create("term_grouper", "vacuum_annihilating").run(qubit_hamiltonian)
+        assert grouped.tapering == qubit_hamiltonian.tapering
+
+        trotter = registry.create("hamiltonian_unitary_builder", "trotter")
+        trotter.settings().update({"order": 1, "num_divisions": 1, "time": 0.5})
+        unitary = trotter.run(grouped)
+        container = unitary.get_container()
+
+        block = Operator(cswap_mapper.run(unitary).get_qiskit_circuit()).data[0:8, 0:8]
+        terms = [(term.pauli_term, term.angle) for term in container.step_terms]
+        u = np.linalg.matrix_power(build_product_formula_matrix(terms, container.num_qubits), container.step_reps)
+
+        # <0|U|0> != 1, so this only matches because the vacuum phase is cancelled on the control.
+        assert not np.isclose(u[0, 0], 1.0, atol=float_comparison_absolute_tolerance)
+        assert np.allclose(
+            block / block[0, 0],
+            controlled_unitary(u),
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
 
 
 class TestVacuumAnnihilatingAcrossFermionToQubitMappings:

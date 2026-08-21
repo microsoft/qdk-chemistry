@@ -35,7 +35,8 @@ def _vacuum_eigenphase(terms: list[tuple[dict[int, str], float]], atol: float) -
 
     Args:
         terms: Ordered ``(pauli_map, angle)`` pairs, one per exponential factor.
-        atol: Absolute tolerance used when testing amplitude cancellation.
+        atol: Absolute tolerance on the amplitude leaked out of the vacuum, aggregated over every
+            flipped-qubit set the product formula closes.
 
     Returns:
         The imprinted phase, or ``None`` when the vacuum is not an eigenstate of the product.
@@ -43,6 +44,7 @@ def _vacuum_eigenphase(terms: list[tuple[dict[int, str], float]], atol: float) -
     """
     block: list[tuple[int, int]] = []  # symplectic (X, Z) bit masks of the terms in the open block
     contributions: dict[int, list[complex]] = {}
+    leaked: list[float] = []
     diagonal: list[float] = []
 
     for pauli_map, angle in terms:
@@ -64,6 +66,10 @@ def _vacuum_eigenphase(terms: list[tuple[dict[int, str], float]], atol: float) -
             pending.append(angle * 1j ** (x_mask & z_mask).bit_count())
             residual = complex(math.fsum(c.real for c in pending), math.fsum(c.imag for c in pending))
             if abs(residual) <= atol:
+                # Every closed set may leak, so the budget covers their sum rather than each in turn.
+                leaked.append(abs(residual))
+                if math.fsum(leaked) > atol:
+                    return None
                 del contributions[x_mask]
         else:
             # Diagonal strings act as +1 on |0...0>, so they contribute phase only.
@@ -81,8 +87,8 @@ class ControlledSwapPauliSequenceMapperSettings(ControlledCircuitMapperSettings)
     """Settings for the :class:`ControlledSwapPauliSequenceMapper`.
 
     Attributes:
-        vacuum_preservation_tolerance: Absolute tolerance on the amplitude leaked out of the vacuum
-            over the whole evolution, i.e. over all ``step_reps`` repetitions.
+        vacuum_preservation_tolerance: Absolute tolerance on the amplitude leaked out of the vacuum,
+            aggregated over every flipped-qubit set and over all ``step_reps`` repetitions.
 
     """
 
@@ -93,7 +99,7 @@ class ControlledSwapPauliSequenceMapperSettings(ControlledCircuitMapperSettings)
             "vacuum_preservation_tolerance",
             "double",
             1e-9,
-            "Absolute tolerance on the amplitude the repeated evolution may leak out of the vacuum.",
+            "Absolute tolerance on the total amplitude the repeated evolution may leak out of the vacuum.",
         )
 
 
@@ -135,6 +141,8 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
 
     Notes:
         * Applies to particle-conserving Hamiltonians.
+        * The requirement is on the mapped operator, not the encoding: after qubit tapering the
+          all-zero state belongs to the retained sector, which the Hamiltonian need not annihilate.
         * Currently supports only single-control-qubit scenarios.
         * Requires a ``PauliProductFormulaContainer`` for the time evolution unitary.
         * The vacuum register is allocated internally by the Q# operation.

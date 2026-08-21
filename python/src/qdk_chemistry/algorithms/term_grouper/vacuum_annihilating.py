@@ -33,7 +33,7 @@ class VacuumAnnihilatingTermGrouperSettings(TermGrouperSettings):
     """Settings for the :class:`VacuumAnnihilatingTermGrouper`.
 
     Attributes:
-        tolerance: Absolute tolerance on a group's accumulated vacuum amplitude.
+        tolerance: Absolute tolerance on the vacuum amplitude of a flipped-qubit set.
 
     """
 
@@ -97,11 +97,15 @@ class VacuumAnnihilatingTermGrouper(TermGrouper):
             QubitOperator: New instance with a ``FlatPartition`` (strategy ``"vacuum_annihilating"``).
 
         Raises:
+            ValueError: If ``tolerance`` is negative or not finite.
             ValueError: If a coefficient is not a finite real number.
             ValueError: If terms flipping the same qubits do not cancel on the vacuum.
 
         """
         tolerance = self._settings.get("tolerance")
+        if not math.isfinite(tolerance) or tolerance < 0.0:
+            raise ValueError(f"tolerance must be finite and non-negative, got {tolerance}.")
+
         flipped_qubits = str.maketrans("IXYZ", "0110")
 
         coefficients = np.asarray(qubit_hamiltonian.coefficients)
@@ -127,6 +131,19 @@ class VacuumAnnihilatingTermGrouper(TermGrouper):
             if not flipped:
                 diagonal = tuple(index for index, _ in entries)
                 continue
+
+            # Certify the whole flipped-qubit set first: splitting on an approximately-zero prefix
+            # would otherwise strand a remainder that the set as a whole cancels.
+            residual = math.fsum(amplitude for _, amplitude in entries)
+            if abs(residual) > tolerance:
+                qubits = [qubit for qubit in range(flipped.bit_length()) if flipped >> qubit & 1]
+                raise ValueError(
+                    f"VacuumAnnihilatingTermGrouper cannot group terms {[index for index, _ in entries]}: "
+                    f"they flip qubits {qubits} and leave an uncancelled vacuum amplitude of {residual:.3g}. "
+                    "The Hamiltonian does not annihilate |0...0> in this encoding, so no ordering of "
+                    "its Pauli strings preserves the vacuum under Trotterisation."
+                )
+
             current: list[int] = []
             pending: list[float] = []
             for index, amplitude in entries:
@@ -137,13 +154,7 @@ class VacuumAnnihilatingTermGrouper(TermGrouper):
                     groups.append(tuple(current))
                     current, pending = [], []
             if current:
-                qubits = [qubit for qubit in range(flipped.bit_length()) if flipped >> qubit & 1]
-                raise ValueError(
-                    f"VacuumAnnihilatingTermGrouper cannot group terms {current}: they flip qubits "
-                    f"{qubits} and leave an uncancelled vacuum amplitude of {math.fsum(pending):.3g}. "
-                    "The Hamiltonian does not annihilate |0...0> in this encoding, so no ordering of "
-                    "its Pauli strings preserves the vacuum under Trotterisation."
-                )
+                groups.append(tuple(current))
 
         ordered = ([diagonal] if diagonal else []) + sorted(groups, key=lambda group: group[0])
         partition = FlatPartition(strategy="vacuum_annihilating", groups=tuple(ordered))
