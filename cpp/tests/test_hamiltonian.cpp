@@ -15,6 +15,7 @@
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
+#include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
@@ -933,6 +934,42 @@ TEST_F(HamiltonianConstructorTest, CholeskyFactory) {
   // Test setting eri_threshold
   EXPECT_NO_THROW(cholesky_hc->settings().set("eri_threshold", 1e-10));
   EXPECT_DOUBLE_EQ(cholesky_hc->settings().get<double>("eri_threshold"), 1e-10);
+}
+
+TEST_F(HamiltonianConstructorTest, EcpCoreEnergyUsesEffectiveNuclearRepulsion) {
+  auto structure = testing::create_agh_structure();
+  auto basis_set = BasisSet::from_basis_name("def2-svp", structure);
+  ASSERT_TRUE(basis_set->has_ecp_electrons());
+
+  const auto num_atomic_orbitals = basis_set->get_num_atomic_orbitals();
+  auto orbitals = std::make_shared<Orbitals>(
+      Eigen::MatrixXd::Identity(num_atomic_orbitals, num_atomic_orbitals),
+      Eigen::VectorXd::Zero(num_atomic_orbitals), std::nullopt, basis_set);
+
+  const double bond_length =
+      (structure->get_atom_coordinates(1) - structure->get_atom_coordinates(0))
+          .norm();
+  // def2-SVP replaces 28 Ag core electrons, so Z_eff(Ag) = 47 - 28 = 19.
+  const double expected_core_energy = 19.0 / bond_length;
+  EXPECT_NEAR(basis_set->calculate_effective_nuclear_repulsion_energy(),
+              expected_core_energy, testing::numerical_zero_tolerance);
+  const double structure_nuclear_repulsion =
+      structure->calculate_nuclear_repulsion_energy();
+  EXPECT_NEAR(structure_nuclear_repulsion, 47.0 / bond_length,
+              testing::numerical_zero_tolerance);
+  EXPECT_GT(std::abs(structure_nuclear_repulsion - expected_core_energy),
+            testing::numerical_zero_tolerance);
+
+  for (const auto* constructor_name : {"qdk", "qdk_cholesky"}) {
+    SCOPED_TRACE(constructor_name);
+    auto constructor = HamiltonianConstructorFactory::create(constructor_name);
+    auto hamiltonian = constructor->run(orbitals);
+    EXPECT_NEAR(hamiltonian->get_core_energy(), expected_core_energy,
+                testing::numerical_zero_tolerance);
+    EXPECT_GT(
+        std::abs(hamiltonian->get_core_energy() - structure_nuclear_repulsion),
+        testing::numerical_zero_tolerance);
+  }
 }
 
 TEST_F(HamiltonianConstructorTest, CholeskyRestrictedO2) {

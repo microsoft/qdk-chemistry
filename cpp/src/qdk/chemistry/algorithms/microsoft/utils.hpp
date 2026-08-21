@@ -8,6 +8,7 @@
 #include <qdk/chemistry/scf/core/molecule.h>
 
 #include <Eigen/Core>
+#include <cstdint>
 #include <libint2.hpp>  // for Shell class
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
@@ -57,6 +58,19 @@ void finalize_backend();
  */
 qdk::chemistry::data::Structure convert_to_structure(
     const qcs::Molecule& molecule);
+
+/**
+ * @brief Convert floating-point nuclear charges to nonnegative integers.
+ *
+ * Values within 1e-12 of an integer are rounded. Zero is supported.
+ *
+ * @param nuclear_charges Nuclear charges to convert.
+ * @return Integral nuclear charges.
+ * @throws std::invalid_argument if a charge is non-finite, negative, or
+ * fractional beyond the tolerance.
+ */
+std::vector<std::uint64_t> to_integral_nuclear_charges(
+    const Eigen::VectorXd& nuclear_charges);
 
 /**
  * @brief Convert a qdk::chemistry::data::Structure to a Molecule
