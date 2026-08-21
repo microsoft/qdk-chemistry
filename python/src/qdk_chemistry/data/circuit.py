@@ -247,12 +247,19 @@ class Circuit(DataClass):
                 self._qsharp_factory.program,
                 *self._qsharp_factory.parameter.values(),
             )
-            return logical_counts.estimate(params)
+            result = logical_counts.estimate(params)
+        elif self.qasm is not None:
+            result = openqasm_estimate(self.qasm, params)
+        else:
+            raise RuntimeError("Cannot estimate resources: no Q# factory data or QASM representation is available.")
 
-        if self.qasm is not None:
-            return openqasm_estimate(self.qasm, params)
-
-        raise RuntimeError("Cannot estimate resources: no Q# factory data or QASM representation is available.")
+        estimated_num_qubits = getattr(result, "logical_counts", {}).get("numQubits")
+        if self.num_qubits is not None and estimated_num_qubits is not None and estimated_num_qubits != self.num_qubits:
+            Logger.warn(
+                f"This circuit declares {self.num_qubits} qubits but the resource estimate reports "
+                f"{estimated_num_qubits}. The declared width is the one callers act on, so it may be stale."
+            )
+        return result
 
     def get_qre_application(self):
         """Convert the circuit to a ``qdk.qre`` Application for resource estimation.
