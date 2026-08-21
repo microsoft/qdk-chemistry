@@ -113,7 +113,7 @@ def run_qubit_mapping_workflow() -> QubitMappingResult:
     ################################################################################
     # start-cell-validate-mapping
     num_alpha, num_beta = (
-        active_space_result.refined_wavefunction.get_active_num_electrons()
+        active_space_result.refined_casci_wavefunction.get_active_num_electrons()
     )
 
     # QDK/Chemistry's blocked fermion ordering stores alpha occupations in the
@@ -299,7 +299,7 @@ def print_qubit_mapping_results(result: QubitMappingResult) -> None:
     ################################################################################
     # start-cell-core-energy
     num_alpha, num_beta = (
-        result.active_space_result.refined_wavefunction.get_active_num_electrons()
+        result.active_space_result.refined_casci_wavefunction.get_active_num_electrons()
     )
     print(
         f"Fixed-electron-number subspace: {num_alpha} alpha, {num_beta} beta electrons "

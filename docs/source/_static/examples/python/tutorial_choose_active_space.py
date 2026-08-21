@@ -12,6 +12,8 @@ the selected orbital subspace and its CASCI energy.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
@@ -34,65 +36,6 @@ N    0.000000    0.000000    1.850000
 """)
 
 
-@dataclass
-class ActiveSpaceResult:
-    """Results shared by later tutorial chapters and the visualization notebook.
-
-    Attributes:
-        structure: Molecular geometry used by every calculation.
-        hartree_fock_energy: Restricted Hartree--Fock energy in Hartree.
-        valence_wavefunction: Hartree--Fock wavefunction with initial valence
-            active-space metadata attached.
-        valence_indices: Spatial-orbital indices in the initial valence space.
-        num_valence_electrons: Total active electrons in the valence space.
-        num_valence_orbitals: Spatial orbitals in the valence space.
-        valence_energy: Initial valence-space CASCI energy in Hartree.
-        valence_casci_wavefunction: Correlated valence-space wavefunction whose
-            reduced density matrices define the natural orbitals.
-        num_valence_determinants: Determinants in the complete valence-space CI.
-        natural_orbital_energy: CASCI energy after the natural-orbital rotation.
-        natural_orbital_casci_wavefunction: Correlated wavefunction recomputed in
-            the natural-orbital representation.
-        orbital_entropies: One entropy per valence spatial orbital, ordered like
-            ``valence_indices``.
-        refined_wavefunction: autoCAS wavefunction carrying the selected orbital
-            partition before gauge fixing.
-        refined_orbitals: Selected orbitals after native gauge fixing inside
-            occupation-degenerate blocks.
-        inactive_indices: Frozen doubly occupied spatial-orbital indices.
-        refined_indices: Spatial-orbital indices retained as active by autoCAS.
-        num_refined_electrons: Electrons in the selected active space.
-        num_virtual_orbitals: Spatial orbitals held empty outside the active space.
-        refined_energy: Selected-space CASCI energy in Hartree and the later
-            algorithmic reference.
-        refined_casci_wavefunction: Complete selected-space CASCI wavefunction in
-            the gauge-fixed orbital representation.
-        num_refined_determinants: Determinants in the complete selected-space CI.
-    """
-
-    structure: Structure
-    hartree_fock_energy: float
-    valence_wavefunction: Wavefunction
-    valence_indices: list[int]
-    num_valence_electrons: int
-    num_valence_orbitals: int
-    valence_energy: float
-    valence_casci_wavefunction: Wavefunction
-    num_valence_determinants: int
-    natural_orbital_energy: float
-    natural_orbital_casci_wavefunction: Wavefunction
-    orbital_entropies: list[float]
-    refined_wavefunction: Wavefunction
-    refined_orbitals: Orbitals
-    inactive_indices: list[int]
-    refined_indices: list[int]
-    num_refined_electrons: int
-    num_virtual_orbitals: int
-    refined_energy: float
-    refined_casci_wavefunction: Wavefunction
-    num_refined_determinants: int
-
-
 def run_active_space_workflow() -> ActiveSpaceResult:
     """Build the correlated molecular model used by later tutorial chapters.
 
@@ -107,6 +50,7 @@ def run_active_space_workflow() -> ActiveSpaceResult:
         gauge-fixed selected orbitals needed by mapping, state
         preparation, and visualization.
     """
+    # Hartree-Fock reference
     ################################################################################
     # docs:xyz ../data/tutorial_stretched_n2.structure.xyz
     # start-cell-hartree-fock
@@ -125,6 +69,7 @@ def run_active_space_workflow() -> ActiveSpaceResult:
     # end-cell-hartree-fock
     ################################################################################
 
+    # Initial valence space
     ################################################################################
     # start-cell-valence-space
     num_valence_electrons, num_valence_orbitals = compute_valence_space_parameters(
@@ -150,6 +95,7 @@ def run_active_space_workflow() -> ActiveSpaceResult:
     # end-cell-valence-space
     ################################################################################
 
+    # Initial valence-space CASCI
     ################################################################################
     # start-cell-initial-casci
     hamiltonian_constructor = create("hamiltonian_constructor")
@@ -176,6 +122,7 @@ def run_active_space_workflow() -> ActiveSpaceResult:
     # end-cell-initial-casci
     ################################################################################
 
+    # Natural orbitals
     ################################################################################
     # start-cell-natural-orbitals
     # Rotate the valence orbitals using the CASCI one-particle RDM so each
@@ -206,6 +153,7 @@ def run_active_space_workflow() -> ActiveSpaceResult:
     # end-cell-natural-orbitals
     ################################################################################
 
+    # Active-space refinement and gauge fixing
     ################################################################################
     # start-cell-refine
     # autoCAS uses the RDM-derived orbital entropies to retain the orbitals that
@@ -256,6 +204,7 @@ def run_active_space_workflow() -> ActiveSpaceResult:
     # end-cell-refine
     ################################################################################
 
+    # Selected-space CASCI
     ################################################################################
     # start-cell-final-casci
     refined_hamiltonian = hamiltonian_constructor.run(refined_orbitals)
@@ -271,17 +220,14 @@ def run_active_space_workflow() -> ActiveSpaceResult:
     return ActiveSpaceResult(
         structure=structure,
         hartree_fock_energy=hartree_fock_energy,
-        valence_wavefunction=valence_wavefunction,
         valence_indices=valence_indices,
         num_valence_electrons=num_valence_electrons,
         num_valence_orbitals=num_valence_orbitals,
         valence_energy=valence_energy,
-        valence_casci_wavefunction=valence_casci_wavefunction,
         num_valence_determinants=num_valence_determinants,
         natural_orbital_energy=natural_orbital_energy,
         natural_orbital_casci_wavefunction=natural_orbital_casci_wavefunction,
         orbital_entropies=orbital_entropies,
-        refined_wavefunction=refined_wavefunction,
         refined_orbitals=refined_orbitals,
         inactive_indices=inactive_indices,
         refined_indices=refined_indices,
@@ -291,6 +237,72 @@ def run_active_space_workflow() -> ActiveSpaceResult:
         refined_casci_wavefunction=refined_casci_wavefunction,
         num_refined_determinants=num_refined_determinants,
     )
+
+
+def main() -> None:
+    """Run the command-line workflow and print its lab-notebook evidence."""
+    # Change ``off`` to ``info`` to see detailed QDK/Chemistry calculation logs.
+    Logger.set_global_level(Logger.LogLevel.off)
+
+    result = run_active_space_workflow()
+    print_active_space_results(result)
+
+
+################################################################################
+# Students can stop reading here. The definitions below package results for later
+# chapters and prepare data for interactive visualizations. The final two lines
+# run the student-facing main() function when this file is executed.
+################################################################################
+
+
+@dataclass
+class ActiveSpaceResult:
+    """Results shared by later tutorial chapters and the visualization notebook.
+
+    Attributes:
+        structure: Molecular geometry used by every calculation.
+        hartree_fock_energy: Restricted Hartree--Fock energy in Hartree.
+        valence_indices: Spatial-orbital indices in the initial valence space.
+        num_valence_electrons: Total active electrons in the valence space.
+        num_valence_orbitals: Spatial orbitals in the valence space.
+        valence_energy: Initial valence-space CASCI energy in Hartree.
+        num_valence_determinants: Determinants in the complete valence-space CI.
+        natural_orbital_energy: CASCI energy after the natural-orbital rotation.
+        natural_orbital_casci_wavefunction: Correlated wavefunction recomputed in
+            the natural-orbital representation.
+        orbital_entropies: One entropy per valence spatial orbital, ordered like
+            ``valence_indices``.
+        refined_orbitals: Selected orbitals after native gauge fixing inside
+            occupation-degenerate blocks.
+        inactive_indices: Frozen doubly occupied spatial-orbital indices.
+        refined_indices: Spatial-orbital indices retained as active by autoCAS.
+        num_refined_electrons: Electrons in the selected active space.
+        num_virtual_orbitals: Spatial orbitals held empty outside the active space.
+        refined_energy: Selected-space CASCI energy in Hartree and the later
+            algorithmic reference.
+        refined_casci_wavefunction: Complete selected-space CASCI wavefunction in
+            the gauge-fixed orbital representation.
+        num_refined_determinants: Determinants in the complete selected-space CI.
+    """
+
+    structure: Structure
+    hartree_fock_energy: float
+    valence_indices: list[int]
+    num_valence_electrons: int
+    num_valence_orbitals: int
+    valence_energy: float
+    num_valence_determinants: int
+    natural_orbital_energy: float
+    natural_orbital_casci_wavefunction: Wavefunction
+    orbital_entropies: list[float]
+    refined_orbitals: Orbitals
+    inactive_indices: list[int]
+    refined_indices: list[int]
+    num_refined_electrons: int
+    num_virtual_orbitals: int
+    refined_energy: float
+    refined_casci_wavefunction: Wavefunction
+    num_refined_determinants: int
 
 
 def print_active_space_results(result: ActiveSpaceResult) -> None:
@@ -339,7 +351,7 @@ def print_active_space_results(result: ActiveSpaceResult) -> None:
     )
 
 
-def plot_orbital_entropy_selection(result: ActiveSpaceResult) -> "Figure":
+def plot_orbital_entropy_selection(result: ActiveSpaceResult) -> Figure:
     """Plot entropy-ranked candidate orbitals and the autoCAS selection cut.
 
     The companion Jupyter notebook uses this helper to display and regenerate
@@ -586,17 +598,6 @@ def generate_active_orbital_cube_data(
             },
         }
     return cube_data
-
-
-def main() -> None:
-    """Run the command-line workflow and print its lab-notebook evidence."""
-    # Change ``off`` to ``info`` to see detailed QDK/Chemistry calculation logs.
-    Logger.set_global_level(Logger.LogLevel.off)
-    # Earlier tutorial scripts execute one linear calculation. This chapter also
-    # provides an interactive notebook, so functions keep both versions on the
-    # same tested chemistry workflow instead of duplicating the calculation.
-    result = run_active_space_workflow()
-    print_active_space_results(result)
 
 
 if __name__ == "__main__":
