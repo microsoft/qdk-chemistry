@@ -1,15 +1,7 @@
 #!/bin/bash
 set -e
 
-# install_cpp_dependencies.sh — build and install qdk-chemistry's C++ dependencies for CI pipelines (GitHub
-# Actions and, later, Azure DevOps).
-#
-# This is the CI-facing counterpart of .devcontainer/scripts/install_cpp_dependencies.sh (which is for the
-# devcontainer only). The two are kept as separate files because their target environments diverge (e.g. the
-# ADO wheel pipeline needs a different BLAS_VENDOR -- BLIS+LibFLAME instead of OpenBLAS -- and CI cares about
-# reproducible caching more than local dev iteration speed), but they build the same dependency set and share
-# the two centralized, single-source-of-truth scripts for blaspp/lapackpp (install-blaspp.sh / install-lapackpp.sh
-# in this directory) so that logic is never duplicated.
+# install_cpp_dependencies.sh — build and install qdk-chemistry's C++ dependencies for CI pipelines.
 #
 # Usage: install_cpp_dependencies.sh <cpp_cgmanifest_path> <macis_cgmanifest_path>
 #
@@ -183,8 +175,7 @@ make install
 cd "$BUILD_DIR"
 rm -rf spdlog
 
-# Install blaspp / lapackpp via the centralized scripts shared with the devcontainer (single canonical build for
-# each -- see install-blaspp.sh / install-lapackpp.sh in this directory).
+# Install blaspp / lapackpp
 echo "=== Installing blaspp ==="
 bash "${SCRIPT_DIR}/install-blaspp.sh" "$INSTALL_PREFIX" "$BLASPP_COMMIT" "$BLAS_VENDOR" "$MARCH" "$BUILD_SHARED_LIBS"
 
