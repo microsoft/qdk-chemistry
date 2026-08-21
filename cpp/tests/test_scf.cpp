@@ -1044,6 +1044,8 @@ TEST_F(ScfTest, AgHBasisSetEcpJsonMapping) {
 
   // Verify element_ecp_electrons mapping
   EXPECT_TRUE(json.contains("element_ecp_electrons"));
+  EXPECT_TRUE(json.contains("atom_ecp_electrons"));
+  EXPECT_EQ(json["atom_ecp_electrons"], std::vector<size_t>({28, 0}));
   auto element_ecp_electrons_json = json["element_ecp_electrons"];
 
   // element_ecp_electrons should be a flat list: [atomic_num1, ecp_elec1,
@@ -1122,6 +1124,55 @@ TEST_F(ScfTest, AgHBasisSetEcpJsonMapping) {
   EXPECT_TRUE(json.contains("electron_shells"));
   auto electron_shells_json = json["electron_shells"];
   EXPECT_GT(electron_shells_json.size(), 0);
+
+  auto internal_basis =
+      qdk::chemistry::utils::microsoft::convert_basis_set_from_qdk(*basis_set);
+  auto legacy_json = internal_basis->to_json();
+  legacy_json.erase("atom_ecp_electrons");
+  auto legacy_basis = qdk::chemistry::scf::BasisSet::from_serialized_json(
+      internal_basis->mol, legacy_json);
+  EXPECT_EQ(legacy_basis->atom_ecp_electrons, std::vector<int>({28, 0}));
+}
+
+TEST_F(ScfTest, SameElementAtomsPreserveDistinctEcpTreatment) {
+  std::vector<Eigen::Vector3d> coordinates = {
+      {0.0, 0.0, 0.0},
+      {5.0, 0.0, 0.0},
+  };
+  std::vector<Element> elements = {Element::Ag, Element::Ag};
+  auto structure = std::make_shared<Structure>(coordinates, elements);
+  auto basis_set = BasisSet::from_index_map(
+      std::map<size_t, std::string>{{0, "def2-svp"}, {1, "ano-rcc"}},
+      structure);
+
+  ASSERT_EQ(basis_set->get_ecp_electrons(), std::vector<size_t>({28, 0}));
+
+  auto json = qdk::chemistry::utils::microsoft::convert_to_json(*basis_set);
+  EXPECT_EQ(json["atom_ecp_electrons"], std::vector<size_t>({28, 0}));
+  EXPECT_TRUE(json["element_ecp_electrons"].empty());
+
+  auto internal_basis =
+      qdk::chemistry::utils::microsoft::convert_basis_set_from_qdk(*basis_set);
+  EXPECT_EQ(internal_basis->atom_ecp_electrons, std::vector<int>({28, 0}));
+  EXPECT_EQ(internal_basis->mol->atomic_charges,
+            std::vector<uint64_t>({19, 47}));
+  EXPECT_EQ(internal_basis->n_ecp_electrons, 28);
+  EXPECT_EQ(internal_basis->mol->n_electrons, 66);
+  EXPECT_TRUE(internal_basis->to_json()["element_ecp_electrons"].empty());
+
+  auto round_tripped =
+      qdk::chemistry::utils::microsoft::convert_basis_set_to_qdk(
+          *internal_basis);
+  EXPECT_EQ(round_tripped.get_ecp_electrons(), std::vector<size_t>({28, 0}));
+
+  internal_basis->atom_ecp_electrons[0] = -1;
+  EXPECT_THROW(qdk::chemistry::utils::microsoft::convert_basis_set_to_qdk(
+                   *internal_basis),
+               std::runtime_error);
+  internal_basis->atom_ecp_electrons[0] = 48;
+  EXPECT_THROW(qdk::chemistry::utils::microsoft::convert_basis_set_to_qdk(
+                   *internal_basis),
+               std::runtime_error);
 }
 
 TEST_F(ScfTest, AgHEcpShellIndices) {

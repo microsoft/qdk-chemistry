@@ -169,6 +169,7 @@ def basis_to_pyscf_mol(basis: BasisSet, charge: int = 0, multiplicity: int = 1) 
     if basis.has_ecp_shells() and basis.has_ecp_electrons():
         # Build PySCF ECP structure from QDK ECP shells
         ecp_dict = {}
+        ecp_data_by_atom = {}
         ecp_electrons = basis.get_ecp_electrons()
 
         for iatm in range(natoms):
@@ -213,8 +214,21 @@ def basis_to_pyscf_mol(basis: BasisSet, charge: int = 0, multiplicity: int = 1) 
 
                         l_components.append([l_value, terms])
 
-                    # Store in ecp_dict using elements
-                    ecp_dict[elements[iatm]] = [ncore, l_components]
+                    ecp_data_by_atom[iatm] = [ncore, l_components]
+
+        atom_indices_by_element: dict[str, list[int]] = {}
+        for iatm, element in enumerate(elements):
+            atom_indices_by_element.setdefault(element, []).append(iatm)
+
+        for element, atom_indices in atom_indices_by_element.items():
+            element_ecp_data = [ecp_data_by_atom.get(iatm) for iatm in atom_indices]
+            first_ecp_data = element_ecp_data[0]
+            if first_ecp_data is not None and all(ecp_data == first_ecp_data for ecp_data in element_ecp_data):
+                ecp_dict[element] = first_ecp_data
+            else:
+                for iatm, ecp_data in zip(atom_indices, element_ecp_data, strict=True):
+                    if ecp_data is not None:
+                        ecp_dict[pyscf_symbols[iatm]] = ecp_data
 
         if ecp_dict:
             mol.ecp = ecp_dict
@@ -222,7 +236,26 @@ def basis_to_pyscf_mol(basis: BasisSet, charge: int = 0, multiplicity: int = 1) 
             mol.qdk_ecp_name = basis.get_ecp_name()
     elif basis.has_ecp_electrons():
         # Fallback: only ECP name available, no shells
-        mol.ecp = basis.get_ecp_name()
+        ecp_name = basis.get_ecp_name()
+        ecp_electrons = basis.get_ecp_electrons()
+        ecp_dict = {}
+        named_ecp_indices_by_element: dict[str, list[int]] = {}
+        for iatm, element in enumerate(elements):
+            named_ecp_indices_by_element.setdefault(element, []).append(iatm)
+
+        for element, atom_indices in named_ecp_indices_by_element.items():
+            element_ecp_electrons = [ecp_electrons[iatm] for iatm in atom_indices]
+            if element_ecp_electrons[0] > 0 and all(
+                ncore == element_ecp_electrons[0] for ncore in element_ecp_electrons
+            ):
+                ecp_dict[element] = ecp_name
+            else:
+                for iatm, ncore in zip(atom_indices, element_ecp_electrons, strict=True):
+                    if ncore > 0:
+                        ecp_dict[pyscf_symbols[iatm]] = ecp_name
+
+        mol.ecp = ecp_dict
+        mol.qdk_ecp_name = ecp_name
 
     mol.build()
 
@@ -293,8 +326,9 @@ def pyscf_mol_to_qdk_basis(
         for iatm in range(pyscf_mol.natm):
             atom_symbol = atom_symbols[iatm]
             element = atom_symbol.rstrip("0123456789")
-            if element in pyscf_mol._ecp:  # noqa: SLF001
-                ecp_data = pyscf_mol._ecp[element]  # noqa: SLF001
+            ecp_key = atom_symbol if atom_symbol in pyscf_mol._ecp else element  # noqa: SLF001
+            if ecp_key in pyscf_mol._ecp:  # noqa: SLF001
+                ecp_data = pyscf_mol._ecp[ecp_key]  # noqa: SLF001
                 # Structure: [ncore, [[l, [[[exp, coeff]], ...]], ...]], where the inner structure has r-power terms
                 ecp_components = ecp_data[1]
 
@@ -368,9 +402,11 @@ def pyscf_mol_to_qdk_basis(
 
                 # Extract ncore values directly from the ECP dictionary structure
                 for iatm in range(pyscf_mol.natm):
-                    element = atom_symbols[iatm].rstrip("0123456789")
-                    if element in pyscf_mol.ecp:
-                        ecp_electrons[iatm] = pyscf_mol.ecp[element][0]
+                    atom_symbol = atom_symbols[iatm]
+                    element = atom_symbol.rstrip("0123456789")
+                    ecp_key = atom_symbol if atom_symbol in pyscf_mol.ecp else element
+                    if ecp_key in pyscf_mol.ecp:
+                        ecp_electrons[iatm] = pyscf_mol.ecp[ecp_key][0]
 
                 # Validate consistency with mol.atom_nelec_core if available
                 if hasattr(pyscf_mol, "atom_nelec_core"):
