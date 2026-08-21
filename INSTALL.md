@@ -132,7 +132,28 @@ After the initial build, restart VS Code and reopen in the container to ensure t
 
 ### Step 4: Develop
 
-The dev container builds the C++ library and links it to the Python package in separate steps, as shown in `.devcontainer/scripts/post_create.sh`. After changing the source code, you need to rebuild and install accordingly.
+The dev container installs the Python package in editable mode, so changes to pure Python files are available immediately. After changing pybind11 sources, rebuild the Python package:
+
+```bash
+python -m pip install --no-build-isolation --check-build-dependencies --no-deps \
+  -C build-dir="build/{wheel_tag}" -e ./python
+```
+
+After changing the C++ library, build and install it before rebuilding the Python bindings:
+
+```bash
+cmake --build cpp/build --target chemistry
+cmake --install cpp/build
+python -m pip install --no-build-isolation --check-build-dependencies --no-deps \
+  -C build-dir="build/{wheel_tag}" -e ./python
+```
+
+Build only the relevant C++ test target during development, then run its tests from the directory where CTest registers them. For example:
+
+```bash
+cmake --build cpp/build --target test_algorithm_hash
+ctest --test-dir cpp/build/tests --output-on-failure -R AlgorithmHash
+```
 
 **NOTE:**
 
