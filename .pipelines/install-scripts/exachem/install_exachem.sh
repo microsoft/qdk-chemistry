@@ -97,8 +97,27 @@ mkdir -p "${BUILD_ROOT}" "${INSTALL_PREFIX}"
 
 # BLAS++/LAPACK++ are found via TAMM's default find_package search (no NO_DEFAULT_PATH), so putting
 # CPP_DEPS_PREFIX on CMAKE_PREFIX_PATH is enough for them -- unlike LibInt2/GauXC below, which need explicit
-# -D*_ROOT flags.
-export CMAKE_PREFIX_PATH="${CPP_DEPS_PREFIX}:${CMAKE_PREFIX_PATH:-}"
+# -D*_ROOT flags. INSTALL_PREFIX is added too so the seeded Eigen3 below (and anything CMSB itself installs) is
+# found consistently by both the outer TAMM configure and its nested TAMM_External re-configure.
+export CMAKE_PREFIX_PATH="${CPP_DEPS_PREFIX}:${INSTALL_PREFIX}:${CMAKE_PREFIX_PATH:-}"
+
+# TAMM's CMSB superbuild always tries find_package(Eigen3 CONFIG) first and only falls back to git-cloning its own
+# copy (from gitlab.com, unreachable from these CI runners) if that fails. Rather than relying on CMake flags --
+# which CMSB's nested TAMM_External re-configure does not forward -- seed INSTALL_PREFIX with a copy of the
+# apt-installed libeigen3-dev, mirroring the same relative layout (share/eigen3/cmake + include/eigen3) that CMSB
+# would have produced had it built Eigen3 itself. INSTALL_PREFIX is on CMAKE_PREFIX_PATH for every CMSB configure
+# pass (outer and nested alike), so this is found everywhere without further flags.
+EIGEN3_CONFIG="$(find /usr -maxdepth 6 -name 'Eigen3Config.cmake' -print -quit 2>/dev/null || true)"
+if [ -z "${EIGEN3_CONFIG}" ]; then
+  echo "ERROR: Eigen3Config.cmake not found under /usr (expected from apt's libeigen3-dev)." >&2
+  exit 1
+fi
+EIGEN3_CMAKE_DIR="$(dirname "${EIGEN3_CONFIG}")"                     # e.g. /usr/share/eigen3/cmake
+EIGEN3_PREFIX="$(dirname "$(dirname "${EIGEN3_CMAKE_DIR}")")"        # e.g. /usr
+mkdir -p "${INSTALL_PREFIX}/share/eigen3" "${INSTALL_PREFIX}/include"
+cp -r "${EIGEN3_CMAKE_DIR}" "${INSTALL_PREFIX}/share/eigen3/cmake"
+cp -r "${EIGEN3_PREFIX}/include/eigen3" "${INSTALL_PREFIX}/include/eigen3"
+echo "==> Seeded Eigen3 from ${EIGEN3_PREFIX} into ${INSTALL_PREFIX}"
 
 # --------------------------------------------------------------------------------------------------------------------
 # Serial HDF5 discovery. Ubuntu's `libhdf5-dev` (already installed by the workflow for qdk-chemistry itself) puts
@@ -120,17 +139,6 @@ else
 fi
 echo "==> HDF5: cflags='${HDF5_CFLAGS}' libs='${HDF5_LIBS}'"
 
-# TAMM's CMSB superbuild always tries find_package(Eigen3 CONFIG) first and only clones its own copy (from
-# gitlab.com) if that fails. Ubuntu's apt-installed libeigen3-dev isn't always on CMake's default CONFIG search
-# path, so point at it explicitly -- this also avoids depending on gitlab.com being reachable from CI runners.
-EIGEN3_CONFIG="$(find /usr -maxdepth 6 -name 'Eigen3Config.cmake' -print -quit 2>/dev/null || true)"
-if [ -z "${EIGEN3_CONFIG}" ]; then
-  echo "ERROR: Eigen3Config.cmake not found under /usr (expected from apt's libeigen3-dev)." >&2
-  exit 1
-fi
-EIGEN3_DIR="$(dirname "${EIGEN3_CONFIG}")"
-echo "==> Eigen3_DIR=${EIGEN3_DIR}"
-
 # Flags shared by both the TAMM and ExaChem configure lines below. USE_HDF5=OFF disables TAMM's parallel-HDF5 layer
 # (the base HDF5 here, like qdk-chemistry's own, is serial-only); USE_SERIAL_IO selects ExaChem's serial-I/O SCF
 # path instead. These MUST be identical on both configure lines, or ExaChem's CMSB reconfigures/rebuilds TAMM.
@@ -143,7 +151,6 @@ COMMON_CMAKE_ARGS=(
   -DTAMM_CXX_FLAGS="-DUSE_SERIAL_IO ${HDF5_CFLAGS}"
   -DLibInt2_ROOT="${CPP_DEPS_PREFIX}"
   -DGauXC_ROOT="${CPP_DEPS_PREFIX}"
-  -DEigen3_DIR="${EIGEN3_DIR}"
 )
 
 # --------------------------------------------------------------------------------------------------------------------
