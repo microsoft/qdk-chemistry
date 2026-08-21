@@ -19,7 +19,7 @@ from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_swap_pauli_se
     ControlledSwapPauliSequenceMapper,
     _vacuum_eigenphase,
 )
-from qdk_chemistry.data import LatticeGraph, MajoranaMapping, QubitOperator
+from qdk_chemistry.data import LatticeGraph, MajoranaMapping, QubitOperator, TaperingSpecification
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
@@ -37,37 +37,11 @@ if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit.quantum_info import Operator, Statevector
 
 
-#: Qubit index used as the control in every mapper built by these tests.
-CONTROL_INDEX = 2
-
-#: Single-qubit Pauli matrices, keyed by axis.
-PAULI_MATRICES = {
-    "I": np.eye(2, dtype=complex),
-    "X": np.array([[0, 1], [1, 0]], dtype=complex),
-    "Y": np.array([[0, -1j], [1j, 0]], dtype=complex),
-    "Z": np.array([[1, 0], [0, -1]], dtype=complex),
-}
-
 #: Sparse Pauli terms of the two-mode worked example.
 XX = {0: "X", 1: "X"}
 YY = {0: "Y", 1: "Y"}
 Z0 = {0: "Z"}
 IDENTITY: dict[int, str] = {}
-
-#: Time step at which the interleaved ordering leaks exactly half the vacuum amplitude.
-LEAKING_TIME_STEP = np.pi / 2
-
-#: H = 0.5 (XX + YY) + 0.5 (I - Z0) as ``(pauli_term, coefficient)``, in two orderings.
-GROUPED_ORDERING = [(XX, 0.5), (YY, 0.5), (Z0, -0.5), (IDENTITY, 0.5)]
-INTERLEAVED_ORDERING = [(XX, 0.5), (Z0, -0.5), (YY, 0.5), (IDENTITY, 0.5)]
-
-#: 0.5 (XX + YY) - 0.5 Z0 + 0.5 Z1: number conserving, so H|00> = 0.
-END_TO_END_PAULI_STRINGS = ["XX", "YY", "IZ", "ZI"]
-END_TO_END_COEFFICIENTS = [0.5, 0.5, -0.5, 0.5]
-END_TO_END_EVOLUTION_TIME = 0.5
-
-#: Absolute tolerance the mapper uses when testing amplitude cancellation.
-VACUUM_PRESERVATION_TOLERANCE = 1e-9
 
 #: Fermion-to-qubit mappings the vacuum-annihilating reconstruction is expected to hold for.
 FERMION_TO_QUBIT_MAPPINGS = {
@@ -80,9 +54,15 @@ FERMION_TO_QUBIT_MAPPINGS = {
 
 def build_pauli_matrix(pauli_term, num_qubits):
     """Build the dense matrix of a sparse Pauli term (qubit 0 = least significant)."""
+    paulis = {
+        "I": np.eye(2, dtype=complex),
+        "X": np.array([[0, 1], [1, 0]], dtype=complex),
+        "Y": np.array([[0, -1j], [1j, 0]], dtype=complex),
+        "Z": np.array([[1, 0], [0, -1]], dtype=complex),
+    }
     matrix = np.array([[1]], dtype=complex)
     for qubit in reversed(range(num_qubits)):
-        matrix = np.kron(matrix, PAULI_MATRICES[pauli_term.get(qubit, "I")])
+        matrix = np.kron(matrix, paulis[pauli_term.get(qubit, "I")])
     return matrix
 
 
@@ -140,7 +120,7 @@ def unitary_rep(diagonal_ppf_container):
 def cswap_mapper():
     """Create a CSWAP mapper configured with a single control qubit."""
     mapper = ControlledSwapPauliSequenceMapper()
-    mapper.settings().set("control_indices", [CONTROL_INDEX])
+    mapper.settings().set("control_indices", [2])
     return mapper
 
 
@@ -159,7 +139,7 @@ def make_two_qubit_rep():
 def make_ordering_rep(make_two_qubit_rep):
     """Return a factory turning a ``(pauli_term, coefficient)`` ordering into a UnitaryRepresentation."""
 
-    def _make(ordering, time_step=LEAKING_TIME_STEP):
+    def _make(ordering, time_step=np.pi / 2):
         return make_two_qubit_rep([(pauli_term, coefficient * time_step) for pauli_term, coefficient in ordering])
 
     return _make
@@ -168,11 +148,12 @@ def make_ordering_rep(make_two_qubit_rep):
 @pytest.fixture
 def vacuum_annihilating_unitary():
     """Group the end-to-end Hamiltonian with ``vacuum_annihilating`` and Trotterise it."""
-    hamiltonian = QubitOperator(END_TO_END_PAULI_STRINGS, np.array(END_TO_END_COEFFICIENTS))
+    # 0.5 (XX + YY) - 0.5 Z0 + 0.5 Z1: number conserving, so H|00> = 0.
+    hamiltonian = QubitOperator(["XX", "YY", "IZ", "ZI"], np.array([0.5, 0.5, -0.5, 0.5]))
     grouped = registry.create("term_grouper", "vacuum_annihilating").run(hamiltonian)
 
     trotter = registry.create("hamiltonian_unitary_builder", "trotter")
-    trotter.settings().update({"order": 1, "num_divisions": 1, "time": END_TO_END_EVOLUTION_TIME})
+    trotter.settings().update({"order": 1, "num_divisions": 1, "time": 0.5})
     return trotter.run(grouped)
 
 
@@ -189,7 +170,7 @@ def make_mapped_unitary():
         grouped = registry.create("term_grouper", "vacuum_annihilating").run(qubit_hamiltonian)
 
         trotter = registry.create("hamiltonian_unitary_builder", "trotter")
-        trotter.settings().update({"order": 1, "num_divisions": 1, "time": END_TO_END_EVOLUTION_TIME})
+        trotter.settings().update({"order": 1, "num_divisions": 1, "time": 0.5})
         return trotter.run(grouped)
 
     return _make
@@ -296,7 +277,7 @@ class TestControlledSwapPauliSequenceMapper:
 
         prepared = QuantumCircuit(5)
         prepared.x(0)  # system in |01>, an eigenstate of U
-        prepared.h(CONTROL_INDEX)
+        prepared.h(2)
         prepared.compose(circuit.get_qiskit_circuit(), inplace=True)
 
         # Little-endian index bits q4 q3 q2 q1 q0: |01> with the control at 0 -> 1, at 1 -> 5.
@@ -365,9 +346,23 @@ class TestVacuumPreservationValidation:
 
         # Settings lock once an algorithm has run, so the loose tolerance needs a fresh mapper.
         tolerant = ControlledSwapPauliSequenceMapper()
-        tolerant.settings().set("control_indices", [CONTROL_INDEX])
+        tolerant.settings().set("control_indices", [2])
         tolerant.settings().set("vacuum_preservation_tolerance", 1e-6)
         assert isinstance(tolerant.run(rep), Circuit)
+
+    def test_tolerance_is_budgeted_over_the_repetitions(self, cswap_mapper, make_two_qubit_rep):
+        """A residual that is harmless once leaks ``step_reps`` times over, so the budget scales."""
+        terms = [(XX, 0.5), (YY, 0.5 + 1e-10)]
+        assert isinstance(cswap_mapper.run(make_two_qubit_rep(terms)), Circuit)
+
+        step_terms = [ExponentiatedPauliTerm(pauli_term=pauli_term, angle=angle) for pauli_term, angle in terms]
+        repeated = UnitaryRepresentation(
+            container=PauliProductFormulaContainer(step_terms, step_reps=1000, num_qubits=2)
+        )
+        mapper = ControlledSwapPauliSequenceMapper()
+        mapper.settings().set("control_indices", [2])
+        with pytest.raises(ValueError, match="vacuum-preserving product formula"):
+            mapper.run(repeated)
 
 
 class TestVacuumPreservingBlocks:
@@ -418,16 +413,14 @@ class TestVacuumLeakageWithoutGrouping:
         Inside the sandwich that entangles the vacuum register with the control, and the final
         ``ResetAll`` destroys the control coherence.
         """
-        state = evolve_vacuum(INTERLEAVED_ORDERING, LEAKING_TIME_STEP)
-
+        state = evolve_vacuum([(XX, 0.5), (Z0, -0.5), (YY, 0.5), (IDENTITY, 0.5)], np.pi / 2)
         assert np.isclose(state[0], (1 - 1j) / 2)
         assert np.isclose(state[3], (-1 + 1j) / 2)
         assert np.isclose(abs(state[3]) ** 2, 0.5)
 
     def test_grouped_ordering_preserves_the_vacuum(self):
         """``XX, YY, Z0, I`` keeps the partners adjacent and returns |00> exactly."""
-        state = evolve_vacuum(GROUPED_ORDERING, LEAKING_TIME_STEP)
-
+        state = evolve_vacuum([(XX, 0.5), (YY, 0.5), (Z0, -0.5), (IDENTITY, 0.5)], np.pi / 2)
         expected = np.zeros(4, dtype=complex)
         expected[0] = 1.0
         assert np.allclose(state, expected, atol=float_comparison_absolute_tolerance)
@@ -435,11 +428,12 @@ class TestVacuumLeakageWithoutGrouping:
     def test_mapper_rejects_the_leaking_ordering(self, cswap_mapper, make_ordering_rep):
         """The mapper's validation matches the numerics above."""
         with pytest.raises(ValueError, match="vacuum-preserving product formula"):
-            cswap_mapper.run(make_ordering_rep(INTERLEAVED_ORDERING))
+            cswap_mapper.run(make_ordering_rep([(XX, 0.5), (Z0, -0.5), (YY, 0.5), (IDENTITY, 0.5)]))
 
     def test_mapper_accepts_the_grouped_ordering(self, cswap_mapper, make_ordering_rep):
         """The ordering that preserves the vacuum passes validation."""
-        assert isinstance(cswap_mapper.run(make_ordering_rep(GROUPED_ORDERING)), Circuit)
+        rep = make_ordering_rep([(XX, 0.5), (YY, 0.5), (Z0, -0.5), (IDENTITY, 0.5)])
+        assert isinstance(cswap_mapper.run(rep), Circuit)
 
 
 class TestVacuumAnnihilatingGroupingEndToEnd:
@@ -500,10 +494,43 @@ class TestVacuumAnnihilatingGroupingEndToEnd:
         grouped = registry.create("term_grouper", "vacuum_annihilating").run(hamiltonian)
 
         trotter = registry.create("hamiltonian_unitary_builder", "trotter")
-        trotter.settings().update({"order": 1, "num_divisions": 1, "time": END_TO_END_EVOLUTION_TIME})
+        trotter.settings().update({"order": 1, "num_divisions": 1, "time": 0.5})
 
         with pytest.raises(ValueError, match="vacuum-preserving product formula"):
             cswap_mapper.run(trotter.run(grouped))
+
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
+    def test_cswap_circuit_from_tapered_hamiltonian_is_a_controlled_unitary(self, cswap_mapper):
+        r"""A tapered (SCBK-style) Hamiltonian keeps its metadata and its vacuum phase corrected.
+
+        Sector tapering leaves a constant behind, so :math:`E_0 \ne 0` and the :math:`|0\rangle`
+        branch acquires a phase the mapper has to cancel.
+        """
+        hamiltonian = QubitOperator(
+            ["ZI", "IZ", "II"],
+            np.array([0.5, 0.5, 3.0]),
+            tapering=TaperingSpecification(qubit_indices=(2, 3), eigenvalues=(1, -1)),
+        )
+        grouped = registry.create("term_grouper", "vacuum_annihilating").run(hamiltonian)
+        assert grouped.tapering == hamiltonian.tapering
+
+        trotter = registry.create("hamiltonian_unitary_builder", "trotter")
+        trotter.settings().update({"order": 1, "num_divisions": 1, "time": 0.5})
+        unitary = trotter.run(grouped)
+        container = unitary.get_container()
+
+        block = Operator(cswap_mapper.run(unitary).get_qiskit_circuit()).data[0:8, 0:8]
+        terms = [(term.pauli_term, term.angle) for term in container.step_terms]
+        u = np.linalg.matrix_power(build_product_formula_matrix(terms, container.num_qubits), container.step_reps)
+
+        # <0|U|0> != 1, so this only matches because the vacuum phase is cancelled on the control.
+        assert not np.isclose(u[0, 0], 1.0, atol=float_comparison_absolute_tolerance)
+        assert np.allclose(
+            block / block[0, 0],
+            controlled_unitary(u),
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
 
 
 class TestVacuumAnnihilatingAcrossFermionToQubitMappings:
@@ -521,7 +548,7 @@ class TestVacuumAnnihilatingAcrossFermionToQubitMappings:
         container = make_mapped_unitary(mapping_name).get_container()
         terms = [(term.pauli_term, term.angle) for term in container.step_terms]
 
-        assert _vacuum_eigenphase(terms, VACUUM_PRESERVATION_TOLERANCE) is not None
+        assert _vacuum_eigenphase(terms, 1e-9) is not None
 
     @pytest.mark.parametrize("mapping_name", list(FERMION_TO_QUBIT_MAPPINGS))
     def test_predicted_phase_matches_the_evolved_vacuum(self, make_mapped_unitary, mapping_name):
@@ -533,7 +560,7 @@ class TestVacuumAnnihilatingAcrossFermionToQubitMappings:
         vacuum[0] = 1.0
         evolved = build_product_formula_matrix(terms, container.num_qubits) @ vacuum
 
-        phase = _vacuum_eigenphase(terms, VACUUM_PRESERVATION_TOLERANCE)
+        phase = _vacuum_eigenphase(terms, 1e-9)
         assert np.allclose(evolved[1:], 0.0, atol=float_comparison_absolute_tolerance)
         assert np.isclose(evolved[0], np.exp(1j * phase), atol=float_comparison_absolute_tolerance)
 

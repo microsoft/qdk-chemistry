@@ -78,7 +78,13 @@ class PauliProductFormulaContainer(UnitaryContainer):
             num_qubits: The number of qubits the unitary acts on.
             scale: The evolution time used for eigenvalue-phase conversion.
 
+        Raises:
+            ValueError: If ``step_reps`` is not positive.
+
         """
+        if step_reps <= 0:
+            raise ValueError(f"step_reps must be a positive integer, got {step_reps}.")
+
         self.step_terms = step_terms
         self.step_reps = step_reps
         self._num_qubits = num_qubits

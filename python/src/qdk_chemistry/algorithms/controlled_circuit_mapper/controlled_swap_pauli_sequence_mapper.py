@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import math
+
 from qdk import qsharp
 
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
@@ -40,8 +42,8 @@ def _vacuum_eigenphase(terms: list[tuple[dict[int, str], float]], atol: float) -
 
     """
     block: list[tuple[int, int]] = []  # symplectic (X, Z) bit masks of the terms in the open block
-    residual: dict[int, complex] = {}
-    diagonal = 0.0
+    contributions: dict[int, list[complex]] = {}
+    diagonal: list[float] = []
 
     for pauli_map, angle in terms:
         x_mask = z_mask = 0
@@ -58,27 +60,29 @@ def _vacuum_eigenphase(terms: list[tuple[dict[int, str], float]], atol: float) -
 
         if x_mask:
             # P|0...0> = i^{n_Y}|b>, with b the bit pattern of the X/Y support.
-            residual[x_mask] = residual.get(x_mask, 0j) + angle * 1j ** (x_mask & z_mask).bit_count()
-            if abs(residual[x_mask]) <= atol:
-                del residual[x_mask]
+            pending = contributions.setdefault(x_mask, [])
+            pending.append(angle * 1j ** (x_mask & z_mask).bit_count())
+            residual = complex(math.fsum(c.real for c in pending), math.fsum(c.imag for c in pending))
+            if abs(residual) <= atol:
+                del contributions[x_mask]
         else:
             # Diagonal strings act as +1 on |0...0>, so they contribute phase only.
-            diagonal += angle
+            diagonal.append(angle)
 
-        if not residual:
+        if not contributions:
             block = []
 
-    if block or residual:
+    if block or contributions:
         return None
-    return -diagonal
+    return -math.fsum(diagonal)
 
 
 class ControlledSwapPauliSequenceMapperSettings(ControlledCircuitMapperSettings):
     """Settings for the :class:`ControlledSwapPauliSequenceMapper`.
 
     Attributes:
-        vacuum_preservation_tolerance: Absolute tolerance used when checking that the
-            Pauli amplitudes within a block cancel on the vacuum.
+        vacuum_preservation_tolerance: Absolute tolerance on the amplitude leaked out of the vacuum
+            over the whole evolution, i.e. over all ``step_reps`` repetitions.
 
     """
 
@@ -89,7 +93,7 @@ class ControlledSwapPauliSequenceMapperSettings(ControlledCircuitMapperSettings)
             "vacuum_preservation_tolerance",
             "double",
             1e-9,
-            "Absolute tolerance for the vacuum-preservation validation of the input product formula.",
+            "Absolute tolerance on the amplitude the repeated evolution may leak out of the vacuum.",
         )
 
 
@@ -228,7 +232,9 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
 
         """
         terms = [(term.pauli_term, term.angle) for term in container.step_terms]
-        phase = _vacuum_eigenphase(terms, self._settings.get("vacuum_preservation_tolerance"))
+        # A residual left by one step leaks again on every repetition, so the per-step budget shrinks.
+        atol = self._settings.get("vacuum_preservation_tolerance") / container.step_reps
+        phase = _vacuum_eigenphase(terms, atol)
         if phase is None:
             raise ValueError(
                 "ControlledSwapPauliSequenceMapper requires a vacuum-preserving product formula: the "

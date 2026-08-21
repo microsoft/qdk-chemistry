@@ -68,6 +68,12 @@ class TestPauliProductFormulaContainer:
         assert container.step_reps == 4
         assert len(container.step_terms) == 3
 
+    @pytest.mark.parametrize("step_reps", [0, -1])
+    def test_non_positive_step_reps_raises(self, step_terms, step_reps):
+        """A step repeated zero or fewer times has no defined unitary."""
+        with pytest.raises(ValueError, match="step_reps must be a positive integer"):
+            PauliProductFormulaContainer(step_terms=step_terms, step_reps=step_reps, num_qubits=2)
+
     def test_update_ordering(self, container):
         """Test setting a new valid evolution ordering."""
         updated_container = container.reorder_terms([1, 2, 0])

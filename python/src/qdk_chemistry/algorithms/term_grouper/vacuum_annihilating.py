@@ -19,6 +19,8 @@ with :math:`F` the flipped-qubit set, :math:`n_Y` the number of :math:`Y` factor
 
 from __future__ import annotations
 
+import math
+
 from qdk_chemistry.algorithms.term_grouper.base import TermGrouper, TermGrouperSettings
 from qdk_chemistry.data import FlatPartition, QubitOperator
 
@@ -114,13 +116,15 @@ class VacuumAnnihilatingTermGrouper(TermGrouper):
                 diagonal = tuple(index for index, _ in entries)
                 continue
             current: list[int] = []
-            total = 0j
+            pending: list[complex] = []
             for index, amplitude in entries:
                 current.append(index)
-                total += amplitude
+                pending.append(amplitude)
+                # Resummed rather than accumulated so badly scaled coefficients still cancel exactly.
+                total = complex(math.fsum(c.real for c in pending), math.fsum(c.imag for c in pending))
                 if abs(total) <= tolerance:
                     groups.append(tuple(current))
-                    current, total = [], 0j
+                    current, pending = [], []
             if current:
                 groups.append(tuple(current))
 
