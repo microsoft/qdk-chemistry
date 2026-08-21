@@ -122,9 +122,9 @@ The native QDK/Chemistry implementation for Hamiltonian construction. Transforms
    * - ``eri_method``
      - string
      - Method for computing electron repulsion integrals ("direct" or "incore")
-    * - ``integral_dressing``
-       - string
-       - One-electron integral dressing ("", "x2c_1e", or "x2c_1e_contracted"). Default: ""
+   * - ``integral_dressing``
+     - string
+     - One-electron integral dressing ("", "x2c_1e", or "x2c_1e_contracted"). Default: ""
 
 Spin-Free X2C-1e Option
 ~~~~~~~~~~~~~~~~~~~~~~~
