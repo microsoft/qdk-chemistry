@@ -27,6 +27,7 @@ jobs:
   # - rename this job and its display name back to "published-baseline" and
   #   "Exact published baseline";
   # - restore the 30-minute timeout and remove CMAKE_BUILD_PARALLEL_LEVEL;
+  # - remove the source-build prerequisite steps;
   # - replace the current-source installation with the commented published-wheel
   #   installation below; and
   # - add native Windows jobs for every architecture with a published wheel.
@@ -62,6 +63,34 @@ jobs:
       run: |
         VERSION=$(python -c 'import runpy; print(runpy.run_path("docs/source/tutorials/_versions.py")["GROUND_STATE_TUTORIAL_VERSION"])')
         echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+    - name: Install Linux source-build prerequisites
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          ninja-build \
+          cmake \
+          libeigen3-dev \
+          libboost-all-dev \
+          libhdf5-dev \
+          libopenblas-dev \
+          libgfortran5 \
+          pkg-config
+
+    - name: Install macOS source-build prerequisites
+      if: runner.os == 'macOS'
+      run: |
+        brew install \
+          cmake \
+          ninja \
+          eigen \
+          boost \
+          hdf5 \
+          nlohmann-json \
+          bison \
+          flex
 
     - name: Install current-source tutorial environment
       run: |
