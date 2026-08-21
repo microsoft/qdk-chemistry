@@ -194,13 +194,13 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
                 "ControlledSwapPauliSequenceMapper only supports PauliProductFormula container for the unitary."
             )
 
-        vacuum_phase = self._vacuum_phase(unitary_container)
-
         control_indices = self._get_control_indices()
         if len(control_indices) != 1:
             raise ValueError("ControlledSwapPauliSequenceMapper currently only supports a single control qubit.")
 
         target_indices = self._get_target_indices(unitary)
+
+        vacuum_phase = self._vacuum_phase(unitary_container)
 
         pauli_terms: list[list[qsharp.Pauli]] = []
         angles: list[float] = []

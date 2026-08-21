@@ -44,37 +44,31 @@ class VacuumAnnihilatingTermGrouperSettings(TermGrouperSettings):
             "tolerance",
             "double",
             1e-9,
-            "Absolute tolerance on residual vacuum amplitude when certifying cancellation within each flipped-qubit set.",
+            "Absolute tolerance on residual vacuum amplitude "
+            "when certifying cancellation within each flipped-qubit set.",
         )
 
 
 class VacuumAnnihilatingTermGrouper(TermGrouper):
     r"""Group Pauli *terms* whose weighted amplitudes cancel on :math:`|0\ldots0\rangle`.
 
-    Only terms sharing a flipped-qubit set reach the same basis state :math:`|b_F\rangle`, so
-    they are the only ones whose amplitudes can cancel.  Within such a set the grouper
-    accumulates :math:`c_j i^{n_Y^{(j)}}` in index order and closes a group as soon as the
-    running sum vanishes, giving the finest partition into groups that each satisfy
+    Only terms sharing a flipped-qubit set reach the same basis state :math:`|b_F\rangle`, so they
+    are the only ones whose amplitudes can cancel.  Each set has to satisfy
+    :math:`\sum_j c_j\, P_j\, |0\ldots0\rangle = 0` to within ``tolerance``, otherwise grouping
+    fails with a :class:`ValueError`.  A certified set is then cut wherever its running sum
+    vanishes exactly, so every group but the last cancels on its own and the last carries the
+    tolerated residual.  Diagonal (:math:`I`/:math:`Z`) strings only phase the vacuum, which a
+    consumer can correct for, so they form one group whose sum is left unconstrained.
 
-    .. math::
-
-        \sum_{j \in g} c_j\, P_j\, |0\ldots0\rangle = 0 .
-
-    Terms left over at the end of a flipped-qubit set cannot cancel, so the operator does not
-    annihilate the vacuum and grouping fails with a :class:`ValueError`.  Diagonal
-    (:math:`I`/:math:`Z`) strings never move the vacuum and form a single group that only phases
-    it, which a consumer can correct for, so their sum is left unconstrained.
-
-    Groups are additionally restricted to a single :math:`Y`-count parity, which makes their
-    members commute: two strings sharing a flipped-qubit set disagree only inside it, on
-    positions where one carries :math:`X` and the other :math:`Y`, and the number of those has
+    Groups hold a single :math:`Y`-count parity, which makes their members commute: two strings
+    sharing a flipped-qubit set disagree only inside it, and the number of such positions has
     parity :math:`n_Y^{(a)} + n_Y^{(b)} \bmod 2`.  No cancellation is lost, since with real
     coefficients the even-parity terms contribute :math:`\pm 1` and the odd-parity ones
     :math:`\pm i`, so the two sub-sums are the real and imaginary parts of the total.
 
-    The motivating case is fermionic chemistry, here each excitation annihilates the all-zero
-    reference through the *weighted sum* of its Pauli strings,
-    and which is what the ``ControlledSwapPauliSequenceMapper`` requires.
+    The motivating case is fermionic chemistry, where each excitation annihilates the all-zero
+    reference only through the *weighted sum* of its Pauli strings, which is the ordering the
+    ``ControlledSwapPauliSequenceMapper`` requires.
 
     """
 
