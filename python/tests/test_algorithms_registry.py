@@ -7,6 +7,7 @@
 
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
 
 from qdk_chemistry._core._algorithms import ScfSolverFactory
@@ -283,6 +284,46 @@ class TestRegistryCachingWarnings:
             result = algorithm.run("input", cache=tmp_path, option=True)
 
         assert result == (("input",), {"option": True})
+
+    def test_cache_round_trip_numpy_scalar_and_array_result(self, tmp_path):
+        """Cache an algorithm result containing a NumPy scalar and array."""
+
+        class NumpyResultAlgorithm:
+            calls = 0
+
+            def hash(self):
+                """Return a stable run hash."""
+                return "numpy_result"
+
+            def run(self):
+                """Return a NumPy scalar and array result."""
+                self.calls += 1
+                return np.float32(1.25), np.array([1.0, 2.0], dtype=np.float32)
+
+            def type_name(self):
+                """Return the test algorithm type."""
+                return "test_algorithm"
+
+            def name(self):
+                """Return the test algorithm name."""
+                return "numpy_result"
+
+            def settings(self):
+                """Return empty algorithm settings."""
+                settings = MagicMock()
+                settings.to_dict.return_value = {}
+                return settings
+
+        implementation = NumpyResultAlgorithm()
+        algorithm = registry._AlgorithmWrapper(implementation)
+
+        algorithm.run(cache=tmp_path)
+        energy, state = algorithm.run(cache=tmp_path)
+
+        assert implementation.calls == 1
+        assert energy == 1.25
+        assert type(energy) is float
+        np.testing.assert_array_equal(state, np.array([1.0, 2.0], dtype=np.float32))
 
 
 class TestRegistryAvailable:
