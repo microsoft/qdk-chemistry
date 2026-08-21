@@ -621,33 +621,17 @@ TEST(BlasThreadsTest, ScopedGuardPinsAndRestores) {
   ASSERT_GT(original, 0);
 
   {
-    ScopedBlasThreads guard(1);
+    ScopedBlasThreads guard;
     EXPECT_TRUE(guard.active());
     EXPECT_EQ(get_blas_num_threads(), 1);
 
     // Nested guards must not restore the count early.
     {
-      ScopedBlasThreads nested(1);
+      ScopedBlasThreads nested;
       EXPECT_EQ(get_blas_num_threads(), 1);
     }
     EXPECT_EQ(get_blas_num_threads(), 1);
   }
 
-  EXPECT_EQ(get_blas_num_threads(), original);
-}
-
-TEST(BlasThreadsTest, GuardIgnoresInvalidThreadCounts) {
-  using namespace qdk::chemistry::scf::util;
-
-  if (detected_blas_vendor() == BlasVendor::Unknown) {
-    GTEST_SKIP() << "No BLAS thread-control API available";
-  }
-
-  const int original = get_blas_num_threads();
-  {
-    ScopedBlasThreads guard(0);
-    EXPECT_FALSE(guard.active());
-    EXPECT_EQ(get_blas_num_threads(), original);
-  }
   EXPECT_EQ(get_blas_num_threads(), original);
 }

@@ -298,7 +298,7 @@ void GAUXC::build_XC(const double* D, double* XC, double* xc_energy) {
 
   // GauXC parallelizes over grid batches with OpenMP and calls BLAS from
   // each thread; pin BLAS to one thread to avoid nested threading.
-  util::ScopedBlasThreads blas_thread_guard(1);
+  util::ScopedBlasThreads blas_thread_guard;
 
   // Allocate a large temporary buffer
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
@@ -358,7 +358,7 @@ void GAUXC::get_gradients(const double* D, double* dXC) {
 
   // GauXC parallelizes over grid batches with OpenMP and calls BLAS from
   // each thread; pin BLAS to one thread to avoid nested threading.
-  util::ScopedBlasThreads blas_thread_guard(1);
+  util::ScopedBlasThreads blas_thread_guard;
 
   // Allocate a large temporary buffer
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
@@ -408,7 +408,7 @@ void GAUXC::build_snK(const double* D, double* K) {
 
   // GauXC parallelizes over grid batches with OpenMP and calls BLAS from
   // each thread; pin BLAS to one thread to avoid nested threading.
-  util::ScopedBlasThreads blas_thread_guard(1);
+  util::ScopedBlasThreads blas_thread_guard;
 
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
   allocate_device_buffer_async_(device_buffer_sz_, 0);
@@ -445,7 +445,7 @@ void GAUXC::eval_fxc_contraction(const double* D, const double* tD,
 
   // GauXC parallelizes over grid batches with OpenMP and calls BLAS from
   // each thread; pin BLAS to one thread to avoid nested threading.
-  util::ScopedBlasThreads blas_thread_guard(1);
+  util::ScopedBlasThreads blas_thread_guard;
 
   // Allocate a large temporary buffer
 #ifdef QDK_CHEMISTRY_ENABLE_GPU

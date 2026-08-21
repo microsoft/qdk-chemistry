@@ -22,7 +22,7 @@
 @QDK_CHEMISTRY_BLAS_BACKEND_TABLE@
 
 // The row whose API links against the configured BLAS. Undefined when none
-// could be bound, in which case util/blas_threads.cpp looks it up at runtime.
+// could be bound, in which case ScopedBlasThreads is a no-op.
 #cmakedefine QDK_CHEMISTRY_BLAS_LINKED_VENDOR @QDK_CHEMISTRY_BLAS_LINKED_VENDOR@
 #cmakedefine QDK_CHEMISTRY_BLAS_LINKED_SET_FN @QDK_CHEMISTRY_BLAS_LINKED_SET_FN@
 #cmakedefine QDK_CHEMISTRY_BLAS_LINKED_GET_FN @QDK_CHEMISTRY_BLAS_LINKED_GET_FN@

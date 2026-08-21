@@ -31,8 +31,8 @@ const char* to_string(BlasVendor vendor);
  * @brief BLAS backend whose thread count this build controls (resolved once,
  * on first use).
  *
- * The backend is bound at link time where CMake could probe one, and looked
- * up in the running process otherwise.
+ * The backend is bound at link time, where CMake could probe one against the
+ * configured BLAS.
  *
  * @return The bound vendor, or BlasVendor::Unknown when no supported
  *         thread-control API is available, in which case ScopedBlasThreads is
@@ -52,7 +52,7 @@ BlasVendor detected_blas_vendor();
 int get_blas_num_threads();
 
 /**
- * @brief RAII guard that pins BLAS to a fixed thread count while active and
+ * @brief RAII guard that pins BLAS to a single thread while active and
  * restores the previous count once the outermost guard exits.
  *
  * Motivation: GauXC's OpenMP-parallel grid loop calls BLAS from many threads
@@ -64,15 +64,17 @@ int get_blas_num_threads();
  * The BLAS thread count is process-global state, so this guard uses a shared,
  * mutex-protected nesting depth instead of per-instance state: only the first
  * guard to start changes it, and only the last one to finish restores it. This
- * keeps concurrent/recursive use safe.
+ * keeps concurrent/recursive use safe, and is why the count is not
+ * configurable: a nested guard could not be honored without overriding the
+ * count an enclosing one relies on.
  *
- * If the BLAS backend in use exposes no thread-control API, the guard is a
- * no-op (a one-time warning is logged).
+ * The guard is a no-op if the BLAS backend exposes no thread-control API (a
+ * one-time warning is logged), or cannot report its current count, which would
+ * leave nothing to restore.
  */
 class ScopedBlasThreads {
  public:
-  /// @param num_threads Thread count to pin BLAS to while the guard is alive.
-  explicit ScopedBlasThreads(int num_threads = 1);
+  ScopedBlasThreads();
   ~ScopedBlasThreads();
 
   ScopedBlasThreads(const ScopedBlasThreads&) = delete;

@@ -107,9 +107,9 @@ install(
 ###############################################################################
 #
 # Each BLAS backend spells that API differently, so ask the configured BLAS
-# which one links instead of assuming OpenBLAS. Binding at link time is what
-# makes a statically linked BLAS work (its symbols are exported by no module,
-# so blas_threads.cpp cannot find them at runtime).
+# which one links instead of assuming OpenBLAS. Binding here is the only way to
+# reach the BLAS our own calls go to: a symbol found in the running process may
+# belong to a different BLAS, and a statically linked one exports nothing.
 
 include(CheckFunctionExists)
 
@@ -119,8 +119,8 @@ set(QDK_CHEMISTRY_BLAS_VENDOR "${BLAS_VENDOR}")
 # backend's API, so ask the dispatcher first. Single source of truth for BLAS
 # thread control: drives the configure-time probe below and, through
 # QDK_CHEMISTRY_BLAS_BACKEND_TABLE in config.h.in, the BlasVendor enumeration
-# and runtime lookup in util/blas_threads.{h,cpp}. Columns are setter, getter,
-# thread-count type, BlasVendor enumerator, display name.
+# in util/blas_threads.h. Columns are setter, getter, thread-count type,
+# BlasVendor enumerator, display name.
 #
 # OPENBLAS also covers drop-ins such as ARM Performance Libraries. BLIS types
 # the count as dim_t, 32- or 64-bit depending on its build; the 64-bit form is
@@ -176,7 +176,8 @@ function(qdk_check_blas_thread_api backend out_var)
   endif()
 endfunction()
 
-# Pick at most one backend; empty means blas_threads.cpp uses its runtime lookup.
+# Pick at most one backend; empty means ScopedBlasThreads is a no-op, since a
+# backend can only be bound here.
 set(_qdk_blas_thread_api "")
 if(QDK_CHEMISTRY_BLAS_THREAD_API STREQUAL "AUTO")
   foreach(_qdk_blas_backend IN LISTS _qdk_blas_backends)
@@ -215,14 +216,11 @@ else()
       "BLAS vendor whose thread-control symbols are bound into the library")
   set(QDK_CHEMISTRY_BLAS_THREAD_SYMBOL "" CACHE INTERNAL
       "BLAS thread-control symbol bound into the library")
-  set(_qdk_blas_thread_api "none (runtime lookup only)")
+  set(_qdk_blas_thread_api "none (thread control disabled)")
 endif()
 
 message(STATUS "QDK Chemistry BLAS vendor: '${QDK_CHEMISTRY_BLAS_VENDOR}', "
                "thread-control API: ${_qdk_blas_thread_api}")
-
-# dlsym() for the runtime fallback; empty on Windows and macOS.
-target_link_libraries(chemistry PRIVATE ${CMAKE_DL_LIBS})
 
 # Generate Config Header
 configure_file(${CMAKE_CURRENT_LIST_DIR}/config.h.in ${PROJECT_BINARY_DIR}/include/qdk/chemistry/scf/config.h)

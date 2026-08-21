@@ -7,28 +7,13 @@
 
 #include <cstdint>
 #include <functional>
-#include <initializer_list>
 #include <mutex>
 #include <qdk/chemistry/utils/logger.hpp>
 
-#if defined(_WIN32)
-// Keep windows.h from pulling in unrelated headers and from defining the
-// min/max macros, which break standard headers used elsewhere.
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#else
-#include <dlfcn.h>
-#endif
-
 // The thread-control API this build links against, named by CMake (see the BLAS
-// section of ../CMakeLists.txt). Binding directly is the most accurate answer
-// and the only one that works for a statically linked BLAS, whose symbols no
-// module exports and which therefore cannot be discovered at runtime.
+// section of ../CMakeLists.txt). Binding here is the only way to reach the BLAS
+// our own calls go to: a symbol found in the running process may belong to a
+// different BLAS, and a statically linked one exports nothing to find.
 #if defined(QDK_CHEMISTRY_BLAS_LINKED_SET_FN)
 extern "C" {
 void QDK_CHEMISTRY_BLAS_LINKED_SET_FN(QDK_CHEMISTRY_BLAS_LINKED_TYPE);
@@ -51,54 +36,7 @@ constexpr const char* kConfiguredBlasVendor =
     sizeof(QDK_CHEMISTRY_BLAS_VENDOR) > 1 ? QDK_CHEMISTRY_BLAS_VENDOR
                                           : "unknown";
 
-/**
- * @brief Look up an optional symbol in the current process.
- *
- * The BLAS backend is a build/deployment choice of the user, so no vendor
- * specific symbol may be linked at all. Resolving the thread-control entry
- * points at runtime keeps this file free of link-time dependencies on any
- * particular BLAS implementation.
- */
-void* find_symbol(const char* name) {
-#if defined(_WIN32)
-  // Modules that may export a BLAS thread-control API. Only already loaded
-  // modules are inspected; nothing new is brought into the process.
-  static const char* const kModules[] = {
-      "openblas.dll",  "libopenblas.dll",    "mkl_rt.dll",
-      "mkl_rt.2.dll",  "blis.dll",           "AOCL-LibBlis-Win-MT-dll.dll",
-      "flexiblas.dll", "nvpl_blas_core.dll",
-  };
-  for (const char* module_name : kModules) {
-    if (HMODULE handle = GetModuleHandleA(module_name)) {
-      if (FARPROC symbol = GetProcAddress(handle, name)) {
-        return reinterpret_cast<void*>(symbol);
-      }
-    }
-  }
-  // Statically linked BLAS: the symbol may live in this module or the
-  // executable itself.
-  HMODULE self = nullptr;
-  GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
-                         GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                     reinterpret_cast<LPCSTR>(&find_symbol), &self);
-  for (HMODULE handle : {self, GetModuleHandleA(nullptr)}) {
-    if (handle == nullptr) continue;
-    if (FARPROC symbol = GetProcAddress(handle, name)) {
-      return reinterpret_cast<void*>(symbol);
-    }
-  }
-  return nullptr;
-#else
-  return dlsym(RTLD_DEFAULT, name);
-#endif
-}
-
-template <typename Fn>
-Fn find_function(const char* name) {
-  return reinterpret_cast<Fn>(find_symbol(name));
-}
-
-/// @brief Resolved thread-control API of whichever BLAS backend is loaded.
+/// @brief Resolved thread-control API of the BLAS backend bound at link time.
 struct BlasThreadApi {
   BlasVendor vendor = BlasVendor::Unknown;
   std::function<int()> get_num_threads;
@@ -137,54 +75,12 @@ BlasThreadApi linked_blas_thread_api() {
 #endif
 }
 
-/**
- * @brief Resolve one backend's thread-control API in the running process.
- *
- * @tparam T The type the backend uses for a thread count.
- * @return The API, or an invalid BlasThreadApi if either half is missing.
- */
-template <typename T>
-BlasThreadApi try_backend(BlasVendor vendor, const char* set_name,
-                          const char* get_name) {
-  using SetFn = void (*)(T);
-  using GetFn = T (*)(void);
-  auto set_fn = find_function<SetFn>(set_name);
-  auto get_fn = find_function<GetFn>(get_name);
-  if (!set_fn || !get_fn) return {};
-  return {vendor, [get_fn] { return narrow_thread_count(get_fn()); },
-          [set_fn](int n) { set_fn(static_cast<T>(n)); }};
-}
-
-// Runtime probes, generated from the backend table so they keep the order CMake
-// probes at configure time.
-#define QDK_CHEMISTRY_BLAS_RUNTIME_PROBE(token, vendor, label, set_fn, get_fn, \
-                                         type)                                 \
-  +[]() -> BlasThreadApi {                                                     \
-    return try_backend<type>(BlasVendor::vendor, #set_fn, #get_fn);            \
-  },
-constexpr BlasThreadApi (*kRuntimeProbes[])() = {
-    QDK_CHEMISTRY_BLAS_BACKEND_TABLE(QDK_CHEMISTRY_BLAS_RUNTIME_PROBE)};
-#undef QDK_CHEMISTRY_BLAS_RUNTIME_PROBE
-
 const BlasThreadApi& blas_thread_api() {
   static const BlasThreadApi api = [] {
-    // Prefer the API bound at link time: that BLAS is by construction the one
-    // our calls go to, and it is the only option when BLAS is linked
-    // statically (no module exports the symbols to look up at runtime).
     if (BlasThreadApi linked = linked_blas_thread_api(); linked.valid()) {
       QDK_LOGGER().debug("Using {} BLAS thread control (bound at link time)",
                          to_string(linked.vendor));
       return linked;
-    }
-
-    // Fall back to whichever backend is loaded in this process.
-    for (const auto probe : kRuntimeProbes) {
-      BlasThreadApi api = probe();
-      if (api.valid()) {
-        QDK_LOGGER().debug("Using {} BLAS thread control (found at runtime)",
-                           to_string(api.vendor));
-        return api;
-      }
     }
 
     QDK_LOGGER().warn(
@@ -200,19 +96,21 @@ const BlasThreadApi& blas_thread_api() {
   return api;
 }
 
-std::mutex& thread_count_mutex() {
-  static std::mutex mutex;
-  return mutex;
-}
+/**
+ * @brief Shared state backing ScopedBlasThreads.
+ *
+ * The BLAS thread count is process-global, so this is too. `saved` is
+ * meaningful only while `depth > 0`; both are touched only under `mutex`.
+ */
+struct BlasThreadState {
+  std::mutex mutex;
+  int depth = 0;
+  int saved = 0;
+};
 
-int& scope_depth() {
-  static int depth = 0;
-  return depth;
-}
-
-int& saved_num_threads() {
-  static int num_threads = 1;
-  return num_threads;
+BlasThreadState& blas_thread_state() {
+  static BlasThreadState state;
+  return state;
 }
 
 }  // namespace
@@ -238,25 +136,32 @@ int get_blas_num_threads() {
   return api.valid() ? api.get_num_threads() : 0;
 }
 
-ScopedBlasThreads::ScopedBlasThreads(int num_threads) {
+ScopedBlasThreads::ScopedBlasThreads() {
   const BlasThreadApi& api = blas_thread_api();
-  if (!api.valid() || num_threads < 1) return;
+  if (!api.valid()) return;
 
-  std::lock_guard<std::mutex> lock(thread_count_mutex());
-  if (scope_depth()++ == 0) {
+  BlasThreadState& state = blas_thread_state();
+  std::lock_guard<std::mutex> lock(state.mutex);
+  if (state.depth == 0) {
+    // Decline rather than guess: a backend that cannot report leaves nothing
+    // to restore on exit.
     const int current = api.get_num_threads();
-    saved_num_threads() = current > 0 ? current : 1;
-    api.set_num_threads(num_threads);
+    if (current < 1) return;
+    state.saved = current;
+    api.set_num_threads(1);
   }
+  // After the fallible part, so a declined guard leaves no depth behind.
+  ++state.depth;
   active_ = true;
 }
 
 ScopedBlasThreads::~ScopedBlasThreads() {
   if (!active_) return;
 
-  std::lock_guard<std::mutex> lock(thread_count_mutex());
-  if (--scope_depth() == 0) {
-    blas_thread_api().set_num_threads(saved_num_threads());
+  BlasThreadState& state = blas_thread_state();
+  std::lock_guard<std::mutex> lock(state.mutex);
+  if (--state.depth == 0) {
+    blas_thread_api().set_num_threads(state.saved);
   }
 }
 
