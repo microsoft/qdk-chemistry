@@ -101,12 +101,12 @@ class ControlledPSPMapper(ControlledCircuitMapper):
             Circuit: A quantum circuit implementing the controlled block encoding.
 
         Raises:
-            ValueError: If more than one control qubit is requested.
+            ValueError: If the control qubit is not a single qubit at index 0.
 
         """
         control_indices = self._get_control_indices()
-        if len(control_indices) != 1:
-            raise ValueError("ControlledPSPMapper currently only supports a single control qubit.")
+        if len(control_indices) != 1 or control_indices[0] != 0:
+            raise ValueError("ControlledPSPMapper currently only supports a single control qubit at index 0.")
 
         block_mapper = self._block_mapper()
         container = unitary.get_container()
