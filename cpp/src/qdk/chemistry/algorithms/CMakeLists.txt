@@ -7,6 +7,7 @@ target_sources(chemistry PRIVATE
     mc.cpp
     nuclear_derivative.cpp
     nuclear_derivative_detail.cpp
+    orbital_optimization.cpp
     pmc.cpp
     population_analysis.cpp
     qdk_nuclear_derivative.cpp

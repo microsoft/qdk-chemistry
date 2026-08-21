@@ -26,11 +26,9 @@ class ActiveSpaceOptimizerSettings : public data::Settings {
         "multi_configuration_calculator",
         data::AlgorithmRef("multi_configuration_calculator", "macis_cas"),
         "Correlated active-space solver used in each macro iteration.");
-    set_default(
-        "orbital_optimizer", data::AlgorithmRef("orbital_optimizer", ""),
-        "Orbital optimizer used to update the active-space projector. No "
-        "default implementation is registered yet; concrete active-space "
-        "optimizers must select one before the workflow can run.");
+    set_default("orbital_optimizer",
+                data::AlgorithmRef("orbital_optimizer", "qdk_qio"),
+                "Orbital optimizer used to update the active-space projector.");
     set_default(
         "max_macro_iterations", static_cast<int64_t>(20),
         "Maximum number of self-consistent macro iterations.",

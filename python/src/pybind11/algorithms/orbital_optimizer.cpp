@@ -7,6 +7,7 @@
 #include <qdk/chemistry.hpp>
 
 #include "factory_bindings.hpp"
+#include "qdk/chemistry/algorithms/microsoft/qio/qio_orbital_optimizer.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::algorithms;
@@ -68,6 +69,16 @@ new basis.
     return "<qdk_chemistry.algorithms.OrbitalOptimizer>";
   });
   qdk::chemistry::python::bind_create_nested(optimizer);
+
+  py::class_<microsoft::QIOOrbitalOptimizer, OrbitalOptimizer,
+             py::smart_holder>(m, "QdkQIOOrbitalOptimizer", R"(
+QDK full-window quantum-information orbital optimizer.
+
+The optimizer reconstructs the inactive and virtual RDM blocks from the
+correlated active-space state, minimizes total single-orbital entropy, and
+returns an orbital proposal that requires a subsequent correlated solve.
+)")
+      .def(py::init<>());
 
   qdk::chemistry::python::bind_algorithm_factory<
       OrbitalOptimizerFactory, OrbitalOptimizer, OrbitalOptimizerBase>(

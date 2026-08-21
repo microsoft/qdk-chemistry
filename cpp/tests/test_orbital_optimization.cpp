@@ -36,6 +36,32 @@ std::shared_ptr<Wavefunction> make_wavefunction(
       coefficients, determinants, orbitals));
 }
 
+std::shared_ptr<Wavefunction> make_qio_wavefunction() {
+  Eigen::MatrixXd coefficients = Eigen::MatrixXd::Identity(2, 2);
+  Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(2, 2);
+  auto orbitals = std::make_shared<Orbitals>(
+      coefficients, std::nullopt, std::make_optional(overlap),
+      testing::create_random_basis_set(2, "test"));
+  orbitals = testing::with_active_space(orbitals, {0, 1}, {});
+
+  Eigen::MatrixXd rdm_alpha(2, 2);
+  rdm_alpha << 0.5, 0.5, 0.5, 0.5;
+  const Eigen::MatrixXd rdm_beta = Eigen::MatrixXd::Zero(2, 2);
+  const Eigen::VectorXd zero_two_rdm = Eigen::VectorXd::Zero(16);
+  Eigen::VectorXd ci_coefficients(1);
+  ci_coefficients << 1.0;
+  const Wavefunction::DeterminantVector determinants{
+      Configuration::from_spin_half_string("20")};
+  return std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+      ContainerTypes::VectorVariant(ci_coefficients), determinants, orbitals,
+      std::nullopt,
+      std::make_optional<ContainerTypes::MatrixVariant>(rdm_alpha),
+      std::make_optional<ContainerTypes::MatrixVariant>(rdm_beta), std::nullopt,
+      std::make_optional<ContainerTypes::VectorVariant>(zero_two_rdm),
+      std::make_optional<ContainerTypes::VectorVariant>(zero_two_rdm),
+      std::make_optional<ContainerTypes::VectorVariant>(zero_two_rdm)));
+}
+
 class TestOrbitalOptimizer : public OrbitalOptimizer {
  public:
   std::string name() const override { return "test_orbital_optimizer"; }
@@ -65,7 +91,8 @@ class TestActiveSpaceOptimizer : public ActiveSpaceOptimizer {
 }  // namespace
 
 TEST(OrbitalOptimizationTest, EmptyFactoriesSupportRegistration) {
-  EXPECT_TRUE(OrbitalOptimizerFactory::available().empty());
+  EXPECT_EQ(OrbitalOptimizerFactory::available(),
+            std::vector<std::string>{"qdk_qio"});
   EXPECT_TRUE(ActiveSpaceOptimizerFactory::available().empty());
 
   OrbitalOptimizerFactory::register_instance(
@@ -81,6 +108,22 @@ TEST(OrbitalOptimizationTest, EmptyFactoriesSupportRegistration) {
       OrbitalOptimizerFactory::unregister_instance("test_orbital_optimizer"));
   EXPECT_TRUE(ActiveSpaceOptimizerFactory::unregister_instance(
       "test_active_space_optimizer"));
+}
+
+TEST(OrbitalOptimizationTest, QIOOptimizerReturnsOrbitalProposal) {
+  auto optimizer = OrbitalOptimizerFactory::create();
+  EXPECT_EQ(optimizer->name(), "qdk_qio");
+
+  auto result = optimizer->run(make_qio_wavefunction());
+
+  ASSERT_NE(result, nullptr);
+  ASSERT_NE(result->orbitals(), nullptr);
+  EXPECT_LT(result->final_objective(), result->initial_objective());
+  EXPECT_NEAR(result->final_objective(), 0.0, 1e-8);
+  EXPECT_GT(result->iterations(), 0);
+  EXPECT_TRUE(result->converged());
+  EXPECT_FALSE(result->orbitals()->has_energies());
+  EXPECT_TRUE(result->orbitals()->has_active_space());
 }
 
 TEST(OrbitalOptimizationTest, OrbitalOptimizerRunReturnsResult) {
@@ -121,11 +164,9 @@ TEST(OrbitalOptimizationTest, ActiveSpaceOptimizerDefaultSettings) {
   EXPECT_DOUBLE_EQ(settings.get<double>("energy_tolerance"), 1e-8);
   EXPECT_DOUBLE_EQ(settings.get<double>("objective_tolerance"), 1e-8);
 
-  // The orbital optimizer reference is a neutral placeholder: it names the
-  // correct algorithm type but no concrete (nonexistent) implementation.
   const auto ref = settings.get<AlgorithmRef>("orbital_optimizer");
   EXPECT_EQ(ref.get_algorithm_type(), "orbital_optimizer");
-  EXPECT_TRUE(ref.get_algorithm_name().empty());
+  EXPECT_EQ(ref.get_algorithm_name(), "qdk_qio");
 }
 
 TEST(OrbitalOptimizationTest, ResultValidation) {
