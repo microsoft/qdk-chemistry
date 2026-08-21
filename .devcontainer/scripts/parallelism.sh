@@ -40,9 +40,6 @@ parallel_jobs_for_memory() {
         mem_bytes="$cgroup_limit_bytes"
     fi
 
-    # tiny overhead to get common cases correct (e.g., 15.9GB RAM, 8GB per job -> 2 jobs)
-    mem_bytes=$(( mem_bytes * 103 / 100 ))
-
     jobs=$(( mem_bytes / (memory_per_job_gb * 1024 * 1024 * 1024) ))
 
     (( jobs < 1 )) && jobs=1
