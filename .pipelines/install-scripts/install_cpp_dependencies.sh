@@ -42,7 +42,6 @@ INSTALL_PREFIX="${INSTALL_PREFIX:-/usr/local}"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 BUILD_SHARED_LIBS="${BUILD_SHARED_LIBS:-OFF}"  # Default to static
 MARCH="${MARCH:-x86-64-v3}"  # matches the uarch qdk-chemistry's Linux CI runners build for
-BLAS_VENDOR="${BLAS_VENDOR:-openblas}"  # GHA/devcontainer: openblas; ADO wheel pipeline: blis (set by caller)
 LIBINT_JOBS=${LIBINT_JOBS:-4}  # Limit libint build jobs to 4 due to high memory usage
 KEEP_BUILD_DIR="${KEEP_BUILD_DIR:-0}"
 if command -v nproc >/dev/null 2>&1; then
@@ -53,6 +52,17 @@ fi
 MAC_BUILD="OFF"
 if [[ "$OSTYPE" == "darwin"* ]]; then
     MAC_BUILD="ON"
+fi
+
+# BLAS vendor for BLAS++: openblas on Linux (installed via apt); on macOS there's no BLAS package installed, so
+# leave it as "auto" so BLAS++ finds Apple's Accelerate framework itself. ADO's BLIS+LibFLAME pipeline overrides
+# this by setting BLAS_VENDOR=blis before calling this script.
+if [[ -z "${BLAS_VENDOR:-}" ]]; then
+    if [[ "$MAC_BUILD" == "ON" ]]; then
+        BLAS_VENDOR="auto"
+    else
+        BLAS_VENDOR="openblas"
+    fi
 fi
 
 # Helper function to extract commit hash from cgmanifest by repository URL pattern
