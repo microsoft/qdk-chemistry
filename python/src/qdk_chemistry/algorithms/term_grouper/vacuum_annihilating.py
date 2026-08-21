@@ -69,12 +69,9 @@ class VacuumAnnihilatingTermGrouper(TermGrouper):
     coefficients the even-parity terms contribute :math:`\pm 1` and the odd-parity ones
     :math:`\pm i`, so the two sub-sums are the real and imaginary parts of the total.
 
-    Grouping this way lets a Trotterised evolution reproduce a cancellation that the full
-    operator has but no single Pauli string can, since a unitary :math:`e^{-i\theta P}` never
-    annihilates a state while a sum of terms may.  The motivating case is fermionic chemistry,
-    where each excitation annihilates the all-zero reference through the *weighted sum* of its
-    Pauli strings, and which is what the
-    :class:`~qdk_chemistry.algorithms.ControlledSwapPauliSequenceMapper` requires.
+    The motivating case is fermionic chemistry, here each excitation annihilates the all-zero
+    reference through the *weighted sum* of its Pauli strings,
+    and which is what the ``ControlledSwapPauliSequenceMapper`` requires.
 
     """
 

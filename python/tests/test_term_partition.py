@@ -159,6 +159,7 @@ class TestTermGrouperRegistry:
         qh = QubitOperator(["XX", "YY", "ZZ"], np.array([1.0, 2.0, 3.0]))
         out = registry.create("term_grouper", "identity").run(qh)
         assert out.term_partition.num_groups == len(qh.pauli_strings)
+        assert all(len(g) == 1 for g in out.term_partition.groups)
 
     @pytest.mark.parametrize("strategy", ["commuting", "qubit_wise_commuting", "identity", "vacuum_annihilating"])
     def test_operator_metadata_survives_grouping(self, strategy):
