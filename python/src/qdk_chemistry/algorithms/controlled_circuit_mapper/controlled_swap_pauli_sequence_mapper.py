@@ -123,8 +123,8 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
         U|0\ldots0\rangle = e^{-it\sum_i P_i}|0\ldots0\rangle
         \approx \prod_i e^{-it P_i}|0\ldots0\rangle = |0\ldots0\rangle .
 
-    Grouping the Hamiltonian with the ``qubit_flip`` term grouper
-    (:class:`~qdk_chemistry.algorithms.term_grouper.QubitFlipTermGrouper`) produces that ordering.
+    Grouping the Hamiltonian with the ``vacuum_annihilating`` term grouper
+    (:class:`~qdk_chemistry.algorithms.term_grouper.VacuumAnnihilatingTermGrouper`) produces that ordering.
     The incoming formula is validated and rejected otherwise; interleaving cancellation partners,
     say ``XX, Z0, YY, I`` for :math:`H = \tfrac12(XX + YY) + \tfrac12(I - Z_0)`, leaks half the
     vacuum amplitude.
@@ -235,7 +235,7 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
                 "Pauli terms could not be split into contiguous, mutually commuting blocks that leave "
                 "|0...0> invariant, so the CSWAP sandwich would leak the vacuum and decohere the control. "
                 "The mapper applies to particle-conserving Hamiltonians; group such a Hamiltonian with "
-                "the 'qubit_flip' term grouper before building the unitary, e.g. "
-                "registry.create('term_grouper', 'qubit_flip').run(qubit_hamiltonian)."
+                "the 'vacuum_annihilating' term grouper before building the unitary, e.g. "
+                "registry.create('term_grouper', 'vacuum_annihilating').run(qubit_hamiltonian)."
             )
         return container.step_reps * phase

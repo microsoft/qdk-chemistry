@@ -121,9 +121,8 @@ controlled-:math:`U` up to a global phase for any :math:`E_0`.
 
 The vacuum must remain an eigenstate of the evolution, which is exactly what particle
 conservation buys: :math:`H` cannot connect :math:`|0\ldots0\rangle` to any other occupation
-number. Leaked amplitude entangles the vacuum
-register with the control, and resetting it at the end destroys the control coherence — the
-phase the algorithm is trying to measure is lost.
+number. Leaked amplitude entangles the vacuum register with the control, and resetting it at the
+end destroys the control coherence, the phase the algorithm is trying to measure is lost.
 
 For a molecular Hamiltonian every fermionic term (:math:`a_p^\dagger a_q` and
 :math:`a_p^\dagger a_r^\dagger a_s a_q`) annihilates the vacuum. A single Pauli string is unitary
@@ -135,12 +134,14 @@ fermionic term are exponentiated as one contiguous block:
    U|0\ldots0\rangle = e^{-it\sum_i P_i}|0\ldots0\rangle
    \approx \prod_i e^{-it P_i}|0\ldots0\rangle = |0\ldots0\rangle .
 
-The :ref:`qubit-flip term grouper <algorithms-term-grouper>` (factory name ``"qubit_flip"``)
-produces that ordering. A Pauli factor *flips* a qubit when it exchanges :math:`|0\rangle` and
-:math:`|1\rangle`, which :math:`X` and :math:`Y` do and :math:`I` and :math:`Z` do not.
-Terms carrying :math:`X`/:math:`Y` on the same qubits with the same :math:`Y`-count parity form a
-group: the shared flip set is what lets their amplitudes cancel on the vacuum, and equal parity
-makes the group members commute, so each group can be exponentiated term by term.
+The :ref:`vacuum-annihilating term grouper <algorithms-term-grouper>` (factory name
+``"vacuum_annihilating"``) produces that ordering. A Pauli factor *flips* a qubit when it
+exchanges :math:`|0\rangle` and :math:`|1\rangle`, which :math:`X` and :math:`Y` do and
+:math:`I` and :math:`Z` do not. Terms flipping the same qubits are the only ones that can
+cancel, so the grouper walks them in order and closes a group as soon as the accumulated
+amplitude :math:`\sum_j c_j i^{n_Y^{(j)}}` vanishes — each emitted group therefore annihilates
+the vacuum outright. Groups are restricted to one :math:`Y`-count parity so that their members
+commute and can be exponentiated term by term.
 
 The mapper validates its input product formula and raises a :class:`ValueError` when the
 ordering is not vacuum preserving, rather than returning a wrong result.

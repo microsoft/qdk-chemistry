@@ -69,7 +69,7 @@ END_TO_END_EVOLUTION_TIME = 0.5
 #: Absolute tolerance the mapper uses when testing amplitude cancellation.
 VACUUM_PRESERVATION_TOLERANCE = 1e-9
 
-#: Fermion-to-qubit mappings the qubit-flip reconstruction is expected to hold for.
+#: Fermion-to-qubit mappings the vacuum-annihilating reconstruction is expected to hold for.
 FERMION_TO_QUBIT_MAPPINGS = {
     "jordan-wigner": MajoranaMapping.jordan_wigner,
     "bravyi-kitaev": MajoranaMapping.bravyi_kitaev,
@@ -166,10 +166,10 @@ def make_ordering_rep(make_two_qubit_rep):
 
 
 @pytest.fixture
-def qubit_flip_unitary():
-    """Group the end-to-end Hamiltonian with ``qubit_flip`` and Trotterise it."""
+def vacuum_annihilating_unitary():
+    """Group the end-to-end Hamiltonian with ``vacuum_annihilating`` and Trotterise it."""
     hamiltonian = QubitOperator(END_TO_END_PAULI_STRINGS, np.array(END_TO_END_COEFFICIENTS))
-    grouped = registry.create("term_grouper", "qubit_flip").run(hamiltonian)
+    grouped = registry.create("term_grouper", "vacuum_annihilating").run(hamiltonian)
 
     trotter = registry.create("hamiltonian_unitary_builder", "trotter")
     trotter.settings().update({"order": 1, "num_divisions": 1, "time": END_TO_END_EVOLUTION_TIME})
@@ -178,7 +178,7 @@ def qubit_flip_unitary():
 
 @pytest.fixture
 def make_mapped_unitary():
-    """Return a factory running molecular Hamiltonian -> qubit mapping -> ``qubit_flip`` -> Trotter."""
+    """Return a factory running molecular Hamiltonian -> qubit mapping -> ``vacuum_annihilating`` -> Trotter."""
 
     def _make(mapping_name):
         hamiltonian = create_nontrivial_test_hamiltonian()
@@ -186,7 +186,7 @@ def make_mapped_unitary():
         mapping = FERMION_TO_QUBIT_MAPPINGS[mapping_name](num_spin_orbitals)
 
         qubit_hamiltonian = registry.create("qubit_mapper", "qdk").run(hamiltonian, mapping)
-        grouped = registry.create("term_grouper", "qubit_flip").run(qubit_hamiltonian)
+        grouped = registry.create("term_grouper", "vacuum_annihilating").run(qubit_hamiltonian)
 
         trotter = registry.create("hamiltonian_unitary_builder", "trotter")
         trotter.settings().update({"order": 1, "num_divisions": 1, "time": END_TO_END_EVOLUTION_TIME})
@@ -403,7 +403,7 @@ class TestVacuumPreservingBlocks:
 
 
 class TestVacuumLeakageWithoutGrouping:
-    r"""The worked example motivating the qubit-flip grouper.
+    r"""The worked example motivating the vacuum-annihilating grouper.
 
     For the Jordan-Wigner image of
     :math:`H = a_0^\dagger a_1 + a_1^\dagger a_0 + a_0^\dagger a_0
@@ -442,12 +442,12 @@ class TestVacuumLeakageWithoutGrouping:
         assert isinstance(cswap_mapper.run(make_ordering_rep(GROUPED_ORDERING)), Circuit)
 
 
-class TestQubitFlipGroupingEndToEnd:
+class TestVacuumAnnihilatingGroupingEndToEnd:
     """End-to-end: group a qubit Hamiltonian, Trotterise it, and control it with CSWAP."""
 
-    def test_grouped_trotter_step_preserves_the_vacuum(self, qubit_flip_unitary):
+    def test_grouped_trotter_step_preserves_the_vacuum(self, vacuum_annihilating_unitary):
         """The Trotterised product formula fixes |00>, which is what the mapper requires."""
-        container = qubit_flip_unitary.get_container()
+        container = vacuum_annihilating_unitary.get_container()
         terms = [(term.pauli_term, term.angle) for term in container.step_terms]
 
         vacuum = np.zeros(2**container.num_qubits, dtype=complex)
@@ -459,14 +459,16 @@ class TestQubitFlipGroupingEndToEnd:
         assert np.allclose(evolved[1:], 0.0, atol=float_comparison_absolute_tolerance)
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
-    def test_cswap_circuit_from_grouped_hamiltonian_is_a_controlled_unitary(self, cswap_mapper, qubit_flip_unitary):
-        r"""The pipeline ``qubit_flip`` -> ``trotter`` -> ``cswap_pauli_sequence`` yields a controlled-:math:`U`.
+    def test_cswap_circuit_from_grouped_hamiltonian_is_a_controlled_unitary(
+        self, cswap_mapper, vacuum_annihilating_unitary
+    ):
+        r"""The pipeline yields a controlled-:math:`U`.
 
         The vacuum codespace block must be unitary (no leakage) and reproduce
         :math:`|0\rangle\langle0| \otimes I + |1\rangle\langle1| \otimes U` up to a global phase.
         """
-        container = qubit_flip_unitary.get_container()
-        circuit = cswap_mapper.run(qubit_flip_unitary)
+        container = vacuum_annihilating_unitary.get_container()
+        circuit = cswap_mapper.run(vacuum_annihilating_unitary)
 
         # q0, q1 = system; q2 = control; q3, q4 = internally allocated vacuum register.
         qc = circuit.get_qiskit_circuit()
@@ -495,7 +497,7 @@ class TestQubitFlipGroupingEndToEnd:
     def test_transverse_field_ising_is_rejected(self, cswap_mapper):
         """A TFIM does not conserve particle number, so its evolution rotates the vacuum out."""
         hamiltonian = create_ising_hamiltonian(LatticeGraph.chain(4, periodic=False), j=1.0, h=0.5)
-        grouped = registry.create("term_grouper", "qubit_flip").run(hamiltonian)
+        grouped = registry.create("term_grouper", "vacuum_annihilating").run(hamiltonian)
 
         trotter = registry.create("hamiltonian_unitary_builder", "trotter")
         trotter.settings().update({"order": 1, "num_divisions": 1, "time": END_TO_END_EVOLUTION_TIME})
@@ -504,10 +506,10 @@ class TestQubitFlipGroupingEndToEnd:
             cswap_mapper.run(trotter.run(grouped))
 
 
-class TestQubitFlipAcrossFermionToQubitMappings:
-    """The qubit-flip reconstruction must not be specific to Jordan-Wigner.
+class TestVacuumAnnihilatingAcrossFermionToQubitMappings:
+    """The vacuum-annihilating reconstruction must not be specific to Jordan-Wigner.
 
-    The fermionic provenance of the Pauli strings is discarded by the mapping, so ``qubit_flip``
+    The fermionic provenance of the Pauli strings is discarded by the mapping, so ``vacuum_annihilating``
     recovers the vacuum-annihilating groups from Pauli structure alone.  Whether that
     reconstruction is faithful depends on the encoding placing every string of a fermionic term
     on a common flipped-qubit set, which these tests pin down for the supported mappings.

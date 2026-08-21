@@ -24,13 +24,17 @@ from qdk_chemistry.algorithms.term_grouper.commuting import (
     QubitWiseCommutingTermGrouper,
 )
 from qdk_chemistry.algorithms.term_grouper.identity import IdentityTermGrouper
-from qdk_chemistry.algorithms.term_grouper.qubit_flip import QubitFlipTermGrouper
+from qdk_chemistry.algorithms.term_grouper.vacuum_annihilating import (
+    VacuumAnnihilatingTermGrouper,
+    VacuumAnnihilatingTermGrouperSettings,
+)
 
 __all__ = [
     "FullCommutingTermGrouper",
     "IdentityTermGrouper",
-    "QubitFlipTermGrouper",
     "QubitWiseCommutingTermGrouper",
     "TermGrouper",
     "TermGrouperFactory",
+    "VacuumAnnihilatingTermGrouper",
+    "VacuumAnnihilatingTermGrouperSettings",
 ]

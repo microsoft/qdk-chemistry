@@ -77,7 +77,7 @@ qubit_ham = create("qubit_mapper").run(
 # 3. Group Pauli strings that flip the same qubits. These are the strings coming
 #    from the same fermionic term, whose amplitudes cancel on |0...0>. Without
 #    this step Trotterization interleaves them and the vacuum leaks.
-term_grouper = create("term_grouper", "qubit_flip")
+term_grouper = create("term_grouper", "vacuum_annihilating")
 grouped_ham = term_grouper.run(qubit_ham)
 
 # 4. Trotterize. The builder honours the grouping, so each group is exponentiated
