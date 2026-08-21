@@ -8,6 +8,8 @@
 #include <cmath>
 #include <filesystem>
 #include <limits>
+#include <macis/util/transform.hpp>
+#include <numbers>
 #include <numeric>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
@@ -15,10 +17,13 @@
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/microsoft/localization/active_space_qio.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
+#include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <qdk/chemistry/data/orbital_entropy.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
+#include <random>
 
+#include "qdk/chemistry/utils/golden_section.hpp"
 #include "testing_utilities.hpp"
 #include "ut_common.hpp"
 
@@ -52,6 +57,14 @@ TEST_F(LocalizationTest, LocalizationSelector_MetaData) {
   EXPECT_NO_THROW({ auto settings = selector->settings(); });
 }
 
+TEST_F(LocalizationTest, GaugeFixingHamiltonianConstructorDefault) {
+  auto localizer = LocalizerFactory::create("qdk_gauge_fixing");
+  const auto constructor_ref =
+      localizer->settings().get<AlgorithmRef>("hamiltonian_constructor");
+  EXPECT_EQ(constructor_ref.get_algorithm_type(), "hamiltonian_constructor");
+  EXPECT_EQ(constructor_ref.get_algorithm_name(), "qdk");
+}
+
 TEST_F(LocalizationTest, Factory) {
   auto available_localizers = LocalizerFactory::available();
   // Lower bound rather than an exact count: adding future localizers should not
@@ -72,6 +85,9 @@ TEST_F(LocalizationTest, Factory) {
   EXPECT_TRUE(std::find(available_localizers.begin(),
                         available_localizers.end(),
                         "qdk_vvhv") != available_localizers.end());
+  EXPECT_TRUE(std::find(available_localizers.begin(),
+                        available_localizers.end(),
+                        "qdk_gauge_fixing") != available_localizers.end());
   EXPECT_THROW(LocalizerFactory::create("nonexistent_localizer"),
                std::runtime_error);
   EXPECT_NO_THROW(LocalizerFactory::register_instance(
@@ -108,9 +124,12 @@ TEST_F(LocalizationTest,
   const auto& coeffs_beta =
       wfn->get_orbitals()->coefficients()->block({axes::beta(), axes::beta()});
   const std::vector<size_t> empty_indices;
-  const std::vector<std::string> localizer_names = {
-      "qdk_pipek_mezey", "qdk_mp2_natural_orbitals", "qdk_natural_orbitals",
-      "qdk_active_space_qio", "qdk_vvhv"};
+  const std::vector<std::string> localizer_names = {"qdk_pipek_mezey",
+                                                    "qdk_mp2_natural_orbitals",
+                                                    "qdk_natural_orbitals",
+                                                    "qdk_active_space_qio",
+                                                    "qdk_vvhv",
+                                                    "qdk_gauge_fixing"};
 
   for (const auto& localizer_name : localizer_names) {
     auto localizer = LocalizerFactory::create(localizer_name);
@@ -1778,6 +1797,505 @@ TEST_F(LocalizationTest, NaturalOrbitals_EdgeCase) {
         localizer->run(wfn, active_alpha, active_alpha);
       },
       std::invalid_argument);
+}
+
+/// Build the LiH valence natural-orbital wavefunction used by gauge-fixing
+/// tests, along with its active indices and active electron counts.
+struct GaugeFixingFixture {
+  std::shared_ptr<Wavefunction> natural_wavefunction;
+  std::vector<size_t> active_indices;
+  size_t num_alpha;
+  size_t num_beta;
+};
+
+GaugeFixingFixture make_gauge_fixing_fixture() {
+  auto [E_HF, wfn_HF] = ScfSolverFactory::create()->run(
+      testing::create_lih_structure(), 0, 1, "cc-pvdz");
+
+  auto active_space = ActiveSpaceSelectorFactory::create("qdk_valence");
+  active_space->settings().set("num_active_electrons", 2);
+  active_space->settings().set("num_active_orbitals", 5);
+  auto active_space_wfn = active_space->run(wfn_HF);
+
+  const auto [num_alpha, num_beta] =
+      active_space_wfn->get_active_num_electrons();
+  auto mc_calc = MultiConfigurationCalculatorFactory::create("macis_cas");
+  mc_calc->settings().set("calculate_one_rdm", true);
+  auto [E_cas, wfn_cas] =
+      mc_calc->run(HamiltonianConstructorFactory::create()->run(
+                       active_space_wfn->get_orbitals()),
+                   num_alpha, num_beta);
+
+  const auto active_channel = spin_channel_indices(
+      active_space_wfn->get_orbitals()->active_indices(), axes::alpha());
+  std::vector<size_t> active_indices(active_channel.begin(),
+                                     active_channel.end());
+
+  auto natural = LocalizerFactory::create("qdk_natural_orbitals")
+                     ->run(wfn_cas, active_indices, active_indices);
+  return {natural, active_indices, num_alpha, num_beta};
+}
+
+TEST_F(LocalizationTest, GaugeFixingUsesConfiguredHamiltonianConstructor) {
+  auto fixture = make_gauge_fixing_fixture();
+  auto localizer = LocalizerFactory::create("qdk_gauge_fixing");
+  localizer->settings().set(
+      "hamiltonian_constructor",
+      AlgorithmRef("hamiltonian_constructor",
+                   "_nonexistent_gauge_fixing_hamiltonian_constructor"));
+
+  EXPECT_THROW(localizer->run(fixture.natural_wavefunction,
+                              fixture.active_indices, fixture.active_indices),
+               std::runtime_error);
+}
+
+/// Jordan-Wigner mapped coefficient norm of the orbitals' active space.
+double mapped_coefficient_norm(const std::shared_ptr<Orbitals>& orbitals,
+                               size_t num_active) {
+  auto hamiltonian = HamiltonianConstructorFactory::create()->run(orbitals);
+  const auto mapped = qdk::chemistry::data::majorana_map_hamiltonian(
+      MajoranaMapping::jordan_wigner(2 * num_active), *hamiltonian, true, 1e-14,
+      1e-14);
+  double norm = 0.0;
+  for (const auto& coefficient : mapped.coefficients) {
+    norm += std::abs(coefficient);
+  }
+  return norm;
+}
+
+TEST_F(LocalizationTest, GaugeFixingScalarRefinementResolvesSubgridCusp) {
+  // The coefficient norm has cusps that can sit far inside one coarse grid
+  // cell; refinement must resolve them to an absolute angular tolerance.
+  const double expected_angle = 1e-8;
+  const auto [angle, value] = qdk::chemistry::utils::golden_section_minimum(
+      [expected_angle](double x) { return std::abs(x - expected_angle); },
+      -std::numbers::pi / 32.0, std::numbers::pi / 32.0);
+
+  EXPECT_NEAR(expected_angle, angle, 1e-12);
+  EXPECT_LT(value, 1e-12);
+}
+
+TEST_F(LocalizationTest, GaugeFixingScalarRefinementKeepsTheBestSampledPoint) {
+  // Contraction assumes one minimum in the bracket. The coefficient norm is a
+  // sum of absolute values and can put several cusps inside one coarse cell,
+  // so the caller must not be handed a point worse than the scan that placed
+  // the bracket.
+  const auto objective = [](double x) {
+    return std::min(std::abs(x + 0.9) + 0.2, std::abs(x - 0.35));
+  };
+  const auto [angle, value] =
+      qdk::chemistry::utils::golden_section_minimum(objective, -1.0, 1.0);
+  EXPECT_LE(value, std::min(objective(-1.0), objective(1.0)));
+  EXPECT_NEAR(objective(angle), value, 1e-15);
+}
+
+TEST_F(LocalizationTest, GaugeFixingScalarRefinementTerminatesBelowSpacing) {
+  // A tolerance finer than the bracket's own floating-point spacing cannot be
+  // met; the contraction must stop rather than spin.
+  const auto [angle, value] = qdk::chemistry::utils::golden_section_minimum(
+      [](double x) { return (x - 1.25) * (x - 1.25); }, 1.0, 2.0,
+      std::numeric_limits<double>::epsilon() / 4.0);
+  EXPECT_NEAR(1.25, angle, 1e-8);
+  EXPECT_LT(value, 1e-15);
+}
+
+TEST_F(LocalizationTest, GaugeFixingScalarRefinementRejectsNonFiniteInputs) {
+  const auto objective = [](double x) { return x * x; };
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  const double infinity = std::numeric_limits<double>::infinity();
+
+  EXPECT_THROW(
+      qdk::chemistry::utils::golden_section_minimum(objective, nan, 1.0),
+      std::invalid_argument);
+  EXPECT_THROW(
+      qdk::chemistry::utils::golden_section_minimum(objective, -1.0, infinity),
+      std::invalid_argument);
+  EXPECT_THROW(
+      qdk::chemistry::utils::golden_section_minimum(objective, -1.0, 1.0, nan),
+      std::invalid_argument);
+}
+
+TEST_F(LocalizationTest, GaugeFixingRotatedIntegralsMatchARebuiltHamiltonian) {
+  // The sweep rotates the active-space integrals instead of rebuilding the
+  // Hamiltonian for every candidate. That is only valid if both routes give
+  // the same mapped coefficient norm.
+  auto fixture = make_gauge_fixing_fixture();
+  auto orbitals = fixture.natural_wavefunction->get_orbitals();
+  const size_t num_active = fixture.active_indices.size();
+  auto hamil_ctor = HamiltonianConstructorFactory::create();
+  const auto mapping = MajoranaMapping::jordan_wigner(2 * num_active);
+
+  const auto reference = hamil_ctor->run(orbitals);
+  const auto& [reference_one_body, ignored_one_body] =
+      reference->get_one_body_integrals();
+  const auto& [reference_two_body, ignored_aabb, ignored_bbbb] =
+      reference->get_two_body_integrals();
+
+  // A rotation confined to the active space, mixing the first two orbitals.
+  const double angle = 0.41;
+  Eigen::MatrixXd rotation = Eigen::MatrixXd::Identity(num_active, num_active);
+  rotation(0, 0) = std::cos(angle);
+  rotation(1, 0) = std::sin(angle);
+  rotation(0, 1) = -std::sin(angle);
+  rotation(1, 1) = std::cos(angle);
+
+  Eigen::MatrixXd one_body(num_active, num_active);
+  macis::two_index_transform(num_active, num_active, reference_one_body.data(),
+                             num_active, rotation.data(), num_active,
+                             one_body.data(), num_active);
+  Eigen::VectorXd two_body(reference_two_body.size());
+  macis::four_index_transform(num_active, num_active, reference_two_body.data(),
+                              num_active, rotation.data(), num_active,
+                              two_body.data(), num_active);
+  const auto rotated = qdk::chemistry::data::majorana_map_hamiltonian(
+      mapping, 0.0, one_body.data(), one_body.data(), two_body.data(),
+      two_body.data(), two_body.data(), num_active, true, 1e-14, 1e-14);
+  double rotated_norm = 0.0;
+  for (const auto& coefficient : rotated.coefficients) {
+    rotated_norm += std::abs(coefficient);
+  }
+
+  // The same rotation applied to the orbitals themselves, then rebuilt.
+  Eigen::MatrixXd coefficients =
+      orbitals->coefficients()->block({axes::alpha(), axes::alpha()});
+  Eigen::MatrixXd active(coefficients.rows(),
+                         static_cast<Eigen::Index>(num_active));
+  for (size_t i = 0; i < num_active; ++i) {
+    active.col(static_cast<Eigen::Index>(i)) =
+        coefficients.col(static_cast<Eigen::Index>(fixture.active_indices[i]));
+  }
+  const Eigen::MatrixXd rotated_active = active * rotation;
+  for (size_t i = 0; i < num_active; ++i) {
+    coefficients.col(static_cast<Eigen::Index>(fixture.active_indices[i])) =
+        rotated_active.col(static_cast<Eigen::Index>(i));
+  }
+  auto rebuilt_orbitals = std::make_shared<Orbitals>(
+      coefficients, std::nullopt, orbitals->get_overlap_matrix(),
+      orbitals->get_basis_set(), orbitals->active_indices(),
+      orbitals->inactive_indices());
+  const double rebuilt_norm =
+      mapped_coefficient_norm(rebuilt_orbitals, num_active);
+
+  EXPECT_NEAR(rebuilt_norm, rotated_norm, 1e-9);
+}
+
+TEST_F(LocalizationTest, GaugeFixingPreservesEnergyAndDoesNotIncreaseNorm) {
+  auto fixture = make_gauge_fixing_fixture();
+  auto hamil_ctor = HamiltonianConstructorFactory::create();
+  auto mc_calc = MultiConfigurationCalculatorFactory::create("macis_cas");
+
+  auto [energy_before, wfn_before] = mc_calc->run(
+      hamil_ctor->run(fixture.natural_wavefunction->get_orbitals()),
+      fixture.num_alpha, fixture.num_beta);
+  const double norm_before =
+      mapped_coefficient_norm(fixture.natural_wavefunction->get_orbitals(),
+                              fixture.active_indices.size());
+
+  auto gauge_fixed = LocalizerFactory::create("qdk_gauge_fixing")
+                         ->run(fixture.natural_wavefunction,
+                               fixture.active_indices, fixture.active_indices);
+
+  auto [energy_after, wfn_after] =
+      mc_calc->run(hamil_ctor->run(gauge_fixed->get_orbitals()),
+                   fixture.num_alpha, fixture.num_beta);
+  // Rotations inside degenerate blocks preserve the selected subspace.
+  EXPECT_NEAR(energy_before, energy_after, 1e-9);
+  // Only norm-reducing rotations are accepted.
+  EXPECT_LE(mapped_coefficient_norm(gauge_fixed->get_orbitals(),
+                                    fixture.active_indices.size()),
+            norm_before + 1e-10);
+}
+
+TEST_F(LocalizationTest, GaugeFixingCarriesTheSpinResolvedActiveOneRdm) {
+  auto fixture = make_gauge_fixing_fixture();
+  ASSERT_TRUE(fixture.natural_wavefunction->has_active_one_rdm());
+
+  auto gauge_fixed = LocalizerFactory::create("qdk_gauge_fixing")
+                         ->run(fixture.natural_wavefunction,
+                               fixture.active_indices, fixture.active_indices);
+
+  // Chaining localizers must not drop the spin-resolved blocks that
+  // 'qdk_natural_orbitals' produced.
+  ASSERT_TRUE(gauge_fixed->has_active_one_rdm());
+  const auto* spin_resolved = std::get_if<SymmetryBlockedTensor<2, double>>(
+      &gauge_fixed->active_one_rdm());
+  ASSERT_NE(spin_resolved, nullptr);
+  const Eigen::MatrixXd alpha =
+      spin_resolved->block({axes::alpha(), axes::alpha()});
+  const Eigen::MatrixXd beta =
+      spin_resolved->block({axes::beta(), axes::beta()});
+
+  // The rotation is orthogonal, so it preserves the particle number in each
+  // spin channel, and the blocks must still sum to the spin-traced RDM the
+  // wavefunction carries -- the two are rotated together or not at all.
+  const auto* input = std::get_if<SymmetryBlockedTensor<2, double>>(
+      &fixture.natural_wavefunction->active_one_rdm());
+  ASSERT_NE(input, nullptr);
+  EXPECT_NEAR(
+      Eigen::MatrixXd(input->block({axes::alpha(), axes::alpha()})).trace(),
+      alpha.trace(), 1e-10);
+  const Eigen::MatrixXd traced =
+      std::get<Eigen::MatrixXd>(gauge_fixed->get_active_one_rdm_spin_traced());
+  EXPECT_NEAR(0.0, (alpha + beta - traced).cwiseAbs().maxCoeff(), 1e-12);
+}
+
+TEST_F(LocalizationTest, GaugeFixingIsIdempotentAndPreservesOccupations) {
+  auto fixture = make_gauge_fixing_fixture();
+  const Eigen::VectorXd expected_occupations =
+      std::get<Eigen::MatrixXd>(
+          fixture.natural_wavefunction->get_active_one_rdm_spin_traced())
+          .diagonal();
+
+  auto gauge_fixed = LocalizerFactory::create("qdk_gauge_fixing")
+                         ->run(fixture.natural_wavefunction,
+                               fixture.active_indices, fixture.active_indices);
+  const Eigen::VectorXd occupations =
+      std::get<Eigen::MatrixXd>(gauge_fixed->get_active_one_rdm_spin_traced())
+          .diagonal();
+  // Rotations inside degenerate eigenspaces leave the 1-RDM unchanged.
+  EXPECT_NEAR(0.0, (occupations - expected_occupations).cwiseAbs().maxCoeff(),
+              1e-12);
+
+  auto repeated =
+      LocalizerFactory::create("qdk_gauge_fixing")
+          ->run(gauge_fixed, fixture.active_indices, fixture.active_indices);
+  const auto& first = gauge_fixed->get_orbitals()->coefficients()->block(
+      {axes::alpha(), axes::alpha()});
+  const auto& second = repeated->get_orbitals()->coefficients()->block(
+      {axes::alpha(), axes::alpha()});
+  // A gauge that is already fixed must be a fixed point of the algorithm.
+  EXPECT_NEAR(0.0, (second - first).cwiseAbs().maxCoeff(), 1e-10);
+}
+
+TEST_F(LocalizationTest, GaugeFixingIsIndependentOfStartingOrientation) {
+  auto fixture = make_gauge_fixing_fixture();
+  const Eigen::MatrixXd one_rdm = std::get<Eigen::MatrixXd>(
+      fixture.natural_wavefunction->get_active_one_rdm_spin_traced());
+  const Eigen::VectorXd occupations = one_rdm.diagonal();
+
+  // Locate the degenerate pi pair that carries the gauge freedom.
+  std::vector<size_t> degenerate;
+  for (Eigen::Index i = 0; i < occupations.size(); ++i) {
+    for (Eigen::Index j = i + 1; j < occupations.size(); ++j) {
+      if (std::abs(occupations[i] - occupations[j]) < 1e-6) {
+        degenerate = {fixture.active_indices[static_cast<size_t>(i)],
+                      fixture.active_indices[static_cast<size_t>(j)]};
+      }
+    }
+  }
+  ASSERT_EQ(degenerate.size(), 2u);
+
+  auto localizer = LocalizerFactory::create("qdk_gauge_fixing");
+  auto expected =
+      localizer->run(fixture.natural_wavefunction, fixture.active_indices,
+                     fixture.active_indices);
+
+  auto orbitals = fixture.natural_wavefunction->get_orbitals();
+  Eigen::MatrixXd rotated_coefficients =
+      orbitals->coefficients()->block({axes::alpha(), axes::alpha()});
+  const Eigen::VectorXd first_column =
+      rotated_coefficients.col(static_cast<Eigen::Index>(degenerate[0]));
+  const Eigen::VectorXd second_column =
+      rotated_coefficients.col(static_cast<Eigen::Index>(degenerate[1]));
+  const double angle = 0.7;
+  rotated_coefficients.col(static_cast<Eigen::Index>(degenerate[0])) =
+      std::cos(angle) * first_column + std::sin(angle) * second_column;
+  rotated_coefficients.col(static_cast<Eigen::Index>(degenerate[1])) =
+      std::cos(angle) * second_column - std::sin(angle) * first_column;
+
+  auto rotated_orbitals = std::make_shared<Orbitals>(
+      rotated_coefficients, std::nullopt, orbitals->get_overlap_matrix(),
+      orbitals->get_basis_set(), orbitals->active_indices(),
+      orbitals->inactive_indices());
+  auto rotated_wavefunction =
+      qdk::chemistry::algorithms::detail::new_aufbau_determinant_wavefunction(
+          fixture.natural_wavefunction, rotated_orbitals,
+          ContainerTypes::MatrixVariant(one_rdm));
+
+  auto actual = LocalizerFactory::create("qdk_gauge_fixing")
+                    ->run(rotated_wavefunction, fixture.active_indices,
+                          fixture.active_indices);
+  const auto& expected_coefficients =
+      expected->get_orbitals()->coefficients()->block(
+          {axes::alpha(), axes::alpha()});
+  const auto& actual_coefficients =
+      actual->get_orbitals()->coefficients()->block(
+          {axes::alpha(), axes::alpha()});
+  // The chosen gauge must not depend on the arbitrary input orientation.
+  EXPECT_NEAR(
+      0.0, (actual_coefficients - expected_coefficients).cwiseAbs().maxCoeff(),
+      1e-10);
+}
+
+TEST_F(LocalizationTest, GaugeFixingRejectsSplitDegenerateBlock) {
+  auto fixture = make_gauge_fixing_fixture();
+  const Eigen::VectorXd occupations =
+      std::get<Eigen::MatrixXd>(
+          fixture.natural_wavefunction->get_active_one_rdm_spin_traced())
+          .diagonal();
+
+  size_t split_position = 0;
+  for (Eigen::Index i = 0; i < occupations.size(); ++i) {
+    for (Eigen::Index j = i + 1; j < occupations.size(); ++j) {
+      if (std::abs(occupations[i] - occupations[j]) < 1e-6) {
+        split_position = static_cast<size_t>(i);
+      }
+    }
+  }
+  std::vector<size_t> split_indices;
+  for (size_t i = 0; i < fixture.active_indices.size(); ++i) {
+    if (i != split_position) {
+      split_indices.push_back(fixture.active_indices[i]);
+    }
+  }
+
+  // Rotating a partly selected block would change the selected subspace.
+  EXPECT_THROW(
+      LocalizerFactory::create("qdk_gauge_fixing")
+          ->run(fixture.natural_wavefunction, split_indices, split_indices),
+      std::runtime_error);
+}
+
+TEST_F(LocalizationTest, GaugeFixingRejectsInvalidIndices) {
+  auto fixture = make_gauge_fixing_fixture();
+  std::vector<size_t> unsorted(fixture.active_indices.rbegin(),
+                               fixture.active_indices.rend());
+  EXPECT_THROW(LocalizerFactory::create("qdk_gauge_fixing")
+                   ->run(fixture.natural_wavefunction, unsorted, unsorted),
+               std::invalid_argument);
+
+  std::vector<size_t> shortened(fixture.active_indices.begin(),
+                                fixture.active_indices.end() - 1);
+  EXPECT_THROW(LocalizerFactory::create("qdk_gauge_fixing")
+                   ->run(fixture.natural_wavefunction, fixture.active_indices,
+                         shortened),
+               std::invalid_argument);
+
+  std::vector<size_t> duplicated{fixture.active_indices.front(),
+                                 fixture.active_indices.front()};
+  EXPECT_THROW(LocalizerFactory::create("qdk_gauge_fixing")
+                   ->run(fixture.natural_wavefunction, duplicated, duplicated),
+               std::invalid_argument);
+}
+
+TEST_F(LocalizationTest, GaugeFixingRejectsNonFiniteToleranceSettings) {
+  auto fixture = make_gauge_fixing_fixture();
+  // The settings bounds cannot reject NaN, so every tolerance the algorithm
+  // branches on has to be checked before it is used.
+  for (const auto* key : {"degeneracy_tolerance", "improvement_tolerance"}) {
+    auto localizer = LocalizerFactory::create("qdk_gauge_fixing");
+    localizer->settings().set(key, std::numeric_limits<double>::quiet_NaN());
+    EXPECT_THROW(localizer->run(fixture.natural_wavefunction,
+                                fixture.active_indices, fixture.active_indices),
+                 std::invalid_argument)
+        << "NaN accepted for " << key;
+  }
+}
+
+TEST_F(LocalizationTest, GaugeFixingPreservesActiveSpaceForPartialSelection) {
+  auto fixture = make_gauge_fixing_fixture();
+  const Eigen::VectorXd occupations =
+      std::get<Eigen::MatrixXd>(
+          fixture.natural_wavefunction->get_active_one_rdm_spin_traced())
+          .diagonal();
+
+  // Gauge freedom lives in the degenerate pi pair, so select only that pair.
+  std::vector<size_t> degenerate;
+  for (Eigen::Index i = 0; i < occupations.size(); ++i) {
+    for (Eigen::Index j = i + 1; j < occupations.size(); ++j) {
+      if (std::abs(occupations[i] - occupations[j]) < 1e-6) {
+        degenerate = {fixture.active_indices[static_cast<size_t>(i)],
+                      fixture.active_indices[static_cast<size_t>(j)]};
+      }
+    }
+  }
+  ASSERT_EQ(degenerate.size(), 2u);
+  ASSERT_LT(degenerate.size(), fixture.active_indices.size());
+
+  auto hamil_ctor = HamiltonianConstructorFactory::create();
+  auto mc_calc = MultiConfigurationCalculatorFactory::create("macis_cas");
+  auto [energy_before, wfn_before] = mc_calc->run(
+      hamil_ctor->run(fixture.natural_wavefunction->get_orbitals()),
+      fixture.num_alpha, fixture.num_beta);
+
+  auto gauge_fixed =
+      LocalizerFactory::create("qdk_gauge_fixing")
+          ->run(fixture.natural_wavefunction, degenerate, degenerate);
+
+  // Selecting a subset restricts which blocks are swept; it must not truncate
+  // the returned active space, which would move the correlation energy.
+  const auto active_after = spin_channel_indices(
+      gauge_fixed->get_orbitals()->active_indices(), axes::alpha());
+  EXPECT_EQ(std::vector<size_t>(active_after.begin(), active_after.end()),
+            fixture.active_indices);
+  const auto [alpha_after, beta_after] =
+      gauge_fixed->get_active_num_electrons();
+  EXPECT_EQ(alpha_after, fixture.num_alpha);
+  EXPECT_EQ(beta_after, fixture.num_beta);
+
+  auto [energy_after, wfn_after] =
+      mc_calc->run(hamil_ctor->run(gauge_fixed->get_orbitals()),
+                   fixture.num_alpha, fixture.num_beta);
+  EXPECT_NEAR(energy_before, energy_after, 1e-9);
+}
+
+TEST_F(LocalizationTest, GaugeFixingBoundsBlockSpreadByDegeneracyTolerance) {
+  auto fixture = make_gauge_fixing_fixture();
+  auto orbitals = fixture.natural_wavefunction->get_orbitals();
+  const size_t num_active = fixture.active_indices.size();
+  ASSERT_GE(num_active, 3u);
+
+  // Occupations whose adjacent gaps each sit below the tolerance while the
+  // chain spans well over it. Merging the chain into one block would rotate
+  // orbitals of unequal occupation, so the 1-RDM carried on the result would
+  // no longer describe the returned orbitals.
+  const double degeneracy_tolerance = 1e-2;
+  Eigen::VectorXd occupations(static_cast<Eigen::Index>(num_active));
+  for (size_t i = 0; i < num_active; ++i) {
+    occupations[static_cast<Eigen::Index>(i)] =
+        1.0 - 0.6 * degeneracy_tolerance * static_cast<double>(i);
+  }
+  const Eigen::MatrixXd chained_rdm = occupations.asDiagonal();
+  auto chained =
+      qdk::chemistry::algorithms::detail::new_aufbau_determinant_wavefunction(
+          fixture.natural_wavefunction, orbitals,
+          ContainerTypes::MatrixVariant(chained_rdm));
+
+  auto localizer = LocalizerFactory::create("qdk_gauge_fixing");
+  localizer->settings().set("degeneracy_tolerance", degeneracy_tolerance);
+  auto gauge_fixed =
+      localizer->run(chained, fixture.active_indices, fixture.active_indices);
+
+  const Eigen::MatrixXd& before =
+      orbitals->coefficients()->block({axes::alpha(), axes::alpha()});
+  const Eigen::MatrixXd& after =
+      gauge_fixed->get_orbitals()->coefficients()->block(
+          {axes::alpha(), axes::alpha()});
+  Eigen::MatrixXd before_active(before.rows(),
+                                static_cast<Eigen::Index>(num_active));
+  Eigen::MatrixXd after_active(after.rows(),
+                               static_cast<Eigen::Index>(num_active));
+  for (size_t i = 0; i < num_active; ++i) {
+    before_active.col(static_cast<Eigen::Index>(i)) =
+        before.col(static_cast<Eigen::Index>(fixture.active_indices[i]));
+    after_active.col(static_cast<Eigen::Index>(i)) =
+        after.col(static_cast<Eigen::Index>(fixture.active_indices[i]));
+  }
+  const Eigen::MatrixXd rotation =
+      before_active.transpose() * orbitals->get_overlap_matrix() * after_active;
+
+  // The carried 1-RDM stays truthful only while the applied rotation nearly
+  // commutes with it, which the tolerance is what bounds.
+  const Eigen::MatrixXd rotated_rdm =
+      rotation.transpose() * chained_rdm * rotation;
+  EXPECT_LE((rotated_rdm - chained_rdm).cwiseAbs().maxCoeff(),
+            degeneracy_tolerance);
+
+  const Eigen::MatrixXd returned_rdm =
+      std::get<Eigen::MatrixXd>(gauge_fixed->get_active_one_rdm_spin_traced());
+  EXPECT_TRUE(returned_rdm.isApprox(rotated_rdm, testing::rdm_tolerance));
+  EXPECT_GT((returned_rdm - chained_rdm).cwiseAbs().maxCoeff(),
+            testing::rdm_tolerance);
 }
 
 static void expect_active_space_qio_entropy_helper_matches_wavefunction(
