@@ -184,8 +184,8 @@ Four-center integrals are lazily computed from the three-center integrals on dem
      - bool
      - Whether to store the AO three-center integrals in a ``CholeskyHamiltonianContainer`` in addition to the MO three-center integrals, which are always saved. Default: false
     * - ``integral_dressing``
-       - string
-       - One-electron integral dressing ("", "x2c_1e", or "x2c_1e_contracted"). Default: ""
+      - string
+      - One-electron integral dressing ("", "x2c_1e", or "x2c_1e_contracted"). Default: ""
 
 Related classes
 ---------------
