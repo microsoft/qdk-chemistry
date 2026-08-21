@@ -257,8 +257,9 @@ class Circuit(DataClass):
         if self.num_qubits is not None and estimated_num_qubits is not None and estimated_num_qubits != self.num_qubits:
             Logger.warn(
                 f"This circuit declares {self.num_qubits} qubits but the resource estimate reports "
-                f"{estimated_num_qubits}."
+                f"{estimated_num_qubits}; num_qubits is updated to {estimated_num_qubits}."
             )
+            object.__setattr__(self, "num_qubits", estimated_num_qubits)
         return result
 
     def get_qre_application(self):

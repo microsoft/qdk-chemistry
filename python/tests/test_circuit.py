@@ -496,7 +496,7 @@ class TestCircuitEstimate:
         assert hasattr(result, "logical_counts")
 
     def test_estimate_warns_when_the_declared_width_disagrees(self, monkeypatch):
-        """A stale ``num_qubits`` is surfaced rather than silently trusted."""
+        """A stale ``num_qubits`` is surfaced and replaced by the estimated width."""
         warnings: list[str] = []
         monkeypatch.setattr(circuit_module.Logger, "warn", warnings.append)
 
@@ -506,6 +506,7 @@ class TestCircuitEstimate:
         assert result.logical_counts["numQubits"] == 2
         assert len(warnings) == 1
         assert "declares 5 qubits" in warnings[0]
+        assert circuit.num_qubits == 2
 
     def test_estimate_raises_with_qir_only(self):
         """Test that estimate raises when only QIR representation is available."""

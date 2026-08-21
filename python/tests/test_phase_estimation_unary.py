@@ -11,6 +11,7 @@ from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.circuit_mapper.psp_mapper import PSPMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
+from qdk_chemistry.algorithms.phase_estimation.circuit_builder import unary_phase_estimation_builder
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.unary_phase_estimation_builder import (
     QdkUnaryQpeCircuitBuilder,
     cosine_window_state,
@@ -22,6 +23,8 @@ from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import (
 from qdk_chemistry.algorithms.state_preparation import identity_state_prep
 from qdk_chemistry.data import AlgorithmRef, QubitOperator
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
+from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
+from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 
@@ -207,6 +210,111 @@ class TestPhaseDecoding:
         # The tie is broken toward the smaller phase fraction of the two candidates.
         expected = 0.0625 if resolve_positive_branch else 0.3125
         assert forward.canonical_phase_fraction == pytest.approx(expected)
+
+
+class _Stub:
+    """A nested-algorithm stand-in whose ``run`` hands back a fixed object."""
+
+    def __init__(self, result) -> None:
+        self._result = result
+
+    def run(self, *_args, **_kwargs):
+        """Return the fixed result."""
+        return self._result
+
+
+def _hamiltonian() -> QubitOperator:
+    """``H = (X + Z)/2`` on a single qubit."""
+    return QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([0.5, 0.5]))
+
+
+def _make_builder(num_queries: int = 3, **nested) -> QdkUnaryQpeCircuitBuilder:
+    """Build the unary builder with the ``nested`` algorithms substituted by setting name."""
+    builder = QdkUnaryQpeCircuitBuilder(num_queries=num_queries)
+    original = builder._create_nested
+    builder._create_nested = lambda name, *a, **kw: nested[name] if name in nested else original(name, *a, **kw)
+    return builder
+
+
+def _run_builder(builder: QdkUnaryQpeCircuitBuilder, state_preparation: Circuit | None = None):
+    """Run ``builder`` against ``H = (X + Z)/2``."""
+    hamiltonian = _hamiltonian()
+    return builder.run(
+        state_preparation=state_preparation or identity_state_prep(hamiltonian.num_qubits),
+        qubit_hamiltonian=hamiltonian,
+    )
+
+
+class TestMisconfigurationIsSurfaced:
+    """Rejected configurations must raise, and overridden settings must warn."""
+
+    @pytest.mark.parametrize("num_queries", [0, -1, -7])
+    def test_a_non_positive_query_count_is_rejected(self, num_queries):
+        """``num_queries`` sizes the whole schedule, so it must be positive."""
+        with pytest.raises(ValueError, match="num_queries must be a positive integer"):
+            QdkUnaryQpeCircuitBuilder(num_queries=num_queries).resolve_num_queries()
+
+    def test_a_plain_block_encoding_is_rejected(self):
+        """The schedule drops one reflection, so a bare LCU has nothing to drop."""
+        with pytest.raises(ValueError, match="Requires a LCU walk unitary representation"):
+            _run_builder(_make_builder(unitary_builder=LCUBuilder(quantum_walk=False)))
+
+    @pytest.mark.parametrize(
+        ("declared_width", "message"),
+        [(None, "did not report num_qubits"), (1, "non-empty ancilla register"), (0, "non-empty ancilla register")],
+    )
+    def test_a_mapper_that_leaves_nothing_to_reflect_about_is_rejected(self, declared_width, message):
+        """The builder reflects the ancilla tail that ``Circuit.num_qubits`` implies."""
+        mapper = _Stub(Circuit(qasm="OPENQASM 3.0;\n", num_qubits=declared_width))
+        with pytest.raises(ValueError, match=message):
+            _run_builder(_make_builder(circuit_mapper=mapper))
+
+    def test_a_state_preparation_without_a_qsharp_operation_is_rejected(self):
+        """The schedule threads the state prep into a Q# operation, so QASM alone is not enough."""
+        with pytest.raises(RuntimeError, match="State preparation has no Q# operation"):
+            _run_builder(_make_builder(), state_preparation=Circuit(qasm="OPENQASM 3.0;\n"))
+
+    @pytest.mark.parametrize(
+        ("setting", "algorithm", "message"),
+        [
+            ("qpe_circuit_builder", "qdk_standard", "QdkUnaryQpeCircuitBuilder"),
+            ("circuit_executor", "qdk_full_state_simulator", "qdk_sparse_state_simulator"),
+        ],
+    )
+    def test_an_unsupported_nested_algorithm_is_rejected(self, setting, algorithm, message):
+        """The doubled phase needs the unary builder, and the recursive Q# needs the sparse simulator."""
+        qpe = UnaryPhaseEstimation(shots=8)
+        qpe.settings().set(setting, AlgorithmRef(setting, algorithm))
+        hamiltonian = _hamiltonian()
+        with pytest.raises(TypeError, match=message):
+            qpe.run(
+                qubit_hamiltonian=hamiltonian,
+                state_preparation=identity_state_prep(hamiltonian.num_qubits),
+            )
+
+    def test_a_configured_num_bits_is_ignored_with_a_warning(self, monkeypatch):
+        """The query count fixes the register size, so ``num_bits`` cannot also set it."""
+        warnings: list[str] = []
+        monkeypatch.setattr(unary_phase_estimation_builder.Logger, "warn", warnings.append)
+        builder = _make_builder()
+        builder.settings().set("num_bits", 7)
+
+        _run_builder(builder)
+
+        assert any("num_bits=7 is ignored" in message for message in warnings), warnings
+
+    def test_a_carried_walk_power_is_ignored_with_a_warning(self, monkeypatch):
+        """The schedule picks its own power per slot, so a container power is meaningless."""
+        warnings: list[str] = []
+        monkeypatch.setattr(unary_phase_estimation_builder.Logger, "warn", warnings.append)
+        container = LCUBuilder(quantum_walk=True).run(_hamiltonian()).get_container()
+        powered = UnitaryRepresentation(
+            container=LCUWalkContainer(container.block_encoding, power=2, scale=container.scale)
+        )
+
+        _run_builder(_make_builder(unitary_builder=_Stub(powered)))
+
+        assert any("power 2 is ignored" in message for message in warnings), warnings
 
 
 class TestRegisterSizeHasOneDefinition:
