@@ -20,7 +20,7 @@ include(CMakeFindDependencyMacro)
 # search below to the same provider, or a machine with several BLAS
 # installations may pick a different one and fail to link.
 set(QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR "@QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR@")
-set(QDK_CHEMISTRY_BLAS_THREAD_SYMBOL "@QDK_CHEMISTRY_BLAS_THREAD_SYMBOL@")
+set(QDK_CHEMISTRY_BLAS_THREAD_SYMBOLS "@QDK_CHEMISTRY_BLAS_THREAD_SYMBOLS@")
 if(QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR AND NOT BLAS_PREFERENCE_LIST)
   set(BLAS_PREFERENCE_LIST "${QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR}")
 endif()
@@ -69,11 +69,12 @@ endif()
 
 list(REMOVE_AT CMAKE_MODULE_PATH 0)
 
-# Check the bound symbol rather than comparing vendor names: BLAS_VENDOR is only
-# set when the linalg FindBLAS module performs the search, so it is empty
+# Check the bound symbols rather than comparing vendor names: BLAS_VENDOR is
+# only set when the linalg FindBLAS module performs the search, so it is empty
 # whenever another module found BLAS first. Failing here beats an unresolved
-# symbol at link time.
-if(QDK_CHEMISTRY_BLAS_THREAD_SYMBOL)
+# symbol at link time. Every bound symbol is checked, because the library calls
+# both halves of the thread-control API and either one missing fails the link.
+if(QDK_CHEMISTRY_BLAS_THREAD_SYMBOLS)
   include(CheckFunctionExists)
 
   # A function, not a macro, so CMAKE_REQUIRED_* stays local.
@@ -89,14 +90,20 @@ if(QDK_CHEMISTRY_BLAS_THREAD_SYMBOL)
     set(${out_var} "${QDK_CHEMISTRY_CONSUMER_HAS_${symbol}}" PARENT_SCOPE)
   endfunction()
 
-  _qdk_check_blas_thread_symbol(
-    "${QDK_CHEMISTRY_BLAS_THREAD_SYMBOL}" _qdk_blas_thread_symbol_found)
+  set(_qdk_blas_missing_symbols "")
+  foreach(_qdk_blas_symbol IN LISTS QDK_CHEMISTRY_BLAS_THREAD_SYMBOLS)
+    _qdk_check_blas_thread_symbol("${_qdk_blas_symbol}" _qdk_blas_symbol_found)
+    if(NOT _qdk_blas_symbol_found)
+      list(APPEND _qdk_blas_missing_symbols "${_qdk_blas_symbol}")
+    endif()
+  endforeach()
 
-  if(NOT _qdk_blas_thread_symbol_found)
+  if(_qdk_blas_missing_symbols)
+    list(JOIN _qdk_blas_missing_symbols ", " _qdk_blas_missing_symbols_text)
     message(FATAL_ERROR
       "qdk::chemistry was built against BLAS vendor "
       "'${QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR}' and calls "
-      "'${QDK_CHEMISTRY_BLAS_THREAD_SYMBOL}', which the BLAS resolved here "
+      "'${_qdk_blas_missing_symbols_text}', which the BLAS resolved here "
       "(${BLAS_LIBRARIES}) does not provide; linking would fail with an "
       "unresolved symbol. Point this project at the same BLAS (e.g. "
       "-DBLAS_LIBRARIES=..., -DBLA_VENDOR=... or "

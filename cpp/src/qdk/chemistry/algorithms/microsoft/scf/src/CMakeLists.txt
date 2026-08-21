@@ -208,14 +208,15 @@ if(_qdk_blas_thread_api)
   set(QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR "${QDK_CHEMISTRY_BLAS_VENDOR}"
       CACHE INTERNAL
       "BLAS vendor whose thread-control symbols are bound into the library")
-  set(QDK_CHEMISTRY_BLAS_THREAD_SYMBOL "${QDK_CHEMISTRY_BLAS_LINKED_SET_FN}"
+  set(QDK_CHEMISTRY_BLAS_THREAD_SYMBOLS
+      "${QDK_CHEMISTRY_BLAS_LINKED_SET_FN};${QDK_CHEMISTRY_BLAS_LINKED_GET_FN}"
       CACHE INTERNAL
-      "BLAS thread-control symbol bound into the library")
+      "BLAS thread-control symbols bound into the library")
 else()
   set(QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR "" CACHE INTERNAL
       "BLAS vendor whose thread-control symbols are bound into the library")
-  set(QDK_CHEMISTRY_BLAS_THREAD_SYMBOL "" CACHE INTERNAL
-      "BLAS thread-control symbol bound into the library")
+  set(QDK_CHEMISTRY_BLAS_THREAD_SYMBOLS "" CACHE INTERNAL
+      "BLAS thread-control symbols bound into the library")
   set(_qdk_blas_thread_api "none (thread control disabled)")
 endif()
 
