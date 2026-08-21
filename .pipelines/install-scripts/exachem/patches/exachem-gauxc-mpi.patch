@@ -1,22 +1,22 @@
 # exachem-gauxc-mpi.patch
 # ----------------------------------------------------------------------------------------------------------------------
-# Let ExaChem's SCF/GauXC glue compile against a GauXC built WITHOUT MPI (GAUXC_ENABLE_MPI=OFF), so we can reuse the
-# GauXC shipped in the qdk-chemistry-runtime base image instead of rebuilding it from source.
+# Let ExaChem's SCF/GauXC glue compile against a GauXC built WITHOUT MPI (GAUXC_ENABLE_MPI=OFF), so CI can reuse the
+# GauXC it already builds for qdk-chemistry itself instead of building a second, MPI-enabled copy.
 #
-# Verified against ExaChem 45c192e + the base image's GauXC headers:
+# Verified against ExaChem 45c192e:
 #   scf_gauxc.cpp constructs GauXC's runtime env with an MPI communicator
 #   unconditionally (DeviceRuntimeEnvironment(comm, pool) / RuntimeEnvironment(comm)).
 #   GauXC declares those ctors via its own GAUXC_MPI_CODE(...) macro, which
 #   expands to its args only when GAUXC_HAS_MPI is defined (else to nothing).
-#   The base GauXC is MPI-off (gauxc_config.hpp `#undef GAUXC_HAS_MPI`), so the
-#   comm-passing calls don't compile there.
+#   An MPI-off GauXC (gauxc_config.hpp `#undef GAUXC_HAS_MPI`) doesn't compile
+#   the comm-passing calls.
 #   -> Wrap the comm arg(s) in GAUXC_MPI_CODE(...) so the SAME source compiles
 #      against both MPI-on and MPI-off GauXC (macro is in scope transitively).
 #
 # Semantic note: with MPI-off GauXC every rank sees comm_size()==1, so the XC grid is NOT distributed (each rank
-# computes the full VXC). Results are unchanged, and for the coupled-cluster (HF reference) workloads this image targets
+# computes the full VXC). Results are unchanged, and for the coupled-cluster (HF reference) workloads this CI targets
 # the GauXC XC integrator is not invoked at run time. Only a DFT / sNK run would lose XC-phase scaling across ranks --
-# an acceptable trade for skipping the GauXC(+CUTLASS) source build and reusing the arch-matched binary.
+# an acceptable trade for reusing qdk-chemistry's own GauXC build instead of a second MPI-enabled one.
 #
 # Apply: git -C <exachem-src> apply exachem-gauxc-mpi.patch
 # ----------------------------------------------------------------------------------------------------------------------

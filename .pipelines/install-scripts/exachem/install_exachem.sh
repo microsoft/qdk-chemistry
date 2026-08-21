@@ -1,38 +1,27 @@
 #!/usr/bin/env bash
 #
-# install_exachem.sh — build and install ExaChem (+ its TAMM tensor backend) for CI use as an external MPI process.
+# install_exachem.sh — build and install ExaChem (+ its TAMM tensor backend) for CI, to run as an external MPI
+# process. Reuses OpenBLAS/BLAS++/LAPACK++/LibInt2/GauXC already built into CPP_DEPS_PREFIX by
+# install_cpp_dependencies.sh (TAMM finds BLAS++/LAPACK++ via its default find_package on CMAKE_PREFIX_PATH;
+# LibInt2/GauXC via explicit -D*_ROOT below), and the system MPI (e.g. apt-installed openmpi-bin/libopenmpi-dev
+# on Ubuntu). GPU is not supported here.
 #
-# This is the bare-metal (no container) counterpart of qaml/libs/containers/exachem.Dockerfile, adapted for
-# qdk-chemistry's own GitHub Actions Linux (Ubuntu) runners:
-#
-#   * Open MPI comes from apt (`libopenmpi-dev` / `openmpi-bin`, installed by the workflow) rather than being
-#     built from source: Ubuntu 24.04's package (Open MPI 4.1.6) already ships working Fortran bindings
-#     (`mpifort`), so there is no need to build our own like the qaml/Azure-Linux container did.
-#   * BLAS++ and LAPACK++ are NOT built here either: qdk-chemistry's own cpp-deps install
-#     (.pipelines/install-scripts/install_cpp_dependencies.sh, run before this script into $CPP_DEPS_PREFIX)
-#     already builds both for MACIS, against the same OpenBLAS this CI installs via apt (not Intel MKL, unlike
-#     the qaml container, which reuses the qdk-chemistry-runtime image's MKL). TAMM finds them via its default
-#     `find_package` search (no NO_DEFAULT_PATH) simply by having $CPP_DEPS_PREFIX on CMAKE_PREFIX_PATH.
-#   * LibInt2 and GauXC (the two most expensive dependencies -- see the qaml technical report) are likewise NOT
-#     rebuilt here. They are reused directly from qdk-chemistry's own cached C++ dependency prefix, with GauXC
-#     already built GAUXC_ENABLE_MPI=OFF (exactly the configuration ExaChem's GauXC-MPI patch below expects), via
-#     `-D*_ROOT` + `-DBUILD_*=OFF`. That prefix must already be populated (i.e. this script must run after
-#     install_cpp_dependencies.sh) before this script is invoked.
-#   * Everything else CMSB (the TAMM superbuild) would otherwise source-build itself (GlobalArrays, HPTT, Librett,
-#     EcpInt, its own Eigen3, doctest, MS-GSL) is left alone, matching the container's behavior.
-#   * GPU is intentionally not supported here: these are CPU-only CI runners, so there is no GPU_ARCH/CUDA handling.
-#
-# The only things actually built by this script are TAMM and ExaChem themselves, at the same pinned commits +
-# source patches validated in the qaml ExaChem container -- see notes/exachem-technical-report.md there for the
-# full rationale (GCC 13 C++20-miscompile-driven version pins, GA_RUNTIME=MPI_PROGRESS_RANK for multi-rank CCSD
-# progress, serial-HDF5, LibInt2/GauXC reuse patches).
-#
-# Usage: install_exachem.sh
-# Required env vars: CPP_DEPS_PREFIX (qdk-chemistry's own cached C++ deps prefix; provides LibInt2/GauXC/BLAS++/
-#                    LAPACK++, and must already have Open MPI's mpicc/mpifort on PATH)
-# Optional env vars: INSTALL_PREFIX, MARCH, JOBS, KEEP_BUILD_DIR (see defaults below)
+# Usage: install_exachem.sh <cgmanifest_path>
+#   cgmanifest_path - Full path to cpp/manifest/qdk-chemistry/cgmanifest.json (source of TAMM/ExaChem commits).
+# Required env vars: CPP_DEPS_PREFIX
+# Optional env vars: INSTALL_PREFIX, BUILD_ROOT, MARCH, JOBS, KEEP_BUILD_DIR
 #
 set -euo pipefail
+
+if [[ $# -ne 1 ]]; then
+  echo "Usage: $0 <cgmanifest_path>" >&2
+  exit 1
+fi
+CGMANIFEST="$1"
+if [[ ! -f "${CGMANIFEST}" ]]; then
+  echo "Error: cgmanifest.json not found at ${CGMANIFEST}" >&2
+  exit 1
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -51,30 +40,64 @@ KEEP_BUILD_DIR="${KEEP_BUILD_DIR:-0}"
 MARCH="${MARCH:-x86-64-v3}"
 JOBS="${JOBS:-$(nproc)}"
 MODULES="${MODULES:-CC}"
-# GA_RUNTIME: see qaml/libs/containers/exachem.Dockerfile's ARG comment. MPI_PROGRESS_RANK is the only Global Arrays
-# runtime that drives progress on a plain shm/TCP transport (no RDMA NIC on these runners), required by CCSD's many
-# small one-sided tensor ops. Requires >= 2 MPI ranks (1 data-server rank + >= 1 compute rank).
+# MPI_PROGRESS_RANK is the only Global Arrays runtime that makes progress on a plain shm/TCP transport (no RDMA
+# NIC on these runners); it requires >= 2 MPI ranks (1 data-server rank + >= 1 compute rank).
 GA_RUNTIME="${GA_RUNTIME:-MPI_PROGRESS_RANK}"
 
-# Source pins -- last commits that build+run correctly with GCC 13 (see the qaml technical report §5.1: newer
-# TAMM/ExaChem main requires GNU >= 14.1 for C++20 features GCC 13 miscompiles at -O2/-O3). GitHub's
-# Ubuntu24.04Nightly image ships GCC 13 by default, so we reuse the exact same pins validated in that container.
-TAMM_REPO="${TAMM_REPO:-https://github.com/NWChemEx/TAMM.git}"
-TAMM_COMMIT="${TAMM_COMMIT:-63c274e37c102a316e844f954bb2387988b0256c}"
-EXACHEM_REPO="${EXACHEM_REPO:-https://github.com/ExaChem/exachem.git}"
-EXACHEM_COMMIT="${EXACHEM_COMMIT:-45c192e840fd1e0417871d926e9ab87748111e53}"
+get_commit_hash() {
+    local repo_pattern="$1"
+    python3 -c "
+import json
+with open('${CGMANIFEST}') as f:
+    data = json.load(f)
+for reg in data['registrations']:
+    comp = reg['component']
+    if comp['type'] == 'git' and '${repo_pattern}' in comp['git'].get('repositoryUrl', ''):
+        print(comp['git']['commitHash'].strip())
+        break
+"
+}
+
+get_repo_url() {
+    local repo_pattern="$1"
+    python3 -c "
+import json
+with open('${CGMANIFEST}') as f:
+    data = json.load(f)
+for reg in data['registrations']:
+    comp = reg['component']
+    if comp['type'] == 'git' and '${repo_pattern}' in comp['git'].get('repositoryUrl', ''):
+        print(comp['git']['repositoryUrl'].strip())
+        break
+"
+}
+
+# TAMM/ExaChem are pinned to specific commits rather than tagged releases: newer upstream main requires GCC >= 14.1
+# for C++20 features GCC 13 miscompiles at -O2/-O3, and GitHub's Ubuntu runners default to GCC 13.
+TAMM_REPO="$(get_repo_url "NWChemEx/TAMM")"
+TAMM_COMMIT="$(get_commit_hash "NWChemEx/TAMM")"
+EXACHEM_REPO="$(get_repo_url "ExaChem/exachem")"
+EXACHEM_COMMIT="$(get_commit_hash "ExaChem/exachem")"
+if [[ -z "${TAMM_REPO}" || -z "${TAMM_COMMIT}" ]]; then
+  echo "Error: could not find TAMM repositoryUrl/commitHash in ${CGMANIFEST}" >&2
+  exit 1
+fi
+if [[ -z "${EXACHEM_REPO}" || -z "${EXACHEM_COMMIT}" ]]; then
+  echo "Error: could not find ExaChem repositoryUrl/commitHash in ${CGMANIFEST}" >&2
+  exit 1
+fi
 
 echo "==> ExaChem CI build: march=${MARCH} jobs=${JOBS} modules=${MODULES} ga_runtime=${GA_RUNTIME}"
+echo "==> TAMM: ${TAMM_COMMIT} / ExaChem: ${EXACHEM_COMMIT}"
 echo "==> Reusing LibInt2/GauXC/BLAS++/LAPACK++ from CPP_DEPS_PREFIX=${CPP_DEPS_PREFIX}"
 echo "==> INSTALL_PREFIX=${INSTALL_PREFIX}"
 
 rm -rf "${BUILD_ROOT}"
 mkdir -p "${BUILD_ROOT}" "${INSTALL_PREFIX}"
 
-# Make sure BLAS++/LAPACK++ (built into CPP_DEPS_PREFIX by install_cpp_dependencies.sh) are visible to the
-# TAMM/ExaChem configure below. They are found via TAMM's default `find_package` search (no NO_DEFAULT_PATH), so
-# putting CPP_DEPS_PREFIX on CMAKE_PREFIX_PATH is sufficient -- unlike LibInt2/GauXC below, no explicit *_ROOT
-# flag is needed for them.
+# BLAS++/LAPACK++ are found via TAMM's default find_package search (no NO_DEFAULT_PATH), so putting
+# CPP_DEPS_PREFIX on CMAKE_PREFIX_PATH is enough for them -- unlike LibInt2/GauXC below, which need explicit
+# -D*_ROOT flags.
 export CMAKE_PREFIX_PATH="${CPP_DEPS_PREFIX}:${CMAKE_PREFIX_PATH:-}"
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -127,9 +150,9 @@ CC=gcc CXX=g++ FC=gfortran cmake -S "${BUILD_ROOT}/TAMM" -B "${BUILD_ROOT}/TAMM/
 cmake --build "${BUILD_ROOT}/TAMM/build" -j "${JOBS}"
 cmake --install "${BUILD_ROOT}/TAMM/build"
 
-# Bake GauXC_ROOT into the generated tamm-config.cmake so every consumer (ExaChem's outer configure AND its nested
-# EXACHEM_External sub-project) can re-import gauxc::gauxc from the reused install. CMSB bakes in LibInt2_ROOT
-# (CMSBTargetConfig.cmake.in) but NOT GauXC_ROOT (see qaml technical report §6).
+# CMSB's generated tamm-config.cmake bakes in LibInt2_ROOT (CMSBTargetConfig.cmake.in) but not GauXC_ROOT, so
+# downstream consumers (ExaChem's outer configure and its nested EXACHEM_External sub-project) can't re-import
+# gauxc::gauxc from the reused install without this. Patch it in if not already present.
 TAMM_CFG="${INSTALL_PREFIX}/share/cmake/tamm/tamm-config.cmake"
 if [ -f "${TAMM_CFG}" ] && ! grep -q 'set(GauXC_ROOT' "${TAMM_CFG}"; then
   sed -i "/^set(LibInt2_ROOT/a set(GauXC_ROOT ${CPP_DEPS_PREFIX})" "${TAMM_CFG}"
@@ -137,9 +160,8 @@ if [ -f "${TAMM_CFG}" ] && ! grep -q 'set(GauXC_ROOT' "${TAMM_CFG}"; then
 fi
 
 # --------------------------------------------------------------------------------------------------------------------
-# Step 2: build ExaChem, patched to compile against the reused (MPI-off) GauXC and (2.9.0) LibInt2 -- same patches
-# validated in qaml/libs/containers/exachem.Dockerfile. Same configure shape + same install prefix as TAMM (ExaChem
-# find_package()s the TAMM just installed).
+# Step 2: build ExaChem, patched to compile against the reused (MPI-off) GauXC and (2.9.0) LibInt2. Same configure
+# shape + same install prefix as TAMM (ExaChem find_package()s the TAMM just installed).
 # --------------------------------------------------------------------------------------------------------------------
 echo "=== Building ExaChem (${EXACHEM_COMMIT}) ==="
 git clone "${EXACHEM_REPO}" "${BUILD_ROOT}/exachem"
@@ -156,8 +178,7 @@ cmake --build "${BUILD_ROOT}/exachem/build" -j "${JOBS}"
 cmake --install "${BUILD_ROOT}/exachem/build"
 
 # --------------------------------------------------------------------------------------------------------------------
-# Smoke test: binary exists and every shared library resolves (no host-injected GPU driver libs to ignore here --
-# this is a CPU-only build).
+# Smoke test: binary exists and every shared library resolves.
 # --------------------------------------------------------------------------------------------------------------------
 test -x "${INSTALL_PREFIX}/bin/ExaChem"
 missing="$(ldd "${INSTALL_PREFIX}/bin/ExaChem" | grep -i 'not found' || true)"

@@ -6,8 +6,8 @@
 # Verified against ExaChem 45c192e / TAMM e485b7a6:
 #
 #  1) scf_gauxc.cpp uses ExchCXX::libxc_name_string(...). That alias exists ONLY
-#     inside `#ifdef EXCHCXX_ENABLE_LIBXC` (exchcxx/enums/backend.hpp). The base
-#     image's ExchCXX is built WITHOUT libxc, so those calls don't compile.
+#     inside `#ifdef EXCHCXX_ENABLE_LIBXC` (exchcxx/enums/backend.hpp). qdk-chemistry's
+#     ExchCXX is built WITHOUT libxc, so those calls don't compile.
 #     -> Guard each call with #ifdef EXCHCXX_ENABLE_LIBXC / #else throw / #endif.
 #  2) scf_outputs.cpp's read/write_scf_mat call get_hdf5_dt<T>() + HDF5 H5* APIs,
 #     which tamm/tamm_io.hpp provides ONLY under `#if defined(USE_HDF5)`. With
