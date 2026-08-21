@@ -377,8 +377,6 @@ std::shared_ptr<data::Wavefunction> GaugeFixingLocalizer::_run_impl(
             const double cosine = std::cos(angle);
             const double sine = std::sin(angle);
             Eigen::MatrixXd candidate = active_rotation;
-            // Use the header-only template: the wheel's BLIS and legacy
-            // libFLAME archives both export the out-of-line rotation symbols.
             blas::rot<double, double>(num_active, candidate.col(left).data(), 1,
                                       candidate.col(right).data(), 1, cosine,
                                       sine);
