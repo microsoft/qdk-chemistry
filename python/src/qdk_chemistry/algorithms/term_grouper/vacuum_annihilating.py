@@ -149,8 +149,7 @@ class VacuumAnnihilatingTermGrouper(TermGrouper):
             for index, amplitude in entries:
                 current.append(index)
                 pending.append(amplitude)
-                # Resummed rather than accumulated so badly scaled coefficients still cancel exactly.
-                if abs(math.fsum(pending)) <= tolerance:
+                if math.fsum(pending) == 0.0:
                     groups.append(tuple(current))
                     current, pending = [], []
             if current:

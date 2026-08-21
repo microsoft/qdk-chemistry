@@ -298,8 +298,9 @@ class TestVacuumAnnihilatingTermGrouper:
         with pytest.raises(ValueError, match="uncancelled vacuum amplitude"):
             registry.create("term_grouper", "vacuum_annihilating").run(qh)
 
+        # Certified as a whole, but no prefix cancels exactly, so the set stays in one group.
         tolerant = registry.create("term_grouper", "vacuum_annihilating", tolerance=1e-6)
-        assert tolerant.run(qh).term_partition.groups == ((0, 1), (2, 3))
+        assert tolerant.run(qh).term_partition.groups == ((0, 1, 2, 3),)
 
     def test_tiny_prefixes_do_not_strand_a_remainder(self):
         """The flip set cancels exactly, so splitting on a sub-tolerance prefix must not reject it."""
@@ -307,6 +308,16 @@ class TestVacuumAnnihilatingTermGrouper:
         out = registry.create("term_grouper", "vacuum_annihilating").run(qh)
 
         assert sorted(index for group in out.term_partition.groups for index in group) == [0, 1, 2]
+        # Closing an approximately-zero prefix must not leave a group that fails the contract.
+        for group in out.term_partition.groups:
+            assert abs(sum(float(out.coefficients[index].real) for index in group)) <= 1e-9
+
+    def test_catastrophic_cancellation_is_accepted(self):
+        """The set sums to zero exactly, which a running subtraction would lose."""
+        qh = QubitOperator(["XX"] * 4, np.array([1e16, 1.0, -1e16, -1.0]))
+        out = registry.create("term_grouper", "vacuum_annihilating").run(qh)
+
+        assert sorted(index for group in out.term_partition.groups for index in group) == [0, 1, 2, 3]
 
     @pytest.mark.parametrize("tolerance", [-1e-9, np.inf, np.nan])
     def test_invalid_tolerance_raises(self, tolerance):
