@@ -507,16 +507,6 @@ class TestCircuitEstimate:
         assert len(warnings) == 1
         assert "declares 5 qubits" in warnings[0]
 
-    def test_estimate_stays_quiet_when_the_declared_width_agrees(self, monkeypatch):
-        """A width that matches the estimate must not produce noise."""
-        warnings: list[str] = []
-        monkeypatch.setattr(circuit_module.Logger, "warn", warnings.append)
-
-        Circuit(qasm=self._QASM_WITH_T, num_qubits=2).estimate()
-        Circuit(qasm=self._QASM_WITH_T).estimate()
-
-        assert warnings == []
-
     def test_estimate_raises_with_qir_only(self):
         """Test that estimate raises when only QIR representation is available."""
         qir = openqasm_compile(

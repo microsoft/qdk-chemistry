@@ -257,7 +257,7 @@ class Circuit(DataClass):
         if self.num_qubits is not None and estimated_num_qubits is not None and estimated_num_qubits != self.num_qubits:
             Logger.warn(
                 f"This circuit declares {self.num_qubits} qubits but the resource estimate reports "
-                f"{estimated_num_qubits}. The declared width is the one callers act on, so it may be stale."
+                f"{estimated_num_qubits}."
             )
         return result
 
