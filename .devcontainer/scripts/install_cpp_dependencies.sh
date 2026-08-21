@@ -18,6 +18,12 @@ fi
 CGMANIFEST="$1"
 MACIS_CGMANIFEST="$2"
 
+# Resolve the repo-relative location of the centralized per-dependency install scripts shared with CI
+# (.pipelines/install-scripts/install_cpp_dependencies.sh) -- see install-blaspp.sh/install-lapackpp.sh there for
+# why these two builds live in a single canonical script instead of being duplicated here.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PIPELINE_INSTALL_SCRIPTS="$(cd "${SCRIPT_DIR}/../../.pipelines/install-scripts" && pwd)"
+
 if [[ ! -f "$CGMANIFEST" ]]; then
     echo "Error: cgmanifest.json not found at $CGMANIFEST"
     exit 1
@@ -37,7 +43,9 @@ BUILD_DIR="${BUILD_DIR:-/tmp/qdk_deps_build}"
 INSTALL_PREFIX="${INSTALL_PREFIX:-/usr/local}"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 BUILD_SHARED_LIBS="${BUILD_SHARED_LIBS:-OFF}"  # Default to static
-
+MARCH="${MARCH:-native}"
+BLAS_VENDOR="${BLAS_VENDOR:-openblas}"  # matches the OpenBLAS the devcontainer installs via apt (see Dockerfile)
+LIBINT_JOBS=${LIBINT_JOBS:-4}  # Limit libint build jobs to 4 due to high memory usage
 KEEP_BUILD_DIR="${KEEP_BUILD_DIR:-0}"
 
 PARALLELISM_HELPER="/usr/local/share/qdk/parallelism.sh"
@@ -186,39 +194,13 @@ make install
 cd "$BUILD_DIR"
 rm -rf spdlog
 
-# Install blaspp
+# Install blaspp / lapackpp via the centralized scripts shared with CI pipelines (single canonical build for
+# each -- see .pipelines/install-scripts/install-blaspp.sh / install-lapackpp.sh).
 echo "=== Installing blaspp ==="
-git clone https://github.com/icl-utk-edu/blaspp.git blaspp
-cd blaspp
-git checkout "$BLASPP_COMMIT"
-mkdir -p build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
-         -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
-         -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-         -DBUILD_TESTING=OFF \
-         -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS"
-make -j"$JOBS"
-make install
-cd "$BUILD_DIR"
-rm -rf blaspp
+bash "${PIPELINE_INSTALL_SCRIPTS}/install-blaspp.sh" "$INSTALL_PREFIX" "$BLASPP_COMMIT" "$BLAS_VENDOR" "$MARCH" "$BUILD_SHARED_LIBS"
 
-# Install lapackpp
 echo "=== Installing lapackpp ==="
-git clone https://github.com/icl-utk-edu/lapackpp.git lapackpp
-cd lapackpp
-git checkout "$LAPACKPP_COMMIT"
-mkdir -p build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
-         -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
-         -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-         -DBUILD_TESTING=OFF \
-         -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS"
-make -j"$JOBS"
-make install
-cd "$BUILD_DIR"
-rm -rf lapackpp
+bash "${PIPELINE_INSTALL_SCRIPTS}/install-lapackpp.sh" "$INSTALL_PREFIX" "$LAPACKPP_COMMIT" "$MARCH" "$BUILD_SHARED_LIBS"
 
 # Install libint2
 echo "=== Installing libint2 ==="
