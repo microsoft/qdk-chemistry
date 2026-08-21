@@ -6,8 +6,6 @@
 
 #include <qdk/chemistry/scf/config.h>
 
-#include <lapack.hh>
-
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
 #include <mpi.h>
 #endif
@@ -25,20 +23,6 @@ namespace qdk::chemistry::utils::microsoft {
 using qdk::chemistry::data::MAX_ORBITAL_ANGULAR_MOMENTUM;
 
 namespace qcs = qdk::chemistry::scf;
-
-void symmetric_eigendecomposition(Eigen::MatrixXd& matrix,
-                                  Eigen::VectorXd& eigenvalues,
-                                  const std::string& context) {
-  const int64_t dimension = matrix.rows();
-  eigenvalues.resize(dimension);
-  const int64_t info =
-      lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, dimension,
-                   matrix.data(), dimension, eigenvalues.data());
-  if (info != 0) {
-    throw std::runtime_error("Symmetric eigendecomposition failed for " +
-                             context + " (info=" + std::to_string(info) + ")");
-  }
-}
 
 void _norm_psi4_mode(std::vector<qcs::Shell>& shells) {
   QDK_LOG_TRACE_ENTERING();

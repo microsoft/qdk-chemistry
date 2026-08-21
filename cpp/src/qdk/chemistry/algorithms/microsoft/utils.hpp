@@ -45,17 +45,6 @@ void initialize_backend();
 void finalize_backend();
 
 /**
- * @brief Diagonalize a real symmetric matrix in place with checked LAPACK
- * error handling.
- * @param matrix On input, the symmetric matrix; on output, its eigenvectors.
- * @param eigenvalues The eigenvalues in ascending order.
- * @param context Description included in an error message if LAPACK fails.
- */
-void symmetric_eigendecomposition(Eigen::MatrixXd& matrix,
-                                  Eigen::VectorXd& eigenvalues,
-                                  const std::string& context);
-
-/**
  * @brief Convert a Molecule to a qdk::chemistry::data::Structure
  *
  * This function takes a Molecule object and converts it into a

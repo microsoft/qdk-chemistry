@@ -131,12 +131,11 @@ Spin-Free X2C-1e Option
 
 .. rubric:: Setting: ``integral_dressing="x2c_1e"`` or ``integral_dressing="x2c_1e_contracted"``
 
-Both the ``"qdk"`` and ``"qdk_cholesky"`` constructors can apply spin-free exact-two-component scalar-relativistic corrections to the one-electron Hamiltonian using the exact-decoupling formulation and its corrected Schrödinger-picture transformation :cite:`Kutzelnigg2005,Liu2009X2C`.
+The ``integral_dressing`` setting applies spin-free exact-two-component scalar-relativistic corrections to the one-electron Hamiltonian using the exact-decoupling formulation :cite:`Kutzelnigg2005,Liu2009X2C`.
 The X2C-1e path constructs the modified Dirac Hamiltonian from the :term:`AO` overlap, kinetic, nuclear-attraction, and spin-free :math:`\boldsymbol{p}V\boldsymbol{p}` integrals, selects its electronic states, and projects their energies back into the original AO metric.
 
-This implementation uses the X2C-1e approximation: the two-electron integrals are not picture-change transformed, and spin-orbit terms are not included.
-Only all-electron relativistic basis sets are supported; effective core potentials are not supported.
-Cartesian atomic orbitals are not currently supported.
+This implementation uses the X2C-1e approximation: the two-electron integrals are not transformed, and spin-orbit terms are not included.
+ECPs and Cartesian atomic orbitals are not supported.
 With ``integral_dressing="x2c_1e"``, contracted basis functions are decontracted for the X2C transformation and the resulting one-electron Hamiltonian is then exactly recontracted.
 Use ``integral_dressing="x2c_1e_contracted"`` to perform the X2C transformation directly in the supplied contracted basis.
 

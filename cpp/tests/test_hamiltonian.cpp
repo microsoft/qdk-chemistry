@@ -2952,7 +2952,17 @@ TEST_F(HamiltonianConstructorTest, X2CRestrictedOpenShellOrbitals) {
       testing::spin_index_set(num_orbitals, {}, {}, true));
 
   auto x2c = make_x2c_constructor();
-  EXPECT_NO_THROW(x2c->run(explicit_rohf_orbitals));
+  auto h_x2c = x2c->run(explicit_rohf_orbitals);
+  ASSERT_TRUE(h_x2c->is_restricted());
+  auto [one_body_alpha, one_body_beta] = h_x2c->get_one_body_integrals();
+  // Generated with PySCF using exact QDK STO-3G shells, QDK's speed of light,
+  // and QDK ROHF coefficients. The default integral_dressing="x2c_1e" path
+  // is used.
+  constexpr double expected_trace = -64.643371650436904;
+  EXPECT_NEAR(one_body_alpha.trace(), expected_trace,
+              testing::scf_energy_tolerance);
+  EXPECT_NEAR(one_body_beta.trace(), expected_trace,
+              testing::scf_energy_tolerance);
 }
 
 TEST_F(HamiltonianConstructorTest, X2CAbsoluteOneBodyReferences) {
