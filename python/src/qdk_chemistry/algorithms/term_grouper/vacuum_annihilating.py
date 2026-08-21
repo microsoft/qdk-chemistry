@@ -44,7 +44,7 @@ class VacuumAnnihilatingTermGrouperSettings(TermGrouperSettings):
             "tolerance",
             "double",
             1e-9,
-            "Absolute tolerance below which a group's accumulated vacuum amplitude counts as zero.",
+            "Absolute tolerance on residual vacuum amplitude when certifying cancellation within each flipped-qubit set.",
         )
 
 
