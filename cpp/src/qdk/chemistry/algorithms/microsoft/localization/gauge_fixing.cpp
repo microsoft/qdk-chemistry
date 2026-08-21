@@ -377,8 +377,9 @@ std::shared_ptr<data::Wavefunction> GaugeFixingLocalizer::_run_impl(
             const double cosine = std::cos(angle);
             const double sine = std::sin(angle);
             Eigen::MatrixXd candidate = active_rotation;
-            blas::rot(num_active, candidate.col(left).data(), 1,
-                      candidate.col(right).data(), 1, cosine, sine);
+            blas::rot<double, double>(num_active, candidate.col(left).data(), 1,
+                                      candidate.col(right).data(), 1, cosine,
+                                      sine);
             return coefficient_norm(candidate);
           };
 
@@ -412,8 +413,9 @@ std::shared_ptr<data::Wavefunction> GaugeFixingLocalizer::_run_impl(
             current_norm = plane_norm(canonical_angle);
             const double cosine = std::cos(canonical_angle);
             const double sine = std::sin(canonical_angle);
-            blas::rot(num_active, active_rotation.col(left).data(), 1,
-                      active_rotation.col(right).data(), 1, cosine, sine);
+            blas::rot<double, double>(
+                num_active, active_rotation.col(left).data(), 1,
+                active_rotation.col(right).data(), 1, cosine, sine);
           }
         }
       }
