@@ -18,9 +18,6 @@ fi
 CGMANIFEST="$1"
 MACIS_CGMANIFEST="$2"
 
-# Resolve the repo-relative location of the centralized per-dependency install scripts shared with CI
-# (.pipelines/install-scripts/install_cpp_dependencies.sh) -- see install-blaspp.sh/install-lapackpp.sh there for
-# why these two builds live in a single canonical script instead of being duplicated here.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PIPELINE_INSTALL_SCRIPTS="$(cd "${SCRIPT_DIR}/../../.pipelines/install-scripts" && pwd)"
 
@@ -177,8 +174,7 @@ make install
 cd "$BUILD_DIR"
 rm -rf spdlog
 
-# Install blaspp / lapackpp via the centralized scripts shared with CI pipelines (single canonical build for
-# each -- see .pipelines/install-scripts/install-blaspp.sh / install-lapackpp.sh).
+# Install blaspp / lapackpp
 echo "=== Installing blaspp ==="
 bash "${PIPELINE_INSTALL_SCRIPTS}/install-blaspp.sh" "$INSTALL_PREFIX" "$BLASPP_COMMIT" "$BLAS_VENDOR" "$MARCH" "$BUILD_SHARED_LIBS"
 

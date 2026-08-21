@@ -3,14 +3,10 @@ set -e
 
 # install-blaspp.sh — build and install BLAS++ (icl-utk-edu/blaspp) from source.
 #
-# BLAS++ provides the C++ `blas::` API used directly by TAMM/MACIS (e.g. MACIS's own blaspp dependency, and
-# TAMM's cpu_blas.cpp / blockops_blas.hpp). It is not distributed via apt, so we build it from source. This is the
-# single canonical BLAS++ build used by both the devcontainer (.devcontainer/scripts/install_cpp_dependencies.sh)
-# and CI pipelines (.pipelines/install-scripts/install_cpp_dependencies.sh) -- do not duplicate this logic
-# elsewhere; add a caller instead.
+# BLAS++ provides the C++ `blas::` API used directly by TAMM/MACIS.
 #
 # The commit hash is NOT defaulted here: it must always be resolved from external/macis/manifest/cgmanifest.json
-# by the caller and passed in, so the built version can never silently drift from the pinned manifest.
+# by the caller and passed in.
 #
 # Usage: install-blaspp.sh <install_prefix> <commit> [blas_vendor] [march] [build_shared_libs]
 #   install_prefix     - CMAKE_INSTALL_PREFIX (also searched for an existing BLAS install, e.g. OpenBLAS/BLIS).
@@ -32,8 +28,7 @@ WORKDIR="$(pwd)/blaspp"
 
 echo "Installing BLAS++ (${COMMIT}, vendor=${BLAS_VENDOR}) to ${INSTALL_PREFIX}..."
 
-# Clean up any leftover state from a previous (possibly failed) attempt on this self-hosted agent -- the
-# workspace persists across builds and retries.
+# Clean up any leftover directory from a previous (possibly failed) run.
 rm -rf "${WORKDIR}"
 git clone "${BLASPP_REPO}" "${WORKDIR}"
 git -C "${WORKDIR}" checkout "${COMMIT}"
