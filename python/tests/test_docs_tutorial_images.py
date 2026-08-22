@@ -63,7 +63,9 @@ def test_tutorial_graphviz_figures_render_as_transparent_svg():
 
     assert references == dot_files
     for name in references:
-        assert 'bgcolor="transparent"' in (DIAGRAMS_DIR / name).read_text(encoding="utf-8")
+        dot_source = (DIAGRAMS_DIR / name).read_text(encoding="utf-8")
+        assert 'bgcolor="transparent"' in dot_source
+        assert re.search(r"<SUB>(?!<FONT POINT-SIZE=)", dot_source) is None
 
     configuration = ast.parse((REPOSITORY_ROOT / "docs" / "source" / "conf.py").read_text(encoding="utf-8"))
     output_formats = [
