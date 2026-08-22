@@ -183,6 +183,18 @@ class OneBodyIntegral {
    */
   void ecp_integral(double* res);
 
+  /**
+   * @brief Compute spin-free pVp integral matrix W[μν] = ⟨μ|p·V·p|ν⟩
+   *
+   * Evaluates the scalar (spin-free) component of the p·V·p operator
+   * needed for scalar-relativistic (X2C, DKH) Hamiltonians.
+   * Uses Libint2 Operator::opVop.
+   *
+   * @param[out] res Output buffer for pVp matrix (size: num_atomic_orbitals
+   * × num_atomic_orbitals)
+   */
+  void pvp_integral(double* res);
+
 #ifdef QDK_CHEMISTRY_ENABLE_QMMM
   /**
    * @brief Compute point charge interaction integral matrix for QM/MM

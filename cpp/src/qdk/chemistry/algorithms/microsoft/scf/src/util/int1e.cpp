@@ -696,6 +696,29 @@ void OneBodyIntegral::ecp_integral(double* res) {
 #endif
 }
 
+void OneBodyIntegral::pvp_integral(double* res) {
+  QDK_LOG_TRACE_ENTERING();
+  // opVop returns multiple components (scalar + spin-orbit).
+  // We compute all, then extract component 0 (scalar pVp).
+  auto engine_fn = [&]() {
+    auto engine = std::make_unique<Libint2Engine>(libint2::Operator::opVop,
+                                                  obs_, 0, basis_mode_);
+    engine->get().set_params(atoms_);
+    return engine;
+  };
+  size_t nopers = engine_fn()->nopers();
+  std::vector<RowMajorMatrix> mat(nopers,
+                                  RowMajorMatrix::Zero(obs_.nbf(), obs_.nbf()));
+  integral_(nopers, engine_fn, mat.data());
+  memcpy(res, mat[0].data(), sizeof(double) * mat[0].size());
+#ifdef QDK_CHEMISTRY_ENABLE_MPI
+  if (mpi_.world_size > 1) {
+    MPI_Reduce(mpi_.world_rank == 0 ? MPI_IN_PLACE : res, res, mat[0].size(),
+               MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+  }
+#endif
+}
+
 void OneBodyIntegral::integral_deriv_(EngineFactory engine_fn,
                                       const RowMajorMatrix& coeff,
                                       AtomCenterFn center_fn, double* res) {
