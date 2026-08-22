@@ -35,14 +35,16 @@ __all__ = [
 class _TemporaryFileReservation:
     def __init__(
         self,
-        descriptor: int,
         path: Path,
         status: os.stat_result,
     ) -> None:
-        self.descriptor = descriptor
+        self.descriptor = -1
         self.path = path
         self.status = status
         self.cleanup = True
+
+    def adopt_descriptor(self, descriptor: int) -> None:
+        self.descriptor = descriptor
 
     def take_descriptor(self) -> int:
         descriptor, self.descriptor = self.descriptor, -1
@@ -295,9 +297,15 @@ def _package_reservation(
     temporary_path: Path,
     reserved_status: os.stat_result,
 ) -> _TemporaryFileReservation:
+    reservation: _TemporaryFileReservation | None = None
     try:
-        return _TemporaryFileReservation(descriptor, temporary_path, reserved_status)
+        reservation = _TemporaryFileReservation(temporary_path, reserved_status)
+        reservation.adopt_descriptor(descriptor)
+        return reservation
     except BaseException as error:
+        if reservation is not None and reservation.descriptor >= 0:
+            descriptor = reservation.take_descriptor()
+            reservation.disarm()
         close_error = _close_descriptor(descriptor)
         if _temporary_path_matches(temporary_path, reserved_status):
             try:

@@ -214,6 +214,37 @@ def test_reservation_finalizer_closes_and_removes_temporary_file(tmp_path: Path)
     assert not temporary_path.exists()
 
 
+def test_failed_reservation_adoption_has_one_descriptor_owner(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    temporary_path = tmp_path / "temporary.txt"
+    descriptor = file_io_module._create_exclusive_file(temporary_path)
+    reserved_status = os.fstat(descriptor)
+    reservations: list[file_io_module._TemporaryFileReservation] = []
+    adopt_descriptor = file_io_module._TemporaryFileReservation.adopt_descriptor
+
+    def adopt_then_fail(
+        reservation: file_io_module._TemporaryFileReservation,
+        owned_descriptor: int,
+    ) -> None:
+        adopt_descriptor(reservation, owned_descriptor)
+        reservations.append(reservation)
+        raise MemoryError("adoption failed")
+
+    monkeypatch.setattr(
+        file_io_module._TemporaryFileReservation,
+        "adopt_descriptor",
+        adopt_then_fail,
+    )
+
+    with pytest.raises(MemoryError, match="adoption failed"):
+        file_io_module._package_reservation(descriptor, temporary_path, reserved_status)
+
+    assert reservations[0].descriptor == -1
+    assert not temporary_path.exists()
+
+
 @pytest.mark.skipif(os.name != "nt", reason="Windows read-only behavior")
 def test_clean_up_read_only_temporary_file_when_writer_fails(tmp_path: Path):
     path = tmp_path / "data.txt"
