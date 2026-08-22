@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <cmath>
 #include <qdk/chemistry/data/orbital_optimization.hpp>
 #include <stdexcept>
 
@@ -42,9 +43,14 @@ ActiveSpaceOptimizationResult::ActiveSpaceOptimizationResult(
     throw std::invalid_argument(
         "Macro-iteration count must match the history length");
   }
-  if (!energy_history_.empty() && energy_ != energy_history_.back()) {
-    throw std::invalid_argument(
-        "Final energy must match the last energy-history entry");
+  if (!energy_history_.empty()) {
+    const auto final_history_energy = energy_history_.back();
+    const bool matching_nan =
+        std::isnan(energy_) && std::isnan(final_history_energy);
+    if (energy_ != final_history_energy && !matching_nan) {
+      throw std::invalid_argument(
+          "Final energy must match the last energy-history entry");
+    }
   }
 }
 

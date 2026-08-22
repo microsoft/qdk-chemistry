@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 
+#include <limits>
 #include <qdk/chemistry/algorithms/active_space_optimization.hpp>
 #include <qdk/chemistry/algorithms/orbital_optimization.hpp>
 #include <qdk/chemistry/data/configuration.hpp>
@@ -154,6 +155,19 @@ TEST(OrbitalOptimizationTest, ActiveSpaceHistoryInvariants) {
   EXPECT_THROW(ActiveSpaceOptimizationResult(-2.0, wavefunction, true, 2,
                                              std::vector<double>{-0.9, -1.0},
                                              std::vector<double>{2.0, 1.0}),
+               std::invalid_argument);
+
+  const auto nan = std::numeric_limits<double>::quiet_NaN();
+  EXPECT_NO_THROW(ActiveSpaceOptimizationResult(nan, wavefunction, false, 1,
+                                                std::vector<double>{nan},
+                                                std::vector<double>{1.0}));
+  EXPECT_THROW(ActiveSpaceOptimizationResult(nan, wavefunction, false, 1,
+                                             std::vector<double>{-1.0},
+                                             std::vector<double>{1.0}),
+               std::invalid_argument);
+  EXPECT_THROW(ActiveSpaceOptimizationResult(-1.0, wavefunction, false, 1,
+                                             std::vector<double>{nan},
+                                             std::vector<double>{1.0}),
                std::invalid_argument);
 
   // A consistent zero-iteration result (empty histories) is valid.
