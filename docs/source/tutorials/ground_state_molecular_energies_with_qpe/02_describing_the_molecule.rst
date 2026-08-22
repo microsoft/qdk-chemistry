@@ -24,10 +24,10 @@ After completing this chapter, you will be able to:
    Record the molecular inputs and both Hartree--Fock energies before calculating their difference.
    Interpret the difference as basis-set sensitivity rather than as the total error of either energy.
 
-Example download
-====================
+Example files
+=============
 
-Download :download:`tutorial_describe_n2.py <../../_static/examples/python/tutorial_describe_n2.py>` and save it in your tutorial working directory.
+Add :download:`tutorial_describe_n2.py <../../_static/examples/python/tutorial_describe_n2.py>` to your tutorial working folder.
 Open the file in Visual Studio Code and review the complete script, including imports and setup code omitted from the excerpts below.
 The sections below explain the inputs and calculations in this complete executable file before you run it.
 

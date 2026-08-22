@@ -58,13 +58,23 @@ The :term:`QDK` extension provides Q# language support, while the required tutor
 Create a folder for your downloaded tutorial files, then use **File > Open Folder** in Visual Studio Code to open it as your tutorial working folder.
 
 Use Python 3.10 or later on a platform supported by :term:`QDK`/Chemistry.
-Released packages support Linux on x86-64 and Arm64, macOS on Apple silicon, and Windows on x86-64 and Arm64 through the Windows Subsystem for Linux.
+Released packages support Linux on x86-64 and Arm64, macOS on Apple silicon, and native Windows on x86-64.
+Windows users on either x86-64 or Arm64 can also use the `Windows Subsystem for Linux (WSL) <https://learn.microsoft.com/windows/wsl/install>`_, which uses the corresponding Linux wheels and Linux commands.
+Native Windows Arm64 wheels are not yet part of the release pipeline.
 The `installation instructions <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_ contain the current support matrix.
 Check the version before creating the environment:
 
-.. code-block:: console
+.. tab:: Linux, macOS, and WSL
 
-   python3 --version
+   .. code-block:: console
+
+      python3 --version
+
+.. tab:: Windows PowerShell
+
+   .. code-block:: powershell
+
+      python --version
 
 Continue if the command reports Python 3.10 or later; otherwise, install a newer version of Python.
 
@@ -73,14 +83,22 @@ Python environment setup
 
 Use an isolated Python environment so that the tutorial dependencies do not conflict with packages used by other projects.
 In Visual Studio Code, select **Terminal > New Terminal**.
-From this integrated terminal, create and activate a virtual environment in the tutorial working folder:
+From this integrated terminal, create and activate a virtual environment in the tutorial working folder using the commands for your operating system.
 
-.. code-block:: console
+.. tab:: Linux, macOS, and WSL
 
-   python3 -m venv .venv
-   source .venv/bin/activate
+   .. code-block:: console
 
-The activation command above applies to Linux, macOS, and the Windows Subsystem for Linux.
+      python3 -m venv .venv
+      source .venv/bin/activate
+
+.. tab:: Windows PowerShell
+
+   .. code-block:: powershell
+
+      python -m venv .venv
+      .\.venv\Scripts\Activate.ps1
+
 Install the released :term:`QDK`/Chemistry package into the active environment:
 
 .. parsed-literal::
@@ -115,9 +133,12 @@ How to use the tutorial
 =======================
 
 Complete the required chapters in the order listed in the :doc:`tutorial introduction <index>` because each stage uses decisions and results recorded earlier.
+The example files form one cumulative workflow.
+Save every linked Python script and Jupyter notebook in the same tutorial working folder, and keep earlier files there because later scripts import them.
+Each chapter's **Example files** section links only the files introduced in that chapter; you do not need to download files already in the folder again.
 For each chapter:
 
-1. Download the complete example files and open them in Visual Studio Code.
+1. Add the newly linked example files to the tutorial working folder and open them in Visual Studio Code.
 2. Read the complete file, including imports and setup code omitted from the excerpts in the chapter.
 3. Read the chapter explanation before running the example.
 4. Run the Python example in the Visual Studio Code integrated terminal, and run any interactive Jupyter notebook as directed by the chapter.
