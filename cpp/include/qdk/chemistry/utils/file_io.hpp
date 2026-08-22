@@ -37,12 +37,13 @@ std::string read_text_file(const std::filesystem::path& path);
  * temporary path preserves the destination's suffixes for format-sensitive
  * writers.
  *
- * On POSIX, replacing an existing file preserves its permission bits and new
- * files are created with owner-only permissions. On Windows, replacement
- * preserves the read-only attribute and new files use the filesystem's
- * standard access controls. Other file-object metadata and hard-link identity
- * are not preserved. Atomic replacement prevents partial visibility but does
- * not guarantee durability after power loss.
+ * On POSIX, replacing an existing file preserves its ordinary read, write, and
+ * execute permission bits. New files are created with owner-only permissions.
+ * On Windows, replacement preserves the read-only attribute and new files use
+ * the filesystem's standard access controls. Other file-object metadata and
+ * hard-link identity are not preserved. Atomic replacement prevents partial
+ * visibility but does not guarantee durability after power loss.
+ * Windows alternate data streams are not supported.
  *
  * The destination's parent directory must not be readable or writable by
  * principals less privileged than the process performing the write.

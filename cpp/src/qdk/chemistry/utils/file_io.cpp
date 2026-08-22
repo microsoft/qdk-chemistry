@@ -72,6 +72,18 @@ void validate_path(const std::filesystem::path& path) {
       std::filesystem::path::string_type::npos) {
     throw std::invalid_argument("Path contains an embedded NUL character");
   }
+  if (path.filename().empty()) {
+    throw std::invalid_argument("Path must name a file");
+  }
+#ifdef _WIN32
+  const auto root_name_length = path.root_name().native().size();
+  if (native_path.find(static_cast<std::filesystem::path::value_type>(':'),
+                       root_name_length) !=
+      std::filesystem::path::string_type::npos) {
+    throw std::invalid_argument(
+        "Windows alternate data streams are not supported");
+  }
+#endif
 }
 
 std::filesystem::path make_temporary_path(
@@ -166,7 +178,7 @@ class ReservedTemporaryFile {
   }
 
   ~ReservedTemporaryFile() {
-    if (cleanup_ && path_matches_identity()) {
+    if (cleanup_ && has_same_identity(path_)) {
 #ifdef _WIN32
       const DWORD attributes = GetFileAttributesW(path_.c_str());
       if (attributes != INVALID_FILE_ATTRIBUTES &&
@@ -183,6 +195,9 @@ class ReservedTemporaryFile {
   }
 
   const std::filesystem::path& path() const { return path_; }
+  bool has_same_identity(const std::filesystem::path& path) const noexcept {
+    return path_matches_identity(path);
+  }
 
   void verify_identity() const {
 #ifdef _WIN32
@@ -266,7 +281,7 @@ class ReservedTemporaryFile {
   }
 #endif
 
-  bool path_matches_identity() const noexcept {
+  bool path_matches_identity(const std::filesystem::path& path) const noexcept {
     if (handle_ == invalid_handle()) {
       return false;
     }
@@ -276,7 +291,7 @@ class ReservedTemporaryFile {
       return false;
     }
     HANDLE current_handle = CreateFileW(
-        path_.c_str(), FILE_READ_ATTRIBUTES,
+        path.c_str(), FILE_READ_ATTRIBUTES,
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
         OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
     if (current_handle == INVALID_HANDLE_VALUE) {
@@ -298,7 +313,7 @@ class ReservedTemporaryFile {
     struct stat reserved_status{};
     struct stat current_status{};
     return ::fstat(handle_, &reserved_status) == 0 &&
-           ::lstat(path_.c_str(), &current_status) == 0 &&
+           ::lstat(path.c_str(), &current_status) == 0 &&
            reserved_status.st_dev == current_status.st_dev &&
            reserved_status.st_ino == current_status.st_ino &&
            S_ISREG(current_status.st_mode) && current_status.st_nlink == 1;
@@ -340,6 +355,11 @@ ReservedTemporaryFile create_exclusive_file(const std::filesystem::path& path,
     error = std::error_code(errno, std::generic_category());
     return {path, ReservedTemporaryFile::invalid_handle()};
   }
+  if (::fchmod(descriptor, S_IRUSR | S_IWUSR) != 0) {
+    const int permission_error = errno;
+    error = std::error_code(permission_error, std::generic_category());
+    return {path, descriptor};
+  }
 #endif
   return {path,
 #ifdef _WIN32
@@ -348,6 +368,28 @@ ReservedTemporaryFile create_exclusive_file(const std::filesystem::path& path,
           descriptor
 #endif
   };
+}
+
+bool is_name_too_long(const std::error_code& error,
+                      const std::filesystem::path& destination) {
+  if (error == std::errc::filename_too_long) {
+    return true;
+  }
+#ifdef _WIN32
+  if (error.value() == ERROR_FILENAME_EXCED_RANGE ||
+      error.value() == ERROR_BUFFER_OVERFLOW) {
+    return true;
+  }
+  if (error.value() == ERROR_PATH_NOT_FOUND) {
+    std::error_code parent_error;
+    return std::filesystem::is_directory(destination.parent_path(),
+                                         parent_error) &&
+           !parent_error;
+  }
+#else
+  static_cast<void>(destination);
+#endif
+  return false;
 }
 
 ReservedTemporaryFile reserve_temporary_file(
@@ -363,10 +405,13 @@ ReservedTemporaryFile reserve_temporary_file(
     std::error_code error;
     auto temporary_file = create_exclusive_file(temporary_path, error);
     if (!error) {
+      if (temporary_file.has_same_identity(destination)) {
+        continue;
+      }
       return temporary_file;
     }
     if (error != std::errc::file_exists) {
-      if (error == std::errc::filename_too_long) {
+      if (is_name_too_long(error, destination)) {
         break;
       }
       throw std::runtime_error("Could not create temporary file beside '" +
@@ -390,12 +435,15 @@ ReservedTemporaryFile reserve_temporary_file(
       std::error_code error;
       auto temporary_file = create_exclusive_file(temporary_path, error);
       if (!error) {
+        if (temporary_file.has_same_identity(destination)) {
+          continue;
+        }
         return temporary_file;
       }
       if (error == std::errc::file_exists) {
         continue;
       }
-      if (error == std::errc::filename_too_long) {
+      if (is_name_too_long(error, destination)) {
         break;
       }
       throw std::runtime_error("Could not create temporary file beside '" +
@@ -507,7 +555,8 @@ void preserve_permissions(ReservedTemporaryFile& temporary_file,
                              display_path(destination) + "'");
   }
 
-  temporary_file.set_permissions(status.permissions());
+  temporary_file.set_permissions(status.permissions() &
+                                 std::filesystem::perms::all);
 }
 
 }  // namespace

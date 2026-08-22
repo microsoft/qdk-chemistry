@@ -71,6 +71,23 @@ TEST_F(FileIoTest, RejectsMissingParentDirectoryByDefault) {
   EXPECT_FALSE(std::filesystem::exists(path));
 }
 
+TEST_F(FileIoTest, RejectsTrailingSeparatorBeforeWriterRuns) {
+  const auto directory = root_ / "directory";
+  const auto trailing_path = directory / "";
+  std::filesystem::create_directory(directory);
+  bool writer_ran = false;
+
+  EXPECT_THROW(
+      qdk::chemistry::utils::write_file_atomically(
+          trailing_path,
+          [&writer_ran](const std::filesystem::path&) { writer_ran = true; }),
+      std::invalid_argument);
+  EXPECT_THROW(qdk::chemistry::utils::ensure_parent_directory(trailing_path),
+               std::invalid_argument);
+
+  EXPECT_FALSE(writer_ran);
+}
+
 TEST_F(FileIoTest, RejectsEmbeddedNulPaths) {
   const auto prefix = root_ / "data.txt";
   std::string path = prefix.string();
@@ -125,6 +142,44 @@ TEST_F(FileIoTest, PreservesDestinationPermissions) {
   qdk::chemistry::utils::write_text_file_atomically(path, "replacement");
 
   EXPECT_EQ(std::filesystem::status(path).permissions(), private_permissions);
+#endif
+}
+
+TEST_F(FileIoTest, ClearsSpecialPermissionBitsOnReplacement) {
+#ifndef _WIN32
+  const auto path = root_ / "data.txt";
+  qdk::chemistry::utils::write_text_file_atomically(path, "original");
+  const auto permissions =
+      std::filesystem::perms::owner_all | std::filesystem::perms::group_read |
+      std::filesystem::perms::group_exec | std::filesystem::perms::others_read |
+      std::filesystem::perms::others_exec | std::filesystem::perms::set_uid |
+      std::filesystem::perms::set_gid | std::filesystem::perms::sticky_bit;
+  std::filesystem::permissions(path, permissions,
+                               std::filesystem::perm_options::replace);
+
+  qdk::chemistry::utils::write_text_file_atomically(path, "replacement");
+
+  EXPECT_EQ(std::filesystem::status(path).permissions(),
+            permissions & std::filesystem::perms::all);
+#endif
+}
+
+TEST_F(FileIoTest, RestrictiveUmaskDoesNotPreventWriting) {
+#ifndef _WIN32
+  const auto path = root_ / "data.txt";
+  const mode_t original_umask = ::umask(0777);
+  try {
+    qdk::chemistry::utils::write_text_file_atomically(path, "contents");
+  } catch (...) {
+    ::umask(original_umask);
+    throw;
+  }
+  ::umask(original_umask);
+
+  EXPECT_EQ(qdk::chemistry::utils::read_text_file(path), "contents");
+  EXPECT_EQ(
+      std::filesystem::status(path).permissions(),
+      std::filesystem::perms::owner_read | std::filesystem::perms::owner_write);
 #endif
 }
 
@@ -276,6 +331,36 @@ TEST_F(FileIoTest, AllowsExclusiveWriterOnWindows) {
 
   EXPECT_EQ(qdk::chemistry::utils::read_text_file(path), "contents");
 }
+
+TEST_F(FileIoTest, RejectsAlternateDataStreamsOnWindows) {
+  const auto path = root_ / "data.txt:stream";
+  bool writer_ran = false;
+
+  EXPECT_THROW(
+      qdk::chemistry::utils::write_file_atomically(
+          path,
+          [&writer_ran](const std::filesystem::path&) { writer_ran = true; }),
+      std::invalid_argument);
+
+  EXPECT_FALSE(writer_ran);
+}
+
+TEST_F(FileIoTest, FallsBackForNearMaxPathDestinationOnWindows) {
+  auto parent = root_;
+  while ((parent / "d.txt").native().size() < 220) {
+    parent /= "segment123";
+  }
+  const auto current_length = (parent / "d.txt").native().size();
+  if (current_length < 244) {
+    parent /= std::wstring(243 - current_length, L'p');
+  }
+  std::filesystem::create_directories(parent);
+  const auto path = parent / "d.txt";
+
+  qdk::chemistry::utils::write_text_file_atomically(path, "contents");
+
+  EXPECT_EQ(qdk::chemistry::utils::read_text_file(path), "contents");
+}
 #endif
 
 TEST_F(FileIoTest, PreservesDestinationSuffixesForWriter) {
@@ -333,6 +418,39 @@ TEST_F(FileIoTest, CompactTemporaryPathNeverAliasesDestination) {
   EXPECT_EQ(qdk::chemistry::utils::read_text_file(path), "contents");
 }
 #endif
+
+TEST_F(FileIoTest, CompactTemporaryPathUsesDistinctFilesystemIdentity) {
+  const auto case_probe = root_ / "QdkCaseProbe";
+  {
+    std::ofstream output(case_probe);
+    output << "probe";
+  }
+  if (!std::filesystem::exists(root_ / "qdkcaseprobe")) {
+    GTEST_SKIP() << "Filesystem is case-sensitive";
+  }
+  std::filesystem::remove(case_probe);
+
+  const auto path =
+      root_ / ("Q" + std::string(14, 'q') + "0." + std::string(230, 'a'));
+  {
+    std::ofstream output(path);
+    if (!output.is_open()) {
+      GTEST_SKIP() << "Filesystem does not support the long test path";
+    }
+  }
+  std::filesystem::remove(path);
+  bool destination_visible = false;
+
+  qdk::chemistry::utils::write_file_atomically(
+      path, [&](const std::filesystem::path& temporary_path) {
+        destination_visible = std::filesystem::exists(path);
+        std::ofstream output(temporary_path);
+        output << "contents";
+      });
+
+  EXPECT_FALSE(destination_visible);
+  EXPECT_EQ(qdk::chemistry::utils::read_text_file(path), "contents");
+}
 
 TEST_F(FileIoTest, RejectsReplacedTemporaryFile) {
   const auto path = root_ / "data.txt";

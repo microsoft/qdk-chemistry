@@ -8,16 +8,19 @@
 import ctypes
 import os
 import stat
+import threading
 from ctypes import wintypes
 from pathlib import Path
 
 import pytest
 
 from qdk_chemistry.utils import (
+    ensure_parent_directory,
     read_text_file,
     write_file_atomically,
     write_text_file_atomically,
 )
+from qdk_chemistry.utils import file_io as file_io_module
 
 
 def test_write_read_and_replace_text(tmp_path: Path):
@@ -54,6 +57,16 @@ def test_reject_trailing_separator_destination(tmp_path: Path):
         write_text_file_atomically(f"{path}{os.sep}", "contents")
 
     assert not path.exists()
+
+
+def test_reject_trailing_separator_in_all_path_helpers(tmp_path: Path):
+    path = tmp_path / "data"
+    trailing_path = f"{path}{os.sep}"
+
+    with pytest.raises(ValueError, match="must name a file"):
+        ensure_parent_directory(trailing_path)
+    with pytest.raises(ValueError, match="must name a file"):
+        read_text_file(trailing_path)
 
 
 def test_preserve_destination_when_writer_fails(tmp_path: Path):
@@ -123,6 +136,30 @@ def test_preserve_destination_permissions(tmp_path: Path):
     write_text_file_atomically(path, "replacement")
 
     assert stat.S_IMODE(path.stat().st_mode) == 0o640
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits are not portable to Windows")
+def test_clear_special_permission_bits_on_replacement(tmp_path: Path):
+    path = tmp_path / "data.txt"
+    write_text_file_atomically(path, "original")
+    path.chmod(0o7755)
+
+    write_text_file_atomically(path, "replacement")
+
+    assert stat.S_IMODE(path.stat().st_mode) == 0o755
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX umask semantics")
+def test_restrictive_umask_does_not_prevent_writing(tmp_path: Path):
+    path = tmp_path / "data.txt"
+    original_umask = os.umask(0o777)
+    try:
+        write_text_file_atomically(path, "contents")
+    finally:
+        os.umask(original_umask)
+
+    assert read_text_file(path) == "contents"
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX symlink semantics")
@@ -225,6 +262,74 @@ def test_allow_exclusive_writer_on_windows(tmp_path: Path):
     assert read_text_file(path) == "contents"
 
 
+@pytest.mark.skipif(os.name != "nt", reason="Windows file-sharing behavior")
+def test_reader_does_not_block_atomic_replacement_on_windows(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    path = tmp_path / "data.txt"
+    write_text_file_atomically(path, "original")
+    reader_opened = threading.Event()
+    release_reader = threading.Event()
+    original_fdopen = file_io_module.os.fdopen
+
+    def blocking_fdopen(*args, **kwargs):
+        stream = original_fdopen(*args, **kwargs)
+        reader_opened.set()
+        assert release_reader.wait(timeout=10)
+        return stream
+
+    monkeypatch.setattr(file_io_module.os, "fdopen", blocking_fdopen)
+    result: list[str] = []
+    reader = threading.Thread(target=lambda: result.append(read_text_file(path)))
+    reader.start()
+    assert reader_opened.wait(timeout=10)
+    try:
+        write_text_file_atomically(path, "replacement")
+    finally:
+        release_reader.set()
+        reader.join(timeout=10)
+
+    assert result == ["original"]
+    assert read_text_file(path) == "replacement"
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows path semantics")
+def test_reject_alternate_data_stream_destination_on_windows(tmp_path: Path):
+    path = tmp_path / "data.txt:stream"
+
+    with pytest.raises(ValueError, match="alternate data streams"):
+        write_text_file_atomically(path, "contents")
+
+    assert not (tmp_path / "data.txt").exists()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows path semantics")
+def test_fall_back_for_near_max_path_destination_on_windows(tmp_path: Path):
+    parent = tmp_path
+    while len(str(parent / "d.txt")) < 220:
+        parent /= "segment123"
+    current_length = len(str(parent / "d.txt"))
+    if current_length < 244:
+        parent /= "p" * (243 - current_length)
+    parent.mkdir(parents=True)
+    path = parent / "d.txt"
+
+    write_text_file_atomically(path, "contents")
+
+    assert read_text_file(path) == "contents"
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows error semantics")
+def test_windows_errors_preserve_winerror_and_subclass(tmp_path: Path):
+    permission_error = file_io_module._windows_error(tmp_path / "data.txt", 5)
+    length_error = file_io_module._windows_error(tmp_path / "data.txt", 206)
+
+    assert isinstance(permission_error, PermissionError)
+    assert permission_error.winerror == 5
+    assert file_io_module._is_name_too_long(length_error, tmp_path / "data.txt")
+
+
 def test_preserve_destination_suffixes_for_writer(tmp_path: Path):
     path = tmp_path / "data.structure.json"
     observed_temporary_path: Path | None = None
@@ -273,6 +378,31 @@ def test_compact_temporary_path_never_aliases_destination(tmp_path: Path):
     write_file_atomically(path, write_temporary_file)
 
     assert observed_temporary_path != path
+    assert not destination_visible
+    assert read_text_file(path) == "contents"
+
+
+def test_compact_temporary_path_uses_distinct_filesystem_identity(tmp_path: Path):
+    case_probe = tmp_path / "QdkCaseProbe"
+    case_probe.write_text("probe", encoding="utf-8")
+    if not (tmp_path / "qdkcaseprobe").exists():
+        pytest.skip("Filesystem is case-sensitive")
+    case_probe.unlink()
+    path = tmp_path / f"Q{'q' * 14}0.{'a' * 230}"
+    try:
+        path.touch()
+    except OSError:
+        pytest.skip("Filesystem does not support the long test path")
+    path.unlink()
+    destination_visible = False
+
+    def write_temporary_file(temporary_path: Path) -> None:
+        nonlocal destination_visible
+        destination_visible = path.exists()
+        temporary_path.write_text("contents", encoding="utf-8")
+
+    write_file_atomically(path, write_temporary_file)
+
     assert not destination_visible
     assert read_text_file(path) == "contents"
 

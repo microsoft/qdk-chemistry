@@ -10,6 +10,7 @@ from __future__ import annotations
 import ctypes
 import errno
 import importlib
+import ntpath
 import os
 import stat
 import sys
@@ -33,6 +34,7 @@ __all__ = [
 
 def ensure_parent_directory(path: PathLike) -> None:
     """Create the parent directory of *path* when it does not exist."""
+    _validate_destination_path(path)
     parent = Path(path).parent
     if parent != Path("."):
         parent.mkdir(parents=True, exist_ok=True)
@@ -43,11 +45,21 @@ def _validate_destination_path(path: PathLike) -> None:
     separators = tuple(separator for separator in (os.sep, os.altsep) if separator)
     if value.endswith(separators):
         raise ValueError(f"Destination path must name a file: '{value}'")
+    if sys.platform == "win32" and ":" in ntpath.splitdrive(value)[1]:
+        raise ValueError(f"Windows alternate data streams are not supported: '{value}'")
 
 
 def read_text_file(path: PathLike, *, encoding: str = "utf-8") -> str:
     """Read an entire text file without changing its line endings."""
-    descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0))
+    _validate_destination_path(path)
+    if sys.platform == "win32":
+        descriptor = _open_windows_file(
+            path,
+            desired_access=0x80000000,
+            creation_disposition=3,
+        )
+    else:
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0))
     try:
         if not stat.S_ISREG(os.fstat(descriptor).st_mode):
             raise OSError(f"Path is not a regular file: '{path}'")
@@ -69,12 +81,13 @@ def write_file_atomically(
     The path preserves the destination's suffixes for format-sensitive writers.
     The temporary file is removed if the writer raises an exception.
 
-    On POSIX, replacing an existing file preserves its permission bits and new
-    files are created with owner-only permissions. On Windows, replacement
-    preserves the read-only attribute and new files use the filesystem's
-    standard access controls. Other file-object metadata and hard-link identity
-    are not preserved. Atomic replacement prevents partial visibility but does
-    not guarantee durability after power loss.
+    On POSIX, replacing an existing file preserves its ordinary read, write,
+    and execute permission bits. New files are created with owner-only
+    permissions. On Windows, replacement preserves the read-only attribute and
+    new files use the filesystem's standard access controls. Other file-object
+    metadata and hard-link identity are not preserved. Atomic replacement
+    prevents partial visibility but does not guarantee durability after power
+    loss.
 
     The destination's parent directory must not be readable or writable by
     principals less privileged than the process performing the write.
@@ -110,7 +123,7 @@ def write_file_atomically(
         else:
             if stat.S_ISLNK(destination_status.st_mode):
                 raise ValueError(f"Symlink destinations are not supported: '{destination}'")
-            existing_mode = stat.S_IMODE(destination_status.st_mode)
+            existing_mode = stat.S_IMODE(destination_status.st_mode) & 0o777
             destination_mode = existing_mode
             if os.name != "nt" and hasattr(os, "fchmod"):
                 os.fchmod(descriptor, existing_mode)
@@ -149,14 +162,15 @@ def _reserve_temporary_file(destination: Path) -> tuple[int, str]:
         if _component_is_too_long(temporary_path):
             break
         try:
-            descriptor = _create_exclusive_file(temporary_path)
+            descriptor = _reserve_distinct_temporary_file(destination, temporary_path)
         except FileExistsError:
             continue
         except OSError as error:
-            if error.errno != errno.ENAMETOOLONG:
+            if not _is_name_too_long(error, destination):
                 raise
             break
-        return descriptor, str(temporary_path)
+        if descriptor is not None:
+            return descriptor, str(temporary_path)
 
     alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_-"
     for stem_length in range(16, 0, -1):
@@ -168,14 +182,15 @@ def _reserve_temporary_file(destination: Path) -> tuple[int, str]:
             if _component_is_too_long(temporary_path):
                 break
             try:
-                descriptor = _create_exclusive_file(temporary_path)
+                descriptor = _reserve_distinct_temporary_file(destination, temporary_path)
             except FileExistsError:
                 continue
             except OSError as error:
-                if error.errno == errno.ENAMETOOLONG:
+                if _is_name_too_long(error, destination):
                     break
                 raise
-            return descriptor, str(temporary_path)
+            if descriptor is not None:
+                return descriptor, str(temporary_path)
 
     raise FileExistsError(f"Could not create a unique temporary file beside '{destination}'")
 
@@ -188,7 +203,33 @@ def _component_is_too_long(path: Path) -> bool:
 
 def _create_exclusive_file(path: Path) -> int:
     if sys.platform != "win32":
-        return os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_CLOEXEC, 0o600)
+        descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_CLOEXEC, 0o600)
+        try:
+            os.fchmod(descriptor, stat.S_IRUSR | stat.S_IWUSR)
+        except BaseException as error:
+            try:
+                reserved_status = os.fstat(descriptor)
+            except OSError:
+                reserved_status = None
+            finally:
+                os.close(descriptor)
+            if reserved_status is not None and _temporary_path_matches(path, reserved_status):
+                try:
+                    path.unlink()
+                except OSError as cleanup_error:
+                    raise error from cleanup_error
+            raise
+        return descriptor
+
+    return _open_windows_file(path, desired_access=0, creation_disposition=1)
+
+
+def _open_windows_file(
+    path: PathLike,
+    *,
+    desired_access: int,
+    creation_disposition: int,
+) -> int:
 
     create_file = ctypes.WinDLL("kernel32", use_last_error=True).CreateFileW
     create_file.argtypes = (
@@ -202,20 +243,17 @@ def _create_exclusive_file(path: Path) -> int:
     )
     create_file.restype = wintypes.HANDLE
     handle = create_file(
-        str(path),
-        0,
+        os.fspath(path),
+        desired_access,
         0x00000001 | 0x00000002 | 0x00000004,
         None,
-        1,
+        creation_disposition,
         0x00000080,
         None,
     )
     if handle == wintypes.HANDLE(-1).value:
         error = ctypes.get_last_error()
-        message = ctypes.FormatError(error)
-        if error in (80, 183):
-            raise FileExistsError(error, message, str(path))
-        raise OSError(error, message, str(path))
+        raise _windows_error(path, error)
     close_handle = ctypes.WinDLL("kernel32", use_last_error=True).CloseHandle
     close_handle.argtypes = (wintypes.HANDLE,)
     close_handle.restype = wintypes.BOOL
@@ -231,6 +269,37 @@ def _create_exclusive_file(path: Path) -> int:
     except BaseException:
         close_handle(handle)
         raise
+
+
+def _windows_error(path: PathLike, error: int) -> OSError:
+    return OSError(0, ctypes.FormatError(error), os.fspath(path), error)
+
+
+def _reserve_distinct_temporary_file(destination: Path, temporary_path: Path) -> int | None:
+    descriptor = _create_exclusive_file(temporary_path)
+    try:
+        reserved_status = os.fstat(descriptor)
+    except BaseException:
+        os.close(descriptor)
+        raise
+    if not _temporary_path_matches(destination, reserved_status):
+        return descriptor
+
+    os.close(descriptor)
+    if _temporary_path_matches(temporary_path, reserved_status):
+        _remove_temporary_file(temporary_path)
+    return None
+
+
+def _is_name_too_long(error: OSError, destination: Path) -> bool:
+    if error.errno == errno.ENAMETOOLONG:
+        return True
+    if sys.platform != "win32":
+        return False
+    winerror = getattr(error, "winerror", None)
+    if winerror in (111, 206):
+        return True
+    return winerror == 3 and destination.parent.is_dir()
 
 
 def _same_file_identity(reserved_status: os.stat_result, current_status: os.stat_result) -> bool:
