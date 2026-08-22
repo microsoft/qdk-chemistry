@@ -60,7 +60,32 @@ TEST_F(FileIoTest, CreatesParentDirectoriesWhenRequested) {
   qdk::chemistry::utils::write_text_file_atomically(path, "contents", true);
 
   EXPECT_EQ(qdk::chemistry::utils::read_text_file(path), "contents");
+#ifndef _WIN32
+  EXPECT_EQ(std::filesystem::status(path.parent_path()).permissions(),
+            std::filesystem::perms::owner_all);
+  EXPECT_EQ(
+      std::filesystem::status(path.parent_path().parent_path()).permissions(),
+      std::filesystem::perms::owner_all);
+#endif
 }
+
+#ifndef _WIN32
+TEST_F(FileIoTest, CreatesPrivateParentDirectoriesUnderRestrictiveUmask) {
+  const auto path = root_ / "private" / "nested" / "data.txt";
+  const mode_t original_umask = ::umask(0777);
+  try {
+    qdk::chemistry::utils::write_text_file_atomically(path, "contents", true);
+  } catch (...) {
+    ::umask(original_umask);
+    throw;
+  }
+  ::umask(original_umask);
+
+  EXPECT_EQ(std::filesystem::status(path.parent_path()).permissions(),
+            std::filesystem::perms::owner_all);
+  EXPECT_EQ(qdk::chemistry::utils::read_text_file(path), "contents");
+}
+#endif
 
 TEST_F(FileIoTest, RejectsMissingParentDirectoryByDefault) {
   const auto path = root_ / "missing" / "data.txt";
@@ -84,6 +109,23 @@ TEST_F(FileIoTest, RejectsTrailingSeparatorBeforeWriterRuns) {
       std::invalid_argument);
   EXPECT_THROW(qdk::chemistry::utils::ensure_parent_directory(trailing_path),
                std::invalid_argument);
+
+  EXPECT_FALSE(writer_ran);
+}
+
+TEST_F(FileIoTest, RejectsDotComponentsBeforeWriterRuns) {
+  bool writer_ran = false;
+
+  EXPECT_THROW(
+      qdk::chemistry::utils::write_file_atomically(
+          root_ / ".",
+          [&writer_ran](const std::filesystem::path&) { writer_ran = true; }),
+      std::invalid_argument);
+  EXPECT_THROW(
+      qdk::chemistry::utils::write_file_atomically(
+          root_ / "..",
+          [&writer_ran](const std::filesystem::path&) { writer_ran = true; }),
+      std::invalid_argument);
 
   EXPECT_FALSE(writer_ran);
 }
@@ -361,6 +403,15 @@ TEST_F(FileIoTest, FallsBackForNearMaxPathDestinationOnWindows) {
 
   EXPECT_EQ(qdk::chemistry::utils::read_text_file(path), "contents");
 }
+
+TEST_F(FileIoTest, SupportsExtendedLengthPathsOnWindows) {
+  const std::filesystem::path path =
+      L"\\\\?\\" + root_.native() + L"\\extended.txt";
+
+  qdk::chemistry::utils::write_text_file_atomically(path, "contents");
+
+  EXPECT_EQ(qdk::chemistry::utils::read_text_file(path), "contents");
+}
 #endif
 
 TEST_F(FileIoTest, PreservesDestinationSuffixesForWriter) {
@@ -469,6 +520,31 @@ TEST_F(FileIoTest, RejectsReplacedTemporaryFile) {
   EXPECT_FALSE(std::filesystem::exists(path));
   EXPECT_TRUE(std::filesystem::exists(replacement_path));
 }
+
+#ifndef _WIN32
+TEST_F(FileIoTest, CleansReservedPathAfterWriterAddsHardLink) {
+  const auto path = root_ / "data.txt";
+  const auto extra_link = root_ / "extra.txt";
+  std::filesystem::path temporary_path;
+
+  EXPECT_THROW(qdk::chemistry::utils::write_file_atomically(
+                   path,
+                   [&](const std::filesystem::path& reserved_path) {
+                     temporary_path = reserved_path;
+                     std::ofstream output(reserved_path);
+                     output << "sensitive";
+                     output.close();
+                     std::filesystem::create_hard_link(reserved_path,
+                                                       extra_link);
+                     throw std::runtime_error("writer failed");
+                   }),
+               std::runtime_error);
+
+  EXPECT_FALSE(std::filesystem::exists(temporary_path));
+  EXPECT_EQ(qdk::chemistry::utils::read_text_file(extra_link), "sensitive");
+  EXPECT_FALSE(std::filesystem::exists(path));
+}
+#endif
 
 TEST_F(FileIoTest, FreezesRelativeDestinationBeforeWriterRuns) {
   const auto original_directory = std::filesystem::current_path();

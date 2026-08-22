@@ -8,6 +8,7 @@
 import ctypes
 import os
 import stat
+import sys
 import threading
 from ctypes import wintypes
 from pathlib import Path
@@ -39,6 +40,22 @@ def test_create_parent_directories_when_requested(tmp_path: Path):
     write_text_file_atomically(path, "contents", create_parent_directories=True)
 
     assert read_text_file(path) == "contents"
+    if os.name != "nt":
+        assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
+        assert stat.S_IMODE(path.parent.parent.stat().st_mode) == 0o700
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX umask semantics")
+def test_create_private_parent_directories_under_restrictive_umask(tmp_path: Path):
+    path = tmp_path / "private" / "nested" / "data.txt"
+    original_umask = os.umask(0o777)
+    try:
+        write_text_file_atomically(path, "contents", create_parent_directories=True)
+    finally:
+        os.umask(original_umask)
+
+    assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
+    assert read_text_file(path) == "contents"
 
 
 def test_reject_missing_parent_directory_by_default(tmp_path: Path):
@@ -67,6 +84,35 @@ def test_reject_trailing_separator_in_all_path_helpers(tmp_path: Path):
         ensure_parent_directory(trailing_path)
     with pytest.raises(ValueError, match="must name a file"):
         read_text_file(trailing_path)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "",
+        ".",
+        "..",
+        f"data{os.sep}.",
+        "data\0ignored.txt",
+    ],
+)
+def test_reject_invalid_destination_before_writer_runs(tmp_path: Path, path: str):
+    writer_ran = False
+    destination = path if not path.startswith("data") else f"{tmp_path}{os.sep}{path}"
+
+    def writer(temporary_path: Path) -> None:
+        nonlocal writer_ran
+        writer_ran = True
+        temporary_path.write_text("contents", encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"must name a file|embedded NUL"):
+        write_file_atomically(destination, writer)
+    with pytest.raises(ValueError, match=r"must name a file|embedded NUL"):
+        ensure_parent_directory(destination)
+    with pytest.raises(ValueError, match=r"must name a file|embedded NUL"):
+        read_text_file(destination)
+
+    assert not writer_ran
 
 
 def test_preserve_destination_when_writer_fails(tmp_path: Path):
@@ -190,6 +236,25 @@ def test_create_new_file_with_owner_only_permissions(tmp_path: Path):
     assert stat.S_IMODE(path.stat().st_mode) == 0o600
 
 
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission semantics")
+def test_reject_filesystem_that_ignores_permissions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    path = tmp_path / "data.txt"
+    original_fchmod = os.fchmod
+
+    def apply_broader_permissions(descriptor: int, _mode: int) -> None:
+        original_fchmod(descriptor, 0o644)
+
+    monkeypatch.setattr(file_io_module.os, "fchmod", apply_broader_permissions)
+
+    with pytest.raises(PermissionError, match="did not apply permissions"):
+        write_text_file_atomically(path, "contents")
+
+    assert list(tmp_path.iterdir()) == []
+
+
 @pytest.mark.skipif(os.name != "nt", reason="Windows read-only behavior")
 def test_replace_read_only_destination_on_windows(tmp_path: Path):
     path = tmp_path / "data.txt"
@@ -219,6 +284,8 @@ def test_preserve_writable_destination_on_windows(tmp_path: Path):
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows file-sharing behavior")
 def test_allow_exclusive_writer_on_windows(tmp_path: Path):
+    if sys.platform != "win32":
+        raise AssertionError("Windows-only test ran on another platform")
     path = tmp_path / "data.txt"
 
     def write_with_exclusive_handle(temporary_path: Path) -> None:
@@ -267,6 +334,8 @@ def test_reader_does_not_block_atomic_replacement_on_windows(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
+    if sys.platform != "win32":
+        raise AssertionError("Windows-only test ran on another platform")
     path = tmp_path / "data.txt"
     write_text_file_atomically(path, "original")
     reader_opened = threading.Event()
@@ -322,6 +391,8 @@ def test_fall_back_for_near_max_path_destination_on_windows(tmp_path: Path):
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows error semantics")
 def test_windows_errors_preserve_winerror_and_subclass(tmp_path: Path):
+    if sys.platform != "win32":
+        raise AssertionError("Windows-only test ran on another platform")
     permission_error = file_io_module._windows_error(tmp_path / "data.txt", 5)
     length_error = file_io_module._windows_error(tmp_path / "data.txt", 206)
 
@@ -428,6 +499,28 @@ def test_reject_replaced_temporary_file(tmp_path: Path):
     if os.name != "nt":
         assert replacement_path is not None
         assert replacement_path.read_text(encoding="utf-8") == "replacement"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX hard-link semantics")
+def test_clean_up_reserved_path_after_writer_adds_hard_link(tmp_path: Path):
+    path = tmp_path / "data.txt"
+    extra_link = tmp_path / "extra.txt"
+    temporary_path: Path | None = None
+
+    def fail_after_linking(reserved_path: Path) -> None:
+        nonlocal temporary_path
+        temporary_path = reserved_path
+        reserved_path.write_text("sensitive", encoding="utf-8")
+        os.link(reserved_path, extra_link)
+        raise RuntimeError("writer failed")
+
+    with pytest.raises(RuntimeError, match="writer failed"):
+        write_file_atomically(path, fail_after_linking)
+
+    assert temporary_path is not None
+    assert not temporary_path.exists()
+    assert extra_link.read_text(encoding="utf-8") == "sensitive"
+    assert not path.exists()
 
 
 def test_freeze_relative_destination_before_writer_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

@@ -31,22 +31,29 @@ std::string read_text_file(const std::filesystem::path& path);
  * @brief Write a file through a temporary sibling and atomically replace the
  * destination.
  *
- * The writer receives a unique temporary path in the destination directory.
- * The temporary file is removed if the writer throws. Keeping the temporary
- * file beside the destination allows replacement to remain atomic. The
- * temporary path preserves the destination's suffixes for format-sensitive
- * writers.
+ * The writer receives the path of an existing empty temporary file in the
+ * destination directory. It must open and write that file in place, close all
+ * writes before returning, and must not unlink, rename, replace, or hard-link
+ * the file. Cleanup is guaranteed only while the reserved file remains at the
+ * temporary path. Keeping the temporary file beside the destination allows
+ * replacement to remain atomic. The path preserves the destination's suffixes
+ * for format-sensitive writers.
  *
  * On POSIX, replacing an existing file preserves its ordinary read, write, and
  * execute permission bits. New files are created with owner-only permissions.
+ * The filesystem must enforce POSIX permission bits; the write fails rather
+ * than publishing a file with broader effective permissions.
  * On Windows, replacement preserves the read-only attribute and new files use
  * the filesystem's standard access controls. Other file-object metadata and
  * hard-link identity are not preserved. Atomic replacement prevents partial
  * visibility but does not guarantee durability after power loss.
  * Windows alternate data streams are not supported.
  *
- * The destination's parent directory must not be readable or writable by
- * principals less privileged than the process performing the write.
+ * The destination's parent directory and mutable ancestors must not be
+ * writable by principals less privileged than the process performing the
+ * write. Missing POSIX parent directories are created with owner-only
+ * permissions. Windows parent directories use inherited filesystem access
+ * controls.
  *
  * @param path Destination path.
  * @param writer Function that writes the complete temporary file.

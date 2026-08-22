@@ -9,6 +9,7 @@
 #include <qdk/chemistry/utils/file_io.hpp>
 #include <stdexcept>
 #include <system_error>
+#include <vector>
 
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -72,19 +73,56 @@ void validate_path(const std::filesystem::path& path) {
       std::filesystem::path::string_type::npos) {
     throw std::invalid_argument("Path contains an embedded NUL character");
   }
-  if (path.filename().empty()) {
+  const auto filename = path.filename();
+  if (filename.empty() || filename == "." || filename == "..") {
     throw std::invalid_argument("Path must name a file");
   }
 #ifdef _WIN32
-  const auto root_name_length = path.root_name().native().size();
-  if (native_path.find(static_cast<std::filesystem::path::value_type>(':'),
-                       root_name_length) !=
+  if (path.filename().native().find(
+          static_cast<std::filesystem::path::value_type>(':')) !=
       std::filesystem::path::string_type::npos) {
     throw std::invalid_argument(
         "Windows alternate data streams are not supported");
   }
 #endif
 }
+
+#ifdef _WIN32
+enum class IdentityMatch { match, different, unknown };
+
+IdentityMatch compare_handle_to_path_identity(
+    HANDLE handle, const std::filesystem::path& path,
+    bool require_single_link) noexcept {
+  if (handle == INVALID_HANDLE_VALUE) {
+    return IdentityMatch::unknown;
+  }
+  BY_HANDLE_FILE_INFORMATION reserved_info{};
+  if (!GetFileInformationByHandle(handle, &reserved_info)) {
+    return IdentityMatch::unknown;
+  }
+  HANDLE current_handle = CreateFileW(
+      path.c_str(), FILE_READ_ATTRIBUTES,
+      FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+      OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+  if (current_handle == INVALID_HANDLE_VALUE) {
+    return IdentityMatch::unknown;
+  }
+  BY_HANDLE_FILE_INFORMATION current_info{};
+  const bool inspected =
+      GetFileInformationByHandle(current_handle, &current_info) != 0;
+  CloseHandle(current_handle);
+  if (!inspected) {
+    return IdentityMatch::unknown;
+  }
+  const bool matches =
+      reserved_info.dwVolumeSerialNumber == current_info.dwVolumeSerialNumber &&
+      reserved_info.nFileIndexHigh == current_info.nFileIndexHigh &&
+      reserved_info.nFileIndexLow == current_info.nFileIndexLow &&
+      (current_info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) == 0 &&
+      (!require_single_link || current_info.nNumberOfLinks == 1);
+  return matches ? IdentityMatch::match : IdentityMatch::different;
+}
+#endif
 
 std::filesystem::path make_temporary_path(
     const std::filesystem::path& destination) {
@@ -178,7 +216,7 @@ class ReservedTemporaryFile {
   }
 
   ~ReservedTemporaryFile() {
-    if (cleanup_ && has_same_identity(path_)) {
+    if (cleanup_ && path_matches_identity(path_, false)) {
 #ifdef _WIN32
       const DWORD attributes = GetFileAttributesW(path_.c_str());
       if (attributes != INVALID_FILE_ATTRIBUTES &&
@@ -196,7 +234,7 @@ class ReservedTemporaryFile {
 
   const std::filesystem::path& path() const { return path_; }
   bool has_same_identity(const std::filesystem::path& path) const noexcept {
-    return path_matches_identity(path);
+    return path_matches_identity(path, true);
   }
 
   void verify_identity() const {
@@ -255,7 +293,10 @@ class ReservedTemporaryFile {
 #ifdef _WIN32
     static_cast<void>(permissions);
 #else
-    if (::fchmod(handle_, static_cast<mode_t>(permissions)) != 0) {
+    const auto requested = static_cast<mode_t>(permissions) & 0777;
+    struct stat status{};
+    if (::fchmod(handle_, requested) != 0 || ::fstat(handle_, &status) != 0 ||
+        (status.st_mode & 0777) != requested) {
       throw std::runtime_error("Could not set temporary file permissions: '" +
                                display_path(path_) + "'");
     }
@@ -281,34 +322,14 @@ class ReservedTemporaryFile {
   }
 #endif
 
-  bool path_matches_identity(const std::filesystem::path& path) const noexcept {
+  bool path_matches_identity(const std::filesystem::path& path,
+                             bool require_single_link) const noexcept {
     if (handle_ == invalid_handle()) {
       return false;
     }
 #ifdef _WIN32
-    BY_HANDLE_FILE_INFORMATION reserved_info{};
-    if (!GetFileInformationByHandle(handle_, &reserved_info)) {
-      return false;
-    }
-    HANDLE current_handle = CreateFileW(
-        path.c_str(), FILE_READ_ATTRIBUTES,
-        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
-        OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
-    if (current_handle == INVALID_HANDLE_VALUE) {
-      return false;
-    }
-    BY_HANDLE_FILE_INFORMATION current_info{};
-    const bool inspected =
-        GetFileInformationByHandle(current_handle, &current_info) != 0;
-    CloseHandle(current_handle);
-    return inspected &&
-           reserved_info.dwVolumeSerialNumber ==
-               current_info.dwVolumeSerialNumber &&
-           reserved_info.nFileIndexHigh == current_info.nFileIndexHigh &&
-           reserved_info.nFileIndexLow == current_info.nFileIndexLow &&
-           (current_info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) ==
-               0 &&
-           current_info.nNumberOfLinks == 1;
+    return compare_handle_to_path_identity(
+               handle_, path, require_single_link) == IdentityMatch::match;
 #else
     struct stat reserved_status{};
     struct stat current_status{};
@@ -316,7 +337,8 @@ class ReservedTemporaryFile {
            ::lstat(path.c_str(), &current_status) == 0 &&
            reserved_status.st_dev == current_status.st_dev &&
            reserved_status.st_ino == current_status.st_ino &&
-           S_ISREG(current_status.st_mode) && current_status.st_nlink == 1;
+           S_ISREG(current_status.st_mode) &&
+           (!require_single_link || current_status.st_nlink == 1);
 #endif
   }
 
@@ -358,6 +380,12 @@ ReservedTemporaryFile create_exclusive_file(const std::filesystem::path& path,
   if (::fchmod(descriptor, S_IRUSR | S_IWUSR) != 0) {
     const int permission_error = errno;
     error = std::error_code(permission_error, std::generic_category());
+    return {path, descriptor};
+  }
+  struct stat status{};
+  if (::fstat(descriptor, &status) != 0 ||
+      (status.st_mode & 0777) != (S_IRUSR | S_IWUSR)) {
+    error = std::make_error_code(std::errc::permission_denied);
     return {path, descriptor};
   }
 #endif
@@ -462,6 +490,14 @@ void replace_file(const std::filesystem::path& source,
   const DWORD original_attributes = GetFileAttributesW(destination.c_str());
   const bool destination_exists =
       original_attributes != INVALID_FILE_ATTRIBUTES;
+  HANDLE original_handle_value = INVALID_HANDLE_VALUE;
+  if (destination_exists) {
+    original_handle_value = CreateFileW(
+        destination.c_str(), FILE_READ_ATTRIBUTES,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+        OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+  }
+  const ScopedReadHandle original_handle(original_handle_value);
   if (destination_exists &&
       !SetFileAttributesW(source.c_str(),
                           settable_file_attributes(original_attributes))) {
@@ -496,7 +532,19 @@ void replace_file(const std::filesystem::path& source,
 
   if (!move()) {
     const DWORD retry_error = GetLastError();
+    const auto identity = compare_handle_to_path_identity(original_handle.get(),
+                                                          destination, false);
+    if (identity == IdentityMatch::unknown) {
+      const std::error_code error(static_cast<int>(retry_error),
+                                  std::system_category());
+      throw std::runtime_error(
+          "Could not replace file '" + display_path(destination) +
+          "': " + error.message() +
+          "; original attributes were not restored because the destination "
+          "identity could not be verified");
+    }
     const bool restored =
+        identity == IdentityMatch::different ||
         SetFileAttributesW(destination.c_str(),
                            settable_file_attributes(original_attributes)) != 0;
     const DWORD restore_error = restored ? ERROR_SUCCESS : GetLastError();
@@ -559,6 +607,83 @@ void preserve_permissions(ReservedTemporaryFile& temporary_file,
                                  std::filesystem::perms::all);
 }
 
+void create_private_directories(const std::filesystem::path& directory) {
+#ifdef _WIN32
+  std::error_code error;
+  std::filesystem::create_directories(directory, error);
+  if (error) {
+    throw std::runtime_error("Could not create directory '" +
+                             display_path(directory) + "': " + error.message());
+  }
+#else
+  std::vector<std::filesystem::path> missing;
+  auto current = directory;
+  std::error_code status_error;
+  while (!current.empty() &&
+         !std::filesystem::is_directory(current, status_error)) {
+    if (status_error && status_error != std::errc::no_such_file_or_directory) {
+      throw std::runtime_error("Could not inspect directory '" +
+                               display_path(current) +
+                               "': " + status_error.message());
+    }
+    status_error.clear();
+    missing.push_back(current);
+    const auto parent = current.parent_path();
+    if (parent == current) {
+      break;
+    }
+    current = parent;
+  }
+
+  for (auto iterator = missing.rbegin(); iterator != missing.rend();
+       ++iterator) {
+    if (::mkdir(iterator->c_str(), S_IRWXU) != 0) {
+      const int mkdir_error = errno;
+      if (mkdir_error == EEXIST && std::filesystem::is_directory(*iterator)) {
+        continue;
+      }
+      const std::error_code error(mkdir_error, std::generic_category());
+      throw std::runtime_error("Could not create directory '" +
+                               display_path(*iterator) +
+                               "': " + error.message());
+    }
+    if (::chmod(iterator->c_str(), S_IRWXU) != 0) {
+      const std::error_code error(errno, std::generic_category());
+      std::error_code ignored;
+      std::filesystem::remove(*iterator, ignored);
+      throw std::runtime_error("Could not secure directory '" +
+                               display_path(*iterator) +
+                               "': " + error.message());
+    }
+    const int descriptor = ::open(
+        iterator->c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    struct stat status{};
+    int permission_error = 0;
+    if (descriptor == -1) {
+      permission_error = errno;
+    } else if (::fchmod(descriptor, S_IRWXU) != 0) {
+      permission_error = errno;
+    } else if (::fstat(descriptor, &status) != 0) {
+      permission_error = errno;
+    } else if ((status.st_mode & 0777) != S_IRWXU) {
+      permission_error = EPERM;
+    }
+    if (permission_error != 0) {
+      const std::error_code error(permission_error, std::generic_category());
+      if (descriptor != -1) {
+        ::close(descriptor);
+      }
+      std::error_code ignored;
+      std::filesystem::remove(*iterator, ignored);
+      throw std::runtime_error("Could not secure directory '" +
+                               display_path(*iterator) +
+                               "': " + error.message());
+    }
+    ::close(descriptor);
+  }
+#endif
+}
+
 }  // namespace
 
 void ensure_parent_directory(const std::filesystem::path& path) {
@@ -568,12 +693,7 @@ void ensure_parent_directory(const std::filesystem::path& path) {
     return;
   }
 
-  std::error_code error;
-  std::filesystem::create_directories(parent, error);
-  if (error) {
-    throw std::runtime_error("Could not create parent directory for '" +
-                             display_path(path) + "': " + error.message());
-  }
+  create_private_directories(parent);
 }
 
 std::string read_text_file(const std::filesystem::path& path) {

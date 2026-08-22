@@ -37,13 +37,20 @@ def ensure_parent_directory(path: PathLike) -> None:
     _validate_destination_path(path)
     parent = Path(path).parent
     if parent != Path("."):
-        parent.mkdir(parents=True, exist_ok=True)
+        if os.name == "nt":
+            parent.mkdir(parents=True, exist_ok=True)
+        else:
+            _create_private_directories(parent)
 
 
 def _validate_destination_path(path: PathLike) -> None:
     value = os.fspath(path)
     separators = tuple(separator for separator in (os.sep, os.altsep) if separator)
-    if value.endswith(separators):
+    path_module = ntpath if sys.platform == "win32" else os.path
+    final_component = path_module.basename(value)
+    if "\0" in value:
+        raise ValueError(f"Path contains an embedded NUL character: '{value}'")
+    if not value or value.endswith(separators) or final_component in ("", ".", ".."):
         raise ValueError(f"Destination path must name a file: '{value}'")
     if sys.platform == "win32" and ":" in ntpath.splitdrive(value)[1]:
         raise ValueError(f"Windows alternate data streams are not supported: '{value}'")
@@ -77,20 +84,27 @@ def write_file_atomically(
 ) -> None:
     """Write through a temporary sibling and atomically replace *path*.
 
-    The writer receives a unique temporary path in the destination directory.
-    The path preserves the destination's suffixes for format-sensitive writers.
-    The temporary file is removed if the writer raises an exception.
+    The writer receives an existing empty temporary file in the destination
+    directory. It must write that file in place, close all writes before
+    returning, and must not unlink, rename, replace, or hard-link the file.
+    Cleanup is guaranteed only while the reserved file remains at the temporary
+    path. The path preserves the destination's suffixes for format-sensitive
+    writers.
 
     On POSIX, replacing an existing file preserves its ordinary read, write,
     and execute permission bits. New files are created with owner-only
-    permissions. On Windows, replacement preserves the read-only attribute and
-    new files use the filesystem's standard access controls. Other file-object
-    metadata and hard-link identity are not preserved. Atomic replacement
-    prevents partial visibility but does not guarantee durability after power
-    loss.
+    permissions. The filesystem must enforce POSIX permission bits; the write
+    fails rather than publishing a file with broader effective permissions. On
+    Windows, replacement preserves the read-only attribute and new files use
+    the filesystem's standard access controls. Other file-object metadata and
+    hard-link identity are not preserved. Atomic replacement prevents partial
+    visibility but does not guarantee durability after power loss.
 
-    The destination's parent directory must not be readable or writable by
-    principals less privileged than the process performing the write.
+    The destination's parent directory and mutable ancestors must not be
+    writable by principals less privileged than the process performing the
+    write. Missing POSIX parent directories are created with owner-only
+    permissions. Windows parent directories use inherited filesystem access
+    controls.
     """
     _validate_destination_path(path)
     destination = Path(path)
@@ -115,25 +129,27 @@ def write_file_atomically(
             raise RuntimeError(f"Temporary file identity changed: '{temporary_path}'")
 
         try:
-            destination_status = destination.lstat()
+            existing_status = destination.lstat()
         except FileNotFoundError:
             destination_mode = None
+            destination_status = None
             if os.name != "nt":
-                os.fchmod(descriptor, stat.S_IRUSR | stat.S_IWUSR)
+                _set_permissions(descriptor, stat.S_IRUSR | stat.S_IWUSR, temporary_path)
         else:
-            if stat.S_ISLNK(destination_status.st_mode):
+            destination_status = existing_status
+            if stat.S_ISLNK(existing_status.st_mode):
                 raise ValueError(f"Symlink destinations are not supported: '{destination}'")
-            existing_mode = stat.S_IMODE(destination_status.st_mode) & 0o777
+            existing_mode = stat.S_IMODE(existing_status.st_mode) & 0o777
             destination_mode = existing_mode
             if os.name != "nt" and hasattr(os, "fchmod"):
-                os.fchmod(descriptor, existing_mode)
+                _set_permissions(descriptor, existing_mode, temporary_path)
             elif os.name != "nt":
                 temporary_path.chmod(existing_mode)
 
         if os.name == "nt":
             os.close(descriptor)
             descriptor = -1
-        _replace_file(temporary_path, destination, destination_mode)
+        _replace_file(temporary_path, destination, destination_mode, destination_status)
     except BaseException as error:
         if reserved_status is None and descriptor >= 0:
             try:
@@ -205,7 +221,7 @@ def _create_exclusive_file(path: Path) -> int:
     if sys.platform != "win32":
         descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_CLOEXEC, 0o600)
         try:
-            os.fchmod(descriptor, stat.S_IRUSR | stat.S_IWUSR)
+            _set_permissions(descriptor, stat.S_IRUSR | stat.S_IWUSR, path)
         except BaseException as error:
             try:
                 reserved_status = os.fstat(descriptor)
@@ -230,6 +246,8 @@ def _open_windows_file(
     desired_access: int,
     creation_disposition: int,
 ) -> int:
+    if sys.platform != "win32":
+        raise NotImplementedError("Windows file handles require Windows")
 
     create_file = ctypes.WinDLL("kernel32", use_last_error=True).CreateFileW
     create_file.argtypes = (
@@ -272,21 +290,38 @@ def _open_windows_file(
 
 
 def _windows_error(path: PathLike, error: int) -> OSError:
+    if sys.platform != "win32":
+        raise NotImplementedError("Windows errors require Windows")
     return OSError(0, ctypes.FormatError(error), os.fspath(path), error)
 
 
 def _reserve_distinct_temporary_file(destination: Path, temporary_path: Path) -> int | None:
     descriptor = _create_exclusive_file(temporary_path)
+    reserved_status: os.stat_result | None = None
     try:
         reserved_status = os.fstat(descriptor)
-    except BaseException:
+        destination_matches = _path_matches_identity(
+            destination,
+            reserved_status,
+            require_single_link=True,
+        )
+    except BaseException as error:
         os.close(descriptor)
+        if reserved_status is not None and _path_matches_identity(
+            temporary_path,
+            reserved_status,
+            require_single_link=False,
+        ):
+            try:
+                _remove_temporary_file(temporary_path)
+            except OSError as cleanup_error:
+                raise error from cleanup_error
         raise
-    if not _temporary_path_matches(destination, reserved_status):
+    if not destination_matches:
         return descriptor
 
     os.close(descriptor)
-    if _temporary_path_matches(temporary_path, reserved_status):
+    if _path_matches_identity(temporary_path, reserved_status, require_single_link=False):
         _remove_temporary_file(temporary_path)
     return None
 
@@ -311,12 +346,42 @@ def _same_file_identity(reserved_status: os.stat_result, current_status: os.stat
     )
 
 
-def _temporary_path_matches(temporary_path: Path, reserved_status: os.stat_result) -> bool:
+def _path_matches_identity(
+    path: Path,
+    reserved_status: os.stat_result,
+    *,
+    require_single_link: bool,
+) -> bool:
+    return (
+        _path_identity_state(
+            path,
+            reserved_status,
+            require_single_link=require_single_link,
+        )
+        is True
+    )
+
+
+def _path_identity_state(
+    path: Path,
+    reserved_status: os.stat_result,
+    *,
+    require_single_link: bool,
+) -> bool | None:
     try:
-        current_status = temporary_path.lstat()
-    except OSError:
-        return False
-    return _same_file_identity(reserved_status, current_status)
+        current_status = path.lstat()
+    except (OSError, ValueError):
+        return None
+    return (
+        reserved_status.st_dev == current_status.st_dev
+        and reserved_status.st_ino == current_status.st_ino
+        and stat.S_ISREG(current_status.st_mode)
+        and (not require_single_link or current_status.st_nlink == 1)
+    )
+
+
+def _temporary_path_matches(temporary_path: Path, reserved_status: os.stat_result) -> bool:
+    return _path_matches_identity(temporary_path, reserved_status, require_single_link=False)
 
 
 def _remove_temporary_file(temporary_path: Path) -> None:
@@ -334,7 +399,12 @@ def _remove_temporary_file(temporary_path: Path) -> None:
         temporary_path.unlink(missing_ok=True)
 
 
-def _replace_file(temporary_path: Path, destination: Path, destination_mode: int | None) -> None:
+def _replace_file(
+    temporary_path: Path,
+    destination: Path,
+    destination_mode: int | None,
+    destination_status: os.stat_result | None,
+) -> None:
     """Replace a destination, handling Windows read-only files."""
     if os.name == "nt" and destination_mode is not None:
         temporary_path.chmod(destination_mode)
@@ -351,11 +421,71 @@ def _replace_file(temporary_path: Path, destination: Path, destination_mode: int
     try:
         os.replace(temporary_path, destination)
     except BaseException as replace_error:
+        if destination_status is None:
+            raise
+        identity_matches = _path_identity_state(
+            destination,
+            destination_status,
+            require_single_link=False,
+        )
+        if identity_matches is False:
+            raise
+        if identity_matches is None:
+            raise RuntimeError(
+                f"Could not safely restore attributes for '{destination}' because its identity could not be verified"
+            ) from replace_error
         try:
             destination.chmod(destination_mode)
         except OSError as rollback_error:
             raise replace_error from rollback_error
         raise
+
+
+def _set_permissions(descriptor: int, mode: int, path: Path) -> None:
+    os.fchmod(descriptor, mode)
+    actual_mode = stat.S_IMODE(os.fstat(descriptor).st_mode)
+    if actual_mode != mode:
+        raise PermissionError(
+            errno.EPERM,
+            f"Filesystem did not apply permissions {mode:#o} to '{path}'",
+            os.fspath(path),
+        )
+
+
+def _create_private_directories(directory: Path) -> None:
+    missing: list[Path] = []
+    current = directory
+    while not current.is_dir():
+        missing.append(current)
+        parent = current.parent
+        if parent == current:
+            break
+        current = parent
+
+    for missing_directory in reversed(missing):
+        try:
+            os.mkdir(missing_directory, 0o700)
+        except FileExistsError:
+            if not missing_directory.is_dir():
+                raise
+            continue
+        descriptor = -1
+        try:
+            os.chmod(missing_directory, 0o700)
+            descriptor = os.open(
+                missing_directory,
+                os.O_RDONLY
+                | getattr(os, "O_DIRECTORY", 0)
+                | getattr(os, "O_NOFOLLOW", 0)
+                | getattr(os, "O_CLOEXEC", 0),
+            )
+            _set_permissions(descriptor, 0o700, missing_directory)
+        except BaseException:
+            if descriptor >= 0:
+                os.close(descriptor)
+            missing_directory.rmdir()
+            raise
+        os.close(descriptor)
 
 
 def write_text_file_atomically(
