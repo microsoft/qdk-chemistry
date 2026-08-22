@@ -5,7 +5,11 @@
 #include "hamiltonian_basis_transformer.hpp"
 
 #include <Eigen/Cholesky>
+#include <Eigen/Eigenvalues>
+#include <Eigen/SVD>
+#include <algorithm>
 #include <cmath>
+#include <limits>
 #include <optional>
 #include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
@@ -25,12 +29,15 @@ using data::SymmetryProduct;
 using data::axes::alpha;
 using data::axes::beta;
 
+constexpr double kMaximumValidationTolerance = 1.0e-2;
+
 class HamiltonianBasisTransformerSettings : public data::Settings {
  public:
   HamiltonianBasisTransformerSettings() {
-    set_default("validation_tolerance", 1.0e-10,
-                "Tolerance for validating the orbital basis change",
-                data::BoundConstraint<double>{0.0, 1.0});
+    set_default(
+        "validation_tolerance", 1.0e-10,
+        "Tolerance for validating the orbital basis change",
+        data::BoundConstraint<double>{0.0, kMaximumValidationTolerance});
   }
 };
 
@@ -74,6 +81,22 @@ void require_restricted(const SymmetryBlockedTensor<2>& tensor,
       description + " must use explicit shared restricted-spin block storage");
 }
 
+void require_full_column_rank(const Eigen::MatrixXd& matrix,
+                              const std::string& description) {
+  Eigen::JacobiSVD<Eigen::MatrixXd> decomposition(matrix);
+  require(decomposition.info() == Eigen::Success &&
+              decomposition.singularValues().allFinite() &&
+              decomposition.singularValues().size() == matrix.cols(),
+          description + " rank could not be determined");
+  const double largest = decomposition.singularValues()(0);
+  const double threshold =
+      100.0 * std::numeric_limits<double>::epsilon() *
+      static_cast<double>(std::max(matrix.rows(), matrix.cols())) *
+      std::max(1.0, largest);
+  require(decomposition.singularValues().tail(1)(0) > threshold,
+          description + " must have full column rank");
+}
+
 bool matching_metadata(const SymmetryBlockedTensor<2>& lhs,
                        const SymmetryBlockedTensor<2>& rhs) {
   for (std::size_t slot = 0; slot < 2; ++slot) {
@@ -98,6 +121,14 @@ std::vector<std::size_t> restricted_indices(
   return alpha_indices;
 }
 
+std::vector<std::size_t> optional_restricted_indices(
+    const std::shared_ptr<const SymmetryBlockedIndexSet>& indices,
+    const Orbitals& orbitals, const SymmetryProduct& symmetry,
+    const std::string& description) {
+  if (!indices) return {};
+  return restricted_indices(indices, orbitals, symmetry, description);
+}
+
 SymmetryBlockedTensor<2> restricted_rank2(Eigen::MatrixXd block) {
   auto symmetry = std::make_shared<const SymmetryProduct>(
       SymmetryProduct({data::axes::spin(1, true)}));
@@ -120,8 +151,7 @@ SymmetryBlockedTensor<3> restricted_rank3(
       {beta(), data::spin_channel_indices(active, beta()).size()}};
   auto storage = std::make_shared<const Eigen::MatrixXd>(std::move(block));
   SymmetryBlockedTensor<3>::BlockMap blocks{
-      {{{alpha(), alpha(), SymmetryLabel{}}}, storage},
-      {{{beta(), beta(), SymmetryLabel{}}}, storage}};
+      {{{alpha(), alpha(), SymmetryLabel{}}}, std::move(storage)}};
   return {{symmetry, symmetry, source.symmetries()[2]},
           {extents, extents, source.extents()[2]},
           std::move(blocks)};
@@ -141,6 +171,14 @@ Eigen::MatrixXd active_coefficients(const Orbitals& orbitals,
 
 QdkHamiltonianBasisTransformer::QdkHamiltonianBasisTransformer() {
   _settings = std::make_unique<HamiltonianBasisTransformerSettings>();
+}
+
+std::shared_ptr<data::Hamiltonian> QdkHamiltonianBasisTransformer::run(
+    std::shared_ptr<data::Hamiltonian> hamiltonian,
+    std::shared_ptr<data::Orbitals> target_orbitals) const {
+  const std::scoped_lock lock(_run_mutex);
+  return HamiltonianBasisTransformer::run(std::move(hamiltonian),
+                                          std::move(target_orbitals));
 }
 
 std::shared_ptr<data::Hamiltonian> QdkHamiltonianBasisTransformer::_run_impl(
@@ -219,18 +257,13 @@ std::shared_ptr<data::Hamiltonian> QdkHamiltonianBasisTransformer::_run_impl(
 
   const auto source_inactive = source_orbitals->inactive_indices();
   const auto target_inactive = target_orbitals->inactive_indices();
-  require(
-      static_cast<bool>(source_inactive) == static_cast<bool>(target_inactive),
-      "Source and target inactive-space metadata presence must match");
-  if (source_inactive) {
-    require(
-        restricted_indices(source_inactive, *source_orbitals, expected_symmetry,
-                           "Source inactive-space index set") ==
-            restricted_indices(target_inactive, *target_orbitals,
-                               expected_symmetry,
-                               "Target inactive-space index set"),
-        "Source and target inactive spaces do not match");
-  }
+  require(optional_restricted_indices(source_inactive, *source_orbitals,
+                                      expected_symmetry,
+                                      "Source inactive-space index set") ==
+              optional_restricted_indices(target_inactive, *target_orbitals,
+                                          expected_symmetry,
+                                          "Target inactive-space index set"),
+          "Source and target inactive spaces do not match");
 
   const auto& source_coefficients =
       source_orbitals->coefficients()->block({alpha(), alpha()});
@@ -263,37 +296,62 @@ std::shared_ptr<data::Hamiltonian> QdkHamiltonianBasisTransformer::_run_impl(
       0.5 * (stored_overlap + stored_overlap.transpose());
   const Eigen::Index nactive = source_indices.size();
   const Eigen::MatrixXd identity = Eigen::MatrixXd::Identity(nactive, nactive);
-  Eigen::MatrixXd rotation;
+  Eigen::MatrixXd source_metric_coefficients;
+  Eigen::MatrixXd target_metric_coefficients;
   Eigen::LLT<Eigen::MatrixXd> overlap_cholesky(overlap);
   if (overlap_cholesky.info() == Eigen::Success) {
-    const Eigen::MatrixXd source_metric_coefficients =
+    source_metric_coefficients =
         overlap_cholesky.matrixU() * source_active_coefficients;
-    const Eigen::MatrixXd target_metric_coefficients =
+    target_metric_coefficients =
         overlap_cholesky.matrixU() * target_active_coefficients;
-    require_close(
-        source_metric_coefficients.transpose() * source_metric_coefficients,
-        identity, tolerance, "Source active-orbital overlap");
-    require_close(
-        target_metric_coefficients.transpose() * target_metric_coefficients,
-        identity, tolerance, "Target active-orbital overlap");
-    rotation =
-        source_metric_coefficients.transpose() * target_metric_coefficients;
-    require_close(source_metric_coefficients * rotation,
-                  target_metric_coefficients, tolerance,
-                  "Target active orbitals");
   } else {
+    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> overlap_eigensolver(overlap);
+    require(overlap_eigensolver.info() == Eigen::Success &&
+                overlap_eigensolver.eigenvalues().allFinite(),
+            "AO overlap metric eigendecomposition failed");
+    const double spectral_scale =
+        std::max(1.0, overlap_eigensolver.eigenvalues().cwiseAbs().maxCoeff());
+    const double negative_eigenvalue_tolerance =
+        100.0 * std::numeric_limits<double>::epsilon() *
+        static_cast<double>(overlap.rows()) * spectral_scale;
+    require(overlap_eigensolver.eigenvalues().minCoeff() >=
+                -negative_eigenvalue_tolerance,
+            "AO overlap metric must be positive semidefinite");
     require_close(source_active_coefficients.transpose() * overlap *
                       source_active_coefficients,
                   identity, tolerance, "Source active-orbital overlap");
     require_close(target_active_coefficients.transpose() * overlap *
                       target_active_coefficients,
                   identity, tolerance, "Target active-orbital overlap");
-    rotation = source_active_coefficients.transpose() * overlap *
-               target_active_coefficients;
-    require_close(source_active_coefficients * rotation,
-                  target_active_coefficients, tolerance,
-                  "Target active orbitals");
+    const Eigen::VectorXd square_root_eigenvalues =
+        overlap_eigensolver.eigenvalues().cwiseMax(0.0).cwiseSqrt();
+    const Eigen::MatrixXd source_eigen_coefficients =
+        overlap_eigensolver.eigenvectors().transpose() *
+        source_active_coefficients;
+    const Eigen::MatrixXd target_eigen_coefficients =
+        overlap_eigensolver.eigenvectors().transpose() *
+        target_active_coefficients;
+    source_metric_coefficients =
+        square_root_eigenvalues.asDiagonal() * source_eigen_coefficients;
+    target_metric_coefficients =
+        square_root_eigenvalues.asDiagonal() * target_eigen_coefficients;
   }
+  require_full_column_rank(source_metric_coefficients,
+                           "Source active orbitals");
+  require_full_column_rank(target_metric_coefficients,
+                           "Target active orbitals");
+  require_close(
+      source_metric_coefficients.transpose() * source_metric_coefficients,
+      identity, tolerance, "Source active-orbital overlap");
+  require_close(
+      target_metric_coefficients.transpose() * target_metric_coefficients,
+      identity, tolerance, "Target active-orbital overlap");
+  Eigen::MatrixXd rotation =
+      source_metric_coefficients.transpose() * target_metric_coefficients;
+  require_full_column_rank(rotation, "Recovered active-space rotation");
+  require_close(source_metric_coefficients * rotation,
+                target_metric_coefficients, tolerance,
+                "Target active orbitals");
   require_close(rotation.transpose() * rotation, identity, tolerance,
                 "Recovered active-space rotation");
 

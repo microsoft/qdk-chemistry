@@ -1296,6 +1296,15 @@ TEST_F(HamiltonianTest, CholeskyBasisTransformer) {
   EXPECT_DOUBLE_EQ(transformed_h->get_core_energy(), source->get_core_energy());
   EXPECT_EQ(transformed_h->get_orbitals(), target_orbitals);
 
+  auto canonical_h = std::make_shared<Hamiltonian>(
+      std::make_unique<CholeskyHamiltonianContainer>(
+          std::get<0>(transformed.get_one_body_integrals()),
+          std::get<0>(transformed.get_three_center_integrals()),
+          target_orbitals, transformed.get_core_energy(),
+          std::get<0>(transformed.get_inactive_fock_matrix()), std::nullopt,
+          transformed.get_type()));
+  EXPECT_EQ(transformed_h->content_hash(), canonical_h->content_hash());
+
   auto source_without_fock = std::make_shared<Hamiltonian>(
       std::make_unique<CholeskyHamiltonianContainer>(
           one_body, three_center, source_orbitals, 1.25, Eigen::MatrixXd{}));
@@ -1517,8 +1526,24 @@ TEST_F(HamiltonianTest, CholeskyBasisTransformerHonorsValidationTolerance) {
           Eigen::MatrixXd::Constant(1, 1, 1.2),
           Eigen::MatrixXd::Constant(1, 1, 0.4), source_orbitals, 0.0,
           Eigen::MatrixXd{}));
+  auto boundary_transformer = HamiltonianBasisTransformerFactory::create("qdk");
+  EXPECT_THROW(
+      boundary_transformer->settings().set("validation_tolerance", 1.0),
+      std::invalid_argument);
+  boundary_transformer->settings().set("validation_tolerance", 1.0e-2);
+  auto zero_target = std::make_shared<Orbitals>(
+      Eigen::MatrixXd::Zero(1, 1), std::nullopt, std::make_optional(overlap),
+      basis_set, active_space, nullptr);
+  EXPECT_THROW(boundary_transformer->run(source, zero_target),
+               std::invalid_argument);
+
   auto transformer = HamiltonianBasisTransformerFactory::create("qdk");
   transformer->settings().set("validation_tolerance", 1.0e-6);
+
+  auto explicit_empty_target = std::make_shared<Orbitals>(
+      coefficients, std::nullopt, std::make_optional(overlap), basis_set,
+      active_space, testing::restricted_index_set(1, {}));
+  EXPECT_NO_THROW(transformer->run(source, explicit_empty_target));
 
   Eigen::MatrixXd within_tolerance = overlap;
   within_tolerance(0, 0) += 5.0e-7;
@@ -1677,12 +1702,83 @@ TEST_F(HamiltonianTest,
           .isApprox(Eigen::MatrixXd::Constant(1, 1, 0.4)));
   EXPECT_DOUBLE_EQ(transformed->get_core_energy(), 0.5);
 
+  Eigen::MatrixXd equivalent_target_coefficients(2, 1);
+  equivalent_target_coefficients << 1.0, 0.0;
+  auto equivalent_target = std::make_shared<Orbitals>(
+      equivalent_target_coefficients, std::nullopt, std::make_optional(overlap),
+      basis_set, active_space, nullptr);
+  auto equivalent_transformed =
+      HamiltonianBasisTransformerFactory::create("qdk")->run(source,
+                                                             equivalent_target);
+  EXPECT_TRUE(std::get<0>(equivalent_transformed->get_one_body_integrals())
+                  .isApprox(Eigen::MatrixXd::Constant(1, 1, 1.2)));
+  EXPECT_TRUE(std::get<0>(equivalent_transformed
+                              ->get_container<CholeskyHamiltonianContainer>()
+                              .get_three_center_integrals())
+                  .isApprox(Eigen::MatrixXd::Constant(1, 1, 0.4)));
+
   auto invalid_target = std::make_shared<Orbitals>(
       0.9 * source_coefficients, std::nullopt, std::make_optional(overlap),
       basis_set, active_space, nullptr);
   EXPECT_THROW(HamiltonianBasisTransformerFactory::create("qdk")->run(
                    source, invalid_target),
                std::invalid_argument);
+}
+
+TEST_F(HamiltonianTest,
+       CholeskyBasisTransformerRejectsIndefiniteOverlapMetric) {
+  Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(2, 2);
+  overlap(1, 1) = -1.0;
+  Eigen::MatrixXd coefficients(2, 1);
+  coefficients << 1.0, 0.0;
+  auto basis_set =
+      testing::create_random_basis_set(2, "test-indefinite-transform");
+  auto active_space = testing::restricted_index_set(1, {0});
+  auto orbitals = std::make_shared<Orbitals>(coefficients, std::nullopt,
+                                             std::make_optional(overlap),
+                                             basis_set, active_space, nullptr);
+  auto source = std::make_shared<Hamiltonian>(
+      std::make_unique<CholeskyHamiltonianContainer>(
+          Eigen::MatrixXd::Constant(1, 1, 1.2),
+          Eigen::MatrixXd::Constant(1, 1, 0.4), orbitals, 0.0,
+          Eigen::MatrixXd{}));
+
+  EXPECT_THROW(
+      HamiltonianBasisTransformerFactory::create("qdk")->run(source, orbitals),
+      std::invalid_argument);
+}
+
+TEST_F(HamiltonianTest,
+       CholeskyBasisTransformerRejectsAmplifiedNegativeOverlapMode) {
+  Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(2, 2);
+  overlap(1, 1) = -1.0e-14;
+  Eigen::MatrixXd source_coefficients(2, 1);
+  source_coefficients << 1.0, 0.0;
+  Eigen::MatrixXd target_coefficients(2, 1);
+  target_coefficients << 1.0, 1.0e7;
+  auto basis_set =
+      testing::create_random_basis_set(2, "test-negative-overlap-mode");
+  auto active_space = testing::restricted_index_set(1, {0});
+  auto source_orbitals = std::make_shared<Orbitals>(
+      source_coefficients, std::nullopt, std::make_optional(overlap), basis_set,
+      active_space, nullptr);
+  auto target_orbitals = std::make_shared<Orbitals>(
+      target_coefficients, std::nullopt, std::make_optional(overlap), basis_set,
+      active_space, nullptr);
+  auto source = std::make_shared<Hamiltonian>(
+      std::make_unique<CholeskyHamiltonianContainer>(
+          Eigen::MatrixXd::Constant(1, 1, 1.2),
+          Eigen::MatrixXd::Constant(1, 1, 0.4), source_orbitals, 0.0,
+          Eigen::MatrixXd{}));
+
+  try {
+    HamiltonianBasisTransformerFactory::create("qdk")->run(source,
+                                                           target_orbitals);
+    FAIL() << "Expected the amplified negative-overlap mode to be rejected";
+  } catch (const std::invalid_argument& error) {
+    EXPECT_NE(std::string(error.what()).find("Target active-orbital overlap"),
+              std::string::npos);
+  }
 }
 
 TEST_F(HamiltonianTest, CholeskyBasisTransformerRejectsNonfiniteIntegrals) {

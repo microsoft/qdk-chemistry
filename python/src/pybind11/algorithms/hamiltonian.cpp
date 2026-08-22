@@ -282,9 +282,11 @@ Initializes a Cholesky Hamiltonian constructor with default settings.
       transformer(m, "HamiltonianBasisTransformer", R"(
 Abstract algorithm for expressing a Hamiltonian in a target orbital basis.
 )");
+  // Keep the GIL for the abstract binding because Python subclasses may
+  // implement the virtual call in Python.
   transformer.def(py::init<>())
       .def("run", &HamiltonianBasisTransformer::run, py::arg("hamiltonian"),
-           py::arg("target_orbitals"), py::call_guard<py::gil_scoped_release>())
+           py::arg("target_orbitals"))
       .def("settings", &HamiltonianBasisTransformer::settings,
            py::return_value_policy::reference_internal)
       .def_property(
@@ -315,5 +317,10 @@ Abstract algorithm for expressing a Hamiltonian in a target orbital basis.
       m, "QdkHamiltonianBasisTransformer", R"(
 QDK basis transformer for restricted Cholesky Hamiltonians.
 )")
-      .def(py::init<>());
+      .def(py::init<>())
+      // The native implementation serializes calls sharing one instance, so
+      // unrelated Python threads can run while the transformation executes.
+      .def("run", &microsoft::QdkHamiltonianBasisTransformer::run,
+           py::arg("hamiltonian"), py::arg("target_orbitals"),
+           py::call_guard<py::gil_scoped_release>());
 }
