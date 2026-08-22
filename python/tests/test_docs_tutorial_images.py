@@ -67,6 +67,12 @@ def test_tutorial_graphviz_figures_render_as_transparent_svg():
         assert 'bgcolor="transparent"' in dot_source
         assert "<SUB>" not in dot_source
 
+    hierarchy_source = (DIAGRAMS_DIR / "tutorial_qpe_wavefunction_hierarchy.dot").read_text(encoding="utf-8")
+    assert "χ[μ]" not in hierarchy_source
+    assert "Φ(HF)" not in hierarchy_source
+    assert "Basis functions χ</B></TD><TD" in hierarchy_source
+    assert "Hartree-Fock Φ</B></TD><TD" in hierarchy_source
+
     configuration = ast.parse((REPOSITORY_ROOT / "docs" / "source" / "conf.py").read_text(encoding="utf-8"))
     output_formats = [
         node.value.value
