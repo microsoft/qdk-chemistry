@@ -28,11 +28,8 @@ composited on white. The opaque source assets are preserved in Git commit
 `git show`, then run the converter:
 
 ```console
-git show e128a7a40d7645dee8a0bbf854c10d823b79ee46:docs/source/_static/diagrams/tutorial_qpe_atomic_basis_functions.png \
-  > /tmp/tutorial_qpe_atomic_basis_functions.png
-python docs/source/_static/diagrams/convert_white_to_alpha.py \
-  /tmp/tutorial_qpe_atomic_basis_functions.png \
-  docs/source/_static/diagrams/tutorial_qpe_atomic_basis_functions.png
+git show e128a7a40d7645dee8a0bbf854c10d823b79ee46:docs/source/_static/diagrams/tutorial_qpe_atomic_basis_functions.png > /tmp/tutorial_qpe_atomic_basis_functions.png
+python docs/source/_static/diagrams/convert_white_to_alpha.py /tmp/tutorial_qpe_atomic_basis_functions.png docs/source/_static/diagrams/tutorial_qpe_atomic_basis_functions.png
 ```
 
 Repeat the command for `tutorial_qpe_example_molecular_orbitals.png`. The script
