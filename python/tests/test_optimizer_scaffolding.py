@@ -6,7 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 from qdk_chemistry import algorithms
-from qdk_chemistry.algorithms import ActiveSpaceOptimizer, OrbitalOptimizer, QdkQIOOrbitalOptimizer
+from qdk_chemistry.algorithms import ActiveSpaceOptimizer, OrbitalOptimizer
 from qdk_chemistry.data import (
     ActiveSpaceOptimizationResult,
     OrbitalOptimizationResult,
@@ -89,15 +89,6 @@ def test_optimizer_factories_support_python_registration() -> None:
         algorithms.unregister("active_space_optimizer", "mock_active_space_optimizer")
 
 
-def test_qdk_qio_optimizer_is_the_default_variant() -> None:
-    """The concrete QIO optimizer is registered as the default orbital optimizer."""
-    optimizer = algorithms.create("orbital_optimizer")
-
-    assert isinstance(optimizer, QdkQIOOrbitalOptimizer)
-    assert optimizer.name() == "qdk_qio"
-    assert optimizer.settings().get("max_cycles") == 200
-
-
 def test_active_space_optimizer_trampoline_executes() -> None:
     """Running a Python ActiveSpaceOptimizer dispatches through the trampoline."""
     optimizer = MockActiveSpaceOptimizer()
@@ -123,7 +114,7 @@ def test_active_space_optimizer_default_settings() -> None:
 
     orbital_optimizer_ref = optimizer.settings().get("orbital_optimizer")
     assert orbital_optimizer_ref.algorithm_type == "orbital_optimizer"
-    assert orbital_optimizer_ref.algorithm_name == "qdk_qio"
+    assert orbital_optimizer_ref.algorithm_name == ""
 
 
 def test_result_types_are_exported() -> None:

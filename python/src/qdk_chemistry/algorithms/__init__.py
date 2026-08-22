@@ -56,7 +56,7 @@ from qdk_chemistry.algorithms.orbital_localizer import (
     QdkPipekMezeyLocalizer,
     QdkVVHVLocalizer,
 )
-from qdk_chemistry.algorithms.orbital_optimizer import OrbitalOptimizer, QdkQIOOrbitalOptimizer
+from qdk_chemistry.algorithms.orbital_optimizer import OrbitalOptimizer
 from qdk_chemistry.algorithms.phase_estimation.base import PhaseEstimation
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import QpeCircuitBuilder
 from qdk_chemistry.algorithms.population_analysis import PopulationAnalyzer, QdkPopulationAnalyzer
@@ -112,7 +112,6 @@ __all__ = [
     "QdkOccupationActiveSpaceSelector",
     "QdkPipekMezeyLocalizer",
     "QdkPopulationAnalyzer",
-    "QdkQIOOrbitalOptimizer",
     "QdkQubitMapper",
     "QdkScfSolver",
     "QdkStabilityChecker",

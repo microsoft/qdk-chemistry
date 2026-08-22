@@ -28,7 +28,11 @@ except ImportError:
 
 # Algorithm types that ship as an interface only, with no registered implementation
 # and therefore an empty default name. Remove entries here as implementations land.
-INTERFACE_ONLY_TYPES = {"effective_hamiltonian_constructor"}
+INTERFACE_ONLY_TYPES = {
+    "active_space_optimizer",
+    "effective_hamiltonian_constructor",
+    "orbital_optimizer",
+}
 
 
 class TestRegistryShowDefault:
@@ -43,12 +47,14 @@ class TestRegistryShowDefault:
 
         # Should have entries for all known algorithm types
         expected_types = [
+            "active_space_optimizer",
             "active_space_selector",
             "dynamical_correlation_calculator",
             "effective_hamiltonian_constructor",
             "geometry_optimizer",
             "hamiltonian_constructor",
             "orbital_localizer",
+            "orbital_optimizer",
             "multi_configuration_calculator",
             "multi_configuration_scf",
             "projected_multi_configuration_calculator",
@@ -88,6 +94,9 @@ class TestRegistryShowDefault:
         default_effective_hamiltonian_constructor = registry.show_default("effective_hamiltonian_constructor")
         assert isinstance(default_effective_hamiltonian_constructor, str)
         assert default_effective_hamiltonian_constructor == ""
+
+        assert registry.show_default("active_space_optimizer") == ""
+        assert registry.show_default("orbital_optimizer") == ""
 
         # Test for multi configuration SCF
         if PYSCF_AVAILABLE:
@@ -283,6 +292,38 @@ class TestRegistryCachingWarnings:
             result = algorithm.run("input", cache=tmp_path, option=True)
 
         assert result == (("input",), {"option": True})
+
+    def test_cache_fallback_warns_when_output_is_not_hashable(self, tmp_path):
+        """An unsupported result is returned after caching is skipped."""
+
+        class UnsupportedResult:
+            """Result type that does not implement content hashing."""
+
+        class AlgorithmWithUnsupportedResult:
+            """Algorithm whose result cannot be stored by the cache."""
+
+            def hash(self):
+                """Return a stable run hash."""
+                return "hash"
+
+            def run(self):
+                """Return an unsupported result instance."""
+                return UnsupportedResult()
+
+            def type_name(self):
+                """Return the test algorithm type."""
+                return "test_algorithm"
+
+            def name(self):
+                """Return the test algorithm name."""
+                return "unsupported_result"
+
+        algorithm = registry._AlgorithmWrapper(AlgorithmWithUnsupportedResult())
+
+        with pytest.warns(UserWarning, match="output could not be hashed"):
+            result = algorithm.run(cache=tmp_path)
+
+        assert isinstance(result, UnsupportedResult)
 
 
 class TestRegistryAvailable:

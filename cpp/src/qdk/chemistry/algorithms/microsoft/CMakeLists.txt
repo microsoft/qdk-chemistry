@@ -10,9 +10,7 @@ target_sources(chemistry PRIVATE
     localization/pipek_mezey.cpp
     localization/active_space_qio.cpp
     localization/vvhv.cpp
-    qio/frozen_space_rdms.cpp
     qio/jacobi_optimizer.cpp
-    qio/qio_orbital_optimizer.cpp
     hamiltonian.cpp
     cholesky_hamiltonian.cpp
     macis_asci.cpp

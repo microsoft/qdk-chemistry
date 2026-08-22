@@ -202,7 +202,9 @@ The localizer optimizes against the fixed input density matrices and returns a s
 It does not recompute the correlated wavefunction after rotating the orbitals.
 It minimizes the quantum-information-orbital objective restricted to rotations within a fixed active space.
 It does not implement full-window QIO or QICAS.
-The :doc:`QIO orbital optimizer <orbital_optimizer>` may mix orbitals across the active-space boundary, while QICAS additionally requires a self-consistent correlated workflow.
+The :doc:`orbital optimizer contract <orbital_optimizer>` permits
+cross-boundary rotations, but no built-in implementation is currently
+registered.
 
 .. rubric:: Settings
 

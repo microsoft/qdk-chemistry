@@ -5,7 +5,4 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry._core._algorithms import (  # noqa: F401 - re-export
-    OrbitalOptimizer,
-    QdkQIOOrbitalOptimizer,
-)
+from qdk_chemistry._core._algorithms import OrbitalOptimizer  # noqa: F401 - re-export

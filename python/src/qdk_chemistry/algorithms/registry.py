@@ -170,7 +170,16 @@ def _store_result(
     from qdk_chemistry.data._hashing import _item_content_hash, collect_content_hashes  # noqa: PLC0415
     from qdk_chemistry.remote.job import Job  # noqa: PLC0415
 
-    output_hashes = collect_content_hashes(result)
+    try:
+        output_hashes = collect_content_hashes(result)
+    except (AttributeError, TypeError, ValueError) as exc:
+        warnings.warn(
+            f"Caching skipped for {algorithm.type_name()}/{algorithm.name()} because its output "
+            f"could not be hashed: {exc}",
+            UserWarning,
+            stacklevel=2,
+        )
+        return
 
     input_hashes: dict[str, str] = {}
     for i, arg in enumerate(args):

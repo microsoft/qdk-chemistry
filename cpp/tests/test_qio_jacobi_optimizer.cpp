@@ -6,13 +6,10 @@
 
 #include <Eigen/Dense>
 #include <cmath>
-#include <qdk/chemistry/algorithms/microsoft/qio/frozen_space_rdms.hpp>
 #include <qdk/chemistry/algorithms/microsoft/qio/jacobi_optimizer.hpp>
 #include <stdexcept>
 #include <vector>
 
-using qdk::chemistry::algorithms::microsoft::qio::detail::
-    build_frozen_space_rdms;
 using qdk::chemistry::algorithms::microsoft::qio::detail::optimize_rotation;
 using qdk::chemistry::algorithms::microsoft::qio::detail::OrbitalPair;
 
@@ -32,44 +29,6 @@ TwoOrbitalRdm delocalized_one_alpha_electron() {
 }
 
 }  // namespace
-
-TEST(QIOFrozenSpaceRDMTest, EmbedsInactiveActiveAndVirtualOrbitals) {
-  Eigen::MatrixXd active_alpha(1, 1);
-  active_alpha << 0.75;
-  Eigen::MatrixXd active_beta(1, 1);
-  active_beta << 0.25;
-  const std::vector<double> active_alpha_beta{0.1};
-  const std::vector<std::size_t> active_indices{1};
-  const std::vector<std::size_t> inactive_indices{0};
-
-  const auto result =
-      build_frozen_space_rdms(active_alpha, active_beta, active_alpha_beta, 3,
-                              active_indices, inactive_indices);
-
-  EXPECT_DOUBLE_EQ(result.alpha(0, 0), 1.0);
-  EXPECT_DOUBLE_EQ(result.beta(0, 0), 1.0);
-  EXPECT_DOUBLE_EQ(result.alpha(1, 1), 0.75);
-  EXPECT_DOUBLE_EQ(result.beta(1, 1), 0.25);
-  EXPECT_DOUBLE_EQ(result.alpha(2, 2), 0.0);
-  EXPECT_DOUBLE_EQ(result.beta(2, 2), 0.0);
-
-  EXPECT_DOUBLE_EQ(result.alpha_beta[0], 1.0);
-  EXPECT_DOUBLE_EQ(result.alpha_beta[4], 0.25);
-  EXPECT_DOUBLE_EQ(result.alpha_beta[36], 0.75);
-  EXPECT_DOUBLE_EQ(result.alpha_beta[40], 0.1);
-  EXPECT_DOUBLE_EQ(result.alpha_beta[80], 0.0);
-}
-
-TEST(QIOFrozenSpaceRDMTest, RejectsOverlappingPartitions) {
-  const Eigen::MatrixXd active = Eigen::MatrixXd::Zero(1, 1);
-  const std::vector<double> active_alpha_beta{0.0};
-  const std::vector<std::size_t> active_indices{0};
-  const std::vector<std::size_t> inactive_indices{0};
-
-  EXPECT_THROW(build_frozen_space_rdms(active, active, active_alpha_beta, 2,
-                                       active_indices, inactive_indices),
-               std::invalid_argument);
-}
 
 TEST(QIOJacobiOptimizerTest, FullObjectiveLocalizesOneElectron) {
   auto rdm = delocalized_one_alpha_electron();

@@ -48,8 +48,8 @@ class OrbitalOptimizer
 struct OrbitalOptimizerFactory
     : public AlgorithmFactory<OrbitalOptimizer, OrbitalOptimizerFactory> {
   static std::string algorithm_type_name() { return "orbital_optimizer"; }
-  static void register_default_instances();
-  static std::string default_algorithm_name() { return "qdk_qio"; }
+  static void register_default_instances() {}
+  static std::string default_algorithm_name() { return ""; }
 };
 
 }  // namespace qdk::chemistry::algorithms

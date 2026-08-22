@@ -42,6 +42,10 @@ ActiveSpaceOptimizationResult::ActiveSpaceOptimizationResult(
     throw std::invalid_argument(
         "Macro-iteration count must match the history length");
   }
+  if (!energy_history_.empty() && energy_ != energy_history_.back()) {
+    throw std::invalid_argument(
+        "Final energy must match the last energy-history entry");
+  }
 }
 
 }  // namespace qdk::chemistry::data
