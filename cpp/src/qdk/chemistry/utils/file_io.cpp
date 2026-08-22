@@ -265,7 +265,7 @@ class ReservedTemporaryFile {
 
   const std::filesystem::path& path() const { return path_; }
   bool has_same_identity(const std::filesystem::path& path) const noexcept {
-    return path_matches_identity(path, true);
+    return path_matches_identity(path, false);
   }
 
   void verify_identity() const {
@@ -521,15 +521,28 @@ ReservedTemporaryFile reserve_temporary_file(
 void replace_file(const std::filesystem::path& source,
                   const std::filesystem::path& destination) {
 #ifdef _WIN32
-  const DWORD original_attributes = GetFileAttributesW(destination.c_str());
-  const bool destination_exists =
-      original_attributes != INVALID_FILE_ATTRIBUTES;
+  const DWORD path_attributes = GetFileAttributesW(destination.c_str());
+  const bool destination_exists = path_attributes != INVALID_FILE_ATTRIBUTES;
   HANDLE original_handle_value = INVALID_HANDLE_VALUE;
+  BY_HANDLE_FILE_INFORMATION original_info{};
+  DWORD original_attributes = FILE_ATTRIBUTE_NORMAL;
   if (destination_exists) {
     original_handle_value = CreateFileW(
         destination.c_str(), FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES,
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
         OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+    if (original_handle_value == INVALID_HANDLE_VALUE ||
+        !GetFileInformationByHandle(original_handle_value, &original_info)) {
+      const std::error_code error(static_cast<int>(GetLastError()),
+                                  std::system_category());
+      if (original_handle_value != INVALID_HANDLE_VALUE) {
+        CloseHandle(original_handle_value);
+      }
+      throw std::runtime_error("Could not inspect file attributes for '" +
+                               display_path(destination) +
+                               "': " + error.message());
+    }
+    original_attributes = original_info.dwFileAttributes;
   }
   const ScopedReadHandle original_handle(original_handle_value);
   if (destination_exists &&
@@ -560,9 +573,7 @@ void replace_file(const std::filesystem::path& source,
                              display_path(destination) +
                              "': " + error.message());
   }
-  BY_HANDLE_FILE_INFORMATION original_info{};
-  if (original_handle.get() == INVALID_HANDLE_VALUE ||
-      !GetFileInformationByHandle(original_handle.get(), &original_info)) {
+  if (original_handle.get() == INVALID_HANDLE_VALUE) {
     const std::error_code error(static_cast<int>(GetLastError()),
                                 std::system_category());
     throw std::runtime_error("Could not inspect read-only destination '" +
@@ -588,6 +599,18 @@ void replace_file(const std::filesystem::path& source,
   const bool replaced = move();
   const DWORD retry_error = replaced ? ERROR_SUCCESS : GetLastError();
   if (replaced) {
+    BY_HANDLE_FILE_INFORMATION displaced_info{};
+    if (GetFileInformationByHandle(original_handle.get(), &displaced_info) &&
+        displaced_info.nNumberOfLinks > 0) {
+      if (!set_handle_file_attributes(original_handle.get(),
+                                      original_attributes)) {
+        const std::error_code error(static_cast<int>(GetLastError()),
+                                    std::system_category());
+        throw std::runtime_error(
+            "Could not restore attributes on the displaced file for '" +
+            display_path(destination) + "': " + error.message());
+      }
+    }
     return;
   }
   if (!set_handle_file_attributes(original_handle.get(), original_attributes)) {

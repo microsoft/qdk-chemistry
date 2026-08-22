@@ -73,7 +73,7 @@ def read_text_file(path: PathLike, *, encoding: str = "utf-8") -> str:
         with os.fdopen(descriptor, "r", encoding=encoding, newline="", closefd=False) as stream:
             return stream.read()
     finally:
-        os.close(descriptor)
+        _close_descriptor_preserving_error(descriptor)
 
 
 def write_file_atomically(
@@ -92,10 +92,15 @@ def write_file_atomically(
     writers.
 
     On POSIX, replacing an existing file preserves its ordinary read, write,
-    and execute permission bits. New files are created with owner-only
-    permissions. The filesystem must enforce POSIX permission bits; the write
-    fails rather than publishing a file with broader mode bits. Platform ACLs
-    are not inspected and may grant access beyond those bits. On Windows,
+    and execute permission bits. Existing destination ACLs and extended
+    attributes are not preserved; the replacement uses metadata inherited when
+    its temporary file is created and may therefore grant broader access than
+    the file it replaced. Callers that rely on explicit ACLs or extended
+    attributes must reapply them after the write. New files are created with
+    owner-only permissions. The filesystem must enforce POSIX permission bits;
+    the write fails rather than publishing a file with broader mode bits.
+    Platform ACLs are not inspected and may grant access beyond those bits. On
+    Windows,
     replacement preserves the read-only attribute and new files use the
     filesystem's standard access controls. Existing Windows security
     descriptors and DACLs are not preserved; the replacement uses access
@@ -159,8 +164,10 @@ def write_file_atomically(
                 temporary_path.chmod(existing_mode)
 
         if os.name == "nt":
-            os.close(descriptor)
-            descriptor = -1
+            owned_descriptor, descriptor = descriptor, -1
+            close_error = _close_descriptor(owned_descriptor)
+            if close_error is not None:
+                raise close_error
         _replace_file(temporary_path, destination, destination_mode)
     except BaseException as error:
         if reserved_status is None and descriptor >= 0:
@@ -169,17 +176,22 @@ def write_file_atomically(
             except OSError:
                 reserved_status = None
         if descriptor >= 0:
-            os.close(descriptor)
-            descriptor = -1
+            owned_descriptor, descriptor = descriptor, -1
+            close_error = _close_descriptor(owned_descriptor)
+        else:
+            close_error = None
         if reserved_status is not None and _temporary_path_matches(temporary_path, reserved_status):
             try:
                 _remove_temporary_file(temporary_path)
             except OSError as cleanup_error:
                 raise error from cleanup_error
+        if close_error is not None:
+            raise error from close_error
         raise
     finally:
         if descriptor >= 0:
-            os.close(descriptor)
+            owned_descriptor, descriptor = descriptor, -1
+            _close_descriptor_preserving_error(owned_descriptor)
 
 
 def _reserve_temporary_file(destination: Path) -> tuple[int, str]:
@@ -239,13 +251,14 @@ def _create_exclusive_file(path: Path) -> int:
                 reserved_status = os.fstat(descriptor)
             except OSError:
                 reserved_status = None
-            finally:
-                os.close(descriptor)
+            close_error = _close_descriptor(descriptor)
             if reserved_status is not None and _temporary_path_matches(path, reserved_status):
                 try:
                     path.unlink()
                 except OSError as cleanup_error:
                     raise error from cleanup_error
+            if close_error is not None:
+                raise error from close_error
             raise
         return descriptor
 
@@ -366,10 +379,10 @@ def _reserve_distinct_temporary_file(destination: Path, temporary_path: Path) ->
         destination_matches = _path_matches_identity(
             destination,
             reserved_status,
-            require_single_link=True,
+            require_single_link=False,
         )
     except BaseException as error:
-        os.close(descriptor)
+        close_error = _close_descriptor(descriptor)
         if reserved_status is not None and _path_matches_identity(
             temporary_path,
             reserved_status,
@@ -379,13 +392,17 @@ def _reserve_distinct_temporary_file(destination: Path, temporary_path: Path) ->
                 _remove_temporary_file(temporary_path)
             except OSError as cleanup_error:
                 raise error from cleanup_error
+        if close_error is not None:
+            raise error from close_error
         raise
     if not destination_matches:
         return descriptor
 
-    os.close(descriptor)
+    close_error = _close_descriptor(descriptor)
     if _path_matches_identity(temporary_path, reserved_status, require_single_link=False):
         _remove_temporary_file(temporary_path)
+    if close_error is not None:
+        raise close_error
     return None
 
 
@@ -447,6 +464,24 @@ def _temporary_path_matches(temporary_path: Path, reserved_status: os.stat_resul
     return _path_matches_identity(temporary_path, reserved_status, require_single_link=False)
 
 
+def _close_descriptor(descriptor: int) -> OSError | None:
+    try:
+        os.close(descriptor)
+    except OSError as error:
+        return error
+    return None
+
+
+def _close_descriptor_preserving_error(descriptor: int) -> None:
+    active_error = sys.exc_info()[1]
+    close_error = _close_descriptor(descriptor)
+    if close_error is None:
+        return
+    if active_error is not None:
+        raise active_error from close_error
+    raise close_error
+
+
 def _remove_temporary_file(temporary_path: Path) -> None:
     """Remove a temporary file, including a Windows read-only file."""
     try:
@@ -483,9 +518,11 @@ def _replace_file(
         else:
             try:
                 original_attributes = int(_windows_file_info(original_descriptor, destination).file_attributes)
-            except BaseException:
-                os.close(original_descriptor)
-                original_descriptor = -1
+            except BaseException as error:
+                owned_descriptor, original_descriptor = original_descriptor, -1
+                close_error = _close_descriptor(owned_descriptor)
+                if close_error is not None:
+                    raise error from close_error
                 raise
     try:
         if os.name == "nt" and destination_mode is not None:
@@ -520,9 +557,21 @@ def _replace_file(
             except OSError as rollback_error:
                 raise replace_error from rollback_error
             raise
+        try:
+            displaced_status = os.fstat(original_descriptor)
+        except OSError:
+            pass
+        else:
+            if displaced_status.st_nlink > 0:
+                _set_windows_file_attributes(
+                    original_descriptor,
+                    original_attributes,
+                    destination,
+                )
     finally:
         if original_descriptor >= 0:
-            os.close(original_descriptor)
+            owned_descriptor, original_descriptor = original_descriptor, -1
+            _close_descriptor_preserving_error(owned_descriptor)
 
 
 def _set_permissions(descriptor: int, mode: int, path: Path) -> None:
@@ -564,12 +613,20 @@ def _create_private_directories(directory: Path) -> None:
                 | getattr(os, "O_CLOEXEC", 0),
             )
             _set_permissions(descriptor, 0o700, missing_directory)
-        except BaseException:
+        except BaseException as error:
+            close_error = None
             if descriptor >= 0:
-                os.close(descriptor)
-            missing_directory.rmdir()
+                close_error = _close_descriptor(descriptor)
+            try:
+                missing_directory.rmdir()
+            except OSError as cleanup_error:
+                raise error from cleanup_error
+            if close_error is not None:
+                raise error from close_error
             raise
-        os.close(descriptor)
+        close_error = _close_descriptor(descriptor)
+        if close_error is not None:
+            raise close_error
 
 
 def write_text_file_atomically(

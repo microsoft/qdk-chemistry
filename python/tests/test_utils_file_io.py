@@ -130,6 +130,36 @@ def test_preserve_destination_when_writer_fails(tmp_path: Path):
     assert list(tmp_path.iterdir()) == [path]
 
 
+def test_close_failure_does_not_skip_cleanup_or_retry_close(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    path = tmp_path / "data.txt"
+    write_text_file_atomically(path, "original")
+    real_close = os.close
+    closed_descriptors: list[int] = []
+
+    def close_then_fail(descriptor: int) -> None:
+        closed_descriptors.append(descriptor)
+        real_close(descriptor)
+        raise OSError("close failed")
+
+    def fail_after_write(temporary_path: Path) -> None:
+        temporary_path.write_text("incomplete", encoding="utf-8")
+        raise RuntimeError("writer failed")
+
+    monkeypatch.setattr(file_io_module.os, "close", close_then_fail)
+    with pytest.raises(RuntimeError, match="writer failed") as caught:
+        write_file_atomically(path, fail_after_write)
+    monkeypatch.undo()
+
+    assert isinstance(caught.value.__cause__, OSError)
+    assert str(caught.value.__cause__) == "close failed"
+    assert len(closed_descriptors) == 1
+    assert read_text_file(path) == "original"
+    assert list(tmp_path.iterdir()) == [path]
+
+
 @pytest.mark.skipif(os.name != "nt", reason="Windows read-only behavior")
 def test_clean_up_read_only_temporary_file_when_writer_fails(tmp_path: Path):
     path = tmp_path / "data.txt"
@@ -295,6 +325,34 @@ def test_reject_read_only_destination_with_surviving_hard_link(tmp_path: Path):
         write_text_file_atomically(path, "replacement")
 
     assert read_text_file(path) == "original"
+    assert read_text_file(alias) == "original"
+    assert alias.stat().st_mode & stat.S_IWRITE == 0
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows read-only behavior")
+def test_restore_read_only_attribute_on_hard_link_created_during_replace(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    path = tmp_path / "data.txt"
+    alias = tmp_path / "alias.txt"
+    write_text_file_atomically(path, "original")
+    path.chmod(stat.S_IREAD)
+    real_replace = os.replace
+    replace_calls = 0
+
+    def link_before_retry(source: Path, destination: Path) -> None:
+        nonlocal replace_calls
+        replace_calls += 1
+        if replace_calls == 2:
+            os.link(destination, alias)
+        real_replace(source, destination)
+
+    monkeypatch.setattr(file_io_module.os, "replace", link_before_retry)
+    write_text_file_atomically(path, "replacement")
+
+    assert replace_calls == 2
+    assert read_text_file(path) == "replacement"
     assert read_text_file(alias) == "original"
     assert alias.stat().st_mode & stat.S_IWRITE == 0
 

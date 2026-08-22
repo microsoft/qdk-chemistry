@@ -40,10 +40,14 @@ std::string read_text_file(const std::filesystem::path& path);
  * for format-sensitive writers.
  *
  * On POSIX, replacing an existing file preserves its ordinary read, write, and
- * execute permission bits. New files are created with owner-only permissions.
- * The filesystem must enforce POSIX permission bits; the write fails rather
- * than publishing a file with broader mode bits. Platform ACLs are not
- * inspected and may grant access beyond those bits.
+ * execute permission bits. Existing destination ACLs and extended attributes
+ * are not preserved; the replacement uses metadata inherited when its
+ * temporary file is created and may therefore grant broader access than the
+ * file it replaced. Callers that rely on explicit ACLs or extended attributes
+ * must reapply them after the write. New files are created with owner-only
+ * permissions. The filesystem must enforce POSIX permission bits; the write
+ * fails rather than publishing a file with broader mode bits. Platform ACLs
+ * are not inspected and may grant access beyond those bits.
  * On Windows, replacement preserves the read-only attribute and new files use
  * the filesystem's standard access controls. Existing Windows security
  * descriptors and DACLs are not preserved; the replacement uses access
