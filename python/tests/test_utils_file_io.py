@@ -457,6 +457,28 @@ def test_remove_created_file_when_windows_descriptor_conversion_fails(
     assert not path.exists()
 
 
+@pytest.mark.skipif(os.name != "nt", reason="Windows descriptor conversion")
+def test_resolve_windows_descriptor_converter_before_creating_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    path = tmp_path / "data.txt"
+
+    def fail_import(_name: str) -> None:
+        raise OSError("converter unavailable")
+
+    monkeypatch.setattr(file_io_module.importlib, "import_module", fail_import)
+
+    with pytest.raises(OSError, match="converter unavailable"):
+        file_io_module._open_windows_file(
+            path,
+            desired_access=0,
+            creation_disposition=1,
+        )
+
+    assert not path.exists()
+
+
 @pytest.mark.skipif(os.name != "nt", reason="Windows file-sharing behavior")
 def test_allow_exclusive_writer_on_windows(tmp_path: Path):
     if sys.platform != "win32":

@@ -300,6 +300,13 @@ def _open_windows_file(
         wintypes.HANDLE,
     )
     create_file.restype = wintypes.HANDLE
+    close_handle = ctypes.WinDLL("kernel32", use_last_error=True).CloseHandle
+    close_handle.argtypes = (wintypes.HANDLE,)
+    close_handle.restype = wintypes.BOOL
+    open_osfhandle = cast(
+        "Callable[[int, int], int]",
+        importlib.import_module("msvcrt").open_osfhandle,
+    )
     handle = create_file(
         os.fspath(path),
         desired_access,
@@ -312,13 +319,6 @@ def _open_windows_file(
     if handle == wintypes.HANDLE(-1).value:
         error = ctypes.get_last_error()
         raise _windows_error(path, error)
-    close_handle = ctypes.WinDLL("kernel32", use_last_error=True).CloseHandle
-    close_handle.argtypes = (wintypes.HANDLE,)
-    close_handle.restype = wintypes.BOOL
-    open_osfhandle = cast(
-        "Callable[[int, int], int]",
-        importlib.import_module("msvcrt").open_osfhandle,
-    )
     try:
         return open_osfhandle(
             cast("int", handle),
