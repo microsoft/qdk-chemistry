@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import ast
 import importlib.util
 import re
 import xml.etree.ElementTree as ET
@@ -28,6 +29,7 @@ SVG_FIGURES = {
     "tutorial_qpe_state_preparation_comparison.svg",
 }
 FIGURE_PATTERN = re.compile(r"^\.\. figure:: /_static/diagrams/(tutorial_qpe_\S+)$", re.MULTILINE)
+GRAPHVIZ_PATTERN = re.compile(r"^\.\. graphviz:: /_static/diagrams/(tutorial_qpe_\S+\.dot)$", re.MULTILINE)
 
 
 def test_tutorial_figure_references_are_complete():
@@ -48,6 +50,30 @@ def test_tutorial_png_figures_have_real_transparency():
         with Image.open(DIAGRAMS_DIR / name) as image:
             assert image.mode == "RGBA", name
             assert image.getchannel("A").getextrema() == (0, 255), name
+
+
+def test_tutorial_graphviz_figures_render_as_transparent_svg():
+    """Require SVG output and transparent canvases for every tutorial DOT file."""
+    references = {
+        match
+        for path in TUTORIAL_DIR.glob("*.rst")
+        for match in GRAPHVIZ_PATTERN.findall(path.read_text(encoding="utf-8"))
+    }
+    dot_files = {path.name for path in DIAGRAMS_DIR.glob("tutorial_qpe_*.dot")}
+
+    assert references == dot_files
+    for name in references:
+        assert 'bgcolor="transparent"' in (DIAGRAMS_DIR / name).read_text(encoding="utf-8")
+
+    configuration = ast.parse((REPOSITORY_ROOT / "docs" / "source" / "conf.py").read_text(encoding="utf-8"))
+    output_formats = [
+        node.value.value
+        for node in configuration.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "graphviz_output_format" for target in node.targets)
+        and isinstance(node.value, ast.Constant)
+    ]
+    assert output_formats == ["svg"]
 
 
 def test_circuit_svgs_preserve_transparent_structure():

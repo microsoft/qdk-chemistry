@@ -16,7 +16,7 @@ python docs/source/_static/diagrams/generate_tutorial_qpe_orbital_entropy.py
 
 Both scripts save their figures with transparent canvases. The phase-grid script
 also regenerates `tutorial_qpe_phase_grid_table.rst`. Files ending in `.dot` are
-rendered by Sphinx through Graphviz.
+rendered by Sphinx through Graphviz as transparent SVG assets.
 
 ## Orbital renders
 
