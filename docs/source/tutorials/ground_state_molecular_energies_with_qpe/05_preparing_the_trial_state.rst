@@ -173,7 +173,7 @@ Choose **Select Kernel**, select **Python Environments**, and choose the ``.venv
 Then select **Run All** to execute the shared trial-state workflow and render the one-, two-, and four-determinant logical circuits.
 Compare the gate types and circuit structure before revealing the answer below.
 
-.. figure:: /_static/diagrams/tutorial_qpe_state_preparation_comparison.svg
+.. figure:: /_static/diagrams/tutorial_qpe_state_preparation_comparison.png
    :alt: Side-by-side logical state-preparation circuits on twelve compute qubits. The one-determinant circuit on the left contains six X gates that prepare one occupation bit string. The two-determinant circuit on the right contains rotations and controlled operations that prepare a coherent superposition of two occupation bit strings.
    :align: center
    :width: 100%

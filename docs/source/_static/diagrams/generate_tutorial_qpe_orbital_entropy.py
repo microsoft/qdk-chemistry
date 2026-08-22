@@ -17,14 +17,19 @@ from tutorial_choose_active_space import (  # noqa: E402
     run_active_space_workflow,
 )
 
+PLOT_BACKGROUND = "#F2F2F2"
+
 
 def main() -> None:
     """Run the shared workflow and write the committed entropy figure."""
     Logger.set_global_level(Logger.LogLevel.off)
     result = run_active_space_workflow()
     figure = plot_orbital_entropy_selection(result)
+    figure.patch.set_facecolor(PLOT_BACKGROUND)
+    for axis in figure.axes:
+        axis.set_facecolor(PLOT_BACKGROUND)
     output_path = Path(__file__).with_name("tutorial_qpe_orbital_entropy.png")
-    figure.savefig(output_path, dpi=200, bbox_inches="tight", transparent=True)
+    figure.savefig(output_path, dpi=200, bbox_inches="tight", facecolor=PLOT_BACKGROUND)
     print(f"Wrote {output_path}")
 
 

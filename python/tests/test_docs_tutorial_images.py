@@ -8,7 +8,7 @@
 import ast
 import importlib.util
 import re
-import xml.etree.ElementTree as ET
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -18,16 +18,17 @@ REPOSITORY_ROOT = Path(__file__).parent.parent.parent
 DIAGRAMS_DIR = REPOSITORY_ROOT / "docs" / "source" / "_static" / "diagrams"
 TUTORIAL_DIR = REPOSITORY_ROOT / "docs" / "source" / "tutorials" / "ground_state_molecular_energies_with_qpe"
 
-PNG_FIGURES = {
+TRANSPARENT_PNG_FIGURES = {
     "tutorial_qpe_atomic_basis_functions.png",
     "tutorial_qpe_example_molecular_orbitals.png",
+}
+OPAQUE_PNG_FIGURES = {
     "tutorial_qpe_orbital_entropy.png",
     "tutorial_qpe_phase_wrapping.png",
+    "tutorial_qpe_power_one_circuit_overview.png",
+    "tutorial_qpe_state_preparation_comparison.png",
 }
-SVG_FIGURES = {
-    "tutorial_qpe_power_one_circuit_overview.svg",
-    "tutorial_qpe_state_preparation_comparison.svg",
-}
+PNG_FIGURES = TRANSPARENT_PNG_FIGURES | OPAQUE_PNG_FIGURES
 FIGURE_PATTERN = re.compile(r"^\.\. figure:: /_static/diagrams/(tutorial_qpe_\S+)$", re.MULTILINE)
 GRAPHVIZ_PATTERN = re.compile(r"^\.\. graphviz:: /_static/diagrams/(tutorial_qpe_\S+\.dot)$", re.MULTILINE)
 
@@ -40,16 +41,25 @@ def test_tutorial_figure_references_are_complete():
         for match in FIGURE_PATTERN.findall(path.read_text(encoding="utf-8"))
     }
 
-    assert references == PNG_FIGURES | SVG_FIGURES
+    assert references == PNG_FIGURES
     assert all((DIAGRAMS_DIR / name).is_file() for name in references)
 
 
 def test_tutorial_png_figures_have_real_transparency():
-    """Require every PNG figure to contain both transparent and opaque pixels."""
-    for name in PNG_FIGURES:
+    """Require orbital PNGs to contain both transparent and opaque pixels."""
+    for name in TRANSPARENT_PNG_FIGURES:
         with Image.open(DIAGRAMS_DIR / name) as image:
             assert image.mode == "RGBA", name
             assert image.getchannel("A").getextrema() == (0, 255), name
+
+
+def test_opaque_png_figures_use_light_gray_backgrounds():
+    """Keep fixed-color plots and circuits readable against dark themes."""
+    for name in OPAQUE_PNG_FIGURES:
+        with Image.open(DIAGRAMS_DIR / name) as image:
+            rgba = image.convert("RGBA")
+            assert rgba.getchannel("A").getextrema() == (255, 255), name
+            assert rgba.getpixel((0, 0)) == (242, 242, 242, 255), name
 
 
 def test_tutorial_graphviz_figures_render_as_transparent_svg():
@@ -91,27 +101,40 @@ def test_tutorial_graphviz_figures_render_as_transparent_svg():
     assert output_formats == ["svg"]
 
 
-def test_circuit_svgs_preserve_transparent_structure():
-    """Check transparent styling and the wires and labels used by the tutorial."""
-    for name in SVG_FIGURES:
-        path = DIAGRAMS_DIR / name
-        root = ET.parse(path).getroot()
-        text = path.read_text(encoding="utf-8")
+def test_screenshot_derived_images_match_local_sources():
+    """Recreate each screenshot-derived output from local source assets."""
+    source_dir = REPOSITORY_ROOT / "docs" / "figure_sources" / "ground_state_qpe"
+    script_path = DIAGRAMS_DIR / "generate_tutorial_qpe_screenshot_images.py"
+    sys.path.insert(0, str(DIAGRAMS_DIR))
+    try:
+        module_spec = importlib.util.spec_from_file_location(
+            "generate_tutorial_qpe_screenshot_images",
+            script_path,
+        )
+        assert module_spec is not None
+        assert module_spec.loader is not None
+        module = importlib.util.module_from_spec(module_spec)
+        module_spec.loader.exec_module(module)
+    finally:
+        sys.path.pop(0)
 
-        assert root.tag.endswith("svg"), name
-        assert "--circuit-bg: transparent" in text, name
-        assert "currentColor" in text, name
-        assert ".dropzone-layer { display: none; }" in text, name
+    for name in module.ORBITAL_SCREENSHOTS:
+        with Image.open(source_dir / name) as source_image:
+            expected = module.white_to_alpha(source_image)
+        with Image.open(DIAGRAMS_DIR / name) as published:
+            assert np.array_equal(
+                np.asarray(expected),
+                np.asarray(published.convert("RGBA")),
+            )
 
-    iqpe_path = DIAGRAMS_DIR / "tutorial_qpe_power_one_circuit_overview.svg"
-    iqpe_root = ET.parse(iqpe_path).getroot()
-    iqpe_text = "".join(iqpe_root.itertext())
-    wire_indices = {int(element.attrib["data-wire"]) for element in iqpe_root.iter() if "data-wire" in element.attrib}
-
-    assert wire_indices == set(range(13))
-    assert "MakeIQPECircuit" in iqpe_text
-    assert "RunIQPE" in iqpe_text
-    assert "RepControlledPauliExp" in iqpe_text
+    for name in module.CIRCUIT_SCREENSHOTS:
+        with Image.open(source_dir / name) as source_image:
+            expected = module.replace_circuit_background(source_image)
+        with Image.open(DIAGRAMS_DIR / name) as published:
+            assert np.array_equal(
+                np.asarray(expected),
+                np.asarray(published.convert("RGB")),
+            )
 
 
 def test_white_to_alpha_preserves_white_composite():

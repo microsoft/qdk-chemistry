@@ -14,6 +14,7 @@ REFERENCE_ENERGY_HARTREE = -9.653276065987
 TARGET_OFFSET_HARTREE = 1e-3
 NUM_PHASE_BITS = 6
 SELECTED_GRID_INDEX = 16
+PLOT_BACKGROUND = "#F2F2F2"
 
 
 def phase_to_energy(phase_fraction: float, evolution_time: float) -> float:
@@ -79,6 +80,8 @@ def render_energy_grid_table(
 def generate_phase_wrapping_figure(evolution_time: float) -> plt.Figure:
     """Show phase wrapping, the signed-energy branch, and aliasing."""
     figure, axis = plt.subplots(figsize=(8.8, 4.4), layout="constrained")
+    figure.patch.set_facecolor(PLOT_BACKGROUND)
+    axis.set_facecolor(PLOT_BACKGROUND)
 
     lower_phases = np.linspace(0.0, 0.5, 100)
     upper_phases = np.linspace(0.5, 1.0, 100)
@@ -169,7 +172,9 @@ def main() -> None:
     }
     for filename, figure in figures.items():
         output_path = Path(__file__).with_name(filename)
-        figure.savefig(output_path, dpi=200, bbox_inches="tight", transparent=True)
+        figure.savefig(
+            output_path, dpi=200, bbox_inches="tight", facecolor=PLOT_BACKGROUND
+        )
         print(f"Wrote {output_path}")
 
     table_path = Path(__file__).with_name("tutorial_qpe_phase_grid_table.rst")

@@ -14,50 +14,38 @@ python docs/source/_static/diagrams/generate_tutorial_qpe_phase_grid.py
 python docs/source/_static/diagrams/generate_tutorial_qpe_orbital_entropy.py
 ```
 
-Both scripts save their figures with transparent canvases. The phase-grid script
-also regenerates `tutorial_qpe_phase_grid_table.rst`. Files ending in `.dot` are
-rendered by Sphinx through Graphviz as transparent SVG assets.
+Both scripts save their figures as PNGs on light-gray canvases so fixed dark
+labels remain readable in light and dark documentation themes. The phase-grid
+script also regenerates `tutorial_qpe_phase_grid_table.rst`. Files ending in
+`.dot` are rendered by Sphinx through Graphviz as transparent SVG assets.
 
 ## Orbital renders
 
 The original cube-generation, isocontour, orbital-index, and camera settings for
-the two Chapter 2 orbital figures are not available. The transparent PNGs retain
-the original dimensions and reproduce every original RGB pixel exactly when
-composited on white. The opaque source assets are preserved in Git commit
-`e128a7a40d7645dee8a0bbf854c10d823b79ee46`. Recover either source with
-`git show`, then run the converter:
+the two Chapter 2 orbital figures are not available. Their original screenshots
+are retained under `docs/figure_sources/ground_state_qpe`. The transparent PNGs
+retain the original dimensions and reproduce every original RGB pixel exactly
+when composited on white.
 
 ```console
-git show e128a7a40d7645dee8a0bbf854c10d823b79ee46:docs/source/_static/diagrams/tutorial_qpe_atomic_basis_functions.png > /tmp/tutorial_qpe_atomic_basis_functions.png
-python docs/source/_static/diagrams/convert_white_to_alpha.py /tmp/tutorial_qpe_atomic_basis_functions.png docs/source/_static/diagrams/tutorial_qpe_atomic_basis_functions.png
+python docs/source/_static/diagrams/generate_tutorial_qpe_screenshot_images.py
 ```
 
-Repeat the command for `tutorial_qpe_example_molecular_orbitals.png`. The script
-uses color-to-alpha unmixing instead of thresholding, so antialiased edges and
-dark surface contours are preserved.
+The generator uses color-to-alpha unmixing instead of thresholding, so
+antialiased edges and dark surface contours are preserved.
 
 ## Logical circuits
 
-QDK/Chemistry obtains circuit data from QDK and displays it with
-`qdk.widgets.Circuit`. The widget is owned by the
-[`microsoft/qdk`](https://github.com/microsoft/qdk) repository and currently
-exposes circuit JSON to an interactive `qsharp-widgets` SVG renderer. It does not
-provide a supported Python or command-line SVG/PNG export API.
+The original widget screenshots are retained under
+`docs/figure_sources/ground_state_qpe`. The screenshot generator replaces large
+neutral background regions with light gray while preserving white labels and
+small gate details. The resulting opaque PNGs remain readable against light and
+dark documentation themes.
 
-The committed SVGs contain no editor, notebook, browser, or widget controls.
-They preserve the widget's natural circuit lengths, align both state-preparation
-circuits to the same twelve wires, and retain all thirteen IQPE wires and
-composite-operation labels. The assets are shared with
-[`microsoft/qdk#3631`](https://github.com/microsoft/qdk/pull/3631).
-
-Until QDK provides a supported exporter, the temporary maintenance workflow is:
-
-1. Run the tested tutorial workflow to construct the circuit data.
-2. Display that data with `qdk.widgets.Circuit`.
-3. Copy the rendered circuit SVG element, not a screenshot or surrounding UI.
-4. Remove editor-only collapse, expand, and drop-zone layers.
-5. Normalize the SVG viewport and use transparent, foreground-relative styles.
-6. Verify wire counts, operation labels, captions, and alt text before committing.
+QDK/Chemistry obtains circuit data from QDK and displays it interactively with
+`qdk.widgets.Circuit`. The widget does not currently provide a supported Python
+or command-line SVG/PNG export API, so updating the source screenshots remains a
+manual maintenance step.
 
 [`microsoft/qdk#3632`](https://github.com/microsoft/qdk/issues/3632) tracks
 deterministic, headless export from circuit data.
