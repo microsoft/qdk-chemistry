@@ -29,7 +29,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-import qdk
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
@@ -41,7 +40,6 @@ from qdk_chemistry.data import (
     StateVectorContainer,
     Wavefunction,
 )
-from qdk_chemistry.utils.qsharp import create_qsharp_context
 
 from .test_helpers import create_test_orbitals
 
@@ -75,12 +73,6 @@ if build_dir.exists():
                 break
         if lib_dir_found:
             break
-
-
-@pytest.fixture
-def qdk_ctx() -> qdk.Context:
-    """Fresh Q# context at the default profile, isolated from the shared one."""
-    return create_qsharp_context()
 
 
 @pytest.fixture

@@ -36,7 +36,6 @@ namespace QDKChemistry.Utils.AliasSampling {
     import Std.StatePreparation.PrepareUniformSuperposition;
     import Std.Arrays.Mapped;
     import Std.Arrays.Padded;
-    import Std.Arrays.Reversed;
     import Std.TableLookup.Select;
     import QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D;
     import QDKChemistry.Utils.SelectSwap.Select2DLoad;

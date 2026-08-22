@@ -13,6 +13,19 @@ import qdk
 
 from qdk_chemistry.algorithms.state_preparation.alias_sampling import AliasSamplingStatePreparation
 from qdk_chemistry.data import Configuration, ModelOrbitals, StateVectorContainer, Wavefunction
+from qdk_chemistry.utils.qsharp import create_qsharp_context
+
+
+@pytest.fixture
+def qdk_ctx() -> qdk.Context:
+    """Fresh Q# context for a single test.
+
+    Every test here simulates a program and reads the result off ``dump_machine``. A
+    context that has already run one program reports that program's state on the next
+    read, so sharing one across tests silently compares a vector against the previous
+    test's output.
+    """
+    return create_qsharp_context()
 
 
 def _run_alias_sampling_and_dump(
