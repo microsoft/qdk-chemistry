@@ -393,37 +393,40 @@ class ReservedTemporaryFile {
 
 ReservedTemporaryFile create_exclusive_file(const std::filesystem::path& path,
                                             std::error_code& error) {
+  std::filesystem::path owned_path(path);
 #ifdef _WIN32
-  HANDLE handle = CreateFileW(
-      path.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-      nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+  HANDLE handle =
+      CreateFileW(owned_path.c_str(), 0,
+                  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                  nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (handle == INVALID_HANDLE_VALUE) {
     error = std::error_code(static_cast<int>(GetLastError()),
                             std::system_category());
-    return {path, ReservedTemporaryFile::invalid_handle()};
+    return {std::move(owned_path), ReservedTemporaryFile::invalid_handle()};
   }
 #else
   const int descriptor = retry_on_eintr([&] {
-    return ::open(path.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0600);
+    return ::open(owned_path.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC,
+                  0600);
   });
   if (descriptor == -1) {
     error = std::error_code(errno, std::generic_category());
-    return {path, ReservedTemporaryFile::invalid_handle()};
+    return {std::move(owned_path), ReservedTemporaryFile::invalid_handle()};
   }
   if (retry_on_eintr([&] { return ::fchmod(descriptor, S_IRUSR | S_IWUSR); }) !=
       0) {
     const int permission_error = errno;
     error = std::error_code(permission_error, std::generic_category());
-    return {path, descriptor};
+    return {std::move(owned_path), descriptor};
   }
   struct stat status{};
   if (retry_on_eintr([&] { return ::fstat(descriptor, &status); }) != 0 ||
       (status.st_mode & 0777) != (S_IRUSR | S_IWUSR)) {
     error = std::make_error_code(std::errc::permission_denied);
-    return {path, descriptor};
+    return {std::move(owned_path), descriptor};
   }
 #endif
-  return {path,
+  return {std::move(owned_path),
 #ifdef _WIN32
           handle
 #else

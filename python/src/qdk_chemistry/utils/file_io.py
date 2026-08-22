@@ -147,13 +147,13 @@ def write_file_atomically(
     if not parent.is_dir():
         raise FileNotFoundError(f"Parent directory does not exist for '{destination}'")
 
-    descriptor, temporary_name = _reserve_temporary_file(destination)
-    temporary_path = Path(temporary_name)
+    descriptor = -1
+    temporary_path: Path | None = None
     reserved_status: os.stat_result | None = None
 
     try:
+        descriptor, temporary_path, reserved_status = _reserve_temporary_file(destination)
         writer(temporary_path)
-        reserved_status = os.fstat(descriptor)
         current_status = temporary_path.lstat()
         if not _same_file_identity(reserved_status, current_status):
             raise RuntimeError(f"Temporary file identity changed: '{temporary_path}'")
@@ -198,7 +198,11 @@ def write_file_atomically(
             close_error = _close_descriptor(owned_descriptor)
         else:
             close_error = None
-        if reserved_status is not None and _temporary_path_matches(temporary_path, reserved_status):
+        if (
+            temporary_path is not None
+            and reserved_status is not None
+            and _temporary_path_matches(temporary_path, reserved_status)
+        ):
             try:
                 _remove_temporary_file(temporary_path)
             except OSError as cleanup_error:
@@ -208,7 +212,7 @@ def write_file_atomically(
         raise
 
 
-def _reserve_temporary_file(destination: Path) -> tuple[int, str]:
+def _reserve_temporary_file(destination: Path) -> tuple[int, Path, os.stat_result]:
     """Reserve a private temporary sibling and keep its descriptor open."""
     suffix = "".join(destination.suffixes)
     for _ in range(64):
@@ -216,15 +220,15 @@ def _reserve_temporary_file(destination: Path) -> tuple[int, str]:
         if _component_is_too_long(temporary_path):
             break
         try:
-            descriptor = _reserve_distinct_temporary_file(destination, temporary_path)
+            reservation = _reserve_distinct_temporary_file(destination, temporary_path)
         except FileExistsError:
             continue
         except OSError as error:
             if not _is_name_too_long(error, destination):
                 raise
             break
-        if descriptor is not None:
-            return descriptor, str(temporary_path)
+        if reservation is not None:
+            return reservation
 
     alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_-"
     for stem_length in range(16, 0, -1):
@@ -236,17 +240,36 @@ def _reserve_temporary_file(destination: Path) -> tuple[int, str]:
             if _component_is_too_long(temporary_path):
                 break
             try:
-                descriptor = _reserve_distinct_temporary_file(destination, temporary_path)
+                reservation = _reserve_distinct_temporary_file(destination, temporary_path)
             except FileExistsError:
                 continue
             except OSError as error:
                 if _is_name_too_long(error, destination):
                     break
                 raise
-            if descriptor is not None:
-                return descriptor, str(temporary_path)
+            if reservation is not None:
+                return reservation
 
     raise FileExistsError(f"Could not create a unique temporary file beside '{destination}'")
+
+
+def _package_reservation(
+    descriptor: int,
+    temporary_path: Path,
+    reserved_status: os.stat_result,
+) -> tuple[int, Path, os.stat_result]:
+    try:
+        return descriptor, temporary_path, reserved_status
+    except BaseException as error:
+        close_error = _close_descriptor(descriptor)
+        if _temporary_path_matches(temporary_path, reserved_status):
+            try:
+                _remove_temporary_file(temporary_path)
+            except OSError as cleanup_error:
+                raise error from cleanup_error
+        if close_error is not None:
+            raise error from close_error
+        raise
 
 
 def _component_is_too_long(path: Path) -> bool:
@@ -393,7 +416,10 @@ def _set_windows_file_attributes(descriptor: int, attributes: int, path: Path) -
         raise _windows_error(path, ctypes.get_last_error())
 
 
-def _reserve_distinct_temporary_file(destination: Path, temporary_path: Path) -> int | None:
+def _reserve_distinct_temporary_file(
+    destination: Path,
+    temporary_path: Path,
+) -> tuple[int, Path, os.stat_result] | None:
     descriptor = _create_exclusive_file(temporary_path)
     reserved_status: os.stat_result | None = None
     try:
@@ -417,8 +443,9 @@ def _reserve_distinct_temporary_file(destination: Path, temporary_path: Path) ->
         if close_error is not None:
             raise error from close_error
         raise
+    assert reserved_status is not None
     if not destination_matches:
-        return descriptor
+        return _package_reservation(descriptor, temporary_path, reserved_status)
 
     close_error = _close_descriptor(descriptor)
     if _path_matches_identity(temporary_path, reserved_status, require_single_link=False):
