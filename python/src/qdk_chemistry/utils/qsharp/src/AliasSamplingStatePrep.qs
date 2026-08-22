@@ -4,6 +4,23 @@
 
 /// Alias sampling state preparation.
 /// Reference: Babbush et al. arXiv:1805.03662, Fig. 11.
+///
+/// This file contains two families of operations with *different* probability
+/// conventions. They are both intentional; do not "unify" them.
+///
+///   * `AliasSamplingPrepare` / `RunAliasSamplingPrep` — the LCU PREPARE oracle of
+///     Babbush et al. Fig. 11. It samples p_ℓ ∝ |c_ℓ| (magnitudes, normalized by the
+///     1-norm), so the index register carries amplitude √(|c_ℓ| / Σ_k |c_k|). Signs are
+///     not represented at all; the accompanying SELECT oracle is expected to carry them.
+///
+///   * `ConditionalAliasSamplingPrepare*` — a genuine state preparation. It squares the
+///     coefficients before building the alias table, so it samples p_{c,ℓ} ∝ c_{c,ℓ}²
+///     (normalized by the 2-norm) and the index register carries amplitude
+///     |c_{c,ℓ}| / ‖c_c‖₂. A QROM-loaded sign bit then applies a Z phase, recovering the
+///     signed amplitude c_{c,ℓ} / ‖c_c‖₂ (Von Burg arXiv:2011.03494, Def. 1).
+///
+/// In short: the plain variant is 1-norm PREPARE over magnitudes, the conditional variant
+/// is 2-norm state preparation over signed coefficients.
 namespace QDKChemistry.Utils.AliasSampling {
 
     import Std.Arithmetic.ApplyIfGreaterLE;
@@ -15,6 +32,7 @@ namespace QDKChemistry.Utils.AliasSampling {
     import Std.Math.AbsD;
     import Std.Math.Ceiling;
     import Std.Math.Lg;
+    import Std.Math.Round;
     import Std.StatePreparation.PrepareUniformSuperposition;
     import Std.Arrays.Mapped;
     import Std.Arrays.Padded;
@@ -46,7 +64,13 @@ namespace QDKChemistry.Utils.AliasSampling {
         coefficients : Double[],
     ) : (Int[], Int[]) {
         let nCoeffs = Length(coefficients);
-        let barHeight = (1 <<< bitsPrecision) - 1;
+        // The full bar height is 2^μ, so a stored keep value k means "keep index ℓ
+        // with probability k / 2^μ" under the σ < keep_ℓ comparison in
+        // AliasSamplingPrepare. Keep values occupy μ bits, so the largest storable
+        // value is 2^μ - 1; entries that must always be kept use that value together
+        // with alt_ℓ = ℓ, which makes the residual 1/2^μ "swap" a no-op.
+        let barHeight = 1 <<< bitsPrecision;
+        let maxKeep = barHeight - 1;
 
         // Normalize probabilities
         mutable total = 0.0;
@@ -54,20 +78,46 @@ namespace QDKChemistry.Utils.AliasSampling {
             set total += AbsD(coefficients[i]);
         }
 
-        // Scale to bar height × nCoeffs
+        // Scale to bar height × nCoeffs, rounding to nearest.
+        let targetTotal = barHeight * nCoeffs;
         mutable scaledProbs : Int[] = [];
-        mutable remainder = 0;
+        mutable scaledTotal = 0;
         for i in 0..nCoeffs - 1 {
-            let scaled = Ceiling(AbsD(coefficients[i]) / total * IntAsDouble(barHeight * nCoeffs));
+            let scaled = Round(AbsD(coefficients[i]) / total * IntAsDouble(targetTotal));
             set scaledProbs += [scaled];
-            set remainder += scaled;
+            set scaledTotal += scaled;
+        }
+
+        // Walker's construction assumes the bars sum to exactly 2^μ · L. Rounding
+        // breaks that, so redistribute the residual one unit at a time instead of
+        // accumulating it and discarding it. Only indices with a non-zero coefficient
+        // are eligible: handing a unit to a zero coefficient would give it a spurious
+        // 2^-μ of probability, and it also keeps the loop from spinning forever when
+        // there is nothing left to take a unit from.
+        mutable adjustable : Int[] = [];
+        for i in 0..nCoeffs - 1 {
+            if AbsD(coefficients[i]) > 0.0 {
+                set adjustable += [i];
+            }
+        }
+
+        mutable residual = targetTotal - scaledTotal;
+        mutable cursor = 0;
+        while residual != 0 and Length(adjustable) > 0 {
+            let index = adjustable[cursor];
+            let delta = residual > 0 ? 1 | -1;
+            if scaledProbs[index] + delta >= 0 {
+                set scaledProbs w/= index <- scaledProbs[index] + delta;
+                set residual -= delta;
+            }
+            set cursor = (cursor + 1) % Length(adjustable);
         }
 
         // Initialize keep and alt arrays
         mutable keepCoeff : Int[] = [];
         mutable altIndex : Int[] = [];
         for i in 0..nCoeffs - 1 {
-            set keepCoeff += [barHeight];
+            set keepCoeff += [maxKeep];
             set altIndex += [i];
         }
 
@@ -133,14 +183,17 @@ namespace QDKChemistry.Utils.AliasSampling {
         let (keepCoeff, altIndex) = DiscretizedProbabilityDistribution(mu, params.coefficients);
 
         let nPadded = 1 <<< nIndexQubits;
-        let barHeight = (1 <<< mu) - 1;
+        // Largest storable keep value: "always keep". Padded rows are unreachable
+        // because PrepareUniformSuperposition only populates the first nCoeffs
+        // indices, but alt_ℓ = ℓ keeps them harmless if they ever were reached.
+        let maxKeep = (1 <<< mu) - 1;
 
         // Build QROM data table: (keep_ℓ, alt_ℓ) for each index
         let selectData = MappedOverRange(
             idx -> if idx < nCoeffs {
                 IntAsBoolArray(keepCoeff[idx], mu) + IntAsBoolArray(altIndex[idx], nIndexQubits)
             } else {
-                IntAsBoolArray(barHeight, mu) + IntAsBoolArray(idx, nIndexQubits)
+                IntAsBoolArray(maxKeep, mu) + IntAsBoolArray(idx, nIndexQubits)
             },
             0..nPadded - 1
         );
@@ -154,10 +207,16 @@ namespace QDKChemistry.Utils.AliasSampling {
         // Step 3: QROM load via SELECT-SWAP network
         SelectSwap(-1, selectData, indexRegister, qromOutput);
 
-        // Step 4: Compare σ ≥ keep_ℓ → set flag
+        // Step 4: Compare σ < keep_ℓ → keep, otherwise swap to alt_ℓ.
+        // ApplyIfGreaterLE(X, a, b, t) flips t when a > b, so passing keep as the
+        // first operand gives "keep_ℓ > σ", i.e. the keep condition; inverting it
+        // yields the swap condition σ ≥ keep_ℓ. Ordering the operands the other way
+        // round would test σ > keep_ℓ, which keeps the index when σ == keep_ℓ and
+        // therefore gives a zero-weight coefficient a residual 1/2^μ probability.
         let keepLoaded = qromOutput[0..mu - 1];
         let altLoaded = qromOutput[mu..mu + nIndexQubits - 1];
-        ApplyIfGreaterLE(X, uniformRegister, keepLoaded, flagQubit);
+        ApplyIfGreaterLE(X, keepLoaded, uniformRegister, flagQubit);
+        X(flagQubit);
 
         // Step 5: Conditional swap index ↔ alt
         for i in 0..nIndexQubits - 1 {
@@ -216,10 +275,15 @@ namespace QDKChemistry.Utils.AliasSampling {
         let nCoeffs = Length(coefficients[0]);
         let nPaddedIdx = 1 <<< nIndexBits;
         let nFreeRiderBits = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
-        let barHeight = (1 <<< bitsPrecision) - 1;
+        // Largest storable keep value; see DiscretizedProbabilityDistribution. Padded rows
+        // use it together with alt_ℓ = ℓ so the residual 1/2^μ "swap" is a no-op.
+        let maxKeep = (1 <<< bitsPrecision) - 1;
 
         mutable result : Bool[][][] = [];
         for c in 0..nCond - 1 {
+            // Squared, unlike the plain PREPARE variant: this operation is a 2-norm state
+            // preparation, so amplitude ∝ |c| requires probability ∝ c². See the namespace
+            // documentation comment.
             let squaredCoeffs = Mapped(x -> x * x, coefficients[c]);
             let (keepCoeff, altIndex) = DiscretizedProbabilityDistribution(bitsPrecision, squaredCoeffs);
             mutable innerData : Bool[][] = [];
@@ -232,7 +296,7 @@ namespace QDKChemistry.Utils.AliasSampling {
                     ];
                 } else {
                     set innerData += [
-                        IntAsBoolArray(barHeight, bitsPrecision) + IntAsBoolArray(b, nIndexBits) + [false, false] + (if nFreeRiderBits > 0 { freeRiderData[c] } else { [] })
+                        IntAsBoolArray(maxKeep, bitsPrecision) + IntAsBoolArray(b, nIndexBits) + [false, false] + (if nFreeRiderBits > 0 { freeRiderData[c] } else { [] })
                     ];
                 }
             }
@@ -340,7 +404,10 @@ namespace QDKChemistry.Utils.AliasSampling {
         let altIndexReg = qromOutput[bitsPrecision..bitsPrecision + nIndexBits - 1];
         let signOrigQubit = qromOutput[bitsPrecision + nIndexBits];
         let signAltQubit = qromOutput[bitsPrecision + nIndexBits + 1];
-        ApplyIfGreaterLE(X, uniformRegister, keepCoeffLoaded, flagQubit);
+        // Same σ < keep_ℓ convention as AliasSamplingPrepare: test keep_ℓ > σ to get
+        // the keep condition, then invert to get the swap condition σ ≥ keep_ℓ.
+        ApplyIfGreaterLE(X, keepCoeffLoaded, uniformRegister, flagQubit);
+        X(flagQubit);
 
         for i in 0..nIndexBits - 1 {
             Controlled SWAP([flagQubit], (indexRegister[i], altIndexReg[i]));

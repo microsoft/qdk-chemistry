@@ -4,6 +4,16 @@ Changelog
 
 For detailed release notes with code examples and feature walkthroughs, see the :doc:`release-notes/index` section.
 
+Unreleased
+==========
+
+- Alias sampling PREPARE oracle as a new state preparation implementation (``alias_sampling``), following Babbush et al. :cite:`Babbush2018` section III.D. It prepares the 1-norm distribution :math:`|c_\ell| / \sum_k |c_k|` with the index register left entangled with ancilla, so it is a block-encoding subroutine rather than a drop-in replacement for ``sparse_isometry`` or ``dense_pure_state``; negative coefficients are rejected
+- QROM-based state preparation as a new state preparation implementation (``qrom``), using multiplexed :math:`R_y` rotations loaded from a QROM table via a phase gradient register. Negative coefficients are not yet supported and emit a ``RuntimeWarning``
+
+Breaking changes:
+
+- ``create_qsharp_context`` now defaults to ``TargetProfile.Adaptive_RIF`` instead of ``TargetProfile.Base``, exposed as the new ``DEFAULT_TARGET_PROFILE`` constant. Circuits that must be measurement-free, including everything converted to Qiskit or emitted as Base-profile QIR, have to ask for ``TargetProfile.Base`` explicitly. A ``Base`` context now also loads only the Base-correct subset of the vendored Q# project: sources that rely on measurement-based uncompute are withheld so they fail as undefined symbols rather than compiling and returning silently wrong results
+
 Version 2.1.0
 =============
 

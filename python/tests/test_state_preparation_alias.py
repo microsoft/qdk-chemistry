@@ -60,17 +60,15 @@ def _compute_marginal_probs(
 
 
 def _make_wavefunction(amplitudes: list[float]) -> Wavefunction:
-    """Create a Wavefunction from a list of amplitudes."""
+    """Create a Wavefunction from a list of amplitudes.
+
+    Zero amplitudes are kept so that determinant ``idx`` stays aligned with position ``idx``
+    in the coefficient vector, which is the index the alias circuit addresses.
+    """
     num_qubits = math.ceil(math.log2(len(amplitudes))) if len(amplitudes) > 1 else 1
-    coeffs_list: list[float] = []
-    dets: list[Configuration] = []
-    for idx, amp in enumerate(amplitudes):
-        if amp != 0.0:
-            bitstring = format(idx, f"0{num_qubits}b")
-            dets.append(Configuration.from_bitstring(bitstring))
-            coeffs_list.append(float(amp))
+    dets = [Configuration.from_bitstring(format(idx, f"0{num_qubits}b")) for idx in range(len(amplitudes))]
     orbitals = ModelOrbitals(num_qubits)
-    container = StateVectorContainer(np.array(coeffs_list), dets, orbitals)
+    container = StateVectorContainer(np.array([float(a) for a in amplitudes]), dets, orbitals)
     return Wavefunction(container)
 
 
@@ -86,16 +84,60 @@ class TestAliasSamplingStatePreparation:
         assert circuit._qsharp_op is not None
         assert circuit._qsharp_factory is not None
 
+    def test_settings_expose_bits_precision(self):
+        """The constructor argument is stored in settings so create() can reach it."""
+        prep = AliasSamplingStatePreparation(bits_precision=6)
+        assert prep.bits_precision == 6
+        assert prep.settings.get("bits_precision") == 6
+
+        prep.settings.set("bits_precision", 8)
+        assert prep.bits_precision == 8
+
+    def test_negative_coefficients_rejected(self):
+        """Alias sampling is a PREPARE oracle over magnitudes and cannot carry a sign.
+
+        Silently dropping the sign would prepare a different state than the caller asked
+        for, so a negative coefficient is a hard error rather than a warning. This matches
+        Qualtran's ``StatePreparationAliasSampling``, which raises for the same reason.
+        """
+        prep = AliasSamplingStatePreparation(bits_precision=4)
+        wf = _make_wavefunction([0.5, -0.3, 0.7, 0.1])
+        with pytest.raises(ValueError, match="non-negative"):
+            prep.run(wf)
+
+    def test_all_zero_coefficients_rejected(self):
+        """An all-zero vector has no distribution to prepare."""
+        prep = AliasSamplingStatePreparation(bits_precision=4)
+        wf = _make_wavefunction([0.0, 0.0, 0.0, 0.0])
+        with pytest.raises(ValueError, match="non-zero"):
+            prep.run(wf)
+
+    def test_zero_coefficients_get_zero_probability(self, qdk_ctx):
+        """A zero coefficient must receive exactly zero probability.
+
+        The alias table stores a keep value out of a full bar height of 2^mu, so a
+        coefficient of zero maps to keep = 0 and is always redirected to its alias. An
+        off-by-one in the bar height would instead leave it a residual 2^-mu of probability.
+        """
+        bits_precision = 4
+        coefficients = [0.5, 0.3, 0.2, 0.0]
+        num_index_qubits = 2
+
+        full_sv = _run_alias_sampling_and_dump(qdk_ctx, coefficients, num_index_qubits, bits_precision)
+        marginal_probs = _compute_marginal_probs(full_sv, num_index_qubits)
+
+        assert marginal_probs[3] == pytest.approx(0.0, abs=1e-12)
+        np.testing.assert_allclose(marginal_probs, [0.5, 0.3, 0.2, 0.0], atol=2.0 / (2**bits_precision))
+
     @pytest.mark.parametrize("num_coefficients", range(3, 10, 3))
     def test_marginal_probs_random(self, qdk_ctx, num_coefficients):
         """Verify alias sampling marginal probabilities with random coefficients.
 
-        The alias sampling circuit prepares:
-          |0> -> Sum_l sqrt(p_l) |l>|garbage_l>
-        where p_l ~ |c_l| / Sum|c_j| is the discretized probability.
-
-        We verify the marginal probability on the index register matches the
-        expected distribution within the discretization tolerance.
+        ``AliasSamplingPrepare`` is the LCU PREPARE oracle of Babbush et al. Fig. 11: it
+        samples the **1-norm** distribution p_l = |c_l| / Sum_k |c_k|, so the index register
+        carries amplitude sqrt(p_l). This is deliberately different from
+        ``ConditionalAliasSamplingPrepareWithFreeRider`` below, which squares its
+        coefficients to realize the 2-norm state preparation instead.
         """
         rng = np.random.default_rng(seed=42 + num_coefficients)
         coefficients = rng.uniform(0.01, 1.0, size=num_coefficients).tolist()
@@ -169,7 +211,15 @@ class TestConditionalAliasSamplingWithFreeRider:
         ],
     )
     def test_marginal_probs_with_free_rider(self, qdk_ctx, n_cond, n_coeffs, condition_value):
-        """Verify marginal probs and free-rider data loading."""
+        """Verify marginal probs and free-rider data loading.
+
+        Unlike ``AliasSamplingPrepare``, this variant squares its coefficients before
+        building the alias table, so it samples the **2-norm** distribution
+        p_l = c_l^2 / Sum_k c_k^2 and the index register carries amplitude |c_l| / ||c||_2.
+        A QROM-loaded sign bit then applies a Z phase to recover the signed amplitude. The
+        squared expectation below is therefore intentional, not a copy of the 1-norm
+        assertion in ``test_marginal_probs_random``.
+        """
         rng = np.random.default_rng(seed=456 + n_cond * 10 + condition_value)
         coefficients = rng.uniform(-1.0, 1.0, size=(n_cond, n_coeffs)).tolist()
         n_fr_bits = 3

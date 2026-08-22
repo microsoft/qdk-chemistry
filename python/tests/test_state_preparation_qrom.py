@@ -6,6 +6,8 @@
 # --------------------------------------------------------------------------------------------
 
 import math
+import warnings
+from typing import ClassVar
 
 import numpy as np
 import pytest
@@ -44,18 +46,30 @@ def _build_expected_from_amplitudes(amplitudes: list[float], num_qubits: int) ->
 
 
 def _make_wavefunction(amplitudes: list[float]) -> Wavefunction:
-    """Create a Wavefunction from a list of amplitudes."""
+    """Create a Wavefunction from a list of amplitudes.
+
+    Zero amplitudes are kept so that determinant ``idx`` stays aligned with position ``idx``
+    in the coefficient vector, which is the index the QROM circuit addresses.
+    """
     num_qubits = math.ceil(math.log2(len(amplitudes))) if len(amplitudes) > 1 else 1
-    coeffs_list: list[float] = []
-    dets: list[Configuration] = []
-    for idx, amp in enumerate(amplitudes):
-        if amp != 0.0:
-            bitstring = format(idx, f"0{num_qubits}b")
-            dets.append(Configuration.from_bitstring(bitstring))
-            coeffs_list.append(float(amp))
+    dets = [Configuration.from_bitstring(format(idx, f"0{num_qubits}b")) for idx in range(len(amplitudes))]
     orbitals = ModelOrbitals(num_qubits)
-    container = StateVectorContainer(np.array(coeffs_list), dets, orbitals)
+    container = StateVectorContainer(np.array([float(a) for a in amplitudes]), dets, orbitals)
     return Wavefunction(container)
+
+
+def _reduced_state(sv: np.ndarray, num_qubits: int) -> np.ndarray:
+    """Project the full statevector onto the ``num_qubits`` state qubits.
+
+    ``dump_machine`` is big-endian (qubit 0 = MSB) and the state register is allocated
+    first, so it occupies the top ``num_qubits`` bits of the dense index.
+    """
+    reduced = np.zeros(2**num_qubits, dtype=complex)
+    stride = len(sv) // (2**num_qubits)
+    for i, amp in enumerate(sv):
+        if abs(amp) > 1e-12:
+            reduced[i // stride] += amp
+    return reduced
 
 
 class TestQROMStatePreparation:
@@ -85,6 +99,93 @@ class TestQROMStatePreparation:
         expected = _build_expected_from_amplitudes(amplitudes, num_qubits)
 
         fidelity = abs(np.dot(np.conj(actual_sv), expected))
+        assert np.isclose(fidelity, 1.0, atol=1e-3)
+
+    def test_settings_expose_rotation_bit_precision(self):
+        """The constructor argument is stored in settings so create() can reach it."""
+        prep = QROMStatePreparation(rotation_bit_precision=6)
+        assert prep.rotation_bit_precision == 6
+        assert prep.settings.get("rotation_bit_precision") == 6
+
+        prep.settings.set("rotation_bit_precision", 8)
+        assert prep.rotation_bit_precision == 8
+
+    def test_empty_coefficients_rejected(self):
+        """An empty coefficient vector is rejected rather than reaching log2(0)."""
+        prep = QROMStatePreparation(rotation_bit_precision=4)
+        with pytest.raises(ValueError, match="at least one coefficient"):
+            prep._run_impl(_EmptyCoefficientWavefunction())
+
+    def test_negative_coefficients_warn(self):
+        """Negative coefficients are accepted but loudly flagged as producing a wrong state."""
+        prep = QROMStatePreparation(rotation_bit_precision=4)
+        wf = _make_wavefunction([0.5, -0.5, 0.5, 0.5])
+        with pytest.warns(RuntimeWarning, match="negative"):
+            prep.run(wf)
+
+    def test_non_negative_coefficients_do_not_warn(self):
+        """The negative-coefficient warning must not fire on ordinary input."""
+        prep = QROMStatePreparation(rotation_bit_precision=4)
+        wf = _make_wavefunction([0.5, 0.3, 0.7, 0.1])
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", RuntimeWarning)
+            prep.run(wf)
+
+
+class _EmptyCoefficientWavefunction:
+    """Stand-in wavefunction whose coefficient vector is empty.
+
+    ``StateVectorContainer`` will not build a determinant-free wavefunction, so the empty
+    input guard is exercised through the minimal interface ``_run_impl`` actually uses.
+    """
+
+    def get_coefficients(self) -> np.ndarray:
+        """Return an empty coefficient vector."""
+        return np.array([])
+
+
+class TestQROMNegativeAmplitudes:
+    """The QROM loader's handling of signed amplitudes.
+
+    Magnitudes come from the multiplexed Ry rotations and are always correct. Signs are
+    applied by a separate QROM-loaded ``Z`` phase kickback whose uncompute is not a faithful
+    adjoint, so the sign ancilla is implicitly measured on release and the sign pattern
+    collapses at random.
+    """
+
+    NEGATIVE_AMPLITUDES: ClassVar[list[float]] = [0.5, -0.5, 0.5, 0.5]
+
+    def test_magnitudes_are_correct(self, qdk_ctx):
+        """Whatever happens to the signs, |amplitude| is still right."""
+        qdk_ctx.set_quantum_seed(1)
+        num_qubits = 2
+        sv = _run_qrom_state_prep_and_dump(qdk_ctx, self.NEGATIVE_AMPLITUDES, num_qubits)
+        actual = np.abs(_reduced_state(sv, num_qubits))
+
+        expected = np.abs(np.array(self.NEGATIVE_AMPLITUDES, dtype=float))
+        expected /= np.linalg.norm(expected)
+
+        np.testing.assert_allclose(actual, expected, atol=1e-3)
+
+    @pytest.mark.xfail(
+        reason=(
+            "Known defect: the sign QROM's uncompute is not a faithful adjoint, so the sign "
+            "ancilla is released while entangled and the signs collapse at random. See the "
+            "QROMStatePreparation docstring. Remove this xfail once SelectSwap's adjoint is fixed."
+        ),
+        strict=True,
+    )
+    def test_signs_are_preserved(self, qdk_ctx):
+        """The prepared state should match the signed target, but currently does not."""
+        qdk_ctx.set_quantum_seed(1)
+        num_qubits = 2
+        sv = _run_qrom_state_prep_and_dump(qdk_ctx, self.NEGATIVE_AMPLITUDES, num_qubits)
+        actual = _reduced_state(sv, num_qubits)
+
+        expected = np.array(self.NEGATIVE_AMPLITUDES, dtype=float)
+        expected /= np.linalg.norm(expected)
+
+        fidelity = abs(np.vdot(actual, expected))
         assert np.isclose(fidelity, 1.0, atol=1e-3)
 
 
