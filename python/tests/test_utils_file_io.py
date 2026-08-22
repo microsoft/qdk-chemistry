@@ -5,8 +5,10 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import ctypes
 import os
 import stat
+from ctypes import wintypes
 from pathlib import Path
 
 import pytest
@@ -41,6 +43,15 @@ def test_reject_missing_parent_directory_by_default(tmp_path: Path):
 
     with pytest.raises(FileNotFoundError, match="Parent directory does not exist"):
         write_text_file_atomically(path, "contents")
+
+    assert not path.exists()
+
+
+def test_reject_trailing_separator_destination(tmp_path: Path):
+    path = tmp_path / "data"
+
+    with pytest.raises(ValueError, match="must name a file"):
+        write_text_file_atomically(f"{path}{os.sep}", "contents")
 
     assert not path.exists()
 
@@ -114,6 +125,21 @@ def test_preserve_destination_permissions(tmp_path: Path):
     assert stat.S_IMODE(path.stat().st_mode) == 0o640
 
 
+@pytest.mark.skipif(os.name == "nt", reason="POSIX symlink semantics")
+def test_reject_symlink_destination_without_copying_referent_mode(tmp_path: Path):
+    target = tmp_path / "target.txt"
+    link = tmp_path / "link.txt"
+    target.write_text("target", encoding="utf-8")
+    target.chmod(0o6755)
+    link.symlink_to(target)
+
+    with pytest.raises(ValueError, match="Symlink destinations are not supported"):
+        write_text_file_atomically(link, "replacement")
+
+    assert link.is_symlink()
+    assert target.read_text(encoding="utf-8") == "target"
+
+
 @pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits are not portable to Windows")
 def test_create_new_file_with_owner_only_permissions(tmp_path: Path):
     path = tmp_path / "data.txt"
@@ -137,6 +163,66 @@ def test_replace_read_only_destination_on_windows(tmp_path: Path):
 
     assert read_text_file(path) == "replacement"
     assert path.stat().st_mode & stat.S_IWRITE == 0
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows read-only behavior")
+def test_preserve_writable_destination_on_windows(tmp_path: Path):
+    path = tmp_path / "data.txt"
+    write_text_file_atomically(path, "original")
+
+    def write_read_only_temporary_file(temporary_path: Path) -> None:
+        temporary_path.write_text("replacement", encoding="utf-8")
+        temporary_path.chmod(stat.S_IREAD)
+
+    write_file_atomically(path, write_read_only_temporary_file)
+
+    assert read_text_file(path) == "replacement"
+    assert path.stat().st_mode & stat.S_IWRITE != 0
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows file-sharing behavior")
+def test_allow_exclusive_writer_on_windows(tmp_path: Path):
+    path = tmp_path / "data.txt"
+
+    def write_with_exclusive_handle(temporary_path: Path) -> None:
+        create_file = ctypes.WinDLL("kernel32", use_last_error=True).CreateFileW
+        create_file.argtypes = (
+            wintypes.LPCWSTR,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.LPVOID,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.HANDLE,
+        )
+        create_file.restype = wintypes.HANDLE
+        handle = create_file(
+            str(temporary_path),
+            0x40000000,
+            0,
+            None,
+            3,
+            0x00000080,
+            None,
+        )
+        assert handle != wintypes.HANDLE(-1).value
+        try:
+            written = wintypes.DWORD()
+            contents = ctypes.create_string_buffer(b"contents")
+            assert ctypes.windll.kernel32.WriteFile(
+                handle,
+                contents,
+                len(contents.value),
+                ctypes.byref(written),
+                None,
+            )
+            assert written.value == len(contents.value)
+        finally:
+            ctypes.windll.kernel32.CloseHandle(handle)
+
+    write_file_atomically(path, write_with_exclusive_handle)
+
+    assert read_text_file(path) == "contents"
 
 
 def test_preserve_destination_suffixes_for_writer(tmp_path: Path):
@@ -172,10 +258,32 @@ def test_preserve_long_destination_suffix(tmp_path: Path):
     assert list(tmp_path.iterdir()) == [path]
 
 
+@pytest.mark.skipif(os.name == "nt", reason="POSIX component length semantics")
+def test_compact_temporary_path_never_aliases_destination(tmp_path: Path):
+    path = tmp_path / f"qqqq0.{'a' * 249}"
+    observed_temporary_path: Path | None = None
+    destination_visible = False
+
+    def write_temporary_file(temporary_path: Path) -> None:
+        nonlocal destination_visible, observed_temporary_path
+        observed_temporary_path = temporary_path
+        destination_visible = path.exists()
+        temporary_path.write_text("contents", encoding="utf-8")
+
+    write_file_atomically(path, write_temporary_file)
+
+    assert observed_temporary_path != path
+    assert not destination_visible
+    assert read_text_file(path) == "contents"
+
+
 def test_reject_replaced_temporary_file(tmp_path: Path):
     path = tmp_path / "data.txt"
+    replacement_path: Path | None = None
 
     def replace_temporary_file(temporary_path: Path) -> None:
+        nonlocal replacement_path
+        replacement_path = temporary_path
         temporary_path.unlink()
         temporary_path.write_text("replacement", encoding="utf-8")
 
@@ -187,7 +295,9 @@ def test_reject_replaced_temporary_file(tmp_path: Path):
             write_file_atomically(path, replace_temporary_file)
 
     assert not path.exists()
-    assert list(tmp_path.iterdir()) == []
+    if os.name != "nt":
+        assert replacement_path is not None
+        assert replacement_path.read_text(encoding="utf-8") == "replacement"
 
 
 def test_freeze_relative_destination_before_writer_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

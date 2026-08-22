@@ -7,12 +7,16 @@
 
 from __future__ import annotations
 
+import ctypes
 import errno
+import importlib
 import os
 import stat
+import sys
 from collections.abc import Callable
+from ctypes import wintypes
 from pathlib import Path
-from typing import TypeAlias
+from typing import TypeAlias, cast
 
 PathLike: TypeAlias = str | os.PathLike[str]
 AtomicFileWriter: TypeAlias = Callable[[Path], None]
@@ -32,6 +36,13 @@ def ensure_parent_directory(path: PathLike) -> None:
     parent = Path(path).parent
     if parent != Path("."):
         parent.mkdir(parents=True, exist_ok=True)
+
+
+def _validate_destination_path(path: PathLike) -> None:
+    value = os.fspath(path)
+    separators = tuple(separator for separator in (os.sep, os.altsep) if separator)
+    if value.endswith(separators):
+        raise ValueError(f"Destination path must name a file: '{value}'")
 
 
 def read_text_file(path: PathLike, *, encoding: str = "utf-8") -> str:
@@ -65,9 +76,10 @@ def write_file_atomically(
     are not preserved. Atomic replacement prevents partial visibility but does
     not guarantee durability after power loss.
 
-    The destination's parent directory must not be writable by principals less
-    privileged than the process performing the write.
+    The destination's parent directory must not be readable or writable by
+    principals less privileged than the process performing the write.
     """
+    _validate_destination_path(path)
     destination = Path(path)
     if not destination.is_absolute():
         destination = Path(os.path.abspath(destination)) if os.name == "nt" else Path.cwd() / destination
@@ -80,26 +92,25 @@ def write_file_atomically(
 
     descriptor, temporary_name = _reserve_temporary_file(destination)
     temporary_path = Path(temporary_name)
+    reserved_status: os.stat_result | None = None
 
     try:
         writer(temporary_path)
         reserved_status = os.fstat(descriptor)
         current_status = temporary_path.lstat()
-        if (
-            reserved_status.st_dev != current_status.st_dev
-            or reserved_status.st_ino != current_status.st_ino
-            or not stat.S_ISREG(current_status.st_mode)
-            or current_status.st_nlink != 1
-        ):
+        if not _same_file_identity(reserved_status, current_status):
             raise RuntimeError(f"Temporary file identity changed: '{temporary_path}'")
 
         try:
-            existing_mode = stat.S_IMODE(destination.stat().st_mode)
+            destination_status = destination.lstat()
         except FileNotFoundError:
             destination_mode = None
             if os.name != "nt":
                 os.fchmod(descriptor, stat.S_IRUSR | stat.S_IWUSR)
         else:
+            if stat.S_ISLNK(destination_status.st_mode):
+                raise ValueError(f"Symlink destinations are not supported: '{destination}'")
+            existing_mode = stat.S_IMODE(destination_status.st_mode)
             destination_mode = existing_mode
             if os.name != "nt" and hasattr(os, "fchmod"):
                 os.fchmod(descriptor, existing_mode)
@@ -111,13 +122,19 @@ def write_file_atomically(
             descriptor = -1
         _replace_file(temporary_path, destination, destination_mode)
     except BaseException as error:
+        if reserved_status is None and descriptor >= 0:
+            try:
+                reserved_status = os.fstat(descriptor)
+            except OSError:
+                reserved_status = None
         if descriptor >= 0:
             os.close(descriptor)
             descriptor = -1
-        try:
-            _remove_temporary_file(temporary_path)
-        except OSError as cleanup_error:
-            raise error from cleanup_error
+        if reserved_status is not None and _temporary_path_matches(temporary_path, reserved_status):
+            try:
+                _remove_temporary_file(temporary_path)
+            except OSError as cleanup_error:
+                raise error from cleanup_error
         raise
     finally:
         if descriptor >= 0:
@@ -129,8 +146,10 @@ def _reserve_temporary_file(destination: Path) -> tuple[int, str]:
     suffix = "".join(destination.suffixes)
     for _ in range(64):
         temporary_path = destination.parent / f".qdk-tmp-{os.urandom(8).hex()}{suffix}"
+        if _component_is_too_long(temporary_path):
+            break
         try:
-            descriptor = os.open(temporary_path, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
+            descriptor = _create_exclusive_file(temporary_path)
         except FileExistsError:
             continue
         except OSError as error:
@@ -144,8 +163,12 @@ def _reserve_temporary_file(destination: Path) -> tuple[int, str]:
         for attempt in range(64):
             stem = "q" * (stem_length - 1) + alphabet[attempt]
             temporary_path = destination.parent / f"{stem}{suffix}"
+            if temporary_path == destination:
+                continue
+            if _component_is_too_long(temporary_path):
+                break
             try:
-                descriptor = os.open(temporary_path, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
+                descriptor = _create_exclusive_file(temporary_path)
             except FileExistsError:
                 continue
             except OSError as error:
@@ -155,6 +178,76 @@ def _reserve_temporary_file(destination: Path) -> tuple[int, str]:
             return descriptor, str(temporary_path)
 
     raise FileExistsError(f"Could not create a unique temporary file beside '{destination}'")
+
+
+def _component_is_too_long(path: Path) -> bool:
+    if os.name != "nt":
+        return False
+    return len(path.name.encode("utf-16-le")) // 2 > 255
+
+
+def _create_exclusive_file(path: Path) -> int:
+    if sys.platform != "win32":
+        return os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_CLOEXEC, 0o600)
+
+    create_file = ctypes.WinDLL("kernel32", use_last_error=True).CreateFileW
+    create_file.argtypes = (
+        wintypes.LPCWSTR,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.HANDLE,
+    )
+    create_file.restype = wintypes.HANDLE
+    handle = create_file(
+        str(path),
+        0,
+        0x00000001 | 0x00000002 | 0x00000004,
+        None,
+        1,
+        0x00000080,
+        None,
+    )
+    if handle == wintypes.HANDLE(-1).value:
+        error = ctypes.get_last_error()
+        message = ctypes.FormatError(error)
+        if error in (80, 183):
+            raise FileExistsError(error, message, str(path))
+        raise OSError(error, message, str(path))
+    close_handle = ctypes.WinDLL("kernel32", use_last_error=True).CloseHandle
+    close_handle.argtypes = (wintypes.HANDLE,)
+    close_handle.restype = wintypes.BOOL
+    open_osfhandle = cast(
+        "Callable[[int, int], int]",
+        importlib.import_module("msvcrt").open_osfhandle,
+    )
+    try:
+        return open_osfhandle(
+            cast("int", handle),
+            os.O_RDONLY | getattr(os, "O_NOINHERIT", 0),
+        )
+    except BaseException:
+        close_handle(handle)
+        raise
+
+
+def _same_file_identity(reserved_status: os.stat_result, current_status: os.stat_result) -> bool:
+    return (
+        reserved_status.st_dev == current_status.st_dev
+        and reserved_status.st_ino == current_status.st_ino
+        and stat.S_ISREG(current_status.st_mode)
+        and current_status.st_nlink == 1
+    )
+
+
+def _temporary_path_matches(temporary_path: Path, reserved_status: os.stat_result) -> bool:
+    try:
+        current_status = temporary_path.lstat()
+    except OSError:
+        return False
+    return _same_file_identity(reserved_status, current_status)
 
 
 def _remove_temporary_file(temporary_path: Path) -> None:
@@ -174,6 +267,8 @@ def _remove_temporary_file(temporary_path: Path) -> None:
 
 def _replace_file(temporary_path: Path, destination: Path, destination_mode: int | None) -> None:
     """Replace a destination, handling Windows read-only files."""
+    if os.name == "nt" and destination_mode is not None:
+        temporary_path.chmod(destination_mode)
     try:
         os.replace(temporary_path, destination)
         return
@@ -186,10 +281,12 @@ def _replace_file(temporary_path: Path, destination: Path, destination_mode: int
     destination.chmod(destination_mode | stat.S_IWRITE)
     try:
         os.replace(temporary_path, destination)
-    except BaseException:
-        destination.chmod(destination_mode)
+    except BaseException as replace_error:
+        try:
+            destination.chmod(destination_mode)
+        except OSError as rollback_error:
+            raise replace_error from rollback_error
         raise
-    destination.chmod(destination_mode)
 
 
 def write_text_file_atomically(

@@ -66,6 +66,14 @@ std::string display_path(const std::filesystem::path& path) {
   return {value.begin(), value.end()};
 }
 
+void validate_path(const std::filesystem::path& path) {
+  const auto& native_path = path.native();
+  if (native_path.find(static_cast<std::filesystem::path::value_type>('\0')) !=
+      std::filesystem::path::string_type::npos) {
+    throw std::invalid_argument("Path contains an embedded NUL character");
+  }
+}
+
 std::filesystem::path make_temporary_path(
     const std::filesystem::path& destination) {
   static std::atomic<unsigned long long> counter{0};
@@ -158,8 +166,7 @@ class ReservedTemporaryFile {
   }
 
   ~ReservedTemporaryFile() {
-    close();
-    if (cleanup_) {
+    if (cleanup_ && path_matches_identity()) {
 #ifdef _WIN32
       const DWORD attributes = GetFileAttributesW(path_.c_str());
       if (attributes != INVALID_FILE_ATTRIBUTES &&
@@ -172,6 +179,7 @@ class ReservedTemporaryFile {
       std::error_code ignored;
       std::filesystem::remove(path_, ignored);
     }
+    close();
   }
 
   const std::filesystem::path& path() const { return path_; }
@@ -258,6 +266,45 @@ class ReservedTemporaryFile {
   }
 #endif
 
+  bool path_matches_identity() const noexcept {
+    if (handle_ == invalid_handle()) {
+      return false;
+    }
+#ifdef _WIN32
+    BY_HANDLE_FILE_INFORMATION reserved_info{};
+    if (!GetFileInformationByHandle(handle_, &reserved_info)) {
+      return false;
+    }
+    HANDLE current_handle = CreateFileW(
+        path_.c_str(), FILE_READ_ATTRIBUTES,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+        OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+    if (current_handle == INVALID_HANDLE_VALUE) {
+      return false;
+    }
+    BY_HANDLE_FILE_INFORMATION current_info{};
+    const bool inspected =
+        GetFileInformationByHandle(current_handle, &current_info) != 0;
+    CloseHandle(current_handle);
+    return inspected &&
+           reserved_info.dwVolumeSerialNumber ==
+               current_info.dwVolumeSerialNumber &&
+           reserved_info.nFileIndexHigh == current_info.nFileIndexHigh &&
+           reserved_info.nFileIndexLow == current_info.nFileIndexLow &&
+           (current_info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) ==
+               0 &&
+           current_info.nNumberOfLinks == 1;
+#else
+    struct stat reserved_status{};
+    struct stat current_status{};
+    return ::fstat(handle_, &reserved_status) == 0 &&
+           ::lstat(path_.c_str(), &current_status) == 0 &&
+           reserved_status.st_dev == current_status.st_dev &&
+           reserved_status.st_ino == current_status.st_ino &&
+           S_ISREG(current_status.st_mode) && current_status.st_nlink == 1;
+#endif
+  }
+
   void close() {
     if (handle_ == invalid_handle()) {
       return;
@@ -278,10 +325,9 @@ class ReservedTemporaryFile {
 ReservedTemporaryFile create_exclusive_file(const std::filesystem::path& path,
                                             std::error_code& error) {
 #ifdef _WIN32
-  HANDLE handle =
-      CreateFileW(path.c_str(), GENERIC_READ | GENERIC_WRITE,
-                  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                  nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+  HANDLE handle = CreateFileW(
+      path.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+      nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (handle == INVALID_HANDLE_VALUE) {
     error = std::error_code(static_cast<int>(GetLastError()),
                             std::system_category());
@@ -309,6 +355,11 @@ ReservedTemporaryFile reserve_temporary_file(
   constexpr int max_attempts = 64;
   for (int attempt = 0; attempt < max_attempts; ++attempt) {
     const auto temporary_path = make_temporary_path(destination);
+#ifdef _WIN32
+    if (temporary_path.filename().native().size() > 255) {
+      break;
+    }
+#endif
     std::error_code error;
     auto temporary_file = create_exclusive_file(temporary_path, error);
     if (!error) {
@@ -328,6 +379,14 @@ ReservedTemporaryFile reserve_temporary_file(
     for (int attempt = 0; attempt < max_attempts; ++attempt) {
       const auto temporary_path =
           make_compact_temporary_path(destination, attempt, stem_length);
+      if (temporary_path == destination) {
+        continue;
+      }
+#ifdef _WIN32
+      if (temporary_path.filename().native().size() > 255) {
+        break;
+      }
+#endif
       std::error_code error;
       auto temporary_file = create_exclusive_file(temporary_path, error);
       if (!error) {
@@ -355,6 +414,15 @@ void replace_file(const std::filesystem::path& source,
   const DWORD original_attributes = GetFileAttributesW(destination.c_str());
   const bool destination_exists =
       original_attributes != INVALID_FILE_ATTRIBUTES;
+  if (destination_exists &&
+      !SetFileAttributesW(source.c_str(),
+                          settable_file_attributes(original_attributes))) {
+    const std::error_code error(static_cast<int>(GetLastError()),
+                                std::system_category());
+    throw std::runtime_error("Could not prepare file attributes for '" +
+                             display_path(destination) +
+                             "': " + error.message());
+  }
 
   auto move = [&]() {
     return MoveFileExW(source.c_str(), destination.c_str(),
@@ -380,19 +448,22 @@ void replace_file(const std::filesystem::path& source,
 
   if (!move()) {
     const DWORD retry_error = GetLastError();
-    SetFileAttributesW(destination.c_str(),
-                       settable_file_attributes(original_attributes));
+    const bool restored =
+        SetFileAttributesW(destination.c_str(),
+                           settable_file_attributes(original_attributes)) != 0;
+    const DWORD restore_error = restored ? ERROR_SUCCESS : GetLastError();
     const std::error_code error(static_cast<int>(retry_error),
                                 std::system_category());
+    if (!restored) {
+      const std::error_code rollback_error(static_cast<int>(restore_error),
+                                           std::system_category());
+      throw std::runtime_error("Could not replace file '" +
+                               display_path(destination) +
+                               "': " + error.message() +
+                               "; could not restore original attributes: " +
+                               rollback_error.message());
+    }
     throw std::runtime_error("Could not replace file '" +
-                             display_path(destination) +
-                             "': " + error.message());
-  }
-  if (!SetFileAttributesW(destination.c_str(),
-                          settable_file_attributes(original_attributes))) {
-    const std::error_code error(static_cast<int>(GetLastError()),
-                                std::system_category());
-    throw std::runtime_error("Could not restore file attributes for '" +
                              display_path(destination) +
                              "': " + error.message());
   }
@@ -410,7 +481,8 @@ void replace_file(const std::filesystem::path& source,
 void preserve_permissions(ReservedTemporaryFile& temporary_file,
                           const std::filesystem::path& destination) {
   std::error_code status_error;
-  const auto status = std::filesystem::status(destination, status_error);
+  const auto status =
+      std::filesystem::symlink_status(destination, status_error);
   if (status_error) {
     if (status_error == std::errc::no_such_file_or_directory) {
 #ifndef _WIN32
@@ -430,6 +502,10 @@ void preserve_permissions(ReservedTemporaryFile& temporary_file,
 #endif
     return;
   }
+  if (std::filesystem::is_symlink(status)) {
+    throw std::runtime_error("Symlink destinations are not supported: '" +
+                             display_path(destination) + "'");
+  }
 
   temporary_file.set_permissions(status.permissions());
 }
@@ -437,6 +513,7 @@ void preserve_permissions(ReservedTemporaryFile& temporary_file,
 }  // namespace
 
 void ensure_parent_directory(const std::filesystem::path& path) {
+  validate_path(path);
   const auto parent = path.parent_path();
   if (parent.empty()) {
     return;
@@ -451,6 +528,7 @@ void ensure_parent_directory(const std::filesystem::path& path) {
 }
 
 std::string read_text_file(const std::filesystem::path& path) {
+  validate_path(path);
   std::string contents;
 #ifdef _WIN32
   HANDLE handle =
@@ -526,6 +604,7 @@ std::string read_text_file(const std::filesystem::path& path) {
 void write_file_atomically(const std::filesystem::path& path,
                            const AtomicFileWriter& writer,
                            bool create_parent_directories) {
+  validate_path(path);
   std::error_code absolute_error;
   const auto destination = std::filesystem::absolute(path, absolute_error);
   if (absolute_error) {

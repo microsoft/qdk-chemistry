@@ -44,8 +44,8 @@ std::string read_text_file(const std::filesystem::path& path);
  * are not preserved. Atomic replacement prevents partial visibility but does
  * not guarantee durability after power loss.
  *
- * The destination's parent directory must not be writable by principals less
- * privileged than the process performing the write.
+ * The destination's parent directory must not be readable or writable by
+ * principals less privileged than the process performing the write.
  *
  * @param path Destination path.
  * @param writer Function that writes the complete temporary file.

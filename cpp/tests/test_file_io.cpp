@@ -71,6 +71,22 @@ TEST_F(FileIoTest, RejectsMissingParentDirectoryByDefault) {
   EXPECT_FALSE(std::filesystem::exists(path));
 }
 
+TEST_F(FileIoTest, RejectsEmbeddedNulPaths) {
+  const auto prefix = root_ / "data.txt";
+  std::string path = prefix.string();
+  path.append("\0ignored", 8);
+  const std::filesystem::path nul_path(path);
+
+  EXPECT_THROW(qdk::chemistry::utils::ensure_parent_directory(nul_path),
+               std::invalid_argument);
+  EXPECT_THROW(qdk::chemistry::utils::read_text_file(nul_path),
+               std::invalid_argument);
+  EXPECT_THROW(
+      qdk::chemistry::utils::write_text_file_atomically(nul_path, "contents"),
+      std::invalid_argument);
+  EXPECT_FALSE(std::filesystem::exists(prefix));
+}
+
 TEST_F(FileIoTest, PreservesDestinationWhenWriterFails) {
   const auto path = root_ / "data.txt";
   qdk::chemistry::utils::write_text_file_atomically(path, "original");
@@ -78,8 +94,9 @@ TEST_F(FileIoTest, PreservesDestinationWhenWriterFails) {
   EXPECT_THROW(qdk::chemistry::utils::write_file_atomically(
                    path,
                    [](const std::filesystem::path& temporary_path) {
-                     qdk::chemistry::utils::write_text_file_atomically(
-                         temporary_path, "incomplete");
+                     std::ofstream output(temporary_path);
+                     output << "incomplete";
+                     output.close();
                      throw std::runtime_error("writer failed");
                    }),
                std::runtime_error);
@@ -110,6 +127,27 @@ TEST_F(FileIoTest, PreservesDestinationPermissions) {
   EXPECT_EQ(std::filesystem::status(path).permissions(), private_permissions);
 #endif
 }
+
+#ifndef _WIN32
+TEST_F(FileIoTest, RejectsSymlinkDestinationsWithoutCopyingReferentMode) {
+  const auto target = root_ / "target.txt";
+  const auto link = root_ / "link.txt";
+  qdk::chemistry::utils::write_text_file_atomically(target, "target");
+  std::filesystem::permissions(
+      target,
+      std::filesystem::perms::owner_all | std::filesystem::perms::group_read |
+          std::filesystem::perms::set_uid | std::filesystem::perms::set_gid,
+      std::filesystem::perm_options::replace);
+  std::filesystem::create_symlink(target, link);
+
+  EXPECT_THROW(
+      qdk::chemistry::utils::write_text_file_atomically(link, "replacement"),
+      std::runtime_error);
+
+  EXPECT_TRUE(std::filesystem::is_symlink(link));
+  EXPECT_EQ(qdk::chemistry::utils::read_text_file(target), "target");
+}
+#endif
 
 TEST_F(FileIoTest, CreatesNewFilesWithOwnerOnlyPermissions) {
 #ifndef _WIN32
@@ -197,6 +235,47 @@ TEST_F(FileIoTest, CleansUpReadOnlyTemporaryFileWhenWriterFails) {
                           std::filesystem::directory_iterator()),
             1);
 }
+
+TEST_F(FileIoTest, PreservesWritableDestinationOnWindows) {
+  const auto path = root_ / "data.txt";
+  qdk::chemistry::utils::write_text_file_atomically(path, "original");
+
+  qdk::chemistry::utils::write_file_atomically(
+      path, [](const std::filesystem::path& temporary_path) {
+        std::ofstream output(temporary_path);
+        output << "replacement";
+        output.close();
+        ASSERT_NE(
+            SetFileAttributesW(temporary_path.c_str(), FILE_ATTRIBUTE_READONLY),
+            0);
+      });
+
+  EXPECT_EQ(qdk::chemistry::utils::read_text_file(path), "replacement");
+  EXPECT_NE(std::filesystem::status(path).permissions() &
+                std::filesystem::perms::owner_write,
+            std::filesystem::perms::none);
+}
+
+TEST_F(FileIoTest, AllowsExclusiveWriterOnWindows) {
+  const auto path = root_ / "data.txt";
+
+  qdk::chemistry::utils::write_file_atomically(
+      path, [](const std::filesystem::path& temporary_path) {
+        HANDLE handle =
+            CreateFileW(temporary_path.c_str(), GENERIC_WRITE, 0, nullptr,
+                        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        ASSERT_NE(handle, INVALID_HANDLE_VALUE);
+        constexpr char contents[] = "contents";
+        DWORD written = 0;
+        EXPECT_NE(WriteFile(handle, contents, sizeof(contents) - 1, &written,
+                            nullptr),
+                  0);
+        EXPECT_EQ(written, sizeof(contents) - 1);
+        CloseHandle(handle);
+      });
+
+  EXPECT_EQ(qdk::chemistry::utils::read_text_file(path), "contents");
+}
 #endif
 
 TEST_F(FileIoTest, PreservesDestinationSuffixesForWriter) {
@@ -235,20 +314,42 @@ TEST_F(FileIoTest, PreservesLongDestinationSuffix) {
                           std::filesystem::directory_iterator()),
             1);
 }
+
+TEST_F(FileIoTest, CompactTemporaryPathNeverAliasesDestination) {
+  const auto path = root_ / ("qqqq0." + std::string(249, 'a'));
+  std::filesystem::path observed_temporary_path;
+  bool destination_visible = false;
+
+  qdk::chemistry::utils::write_file_atomically(
+      path, [&](const std::filesystem::path& temporary_path) {
+        observed_temporary_path = temporary_path;
+        destination_visible = std::filesystem::exists(path);
+        std::ofstream output(temporary_path);
+        output << "contents";
+      });
+
+  EXPECT_NE(observed_temporary_path, path);
+  EXPECT_FALSE(destination_visible);
+  EXPECT_EQ(qdk::chemistry::utils::read_text_file(path), "contents");
+}
 #endif
 
 TEST_F(FileIoTest, RejectsReplacedTemporaryFile) {
   const auto path = root_ / "data.txt";
+  std::filesystem::path replacement_path;
 
-  EXPECT_THROW(qdk::chemistry::utils::write_file_atomically(
-                   path,
-                   [](const std::filesystem::path& temporary_path) {
-                     std::filesystem::remove(temporary_path);
-                     std::ofstream output(temporary_path);
-                     output << "replacement";
-                   }),
-               std::runtime_error);
+  EXPECT_THROW(
+      qdk::chemistry::utils::write_file_atomically(
+          path,
+          [&replacement_path](const std::filesystem::path& temporary_path) {
+            replacement_path = temporary_path;
+            std::filesystem::remove(temporary_path);
+            std::ofstream output(temporary_path);
+            output << "replacement";
+          }),
+      std::runtime_error);
   EXPECT_FALSE(std::filesystem::exists(path));
+  EXPECT_TRUE(std::filesystem::exists(replacement_path));
 }
 
 TEST_F(FileIoTest, FreezesRelativeDestinationBeforeWriterRuns) {
