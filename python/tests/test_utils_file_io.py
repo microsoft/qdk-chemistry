@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import ctypes
+import gc
 import os
 import stat
 import sys
@@ -197,6 +198,20 @@ def test_close_failure_does_not_resurrect_callers_exception(
     monkeypatch.undo()
 
     assert read_text_file(path) == "contents"
+
+
+def test_reservation_finalizer_closes_and_removes_temporary_file(tmp_path: Path):
+    destination = tmp_path / "data.txt"
+    reservation = file_io_module._reserve_temporary_file(destination)
+    descriptor = reservation.descriptor
+    temporary_path = reservation.path
+
+    del reservation
+    gc.collect()
+
+    with pytest.raises(OSError, match="(?i)(bad file descriptor|handle is invalid)"):
+        os.fstat(descriptor)
+    assert not temporary_path.exists()
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows read-only behavior")

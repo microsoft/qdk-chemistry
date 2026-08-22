@@ -32,6 +32,35 @@ __all__ = [
 ]
 
 
+class _TemporaryFileReservation:
+    def __init__(
+        self,
+        descriptor: int,
+        path: Path,
+        status: os.stat_result,
+    ) -> None:
+        self.descriptor = descriptor
+        self.path = path
+        self.status = status
+        self.cleanup = True
+
+    def take_descriptor(self) -> int:
+        descriptor, self.descriptor = self.descriptor, -1
+        return descriptor
+
+    def disarm(self) -> None:
+        self.cleanup = False
+
+    def __del__(self) -> None:
+        try:
+            if self.descriptor >= 0:
+                _close_descriptor(self.take_descriptor())
+            if self.cleanup and _temporary_path_matches(self.path, self.status):
+                _remove_temporary_file(self.path)
+        except BaseException:  # noqa: BLE001
+            pass
+
+
 def ensure_parent_directory(path: PathLike) -> None:
     """Create the parent directory of *path* when it does not exist."""
     path_value = os.fspath(path)
@@ -150,9 +179,13 @@ def write_file_atomically(
     descriptor = -1
     temporary_path: Path | None = None
     reserved_status: os.stat_result | None = None
+    reservation: _TemporaryFileReservation | None = None
 
     try:
-        descriptor, temporary_path, reserved_status = _reserve_temporary_file(destination)
+        reservation = _reserve_temporary_file(destination)
+        descriptor = reservation.descriptor
+        temporary_path = reservation.path
+        reserved_status = reservation.status
         writer(temporary_path)
         current_status = temporary_path.lstat()
         if not _same_file_identity(reserved_status, current_status):
@@ -177,16 +210,17 @@ def write_file_atomically(
                 temporary_path.chmod(existing_mode)
 
         if os.name == "nt":
-            owned_descriptor, descriptor = descriptor, -1
+            owned_descriptor, descriptor = reservation.take_descriptor(), -1
             close_error = _close_descriptor(owned_descriptor)
             if close_error is not None:
                 raise close_error
         _replace_file(temporary_path, destination, destination_mode)
         if descriptor >= 0:
-            owned_descriptor, descriptor = descriptor, -1
+            owned_descriptor, descriptor = reservation.take_descriptor(), -1
             close_error = _close_descriptor(owned_descriptor)
             if close_error is not None:
                 raise close_error
+        reservation.disarm()
     except BaseException as error:
         if reserved_status is None and descriptor >= 0:
             try:
@@ -194,7 +228,8 @@ def write_file_atomically(
             except OSError:
                 reserved_status = None
         if descriptor >= 0:
-            owned_descriptor, descriptor = descriptor, -1
+            owned_descriptor = reservation.take_descriptor() if reservation is not None else descriptor
+            descriptor = -1
             close_error = _close_descriptor(owned_descriptor)
         else:
             close_error = None
@@ -209,10 +244,12 @@ def write_file_atomically(
                 raise error from cleanup_error
         if close_error is not None:
             raise error from close_error
+        if reservation is not None:
+            reservation.disarm()
         raise
 
 
-def _reserve_temporary_file(destination: Path) -> tuple[int, Path, os.stat_result]:
+def _reserve_temporary_file(destination: Path) -> _TemporaryFileReservation:
     """Reserve a private temporary sibling and keep its descriptor open."""
     suffix = "".join(destination.suffixes)
     for _ in range(64):
@@ -257,9 +294,9 @@ def _package_reservation(
     descriptor: int,
     temporary_path: Path,
     reserved_status: os.stat_result,
-) -> tuple[int, Path, os.stat_result]:
+) -> _TemporaryFileReservation:
     try:
-        return descriptor, temporary_path, reserved_status
+        return _TemporaryFileReservation(descriptor, temporary_path, reserved_status)
     except BaseException as error:
         close_error = _close_descriptor(descriptor)
         if _temporary_path_matches(temporary_path, reserved_status):
@@ -419,7 +456,7 @@ def _set_windows_file_attributes(descriptor: int, attributes: int, path: Path) -
 def _reserve_distinct_temporary_file(
     destination: Path,
     temporary_path: Path,
-) -> tuple[int, Path, os.stat_result] | None:
+) -> _TemporaryFileReservation | None:
     descriptor = _create_exclusive_file(temporary_path)
     reserved_status: os.stat_result | None = None
     try:
