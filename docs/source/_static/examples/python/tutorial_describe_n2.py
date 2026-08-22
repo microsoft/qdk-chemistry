@@ -20,8 +20,8 @@ if __name__ == "__main__":
     Logger.set_global_level(Logger.LogLevel.off)
 
 ################################################################################
-# docs:xyz ../data/tutorial_stretched_n2.structure.xyz
 # start-cell-molecule
+# Molecular system
 structure = Structure.from_xyz("""\
 2
 Stretched N2 molecule for the ground-state QPE tutorial
@@ -39,6 +39,7 @@ spin_multiplicity = 1
 
 ################################################################################
 # start-cell-hartree-fock
+# Hartree-Fock basis-set comparison
 # Correlation-consistent double- and triple-zeta bases form a controlled sequence:
 # cc-pVTZ adds radial/angular flexibility beyond cc-pVDZ at higher cost.
 basis_sets = ("cc-pvdz", "cc-pvtz")
@@ -72,8 +73,7 @@ print(f"cc-pvdz wavefunction: {num_cc_pvdz_orbitals} molecular orbitals")
 # end-cell-hartree-fock
 ################################################################################
 
-################################################################################
-# start-cell-compare
+# Compare basis-set energies
 signed_difference = energies["cc-pvtz"] - energies["cc-pvdz"]
 
 # Report the same absolute sensitivity in milliHartree and kJ/mol, a common
@@ -84,10 +84,18 @@ absolute_difference_kj_mol = abs(signed_difference) * HARTREE_TO_KJ_PER_MOL
 print(f"Signed difference (cc-pVTZ - cc-pVDZ): {signed_difference:.12f} Hartree")
 print(f"Absolute difference: {absolute_difference_millihartree:.6f} milliHartree")
 print(f"Absolute difference: {absolute_difference_kj_mol:.6f} kJ/mol")
-# end-cell-compare
+
+
+################################################################################
+# Students can stop reading here. The assertions below guard the documented
+# numerical results when this example runs in automated tests.
 ################################################################################
 
-# Numerical guards run in the documentation example test but are not displayed.
+
+# Keep this tag: test_docs_xyz_consistency.py matches the inline geometry above
+# byte-for-byte against the canonical XYZ file.
+# docs:xyz ../data/tutorial_stretched_n2.structure.xyz
+
 assert abs(energies["cc-pvdz"] - (-108.418633697214)) < 1e-8
 assert abs(energies["cc-pvtz"] - (-108.445215657498)) < 1e-8
 assert abs(signed_difference - (-0.026581960284)) < 2e-8

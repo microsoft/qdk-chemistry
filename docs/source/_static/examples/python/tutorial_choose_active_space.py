@@ -51,7 +51,6 @@ def run_active_space_workflow() -> ActiveSpaceResult:
         preparation, and visualization.
     """
     ################################################################################
-    # docs:xyz ../data/tutorial_stretched_n2.structure.xyz
     # start-cell-hartree-fock
     # Hartree-Fock reference
     structure = create_stretched_n2_structure()
@@ -253,6 +252,11 @@ def main() -> None:
 # chapters and prepare data for interactive visualizations. The final two lines
 # run the student-facing main() function when this file is executed.
 ################################################################################
+
+
+# Keep this tag: test_docs_xyz_consistency.py matches the inline geometry above
+# byte-for-byte against the canonical XYZ file.
+# docs:xyz ../data/tutorial_stretched_n2.structure.xyz
 
 
 @dataclass
