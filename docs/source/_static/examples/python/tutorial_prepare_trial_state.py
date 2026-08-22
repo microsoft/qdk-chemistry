@@ -11,6 +11,8 @@ the state-preparation circuit, and reports logical gate counts.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
 import json
 from collections import Counter
 from collections.abc import Iterator
@@ -18,10 +20,126 @@ from dataclasses import dataclass
 
 import numpy as np
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Circuit, Configuration, Hamiltonian, Wavefunction
+from qdk_chemistry.data import Circuit, Configuration, Wavefunction
 from qdk_chemistry.data.symmetry import SymmetryLabel, axes
 from qdk_chemistry.utils import Logger
 from tutorial_choose_active_space import ActiveSpaceResult, run_active_space_workflow
+
+
+def run_trial_state_workflow(
+    determinant_counts: tuple[int, ...] = (1, 2, 4),
+) -> TrialStateWorkflowResult:
+    """Build and compare sparse trial states for the selected N2 Hamiltonian.
+
+    For each requested support size, the largest reference determinants define
+    a subspace and PMC reoptimizes amplitudes by diagonalizing the Hamiltonian in
+    that subspace. Fidelity is then computed by reading reference and trial
+    coefficients in the same PMC determinant order before taking their inner
+    product.
+
+    Args:
+        determinant_counts: Support sizes to evaluate, in output order.
+
+    Returns:
+        The selected molecular model, reference determinant summary, and one
+        quality/circuit-cost result per requested support size.
+
+    Raises:
+        ValueError: If no support sizes are requested or a requested size is
+            invalid for the selected-space reference.
+    """
+    if not determinant_counts:
+        raise ValueError("determinant_counts must not be empty")
+
+    # Selected-space reference
+    active_space_result = run_active_space_workflow()
+    reference_wavefunction = active_space_result.refined_casci_wavefunction
+    selected_orbitals = active_space_result.refined_orbitals
+    active_hamiltonian = create("hamiltonian_constructor", "qdk").run(selected_orbitals)
+    reference_determinants = leading_determinant_contributions(reference_wavefunction)
+
+    trial_states = []
+    for num_determinants in determinant_counts:
+        ################################################################################
+        # start-cell-sparse-trial
+        # Projected sparse trial states
+        # The leading reference determinants define the trial-state support;
+        # PMC then reoptimizes their amplitudes within that restricted space.
+        top_determinants = leading_determinants(
+            reference_wavefunction, num_determinants
+        )
+        projected_calculator = create(
+            "projected_multi_configuration_calculator", "macis_pmc"
+        )
+        _, trial_wavefunction = projected_calculator.run(
+            active_hamiltonian, list(top_determinants)
+        )
+        retained_determinants = trial_wavefunction.get_active_determinants()
+
+        # Read both vectors in PMC determinant order. Without this alignment,
+        # np.vdot() could multiply coefficients belonging to different determinants.
+        reference_coefficients = np.asarray(
+            [
+                reference_wavefunction.get_coefficient(determinant)
+                for determinant in retained_determinants
+            ]
+        )
+        trial_coefficients = np.asarray(
+            [
+                trial_wavefunction.get_coefficient(determinant)
+                for determinant in retained_determinants
+            ]
+        )
+
+        # The trial vector is normalized on the retained support. The reference
+        # entries keep their full-state normalization, so their restricted norm
+        # records weight omitted by truncation.
+        fidelity = float(abs(np.vdot(reference_coefficients, trial_coefficients)) ** 2)
+        # end-cell-sparse-trial
+        ################################################################################
+
+        ################################################################################
+        # start-cell-preparation-circuit
+        # State-preparation circuits
+        state_preparation = create("state_prep", "sparse_isometry_gf2x")
+        circuit = state_preparation.run(trial_wavefunction)
+        num_compute_qubits, num_logical_gates, logical_gate_counts = circuit_statistics(
+            circuit
+        )
+        # end-cell-preparation-circuit
+        ################################################################################
+
+        trial_states.append(
+            TrialStateResult(
+                num_determinants=trial_wavefunction.size(),
+                fidelity=fidelity,
+                circuit=circuit,
+                num_compute_qubits=num_compute_qubits,
+                num_logical_gates=num_logical_gates,
+                logical_gate_counts=logical_gate_counts,
+            )
+        )
+
+    return TrialStateWorkflowResult(
+        active_space_result=active_space_result,
+        reference_determinants=reference_determinants,
+        trial_states=trial_states,
+    )
+
+
+def main() -> None:
+    """Run the trial-state workflow and print its lab-notebook evidence."""
+    # Change ``off`` to ``info`` to see detailed QDK/Chemistry calculation logs.
+    Logger.set_global_level(Logger.LogLevel.off)
+    result = run_trial_state_workflow()
+    print_trial_state_results(result)
+
+
+################################################################################
+# Students can stop reading here. The definitions below package determinant and
+# trial-state results for the notebook and later tutorial chapters. The final two
+# lines run the student-facing main() function when this file is executed.
+################################################################################
 
 
 @dataclass
@@ -51,7 +169,6 @@ class TrialStateResult:
 
     Attributes:
         num_determinants: Determinants retained by the projected calculation.
-        trial_wavefunction: Normalized PMC wavefunction on the retained support.
         fidelity: Squared overlap with the selected-space CASCI ground state.
         circuit: Generated sparse-isometry state-preparation circuit.
         num_compute_qubits: Qubits in the occupation register.
@@ -60,7 +177,6 @@ class TrialStateResult:
     """
 
     num_determinants: int
-    trial_wavefunction: Wavefunction
     fidelity: float
     circuit: Circuit
     num_compute_qubits: int
@@ -74,15 +190,39 @@ class TrialStateWorkflowResult:
 
     Attributes:
         active_space_result: Gauge-fixed selected molecular model.
-        active_hamiltonian: Fermionic Hamiltonian in the selected orbital gauge.
         reference_determinants: Leading CASCI determinants for interpretation.
         trial_states: PMC/circuit results in requested determinant-count order.
     """
 
     active_space_result: ActiveSpaceResult
-    active_hamiltonian: Hamiltonian
     reference_determinants: list[DeterminantContribution]
     trial_states: list[TrialStateResult]
+
+
+def print_trial_state_results(result: TrialStateWorkflowResult) -> None:
+    """Print determinant, fidelity, and circuit-cost evidence for the lab notebook.
+
+    Args:
+        result: Completed trial-state workflow.
+    """
+    print("Leading selected-space CASCI determinants:")
+    print("  Symbols: 2 = doubly occupied, u = alpha, d = beta, 0 = unoccupied")
+    print("  Occupation     Amplitude       Weight    Cumulative weight")
+    for contribution in result.reference_determinants:
+        print(
+            f"  {contribution.occupation:<10} "
+            f"{contribution.amplitude.real:+.12f}  "
+            f"{contribution.weight:.12f}  "
+            f"{contribution.cumulative_weight:.12f}"
+        )
+
+    print("Sparse trial-state comparison:")
+    for trial_state in result.trial_states:
+        print(f"\nDeterminants: {trial_state.num_determinants}")
+        print(f"Fidelity: {trial_state.fidelity:.12f}")
+        print(f"Compute qubits: {trial_state.num_compute_qubits}")
+        print(f"Preparation logical gate count: {trial_state.num_logical_gates}")
+        print(f"Logical gate-family counts: {trial_state.logical_gate_counts}")
 
 
 def leading_determinants(
@@ -130,8 +270,6 @@ def leading_determinants(
     return dict(ranked[:max_determinants])
 
 
-################################################################################
-# start-cell-determinant-weights
 def leading_determinant_contributions(
     wavefunction: Wavefunction, max_determinants: int = 8
 ) -> list[DeterminantContribution]:
@@ -175,14 +313,8 @@ def leading_determinant_contributions(
             )
         )
     return contributions
-    # end-cell-determinant-weights
 
 
-################################################################################
-
-
-################################################################################
-# start-cell-circuit-statistics
 def iter_decomposed_gate_names(value: object) -> Iterator[str]:
     """Yield normalized names for childless operations in decomposed circuit JSON.
 
@@ -247,144 +379,6 @@ def circuit_statistics(circuit: Circuit) -> tuple[int, int, dict[str, int]]:
         len(logical_gate_names),
         dict(sorted(logical_gate_counts.items())),
     )
-    # end-cell-circuit-statistics
-
-
-################################################################################
-
-
-def run_trial_state_workflow(
-    determinant_counts: tuple[int, ...] = (1, 2, 4),
-) -> TrialStateWorkflowResult:
-    """Build and compare sparse trial states for the selected N2 Hamiltonian.
-
-    For each requested support size, the largest reference determinants define
-    a subspace and PMC reoptimizes amplitudes by diagonalizing the Hamiltonian in
-    that subspace. Fidelity is then computed by reading reference and trial
-    coefficients in the same PMC determinant order before taking their inner
-    product.
-
-    Args:
-        determinant_counts: Support sizes to evaluate, in output order.
-
-    Returns:
-        The selected molecular model, reference determinant summary, and one
-        quality/circuit-cost result per requested support size.
-
-    Raises:
-        ValueError: If no support sizes are requested or a requested size is
-            invalid for the selected-space reference.
-    """
-    if not determinant_counts:
-        raise ValueError("determinant_counts must not be empty")
-
-    active_space_result = run_active_space_workflow()
-    reference_wavefunction = active_space_result.refined_casci_wavefunction
-    selected_orbitals = active_space_result.refined_orbitals
-    active_hamiltonian = create("hamiltonian_constructor", "qdk").run(selected_orbitals)
-    reference_determinants = leading_determinant_contributions(reference_wavefunction)
-
-    trial_states = []
-    for num_determinants in determinant_counts:
-        ################################################################################
-        # start-cell-sparse-trial
-        # The leading reference determinants define the trial-state support;
-        # PMC then reoptimizes their amplitudes within that restricted space.
-        top_determinants = leading_determinants(
-            reference_wavefunction, num_determinants
-        )
-        projected_calculator = create(
-            "projected_multi_configuration_calculator", "macis_pmc"
-        )
-        _, trial_wavefunction = projected_calculator.run(
-            active_hamiltonian, list(top_determinants)
-        )
-        retained_determinants = trial_wavefunction.get_active_determinants()
-
-        # Read both vectors in PMC determinant order. Without this alignment,
-        # np.vdot() could multiply coefficients belonging to different determinants.
-        reference_coefficients = np.asarray(
-            [
-                reference_wavefunction.get_coefficient(determinant)
-                for determinant in retained_determinants
-            ]
-        )
-        trial_coefficients = np.asarray(
-            [
-                trial_wavefunction.get_coefficient(determinant)
-                for determinant in retained_determinants
-            ]
-        )
-
-        # The trial vector is normalized on the retained support. The reference
-        # entries keep their full-state normalization, so their restricted norm
-        # records weight omitted by truncation.
-        fidelity = float(abs(np.vdot(reference_coefficients, trial_coefficients)) ** 2)
-        # end-cell-sparse-trial
-        ################################################################################
-
-        ################################################################################
-        # start-cell-preparation-circuit
-        state_preparation = create("state_prep", "sparse_isometry_gf2x")
-        circuit = state_preparation.run(trial_wavefunction)
-        num_compute_qubits, num_logical_gates, logical_gate_counts = circuit_statistics(
-            circuit
-        )
-        # end-cell-preparation-circuit
-        ################################################################################
-
-        trial_states.append(
-            TrialStateResult(
-                num_determinants=trial_wavefunction.size(),
-                trial_wavefunction=trial_wavefunction,
-                fidelity=fidelity,
-                circuit=circuit,
-                num_compute_qubits=num_compute_qubits,
-                num_logical_gates=num_logical_gates,
-                logical_gate_counts=logical_gate_counts,
-            )
-        )
-
-    return TrialStateWorkflowResult(
-        active_space_result=active_space_result,
-        active_hamiltonian=active_hamiltonian,
-        reference_determinants=reference_determinants,
-        trial_states=trial_states,
-    )
-
-
-def print_trial_state_results(result: TrialStateWorkflowResult) -> None:
-    """Print determinant, fidelity, and circuit-cost evidence for the lab notebook.
-
-    Args:
-        result: Completed trial-state workflow.
-    """
-    print("Leading selected-space CASCI determinants:")
-    print("  Symbols: 2 = doubly occupied, u = alpha, d = beta, 0 = unoccupied")
-    print("  Occupation     Amplitude       Weight    Cumulative weight")
-    for contribution in result.reference_determinants:
-        print(
-            f"  {contribution.occupation:<10} "
-            f"{contribution.amplitude.real:+.12f}  "
-            f"{contribution.weight:.12f}  "
-            f"{contribution.cumulative_weight:.12f}"
-        )
-
-    print("Sparse trial-state comparison:")
-    for trial_state in result.trial_states:
-        print(f"\nDeterminants: {trial_state.num_determinants}")
-        print(f"Fidelity: {trial_state.fidelity:.12f}")
-        print(f"Compute qubits: {trial_state.num_compute_qubits}")
-        print(f"Preparation logical gate count: {trial_state.num_logical_gates}")
-        print(f"Logical gate-family counts: {trial_state.logical_gate_counts}")
-
-
-def main() -> None:
-    """Run the trial-state workflow and print its lab-notebook evidence."""
-    # Change ``off`` to ``info`` to see detailed QDK/Chemistry calculation logs.
-    Logger.set_global_level(Logger.LogLevel.off)
-    result = run_trial_state_workflow()
-    print_trial_state_results(result)
 
 
 if __name__ == "__main__":
