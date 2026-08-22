@@ -23,7 +23,7 @@ digraph TutorialQpeWavefunctionHierarchy {
         fontcolor="#3949AB";
         rank=same;
 
-        Basis [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0"><TR><TD><B>Basis functions χ</B></TD><TD><FONT POINT-SIZE="9"><BR/>μ</FONT></TD></TR><TR><TD COLSPAN="2"><FONT POINT-SIZE="11">Nucleus-centered spatial functions</FONT></TD></TR></TABLE>>, fillcolor="#FFFFFF", color="#5C6BC0", penwidth=2.5, fontcolor="#3949AB", group=left];
+        Basis [label=<<B>Basis functions χ&#160;<SUB><FONT POINT-SIZE="9">μ</FONT></SUB></B><BR/><BR/><FONT POINT-SIZE="11">Nucleus-centered spatial functions</FONT>>, fillcolor="#FFFFFF", color="#5C6BC0", penwidth=2.5, fontcolor="#3949AB", group=left];
         MolecularOrbital [label=<<B>Molecular orbital φₚ</B><BR/><BR/><FONT POINT-SIZE="11">With α or β spin: spin orbital ψₚ</FONT>>, fillcolor="#FFFFFF", color="#5C6BC0", penwidth=2.5, fontcolor="#3949AB", group=right];
 
         Basis -> MolecularOrbital [label="  combine  ", color="#5C6BC0", fontname="Arial", fontcolor="#3949AB"];
@@ -49,7 +49,7 @@ digraph TutorialQpeWavefunctionHierarchy {
     subgraph wavefunctions {
         rank=same;
 
-        HartreeFock [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0"><TR><TD><B>Hartree-Fock Φ</B></TD><TD><FONT POINT-SIZE="9"><BR/>HF</FONT></TD></TR><TR><TD COLSPAN="2"><FONT POINT-SIZE="11" COLOR="#F3E5F5">One optimized determinant</FONT></TD></TR></TABLE>>, fillcolor="#7B1FA2", color="#4A148C", penwidth=2.5, fontcolor="#FFFFFF", group=left];
+        HartreeFock [label=<<B>Hartree-Fock Φ&#160;<SUB><FONT POINT-SIZE="9">HF</FONT></SUB></B><BR/><BR/><FONT POINT-SIZE="11" COLOR="#F3E5F5">One optimized determinant</FONT>>, fillcolor="#7B1FA2", color="#4A148C", penwidth=2.5, fontcolor="#FFFFFF", group=left];
         MultiConfig [label=<<B>Multiconfigurational Ψ</B><BR/><BR/><FONT POINT-SIZE="11" COLOR="#F3E5F5">Combination ∑ᵢ cᵢ Φᵢ</FONT>>, fillcolor="#7B1FA2", color="#4A148C", penwidth=2.5, fontcolor="#FFFFFF", group=right];
     }
 

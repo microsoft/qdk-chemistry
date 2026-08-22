@@ -65,13 +65,20 @@ def test_tutorial_graphviz_figures_render_as_transparent_svg():
     for name in references:
         dot_source = (DIAGRAMS_DIR / name).read_text(encoding="utf-8")
         assert 'bgcolor="transparent"' in dot_source
-        assert "<SUB>" not in dot_source
+        if name != "tutorial_qpe_wavefunction_hierarchy.dot":
+            assert "<SUB>" not in dot_source
 
     hierarchy_source = (DIAGRAMS_DIR / "tutorial_qpe_wavefunction_hierarchy.dot").read_text(encoding="utf-8")
     assert "χ[μ]" not in hierarchy_source
     assert "Φ(HF)" not in hierarchy_source
-    assert "Basis functions χ</B></TD><TD" in hierarchy_source
-    assert "Hartree-Fock Φ</B></TD><TD" in hierarchy_source
+    assert 'χ&#160;<SUB><FONT POINT-SIZE="9">μ</FONT></SUB>' in hierarchy_source
+    assert 'Φ&#160;<SUB><FONT POINT-SIZE="9">HF</FONT></SUB>' in hierarchy_source
+    unapproved_subscripts = re.sub(
+        r'&#160;<SUB><FONT POINT-SIZE="9">(?:μ|HF)</FONT></SUB>',
+        "",
+        hierarchy_source,
+    )
+    assert "<SUB>" not in unapproved_subscripts
 
     configuration = ast.parse((REPOSITORY_ROOT / "docs" / "source" / "conf.py").read_text(encoding="utf-8"))
     output_formats = [
