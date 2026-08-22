@@ -25,13 +25,11 @@ matplotlib.use("Agg")
 
 import platform as plt
 import tempfile
-from collections.abc import Iterator
 from pathlib import Path
 
 import numpy as np
 import pytest
 import qdk
-from qdk import TargetProfile
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
@@ -43,7 +41,7 @@ from qdk_chemistry.data import (
     StateVectorContainer,
     Wavefunction,
 )
-from qdk_chemistry.utils.qsharp import create_qsharp_context, use_qsharp_context
+from qdk_chemistry.utils.qsharp import create_qsharp_context
 
 from .test_helpers import create_test_orbitals
 
@@ -83,43 +81,6 @@ if build_dir.exists():
 def qdk_ctx() -> qdk.Context:
     """Fresh Q# context at the default profile, isolated from the shared one."""
     return create_qsharp_context()
-
-
-@pytest.fixture(scope="session")
-def base_qdk_ctx() -> qdk.Context:
-    """Build the ``TargetProfile.Base`` context once and share it across tests."""
-    return create_qsharp_context(TargetProfile.Base)
-
-
-@pytest.fixture(scope="module")
-def use_base_qdk_ctx(base_qdk_ctx: qdk.Context) -> Iterator[qdk.Context]:
-    """Route the library's shared context to a ``TargetProfile.Base`` build.
-
-    Module-scoped on purpose. Pytest instantiates higher-scoped fixtures first, so a
-    function-scoped version of this would be set up *after* any module-scoped fixture that
-    builds a ``Circuit``. Those circuits pin the context their Q# callable was evaluated
-    into, and generating QIR for them once the shared context has been swapped to Base
-    panics in the compiler with "callable should exist in lowered package" rather than
-    raising.
-    """
-    with use_qsharp_context(base_qdk_ctx) as context:
-        yield context
-
-
-@pytest.fixture
-def qiskit_params_use_base_qdk_ctx(request: pytest.FixtureRequest) -> None:
-    """Compile under Base for any parametrization whose backend name starts with ``qiskit``.
-
-    Qiskit interop converts the Q# to QIR, which has to come out measurement-free, so those
-    parameters need the Base context while their QDK counterparts do not. ``pytest.param``
-    rejects ``pytest.mark.usefixtures`` outright, so the choice cannot be expressed as a mark
-    on the individual parameter and is resolved here instead.
-    """
-    callspec = getattr(request.node, "callspec", None)
-    if callspec is None:
-        return
-    if any(isinstance(value, str) and value.startswith("qiskit") for value in callspec.params.values()):
-        request.getfixturevalue("use_base_qdk_ctx")
 
 
 @pytest.fixture

@@ -26,16 +26,12 @@ from .reference_tolerances import (
     qpe_energy_tolerance,
 )
 
-pytestmark = pytest.mark.usefixtures("qiskit_params_use_base_qdk_ctx")
-
 _builder_params = [
     pytest.param("qdk_iterative", id="qdk_iterative"),
     pytest.param(
         "qiskit_iterative",
         id="qiskit_iterative",
-        marks=[
-            pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
-        ],
+        marks=pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
     ),
 ]
 

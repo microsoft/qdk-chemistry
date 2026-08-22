@@ -6,7 +6,6 @@
 # --------------------------------------------------------------------------------------------
 
 import math
-import warnings
 from typing import ClassVar
 
 import numpy as np
@@ -116,20 +115,18 @@ class TestQROMStatePreparation:
         with pytest.raises(ValueError, match="at least one coefficient"):
             prep._run_impl(_EmptyCoefficientWavefunction())
 
-    def test_negative_coefficients_warn(self):
-        """Negative coefficients are accepted but loudly flagged as producing a wrong state."""
+    def test_negative_coefficients_rejected(self):
+        """Negative coefficients produce a seed-dependent wrong state, so they are refused."""
         prep = QROMStatePreparation(rotation_bit_precision=4)
         wf = _make_wavefunction([0.5, -0.5, 0.5, 0.5])
-        with pytest.warns(RuntimeWarning, match="negative"):
+        with pytest.raises(ValueError, match="negative coefficients"):
             prep.run(wf)
 
-    def test_non_negative_coefficients_do_not_warn(self):
-        """The negative-coefficient warning must not fire on ordinary input."""
+    def test_non_negative_coefficients_are_accepted(self):
+        """The negative-coefficient guard must not fire on ordinary input."""
         prep = QROMStatePreparation(rotation_bit_precision=4)
         wf = _make_wavefunction([0.5, 0.3, 0.7, 0.1])
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", RuntimeWarning)
-            prep.run(wf)
+        assert prep.run(wf) is not None
 
 
 class _EmptyCoefficientWavefunction:
@@ -147,10 +144,11 @@ class _EmptyCoefficientWavefunction:
 class TestQROMNegativeAmplitudes:
     """The QROM loader's handling of signed amplitudes.
 
-    Magnitudes come from the multiplexed Ry rotations and are always correct. Signs are
-    applied by a separate QROM-loaded ``Z`` phase kickback whose uncompute is not a faithful
-    adjoint, so the sign ancilla is implicitly measured on release and the sign pattern
-    collapses at random.
+    :class:`QROMStatePreparation` refuses negative coefficients, so these drive the Q#
+    operation directly to pin the underlying defect. Magnitudes come from the multiplexed
+    Ry rotations and are always correct. Signs are applied by a separate QROM-loaded ``Z``
+    phase kickback whose uncompute is not a faithful adjoint, so the sign ancilla is
+    implicitly measured on release and the sign pattern collapses at random.
     """
 
     NEGATIVE_AMPLITUDES: ClassVar[list[float]] = [0.5, -0.5, 0.5, 0.5]

@@ -248,7 +248,7 @@ This method prepares an :math:`n`-qubit state with :math:`n` layers of multiplex
 As with `Alias Sampling`_, the index is the position of a coefficient in the wavefunction's coefficient vector rather than a determinant bitstring, so the resulting circuit carries no fermionic encoding.
 
 .. warning::
-   **Negative coefficients are not supported yet.** :math:`R_y` rotations only generate non-negative amplitudes, so signs are applied by a separate QROM-loaded ``Z`` phase kickback. That lookup is not correctly uncomputed: the sign ancilla is released while still entangled with the state register, so it is implicitly measured and the signs collapse at random. Magnitudes remain correct, but the sign pattern varies between simulator seeds. Passing a negative coefficient emits a :class:`RuntimeWarning`; use ``dense_pure_state`` for signed amplitudes until this is fixed.
+   **Negative coefficients are not supported yet.** :math:`R_y` rotations only generate non-negative amplitudes, so signs are applied by a separate QROM-loaded ``Z`` phase kickback. That lookup is not correctly uncomputed: the sign ancilla is released while still entangled with the state register, so it is implicitly measured and the signs collapse at random. Magnitudes remain correct, but the sign pattern varies between simulator seeds. Passing a negative coefficient raises :class:`ValueError`; use ``dense_pure_state`` for signed amplitudes until this is fixed.
 
 .. rubric:: Settings
 

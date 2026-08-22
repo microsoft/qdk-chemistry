@@ -6,7 +6,6 @@
 # --------------------------------------------------------------------------------------------
 
 import math
-import warnings
 
 import numpy as np
 
@@ -61,8 +60,8 @@ class QROMStatePreparation(StatePreparation):
         kickback. That lookup is not correctly uncomputed: the sign ancilla is released
         while still entangled with the state register, so it is implicitly measured and the
         signs collapse at random. Magnitudes remain correct, but the sign pattern varies
-        between simulator seeds. Passing a negative coefficient issues a
-        :class:`RuntimeWarning`; use a signed algorithm such as ``dense_pure_state`` until
+        between simulator seeds. Passing a negative coefficient raises
+        :class:`ValueError`; use a signed algorithm such as ``dense_pure_state`` until
         this is fixed.
     """
 
@@ -97,8 +96,8 @@ class QROMStatePreparation(StatePreparation):
             Circuit: A Circuit wrapping the Q# QROM state prep callable and factory.
 
         Raises:
-            ValueError: If the wavefunction has no coefficients or has a non-negligible
-                imaginary part.
+            ValueError: If the wavefunction has no coefficients, has a non-negligible
+                imaginary part, or contains a negative coefficient.
 
         """
         coeffs = np.asarray(wavefunction.get_coefficients())
@@ -112,17 +111,14 @@ class QROMStatePreparation(StatePreparation):
         coeffs = coeffs.astype(float, copy=False)
 
         if np.any(coeffs < 0.0):
-            warnings.warn(
-                "QROM state preparation currently returns an incorrect state for negative "
-                "coefficients. Ry rotations only produce non-negative amplitudes, so the sign is "
-                "applied by a separate QROM-loaded Z phase kickback; that lookup is not correctly "
-                "uncomputed, so the sign ancilla stays entangled with the state register and is "
-                "implicitly measured when released. The magnitudes are right but the signs "
-                "collapse at random, and the result varies between simulator seeds. Use an "
-                "algorithm that supports signed amplitudes (for example 'dense_pure_state') until "
-                "this is fixed.",
-                RuntimeWarning,
-                stacklevel=2,
+            raise ValueError(
+                "QROM state preparation does not support negative coefficients. Ry rotations only "
+                "produce non-negative amplitudes, so the sign is applied by a separate QROM-loaded "
+                "Z phase kickback; that lookup is not correctly uncomputed, so the sign ancilla "
+                "stays entangled with the state register and is implicitly measured when released. "
+                "The magnitudes would be right but the signs collapse at random, and the result "
+                "varies between simulator seeds. Use an algorithm that supports signed amplitudes "
+                "(for example 'dense_pure_state') until this is fixed."
             )
 
         amplitudes = coeffs.tolist()
