@@ -276,7 +276,7 @@ def _create_exclusive_file(path: Path) -> int:
             raise
         return descriptor
 
-    return _open_windows_file(path, desired_access=0x00010000, creation_disposition=1)
+    return _open_windows_file(path, desired_access=0, creation_disposition=1)
 
 
 def _open_windows_file(
@@ -326,18 +326,12 @@ def _open_windows_file(
         )
     except BaseException as error:
         cleanup_error: OSError | None = None
-        if creation_disposition == 1:
-
-            class _WindowsFileDispositionInfo(ctypes.Structure):
-                _fields_ = (("delete_file", ctypes.c_ubyte),)
-
-            disposition = _WindowsFileDispositionInfo(True)
-            set_info = ctypes.WinDLL("kernel32", use_last_error=True).SetFileInformationByHandle
-            set_info.argtypes = (wintypes.HANDLE, ctypes.c_int, wintypes.LPVOID, wintypes.DWORD)
-            set_info.restype = wintypes.BOOL
-            if not set_info(handle, 4, ctypes.byref(disposition), ctypes.sizeof(disposition)):
-                cleanup_error = _windows_error(path, ctypes.get_last_error())
         close_handle(handle)
+        if creation_disposition == 1:
+            try:
+                _remove_temporary_file(Path(path))
+            except OSError as caught_error:
+                cleanup_error = caught_error
         if cleanup_error is not None:
             raise error from cleanup_error
         raise

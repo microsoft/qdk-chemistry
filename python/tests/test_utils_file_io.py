@@ -450,7 +450,7 @@ def test_remove_created_file_when_windows_descriptor_conversion_fails(
     with pytest.raises(OSError, match="descriptor conversion failed"):
         file_io_module._open_windows_file(
             path,
-            desired_access=0x00010000,
+            desired_access=0,
             creation_disposition=1,
         )
 
