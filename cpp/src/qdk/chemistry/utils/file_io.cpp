@@ -526,11 +526,21 @@ void replace_file(const std::filesystem::path& source,
   HANDLE original_handle_value = INVALID_HANDLE_VALUE;
   BY_HANDLE_FILE_INFORMATION original_info{};
   DWORD original_attributes = FILE_ATTRIBUTE_NORMAL;
+  bool can_write_original_attributes = false;
   if (destination_exists) {
     original_handle_value = CreateFileW(
         destination.c_str(), FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES,
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
         OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+    can_write_original_attributes =
+        original_handle_value != INVALID_HANDLE_VALUE;
+    if (original_handle_value == INVALID_HANDLE_VALUE &&
+        GetLastError() == ERROR_ACCESS_DENIED) {
+      original_handle_value = CreateFileW(
+          destination.c_str(), FILE_READ_ATTRIBUTES,
+          FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+          OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+    }
     if (original_handle_value == INVALID_HANDLE_VALUE ||
         !GetFileInformationByHandle(original_handle_value, &original_info)) {
       const std::error_code error(static_cast<int>(GetLastError()),
@@ -579,6 +589,12 @@ void replace_file(const std::filesystem::path& source,
     throw std::runtime_error("Could not inspect read-only destination '" +
                              display_path(destination) +
                              "': " + error.message());
+  }
+  if (!can_write_original_attributes) {
+    throw std::runtime_error(
+        "Could not replace read-only file without permission to change its "
+        "attributes: '" +
+        display_path(destination) + "'");
   }
   if (original_info.nNumberOfLinks != 1) {
     throw std::runtime_error(

@@ -34,6 +34,23 @@ def test_write_read_and_replace_text(tmp_path: Path):
     assert read_text_file(path) == "second"
 
 
+def test_resolve_pathlike_once(tmp_path: Path):
+    path = tmp_path / "data.txt"
+
+    class ChangingPath:
+        calls = 0
+
+        def __fspath__(self) -> str:
+            self.calls += 1
+            return str(path) if self.calls == 1 else "invalid\0path"
+
+    changing_path = ChangingPath()
+    write_text_file_atomically(changing_path, "contents")
+
+    assert changing_path.calls == 1
+    assert read_text_file(path) == "contents"
+
+
 def test_create_parent_directories_when_requested(tmp_path: Path):
     path = tmp_path / "nested" / "directory" / "data.txt"
 
@@ -158,6 +175,28 @@ def test_close_failure_does_not_skip_cleanup_or_retry_close(
     assert len(closed_descriptors) == 1
     assert read_text_file(path) == "original"
     assert list(tmp_path.iterdir()) == [path]
+
+
+def test_close_failure_does_not_resurrect_callers_exception(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    path = tmp_path / "data.txt"
+    real_close = os.close
+
+    def close_then_fail(descriptor: int) -> None:
+        real_close(descriptor)
+        raise OSError("close failed")
+
+    monkeypatch.setattr(file_io_module.os, "close", close_then_fail)
+    try:
+        raise ValueError("caller error")
+    except ValueError:
+        with pytest.raises(OSError, match="close failed"):
+            write_text_file_atomically(path, "contents")
+    monkeypatch.undo()
+
+    assert read_text_file(path) == "contents"
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows read-only behavior")
@@ -370,6 +409,52 @@ def test_preserve_writable_destination_on_windows(tmp_path: Path):
 
     assert read_text_file(path) == "replacement"
     assert path.stat().st_mode & stat.S_IWRITE != 0
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows file attributes")
+def test_strip_temporary_attributes_from_replacement_on_windows(tmp_path: Path):
+    if sys.platform != "win32":
+        raise AssertionError("Windows-only test ran on another platform")
+    path = tmp_path / "data.txt"
+    write_text_file_atomically(path, "original")
+    set_attributes = ctypes.WinDLL("kernel32", use_last_error=True).SetFileAttributesW
+    set_attributes.argtypes = (wintypes.LPCWSTR, wintypes.DWORD)
+    set_attributes.restype = wintypes.BOOL
+
+    def write_temporary_file(temporary_path: Path) -> None:
+        temporary_path.write_text("replacement", encoding="utf-8")
+        assert set_attributes(str(temporary_path), 0x00000002 | 0x00000100)
+
+    write_file_atomically(path, write_temporary_file)
+
+    get_attributes = ctypes.WinDLL("kernel32", use_last_error=True).GetFileAttributesW
+    get_attributes.argtypes = (wintypes.LPCWSTR,)
+    get_attributes.restype = wintypes.DWORD
+    assert get_attributes(str(path)) & (0x00000002 | 0x00000100) == 0
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows descriptor conversion")
+def test_remove_created_file_when_windows_descriptor_conversion_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    path = tmp_path / "data.txt"
+
+    class FailingMsvcrt:
+        @staticmethod
+        def open_osfhandle(_handle: int, _flags: int) -> int:
+            raise OSError("descriptor conversion failed")
+
+    monkeypatch.setattr(file_io_module.importlib, "import_module", lambda _name: FailingMsvcrt)
+
+    with pytest.raises(OSError, match="descriptor conversion failed"):
+        file_io_module._open_windows_file(
+            path,
+            desired_access=0x00010000,
+            creation_disposition=1,
+        )
+
+    assert not path.exists()
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows file-sharing behavior")

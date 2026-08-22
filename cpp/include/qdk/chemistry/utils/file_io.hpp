@@ -55,9 +55,11 @@ std::string read_text_file(const std::filesystem::path& path);
  * grant broader access than the file it replaced. Callers that rely on
  * explicit access-control entries must reapply them after the write. Read-only
  * Windows destinations with multiple hard links are rejected. Other
- * file-object metadata and hard-link identity are not preserved. Atomic
- * replacement prevents partial visibility but does not guarantee durability
- * after power loss.
+ * file-object metadata and hard-link identity are not preserved. The named
+ * temporary file also inherits the parent directory's access controls and may
+ * therefore be readable while the writer runs or after cleanup fails. Atomic
+ * replacement prevents partial visibility at the destination path but does not
+ * guarantee durability after power loss.
  * Windows alternate data streams are not supported.
  *
  * The destination's parent directory and mutable ancestors must not be

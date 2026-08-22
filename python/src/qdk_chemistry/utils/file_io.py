@@ -34,8 +34,9 @@ __all__ = [
 
 def ensure_parent_directory(path: PathLike) -> None:
     """Create the parent directory of *path* when it does not exist."""
-    _validate_destination_path(path)
-    parent = Path(path).parent
+    path_value = os.fspath(path)
+    _validate_destination_path(path_value)
+    parent = Path(path_value).parent
     if parent != Path("."):
         if os.name == "nt":
             parent.mkdir(parents=True, exist_ok=True)
@@ -58,22 +59,31 @@ def _validate_destination_path(path: PathLike) -> None:
 
 def read_text_file(path: PathLike, *, encoding: str = "utf-8") -> str:
     """Read an entire text file without changing its line endings."""
-    _validate_destination_path(path)
+    path_value = os.fspath(path)
+    _validate_destination_path(path_value)
     if sys.platform == "win32":
         descriptor = _open_windows_file(
-            path,
+            path_value,
             desired_access=0x80000000,
             creation_disposition=3,
         )
     else:
-        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0))
+        descriptor = os.open(path_value, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0))
+    operation_error: BaseException | None = None
     try:
         if not stat.S_ISREG(os.fstat(descriptor).st_mode):
-            raise OSError(f"Path is not a regular file: '{path}'")
+            raise OSError(f"Path is not a regular file: '{path_value}'")
         with os.fdopen(descriptor, "r", encoding=encoding, newline="", closefd=False) as stream:
             return stream.read()
+    except BaseException as error:
+        operation_error = error
+        raise
     finally:
-        _close_descriptor_preserving_error(descriptor)
+        close_error = _close_descriptor(descriptor)
+        if close_error is not None:
+            if operation_error is not None:
+                raise operation_error from close_error
+            raise close_error
 
 
 def write_file_atomically(
@@ -108,10 +118,12 @@ def write_file_atomically(
     grant broader access than the file it replaced. Callers that rely on
     explicit access-control entries must reapply them after the write.
     Read-only Windows destinations with multiple hard links are rejected.
-    Other file-object metadata and hard-link identity are not preserved.
-    Atomic replacement prevents partial visibility but does not guarantee
-    durability after power loss. Windows alternate data streams are not
-    supported.
+    Other file-object metadata and hard-link identity are not preserved. The
+    named temporary file also inherits the parent directory's access controls
+    and may therefore be readable while the writer runs or after cleanup
+    fails. Atomic replacement prevents partial visibility at the destination
+    path but does not guarantee durability after power loss. Windows alternate
+    data streams are not supported.
 
     The destination's parent directory and mutable ancestors must not be
     writable by principals less privileged than the process performing the
@@ -123,8 +135,9 @@ def write_file_atomically(
     writer runs. A relative path may therefore be rejected when its expanded
     absolute form exceeds the platform pathname limit.
     """
-    _validate_destination_path(path)
-    destination = Path(path)
+    path_value = os.fspath(path)
+    _validate_destination_path(path_value)
+    destination = Path(path_value)
     if not destination.is_absolute():
         destination = Path(os.path.abspath(destination)) if os.name == "nt" else Path.cwd() / destination
     if create_parent_directories:
@@ -169,6 +182,11 @@ def write_file_atomically(
             if close_error is not None:
                 raise close_error
         _replace_file(temporary_path, destination, destination_mode)
+        if descriptor >= 0:
+            owned_descriptor, descriptor = descriptor, -1
+            close_error = _close_descriptor(owned_descriptor)
+            if close_error is not None:
+                raise close_error
     except BaseException as error:
         if reserved_status is None and descriptor >= 0:
             try:
@@ -188,10 +206,6 @@ def write_file_atomically(
         if close_error is not None:
             raise error from close_error
         raise
-    finally:
-        if descriptor >= 0:
-            owned_descriptor, descriptor = descriptor, -1
-            _close_descriptor_preserving_error(owned_descriptor)
 
 
 def _reserve_temporary_file(destination: Path) -> tuple[int, str]:
@@ -262,7 +276,7 @@ def _create_exclusive_file(path: Path) -> int:
             raise
         return descriptor
 
-    return _open_windows_file(path, desired_access=0, creation_disposition=1)
+    return _open_windows_file(path, desired_access=0x00010000, creation_disposition=1)
 
 
 def _open_windows_file(
@@ -310,8 +324,22 @@ def _open_windows_file(
             cast("int", handle),
             os.O_RDONLY | getattr(os, "O_NOINHERIT", 0),
         )
-    except BaseException:
+    except BaseException as error:
+        cleanup_error: OSError | None = None
+        if creation_disposition == 1:
+
+            class _WindowsFileDispositionInfo(ctypes.Structure):
+                _fields_ = (("delete_file", ctypes.c_ubyte),)
+
+            disposition = _WindowsFileDispositionInfo(True)
+            set_info = ctypes.WinDLL("kernel32", use_last_error=True).SetFileInformationByHandle
+            set_info.argtypes = (wintypes.HANDLE, ctypes.c_int, wintypes.LPVOID, wintypes.DWORD)
+            set_info.restype = wintypes.BOOL
+            if not set_info(handle, 4, ctypes.byref(disposition), ctypes.sizeof(disposition)):
+                cleanup_error = _windows_error(path, ctypes.get_last_error())
         close_handle(handle)
+        if cleanup_error is not None:
+            raise error from cleanup_error
         raise
 
 
@@ -472,16 +500,6 @@ def _close_descriptor(descriptor: int) -> OSError | None:
     return None
 
 
-def _close_descriptor_preserving_error(descriptor: int) -> None:
-    active_error = sys.exc_info()[1]
-    close_error = _close_descriptor(descriptor)
-    if close_error is None:
-        return
-    if active_error is not None:
-        raise active_error from close_error
-    raise close_error
-
-
 def _remove_temporary_file(temporary_path: Path) -> None:
     """Remove a temporary file, including a Windows read-only file."""
     try:
@@ -505,6 +523,8 @@ def _replace_file(
     """Replace a destination, handling Windows read-only files."""
     original_descriptor = -1
     original_attributes: int | None = None
+    operation_error: BaseException | None = None
+    read_only = False
     if os.name == "nt" and destination_mode is not None:
         try:
             original_descriptor = _open_windows_file(
@@ -526,12 +546,19 @@ def _replace_file(
                 raise
     try:
         if os.name == "nt" and destination_mode is not None:
-            temporary_path.chmod(destination_mode)
+            read_only = (
+                original_attributes & 0x00000001 != 0
+                if original_attributes is not None
+                else destination_mode & stat.S_IWRITE == 0
+            )
+            _set_windows_path_attributes(
+                temporary_path,
+                0x00000001 if read_only else 0x00000080,
+            )
         try:
             os.replace(temporary_path, destination)
             return
         except PermissionError as replace_error:
-            read_only = os.name == "nt" and destination_mode is not None and destination_mode & stat.S_IWRITE == 0
             if (
                 not read_only
                 or getattr(replace_error, "winerror", None) != 5
@@ -568,10 +595,27 @@ def _replace_file(
                     original_attributes,
                     destination,
                 )
+    except BaseException as error:
+        operation_error = error
+        raise
     finally:
         if original_descriptor >= 0:
             owned_descriptor, original_descriptor = original_descriptor, -1
-            _close_descriptor_preserving_error(owned_descriptor)
+            close_error = _close_descriptor(owned_descriptor)
+            if close_error is not None:
+                if operation_error is not None:
+                    raise operation_error from close_error
+                raise close_error
+
+
+def _set_windows_path_attributes(path: Path, attributes: int) -> None:
+    if sys.platform != "win32":
+        raise NotImplementedError("Windows file attributes require Windows")
+    set_attributes = ctypes.WinDLL("kernel32", use_last_error=True).SetFileAttributesW
+    set_attributes.argtypes = (wintypes.LPCWSTR, wintypes.DWORD)
+    set_attributes.restype = wintypes.BOOL
+    if not set_attributes(os.fspath(path), attributes):
+        raise _windows_error(path, ctypes.get_last_error())
 
 
 def _set_permissions(descriptor: int, mode: int, path: Path) -> None:
