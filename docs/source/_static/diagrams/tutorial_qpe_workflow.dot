@@ -36,7 +36,7 @@ digraph TutorialQpeWorkflow {
         fontcolor="#1976D2";
         rank=same;
 
-        Molecule [label=<<B>Describe stretched N<SUB><FONT POINT-SIZE="9">2</FONT></SUB></B><BR/><BR/><FONT POINT-SIZE="11" COLOR="#E3F2FD">Geometry, charge, spin, Hartree-Fock</FONT>>, fillcolor="#1976D2", color="#0D47A1", penwidth=2.5, fontcolor="#FFFFFF", group=left];
+        Molecule [label=<<B>Describe stretched N₂</B><BR/><BR/><FONT POINT-SIZE="11" COLOR="#E3F2FD">Geometry, charge, spin, Hartree-Fock</FONT>>, fillcolor="#1976D2", color="#0D47A1", penwidth=2.5, fontcolor="#FFFFFF", group=left];
         ActiveSpace [label=<<B>Select the active space</B><BR/><BR/><FONT POINT-SIZE="11" COLOR="#E3F2FD">Define the correlated molecular model</FONT>>, fillcolor="#1976D2", color="#0D47A1", penwidth=2.5, fontcolor="#FFFFFF", group=right];
 
         Molecule -> ActiveSpace [color="#1976D2"];

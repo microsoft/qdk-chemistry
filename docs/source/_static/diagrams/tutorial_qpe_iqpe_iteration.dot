@@ -14,12 +14,12 @@ digraph TutorialQpeIqpeIteration {
     subgraph inputs {
         rank=same;
 
-        Compute [label=<<B>Fresh compute register</B><BR/><BR/><FONT POINT-SIZE="11">Prepare the trial state |Ψ<SUB><FONT POINT-SIZE="8">trial</FONT></SUB>⟩</FONT>>, fillcolor="#E0F2F1", color="#00796B", penwidth=2.5, fontcolor="#004D40", group=left];
+        Compute [label=<<B>Fresh compute register</B><BR/><BR/><FONT POINT-SIZE="11">Prepare the trial state |Ψₜᵣᵢₐₗ⟩</FONT>>, fillcolor="#E0F2F1", color="#00796B", penwidth=2.5, fontcolor="#004D40", group=left];
 
         Ancilla [label=<<B>Fresh readout ancilla |0⟩</B><BR/><BR/><FONT POINT-SIZE="11">Apply the first H gate</FONT>>, fillcolor="#E8EAF6", color="#5C6BC0", penwidth=2.5, fontcolor="#283593", group=right];
     }
 
-    Feedback [label=<<B>Apply phase feedback</B><BR/><BR/><FONT POINT-SIZE="11">Use angle Φ<SUB><FONT POINT-SIZE="8">k</FONT></SUB> from earlier measured bits</FONT>>, fillcolor="#E8EAF6", color="#5C6BC0", penwidth=2.5, fontcolor="#283593", width=4.2];
+    Feedback [label=<<B>Apply phase feedback</B><BR/><BR/><FONT POINT-SIZE="11">Use angle Φₖ from earlier measured bits</FONT>>, fillcolor="#E8EAF6", color="#5C6BC0", penwidth=2.5, fontcolor="#283593", width=4.2];
 
     Evolution [label=<<B>Apply controlled time evolution</B><BR/><BR/><FONT POINT-SIZE="11">Ancilla controls U^(2^(m−k−1)) on the compute register</FONT>>, fillcolor="#E0F2F1", color="#00796B", penwidth=2.5, fontcolor="#004D40", width=5.0];
 
@@ -27,9 +27,9 @@ digraph TutorialQpeIqpeIteration {
 
     Shots [label=<<B>Repeat with freshly prepared registers</B><BR/><BR/><FONT POINT-SIZE="11">Collect an odd number of outcomes for iteration k</FONT>>, fillcolor="#FFFFFF", color="#5C6BC0", penwidth=2.5, fontcolor="#3949AB", width=4.8];
 
-    Majority [label=<<B>Majority vote selects bit b<SUB><FONT POINT-SIZE="9">k</FONT></SUB></B><BR/><BR/><FONT POINT-SIZE="11">Classical result for this iteration</FONT>>, fillcolor="#F3E5F5", color="#7B1FA2", penwidth=2.5, fontcolor="#4A148C", width=4.2];
+    Majority [label=<<B>Majority vote selects bit bₖ</B><BR/><BR/><FONT POINT-SIZE="11">Classical result for this iteration</FONT>>, fillcolor="#F3E5F5", color="#7B1FA2", penwidth=2.5, fontcolor="#4A148C", width=4.2];
 
-    Update [label=<<B>Update the classical feedback angle</B><BR/><BR/><FONT POINT-SIZE="11">Use b<SUB><FONT POINT-SIZE="8">k</FONT></SUB> to compute Φ<SUB><FONT POINT-SIZE="8">k+1</FONT></SUB></FONT>>, fillcolor="#F3E5F5", color="#7B1FA2", penwidth=2.5, fontcolor="#4A148C", width=4.4];
+    Update [label=<<B>Update the classical feedback angle</B><BR/><BR/><FONT POINT-SIZE="11">Use bₖ to compute Φₖ₊₁</FONT>>, fillcolor="#F3E5F5", color="#7B1FA2", penwidth=2.5, fontcolor="#4A148C", width=4.4];
 
     Next [label=<<B>Continue to iteration k + 1</B><BR/><BR/><FONT POINT-SIZE="11">Build the next controlled power and repeat</FONT>>, fillcolor="#FFFFFF", color="#7B1FA2", penwidth=2.5, fontcolor="#4A148C", width=4.4];
 
