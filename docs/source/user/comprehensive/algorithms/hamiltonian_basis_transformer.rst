@@ -54,5 +54,6 @@ Settings
 ``validation_tolerance``
    Absolute tolerance used to validate the orbital-basis relationship. Active
    orbital checks are evaluated after mapping the orbitals into the AO-overlap
-   metric. The tolerance does not threshold integral values. Default:
-   ``1e-10``.
+   metric. Structural rank requirements are enforced independently of this
+   setting. The tolerance does not threshold integral values. Supported range:
+   ``0`` through ``1e-2``. Default: ``1e-10``.

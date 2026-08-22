@@ -16,15 +16,18 @@ from .test_helpers import create_test_basis_set, create_test_hamiltonian
 
 
 def test_qdk_transformer_registry():
+    """The concrete transformer is registered with its native run binding."""
     assert "qdk" in available("hamiltonian_basis_transformer")
     transformer = create("hamiltonian_basis_transformer")
     assert isinstance(transformer, QdkHamiltonianBasisTransformer)
+    assert "run" in QdkHamiltonianBasisTransformer.__dict__
     assert transformer.name() == "qdk"
     assert transformer.settings().get("validation_tolerance") == pytest.approx(1.0e-10)
     assert inspect_settings("hamiltonian_basis_transformer", "qdk")[0][0] == "validation_tolerance"
 
 
 def test_qdk_transformer_rejects_non_cholesky_hamiltonian():
+    """The QDK implementation rejects unsupported Hamiltonian containers."""
     source = create_test_hamiltonian(2)
     transformer = create("hamiltonian_basis_transformer")
     assert transformer.hash(source, source.get_orbitals())
@@ -34,6 +37,7 @@ def test_qdk_transformer_rejects_non_cholesky_hamiltonian():
 
 
 def test_qdk_transformer_runs_successfully():
+    """The transformer rotates every supported Hamiltonian component."""
     angle = 0.3
     rotation = np.array(
         [

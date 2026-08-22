@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <mutex>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 
 namespace qdk::chemistry::algorithms::microsoft {
@@ -15,11 +16,17 @@ class QdkHamiltonianBasisTransformer final
   QdkHamiltonianBasisTransformer();
 
   std::string name() const final { return "qdk"; }
+  std::shared_ptr<data::Hamiltonian> run(
+      std::shared_ptr<data::Hamiltonian> hamiltonian,
+      std::shared_ptr<data::Orbitals> target_orbitals) const final;
 
  protected:
   std::shared_ptr<data::Hamiltonian> _run_impl(
       std::shared_ptr<data::Hamiltonian> hamiltonian,
       std::shared_ptr<data::Orbitals> target_orbitals) const final;
+
+ private:
+  mutable std::mutex _run_mutex;
 };
 
 }  // namespace qdk::chemistry::algorithms::microsoft
