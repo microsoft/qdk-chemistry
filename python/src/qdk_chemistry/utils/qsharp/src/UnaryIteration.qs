@@ -5,15 +5,23 @@
 namespace QDKChemistry.Utils.UnaryIteration {
 
     import Std.Arrays.MostAndTail;
-    import Std.Convert.IntAsDouble;
+    import Std.Canon.ApplyToEach;
+    import Std.Canon.ApplyXorInPlace;
+    import Std.Core.Length;
     import Std.Diagnostics.Fact;
-    import Std.Math.Ceiling;
-    import Std.Math.Lg;
+    import Std.Intrinsic.AND;
+    import Std.Math.BitSizeI;
+    import Std.ResourceEstimation.BeginEstimateCaching;
+    import Std.ResourceEstimation.EndEstimateCaching;
 
 
     /// Unary iteration
+    ///
+    /// Produces the one-hot indicator of the address register one qubit at a time.
+    ///
     /// References:
-    ///   Babbush et al. (arXiv:1805.03662), Low, Kliuchnikov, Schaeffer (arXiv:1812.00954)
+    ///   Babbush et al. Encoding Electronic Spectra in Quantum Circuits with Linear T Complexity
+    ///   (arXiv:1805.03662), Sec. III A "Unary Iteration and Indexed Operations", Figs. 3-7.
     operation UnaryIteration(
         address : Qubit[],
         numActions : Int,
@@ -29,7 +37,7 @@ namespace QDKChemistry.Utils.UnaryIteration {
         }
     }
 
-    /// Applies one action per address value and exposes its active unary control.
+    /// Applies one action per address value recursively.
     operation UnaryIterationWithControl(
         address : Qubit[],
         numActions : Int,
@@ -37,7 +45,7 @@ namespace QDKChemistry.Utils.UnaryIteration {
     ) : Unit is Adj {
         Fact(numActions > 0, "actions cannot be empty");
 
-        let n = Ceiling(Lg(IntAsDouble(numActions)));
+        let n = AddressQubits(numActions);
         Fact(
             Length(address) >= n,
             $"address register is too small, requires at least {n} qubits",
@@ -78,7 +86,7 @@ namespace QDKChemistry.Utils.UnaryIteration {
     ) : Unit is Adj {
         Fact(numActions > 0, "actions cannot be empty");
 
-        let n = Ceiling(Lg(IntAsDouble(numActions)));
+        let n = AddressQubits(numActions);
         Fact(
             Length(address) >= n,
             $"address register is too small, requires at least {n} qubits",
@@ -87,73 +95,80 @@ namespace QDKChemistry.Utils.UnaryIteration {
         if numActions == 1 {
             action(actionOffset, ctl);
         } else {
-            use helper = Qubit();
+            if BeginEstimateCaching("QDKChemistry.Utils.UnaryIteration.SinglyControlledUnaryIterationWithControl", numActions) {
+                use helper = Qubit();
 
-            let (most, tail) = MostAndTail(address[...n - 1]);
+                let (most, tail) = MostAndTail(address[...n - 1]);
 
-            within {
-                X(tail);
-            } apply {
-                AND(ctl, tail, helper);
+                within {
+                    X(tail);
+                } apply {
+                    AND(ctl, tail, helper);
+                }
+
+                SinglyControlledUnaryIterationWithControl(helper, most, 2^(n - 1), actionOffset, action);
+
+                CNOT(ctl, helper);
+
+                SinglyControlledUnaryIterationWithControl(
+                    helper,
+                    most,
+                    numActions - 2^(n - 1),
+                    actionOffset + 2^(n - 1),
+                    action,
+                );
+
+                Adjoint AND(ctl, tail, helper);
+
+                EndEstimateCaching();
             }
-
-            SinglyControlledUnaryIterationWithControl(helper, most, 2^(n - 1), actionOffset, action);
-
-            CNOT(ctl, helper);
-
-            SinglyControlledUnaryIterationWithControl(
-                helper,
-                most,
-                numActions - 2^(n - 1),
-                actionOffset + 2^(n - 1),
-                action,
-            );
-
-            Adjoint AND(ctl, tail, helper);
         }
     }
 
-    /// Number of address qubits needed to enumerate `numActions` values.
+    /// Number of address qubits needed to enumerate `numActions` values, i.e.
+    /// `Ceiling(Lg(numActions))`.
     function AddressQubits(numActions : Int) : Int {
-        Ceiling(Lg(IntAsDouble(numActions)))
+        Fact(numActions > 0, "numActions must be positive");
+        return BitSizeI(numActions - 1);
     }
 
     /// Flips `flags[index]` for the single selected address.
-    operation TestUnaryIterationOneHot(numActions : Int, addressValue : Int) : Unit {
-        let numAddressQubits = AddressQubits(numActions);
-        let qs = QIR.Runtime.AllocateQubitArray(numAddressQubits + numActions);
-        let address = qs[0..numAddressQubits - 1];
-        let flags = qs[numAddressQubits...];
-        ApplyXorInPlace(addressValue, address);
-        UnaryIteration(address, numActions, (index) => {
-            X(flags[index]);
-        });
-        ApplyXorInPlace(addressValue, address);
+    internal function MakeTestUnaryIterationOneHotOp(numActions : Int, addressValue : Int) : (Qubit[] => Unit) {
+        return qs => {
+            let numAddressQubits = AddressQubits(numActions);
+            let address = qs[0..numAddressQubits - 1];
+            let flags = qs[numAddressQubits...];
+            ApplyXorInPlace(addressValue, address);
+            UnaryIteration(address, numActions, (index) => {
+                X(flags[index]);
+            });
+            ApplyXorInPlace(addressValue, address);
+        }
     }
 
     /// Runs the one-hot iteration on a uniform superposition of every address.
-    operation TestUnaryIterationSuperposedAddress(numActions : Int) : Unit {
-        let numAddressQubits = AddressQubits(numActions);
-        Fact(2^numAddressQubits == numActions, "numActions must be a power of two");
-        let qs = QIR.Runtime.AllocateQubitArray(numAddressQubits + numActions);
-        let address = qs[0..numAddressQubits - 1];
-        let flags = qs[numAddressQubits...];
-        ApplyToEach(H, address);
-        UnaryIteration(address, numActions, (index) => {
-            X(flags[index]);
-        });
+    internal function MakeTestUnaryIterationSuperposedAddressOp(numActions : Int) : (Qubit[] => Unit) {
+        return qs => {
+            let numAddressQubits = AddressQubits(numActions);
+            Fact(2^numAddressQubits == numActions, "numActions must be a power of two");
+            let address = qs[0..numAddressQubits - 1];
+            let flags = qs[numAddressQubits...];
+            ApplyToEach(H, address);
+            UnaryIteration(address, numActions, (index) => {
+                X(flags[index]);
+            });
+        };
     }
 
     /// Applies `Z` to the exposed unary control for every index flagged in `data`.
-    operation TestUnaryIterationControlPhases(numActions : Int, data : Bool[]) : Unit {
-        let numAddressQubits = AddressQubits(numActions);
-        Fact(2^numAddressQubits == numActions, "numActions must be a power of two");
-        let address = QIR.Runtime.AllocateQubitArray(numAddressQubits);
-        ApplyToEach(H, address);
-        UnaryIterationWithControl(address, numActions, (index, control) => {
-            if data[index] {
-                Z(control);
-            }
-        });
+    internal function MakeTestUnaryIterationControlPhasesOp(numActions : Int, data : Bool[]) : (Qubit[] => Unit) {
+        return address => {
+            ApplyToEach(H, address);
+            UnaryIterationWithControl(address, numActions, (index, control) => {
+                if data[index] {
+                    Z(control);
+                }
+            });
+        };
     }
 }

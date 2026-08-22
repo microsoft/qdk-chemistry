@@ -6,16 +6,19 @@ namespace QDKChemistry.Utils.StatePreparation {
 
     import Std.Arrays.Subarray;
     import Std.StatePreparation.PreparePureStateD;
+    import QDKChemistry.Utils.BinaryEncoding.MatrixCompressionOp;
+    import QDKChemistry.Utils.BinaryEncoding.ApplyAdjointableCompressionOp;
+
 
     /// A struct to hold parameters for state preparation.
     /// - `rowMap`: An array of integers representing the mapping of qubits to rows in the state vector.
     /// - `stateVector`: An array of doubles representing the amplitudes of the quantum state.
-    /// - `expansionOps`: An array of arrays of integers representing the operations to expand the state preparation (e.g., CNOTs, X gates).
+    /// - `expansionOps`: An array of MatrixCompressionOp representing the operations to expand the state preparation (e.g., CX, X gates).
     /// - `numQubits`: The number of qubits to allocate for the state preparation.
     struct StatePreparationParams {
         rowMap : Int[],
         stateVector : Double[],
-        expansionOps : Int[][],
+        expansionOps : MatrixCompressionOp[],
         numQubits : Int,
     }
 
@@ -30,23 +33,15 @@ namespace QDKChemistry.Utils.StatePreparation {
         params : StatePreparationParams,
         qs : Qubit[],
     ) : Unit is Adj + Ctl {
-        PreparePureStateD(params.stateVector, Subarray(params.rowMap, qs));
-        for op in params.expansionOps {
-            if Length(op) == 2 {
-                CNOT(qs[op[0]], qs[op[1]]);
-            } elif Length(op) == 1 {
-                X(qs[op[0]]);
-            } else {
-                fail "Unsupported operation length in expansionOps.";
-            }
-        }
+        ApplyDensePreparation(params.rowMap, params.stateVector, qs);
+        ApplyExpansion(params.expansionOps, qs);
     }
 
     /// A helper function to create a callable for state preparation.
     /// # Parameters
     /// - `params`: A `StatePreparationParams` struct containing the parameters for state preparation.
     /// # Returns
-    /// - `Qubit[] => Unit`: A callable that takes an array of qubits and prepares the quantum state on those qubits.
+    /// - `Qubit[] => Unit is Adj + Ctl`: A callable that takes an array of qubits and prepares the quantum state on those qubits.
     function MakeStatePreparationOp(params : StatePreparationParams) : Qubit[] => Unit is Adj + Ctl {
         StatePreparation(params, _)
     }
@@ -56,14 +51,14 @@ namespace QDKChemistry.Utils.StatePreparation {
     /// # Parameters
     /// - `rowMap`: An array of integers representing the mapping of qubits to rows in the state vector.
     /// - `stateVector`: An array of doubles representing the amplitudes of the quantum state.
-    /// - `expansionOps`: An array of arrays of integers representing the operations to expand the state preparation (e.g., CNOTs, X gates).
+    /// - `expansionOps`: An array of MatrixCompressionOp representing the operations to expand the state preparation.
     /// - `numQubits`: The number of qubits to allocate for the state preparation.
     /// # Returns
     /// - `Unit`: The operation prepares the quantum state on the allocated qubits.
     operation MakeStatePreparationCircuit(
         rowMap : Int[],
         stateVector : Double[],
-        expansionOps : Int[][],
+        expansionOps : MatrixCompressionOp[],
         numQubits : Int,
     ) : Unit {
         use qs = Qubit[numQubits];
@@ -95,7 +90,7 @@ namespace QDKChemistry.Utils.StatePreparation {
     operation PrepareSingleReferenceState(
         params : SingleReferenceParams,
         qs : Qubit[],
-    ) : Unit {
+    ) : Unit is Adj + Ctl {
         let bitLen = Length(params.bitStrings);
         if bitLen != Length(qs) {
             fail "Length of bitStrings must match the number of qubits.";
@@ -128,13 +123,13 @@ namespace QDKChemistry.Utils.StatePreparation {
     /// # Parameters
     /// - `params`: A `SingleReferenceParams` struct containing the parameters for state preparation.
     /// # Returns
-    /// - `Qubit[] => Unit`: A callable that takes an array of qubits and prepares the single reference quantum state on those qubits.
-    function MakePrepareSingleReferenceStateOp(params : SingleReferenceParams) : Qubit[] => Unit {
+    /// - `Qubit[] => Unit is Adj + Ctl`: A callable that takes an array of qubits and prepares the single reference quantum state on those qubits.
+    function MakePrepareSingleReferenceStateOp(params : SingleReferenceParams) : Qubit[] => Unit is Adj + Ctl {
         PrepareSingleReferenceState(params, _)
     }
 
     /// Applies Hadamard to each qubit in the array.
-    operation PrepareHadamardAll(qubits : Qubit[]) : Unit {
+    operation PrepareHadamardAll(qubits : Qubit[]) : Unit is Adj + Ctl {
         for q in qubits {
             H(q);
         }
@@ -142,8 +137,64 @@ namespace QDKChemistry.Utils.StatePreparation {
 
     /// Returns a callable that applies Hadamard to each qubit in the array.
     /// # Returns
-    /// - `Qubit[] => Unit`: A callable that prepares the uniform superposition on the given qubits.
-    function MakePrepareHadamardAllOp() : Qubit[] => Unit {
+    /// - `Qubit[] => Unit is Adj + Ctl`: A callable that prepares the uniform superposition on the given qubits.
+    function MakePrepareHadamardAllOp() : Qubit[] => Unit is Adj + Ctl {
         PrepareHadamardAll(_)
+    }
+
+    /// Prepares the dense statevector on the qubit subset given by rowMap.
+    operation ApplyDensePreparation(
+        rowMap : Int[],
+        stateVector : Double[],
+        qs : Qubit[],
+    ) : Unit is Adj + Ctl {
+        PreparePureStateD(stateVector, Subarray(rowMap, qs));
+    }
+
+    /// Applies the GF2+X expansion operations (CX / X gates) to the full register.
+    operation ApplyExpansion(
+        expansionOps : MatrixCompressionOp[],
+        qs : Qubit[],
+    ) : Unit is Adj + Ctl {
+        for gate in expansionOps {
+            ApplyAdjointableCompressionOp(gate, qs);
+        }
+    }
+
+    /// Composes the dense preparation with expansion operations.
+    /// The dense preparation is applied to the subregister specified by embeddingMap,
+    /// then expansion operations are applied to the full register.
+    ///
+    /// The dense preparation is taken as *parameters* rather than as a callable: a callable
+    /// that captures another callable cannot be resolved statically by the adaptive-profile
+    /// code generator, which makes the composition unusable as a QPE `statePrep` argument.
+    operation ComposeSparseIsometry(
+        denseParams : StatePreparationParams,
+        embeddingMap : Int[],
+        expansionOps : MatrixCompressionOp[],
+        qs : Qubit[],
+    ) : Unit is Adj + Ctl {
+        StatePreparation(denseParams, Subarray(embeddingMap, qs));
+        ApplyExpansion(expansionOps, qs);
+    }
+
+    /// Returns a callable that applies sparse isometry composition.
+    function MakeComposeSparseIsometryOp(
+        denseParams : StatePreparationParams,
+        embeddingMap : Int[],
+        expansionOps : MatrixCompressionOp[],
+    ) : Qubit[] => Unit is Adj + Ctl {
+        ComposeSparseIsometry(denseParams, embeddingMap, expansionOps, _)
+    }
+
+    /// Circuit entry point for sparse isometry composition.
+    operation MakeComposeSparseIsometryCircuit(
+        denseParams : StatePreparationParams,
+        embeddingMap : Int[],
+        expansionOps : MatrixCompressionOp[],
+        numQubits : Int,
+    ) : Unit {
+        use qs = Qubit[numQubits];
+        ComposeSparseIsometry(denseParams, embeddingMap, expansionOps, qs);
     }
 }

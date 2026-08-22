@@ -435,6 +435,19 @@ class StateVectorContainer : public WavefunctionContainer {
   bool _is_single_determinant() const;
 
   /**
+   * @brief Read active occupations directly from the single determinant.
+   * @return Pair of (alpha_active_occupations, beta_active_occupations).
+   */
+  std::pair<Eigen::VectorXd, Eigen::VectorXd>
+  _single_determinant_occupations_pair() const;
+
+  /**
+   * @brief Check whether the available 1-RDM represents the determinant.
+   * @return True when no 1-RDM is stored or its blocks match the determinant.
+   */
+  bool _one_rdm_matches_single_determinant() const;
+
+  /**
    * @brief Active-orbital (alpha, beta) occupation vectors.
    * @return Pair of (alpha_active_occupations, beta_active_occupations).
    */

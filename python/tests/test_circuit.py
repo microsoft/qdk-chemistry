@@ -24,7 +24,9 @@ except ImportError:
     from qsharp._native import Circuit as QdkCircuitType
     from qsharp._qsharp import QirInputData
 
+from qdk_chemistry.algorithms.state_preparation._binary_encoding_utils import MatrixCompressionType
 from qdk_chemistry.data import Circuit
+from qdk_chemistry.data import circuit as circuit_module
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -95,6 +97,11 @@ class TestCircuitConstruction:
         assert retrieved_qasm == qasm
         assert "h q[0];" in retrieved_qasm
 
+    def test_num_qubits_records_the_declared_width(self):
+        """Callers read the register width off the circuit rather than its producer."""
+        assert Circuit(qasm="OPENQASM 3.0;", num_qubits=5).num_qubits == 5
+        assert Circuit(qasm="OPENQASM 3.0;", num_qubits=0).num_qubits == 0
+
 
 class TestGetQsharpCircuit:
     """Test cases for get_qsharp method."""
@@ -138,7 +145,14 @@ class TestGetQsharpCircuit:
         state_prep_params = {
             "rowMap": [1, 0],
             "stateVector": [0.6, 0.0, 0.0, 0.8],
-            "expansionOps": [[2]],
+            "expansionOps": [
+                {
+                    "kind": MatrixCompressionType.X.qsharp_code,
+                    "qubits": [2],
+                    "controlState": 0,
+                    "lookupData": [],
+                }
+            ],
             "numQubits": 4,
         }
         qsharp_factory = QsharpFactoryData(
@@ -217,6 +231,28 @@ class TestCircuitSerialization:
 
         assert reconstructed.qasm == original.qasm
         assert reconstructed.qir == original.qir
+
+    def test_json_roundtrip_preserves_num_qubits(self, simple_qasm, simple_qir):
+        """A declared register width has to survive a save/load cycle."""
+        original = Circuit(qasm=simple_qasm, qir=simple_qir, num_qubits=7)
+        reconstructed = Circuit.from_json(original.to_json())
+
+        assert reconstructed.num_qubits == 7
+
+    def test_json_omits_an_undeclared_num_qubits(self, simple_qasm, simple_qir):
+        """Undeclared stays undeclared; it must not round-trip as a made-up width."""
+        json_data = Circuit(qasm=simple_qasm, qir=simple_qir).to_json()
+
+        assert "num_qubits" not in json_data
+        assert Circuit.from_json(json_data).num_qubits is None
+
+    def test_a_payload_written_before_num_qubits_existed_still_loads(self, simple_qasm, simple_qir):
+        """A literal v0.1.0 payload, written before ``num_qubits`` was added, must still load."""
+        legacy = {"qasm": simple_qasm, "qir": str(simple_qir), "version": "0.1.0"}
+        circuit = Circuit.from_json(legacy)
+
+        assert circuit.qasm == simple_qasm
+        assert circuit.num_qubits is None
 
     def test_to_hdf5(self, simple_qasm, simple_qir):
         """Test that to_hdf5 saves Circuit correctly."""
@@ -424,6 +460,18 @@ class TestCircuitImmutability:
 class TestCircuitEstimate:
     """Test cases for Circuit.estimate method."""
 
+    _QASM_WITH_T = """
+        OPENQASM 3.0;
+        include "stdgates.inc";
+        qubit[2] q;
+        bit[2] c;
+        h q[0];
+        t q[0];
+        cx q[0], q[1];
+        c[0] = measure q[0];
+        c[1] = measure q[1];
+    """
+
     def test_estimate_from_factory(self):
         """Test that estimate works with Q# factory data."""
         state_prep_params = {
@@ -443,21 +491,23 @@ class TestCircuitEstimate:
 
     def test_estimate_from_qasm(self):
         """Test that estimate works with QASM representation."""
-        qasm_with_t = """
-            OPENQASM 3.0;
-            include "stdgates.inc";
-            qubit[2] q;
-            bit[2] c;
-            h q[0];
-            t q[0];
-            cx q[0], q[1];
-            c[0] = measure q[0];
-            c[1] = measure q[1];
-        """
-        circuit = Circuit(qasm=qasm_with_t)
+        circuit = Circuit(qasm=self._QASM_WITH_T)
         result = circuit.estimate()
         assert result is not None
         assert hasattr(result, "logical_counts")
+
+    def test_estimate_warns_when_the_declared_width_disagrees(self, monkeypatch):
+        """A stale ``num_qubits`` is surfaced and replaced by the estimated width."""
+        warnings: list[str] = []
+        monkeypatch.setattr(circuit_module.Logger, "warn", warnings.append)
+
+        circuit = Circuit(qasm=self._QASM_WITH_T, num_qubits=5)
+        result = circuit.estimate()
+
+        assert result.logical_counts["numQubits"] == 2
+        assert len(warnings) == 1
+        assert "declares 5 qubits" in warnings[0]
+        assert circuit.num_qubits == 2
 
     def test_estimate_raises_with_qir_only(self):
         """Test that estimate raises when only QIR representation is available."""

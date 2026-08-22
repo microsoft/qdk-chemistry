@@ -33,6 +33,7 @@ DEFAULT_TARGET_PROFILE = TargetProfile.Adaptive_RIF
 #: Q# sources that are supported by ``TargetProfile.Base``.
 _BASE_PROFILE_FILES = (
     "StatePreparation.qs",
+    "BinaryEncoding.qs",
     "CircuitComposition.qs",
     "IterativePhaseEstimation.qs",
     "StandardPhaseEstimation.qs",
@@ -42,6 +43,7 @@ _BASE_PROFILE_FILES = (
     "MeasurementBasis.qs",
     "Select.qs",
     "PrepSelPrep.qs",
+    "AmplitudeAmplification.qs",
 )
 
 
@@ -153,4 +155,5 @@ class _QSharpUtilsProxy:
         return getattr(get_qsharp_context().code.QDKChemistry.Utils, name)
 
 
+# Perform initial initialization
 QSHARP_UTILS = _QSharpUtilsProxy()

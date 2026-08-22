@@ -216,7 +216,7 @@ class TestDensePureStatePreparation:
         from qiskit_aer.primitives import EstimatorV2 as AerEstimator  # noqa: PLC0415
 
         dense_prep = create("state_prep", "dense_pure_state")
-        sparse_prep = create("state_prep", "sparse_isometry_gf2x")
+        sparse_prep = create("state_prep", "sparse_isometry")
 
         # Dense prep with identity rowMap produces Qiskit circuit with standard
         # qubit ordering matching the Hamiltonian convention.
