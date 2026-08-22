@@ -244,6 +244,19 @@ TEST_F(FileIoTest, RejectsSymlinkDestinationsWithoutCopyingReferentMode) {
   EXPECT_TRUE(std::filesystem::is_symlink(link));
   EXPECT_EQ(qdk::chemistry::utils::read_text_file(target), "target");
 }
+
+TEST_F(FileIoTest, RejectsNonRegularDestinations) {
+  const auto path = root_ / "data.fifo";
+  ASSERT_EQ(::mkfifo(path.c_str(), 0666), 0);
+
+  EXPECT_THROW(
+      qdk::chemistry::utils::write_text_file_atomically(path, "replacement"),
+      std::runtime_error);
+
+  struct stat status{};
+  ASSERT_EQ(::lstat(path.c_str(), &status), 0);
+  EXPECT_TRUE(S_ISFIFO(status.st_mode));
+}
 #endif
 
 TEST_F(FileIoTest, CreatesNewFilesWithOwnerOnlyPermissions) {
@@ -308,6 +321,38 @@ TEST_F(FileIoTest, ReplacesReadOnlyDestinationOnWindows) {
   EXPECT_EQ(std::filesystem::status(path).permissions() &
                 std::filesystem::perms::owner_write,
             std::filesystem::perms::none);
+}
+
+TEST_F(FileIoTest, RejectsReadOnlyDestinationWithSurvivingHardLink) {
+  const auto path = root_ / "data.txt";
+  const auto alias = root_ / "alias.txt";
+  qdk::chemistry::utils::write_text_file_atomically(path, "original");
+  std::filesystem::create_hard_link(path, alias);
+  ASSERT_NE(SetFileAttributesW(path.c_str(), FILE_ATTRIBUTE_READONLY), 0);
+
+  EXPECT_THROW(
+      qdk::chemistry::utils::write_text_file_atomically(path, "replacement"),
+      std::runtime_error);
+
+  EXPECT_EQ(qdk::chemistry::utils::read_text_file(path), "original");
+  EXPECT_EQ(qdk::chemistry::utils::read_text_file(alias), "original");
+  EXPECT_NE(GetFileAttributesW(path.c_str()) & FILE_ATTRIBUTE_READONLY, 0);
+  EXPECT_NE(GetFileAttributesW(alias.c_str()) & FILE_ATTRIBUTE_READONLY, 0);
+}
+
+TEST_F(FileIoTest, DoesNotCopyTemporaryStorageAttributeToReplacement) {
+  const auto path = root_ / "data.txt";
+  qdk::chemistry::utils::write_text_file_atomically(path, "original");
+  ASSERT_NE(SetFileAttributesW(path.c_str(), FILE_ATTRIBUTE_READONLY |
+                                                 FILE_ATTRIBUTE_TEMPORARY),
+            0);
+
+  qdk::chemistry::utils::write_text_file_atomically(path, "replacement");
+
+  const DWORD attributes = GetFileAttributesW(path.c_str());
+  ASSERT_NE(attributes, INVALID_FILE_ATTRIBUTES);
+  EXPECT_NE(attributes & FILE_ATTRIBUTE_READONLY, 0);
+  EXPECT_EQ(attributes & FILE_ATTRIBUTE_TEMPORARY, 0);
 }
 
 TEST_F(FileIoTest, CleansUpReadOnlyTemporaryFileWhenWriterFails) {

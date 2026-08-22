@@ -4,6 +4,7 @@
 
 #include <array>
 #include <atomic>
+#include <cerrno>
 #include <chrono>
 #include <fstream>
 #include <qdk/chemistry/utils/file_io.hpp>
@@ -24,6 +25,17 @@
 
 namespace qdk::chemistry::utils {
 namespace {
+
+#ifndef _WIN32
+template <typename Operation>
+auto retry_on_eintr(Operation&& operation) -> decltype(operation()) {
+  decltype(operation()) result;
+  do {
+    result = operation();
+  } while (result == -1 && errno == EINTR);
+  return result;
+}
+#endif
 
 class ScopedReadHandle {
  public:
@@ -172,7 +184,7 @@ std::filesystem::path make_compact_temporary_path(
 }
 
 #ifdef _WIN32
-DWORD settable_file_attributes(DWORD attributes) {
+DWORD normalized_file_attributes(DWORD attributes) {
   constexpr DWORD supported_attributes =
       FILE_ATTRIBUTE_ARCHIVE | FILE_ATTRIBUTE_HIDDEN |
       FILE_ATTRIBUTE_NOT_CONTENT_INDEXED | FILE_ATTRIBUTE_OFFLINE |
@@ -180,6 +192,25 @@ DWORD settable_file_attributes(DWORD attributes) {
       FILE_ATTRIBUTE_TEMPORARY;
   const DWORD result = attributes & supported_attributes;
   return result == 0 ? FILE_ATTRIBUTE_NORMAL : result;
+}
+
+DWORD replacement_file_attributes(DWORD attributes) {
+  const DWORD result = attributes & FILE_ATTRIBUTE_READONLY;
+  return result == 0 ? FILE_ATTRIBUTE_NORMAL : result;
+}
+
+bool set_handle_file_attributes(HANDLE handle, DWORD attributes) noexcept {
+  if (handle == INVALID_HANDLE_VALUE) {
+    return false;
+  }
+  FILE_BASIC_INFO info{};
+  if (!GetFileInformationByHandleEx(handle, FileBasicInfo, &info,
+                                    sizeof(info))) {
+    return false;
+  }
+  info.FileAttributes = normalized_file_attributes(attributes);
+  return SetFileInformationByHandle(handle, FileBasicInfo, &info,
+                                    sizeof(info)) != 0;
 }
 #endif
 
@@ -223,7 +254,7 @@ class ReservedTemporaryFile {
           (attributes & FILE_ATTRIBUTE_READONLY) != 0) {
         SetFileAttributesW(
             path_.c_str(),
-            settable_file_attributes(attributes & ~FILE_ATTRIBUTE_READONLY));
+            normalized_file_attributes(attributes & ~FILE_ATTRIBUTE_READONLY));
       }
 #endif
       std::error_code ignored;
@@ -295,7 +326,8 @@ class ReservedTemporaryFile {
 #else
     const auto requested = static_cast<mode_t>(permissions) & 0777;
     struct stat status{};
-    if (::fchmod(handle_, requested) != 0 || ::fstat(handle_, &status) != 0 ||
+    if (retry_on_eintr([&] { return ::fchmod(handle_, requested); }) != 0 ||
+        retry_on_eintr([&] { return ::fstat(handle_, &status); }) != 0 ||
         (status.st_mode & 0777) != requested) {
       throw std::runtime_error("Could not set temporary file permissions: '" +
                                display_path(path_) + "'");
@@ -371,19 +403,21 @@ ReservedTemporaryFile create_exclusive_file(const std::filesystem::path& path,
     return {path, ReservedTemporaryFile::invalid_handle()};
   }
 #else
-  const int descriptor =
-      ::open(path.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0600);
+  const int descriptor = retry_on_eintr([&] {
+    return ::open(path.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0600);
+  });
   if (descriptor == -1) {
     error = std::error_code(errno, std::generic_category());
     return {path, ReservedTemporaryFile::invalid_handle()};
   }
-  if (::fchmod(descriptor, S_IRUSR | S_IWUSR) != 0) {
+  if (retry_on_eintr([&] { return ::fchmod(descriptor, S_IRUSR | S_IWUSR); }) !=
+      0) {
     const int permission_error = errno;
     error = std::error_code(permission_error, std::generic_category());
     return {path, descriptor};
   }
   struct stat status{};
-  if (::fstat(descriptor, &status) != 0 ||
+  if (retry_on_eintr([&] { return ::fstat(descriptor, &status); }) != 0 ||
       (status.st_mode & 0777) != (S_IRUSR | S_IWUSR)) {
     error = std::make_error_code(std::errc::permission_denied);
     return {path, descriptor};
@@ -493,14 +527,14 @@ void replace_file(const std::filesystem::path& source,
   HANDLE original_handle_value = INVALID_HANDLE_VALUE;
   if (destination_exists) {
     original_handle_value = CreateFileW(
-        destination.c_str(), FILE_READ_ATTRIBUTES,
+        destination.c_str(), FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES,
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
         OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
   }
   const ScopedReadHandle original_handle(original_handle_value);
   if (destination_exists &&
       !SetFileAttributesW(source.c_str(),
-                          settable_file_attributes(original_attributes))) {
+                          replacement_file_attributes(original_attributes))) {
     const std::error_code error(static_cast<int>(GetLastError()),
                                 std::system_category());
     throw std::runtime_error("Could not prepare file attributes for '" +
@@ -519,50 +553,57 @@ void replace_file(const std::filesystem::path& source,
   const DWORD first_error = GetLastError();
   const bool read_only = destination_exists &&
                          (original_attributes & FILE_ATTRIBUTE_READONLY) != 0;
-  if (first_error != ERROR_ACCESS_DENIED || !read_only ||
-      !SetFileAttributesW(destination.c_str(),
-                          settable_file_attributes(original_attributes &
-                                                   ~FILE_ATTRIBUTE_READONLY))) {
+  if (first_error != ERROR_ACCESS_DENIED || !read_only) {
     const std::error_code error(static_cast<int>(first_error),
                                 std::system_category());
     throw std::runtime_error("Could not replace file '" +
                              display_path(destination) +
                              "': " + error.message());
   }
-
-  if (!move()) {
-    const DWORD retry_error = GetLastError();
-    const auto identity = compare_handle_to_path_identity(original_handle.get(),
-                                                          destination, false);
-    if (identity == IdentityMatch::unknown) {
-      const std::error_code error(static_cast<int>(retry_error),
-                                  std::system_category());
-      throw std::runtime_error(
-          "Could not replace file '" + display_path(destination) +
-          "': " + error.message() +
-          "; original attributes were not restored because the destination "
-          "identity could not be verified");
-    }
-    const bool restored =
-        identity == IdentityMatch::different ||
-        SetFileAttributesW(destination.c_str(),
-                           settable_file_attributes(original_attributes)) != 0;
-    const DWORD restore_error = restored ? ERROR_SUCCESS : GetLastError();
-    const std::error_code error(static_cast<int>(retry_error),
+  BY_HANDLE_FILE_INFORMATION original_info{};
+  if (original_handle.get() == INVALID_HANDLE_VALUE ||
+      !GetFileInformationByHandle(original_handle.get(), &original_info)) {
+    const std::error_code error(static_cast<int>(GetLastError()),
                                 std::system_category());
-    if (!restored) {
-      const std::error_code rollback_error(static_cast<int>(restore_error),
-                                           std::system_category());
-      throw std::runtime_error("Could not replace file '" +
-                               display_path(destination) +
-                               "': " + error.message() +
-                               "; could not restore original attributes: " +
-                               rollback_error.message());
-    }
-    throw std::runtime_error("Could not replace file '" +
+    throw std::runtime_error("Could not inspect read-only destination '" +
                              display_path(destination) +
                              "': " + error.message());
   }
+  if (original_info.nNumberOfLinks != 1) {
+    throw std::runtime_error(
+        "Read-only Windows destinations with multiple hard links are not "
+        "supported: '" +
+        display_path(destination) + "'");
+  }
+  if (!set_handle_file_attributes(
+          original_handle.get(),
+          original_attributes & ~FILE_ATTRIBUTE_READONLY)) {
+    const std::error_code error(static_cast<int>(GetLastError()),
+                                std::system_category());
+    throw std::runtime_error("Could not prepare read-only destination '" +
+                             display_path(destination) +
+                             "': " + error.message());
+  }
+
+  const bool replaced = move();
+  const DWORD retry_error = replaced ? ERROR_SUCCESS : GetLastError();
+  if (replaced) {
+    return;
+  }
+  if (!set_handle_file_attributes(original_handle.get(), original_attributes)) {
+    const std::error_code rollback_error(static_cast<int>(GetLastError()),
+                                         std::system_category());
+    const std::error_code error(static_cast<int>(retry_error),
+                                std::system_category());
+    throw std::runtime_error(
+        "Could not replace file '" + display_path(destination) +
+        "': " + error.message() +
+        "; could not restore original attributes: " + rollback_error.message());
+  }
+  const std::error_code error(static_cast<int>(retry_error),
+                              std::system_category());
+  throw std::runtime_error("Could not replace file '" +
+                           display_path(destination) + "': " + error.message());
 #else
   std::error_code error;
   std::filesystem::rename(source, destination, error);
@@ -602,6 +643,10 @@ void preserve_permissions(ReservedTemporaryFile& temporary_file,
     throw std::runtime_error("Symlink destinations are not supported: '" +
                              display_path(destination) + "'");
   }
+  if (!std::filesystem::is_regular_file(status)) {
+    throw std::runtime_error("Destination is not a regular file: '" +
+                             display_path(destination) + "'");
+  }
 
   temporary_file.set_permissions(status.permissions() &
                                  std::filesystem::perms::all);
@@ -637,7 +682,8 @@ void create_private_directories(const std::filesystem::path& directory) {
 
   for (auto iterator = missing.rbegin(); iterator != missing.rend();
        ++iterator) {
-    if (::mkdir(iterator->c_str(), S_IRWXU) != 0) {
+    if (retry_on_eintr([&] { return ::mkdir(iterator->c_str(), S_IRWXU); }) !=
+        0) {
       const int mkdir_error = errno;
       if (mkdir_error == EEXIST && std::filesystem::is_directory(*iterator)) {
         continue;
@@ -647,7 +693,8 @@ void create_private_directories(const std::filesystem::path& directory) {
                                display_path(*iterator) +
                                "': " + error.message());
     }
-    if (::chmod(iterator->c_str(), S_IRWXU) != 0) {
+    if (retry_on_eintr([&] { return ::chmod(iterator->c_str(), S_IRWXU); }) !=
+        0) {
       const std::error_code error(errno, std::generic_category());
       std::error_code ignored;
       std::filesystem::remove(*iterator, ignored);
@@ -655,15 +702,19 @@ void create_private_directories(const std::filesystem::path& directory) {
                                display_path(*iterator) +
                                "': " + error.message());
     }
-    const int descriptor = ::open(
-        iterator->c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    const int descriptor = retry_on_eintr([&] {
+      return ::open(iterator->c_str(),
+                    O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    });
     struct stat status{};
     int permission_error = 0;
     if (descriptor == -1) {
       permission_error = errno;
-    } else if (::fchmod(descriptor, S_IRWXU) != 0) {
+    } else if (retry_on_eintr([&] { return ::fchmod(descriptor, S_IRWXU); }) !=
+               0) {
       permission_error = errno;
-    } else if (::fstat(descriptor, &status) != 0) {
+    } else if (retry_on_eintr([&] { return ::fstat(descriptor, &status); }) !=
+               0) {
       permission_error = errno;
     } else if ((status.st_mode & 0777) != S_IRWXU) {
       permission_error = EPERM;
@@ -734,8 +785,8 @@ std::string read_text_file(const std::filesystem::path& path) {
     contents.append(buffer.data(), bytes_read);
   }
 #else
-  const int descriptor =
-      ::open(path.c_str(), O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+  const int descriptor = retry_on_eintr(
+      [&] { return ::open(path.c_str(), O_RDONLY | O_NONBLOCK | O_CLOEXEC); });
   if (descriptor == -1) {
     throw std::runtime_error("Could not open file for reading: '" +
                              display_path(path) + "'");

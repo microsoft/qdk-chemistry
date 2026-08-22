@@ -173,6 +173,17 @@ def test_reject_non_regular_file(tmp_path: Path):
         read_text_file(fifo)
 
 
+@pytest.mark.skipif(os.name == "nt", reason="POSIX special files")
+def test_reject_non_regular_destination(tmp_path: Path):
+    fifo = tmp_path / "data.fifo"
+    os.mkfifo(fifo)
+
+    with pytest.raises(OSError, match="Destination is not a regular file"):
+        write_text_file_atomically(fifo, "replacement")
+
+    assert stat.S_ISFIFO(fifo.lstat().st_mode)
+
+
 @pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits are not portable to Windows")
 def test_preserve_destination_permissions(tmp_path: Path):
     path = tmp_path / "data.txt"
@@ -257,14 +268,35 @@ def test_reject_filesystem_that_ignores_permissions(
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows read-only behavior")
 def test_replace_read_only_destination_on_windows(tmp_path: Path):
+    if sys.platform != "win32":
+        raise AssertionError("Windows-only test ran on another platform")
     path = tmp_path / "data.txt"
     write_text_file_atomically(path, "original")
-    path.chmod(stat.S_IREAD)
+    set_attributes = ctypes.WinDLL("kernel32", use_last_error=True).SetFileAttributesW
+    set_attributes.argtypes = (wintypes.LPCWSTR, wintypes.DWORD)
+    set_attributes.restype = wintypes.BOOL
+    assert set_attributes(str(path), 0x00000001)
 
     write_text_file_atomically(path, "replacement")
 
     assert read_text_file(path) == "replacement"
     assert path.stat().st_mode & stat.S_IWRITE == 0
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows read-only behavior")
+def test_reject_read_only_destination_with_surviving_hard_link(tmp_path: Path):
+    path = tmp_path / "data.txt"
+    alias = tmp_path / "alias.txt"
+    write_text_file_atomically(path, "original")
+    os.link(path, alias)
+    path.chmod(stat.S_IREAD)
+
+    with pytest.raises(RuntimeError, match="multiple hard links"):
+        write_text_file_atomically(path, "replacement")
+
+    assert read_text_file(path) == "original"
+    assert read_text_file(alias) == "original"
+    assert alias.stat().st_mode & stat.S_IWRITE == 0
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows read-only behavior")

@@ -42,11 +42,18 @@ std::string read_text_file(const std::filesystem::path& path);
  * On POSIX, replacing an existing file preserves its ordinary read, write, and
  * execute permission bits. New files are created with owner-only permissions.
  * The filesystem must enforce POSIX permission bits; the write fails rather
- * than publishing a file with broader effective permissions.
+ * than publishing a file with broader mode bits. Platform ACLs are not
+ * inspected and may grant access beyond those bits.
  * On Windows, replacement preserves the read-only attribute and new files use
- * the filesystem's standard access controls. Other file-object metadata and
- * hard-link identity are not preserved. Atomic replacement prevents partial
- * visibility but does not guarantee durability after power loss.
+ * the filesystem's standard access controls. Existing Windows security
+ * descriptors and DACLs are not preserved; the replacement uses access
+ * controls inherited when its temporary file is created and may therefore
+ * grant broader access than the file it replaced. Callers that rely on
+ * explicit access-control entries must reapply them after the write. Read-only
+ * Windows destinations with multiple hard links are rejected. Other
+ * file-object metadata and hard-link identity are not preserved. Atomic
+ * replacement prevents partial visibility but does not guarantee durability
+ * after power loss.
  * Windows alternate data streams are not supported.
  *
  * The destination's parent directory and mutable ancestors must not be
@@ -54,6 +61,10 @@ std::string read_text_file(const std::filesystem::path& path);
  * write. Missing POSIX parent directories are created with owner-only
  * permissions. Windows parent directories use inherited filesystem access
  * controls.
+ *
+ * On POSIX, relative destinations are frozen to an absolute path before the
+ * writer runs. A relative path may therefore be rejected when its expanded
+ * absolute form exceeds the platform pathname limit.
  *
  * @param path Destination path.
  * @param writer Function that writes the complete temporary file.

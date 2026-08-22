@@ -94,17 +94,29 @@ def write_file_atomically(
     On POSIX, replacing an existing file preserves its ordinary read, write,
     and execute permission bits. New files are created with owner-only
     permissions. The filesystem must enforce POSIX permission bits; the write
-    fails rather than publishing a file with broader effective permissions. On
-    Windows, replacement preserves the read-only attribute and new files use
-    the filesystem's standard access controls. Other file-object metadata and
-    hard-link identity are not preserved. Atomic replacement prevents partial
-    visibility but does not guarantee durability after power loss.
+    fails rather than publishing a file with broader mode bits. Platform ACLs
+    are not inspected and may grant access beyond those bits. On Windows,
+    replacement preserves the read-only attribute and new files use the
+    filesystem's standard access controls. Existing Windows security
+    descriptors and DACLs are not preserved; the replacement uses access
+    controls inherited when its temporary file is created and may therefore
+    grant broader access than the file it replaced. Callers that rely on
+    explicit access-control entries must reapply them after the write.
+    Read-only Windows destinations with multiple hard links are rejected.
+    Other file-object metadata and hard-link identity are not preserved.
+    Atomic replacement prevents partial visibility but does not guarantee
+    durability after power loss. Windows alternate data streams are not
+    supported.
 
     The destination's parent directory and mutable ancestors must not be
     writable by principals less privileged than the process performing the
     write. Missing POSIX parent directories are created with owner-only
     permissions. Windows parent directories use inherited filesystem access
     controls.
+
+    On POSIX, relative destinations are frozen to an absolute path before the
+    writer runs. A relative path may therefore be rejected when its expanded
+    absolute form exceeds the platform pathname limit.
     """
     _validate_destination_path(path)
     destination = Path(path)
@@ -132,13 +144,13 @@ def write_file_atomically(
             existing_status = destination.lstat()
         except FileNotFoundError:
             destination_mode = None
-            destination_status = None
             if os.name != "nt":
                 _set_permissions(descriptor, stat.S_IRUSR | stat.S_IWUSR, temporary_path)
         else:
-            destination_status = existing_status
             if stat.S_ISLNK(existing_status.st_mode):
                 raise ValueError(f"Symlink destinations are not supported: '{destination}'")
+            if not stat.S_ISREG(existing_status.st_mode):
+                raise OSError(f"Destination is not a regular file: '{destination}'")
             existing_mode = stat.S_IMODE(existing_status.st_mode) & 0o777
             destination_mode = existing_mode
             if os.name != "nt" and hasattr(os, "fchmod"):
@@ -149,7 +161,7 @@ def write_file_atomically(
         if os.name == "nt":
             os.close(descriptor)
             descriptor = -1
-        _replace_file(temporary_path, destination, destination_mode, destination_status)
+        _replace_file(temporary_path, destination, destination_mode)
     except BaseException as error:
         if reserved_status is None and descriptor >= 0:
             try:
@@ -245,6 +257,7 @@ def _open_windows_file(
     *,
     desired_access: int,
     creation_disposition: int,
+    flags_and_attributes: int = 0x00000080,
 ) -> int:
     if sys.platform != "win32":
         raise NotImplementedError("Windows file handles require Windows")
@@ -266,7 +279,7 @@ def _open_windows_file(
         0x00000001 | 0x00000002 | 0x00000004,
         None,
         creation_disposition,
-        0x00000080,
+        flags_and_attributes,
         None,
     )
     if handle == wintypes.HANDLE(-1).value:
@@ -293,6 +306,56 @@ def _windows_error(path: PathLike, error: int) -> OSError:
     if sys.platform != "win32":
         raise NotImplementedError("Windows errors require Windows")
     return OSError(0, ctypes.FormatError(error), os.fspath(path), error)
+
+
+class _WindowsFileBasicInfo(ctypes.Structure):
+    _fields_ = (
+        ("creation_time", ctypes.c_longlong),
+        ("last_access_time", ctypes.c_longlong),
+        ("last_write_time", ctypes.c_longlong),
+        ("change_time", ctypes.c_longlong),
+        ("file_attributes", wintypes.DWORD),
+    )
+
+
+def _windows_file_info(descriptor: int, path: Path) -> _WindowsFileBasicInfo:
+    if sys.platform != "win32":
+        raise NotImplementedError("Windows file attributes require Windows")
+    get_osfhandle = cast(
+        "Callable[[int], int]",
+        importlib.import_module("msvcrt").get_osfhandle,
+    )
+    handle = get_osfhandle(descriptor)
+    info = _WindowsFileBasicInfo()
+    get_info = ctypes.WinDLL("kernel32", use_last_error=True).GetFileInformationByHandleEx
+    get_info.argtypes = (wintypes.HANDLE, ctypes.c_int, wintypes.LPVOID, wintypes.DWORD)
+    get_info.restype = wintypes.BOOL
+    if not get_info(handle, 0, ctypes.byref(info), ctypes.sizeof(info)):
+        raise _windows_error(path, ctypes.get_last_error())
+    return info
+
+
+def _normalized_windows_file_attributes(attributes: int) -> int:
+    supported = 0x00000001 | 0x00000002 | 0x00000004 | 0x00000020 | 0x00000100 | 0x00001000 | 0x00002000
+    result = attributes & supported
+    return result or 0x00000080
+
+
+def _set_windows_file_attributes(descriptor: int, attributes: int, path: Path) -> None:
+    if sys.platform != "win32":
+        raise NotImplementedError("Windows file attributes require Windows")
+    get_osfhandle = cast(
+        "Callable[[int], int]",
+        importlib.import_module("msvcrt").get_osfhandle,
+    )
+    handle = get_osfhandle(descriptor)
+    info = _windows_file_info(descriptor, path)
+    info.file_attributes = _normalized_windows_file_attributes(attributes)
+    set_info = ctypes.WinDLL("kernel32", use_last_error=True).SetFileInformationByHandle
+    set_info.argtypes = (wintypes.HANDLE, ctypes.c_int, wintypes.LPVOID, wintypes.DWORD)
+    set_info.restype = wintypes.BOOL
+    if not set_info(handle, 0, ctypes.byref(info), ctypes.sizeof(info)):
+        raise _windows_error(path, ctypes.get_last_error())
 
 
 def _reserve_distinct_temporary_file(destination: Path, temporary_path: Path) -> int | None:
@@ -403,42 +466,63 @@ def _replace_file(
     temporary_path: Path,
     destination: Path,
     destination_mode: int | None,
-    destination_status: os.stat_result | None,
 ) -> None:
     """Replace a destination, handling Windows read-only files."""
+    original_descriptor = -1
+    original_attributes: int | None = None
     if os.name == "nt" and destination_mode is not None:
-        temporary_path.chmod(destination_mode)
-    try:
-        os.replace(temporary_path, destination)
-        return
-    except PermissionError:
-        read_only = os.name == "nt" and destination_mode is not None and destination_mode & stat.S_IWRITE == 0
-        if not read_only:
-            raise
-
-    assert destination_mode is not None
-    destination.chmod(destination_mode | stat.S_IWRITE)
-    try:
-        os.replace(temporary_path, destination)
-    except BaseException as replace_error:
-        if destination_status is None:
-            raise
-        identity_matches = _path_identity_state(
-            destination,
-            destination_status,
-            require_single_link=False,
-        )
-        if identity_matches is False:
-            raise
-        if identity_matches is None:
-            raise RuntimeError(
-                f"Could not safely restore attributes for '{destination}' because its identity could not be verified"
-            ) from replace_error
         try:
-            destination.chmod(destination_mode)
-        except OSError as rollback_error:
-            raise replace_error from rollback_error
-        raise
+            original_descriptor = _open_windows_file(
+                destination,
+                desired_access=0x00000080 | 0x00000100,
+                creation_disposition=3,
+                flags_and_attributes=0x00000080 | 0x00200000,
+            )
+        except OSError:
+            original_descriptor = -1
+        else:
+            try:
+                original_attributes = int(_windows_file_info(original_descriptor, destination).file_attributes)
+            except BaseException:
+                os.close(original_descriptor)
+                original_descriptor = -1
+                raise
+    try:
+        if os.name == "nt" and destination_mode is not None:
+            temporary_path.chmod(destination_mode)
+        try:
+            os.replace(temporary_path, destination)
+            return
+        except PermissionError as replace_error:
+            read_only = os.name == "nt" and destination_mode is not None and destination_mode & stat.S_IWRITE == 0
+            if (
+                not read_only
+                or getattr(replace_error, "winerror", None) != 5
+                or original_descriptor < 0
+                or original_attributes is None
+            ):
+                raise
+
+        if os.fstat(original_descriptor).st_nlink != 1:
+            raise RuntimeError(
+                f"Read-only Windows destinations with multiple hard links are not supported: '{destination}'"
+            )
+        _set_windows_file_attributes(
+            original_descriptor,
+            original_attributes & ~0x00000001,
+            destination,
+        )
+        try:
+            os.replace(temporary_path, destination)
+        except BaseException as replace_error:
+            try:
+                _set_windows_file_attributes(original_descriptor, original_attributes, destination)
+            except OSError as rollback_error:
+                raise replace_error from rollback_error
+            raise
+    finally:
+        if original_descriptor >= 0:
+            os.close(original_descriptor)
 
 
 def _set_permissions(descriptor: int, mode: int, path: Path) -> None:
