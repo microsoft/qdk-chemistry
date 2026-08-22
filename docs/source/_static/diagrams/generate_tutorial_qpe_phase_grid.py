@@ -169,7 +169,7 @@ def main() -> None:
     }
     for filename, figure in figures.items():
         output_path = Path(__file__).with_name(filename)
-        figure.savefig(output_path, dpi=200, bbox_inches="tight", facecolor="white")
+        figure.savefig(output_path, dpi=200, bbox_inches="tight", transparent=True)
         print(f"Wrote {output_path}")
 
     table_path = Path(__file__).with_name("tutorial_qpe_phase_grid_table.rst")

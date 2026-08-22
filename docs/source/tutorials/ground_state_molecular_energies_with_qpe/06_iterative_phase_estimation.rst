@@ -330,7 +330,7 @@ The rendered circuit is still long because it contains the four-determinant stat
 Before opening the answers below, trace the operations on each wire to infer its role and compare the dimensions reported for all six iteration circuits.
 Record the evidence you used in the Jupyter notebook's interpretation task.
 
-.. figure:: /_static/diagrams/tutorial_qpe_power_one_circuit_overview.png
+.. figure:: /_static/diagrams/tutorial_qpe_power_one_circuit_overview.svg
    :alt: Overview of the power-one IQPE circuit on thirteen wires. The top wire is the readout ancilla and receives an H gate, an Rz feedback rotation labeled zero, the controlled Pauli-evolution block, a final H gate, and measurement and reset. The remaining twelve wires form the compute register. State-preparation blocks act on the compute wires that require preparation operations, the controlled Pauli-evolution block spans the ancilla and compute register, and reset operations return the compute wires to zero after evolution.
    :align: center
    :width: 60%

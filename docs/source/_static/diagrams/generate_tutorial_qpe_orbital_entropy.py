@@ -24,7 +24,7 @@ def main() -> None:
     result = run_active_space_workflow()
     figure = plot_orbital_entropy_selection(result)
     output_path = Path(__file__).with_name("tutorial_qpe_orbital_entropy.png")
-    figure.savefig(output_path, dpi=200, bbox_inches="tight", facecolor="white")
+    figure.savefig(output_path, dpi=200, bbox_inches="tight", transparent=True)
     print(f"Wrote {output_path}")
 
 
