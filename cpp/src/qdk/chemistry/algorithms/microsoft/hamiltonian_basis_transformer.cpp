@@ -291,69 +291,111 @@ std::shared_ptr<data::Hamiltonian> QdkHamiltonianBasisTransformer::_run_impl(
       active_coefficients(*source_orbitals, source_indices);
   const auto target_active_coefficients =
       active_coefficients(*target_orbitals, source_indices);
-  const auto& stored_overlap = source_orbitals->get_overlap_matrix();
-  const Eigen::MatrixXd overlap =
-      0.5 * (stored_overlap + stored_overlap.transpose());
   const Eigen::Index nactive = source_indices.size();
   const Eigen::MatrixXd identity = Eigen::MatrixXd::Identity(nactive, nactive);
-  Eigen::MatrixXd source_metric_coefficients;
-  Eigen::MatrixXd target_metric_coefficients;
-  Eigen::LLT<Eigen::MatrixXd> overlap_cholesky(overlap);
-  if (overlap_cholesky.info() == Eigen::Success) {
-    source_metric_coefficients =
-        overlap_cholesky.matrixU() * source_active_coefficients;
-    target_metric_coefficients =
-        overlap_cholesky.matrixU() * target_active_coefficients;
-  } else {
-    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> overlap_eigensolver(overlap);
-    require(overlap_eigensolver.info() == Eigen::Success &&
-                overlap_eigensolver.eigenvalues().allFinite(),
-            "AO overlap metric eigendecomposition failed");
-    const double spectral_scale =
-        std::max(1.0, overlap_eigensolver.eigenvalues().cwiseAbs().maxCoeff());
-    const double negative_eigenvalue_tolerance =
+  Eigen::MatrixXd rotation = [&]() -> Eigen::MatrixXd {
+    const auto& stored_overlap = source_orbitals->get_overlap_matrix();
+    const Eigen::MatrixXd overlap =
+        0.5 * (stored_overlap + stored_overlap.transpose());
+    Eigen::MatrixXd source_metric_coefficients;
+    Eigen::MatrixXd target_metric_coefficients;
+    std::optional<std::pair<Eigen::MatrixXd, Eigen::MatrixXd>>
+        numerical_null_mode_coefficients;
+    const double relative_eigenvalue_tolerance =
         100.0 * std::numeric_limits<double>::epsilon() *
-        static_cast<double>(overlap.rows()) * spectral_scale;
-    require(overlap_eigensolver.eigenvalues().minCoeff() >=
-                -negative_eigenvalue_tolerance,
-            "AO overlap metric must be positive semidefinite");
-    require_close(source_active_coefficients.transpose() * overlap *
-                      source_active_coefficients,
-                  identity, tolerance, "Source active-orbital overlap");
-    require_close(target_active_coefficients.transpose() * overlap *
-                      target_active_coefficients,
-                  identity, tolerance, "Target active-orbital overlap");
-    const Eigen::VectorXd square_root_eigenvalues =
-        overlap_eigensolver.eigenvalues().cwiseMax(0.0).cwiseSqrt();
-    const Eigen::MatrixXd source_eigen_coefficients =
-        overlap_eigensolver.eigenvectors().transpose() *
-        source_active_coefficients;
-    const Eigen::MatrixXd target_eigen_coefficients =
-        overlap_eigensolver.eigenvectors().transpose() *
-        target_active_coefficients;
-    source_metric_coefficients =
-        square_root_eigenvalues.asDiagonal() * source_eigen_coefficients;
-    target_metric_coefficients =
-        square_root_eigenvalues.asDiagonal() * target_eigen_coefficients;
-  }
-  require_full_column_rank(source_metric_coefficients,
-                           "Source active orbitals");
-  require_full_column_rank(target_metric_coefficients,
-                           "Target active orbitals");
-  require_close(
-      source_metric_coefficients.transpose() * source_metric_coefficients,
-      identity, tolerance, "Source active-orbital overlap");
-  require_close(
-      target_metric_coefficients.transpose() * target_metric_coefficients,
-      identity, tolerance, "Target active-orbital overlap");
-  Eigen::MatrixXd rotation =
-      source_metric_coefficients.transpose() * target_metric_coefficients;
-  require_full_column_rank(rotation, "Recovered active-space rotation");
-  require_close(source_metric_coefficients * rotation,
-                target_metric_coefficients, tolerance,
-                "Target active orbitals");
-  require_close(rotation.transpose() * rotation, identity, tolerance,
-                "Recovered active-space rotation");
+        static_cast<double>(overlap.rows());
+    double null_mode_residual_tolerance = tolerance;
+    Eigen::LLT<Eigen::MatrixXd> overlap_cholesky(overlap);
+    if (overlap_cholesky.info() == Eigen::Success &&
+        overlap_cholesky.rcond() > relative_eigenvalue_tolerance) {
+      source_metric_coefficients =
+          overlap_cholesky.matrixU() * source_active_coefficients;
+      target_metric_coefficients =
+          overlap_cholesky.matrixU() * target_active_coefficients;
+    } else {
+      Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> overlap_eigensolver(
+          overlap);
+      require(overlap_eigensolver.info() == Eigen::Success &&
+                  overlap_eigensolver.eigenvalues().allFinite(),
+              "AO overlap metric eigendecomposition failed");
+      const double spectral_scale =
+          overlap_eigensolver.eigenvalues().cwiseAbs().maxCoeff();
+      require(spectral_scale > 0.0,
+              "AO overlap metric must have positive spectral scale");
+      const double negative_eigenvalue_tolerance =
+          relative_eigenvalue_tolerance * spectral_scale;
+      require(overlap_eigensolver.eigenvalues().minCoeff() >=
+                  -negative_eigenvalue_tolerance,
+              "AO overlap metric must be positive semidefinite");
+      const Eigen::MatrixXd source_eigen_coefficients =
+          overlap_eigensolver.eigenvectors().transpose() *
+          source_active_coefficients;
+      const Eigen::MatrixXd target_eigen_coefficients =
+          overlap_eigensolver.eigenvectors().transpose() *
+          target_active_coefficients;
+      const Eigen::VectorXd square_root_eigenvalues =
+          overlap_eigensolver.eigenvalues().unaryExpr(
+              [negative_eigenvalue_tolerance](double eigenvalue) {
+                return eigenvalue > negative_eigenvalue_tolerance
+                           ? std::sqrt(eigenvalue)
+                           : 0.0;
+              });
+      source_metric_coefficients =
+          square_root_eigenvalues.asDiagonal() * source_eigen_coefficients;
+      target_metric_coefficients =
+          square_root_eigenvalues.asDiagonal() * target_eigen_coefficients;
+      const Eigen::VectorXd numerical_null_mode_scale =
+          overlap_eigensolver.eigenvalues().unaryExpr(
+              [negative_eigenvalue_tolerance](double eigenvalue) {
+                return std::abs(eigenvalue) <= negative_eigenvalue_tolerance
+                           ? std::sqrt(std::abs(eigenvalue))
+                           : 0.0;
+              });
+      numerical_null_mode_coefficients.emplace(
+          numerical_null_mode_scale.asDiagonal() * source_eigen_coefficients,
+          numerical_null_mode_scale.asDiagonal() * target_eigen_coefficients);
+      null_mode_residual_tolerance =
+          std::max(tolerance, std::sqrt(relative_eigenvalue_tolerance));
+    }
+    require_full_column_rank(source_metric_coefficients,
+                             "Source active orbitals");
+    require_full_column_rank(target_metric_coefficients,
+                             "Target active orbitals");
+    require_close(
+        source_metric_coefficients.transpose() * source_metric_coefficients,
+        identity, tolerance, "Source active-orbital overlap");
+    require_close(
+        target_metric_coefficients.transpose() * target_metric_coefficients,
+        identity, tolerance, "Target active-orbital overlap");
+    if (numerical_null_mode_coefficients) {
+      const Eigen::MatrixXd zero = Eigen::MatrixXd::Zero(nactive, nactive);
+      require_close(numerical_null_mode_coefficients->first.transpose() *
+                        numerical_null_mode_coefficients->first,
+                    zero, tolerance,
+                    "Source active-orbital numerical-null contribution");
+      require_close(numerical_null_mode_coefficients->second.transpose() *
+                        numerical_null_mode_coefficients->second,
+                    zero, tolerance,
+                    "Target active-orbital numerical-null contribution");
+    }
+    Eigen::MatrixXd recovered_rotation =
+        source_metric_coefficients.transpose() * target_metric_coefficients;
+    require_full_column_rank(recovered_rotation,
+                             "Recovered active-space rotation");
+    require_close(source_metric_coefficients * recovered_rotation,
+                  target_metric_coefficients, tolerance,
+                  "Target active orbitals");
+    if (numerical_null_mode_coefficients) {
+      require_close(
+          numerical_null_mode_coefficients->first * recovered_rotation,
+          numerical_null_mode_coefficients->second,
+          null_mode_residual_tolerance,
+          "Target active orbitals in numerical null modes");
+    }
+    require_close(recovered_rotation.transpose() * recovered_rotation, identity,
+                  tolerance, "Recovered active-space rotation");
+    return recovered_rotation;
+  }();
 
   const auto& one_body = std::get<0>(source.get_one_body_integrals());
   require_finite(one_body, "Source one-body integrals");

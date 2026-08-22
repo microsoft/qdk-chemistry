@@ -9,6 +9,7 @@
 #include <fstream>
 #include <limits>
 #include <nlohmann/json.hpp>
+#include <numeric>
 #include <optional>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/dynamical_correlation_calculator.hpp>
@@ -1751,11 +1752,11 @@ TEST_F(HamiltonianTest,
 TEST_F(HamiltonianTest,
        CholeskyBasisTransformerRejectsAmplifiedNegativeOverlapMode) {
   Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(2, 2);
-  overlap(1, 1) = -1.0e-14;
+  overlap(1, 1) = -1.0e-15;
   Eigen::MatrixXd source_coefficients(2, 1);
   source_coefficients << 1.0, 0.0;
   Eigen::MatrixXd target_coefficients(2, 1);
-  target_coefficients << 1.0, 1.0e7;
+  target_coefficients << 1.0, 100.0;
   auto basis_set =
       testing::create_random_basis_set(2, "test-negative-overlap-mode");
   auto active_space = testing::restricted_index_set(1, {0});
@@ -1776,7 +1777,101 @@ TEST_F(HamiltonianTest,
                                                            target_orbitals);
     FAIL() << "Expected the amplified negative-overlap mode to be rejected";
   } catch (const std::invalid_argument& error) {
-    EXPECT_NE(std::string(error.what()).find("Target active-orbital overlap"),
+    EXPECT_NE(std::string(error.what())
+                  .find("Target active orbitals in numerical null modes"),
+              std::string::npos);
+  }
+}
+
+TEST_F(HamiltonianTest,
+       CholeskyBasisTransformerAcceptsSignedPerturbedNullOverlapModes) {
+  Eigen::MatrixXd source_coefficients(2, 1);
+  source_coefficients << 0.5, 0.5;
+  Eigen::MatrixXd target_coefficients(2, 1);
+  target_coefficients << 1.0, 0.0;
+  auto basis_set =
+      testing::create_random_basis_set(2, "test-perturbed-null-overlap-mode");
+  auto active_space = testing::restricted_index_set(1, {0});
+
+  for (const double direction : {-1.0, 1.0}) {
+    Eigen::MatrixXd overlap = Eigen::MatrixXd::Ones(2, 2);
+    overlap(1, 1) = std::nextafter(
+        1.0, direction * std::numeric_limits<double>::infinity());
+    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigensolver(overlap);
+    ASSERT_EQ(eigensolver.info(), Eigen::Success);
+    if (direction < 0.0) {
+      ASSERT_LT(eigensolver.eigenvalues().minCoeff(), 0.0);
+    } else {
+      ASSERT_GT(eigensolver.eigenvalues().minCoeff(), 0.0);
+    }
+    auto source_orbitals = std::make_shared<Orbitals>(
+        source_coefficients, std::nullopt, std::make_optional(overlap),
+        basis_set, active_space, nullptr);
+    auto target_orbitals = std::make_shared<Orbitals>(
+        target_coefficients, std::nullopt, std::make_optional(overlap),
+        basis_set, active_space, nullptr);
+    auto source = std::make_shared<Hamiltonian>(
+        std::make_unique<CholeskyHamiltonianContainer>(
+            Eigen::MatrixXd::Constant(1, 1, 1.2),
+            Eigen::MatrixXd::Constant(1, 1, 0.4), source_orbitals, 0.0,
+            Eigen::MatrixXd{}));
+
+    EXPECT_NO_THROW(HamiltonianBasisTransformerFactory::create("qdk")->run(
+        source, target_orbitals));
+  }
+
+  Eigen::MatrixXd scaled_overlap = Eigen::MatrixXd::Zero(2, 2);
+  scaled_overlap(0, 0) = 1.0e-16;
+  Eigen::MatrixXd scaled_coefficients = Eigen::MatrixXd::Zero(2, 1);
+  scaled_coefficients(0, 0) = 1.0e8;
+  auto scaled_active_space = testing::restricted_index_set(1, {0});
+  auto scaled_orbitals = std::make_shared<Orbitals>(
+      scaled_coefficients, std::nullopt, std::make_optional(scaled_overlap),
+      basis_set, scaled_active_space, nullptr);
+  auto scaled_source = std::make_shared<Hamiltonian>(
+      std::make_unique<CholeskyHamiltonianContainer>(
+          Eigen::MatrixXd::Constant(1, 1, 1.2),
+          Eigen::MatrixXd::Constant(1, 1, 0.4), scaled_orbitals, 0.0,
+          Eigen::MatrixXd{}));
+  EXPECT_NO_THROW(HamiltonianBasisTransformerFactory::create("qdk")->run(
+      scaled_source, scaled_orbitals));
+}
+
+TEST_F(HamiltonianTest,
+       CholeskyBasisTransformerRejectsDistributedRankDeficiency) {
+  constexpr Eigen::Index dimension = 128;
+  const Eigen::MatrixXd overlap =
+      Eigen::MatrixXd::Identity(dimension, dimension);
+  const Eigen::MatrixXd source_coefficients = overlap;
+  const Eigen::VectorXd normalized_ones =
+      Eigen::VectorXd::Ones(dimension) / std::sqrt(dimension);
+  const Eigen::MatrixXd target_coefficients =
+      overlap - normalized_ones * normalized_ones.transpose();
+  auto basis_set = testing::create_random_basis_set(
+      dimension, "test-distributed-rank-deficiency");
+  std::vector<std::size_t> indices(dimension);
+  std::iota(indices.begin(), indices.end(), 0);
+  auto active_space = testing::restricted_index_set(dimension, indices);
+  auto source_orbitals = std::make_shared<Orbitals>(
+      source_coefficients, std::nullopt, std::make_optional(overlap), basis_set,
+      active_space, nullptr);
+  auto target_orbitals = std::make_shared<Orbitals>(
+      target_coefficients, std::nullopt, std::make_optional(overlap), basis_set,
+      active_space, nullptr);
+  auto source = std::make_shared<Hamiltonian>(
+      std::make_unique<CholeskyHamiltonianContainer>(
+          Eigen::MatrixXd::Identity(dimension, dimension),
+          Eigen::MatrixXd::Zero(dimension * dimension, 1), source_orbitals, 0.0,
+          Eigen::MatrixXd{}));
+  auto transformer = HamiltonianBasisTransformerFactory::create("qdk");
+  transformer->settings().set("validation_tolerance", 1.0e-2);
+
+  try {
+    transformer->run(source, target_orbitals);
+    FAIL() << "Expected distributed rank deficiency to be rejected";
+  } catch (const std::invalid_argument& error) {
+    EXPECT_NE(std::string(error.what())
+                  .find("Target active orbitals must have full column rank"),
               std::string::npos);
   }
 }
