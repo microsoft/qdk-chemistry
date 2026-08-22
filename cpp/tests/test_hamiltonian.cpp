@@ -1838,6 +1838,41 @@ TEST_F(HamiltonianTest,
 }
 
 TEST_F(HamiltonianTest,
+       CholeskyBasisTransformerAcceptsOrthonormalNumericalNullWeight) {
+  constexpr Eigen::Index dimension = 64;
+  constexpr double numerical_null_eigenvalue = 1.0e-13;
+  constexpr double numerical_null_coefficient = 100.0;
+  Eigen::MatrixXd overlap = Eigen::MatrixXd::Zero(dimension, dimension);
+  overlap(0, 0) = 1.0;
+  overlap(dimension - 1, dimension - 1) = numerical_null_eigenvalue;
+  Eigen::MatrixXd source_coefficients = Eigen::MatrixXd::Zero(dimension, 1);
+  source_coefficients(0, 0) =
+      std::sqrt(1.0 - numerical_null_eigenvalue * numerical_null_coefficient *
+                          numerical_null_coefficient);
+  source_coefficients(dimension - 1, 0) = numerical_null_coefficient;
+  const Eigen::MatrixXd target_coefficients = -source_coefficients;
+  auto basis_set = testing::create_random_basis_set(
+      dimension, "test-orthonormal-numerical-null-weight");
+  auto active_space = testing::restricted_index_set(1, {0});
+  auto source_orbitals = std::make_shared<Orbitals>(
+      source_coefficients, std::nullopt, std::make_optional(overlap), basis_set,
+      active_space, nullptr);
+  auto target_orbitals = std::make_shared<Orbitals>(
+      target_coefficients, std::nullopt, std::make_optional(overlap), basis_set,
+      active_space, nullptr);
+  auto source = std::make_shared<Hamiltonian>(
+      std::make_unique<CholeskyHamiltonianContainer>(
+          Eigen::MatrixXd::Constant(1, 1, 1.2),
+          Eigen::MatrixXd::Constant(1, 1, 0.4), source_orbitals, 0.0,
+          Eigen::MatrixXd{}));
+
+  auto transformed = HamiltonianBasisTransformerFactory::create("qdk")->run(
+      source, target_orbitals);
+  EXPECT_TRUE(std::get<0>(transformed->get_one_body_integrals())
+                  .isApprox(Eigen::MatrixXd::Constant(1, 1, 1.2)));
+}
+
+TEST_F(HamiltonianTest,
        CholeskyBasisTransformerRejectsDistributedRankDeficiency) {
   constexpr Eigen::Index dimension = 128;
   const Eigen::MatrixXd overlap =
