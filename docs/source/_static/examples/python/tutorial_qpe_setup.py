@@ -11,38 +11,11 @@ not run a chemistry calculation.
 # --------------------------------------------------------------------------------------------
 
 import os
-
-import qdk_chemistry
-
-
-def public_version(version: str) -> str:
-    """Remove PEP 440 local build metadata from a package version.
-
-    Args:
-        version: Installed version such as ``2.0.0`` or ``2.0.0+local``.
-
-    Returns:
-        The public release component, such as ``2.0.0``.
-    """
-    return version.partition("+")[0]
-
-
-# CI sets this variable to verify the tutorial's declared release compatibility.
-# Downloaded copies leave it unset, so ordinary student execution reports the
-# installed version without embedding test-harness policy in the example.
-GROUND_STATE_TUTORIAL_VERSION = os.getenv("GROUND_STATE_TUTORIAL_VERSION")
-if GROUND_STATE_TUTORIAL_VERSION is not None:
-    installed_public_version = public_version(qdk_chemistry.__version__)
-    assert installed_public_version == GROUND_STATE_TUTORIAL_VERSION, (
-        f"Tutorial expects QDK/Chemistry {GROUND_STATE_TUTORIAL_VERSION}, "
-        f"but {qdk_chemistry.__version__} is installed."
-    )
-
-# start-cell-verify
 import platform
 import sys
 
 import ipykernel
+import qdk_chemistry
 from qdk.widgets import MoleculeViewer
 from qdk_chemistry.algorithms import create
 
@@ -69,4 +42,31 @@ print(f"QDK/Chemistry version: {qdk_chemistry.__version__}")
 print(f"IPython kernel version: {ipykernel.__version__}")
 print(f"Verified widget: {MoleculeViewer.__name__}")
 print(f"Verified {len(required_implementations)} built-in implementations.")
-# end-cell-verify
+
+
+################################################################################
+# Students can stop reading here. The helper and assertion below verify the
+# tutorial's declared release compatibility when this script runs in CI.
+################################################################################
+
+
+def public_version(version: str) -> str:
+    """Remove PEP 440 local build metadata from a package version.
+
+    Args:
+        version: Installed version such as ``2.0.0`` or ``2.0.0+local``.
+
+    Returns:
+        The public release component, such as ``2.0.0``.
+    """
+    return version.partition("+")[0]
+
+
+# CI sets this variable; downloaded copies leave it unset.
+GROUND_STATE_TUTORIAL_VERSION = os.getenv("GROUND_STATE_TUTORIAL_VERSION")
+if GROUND_STATE_TUTORIAL_VERSION is not None:
+    installed_public_version = public_version(qdk_chemistry.__version__)
+    assert installed_public_version == GROUND_STATE_TUTORIAL_VERSION, (
+        f"Tutorial expects QDK/Chemistry {GROUND_STATE_TUTORIAL_VERSION}, "
+        f"but {qdk_chemistry.__version__} is installed."
+    )
