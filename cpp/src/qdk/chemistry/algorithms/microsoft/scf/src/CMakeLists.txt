@@ -114,7 +114,10 @@ set(QDK_CHEMISTRY_BLAS_VENDOR "${BLAS_VENDOR}")
 # Candidate APIs, in probe order: a dispatch layer can also expose its backend's
 # API, so ask the dispatcher first. Single source of truth -- drives the probe
 # below and, via QDK_CHEMISTRY_BLAS_BACKEND_TABLE, the BlasVendor enumeration.
-# Columns are setter, getter, thread-count type, enumerator, display name.
+# Each _qdk_blas_api_<backend> list holds, in order: setter, getter,
+# thread-count type, enumerator, display name. The X-macro emitted below
+# reorders these into (token, enumerator, label, setter, getter, type); keep
+# that expansion in sync with the column order documented in config.h.in.
 # OPENBLAS also covers drop-ins such as ARM Performance Libraries. BLIS types
 # the count as dim_t, whose width the probe below resolves from blis.h.
 set(_qdk_blas_backends FLEXIBLAS OPENBLAS INTELMKL BLIS NVPL)

@@ -165,9 +165,9 @@ class SCFTest
         eri == "CPU" ? ERIMethod::Libint2Direct : ERIMethod::Incore;
     // SnK is not gated by the HGP/RYS/LibintX options, so it is available here
     // too; without this the "SNK" rows silently fall back to TradJK.
-    cfg.k_eri.method = k_eri == "SNK" ? ERIMethod::SnK
-                       : eri == "CPU" ? ERIMethod::Libint2Direct
-                                      : ERIMethod::Incore;
+    cfg.k_eri.method = k_eri == "SNK"   ? ERIMethod::SnK
+                       : k_eri == "CPU" ? ERIMethod::Libint2Direct
+                                        : ERIMethod::Incore;
     cfg.grad_eri.method = (cfg.eri.method == ERIMethod::Incore && !cfg.do_dfj)
                               ? ERIMethod::Libint2Direct
                               : cfg.eri.method;
