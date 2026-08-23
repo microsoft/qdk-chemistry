@@ -40,5 +40,5 @@ You can open the [`index.html`](docs/build/html/index.html) file in that directo
 ## Regenerating tutorial figures
 
 The [ground-state QPE figure maintenance guide](source/_static/diagrams/README.md)
-documents source ownership, regeneration commands, and the temporary logical-circuit
-SVG export workflow.
+documents source ownership, regeneration commands, and screenshot-derived asset
+maintenance.

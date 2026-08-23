@@ -1,4 +1,4 @@
-"""Validate transparent figure assets used by the molecular-QPE tutorial."""
+"""Validate figure assets used by the molecular-QPE tutorial."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
