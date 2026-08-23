@@ -155,7 +155,7 @@ class SCFTest
     cfg.k_eri.method = k_eri == "HGP"   ? ERIMethod::HGP
                        : k_eri == "RYS" ? ERIMethod::Rys
                        : k_eri == "SNK" ? ERIMethod::SnK
-                       : eri == "CPU"   ? ERIMethod::Libint2Direct
+                       : k_eri == "CPU" ? ERIMethod::Libint2Direct
                                         : ERIMethod::Incore;
     cfg.grad_eri.method = (cfg.eri.method == ERIMethod::Incore && !cfg.do_dfj)
                               ? ERIMethod::HGP
