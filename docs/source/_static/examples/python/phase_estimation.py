@@ -166,3 +166,29 @@ iqpe_qubitization.settings().set(
 )
 # end-cell-configure-qubitization
 ################################################################################
+
+################################################################################
+# start-cell-configure-unary
+# Configure phase estimation with unary iteration over the qubitization walk
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import AlgorithmRef
+
+# num_queries is the number of walk queries and need not be a power of two
+qpe_unary = create("phase_estimation", "qdk_unary", shots=200)
+
+unary_circuit_builder = AlgorithmRef(
+    "qpe_circuit_builder",
+    "qdk_unary",
+    num_queries=7,
+    circuit_mapper=AlgorithmRef("circuit_mapper", "prepare_select_prepare"),
+    unitary_builder=AlgorithmRef(
+        "hamiltonian_unitary_builder", "lcu", quantum_walk=True
+    ),
+)
+qpe_unary.settings().set("qpe_circuit_builder", unary_circuit_builder)
+qpe_unary.settings().set(
+    "circuit_executor",
+    AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator", seed=42),
+)
+# end-cell-configure-unary
+################################################################################
