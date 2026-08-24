@@ -650,7 +650,7 @@ def serialize_inputs(
             )
 
         for i, arg in enumerate(args):
-            content_hash = input_hashes.get(f"arg_{i}") if input_hashes else None
+            content_hash = input_hashes.get(f"args.arg_{i}") if input_hashes else None
             serialization_name = (
                 f"arg_{i}_{_item_content_hash(arg)}" if FileSerializer.is_cacheable(arg) else f"arg_{i}"
             )
@@ -667,7 +667,7 @@ def serialize_inputs(
             manifest["args"].append(entry)
 
         for index, (key, value) in enumerate(kwargs.items()):
-            content_hash = input_hashes.get(key) if input_hashes else None
+            content_hash = input_hashes.get(f"kwargs.{key}") if input_hashes else None
             serialization_name = (
                 f"kwarg_{index}_{_item_content_hash(value)}" if FileSerializer.is_cacheable(value) else f"kwarg_{index}"
             )

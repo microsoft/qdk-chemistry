@@ -36,7 +36,7 @@ from qdk_chemistry.remote.backends.local import LocalBackend
 from qdk_chemistry.remote.cache.folder import FolderCache
 from qdk_chemistry.remote.cache.tiered import TieredCache
 from qdk_chemistry.remote.job import Job
-from qdk_chemistry.remote.proxy import _poll_until_done, run
+from qdk_chemistry.remote.proxy import _build_payload_for, _poll_until_done, run
 from qdk_chemistry.remote.serialization import (
     FileSerializer,
     deserialize_inputs,
@@ -367,12 +367,12 @@ class TestInputSerialization:
             algorithm_type="scf_solver",
             algorithm_name="qdk",
             settings={},
-            input_hashes={"arg_0": "hash_of_arg0"},
+            input_hashes={"args.arg_0": "hash_of_arg0"},
         )
         manifest = json.loads((tmp_path / "job" / "manifest.json").read_text())
-        assert manifest["input_hashes"] == {"arg_0": "hash_of_arg0"}
+        assert manifest["input_hashes"] == {"args.arg_0": "hash_of_arg0"}
         assert manifest["args"][0]["content_hash"] == "hash_of_arg0"
-        assert deserialize_inputs(tmp_path / "job")["input_hashes"] == {"arg_0": "hash_of_arg0"}
+        assert deserialize_inputs(tmp_path / "job")["input_hashes"] == {"args.arg_0": "hash_of_arg0"}
 
 
 class TestOutputSerialization:
@@ -579,7 +579,7 @@ class TestJob:
             algorithm_info={"type": "scf_solver"},
             status="submitted",
             run_hash="aaaa",
-            input_hashes={"arg_0": "hash0"},
+            input_hashes={"args.arg_0": "hash0"},
         )
         loaded = Job.load(job.save(tmp_path / "job_j1.json"))
         assert loaded.job_id == "j1"
@@ -587,7 +587,7 @@ class TestJob:
         assert loaded.backend_config == {"timeout": 60}
         assert loaded.backend_state == {"pid": 1234}
         assert loaded.run_hash == "aaaa"
-        assert loaded.input_hashes == {"arg_0": "hash0"}
+        assert loaded.input_hashes == {"args.arg_0": "hash0"}
 
     def test_save_is_atomic(self, tmp_path, monkeypatch):
         """A failed temporary write must preserve the existing job handle."""
@@ -1177,6 +1177,35 @@ class TestRunWithCache:
         algo.hash.return_value = "testhash1234abcd"
         algo.run.return_value = result
         return algo
+
+    def test_input_hash_namespaces_do_not_collide(self, tmp_path):
+        """Keep a keyword named arg_0 distinct from positional argument zero."""
+        positional = np.array([1.0])
+        keyword = np.array([2.0])
+        payload = _build_payload_for(self._mock_algorithm(), (positional,), {"arg_0": keyword})
+        input_hashes = payload["input_hashes"]
+        assert input_hashes == {
+            "args.arg_0": _item_content_hash(positional),
+            "kwargs.arg_0": _item_content_hash(keyword),
+        }
+
+        shared_cache = FolderCache(path=tmp_path / "shared", is_shared=True)
+        shared_cache.put_data(input_hashes["args.arg_0"], positional)
+        shared_cache.put_data(input_hashes["kwargs.arg_0"], keyword)
+        serialize_inputs(
+            tmp_path / "input",
+            args=payload["args"],
+            kwargs=payload["kwargs"],
+            algorithm_type=payload["algorithm_type"],
+            algorithm_name=payload["algorithm_name"],
+            settings=payload["settings"],
+            input_hashes=input_hashes,
+            remote_cache_backend=shared_cache,
+        )
+        restored = deserialize_inputs(tmp_path / "input", cache=shared_cache)
+
+        np.testing.assert_array_equal(restored["args"][0], positional)
+        np.testing.assert_array_equal(restored["kwargs"]["arg_0"], keyword)
 
     def test_run_no_cache(self):
         algo = self._mock_algorithm()

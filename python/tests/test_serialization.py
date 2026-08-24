@@ -254,7 +254,7 @@ def test_input_round_trip(tmp_path, h2_structure):
         algorithm_name="qdk",
         settings={"max_iterations": 100},
         run_hash="run-hash",
-        input_hashes={"arg_0": "structure-hash"},
+        input_hashes={"args.arg_0": "structure-hash"},
         remote_cache={"name": "shared"},
     )
 
@@ -267,7 +267,7 @@ def test_input_round_trip(tmp_path, h2_structure):
     assert restored["kwargs"] == {"basis": "cc-pvdz"}
     assert restored["settings"] == {"max_iterations": 100}
     assert restored["run_hash"] == "run-hash"
-    assert restored["input_hashes"] == {"arg_0": "structure-hash"}
+    assert restored["input_hashes"] == {"args.arg_0": "structure-hash"}
     assert restored["remote_cache"] == {"name": "shared"}
     assert restored["remote_cache_transport"] is False
 
@@ -438,7 +438,7 @@ def test_input_round_trip_uses_shared_cache_transport(tmp_path, h2_structure):
         algorithm_type="test_algorithm",
         algorithm_name="plugin",
         settings={},
-        input_hashes={"arg_0": content_hash},
+        input_hashes={"args.arg_0": content_hash},
         remote_cache={"name": "shared"},
         remote_cache_backend=cache,
         remote_cache_transport=True,

@@ -183,9 +183,9 @@ def _build_payload_for(algorithm: Any, args: tuple, kwargs: dict) -> dict:
 
     input_hashes: dict[str, str] = {}
     for i, arg in enumerate(args):
-        input_hashes[f"arg_{i}"] = _item_content_hash(arg)
+        input_hashes[f"args.arg_{i}"] = _item_content_hash(arg)
     for key, val in kwargs.items():
-        input_hashes[key] = _item_content_hash(val)
+        input_hashes[f"kwargs.{key}"] = _item_content_hash(val)
     if input_hashes:
         payload["input_hashes"] = input_hashes
 

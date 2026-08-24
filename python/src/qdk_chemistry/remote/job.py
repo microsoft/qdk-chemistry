@@ -52,8 +52,9 @@ class Job:
                         inputs.  Used for cache lookups.  ``None`` if not
                         computed.
         input_hashes:   Per-item content hashes of the submitted inputs,
-                        keyed by argument name (e.g. ``"arg_0"``,
-                        ``"charge"``).  ``None`` if not recorded.
+                        keyed by namespaced argument name (e.g.
+                        ``"args.arg_0"``, ``"kwargs.charge"``).  ``None``
+                        if not recorded.
         output_hashes:  Per-item result descriptors.  Each entry is a dict
                         with ``"hash"`` and ``"type"`` keys.  Primitives
                         also carry a ``"value"`` key so they can be

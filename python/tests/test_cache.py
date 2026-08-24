@@ -57,7 +57,7 @@ def sample_job():
         algorithm_info={"type": "scf_solver", "name": "qdk"},
         status="retrieved",
         run_hash="abc123def456",
-        input_hashes={"arg_0": "hash_structure"},
+        input_hashes={"args.arg_0": "hash_structure"},
         output_hashes=[
             {"hash": "hash_float_result", "type": "float", "value": -75.5},
             {"hash": "hash_wfn_result", "type": "wavefunction"},
