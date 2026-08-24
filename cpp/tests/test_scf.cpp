@@ -15,6 +15,7 @@
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/orbital_rotation.hpp>
 
+#include "../src/qdk/chemistry/algorithms/microsoft/scf.hpp"
 #include "../src/qdk/chemistry/algorithms/microsoft/utils.hpp"
 #include "ut_common.hpp"
 
@@ -303,6 +304,138 @@ TEST_F(ScfTest, OH_ROHF_GDM) {
 
   // Check doublet orbitals
   EXPECT_TRUE(wfn_doublet->get_orbitals()->is_restricted());
+}
+
+TEST_F(ScfTest, X2CSettings) {
+  auto solver = ScfSolverFactory::create("qdk");
+  EXPECT_EQ(solver->settings().get<std::string>("integral_dressing"), "");
+  EXPECT_NO_THROW(solver->settings().set("integral_dressing", "x2c_1e"));
+  EXPECT_NO_THROW(
+      solver->settings().set("integral_dressing", "x2c_1e_contracted"));
+  EXPECT_THROW(solver->settings().set("integral_dressing", "unsupported"),
+               std::invalid_argument);
+}
+
+TEST_F(ScfTest, X2CWaterRHFReferences) {
+  auto water = testing::create_water_structure();
+  const std::vector<std::pair<std::string, double>> references = {
+      {"x2c_1e", -74.98146893703478},
+      {"x2c_1e_contracted", -74.98498098619933}};
+
+  for (const auto& [integral_dressing, reference_energy] : references) {
+    SCOPED_TRACE(integral_dressing);
+    auto solver = ScfSolverFactory::create("qdk");
+    solver->settings().set("integral_dressing", integral_dressing);
+    solver->settings().set("enable_gdm", false);
+    solver->settings().set("scf_type", "restricted");
+    solver->settings().set("convergence_threshold", 1e-10);
+    auto [energy, wavefunction] = solver->run(water, 0, 1, "sto-3g");
+
+    EXPECT_NEAR(energy, reference_energy, testing::scf_energy_tolerance);
+    EXPECT_TRUE(wavefunction->get_orbitals()->is_restricted());
+  }
+}
+
+TEST_F(ScfTest, X2CMeanFieldEnergyMatchesHamiltonian) {
+  auto water = testing::create_water_structure();
+  for (const std::string integral_dressing : {"x2c_1e", "x2c_1e_contracted"}) {
+    SCOPED_TRACE(integral_dressing);
+    auto solver = ScfSolverFactory::create("qdk");
+    solver->settings().set("integral_dressing", integral_dressing);
+    solver->settings().set("enable_gdm", false);
+    auto [energy, wavefunction] = solver->run(water, 0, 1, "sto-3g");
+
+    auto constructor = HamiltonianConstructorFactory::create("qdk");
+    constructor->settings().set("integral_dressing", integral_dressing);
+    auto hamiltonian = constructor->run(wavefunction->get_orbitals());
+    Ansatz mean_field_ansatz(hamiltonian, wavefunction);
+    EXPECT_NEAR(mean_field_ansatz.calculate_energy(), energy,
+                testing::scf_energy_tolerance);
+  }
+}
+
+TEST_F(ScfTest, X2COxygenUHFReference) {
+  auto solver = ScfSolverFactory::create("qdk");
+  solver->settings().set("integral_dressing", "x2c_1e");
+  solver->settings().set("enable_gdm", false);
+  solver->settings().set("scf_type", "unrestricted");
+  solver->settings().set("convergence_threshold", 1e-10);
+  auto [energy, wavefunction] =
+      solver->run(testing::create_o2_structure(), 0, 3, "sto-3g");
+
+  EXPECT_NEAR(energy, -147.7128649561073, testing::scf_energy_tolerance);
+  EXPECT_FALSE(wavefunction->get_orbitals()->is_restricted());
+}
+
+TEST_F(ScfTest, X2COHROHFReference) {
+  auto solver = ScfSolverFactory::create("qdk");
+  solver->settings().set("integral_dressing", "x2c_1e");
+  solver->settings().set("enable_gdm", false);
+  solver->settings().set("scf_type", "restricted");
+  solver->settings().set("convergence_threshold", 1e-10);
+  auto [energy, wavefunction] =
+      solver->run(testing::create_oh_structure(), 0, 2, "sto-3g");
+
+  EXPECT_NEAR(energy, -74.40108455493879, testing::scf_energy_tolerance);
+  EXPECT_TRUE(wavefunction->get_orbitals()->is_restricted());
+}
+
+TEST_F(ScfTest, X2CDirectMatchesIncore) {
+  auto water = testing::create_water_structure();
+  auto direct_solver = ScfSolverFactory::create("qdk");
+  direct_solver->settings().set("integral_dressing", "x2c_1e");
+  direct_solver->settings().set("enable_gdm", false);
+  auto [direct_energy, direct_wavefunction] =
+      direct_solver->run(water, 0, 1, "sto-3g");
+
+  auto incore_solver = ScfSolverFactory::create("qdk");
+  incore_solver->settings().set("integral_dressing", "x2c_1e");
+  incore_solver->settings().set("enable_gdm", false);
+  incore_solver->settings().set("eri_method", "incore");
+  auto [incore_energy, incore_wavefunction] =
+      incore_solver->run(water, 0, 1, "sto-3g");
+
+  EXPECT_TRUE(std::isfinite(direct_energy));
+  EXPECT_TRUE(std::isfinite(incore_energy));
+  EXPECT_TRUE(direct_wavefunction->get_orbitals()->is_restricted());
+  EXPECT_TRUE(incore_wavefunction->get_orbitals()->is_restricted());
+  EXPECT_NEAR(incore_energy, direct_energy, testing::scf_energy_tolerance);
+}
+
+TEST_F(ScfTest, X2CGdmMatchesDiis) {
+  auto water = testing::create_water_structure();
+  auto diis_solver = ScfSolverFactory::create("qdk");
+  diis_solver->settings().set("integral_dressing", "x2c_1e");
+  diis_solver->settings().set("enable_gdm", false);
+  auto [diis_energy, diis_wavefunction] =
+      diis_solver->run(water, 0, 1, "sto-3g");
+
+  auto gdm_solver = ScfSolverFactory::create("qdk");
+  gdm_solver->settings().set("integral_dressing", "x2c_1e");
+  gdm_solver->settings().set("enable_gdm", true);
+  gdm_solver->settings().set("gdm_max_diis_iteration", 2);
+  gdm_solver->settings().set("energy_thresh_diis_switch", 1e-14);
+  auto [gdm_energy, gdm_wavefunction] = gdm_solver->run(water, 0, 1, "sto-3g");
+
+  EXPECT_TRUE(diis_wavefunction->get_orbitals()->is_restricted());
+  EXPECT_TRUE(gdm_wavefunction->get_orbitals()->is_restricted());
+  EXPECT_NEAR(gdm_energy, diis_energy, testing::scf_energy_tolerance);
+}
+
+TEST_F(ScfTest, X2CRejectsEcp) {
+  auto solver = ScfSolverFactory::create("qdk");
+  solver->settings().set("integral_dressing", "x2c_1e");
+  EXPECT_THROW(solver->run(testing::create_agh_structure(), 0, 1, "def2-svp"),
+               std::invalid_argument);
+}
+
+TEST_F(ScfTest, X2CRejectsAnalyticNuclearGradient) {
+  qdk::chemistry::algorithms::microsoft::ScfSolver gradient_solver;
+  gradient_solver.settings().set("integral_dressing", "x2c_1e");
+  EXPECT_THROW(
+      gradient_solver.run_with_analytic_gradient(
+          testing::create_water_structure(), 0, 1, std::string("sto-3g")),
+      std::invalid_argument);
 }
 
 TEST_F(ScfTest, Oxygen_atom_ROHF_GDM) {

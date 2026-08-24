@@ -114,26 +114,25 @@ The native QDK/Chemistry implementation for Hamiltonian construction. Transforms
 
 .. list-table::
    :header-rows: 1
-   :widths: 25 25 50
+   :widths: 25 15 15 45
 
    * - Setting
      - Type
+     - Default
      - Description
    * - ``eri_method``
      - string
+     - ``"direct"``
      - Method for computing electron repulsion integrals ("direct" or "incore")
    * - ``integral_dressing``
      - string
-     - One-electron integral dressing ("", "x2c_1e", or "x2c_1e_contracted"). Default: ""
+      - ``""``
+      - One-electron integral dressing: ``""``, ``"x2c_1e"``, or ``"x2c_1e_contracted"``
 
 Spin-Free X2C-1e Option
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 .. rubric:: Setting: ``integral_dressing="x2c_1e"`` or ``integral_dressing="x2c_1e_contracted"``
-
-.. note::
-
-   X2C integral dressing is not currently available during the SCF calculation itself. It is applied only when constructing a Hamiltonian from existing orbitals.
 
 The ``integral_dressing`` setting applies spin-free exact-two-component scalar-relativistic corrections to the one-electron Hamiltonian using the exact-decoupling formulation :cite:`Kutzelnigg2005,Liu2009X2C`.
 The X2C-1e path constructs the modified Dirac Hamiltonian from the :term:`AO` overlap, kinetic, nuclear-attraction, and spin-free :math:`\boldsymbol{p}V\boldsymbol{p}` integrals, selects its electronic states, and projects their energies back into the original AO metric.

@@ -31,9 +31,9 @@
 #include <stdexcept>
 
 #include "qdk/chemistry/algorithms/microsoft/hamiltonian.hpp"
-#include "qdk/chemistry/algorithms/microsoft/scalar_relativistic_hamiltonian.hpp"
 #include "qdk/chemistry/algorithms/microsoft/utils.hpp"
 #include "ut_common.hpp"
+#include "util/one_body.h"
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
 
@@ -2918,7 +2918,7 @@ TEST_F(HamiltonianConstructorTest, X2CDecontractionUsesExactExponentKeys) {
     BasisSet basis_set("exponent-keys", shells, structure);
     auto internal =
         qdk::chemistry::utils::microsoft::convert_basis_set_from_qdk(basis_set);
-    return microsoft::detail::decontract_basis(internal);
+    return qdk::chemistry::scf::detail::decontract_basis(internal);
   };
 
   const auto exact_duplicates = decontract({1.0, 1.0});

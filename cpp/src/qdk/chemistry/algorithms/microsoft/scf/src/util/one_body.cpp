@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include "scalar_relativistic_hamiltonian.hpp"
+#include "util/one_body.h"
 
 #include <qdk/chemistry/scf/util/int1e.h>
 
@@ -21,11 +21,13 @@
 #include <utility>
 #include <vector>
 
-namespace qdk::chemistry::algorithms::microsoft {
+#ifdef QDK_CHEMISTRY_ENABLE_MPI
+#include <mpi.h>
+#endif
+
+namespace qdk::chemistry::scf {
 
 namespace qcs = qdk::chemistry::scf;
-
-namespace detail {
 
 namespace {
 
@@ -298,7 +300,7 @@ Eigen::MatrixXd compute_x2c_hamiltonian(const Eigen::MatrixXd& overlap,
 
 }  // namespace
 
-DecontractedBasis decontract_basis(
+detail::DecontractedBasis detail::decontract_basis(
     const std::shared_ptr<qcs::BasisSet>& contracted_basis) {
   using AtomAngularMomentum = std::pair<uint64_t, uint64_t>;
   using ExponentSet = std::set<double, std::greater<double>>;
@@ -372,8 +374,15 @@ DecontractedBasis decontract_basis(
   return {std::move(uncontracted_basis), std::move(contraction)};
 }
 
-Eigen::MatrixXd build_x2c_one_body_ao(
-    const std::shared_ptr<qcs::BasisSet>& internal_basis_set, bool decontract) {
+namespace {
+
+/** @brief Compute X2C-1e integrals, optionally in a decontracted basis. */
+Eigen::MatrixXd compute_x2c_one_electron(
+    const std::shared_ptr<qcs::BasisSet>& internal_basis_set,
+    const qcs::ParallelConfig& mpi, bool decontract) {
+  if (!internal_basis_set->pure) {
+    throw std::invalid_argument("X2C-1e currently supports spherical AOs only");
+  }
   if (!internal_basis_set->ecp_shells.empty() ||
       internal_basis_set->get_n_ecp_electrons() != 0) {
     throw std::invalid_argument(
@@ -384,13 +393,12 @@ Eigen::MatrixXd build_x2c_one_body_ao(
   std::shared_ptr<qcs::BasisSet> working_basis = internal_basis_set;
   Eigen::MatrixXd contraction;
   if (decontract) {
-    auto decontracted = decontract_basis(internal_basis_set);
+    auto decontracted = detail::decontract_basis(internal_basis_set);
     working_basis = std::move(decontracted.basis);
     contraction = std::move(decontracted.contraction);
   }
 
   const size_t dimension = working_basis->num_atomic_orbitals;
-  const auto mpi = qcs::mpi_default_input();
   auto int1e = std::make_unique<qcs::OneBodyIntegral>(
       working_basis.get(), working_basis->mol.get(), mpi);
   Eigen::MatrixXd overlap(dimension, dimension);
@@ -403,7 +411,13 @@ Eigen::MatrixXd build_x2c_one_body_ao(
   int1e->pvp_integral(pvp.data());
 
   Eigen::MatrixXd hamiltonian =
-      compute_x2c_hamiltonian(overlap, kinetic, potential, pvp);
+      Eigen::MatrixXd::Zero(internal_basis_set->num_atomic_orbitals,
+                            internal_basis_set->num_atomic_orbitals);
+  if (mpi.world_rank != 0) {
+    return hamiltonian;
+  }
+
+  hamiltonian = compute_x2c_hamiltonian(overlap, kinetic, potential, pvp);
   if (decontract) {
     const Eigen::Index contracted_dimension = contraction.cols();
     Eigen::MatrixXd hamiltonian_times_contraction(hamiltonian.rows(),
@@ -430,6 +444,69 @@ Eigen::MatrixXd build_x2c_one_body_ao(
   return hamiltonian;
 }
 
-}  // namespace detail
+}  // namespace
 
-}  // namespace qdk::chemistry::algorithms::microsoft
+RowMajorMatrix build_nonrelativistic_one_body_ao(const BasisSet& basis_set,
+                                                 OneBodyIntegral& integrals) {
+  const size_t dimension = basis_set.num_atomic_orbitals;
+  RowMajorMatrix kinetic(dimension, dimension);
+  RowMajorMatrix potential(dimension, dimension);
+  integrals.kinetic_integral(kinetic.data());
+  integrals.nuclear_integral(potential.data());
+  RowMajorMatrix one_body_ao = kinetic + potential;
+
+  if (!basis_set.ecp_shells.empty()) {
+    RowMajorMatrix ecp = RowMajorMatrix::Zero(dimension, dimension);
+    integrals.ecp_integral(ecp.data());
+    one_body_ao += ecp;
+  }
+  return one_body_ao;
+}
+
+RowMajorMatrix build_x2c_one_body_ao(
+    const std::shared_ptr<qcs::BasisSet>& internal_basis_set,
+    const qcs::ParallelConfig& mpi, bool decontract) {
+  Eigen::MatrixXd hamiltonian;
+#ifdef QDK_CHEMISTRY_ENABLE_MPI
+  if (mpi.world_size == 1) {
+    return compute_x2c_one_electron(internal_basis_set, mpi, decontract);
+  }
+  std::string local_error;
+  try {
+    hamiltonian = compute_x2c_one_electron(internal_basis_set, mpi, decontract);
+  } catch (const std::exception& error) {
+    local_error = error.what();
+  } catch (...) {
+    local_error = "unknown error";
+  }
+  const int local_succeeded = local_error.empty() ? 1 : 0;
+  int succeeded = 0;
+  MPI_Allreduce(&local_succeeded, &succeeded, 1, MPI_INT, MPI_MIN,
+                MPI_COMM_WORLD);
+  if (succeeded == 0) {
+    const int local_failed_rank =
+        local_error.empty() ? mpi.world_size : mpi.world_rank;
+    int failed_rank = 0;
+    MPI_Allreduce(&local_failed_rank, &failed_rank, 1, MPI_INT, MPI_MIN,
+                  MPI_COMM_WORLD);
+    int message_size = mpi.world_rank == failed_rank
+                           ? static_cast<int>(local_error.size())
+                           : 0;
+    MPI_Bcast(&message_size, 1, MPI_INT, failed_rank, MPI_COMM_WORLD);
+    if (mpi.world_rank != failed_rank) {
+      local_error.resize(message_size);
+    }
+    MPI_Bcast(local_error.data(), message_size, MPI_CHAR, failed_rank,
+              MPI_COMM_WORLD);
+    throw std::runtime_error("X2C construction failed on MPI rank " +
+                             std::to_string(failed_rank) + ": " + local_error);
+  }
+  MPI_Bcast(hamiltonian.data(), static_cast<int>(hamiltonian.size()),
+            MPI_DOUBLE, 0, MPI_COMM_WORLD);
+#else
+  hamiltonian = compute_x2c_one_electron(internal_basis_set, mpi, decontract);
+#endif
+  return hamiltonian;
+}
+
+}  // namespace qdk::chemistry::scf

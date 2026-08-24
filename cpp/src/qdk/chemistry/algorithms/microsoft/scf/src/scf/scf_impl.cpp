@@ -11,6 +11,8 @@
 #include <qdk/chemistry/scf/util/int1e.h>
 
 #include <qdk/chemistry/utils/logger.hpp>
+
+#include "util/one_body.h"
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
 #include <mpi.h>
 #endif
@@ -58,6 +60,15 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
   auto& mol = *mol_ptr;
   ctx_.mol = mol_ptr.get();
   ctx_.cfg = &cfg;
+  if (cfg.integral_dressing != IntegralDressing::None && cfg.require_gradient) {
+    throw std::invalid_argument(
+        "Analytic nuclear gradients are not available with X2C-1e");
+  }
+  if (cfg.integral_dressing != IntegralDressing::None &&
+      cfg.require_polarizability) {
+    throw std::invalid_argument(
+        "Polarizabilities are not available with X2C-1e");
+  }
   if (basis_set == nullptr) {
     ctx_.basis_set =
         BasisSet::from_database_json(mol_ptr, cfg.basis, cfg.basis_mode,
@@ -928,23 +939,22 @@ void SCFImpl::build_one_electron_integrals_() {
     eigenvalues_ =
         RowMajorMatrix::Zero(num_orbital_spin_blocks_, num_molecular_orbitals_);
   }
-  RowMajorMatrix T =
-      RowMajorMatrix::Zero(num_atomic_orbitals_, num_atomic_orbitals_);
-  RowMajorMatrix V =
-      RowMajorMatrix::Zero(num_atomic_orbitals_, num_atomic_orbitals_);
-  TIMEIT(int1e_->kinetic_integral(T.data()),
-         "SCFImpl::build_one_electron_integrals->kinetic_integral");
-  TIMEIT(int1e_->nuclear_integral(V.data()),
-         "SCFImpl::build_one_electron_integrals->nuclear_integral");
-
-  RowMajorMatrix ECP =
-      RowMajorMatrix::Zero(num_atomic_orbitals_, num_atomic_orbitals_);
-  if (ctx_.basis_set->ecp_shells.size() > 0) {
-    TIMEIT(int1e_->ecp_integral(ECP.data()),
-           "SCFImpl::build_one_electron_integrals->ecp_integral");
+  RowMajorMatrix one_body_ao;
+  switch (ctx_.cfg->integral_dressing) {
+    case IntegralDressing::None:
+      TIMEIT(one_body_ao =
+                 build_nonrelativistic_one_body_ao(*ctx_.basis_set, *int1e_),
+             "SCFImpl::build_one_electron_integrals->nonrelativistic");
+      break;
+    case IntegralDressing::X2C1e:
+    case IntegralDressing::X2C1eContracted:
+      TIMEIT(one_body_ao = build_x2c_one_body_ao(
+                 ctx_.basis_set, ctx_.cfg->mpi,
+                 ctx_.cfg->integral_dressing == IntegralDressing::X2C1e),
+             "SCFImpl::build_one_electron_integrals->x2c");
+      break;
   }
-
-  H_ = (T + V + ECP).replicate(num_density_matrices_, 1);
+  H_ = one_body_ao.replicate(num_density_matrices_, 1);
 #ifdef QDK_CHEMISTRY_ENABLE_QMMM
   if (add_mm_charge_) {
     T_mm_ = RowMajorMatrix::Zero(num_atomic_orbitals_, num_atomic_orbitals_);
