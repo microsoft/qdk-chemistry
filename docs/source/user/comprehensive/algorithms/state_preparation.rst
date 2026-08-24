@@ -243,10 +243,7 @@ QROM
 
 .. rubric:: Factory name: ``"qrom"``
 
-This method prepares an :math:`n`-qubit state with :math:`n` layers of multiplexed :math:`R_y` rotations, where each layer's rotation angles are loaded from a QROM table and applied through a phase gradient register. It uses only :math:`n = \lceil \log_2 L \rceil` state qubits, plus scratch ancilla per lookup, in exchange for :math:`n` QROM lookups.
-
-.. note::
-   :math:`R_y` rotations only generate non-negative amplitudes, so the coefficient signs are applied afterwards by a QROM-loaded ``Z`` phase kickback. That lookup is uncomputed through ``Std.TableLookup``, whose adjoint repairs the phase kickback its measurement-based uncompute leaves on the address register. The prepared state is therefore correct up to a global phase that depends on those measurement outcomes.
+This method prepares an :math:`n`-qubit state with :math:`n` layers of multiplexed :math:`R_y` rotations, where each layer's rotation angles are loaded from a QROM table and applied through a phase gradient register. It uses only :math:`n = \lceil \log_2 L \rceil` state qubits, plus scratch ancilla per lookup, in exchange for :math:`n` QROM lookups. :math:`R_y` rotations only generate non-negative amplitudes, so the coefficient signs are applied afterwards by a QROM-loaded ``Z`` phase kickback.
 
 .. rubric:: Settings
 

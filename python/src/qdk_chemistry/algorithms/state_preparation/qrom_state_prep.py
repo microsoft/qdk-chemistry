@@ -50,10 +50,9 @@ class QROMStatePreparation(StatePreparation):
 
     Negative coefficients are supported. :math:`R_y` rotations only generate non-negative
     amplitudes, so the signs are applied afterwards by a QROM-loaded ``Z`` phase kickback.
-    That lookup is uncomputed through ``Std.TableLookup``, whose adjoint repairs the phase
-    kickback its measurement-based uncompute leaves on the address register. The prepared
-    state is correct up to a global phase that depends on those measurement outcomes, so
-    compare states with :math:`|\langle \psi | \phi \rangle|` rather than element-wise.
+    The lookups uncompute through measurement, which leaves an unobservable global phase
+    that varies between runs, so tests must compare with
+    :math:`|\langle \psi | \phi \rangle|` rather than element-wise.
     """
 
     def __init__(self, rotation_bit_precision: int = 10):
