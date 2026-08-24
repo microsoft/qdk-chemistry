@@ -56,7 +56,7 @@ class AliasSamplingStatePreparation(StatePreparation):
         1. **Amplitudes are square roots of normalized magnitudes**, not the coefficients
            themselves. It realizes :math:`\sqrt{|c_\ell| / \sum_k |c_k|}`, not
            :math:`c_\ell / \lVert c \rVert_2`. Coefficient signs are discarded, which is why
-           negative coefficients are rejected outright (see :meth:`run`).
+           negative coefficients are rejected outright.
         2. **The index register stays entangled with ancilla.** The output is not a pure
            state on the index register alone. This circuit is only meaningful as the PREPARE
            subroutine of a block encoding (LCU or qubitization), where PREPARE\ :sup:`†`
@@ -92,7 +92,7 @@ class AliasSamplingStatePreparation(StatePreparation):
             bits_precision: Number of bits μ for keep-coefficient precision.
                 Higher values give more accurate state preparation at the cost
                 of more ancilla qubits. Defaults to 10. Equivalent to setting the
-                ``bits_precision`` entry of :attr:`settings`.
+                ``bits_precision`` entry of ``settings()``.
 
         """
         super().__init__()
