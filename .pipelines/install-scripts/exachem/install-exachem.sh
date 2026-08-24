@@ -4,7 +4,9 @@
 # process. Reuses OpenBLAS/BLAS++/LAPACK++/LibInt2/GauXC already built into CPP_DEPS_PREFIX by
 # install-cpp-deps.sh (TAMM finds BLAS++/LAPACK++ via its default find_package on CMAKE_PREFIX_PATH;
 # LibInt2/GauXC via explicit -D*_ROOT below), and the system MPI (e.g. apt-installed openmpi-bin/libopenmpi-dev
-# on Ubuntu). GPU is not supported here.
+# on Ubuntu). GPU is not supported here. TAMM's own CMSB superbuild (NWChemEx-Project/CMakeBuild) is patched
+# (see patches/cmsb-fix-blas-lapack-reuse.patch) so it also reuses the system OpenBLAS/LAPACK instead of
+# building its own redundant copy.
 #
 # Usage: install-exachem.sh <cgmanifest_path>
 #   cgmanifest_path - Full path to cpp/manifest/qdk-chemistry/cgmanifest.json (source of TAMM/ExaChem commits).
@@ -161,28 +163,28 @@ echo "==> HDF5: cflags='${HDF5_CFLAGS}' libs='${HDF5_LIBS}'"
 #
 # NOTE: TAMM's CMSB always rebuilds its own static, generic-target BLAS/LAPACK from source here, even with
 # LINALG_VENDOR=OpenBLAS (apt's libopenblas-dev ships no BLASConfig.cmake/LAPACKConfig.cmake for CMSB's
-# find_package(... CONFIG) to find). Two attempts to make CMSB reuse the system OpenBLAS instead, both abandoned:
-#   1. -DCMSB_DEBUG_CMAKE=OFF alone (the option controlling CMSB's dependency search strategy, per
-#      cmake/macros/DependencyMacros.cmake in NWChemEx-Project/CMakeBuild): makes BLAS/LAPACK fall back to a
-#      plain find_package(... QUIET) that would find the system OpenBLAS -- but CMSB's own
-#      BuildGlobalArrays.cmake unconditionally does add_dependencies(GlobalArrays_External BLAS_External), and
-#      that target is only ever created as a side effect of *building* BLAS from source; once BLAS is found
-#      instead, add_dependencies fails outright ("target BLAS_External does not exist").
-#   2. Patching that one guard out of a local CMSB checkout (cmake/build_external/BuildGlobalArrays.cmake) and
-#      pointing both configure lines at it via -DFETCHCONTENT_SOURCE_DIR_CMAKEBUILD: this DID make CMSB find
-#      the system OpenBLAS/LAPACK (confirmed via CI log: "Found OpenBLAS"/"Found BLAS: TRUE"/"Found LAPACK:
-#      TRUE") -- but exposed a second, deeper CMSB issue. TAMM's superbuild is two-phase: an outer configure
-#      resolves/builds every TAMM_DEPENDENCIES item once, then re-invokes cmake on the same source tree as a
-#      nested "TAMM_External" ExternalProject to actually compile the tamm library, which re-resolves every
-#      dependency itself via cmsb_set_up_target's own loop (cmake/macros/TargetMacros.cmake) using
-#      cmsb_find_dependency() (with NO build-from-source fallback there, unlike find_or_build_dependency()).
-#      With CMSB_DEBUG_CMAKE=OFF, NJSON/MSGSL/DOCTEST/SPDLOG/GlobalArrays fail to be (re-)found in that nested
-#      pass, so their _External targets never exist there, and the immediately following get_property() calls
-#      fail hard ("could not find TARGET NJSON_External"). Confirmed deterministically across all 3 Linux jobs.
-#      Properly fixing this would mean patching CMSB's dependency-injection mechanism between its two build
-#      phases (well beyond a one-line guard fix) -- not worth the added fragility for a ~20-30s CI time saving.
-# The rebuild here is fast and fully contained in EXACHEM_INSTALL_PREFIX -- it never touches CPP_DEPS_PREFIX or
-# the main qdk-chemistry/MACIS build's own system OpenBLAS.
+# find_package(... CONFIG) to find). First attempt at making CMSB reuse the system OpenBLAS instead --
+# -DCMSB_DEBUG_CMAKE=OFF (the global option controlling CMSB's dependency search strategy for *every*
+# dependency, per cmake/macros/DependencyMacros.cmake in NWChemEx-Project/CMakeBuild) -- was abandoned: it did
+# make BLAS/LAPACK resolve via the system OpenBLAS (confirmed via CI log: "Found OpenBLAS"/"Found BLAS:
+# TRUE"/"Found LAPACK: TRUE"), but TAMM's superbuild is two-phase (an outer configure resolves/builds every
+# TAMM_DEPENDENCIES item once, then re-invokes cmake on the same source tree as a nested "TAMM_External"
+# ExternalProject to actually compile the tamm library, re-resolving every dependency itself via
+# cmsb_set_up_target's own loop in cmake/macros/TargetMacros.cmake, which has NO build-from-source fallback).
+# With CMSB_DEBUG_CMAKE=OFF that nested pass failed to (re-)find NJSON/MSGSL/DOCTEST/SPDLOG/GlobalArrays at all
+# ("could not find TARGET NJSON_External"), failing all 3 Linux jobs deterministically.
+#
+# Fixed instead with a narrower, two-part patch (see patches/cmsb-fix-blas-lapack-reuse.patch for the full
+# writeup) that leaves CMSB_DEBUG_CMAKE at its default (TRUE) -- so every other dependency's resolution in both
+# the outer and nested phases is completely unaffected -- and only changes how BLAS/LAPACK specifically are
+# resolved: cmsb_find_dependency() gets a plain find_package(BLAS/LAPACK QUIET) fallback (mirroring the
+# ELPA/HDF5/numactl special cases already there) for when its strict CONFIG-only search fails, and
+# BuildGlobalArrays.cmake's find_or_build_dependency(BLAS) call (only reachable, before this patch, if a
+# BLAS_External target already happened to exist) is made unconditional to match the LAPACK call above it.
+CMSB_SRC_DIR="${BUILD_ROOT}/CMakeBuild-patched"
+git clone --depth 1 https://github.com/NWChemEx-Project/CMakeBuild.git "${CMSB_SRC_DIR}"
+git -C "${CMSB_SRC_DIR}" apply --verbose "${SCRIPT_DIR}/patches/cmsb-fix-blas-lapack-reuse.patch"
+
 COMMON_CMAKE_ARGS=(
   -DCMAKE_BUILD_TYPE=Release
   -DMODULES="${MODULES}"
@@ -192,6 +194,7 @@ COMMON_CMAKE_ARGS=(
   -DTAMM_CXX_FLAGS="-DUSE_SERIAL_IO ${HDF5_CFLAGS}"
   -DLibInt2_ROOT="${CPP_DEPS_PREFIX}"
   -DGauXC_ROOT="${CPP_DEPS_PREFIX}"
+  -DFETCHCONTENT_SOURCE_DIR_CMAKEBUILD="${CMSB_SRC_DIR}"
 )
 
 # --------------------------------------------------------------------------------------------------------------------
