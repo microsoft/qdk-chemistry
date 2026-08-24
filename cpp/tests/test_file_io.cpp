@@ -5,7 +5,9 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <cerrno>
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -16,6 +18,7 @@
 #ifndef _WIN32
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #else
 #ifndef NOMINMAX
@@ -170,6 +173,49 @@ TEST_F(FileIoTest, RejectsDirectoryReads) {
   EXPECT_THROW(qdk::chemistry::utils::read_text_file(root_),
                std::runtime_error);
 }
+
+#ifndef _WIN32
+TEST_F(FileIoTest, DoesNotAcquireControllingTerminalWhenRejectingTerminal) {
+  const int master_descriptor = ::posix_openpt(O_RDWR | O_NOCTTY | O_CLOEXEC);
+  ASSERT_NE(master_descriptor, -1);
+  ASSERT_EQ(::grantpt(master_descriptor), 0);
+  ASSERT_EQ(::unlockpt(master_descriptor), 0);
+  const char* slave_name = ::ptsname(master_descriptor);
+  ASSERT_NE(slave_name, nullptr);
+  const std::string slave_path(slave_name);
+
+  const pid_t child = ::fork();
+  ASSERT_NE(child, -1);
+  if (child == 0) {
+    ::close(master_descriptor);
+    if (::setsid() == -1) {
+      _exit(2);
+    }
+    try {
+      static_cast<void>(qdk::chemistry::utils::read_text_file(slave_path));
+      _exit(3);
+    } catch (const std::runtime_error& error) {
+      if (std::string(error.what()).find("not a regular file") ==
+          std::string::npos) {
+        _exit(5);
+      }
+    }
+    const int terminal_descriptor =
+        ::open("/dev/tty", O_RDONLY | O_NOCTTY | O_CLOEXEC);
+    if (terminal_descriptor != -1) {
+      ::close(terminal_descriptor);
+      _exit(4);
+    }
+    _exit(errno == ENXIO ? 0 : 6);
+  }
+
+  int status = 0;
+  ASSERT_EQ(::waitpid(child, &status, 0), child);
+  ::close(master_descriptor);
+  ASSERT_TRUE(WIFEXITED(status));
+  EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+#endif
 
 TEST_F(FileIoTest, PreservesDestinationPermissions) {
 #ifndef _WIN32

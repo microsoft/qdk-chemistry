@@ -63,16 +63,27 @@ class _TemporaryFileReservation:
             pass
 
 
+def _freeze_path(path_value: str) -> Path:
+    destination = Path(path_value)
+    if destination.is_absolute():
+        return destination
+    return Path(os.path.abspath(destination)) if os.name == "nt" else Path.cwd() / destination
+
+
 def ensure_parent_directory(path: PathLike) -> None:
-    """Create the parent directory of *path* when it does not exist."""
+    """Create the parent directory of *path* when it does not exist.
+
+    Relative paths are frozen to an absolute path before creation begins.
+    """
     path_value = os.fspath(path)
     _validate_destination_path(path_value)
-    parent = Path(path_value).parent
-    if parent != Path("."):
-        if os.name == "nt":
-            parent.mkdir(parents=True, exist_ok=True)
-        else:
-            _create_private_directories(parent)
+    if Path(path_value).parent == Path("."):
+        return
+    parent = _freeze_path(path_value).parent
+    if os.name == "nt":
+        parent.mkdir(parents=True, exist_ok=True)
+    else:
+        _create_private_directories(parent)
 
 
 def _validate_destination_path(path: PathLike) -> None:
@@ -99,7 +110,10 @@ def read_text_file(path: PathLike, *, encoding: str = "utf-8") -> str:
             creation_disposition=3,
         )
     else:
-        descriptor = os.open(path_value, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0))
+        descriptor = os.open(
+            path_value,
+            os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_NOCTTY", 0),
+        )
     operation_error: BaseException | None = None
     try:
         if not stat.S_ISREG(os.fstat(descriptor).st_mode):
@@ -168,9 +182,7 @@ def write_file_atomically(
     """
     path_value = os.fspath(path)
     _validate_destination_path(path_value)
-    destination = Path(path_value)
-    if not destination.is_absolute():
-        destination = Path(os.path.abspath(destination)) if os.name == "nt" else Path.cwd() / destination
+    destination = _freeze_path(path_value)
     if create_parent_directories:
         ensure_parent_directory(destination)
 
@@ -320,7 +332,7 @@ def _package_reservation(
 def _component_is_too_long(path: Path) -> bool:
     if os.name != "nt":
         return False
-    return len(path.name.encode("utf-16-le")) // 2 > 255
+    return len(path.name.encode("utf-16-le", errors="surrogatepass")) // 2 > 255
 
 
 def _create_exclusive_file(path: Path) -> int:
@@ -475,6 +487,11 @@ def _reserve_distinct_temporary_file(
             require_single_link=False,
         )
     except BaseException as error:
+        if reserved_status is None:
+            try:
+                reserved_status = os.fstat(descriptor)
+            except OSError:
+                reserved_status = None
         close_error = _close_descriptor(descriptor)
         if reserved_status is not None and _path_matches_identity(
             temporary_path,

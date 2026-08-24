@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import ctypes
+import errno
 import gc
 import os
 import stat
@@ -61,6 +62,36 @@ def test_create_parent_directories_when_requested(tmp_path: Path):
     if os.name != "nt":
         assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
         assert stat.S_IMODE(path.parent.parent.stat().st_mode) == 0o700
+
+
+def test_freeze_relative_parent_before_creation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    first_directory = tmp_path / "first"
+    second_directory = tmp_path / "second"
+    first_directory.mkdir()
+    second_directory.mkdir()
+    monkeypatch.chdir(first_directory)
+
+    if os.name == "nt":
+        mkdir = Path.mkdir
+
+        def change_directory_then_create(directory: Path, *args, **kwargs) -> None:
+            os.chdir(second_directory)
+            mkdir(directory, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "mkdir", change_directory_then_create)
+    else:
+        create_private_directories = file_io_module._create_private_directories
+
+        def change_directory_then_create(directory: Path) -> None:
+            os.chdir(second_directory)
+            create_private_directories(directory)
+
+        monkeypatch.setattr(file_io_module, "_create_private_directories", change_directory_then_create)
+
+    ensure_parent_directory("nested/data.txt")
+
+    assert (first_directory / "nested").is_dir()
+    assert not (second_directory / "nested").exists()
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX umask semantics")
@@ -212,6 +243,38 @@ def test_reservation_finalizer_closes_and_removes_temporary_file(tmp_path: Path)
     with pytest.raises(OSError, match="(?i)(bad file descriptor|handle is invalid)"):
         os.fstat(descriptor)
     assert not temporary_path.exists()
+
+
+def test_clean_up_after_initial_reservation_fstat_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    destination = tmp_path / "data.txt"
+    fstat = file_io_module.os.fstat
+    fstat_calls = 0
+    closed_descriptors: list[int] = []
+    close_descriptor = file_io_module._close_descriptor
+
+    def fail_initial_reservation_fstat(descriptor: int) -> os.stat_result:
+        nonlocal fstat_calls
+        fstat_calls += 1
+        if fstat_calls == 2:
+            raise OSError("identity snapshot failed")
+        return fstat(descriptor)
+
+    def record_close(descriptor: int) -> OSError | None:
+        closed_descriptors.append(descriptor)
+        return close_descriptor(descriptor)
+
+    monkeypatch.setattr(file_io_module.os, "fstat", fail_initial_reservation_fstat)
+    monkeypatch.setattr(file_io_module, "_close_descriptor", record_close)
+
+    with pytest.raises(OSError, match="identity snapshot failed"):
+        write_text_file_atomically(destination, "contents")
+
+    assert fstat_calls == 3
+    assert len(closed_descriptors) == 1
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_failed_reservation_adoption_has_one_descriptor_owner(
@@ -616,6 +679,19 @@ def test_reject_alternate_data_stream_destination_on_windows(tmp_path: Path):
     assert not (tmp_path / "data.txt").exists()
 
 
+def test_count_windows_surrogate_code_units(monkeypatch: pytest.MonkeyPatch):
+    short_path = Path("data.\ud800")
+    long_path = Path("data." + "\ud800" * 256)
+
+    class WindowsOs:
+        name = "nt"
+
+    monkeypatch.setattr(file_io_module, "os", WindowsOs())
+
+    assert not file_io_module._component_is_too_long(short_path)
+    assert file_io_module._component_is_too_long(long_path)
+
+
 @pytest.mark.skipif(os.name != "nt", reason="Windows path semantics")
 def test_fall_back_for_near_max_path_destination_on_windows(tmp_path: Path):
     parent = tmp_path
@@ -781,6 +857,45 @@ def test_freeze_relative_destination_before_writer_runs(tmp_path: Path, monkeypa
 
     assert read_text_file(first_directory / "data.txt") == "contents"
     assert not (second_directory / "data.txt").exists()
+
+
+@pytest.mark.skipif(
+    os.name == "nt" or not all(hasattr(os, name) for name in ("fork", "openpty", "setsid")),
+    reason="POSIX controlling-terminal semantics",
+)
+def test_reading_terminal_does_not_acquire_controlling_terminal():
+    master_descriptor, slave_descriptor = os.openpty()
+    slave_path = os.ttyname(slave_descriptor)
+    child = os.fork()
+    if child == 0:
+        os.close(master_descriptor)
+        os.close(slave_descriptor)
+        try:
+            os.setsid()
+        except OSError:
+            os._exit(2)
+        try:
+            read_text_file(slave_path)
+        except OSError as error:
+            if "not a regular file" not in str(error):
+                os._exit(4)
+        else:
+            os._exit(3)
+        try:
+            terminal_descriptor = os.open(
+                "/dev/tty",
+                os.O_RDONLY | getattr(os, "O_NOCTTY", 0),
+            )
+        except OSError as error:
+            os._exit(0 if error.errno == errno.ENXIO else 5)
+        os.close(terminal_descriptor)
+        os._exit(1)
+
+    os.close(slave_descriptor)
+    _, status = os.waitpid(child, 0)
+    os.close(master_descriptor)
+
+    assert os.waitstatus_to_exitcode(status) == 0
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX symlink traversal semantics")

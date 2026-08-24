@@ -18,7 +18,8 @@ using AtomicFileWriter =
  * @brief Create the parent directory of a path when it does not exist.
  *
  * A path without a parent component refers to the current directory and needs
- * no action.
+ * no action. Relative paths are frozen to an absolute path before creation
+ * begins.
  */
 void ensure_parent_directory(const std::filesystem::path& path);
 

@@ -99,6 +99,16 @@ void validate_path(const std::filesystem::path& path) {
 #endif
 }
 
+std::filesystem::path freeze_path(const std::filesystem::path& path) {
+  std::error_code error;
+  const auto frozen_path = std::filesystem::absolute(path, error);
+  if (error) {
+    throw std::runtime_error("Could not resolve absolute path for '" +
+                             display_path(path) + "': " + error.message());
+  }
+  return frozen_path;
+}
+
 #ifdef _WIN32
 enum class IdentityMatch { match, different, unknown };
 
@@ -524,33 +534,44 @@ ReservedTemporaryFile reserve_temporary_file(
 void replace_file(const std::filesystem::path& source,
                   const std::filesystem::path& destination) {
 #ifdef _WIN32
-  const DWORD path_attributes = GetFileAttributesW(destination.c_str());
-  const bool destination_exists = path_attributes != INVALID_FILE_ATTRIBUTES;
+  bool destination_exists = true;
   HANDLE original_handle_value = INVALID_HANDLE_VALUE;
   BY_HANDLE_FILE_INFORMATION original_info{};
   DWORD original_attributes = FILE_ATTRIBUTE_NORMAL;
   bool can_write_original_attributes = false;
-  if (destination_exists) {
+  original_handle_value = CreateFileW(
+      destination.c_str(), FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES,
+      FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+      OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+  can_write_original_attributes = original_handle_value != INVALID_HANDLE_VALUE;
+  DWORD inspection_error =
+      can_write_original_attributes ? ERROR_SUCCESS : GetLastError();
+  if (original_handle_value == INVALID_HANDLE_VALUE &&
+      inspection_error == ERROR_ACCESS_DENIED) {
     original_handle_value = CreateFileW(
-        destination.c_str(), FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES,
+        destination.c_str(), FILE_READ_ATTRIBUTES,
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
         OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
-    can_write_original_attributes =
-        original_handle_value != INVALID_HANDLE_VALUE;
-    if (original_handle_value == INVALID_HANDLE_VALUE &&
-        GetLastError() == ERROR_ACCESS_DENIED) {
-      original_handle_value = CreateFileW(
-          destination.c_str(), FILE_READ_ATTRIBUTES,
-          FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
-          OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+    inspection_error = original_handle_value == INVALID_HANDLE_VALUE
+                           ? GetLastError()
+                           : ERROR_SUCCESS;
+  }
+  if (original_handle_value == INVALID_HANDLE_VALUE) {
+    if (inspection_error == ERROR_FILE_NOT_FOUND ||
+        inspection_error == ERROR_PATH_NOT_FOUND) {
+      destination_exists = false;
+    } else {
+      const std::error_code error(static_cast<int>(inspection_error),
+                                  std::system_category());
+      throw std::runtime_error("Could not inspect file attributes for '" +
+                               display_path(destination) +
+                               "': " + error.message());
     }
-    if (original_handle_value == INVALID_HANDLE_VALUE ||
-        !GetFileInformationByHandle(original_handle_value, &original_info)) {
+  } else {
+    if (!GetFileInformationByHandle(original_handle_value, &original_info)) {
       const std::error_code error(static_cast<int>(GetLastError()),
                                   std::system_category());
-      if (original_handle_value != INVALID_HANDLE_VALUE) {
-        CloseHandle(original_handle_value);
-      }
+      CloseHandle(original_handle_value);
       throw std::runtime_error("Could not inspect file attributes for '" +
                                display_path(destination) +
                                "': " + error.message());
@@ -786,7 +807,7 @@ void ensure_parent_directory(const std::filesystem::path& path) {
     return;
   }
 
-  create_private_directories(parent);
+  create_private_directories(freeze_path(path).parent_path());
 }
 
 std::string read_text_file(const std::filesystem::path& path) {
@@ -827,8 +848,12 @@ std::string read_text_file(const std::filesystem::path& path) {
     contents.append(buffer.data(), bytes_read);
   }
 #else
-  const int descriptor = retry_on_eintr(
-      [&] { return ::open(path.c_str(), O_RDONLY | O_NONBLOCK | O_CLOEXEC); });
+  int open_flags = O_RDONLY | O_NONBLOCK | O_CLOEXEC;
+#ifdef O_NOCTTY
+  open_flags |= O_NOCTTY;
+#endif
+  const int descriptor =
+      retry_on_eintr([&] { return ::open(path.c_str(), open_flags); });
   if (descriptor == -1) {
     throw std::runtime_error("Could not open file for reading: '" +
                              display_path(path) + "'");
@@ -867,13 +892,7 @@ void write_file_atomically(const std::filesystem::path& path,
                            const AtomicFileWriter& writer,
                            bool create_parent_directories) {
   validate_path(path);
-  std::error_code absolute_error;
-  const auto destination = std::filesystem::absolute(path, absolute_error);
-  if (absolute_error) {
-    throw std::runtime_error("Could not resolve absolute path for '" +
-                             display_path(path) +
-                             "': " + absolute_error.message());
-  }
+  const auto destination = freeze_path(path);
 
   if (create_parent_directories) {
     ensure_parent_directory(destination);
