@@ -5,10 +5,15 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from unittest.mock import MagicMock
+
+import numpy as np
 import pytest
 
 from qdk_chemistry._core._algorithms import ScfSolverFactory
 from qdk_chemistry.algorithms import ScfSolver, registry
+from qdk_chemistry.data import AlgorithmRef
+from qdk_chemistry.plugins import DuplicateRegistrationError
 from qdk_chemistry.plugins.qiskit import (
     QDK_CHEMISTRY_HAS_QISKIT,
     QDK_CHEMISTRY_HAS_QISKIT_AER,
@@ -21,6 +26,10 @@ try:
     PYSCF_AVAILABLE = True
 except ImportError:
     PYSCF_AVAILABLE = False
+
+# Algorithm types that ship as an interface only, with no registered implementation
+# and therefore an empty default name. Remove entries here as implementations land.
+INTERFACE_ONLY_TYPES = {"effective_hamiltonian_constructor"}
 
 
 class TestRegistryShowDefault:
@@ -37,6 +46,8 @@ class TestRegistryShowDefault:
         expected_types = [
             "active_space_selector",
             "dynamical_correlation_calculator",
+            "effective_hamiltonian_constructor",
+            "geometry_optimizer",
             "hamiltonian_constructor",
             "orbital_localizer",
             "multi_configuration_calculator",
@@ -57,7 +68,10 @@ class TestRegistryShowDefault:
         for algorithm_type in expected_types:
             assert algorithm_type in defaults, f"Expected algorithm type '{algorithm_type}' not found in defaults"
             assert isinstance(defaults[algorithm_type], str), f"Default for '{algorithm_type}' should be a string"
-            assert len(defaults[algorithm_type]) > 0, f"Default for '{algorithm_type}' should not be empty"
+            if algorithm_type in INTERFACE_ONLY_TYPES:
+                assert defaults[algorithm_type] == "", f"Interface-only '{algorithm_type}' should have an empty default"
+            else:
+                assert len(defaults[algorithm_type]) > 0, f"Default for '{algorithm_type}' should not be empty"
 
     def test_show_default_returns_string_for_specific_type(self):
         """Test that show_default returns a string when called with a specific type."""
@@ -70,6 +84,11 @@ class TestRegistryShowDefault:
         default_hamiltonian_constructor = registry.show_default("hamiltonian_constructor")
         assert isinstance(default_hamiltonian_constructor, str)
         assert default_hamiltonian_constructor == "qdk"
+
+        # Test for effective Hamiltonian constructor
+        default_effective_hamiltonian_constructor = registry.show_default("effective_hamiltonian_constructor")
+        assert isinstance(default_effective_hamiltonian_constructor, str)
+        assert default_effective_hamiltonian_constructor == ""
 
         # Test for multi configuration SCF
         if PYSCF_AVAILABLE:
@@ -125,6 +144,13 @@ class TestRegistryShowDefault:
         for algorithm_type, default_name in defaults.items():
             # Each default should be in the available list for that type
             assert algorithm_type in available, f"Algorithm type '{algorithm_type}' not in available algorithms"
+            if algorithm_type in INTERFACE_ONLY_TYPES:
+                assert not available[algorithm_type], (
+                    f"Interface-only '{algorithm_type}' should have no implementations"
+                )
+                continue
+            if algorithm_type == "geometry_optimizer" and not available[algorithm_type]:
+                continue  # geomeTRIC-backed optimizer is optional
             if default_name == "pyscf" and not PYSCF_AVAILABLE:
                 continue  # Skip check if pyscf is not available
             assert default_name in available[algorithm_type], (
@@ -137,6 +163,10 @@ class TestRegistryShowDefault:
         defaults = registry.show_default()
 
         for algorithm_type, default_name in defaults.items():
+            if algorithm_type in INTERFACE_ONLY_TYPES:
+                continue
+            if algorithm_type == "geometry_optimizer" and default_name not in registry.available(algorithm_type):
+                continue  # geomeTRIC-backed optimizer is optional
             if default_name == "pyscf" and not PYSCF_AVAILABLE:
                 continue  # Skip check if pyscf is not available
             # Should be able to create the default algorithm
@@ -255,6 +285,46 @@ class TestRegistryCachingWarnings:
 
         assert result == (("input",), {"option": True})
 
+    def test_cache_round_trip_numpy_scalar_and_array_result(self, tmp_path):
+        """Cache an algorithm result containing a NumPy scalar and array."""
+
+        class NumpyResultAlgorithm:
+            calls = 0
+
+            def hash(self):
+                """Return a stable run hash."""
+                return "numpy_result"
+
+            def run(self):
+                """Return a NumPy scalar and array result."""
+                self.calls += 1
+                return np.float32(1.25), np.array([1.0, 2.0], dtype=np.float32)
+
+            def type_name(self):
+                """Return the test algorithm type."""
+                return "test_algorithm"
+
+            def name(self):
+                """Return the test algorithm name."""
+                return "numpy_result"
+
+            def settings(self):
+                """Return empty algorithm settings."""
+                settings = MagicMock()
+                settings.to_dict.return_value = {}
+                return settings
+
+        implementation = NumpyResultAlgorithm()
+        algorithm = registry._AlgorithmWrapper(implementation)
+
+        algorithm.run(cache=tmp_path)
+        energy, state = algorithm.run(cache=tmp_path)
+
+        assert implementation.calls == 1
+        assert energy == 1.25
+        assert type(energy) is float
+        np.testing.assert_array_equal(state, np.array([1.0, 2.0], dtype=np.float32))
+
 
 class TestRegistryAvailable:
     """Test the available function in the registry module."""
@@ -277,6 +347,10 @@ class TestRegistryAvailable:
         assert len(scf_solvers) > 0
         assert "qdk" in scf_solvers
 
+        effective_hamiltonian_constructors = registry.available("effective_hamiltonian_constructor")
+        assert isinstance(effective_hamiltonian_constructors, list)
+        assert len(effective_hamiltonian_constructors) == 0
+
     def test_available_returns_empty_list_for_unknown_type(self):
         """Test that available returns empty list for unknown algorithm type."""
         result = registry.available("nonexistent_type")
@@ -288,6 +362,11 @@ class TestRegistryAvailable:
         all_algorithms = registry.available()
         for algorithm_type, algorithms in all_algorithms.items():
             assert isinstance(algorithms, list), f"Expected list for {algorithm_type}"
+            if algorithm_type in INTERFACE_ONLY_TYPES:
+                assert not algorithms, f"Interface-only '{algorithm_type}' should have no implementations"
+                continue
+            if algorithm_type == "geometry_optimizer" and not algorithms:
+                continue  # geomeTRIC-backed optimizer is optional
             assert len(algorithms) > 0, f"No algorithms available for {algorithm_type}"
 
     def test_available_algorithms_can_be_created(self):
@@ -522,6 +601,230 @@ class TestRegistryRegisterUnregister:
         # Clean up
         registry.unregister("scf_solver", "custom_test_scf_v2")
 
+    def test_register_duplicate_name_preserves_original(self):
+        """A C++ factory rejects a duplicate name without replacing its owner."""
+
+        class FirstCustomTestScf(ScfSolver):
+            """First SCF implementation claiming the test name."""
+
+            registration_owner = "first"
+
+            def name(self):
+                """Return the shared test name."""
+                return "duplicate_custom_test_scf"
+
+            def _run_impl(self, structure, charge, spin_multiplicity):
+                """Provide the minimal implementation required by the base class."""
+
+        class SecondCustomTestScf(ScfSolver):
+            """Second SCF implementation claiming the test name."""
+
+            registration_owner = "second"
+
+            def name(self):
+                """Return the shared test name."""
+                return "duplicate_custom_test_scf"
+
+            def _run_impl(self, structure, charge, spin_multiplicity):
+                """Provide the minimal implementation required by the base class."""
+
+        registry.register(FirstCustomTestScf)
+        try:
+            with pytest.raises(DuplicateRegistrationError, match="already exists in registry"):
+                registry.register(SecondCustomTestScf)
+
+            registered = registry.create("scf_solver", "duplicate_custom_test_scf")
+            assert registered.registration_owner == "first"
+        finally:
+            registry.unregister("scf_solver", "duplicate_custom_test_scf")
+
+    def test_python_factory_rejects_duplicate_name(self):
+        """A Python factory rejects a duplicate name without replacing its owner."""
+
+        class FirstAlgorithm:
+            """First Python algorithm claiming the test name."""
+
+            registration_owner = "first"
+
+            def type_name(self):
+                """Return a type owned by a Python factory."""
+                return "expectation_estimator"
+
+            def name(self):
+                """Return the shared test name."""
+                return "duplicate_python_algorithm"
+
+            def aliases(self):
+                """Return the shared name as the sole alias."""
+                return [self.name()]
+
+            def settings(self):
+                """Return the settings stub required during creation."""
+                return MagicMock()
+
+        class SecondAlgorithm(FirstAlgorithm):
+            """Second Python algorithm claiming the test name."""
+
+            registration_owner = "second"
+
+        registry.register(FirstAlgorithm)
+        try:
+            with pytest.raises(DuplicateRegistrationError, match="already exists in registry"):
+                registry.register(SecondAlgorithm)
+
+            registered = registry.create("expectation_estimator", "duplicate_python_algorithm")
+            assert registered.registration_owner == "first"
+        finally:
+            registry.unregister("expectation_estimator", "duplicate_python_algorithm")
+
+    def test_python_factory_resolves_aliases_without_registering_them(self):
+        """Aliases resolve at creation time without becoming registry entries."""
+
+        class AliasedAlgorithm:
+            """Python algorithm with a primary name and an alias."""
+
+            registration_owner = "first"
+
+            def type_name(self):
+                """Return a type owned by a Python factory."""
+                return "expectation_estimator"
+
+            def name(self):
+                """Return the primary test name."""
+                return "aliased_python_algorithm"
+
+            def aliases(self):
+                """Return both test registry names."""
+                return [self.name(), "python_algorithm_alias"]
+
+            def settings(self):
+                """Return the settings stub required during creation."""
+                return MagicMock()
+
+        class ReplacementAlgorithm(AliasedAlgorithm):
+            """Replacement implementation using the same name and alias."""
+
+            registration_owner = "replacement"
+
+        registry.register(AliasedAlgorithm)
+        try:
+            assert "aliased_python_algorithm" in registry.available("expectation_estimator")
+            assert "python_algorithm_alias" not in registry.available("expectation_estimator")
+            assert registry.create("expectation_estimator", "python_algorithm_alias").registration_owner == "first"
+
+            registry.unregister("expectation_estimator", "aliased_python_algorithm")
+            registry.register(ReplacementAlgorithm)
+
+            replacement = registry.create("expectation_estimator", "python_algorithm_alias")
+            assert replacement.registration_owner == "replacement"
+        finally:
+            registry.unregister("expectation_estimator", "aliased_python_algorithm")
+
+    def test_python_factory_alias_lookup_only_constructs_selected_algorithm(self):
+        """Alias lookup does not construct unrelated registered algorithms."""
+        construction_counts = {"first": 0, "second": 0}
+
+        class FirstAlgorithm:
+            """Unrelated algorithm whose construction count is tracked."""
+
+            def __init__(self):
+                construction_counts["first"] += 1
+
+            def type_name(self):
+                return "expectation_estimator"
+
+            def name(self):
+                return "first_counted_algorithm"
+
+            def aliases(self):
+                return [self.name(), "first_counted_alias"]
+
+            def settings(self):
+                return MagicMock()
+
+        class SecondAlgorithm(FirstAlgorithm):
+            """Algorithm selected by alias."""
+
+            def __init__(self):
+                construction_counts["second"] += 1
+
+            def name(self):
+                return "second_counted_algorithm"
+
+            def aliases(self):
+                return [self.name(), "second_counted_alias"]
+
+        registry.register(FirstAlgorithm)
+        registry.register(SecondAlgorithm)
+        try:
+            counts_after_registration = construction_counts.copy()
+
+            selected = registry.create("expectation_estimator", "second_counted_alias")
+
+            assert selected.name() == "second_counted_algorithm"
+            assert construction_counts == {
+                "first": counts_after_registration["first"],
+                "second": counts_after_registration["second"] + 1,
+            }
+        finally:
+            registry.unregister("expectation_estimator", "first_counted_algorithm")
+            registry.unregister("expectation_estimator", "second_counted_algorithm")
+
+    def test_builtin_registration_resolves_nested_algorithm_ref(self):
+        """Built-in registration resolves nested algorithms without recursive construction."""
+        sparse = registry.create(
+            "state_prep",
+            "sparse_isometry",
+            dense_state_prep=AlgorithmRef("state_prep", "dense_pure_state"),
+        )
+
+        dense_ref = sparse.settings().get("dense_state_prep")
+        dense = registry.create(dense_ref.algorithm_type, dense_ref.algorithm_name)
+
+        assert dense.name() == "dense_pure_state"
+
+    def test_python_factory_rejects_duplicate_alias(self):
+        """Registration rejects an alias owned by another implementation."""
+
+        class AliasedAlgorithm:
+            """Python algorithm with a primary name and an alias."""
+
+            def type_name(self):
+                """Return a type owned by a Python factory."""
+                return "expectation_estimator"
+
+            def name(self):
+                """Return the primary test name."""
+                return "aliased_python_algorithm"
+
+            def aliases(self):
+                """Return the primary name and test alias."""
+                return [self.name(), "python_algorithm_alias"]
+
+            def settings(self):
+                """Return the settings stub required during creation."""
+                return MagicMock()
+
+        class ConflictingAlgorithm(AliasedAlgorithm):
+            """Python algorithm claiming the registered alias."""
+
+            def name(self):
+                """Return an otherwise-unused primary name."""
+                return "conflicting_python_algorithm"
+
+            def aliases(self):
+                """Return a fresh primary name and an occupied alias."""
+                return [self.name(), "python_algorithm_alias"]
+
+        registry.register(AliasedAlgorithm)
+        try:
+            with pytest.raises(DuplicateRegistrationError, match="python_algorithm_alias"):
+                registry.register(ConflictingAlgorithm)
+
+            assert "conflicting_python_algorithm" not in registry.available("expectation_estimator")
+        finally:
+            registry.unregister("expectation_estimator", "aliased_python_algorithm")
+
     def test_unregister_custom_algorithm(self):
         """Test unregistering a custom algorithm."""
 
@@ -565,9 +868,9 @@ class TestRegistryFactoryRegistration:
     """Test the register_factory and unregister_factory functions."""
 
     def test_register_factory_duplicate(self):
-        """Test that registering a duplicate factory raises ValueError."""
+        """Test that registering a duplicate factory raises DuplicateRegistrationError."""
         # ScfSolverFactory is already registered
-        with pytest.raises(ValueError, match="already registered"):
+        with pytest.raises(DuplicateRegistrationError, match="already registered"):
             registry.register_factory(ScfSolverFactory)
 
     def test_unregister_factory_invalid_type(self):

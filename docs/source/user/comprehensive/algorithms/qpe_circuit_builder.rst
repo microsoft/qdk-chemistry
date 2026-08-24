@@ -54,6 +54,9 @@ The :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeC
    * - ``num_bits``
      - int
      - Number of phase bits to estimate. Must be a positive integer. Default: ``-1`` (invalid; user must set).
+   * - ``measure_phase``
+     - bool
+     - Measure the phase register in the computational basis. Default: ``True``.
    * - ``unitary_builder``
      - :class:`~qdk_chemistry.data.AlgorithmRef`
      - Reference to the algorithm that constructs the target unitary :math:`U`. Default: :class:`~qdk_chemistry.data.AlgorithmRef` to ``"hamiltonian_unitary_builder"`` with method ``"trotter"``.
@@ -73,7 +76,7 @@ Once configured, the :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_
 Available Implementations
 -------------------------
 
-QDK/Chemistry provides two primary implementations of :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilder`:
+QDK/Chemistry provides three primary implementations of :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilder`:
 
 Iterative Phase Estimation Circuit Builder (IQPE)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -135,6 +138,33 @@ Constructs the textbook multi-ancilla QPE circuit with inverse Quantum Fourier T
    :language: python
    :start-after: start-cell-configure-standard
    :end-before: end-cell-configure-standard
+
+Unary-iteration Phase Estimation Circuit Builder
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. rubric:: Class: ``QdkUnaryQpeCircuitBuilder`` (QDK native)
+
+.. rubric:: Factory name: ``"qdk_unary"``
+
+Constructs one flat chain of :math:`p` qubitized walk queries, using unary iteration over the phase register to select which interleaved reflection is omitted and so realize :math:`W^{2a-p}` from a single chain :cite:`Babbush2018` :cite:`Lee2021`.
+The phase register is sized to :math:`\lceil \log_2(p+1) \rceil` and ``num_bits`` is ignored.
+Requires a qubitized walk, so ``unitary_builder`` must be an LCU builder with ``quantum_walk=True`` (its default here).
+
+**Additional settings:**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 15 65
+
+   * - Setting
+     - Type
+     - Description
+   * - ``num_queries``
+     - int
+     - Number of walk queries :math:`p`. For a target energy error :math:`\epsilon`, the Heisenberg-limited setting is :math:`p = \lceil \pi \lambda / (2\epsilon) \rceil` with :math:`\lambda` the block-encoding 1-norm. Need not be a power of two.
+   * - ``circuit_mapper``
+     - AlgorithmRef
+     - Mapper producing the uncontrolled block encoding. It must lay the register out as ``[system | ancilla]``. Default: ``"prepare_select_prepare"``.
 
 Circuit Composition Details
 ----------------------------

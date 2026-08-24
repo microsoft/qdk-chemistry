@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 #include <qdk/chemistry/scf/core/basis_set.h>
 #include <qdk/chemistry/scf/core/molecule.h>
+#include <qdk/chemistry/scf/util/blas_threads.h>
 #include <qdk/chemistry/scf/util/cache.h>
 #include <qdk/chemistry/scf/util/class_registry.h>
 #include <qdk/chemistry/scf/util/gauxc_util.h>
@@ -588,4 +589,49 @@ TEST(AtomGuessTest, CompareWithFileGuess) {
           << "for basis " << basis_name << std::endl;
     }
   }
+}
+
+//==============================================================================
+// BLAS thread control tests
+//==============================================================================
+
+TEST(BlasThreadsTest, DetectionIsConsistent) {
+  using namespace qdk::chemistry::scf::util;
+
+  const BlasVendor vendor = detected_blas_vendor();
+  EXPECT_NE(to_string(vendor), nullptr);
+
+  if (vendor == BlasVendor::Unknown) {
+    // Legal (e.g. macOS Accelerate exposes no thread-count API); the guard
+    // then degrades to a no-op.
+    EXPECT_EQ(get_blas_num_threads(), 0);
+    GTEST_SKIP() << "No BLAS thread-control API available";
+  }
+  EXPECT_GT(get_blas_num_threads(), 0);
+}
+
+TEST(BlasThreadsTest, ScopedGuardPinsAndRestores) {
+  using namespace qdk::chemistry::scf::util;
+
+  if (detected_blas_vendor() == BlasVendor::Unknown) {
+    GTEST_SKIP() << "No BLAS thread-control API available";
+  }
+
+  const int original = get_blas_num_threads();
+  ASSERT_GT(original, 0);
+
+  {
+    ScopedBlasThreads guard;
+    EXPECT_TRUE(guard.active());
+    EXPECT_EQ(get_blas_num_threads(), 1);
+
+    // Nested guards must not restore the count early.
+    {
+      ScopedBlasThreads nested;
+      EXPECT_EQ(get_blas_num_threads(), 1);
+    }
+    EXPECT_EQ(get_blas_num_threads(), 1);
+  }
+
+  EXPECT_EQ(get_blas_num_threads(), original);
 }

@@ -34,8 +34,15 @@ class QuantumWalkContainer(UnitaryContainer):
 
     """
 
-    # Class attribute for filename validation
-    _data_type_name = "quantum_walk_container"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for quantum-walk containers.
+
+        Returns:
+            ``"quantum_walk_container"``.
+
+        """
+        return "quantum_walk_container"
 
     # Serialization version for this class
     _serialization_version = "0.2.0"
@@ -83,8 +90,15 @@ class LCUWalkContainer(QuantumWalkContainer):
 
     """
 
-    # Class attribute for filename validation
-    _data_type_name = "lcu_walk_container"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for LCU-walk containers.
+
+        Returns:
+            ``"lcu_walk_container"``.
+
+        """
+        return "lcu_walk_container"
 
     # Serialization version for this class
     _serialization_version = "0.2.0"
