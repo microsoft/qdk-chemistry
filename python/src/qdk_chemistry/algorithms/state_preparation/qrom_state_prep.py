@@ -59,8 +59,8 @@ class QROMStatePreparation(StatePreparation):
         """Initialize QROMStatePreparation.
 
         Args:
-            rotation_bit_precision: Number of bits for Givens rotation angle
-                precision. Higher values give more accurate rotations.
+            rotation_bit_precision: Number of bits for multiplexed :math:`R_y`
+                angle precision. Higher values give more accurate rotations.
                 Defaults to 10. Equivalent to setting the ``rotation_bit_precision``
                 entry of ``settings()``.
 

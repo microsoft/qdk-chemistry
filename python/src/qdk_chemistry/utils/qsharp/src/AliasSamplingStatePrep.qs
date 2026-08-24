@@ -26,6 +26,7 @@ namespace QDKChemistry.Utils.AliasSampling {
     import Std.Arithmetic.ApplyIfGreaterLE;
     import Std.Arrays.MappedOverRange;
     import Std.Canon.ApplyToEachCA;
+    import Std.Canon.ApplyXorInPlace;
     import Std.Convert.IntAsBoolArray;
     import Std.Convert.IntAsDouble;
     import Std.Core.Length;

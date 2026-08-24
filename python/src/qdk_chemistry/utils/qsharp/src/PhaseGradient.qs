@@ -4,7 +4,7 @@
 
 /// Phase gradient operations for multiplexed rotations.
 ///
-/// Implements Ry and Rz rotations via phase gradient addition.///
+/// Implements Ry and Rz rotations via phase gradient addition.
 /// Given a phase gradient state |φ⟩ = (1/√2^n) Σ_k exp(-2πi·k/2^n) |k⟩,
 /// adding x into the phase gradient register applies a phase e^{2πi·x/2^n},
 /// corresponding to Rz when conditioned on a target qubit via CNOT.
@@ -20,7 +20,7 @@ namespace QDKChemistry.Utils.PhaseGradient {
     ///
     /// Prepared via QFT†|1⟩. The QFT output (without bit-reversal swaps)
     /// aligns with the LE adder (RippleCarryCGIncByLE).
-    /// Idealy this is prepared at the beginning of a circuit and reused throughout.
+    /// Ideally this is prepared at the beginning of a circuit and reused throughout.
     operation PreparePhaseGradientState(phaseGradient : Qubit[]) : Unit is Adj + Ctl {
         let n = Length(phaseGradient);
         X(phaseGradient[n - 1]);

@@ -31,6 +31,7 @@ namespace QDKChemistry.Utils.SelectSwap {
     import Std.Arrays.Zipped;
     import Std.Canon.ApplyToEachA;
     import Std.Canon.ApplyToEachCA;
+    import Std.Canon.ApplyXorInPlace;
     import Std.Convert.IntAsDouble;
     import Std.Convert.ResultAsBool;
     import Std.Diagnostics.Fact;

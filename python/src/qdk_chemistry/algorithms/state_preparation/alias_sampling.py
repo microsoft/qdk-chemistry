@@ -71,8 +71,8 @@ class AliasSamplingStatePreparation(StatePreparation):
     1. ``PrepareUniformSuperposition`` over L terms
     2. :math:`H^{\otimes\mu}` on the comparison register
     3. QROM load of the ``(keep_l, alt_l)`` alias table
-    4. Comparison: ``flag = (sigma < keep_l)``
-    5. Conditional swap: if ``flag`` is not set, ``index <- alt_l``
+    4. Comparison: ``flag = (sigma >= keep_l)``
+    5. Conditional swap: if ``flag`` is set, ``index <- alt_l``
 
     Named registers total :math:`2\lceil\log_2 L\rceil + 2\mu + 1` qubits:
     :math:`\lceil\log_2 L\rceil` index, :math:`\mu` uniform, 1 flag, and
