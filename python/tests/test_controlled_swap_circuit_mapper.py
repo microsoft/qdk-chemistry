@@ -102,24 +102,6 @@ def controlled_unitary(u):
     return np.kron(p_0, np.eye(4, dtype=complex)) + np.kron(p_1, u)
 
 
-def codespace_block(circuit):
-    r"""Return the vacuum :math:`|0\rangle \to |0\rangle` block of a generated CSWAP circuit.
-
-    Qubit layout: q0, q1 = system; q2 = control; q3, q4 = internally allocated vacuum register.
-    Qiskit is little-endian, so the vacuum qubits are the two most significant bits and the
-    codespace is the leading 8x8 block.  The final ``ResetAll`` has no matrix representation and
-    acts as the identity on that codespace, so it is dropped before building the operator.
-    """
-    qc = circuit.get_qiskit_circuit()
-    assert qc.num_qubits == 5
-
-    unitary_part = qc.copy_empty_like()
-    for instruction in qc.data:
-        if instruction.operation.name != "reset":
-            unitary_part.append(instruction.operation, instruction.qubits, instruction.clbits)
-    return Operator(unitary_part).data[0:8, 0:8]
-
-
 @pytest.fixture
 def diagonal_ppf_container():
     """Diagonal (Z/I-only) product formula: the vacuum stays an eigenstate and picks up a phase."""
@@ -240,7 +222,16 @@ class TestControlledSwapPauliSequenceMapper:
         the textbook :math:`C\text{-}U` up to a global phase.
         """
         circuit = cswap_mapper.run(unitary_rep)
-        block = codespace_block(circuit)
+
+        # Qubit layout of the generated circuit: q0, q1 = system; q2 = control;
+        # q3, q4 = internally allocated vacuum register.
+        qc = circuit.get_qiskit_circuit()
+        assert qc.num_qubits == 5
+
+        full = Operator(qc).data  # 32x32, qiskit little-endian: index bits = q4 q3 q2 q1 q0
+        # Vacuum qubits q3, q4 are the two most-significant bits; the vacuum = |0>
+        # codespace is therefore the leading 8x8 block (indices 0..7).
+        block = full[0:8, 0:8]
 
         # Reconstruct the target time-evolution unitary U = exp(-i H t) from the container.
         angle_z0 = diagonal_ppf_container.step_terms[0].angle
@@ -303,7 +294,7 @@ class TestControlledSwapPauliSequenceMapper:
         )
         circuit = cswap_mapper.run(UnitaryRepresentation(container=container))
 
-        block = codespace_block(circuit)
+        block = Operator(circuit.get_qiskit_circuit()).data[0:8, 0:8]
         step = build_product_formula_matrix([(t.pauli_term, t.angle) for t in container.step_terms], 2)
         expected_matrix = controlled_unitary(np.linalg.matrix_power(step, repetitions))
 
@@ -467,7 +458,11 @@ class TestVacuumAnnihilatingGroupingEndToEnd:
         """
         container = vacuum_annihilating_unitary.get_container()
         circuit = cswap_mapper.run(vacuum_annihilating_unitary)
-        block = codespace_block(circuit)
+
+        # q0, q1 = system; q2 = control; q3, q4 = internally allocated vacuum register.
+        qc = circuit.get_qiskit_circuit()
+        assert qc.num_qubits == 5
+        block = Operator(qc).data[0:8, 0:8]
 
         terms = [(term.pauli_term, term.angle) for term in container.step_terms]
         step = build_product_formula_matrix(terms, container.num_qubits)
@@ -506,7 +501,7 @@ class TestVacuumAnnihilatingGroupingEndToEnd:
         unitary = trotter.run(grouped)
         container = unitary.get_container()
 
-        block = codespace_block(cswap_mapper.run(unitary))
+        block = Operator(cswap_mapper.run(unitary).get_qiskit_circuit()).data[0:8, 0:8]
         terms = [(term.pauli_term, term.angle) for term in container.step_terms]
         u = np.linalg.matrix_power(build_product_formula_matrix(terms, container.num_qubits), container.step_reps)
 
@@ -563,7 +558,7 @@ class TestVacuumAnnihilatingGroupingEndToEnd:
         unitary = trotter.run(grouped)
         container = unitary.get_container()
 
-        block = codespace_block(cswap_mapper.run(unitary))
+        block = Operator(cswap_mapper.run(unitary).get_qiskit_circuit()).data[0:8, 0:8]
         terms = [(term.pauli_term, term.angle) for term in container.step_terms]
         u = np.linalg.matrix_power(build_product_formula_matrix(terms, container.num_qubits), container.step_reps)
 

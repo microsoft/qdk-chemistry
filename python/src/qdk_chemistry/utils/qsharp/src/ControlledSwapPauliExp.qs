@@ -18,8 +18,7 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
     /// of controlled-`SWAP` instead of controlling every gate of `Exp`.
     ///
     /// The `repetitions` loop lives *inside* the sandwich, so one layer of controlled-`SWAP`
-    /// covers the whole repeated evolution. The operation is not `Adj + Ctl` because it resets
-    /// its ancilla register.
+    /// covers the whole repeated evolution.
     ///
     /// The evolution must leave the vacuum invariant, `U|0...0> = e^{i phi_0}|0...0>`, as a
     /// particle-conserving Hamiltonian does. That `phi_0` lands on the |0> branch and is passed
@@ -42,7 +41,7 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
         vacuumPhase : Double,
         control : Qubit,
         systems : Qubit[]
-    ) : Unit {
+    ) : Unit is Adj {
         use vacuum = Qubit[Length(systems)];
         within {
             for i in 0..Length(systems) - 1 {
@@ -62,7 +61,6 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
         if AbsD(vacuumPhase) > 1e-12 {
             R1(vacuumPhase, control);
         }
-        ResetAll(vacuum);
     }
 
     /// Parameters for the repeated CSWAP-sandwich controlled Pauli evolution.
@@ -127,7 +125,7 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
     /// - `params`: A `RepControlledSwapPauliExpParams` struct containing the parameters for the operation.
     /// # Returns
     /// - `(Qubit, Qubit[]) => Unit`: A callable that takes a control qubit and an array of system qubits, and prepares the repeated controlled time evolution on the allocated qubits.
-    function MakeRepControlledSwapPauliExpOp(params : RepControlledSwapPauliExpParams) : (Qubit, Qubit[]) => Unit {
+    function MakeRepControlledSwapPauliExpOp(params : RepControlledSwapPauliExpParams) : (Qubit, Qubit[]) => Unit is Adj {
         RepControlledSwapPauliExp(
             params.pauliExponents,
             params.pauliCoefficients,

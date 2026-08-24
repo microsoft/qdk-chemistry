@@ -355,8 +355,7 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         registers.append(classical)
         circuit = QuantumCircuit(*registers)
 
-        # Compose rather than wrap in a gate: the composed subcircuits may include non-unitary ops (e.g., reset).
-        circuit.compose(state_prep_qc, qubits=system_target, inplace=True)
+        circuit.append(state_prep_qc.to_gate(), system_target)
         control = phase[0]
         target_qubits = list(system_target) + (list(unitary_ancilla) if unitary_ancilla else [])
         circuit.h(control)
@@ -366,7 +365,7 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
             circuit.rz(phase_correction, control)
 
         # Append the controlled unitary circuit
-        circuit.compose(ctrl_unitary_qc, qubits=[control, *target_qubits], inplace=True)
+        circuit.append(ctrl_unitary_qc.to_gate(), [control, *target_qubits])
         circuit.h(control)
         circuit.measure(control, classical[0])
 
