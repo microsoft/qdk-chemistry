@@ -220,10 +220,10 @@ This method implements the coherent alias sampling PREPARE oracle of Babbush et 
    \sum_{\ell} \sqrt{\tilde{p}_\ell} \left| \ell \right\rangle \left| \mathrm{garbage}_\ell \right\rangle ,
    \qquad \tilde{p}_\ell \approx \frac{|c_\ell|}{\sum_k |c_k|} ,
 
-where :math:`\tilde{p}` is the target distribution discretized to :math:`\mu` bits. Its Toffoli count is dominated by a single :math:`O(L)` QROM lookup rather than by the amplitude precision, which is what makes it attractive for large Hamiltonians.
+where :math:`\tilde{p}` is the target distribution discretized to :math:`\mu` bits.
 
 .. warning::
-   This is a **block-encoding subroutine, not a general-purpose state preparation**. It differs from `Sparse Isometry`_ and `Dense Pure State`_ in two ways. First, the index register is left entangled with ancilla, so the output is only meaningful inside an :term:`LCU` or qubitization circuit where :math:`\mathrm{PREPARE}^\dagger` later uncomputes the garbage. Second, it realizes :math:`\sqrt{|c_\ell| / \sum_k |c_k|}` rather than :math:`c_\ell / \lVert c \rVert_2`, and has no way to represent a coefficient's sign, so negative coefficients are rejected. Index :math:`\ell` is the position of a coefficient in the wavefunction's coefficient vector, not a determinant bitstring, so the resulting circuit carries no fermionic encoding.
+   This is a **block-encoding subroutine, not a general-purpose state preparation**. The index register is left entangled with ancilla, so the output is only meaningful inside an :term:`LCU` or qubitization circuit where :math:`\mathrm{PREPARE}^\dagger` later uncomputes the garbage. It realizes :math:`\sqrt{|c_\ell| / \sum_k |c_k|}` rather than :math:`c_\ell / \lVert c \rVert_2`, and has no way to represent a coefficient's sign, so negative coefficients are rejected.
 
 .. rubric:: Settings
 
@@ -244,8 +244,6 @@ QROM
 .. rubric:: Factory name: ``"qrom"``
 
 This method prepares an :math:`n`-qubit state with :math:`n` layers of multiplexed :math:`R_y` rotations, where each layer's rotation angles are loaded from a QROM table and applied through a phase gradient register. It uses only :math:`n = \lceil \log_2 L \rceil` state qubits, plus scratch ancilla per lookup, in exchange for :math:`n` QROM lookups.
-
-As with `Alias Sampling`_, the index is the position of a coefficient in the wavefunction's coefficient vector rather than a determinant bitstring, so the resulting circuit carries no fermionic encoding.
 
 .. warning::
    **Negative coefficients are not supported yet.** :math:`R_y` rotations only generate non-negative amplitudes, so signs are applied by a separate QROM-loaded ``Z`` phase kickback. That lookup is not correctly uncomputed: the sign ancilla is released while still entangled with the state register, so it is implicitly measured and the signs collapse at random. Magnitudes remain correct, but the sign pattern varies between simulator seeds. Passing a negative coefficient raises :class:`ValueError`; use ``dense_pure_state`` for signed amplitudes until this is fixed.
