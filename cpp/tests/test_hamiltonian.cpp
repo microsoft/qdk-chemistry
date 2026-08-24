@@ -1764,6 +1764,47 @@ TEST_F(HamiltonianTest,
 }
 
 TEST_F(HamiltonianTest,
+       CholeskyBasisTransformerRejectsTargetMetricNullModeAmplification) {
+  const double angle = 0.3;
+  Eigen::Matrix3d source_coefficients = Eigen::Matrix3d::Identity();
+  Eigen::Matrix3d target_coefficients = source_coefficients;
+  target_coefficients.col(0) << std::cos(angle), std::sin(angle), 1.0e6;
+  target_coefficients.col(1) << -std::sin(angle), std::cos(angle), 0.0;
+  auto basis_set =
+      testing::create_random_basis_set(3, "test-target-metric-transform");
+  auto active_space = testing::restricted_index_set(3, {0, 1});
+  auto inactive_space = testing::restricted_index_set(3, {2});
+
+  for (const double source_null_eigenvalue : {0.0, 1.0e-30}) {
+    Eigen::MatrixXd source_overlap = Eigen::MatrixXd::Identity(3, 3);
+    source_overlap(2, 2) = source_null_eigenvalue;
+    Eigen::MatrixXd target_overlap = source_overlap;
+    target_overlap(2, 2) = 5.0e-11;
+    auto source_orbitals = std::make_shared<Orbitals>(
+        source_coefficients, std::nullopt,
+        std::make_optional(source_overlap), basis_set, active_space,
+        inactive_space);
+    auto target_orbitals = std::make_shared<Orbitals>(
+        target_coefficients, std::nullopt,
+        std::make_optional(target_overlap), basis_set, active_space,
+        inactive_space);
+    auto source = std::make_shared<Hamiltonian>(
+        std::make_unique<CholeskyHamiltonianContainer>(
+            Eigen::Matrix2d::Identity(), Eigen::MatrixXd::Ones(4, 1),
+            source_orbitals, 0.0, Eigen::MatrixXd{}));
+
+    try {
+      HamiltonianBasisTransformerFactory::create("qdk")->run(
+          source, target_orbitals);
+      FAIL() << "Expected target-metric null-mode amplification to be rejected";
+    } catch (const std::invalid_argument& error) {
+      EXPECT_NE(std::string(error.what()).find("target AO metric"),
+                std::string::npos);
+    }
+  }
+}
+
+TEST_F(HamiltonianTest,
        CholeskyBasisTransformerRejectsIndefiniteOverlapMetric) {
   Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(2, 2);
   overlap(1, 1) = -1.0;

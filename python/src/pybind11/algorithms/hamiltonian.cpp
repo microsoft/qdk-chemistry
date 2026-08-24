@@ -318,9 +318,17 @@ Abstract algorithm for expressing a Hamiltonian in a target orbital basis.
 QDK basis transformer for restricted Cholesky Hamiltonians.
 )")
       .def(py::init<>())
-      // The native implementation serializes calls sharing one instance, so
-      // unrelated Python threads can run while the transformation executes.
-      .def("run", &microsoft::QdkHamiltonianBasisTransformer::run,
-           py::arg("hamiltonian"), py::arg("target_orbitals"),
-           py::call_guard<py::gil_scoped_release>());
+      .def(
+          "run",
+          [](microsoft::QdkHamiltonianBasisTransformer &self,
+             std::shared_ptr<Hamiltonian> hamiltonian,
+             std::shared_ptr<Orbitals> target_orbitals) {
+            // Freeze settings while the GIL still serializes Python access,
+            // then release it for the synchronized native transformation.
+            self.settings().lock();
+            py::gil_scoped_release release;
+            return self.run(std::move(hamiltonian),
+                            std::move(target_orbitals));
+          },
+          py::arg("hamiltonian"), py::arg("target_orbitals"));
 }

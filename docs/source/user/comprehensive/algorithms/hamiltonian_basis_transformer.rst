@@ -34,7 +34,9 @@ spatial symmetry labels and unrestricted Hamiltonians are not supported.
 Source one-body integrals, three-center factors, inactive Fock matrix values,
 and the core energy must be finite. After validating overlap-matrix symmetry,
 the implementation uses its explicitly symmetrized value as the orbital
-metric.
+metric. It also validates the target active orbitals against the projected
+difference between the symmetrized source and target metrics, preventing small
+AO-matrix differences from being amplified in numerical null modes.
 
 For each Cholesky factor :math:`L_Q` and recovered active-space rotation
 :math:`U`, the implementation evaluates
@@ -54,6 +56,7 @@ Settings
 ``validation_tolerance``
    Absolute tolerance used to validate the orbital-basis relationship. Active
    orbital checks are evaluated after mapping the orbitals into the AO-overlap
-   metric. Structural rank requirements are enforced independently of this
-   setting. The tolerance does not threshold integral values. Supported range:
-   ``0`` through ``1e-2``. Default: ``1e-10``.
+   metric, including the projected difference between the source and target
+   symmetrized AO metrics. Structural rank requirements are enforced
+   independently of this setting. The tolerance does not threshold integral
+   values. Supported range: ``0`` through ``1e-2``. Default: ``1e-10``.

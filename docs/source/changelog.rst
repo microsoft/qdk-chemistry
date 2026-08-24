@@ -11,7 +11,9 @@ Unreleased
   basis of the same active orbital subspace with the
   ``HamiltonianBasisTransformer`` algorithm, reusing the existing three-center
   factors instead of repeating AO integral evaluation and Cholesky
-  decomposition.
+  decomposition. Target-metric validation bounds numerical null-mode
+  amplification, and Python execution freezes settings before releasing the
+  GIL.
 
 Version 2.1.0
 =============

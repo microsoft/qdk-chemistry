@@ -293,10 +293,21 @@ std::shared_ptr<data::Hamiltonian> QdkHamiltonianBasisTransformer::_run_impl(
       active_coefficients(*target_orbitals, source_indices);
   const Eigen::Index nactive = source_indices.size();
   const Eigen::MatrixXd identity = Eigen::MatrixXd::Identity(nactive, nactive);
+  const auto& stored_source_overlap = source_orbitals->get_overlap_matrix();
+  const auto& stored_target_overlap = target_orbitals->get_overlap_matrix();
+  const Eigen::MatrixXd source_metric =
+      0.5 * (stored_source_overlap + stored_source_overlap.transpose());
+  {
+    const Eigen::MatrixXd metric_difference =
+        0.5 * (stored_target_overlap + stored_target_overlap.transpose()) -
+        source_metric;
+    require_close(target_active_coefficients.transpose() * metric_difference *
+                      target_active_coefficients,
+                  Eigen::MatrixXd::Zero(nactive, nactive), tolerance,
+                  "Target active-orbital overlap in the target AO metric");
+  }
   Eigen::MatrixXd rotation = [&]() -> Eigen::MatrixXd {
-    const auto& stored_overlap = source_orbitals->get_overlap_matrix();
-    const Eigen::MatrixXd overlap =
-        0.5 * (stored_overlap + stored_overlap.transpose());
+    const auto& overlap = source_metric;
     Eigen::MatrixXd source_metric_coefficients;
     Eigen::MatrixXd target_metric_coefficients;
     Eigen::MatrixXd source_overlap;
