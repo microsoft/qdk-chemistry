@@ -154,7 +154,7 @@ extends:
               os: windows
           ${{ else }}:
             pool:
-              name: $(CPU_POOL_X86)
+              name: aqe-1es-NCads_A100_v4-pool
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
