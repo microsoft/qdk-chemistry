@@ -119,9 +119,9 @@ class TestQROMStatePreparation:
         """The constructor argument is stored in settings so create() can reach it."""
         prep = QROMStatePreparation(rotation_bit_precision=6)
         assert prep.rotation_bit_precision == 6
-        assert prep.settings.get("rotation_bit_precision") == 6
+        assert prep.settings().get("rotation_bit_precision") == 6
 
-        prep.settings.set("rotation_bit_precision", 8)
+        prep.settings().set("rotation_bit_precision", 8)
         assert prep.rotation_bit_precision == 8
 
     def test_empty_coefficients_rejected(self):

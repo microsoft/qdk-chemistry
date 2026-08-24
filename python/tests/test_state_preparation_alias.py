@@ -101,9 +101,9 @@ class TestAliasSamplingStatePreparation:
         """The constructor argument is stored in settings so create() can reach it."""
         prep = AliasSamplingStatePreparation(bits_precision=6)
         assert prep.bits_precision == 6
-        assert prep.settings.get("bits_precision") == 6
+        assert prep.settings().get("bits_precision") == 6
 
-        prep.settings.set("bits_precision", 8)
+        prep.settings().set("bits_precision", 8)
         assert prep.bits_precision == 8
 
     def test_negative_coefficients_rejected(self):
