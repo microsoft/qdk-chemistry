@@ -181,6 +181,22 @@ echo "==> HDF5: cflags='${HDF5_CFLAGS}' libs='${HDF5_LIBS}'"
 # ELPA/HDF5/numactl special cases already there) for when its strict CONFIG-only search fails, and
 # BuildGlobalArrays.cmake's find_or_build_dependency(BLAS) call (only reachable, before this patch, if a
 # BLAS_External target already happened to exist) is made unconditional to match the LAPACK call above it.
+# BLAS/LAPACK are safe to fix this way because cmsb_find_dependency links them via raw library file paths
+# (CMake's FindBLAS/FindLAPACK modules set e.g. BLAS_LIBRARIES to absolute .so/.a paths, not an imported
+# target), so nothing about how they get exported/consumed changes.
+#
+# SPDLOG/EcpInt were ALSO tried this way (adding a plain find_package(...) MODULE-mode fallback, pointing at
+# CPP_DEPS_PREFIX via -DSPDLOG_ROOT/-DEcpInt_ROOT, mirroring LibInt2_ROOT/GauXC_ROOT above) -- and it DID make
+# TAMM's own build find/reuse them. But unlike BLAS/LAPACK, cmsb_find_dependency links SPDLOG/EcpInt (like every
+# DEP_ABUILD_MISC item) via an external IMPORTED target reference (spdlog::spdlog, ECPINT::ecpint), and TAMM's
+# generated tamm-config.cmake (from cmake/CMSBTargetConfig.cmake.in) only knows how to re-resolve that target,
+# when consumed by a LATER, SEPARATE cmake invocation (ExaChem's own outer configure, a different process from
+# TAMM's), for LibInt2/HDF5/numactl/HPTT/GauXC/Librett (the only items whose ROOT hint the template's re-lookup
+# loop actually forwards) -- SPDLOG/EcpInt have no such ROOT forwarding in that template, so ExaChem's configure
+# can't re-find spdlog::spdlog/ECPINT::ecpint, and CMake hard-errors on tamm-config.cmake's own
+# set_target_properties(tamm::tamm ... spdlog::spdlog ...) ("the target was not found"). Fixing this would mean
+# patching CMSBTargetConfig.cmake.in itself (the *.in template CMSB installs and configure_file()s, not just its
+# .cmake macros) -- reverted; SPDLOG/EcpInt remain rebuilt from source here, same as before.
 CMSB_SRC_DIR="${BUILD_ROOT}/CMakeBuild-patched"
 git clone --depth 1 https://github.com/NWChemEx-Project/CMakeBuild.git "${CMSB_SRC_DIR}"
 git -C "${CMSB_SRC_DIR}" apply --verbose "${SCRIPT_DIR}/patches/cmsb-fix-blas-lapack-reuse.patch"
@@ -194,14 +210,6 @@ COMMON_CMAKE_ARGS=(
   -DTAMM_CXX_FLAGS="-DUSE_SERIAL_IO ${HDF5_CFLAGS}"
   -DLibInt2_ROOT="${CPP_DEPS_PREFIX}"
   -DGauXC_ROOT="${CPP_DEPS_PREFIX}"
-  # SPDLOG/EcpInt are, like BLAS/LAPACK above, DEP_ABUILD items (DEP_ABUILD_MISC is appended into DEP_ABUILD --
-  # see cmake/macros/DependencyMacros.cmake), so they only ever get a strict find_package(... CONFIG
-  # NO_DEFAULT_PATH) search of CMAKE_INSTALL_PREFIX (=INSTALL_PREFIX, deliberately kept separate from
-  # CPP_DEPS_PREFIX) and ${name}_ROOT -- CMAKE_PREFIX_PATH is NOT reliably honored there either (the same reason
-  # LibInt2_ROOT/GauXC_ROOT above are needed instead of relying on CMAKE_PREFIX_PATH). Point CMSB at where
-  # install-cpp-deps.sh actually built them, same as LibInt2/GauXC.
-  -DSPDLOG_ROOT="${CPP_DEPS_PREFIX}"
-  -DEcpInt_ROOT="${CPP_DEPS_PREFIX}"
   -DFETCHCONTENT_SOURCE_DIR_CMAKEBUILD="${CMSB_SRC_DIR}"
 )
 
