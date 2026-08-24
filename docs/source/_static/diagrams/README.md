@@ -2,8 +2,8 @@
 
 The ground-state molecular-QPE tutorial uses Graphviz diagrams, generated plots,
 orbital renders, and logical-circuit diagrams. PNG regeneration is a
-documentation-maintenance task outside the Sphinx build; Sphinx renders the
-committed DOT sources through Graphviz during the build.
+documentation-maintenance task outside the Sphinx build; the tutorial SVGs are
+also generated from committed DOT sources before the build.
 
 ## Generated plots
 
@@ -13,12 +13,16 @@ QDK/Chemistry documentation dependencies:
 ```console
 python docs/source/_static/diagrams/generate_tutorial_qpe_phase_grid.py
 python docs/source/_static/diagrams/generate_tutorial_qpe_orbital_entropy.py
+python docs/source/_static/diagrams/generate_tutorial_qpe_graphviz.py
 ```
 
-Both scripts save their figures as PNGs on light-gray canvases so fixed dark
+The two plot scripts save their figures as PNGs on light-gray canvases so fixed dark
 labels remain readable in light and dark documentation themes. The phase-grid
-script also regenerates `tutorial_qpe_phase_grid_table.rst`. Files ending in
-`.dot` are rendered by Sphinx through Graphviz as transparent SVG assets.
+script also regenerates `tutorial_qpe_phase_grid_table.rst`. The Graphviz script
+creates committed SVGs from the tutorial DOT sources, adds accessible titles and
+descriptions from the authored figure text, and records each source hash so stale
+outputs are detected by tests. The SVGs use opaque light canvases for predictable
+contrast in light and dark documentation themes.
 
 ## Orbital renders
 

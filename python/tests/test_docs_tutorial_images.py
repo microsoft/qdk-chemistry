@@ -5,10 +5,11 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import ast
 import importlib.util
 import re
 import sys
+import xml.etree.ElementTree as ET
+from hashlib import sha256
 from pathlib import Path
 
 import numpy as np
@@ -29,19 +30,32 @@ OPAQUE_PNG_FIGURES = {
     "tutorial_qpe_state_preparation_comparison.png",
 }
 PNG_FIGURES = TRANSPARENT_PNG_FIGURES | OPAQUE_PNG_FIGURES
+SVG_FIGURES = {
+    "tutorial_qpe_iqpe_iteration.svg",
+    "tutorial_qpe_jordan_wigner_parity.svg",
+    "tutorial_qpe_orbital_partition.svg",
+    "tutorial_qpe_wavefunction_hierarchy.svg",
+    "tutorial_qpe_workflow.svg",
+}
 FIGURE_PATTERN = re.compile(r"^\.\. figure:: /_static/diagrams/(tutorial_qpe_\S+)$", re.MULTILINE)
-GRAPHVIZ_PATTERN = re.compile(r"^\.\. graphviz:: /_static/diagrams/(tutorial_qpe_\S+\.dot)$", re.MULTILINE)
+SVG_FIGURE_PATTERN = re.compile(
+    r"^\.\. figure:: /_static/diagrams/(?P<source>tutorial_qpe_\S+\.svg)\n"
+    r"(?P<options>(?:   :[^\n]+\n)*)",
+    re.MULTILINE,
+)
+ALT_PATTERN = re.compile(r"^   :alt: (?P<alt>.+)$", re.MULTILINE)
+SVG_NAMESPACE = "http://www.w3.org/2000/svg"
 
 
 def test_tutorial_figure_references_are_complete():
-    """Keep the six tutorial figure directives aligned with committed assets."""
+    """Keep all tutorial figure directives aligned with committed assets."""
     references = {
         match
         for path in TUTORIAL_DIR.glob("*.rst")
         for match in FIGURE_PATTERN.findall(path.read_text(encoding="utf-8"))
     }
 
-    assert references == PNG_FIGURES
+    assert references == PNG_FIGURES | SVG_FIGURES
     assert all((DIAGRAMS_DIR / name).is_file() for name in references)
 
 
@@ -59,50 +73,78 @@ def test_opaque_png_figures_use_light_gray_backgrounds():
         with Image.open(DIAGRAMS_DIR / name) as image:
             rgba = image.convert("RGBA")
             assert rgba.getchannel("A").getextrema() == (255, 255), name
-            assert rgba.getpixel((0, 0)) == (242, 242, 242, 255), name
+            expected_background = 248 if "circuit" in name or "state_preparation" in name else 242
+            assert rgba.getpixel((0, 0)) == (*([expected_background] * 3), 255), name
 
 
-def test_tutorial_graphviz_figures_render_as_transparent_svg():
-    """Require SVG output and transparent canvases for every tutorial DOT file."""
-    references = {
-        match
+def test_circuit_png_figures_meet_non_text_contrast():
+    """Keep circuit structure above the WCAG non-text contrast threshold."""
+    background = np.array([248, 248, 248], dtype=np.uint8)
+    structure = np.array([143, 143, 143], dtype=np.uint8)
+
+    def relative_luminance(color: np.ndarray) -> float:
+        channels = color.astype(np.float64) / 255.0
+        linear = np.where(
+            channels <= 0.04045,
+            channels / 12.92,
+            ((channels + 0.055) / 1.055) ** 2.4,
+        )
+        return float(0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2])
+
+    lighter = relative_luminance(background)
+    darker = relative_luminance(structure)
+    assert (lighter + 0.05) / (darker + 0.05) >= 3.0
+
+    for name in (
+        "tutorial_qpe_power_one_circuit_overview.png",
+        "tutorial_qpe_state_preparation_comparison.png",
+    ):
+        with Image.open(DIAGRAMS_DIR / name) as image:
+            rgb = np.asarray(image.convert("RGB"))
+        assert np.any(np.all(rgb == structure, axis=2)), name
+
+
+def test_graphviz_sources_generate_accessible_svg_figures():
+    """Keep committed SVGs aligned with DOT sources and authored descriptions."""
+    directives = [
+        (path, match)
         for path in TUTORIAL_DIR.glob("*.rst")
-        for match in GRAPHVIZ_PATTERN.findall(path.read_text(encoding="utf-8"))
-    }
+        for match in SVG_FIGURE_PATTERN.finditer(path.read_text(encoding="utf-8"))
+    ]
+    references = {match.group("source") for _, match in directives}
     dot_files = {path.name for path in DIAGRAMS_DIR.glob("tutorial_qpe_*.dot")}
+    svg_files = {path.name for path in DIAGRAMS_DIR.glob("tutorial_qpe_*.svg")}
 
-    assert references == dot_files
-    for name in references:
-        dot_source = (DIAGRAMS_DIR / name).read_text(encoding="utf-8")
-        assert 'bgcolor="transparent"' in dot_source
-        if name != "tutorial_qpe_wavefunction_hierarchy.dot":
+    assert references == {name.replace(".dot", ".svg") for name in dot_files}
+    assert references == svg_files
+    assert len(directives) == 5
+    for rst_path, match in directives:
+        svg_name = match.group("source")
+        dot_name = svg_name.replace(".svg", ".dot")
+        dot_path = DIAGRAMS_DIR / dot_name
+        dot_source = dot_path.read_text(encoding="utf-8")
+        assert 'bgcolor="#FAFAFA"' in dot_source
+        if dot_name != "tutorial_qpe_wavefunction_hierarchy.dot":
             assert "<SUB>" not in dot_source
+        alt_match = ALT_PATTERN.search(match.group("options"))
+        assert alt_match is not None, f"{rst_path}: {svg_name}"
 
-    hierarchy_source = (DIAGRAMS_DIR / "tutorial_qpe_wavefunction_hierarchy.dot").read_text(encoding="utf-8")
-    assert "χ[μ]" not in hierarchy_source
-    assert "Φ(HF)" not in hierarchy_source
-    assert 'χ&#160;<SUB><FONT POINT-SIZE="9">μ</FONT></SUB>' in hierarchy_source
-    assert 'Φ&#160;<SUB><FONT POINT-SIZE="9">HF</FONT></SUB>' in hierarchy_source
-    unapproved_subscripts = re.sub(
-        r'&#160;<SUB><FONT POINT-SIZE="9">(?:μ|HF)</FONT></SUB>',
-        "",
-        hierarchy_source,
-    )
-    assert "<SUB>" not in unapproved_subscripts
-
-    configuration = ast.parse((REPOSITORY_ROOT / "docs" / "source" / "conf.py").read_text(encoding="utf-8"))
-    output_formats = []
-    for node in configuration.body:
-        if isinstance(node, ast.Assign):
-            targets = node.targets
-        elif isinstance(node, ast.AnnAssign):
-            targets = [node.target]
-        else:
-            continue
-        if any(isinstance(target, ast.Name) and target.id == "graphviz_output_format" for target in targets):
-            assert isinstance(node.value, ast.Constant)
-            output_formats.append(node.value.value)
-    assert output_formats == ["svg"]
+        svg_path = DIAGRAMS_DIR / svg_name
+        root = ET.parse(svg_path).getroot()
+        svg_id = dot_path.stem.replace("_", "-")
+        assert root.attrib["role"] == "img"
+        assert root.attrib["aria-labelledby"] == f"{svg_id}-title {svg_id}-desc"
+        assert root.attrib["data-source-sha256"] == sha256(dot_path.read_bytes()).hexdigest()
+        title = root.find(f"{{{SVG_NAMESPACE}}}title")
+        description = root.find(f"{{{SVG_NAMESPACE}}}desc")
+        assert title is not None
+        assert title.text
+        assert description is not None
+        assert description.text == alt_match.group("alt")
+        assert "#FAFAFA" in dot_source
+        assert "Arial Bold" not in dot_source
+        svg_text = svg_path.read_text(encoding="utf-8")
+        assert 'font-weight="bold"' in svg_text
 
 
 def test_screenshot_derived_images_match_local_sources():

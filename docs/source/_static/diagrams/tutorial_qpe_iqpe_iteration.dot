@@ -6,7 +6,7 @@ digraph TutorialQpeIqpeIteration {
     overlap=false;
     splines=ortho;
     pad=0.2;
-    bgcolor="transparent";
+    bgcolor="#FAFAFA";
 
     node [shape=box, style="rounded,filled", fontname="Arial", width=3.6, height=0.95, margin="0.22,0.18"];
     edge [penwidth=2.5, arrowsize=0.9, fontname="Arial"];

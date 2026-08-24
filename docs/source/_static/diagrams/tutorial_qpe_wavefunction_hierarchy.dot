@@ -7,19 +7,19 @@ digraph TutorialQpeWavefunctionHierarchy {
     overlap=false;
     splines=spline;
     pad=0.2;
-    bgcolor="transparent";
+    bgcolor="#FAFAFA";
 
     node [shape=box, style="rounded,filled", fontname="Arial", width=3.0, height=0.9, margin="0.20,0.16"];
     edge [penwidth=2.5, arrowsize=1.0];
 
     subgraph cluster_one_electron {
-        label="One-electron representation";
+        label=<<B>One-electron representation</B>>;
         style="filled,rounded";
         fillcolor="#E8EAF6";
         color="#5C6BC0";
         penwidth=2.5;
         fontsize=14;
-        fontname="Arial Bold";
+        fontname="Arial";
         fontcolor="#3949AB";
         rank=same;
 
@@ -30,13 +30,13 @@ digraph TutorialQpeWavefunctionHierarchy {
     }
 
     subgraph cluster_configuration {
-        label="Choose occupations";
+        label=<<B>Choose occupations</B>>;
         style="filled,rounded";
         fillcolor="#E0F2F1";
         color="#26A69A";
         penwidth=2.5;
         fontsize=14;
-        fontname="Arial Bold";
+        fontname="Arial";
         fontcolor="#00796B";
         rank=same;
 

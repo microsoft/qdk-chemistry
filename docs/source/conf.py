@@ -154,9 +154,6 @@ breathe_default_members = (
     "show-inheritance",  # Show base classes in documentation
 )
 
-# Render Graphviz diagrams as SVG; each DOT source controls its canvas background.
-graphviz_output_format = "svg"
-
 # HTML output and theme settings
 html_theme = "sphinx_rtd_theme"  # Use the ReadTheDocs theme for styling
 templates_path = ["_templates"]  # Path to custom HTML templates
