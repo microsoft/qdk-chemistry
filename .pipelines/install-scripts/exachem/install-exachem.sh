@@ -120,6 +120,21 @@ cp -r "${EIGEN3_CMAKE_DIR}" "${INSTALL_PREFIX}/share/eigen3/cmake"
 cp -r "${EIGEN3_PREFIX}/include/eigen3" "${INSTALL_PREFIX}/include/eigen3"
 echo "==> Seeded Eigen3 from ${EIGEN3_PREFIX} into ${INSTALL_PREFIX}"
 
+# TAMM's CMSB Findnumactl.cmake module (cmake/find_external/Findnumactl.cmake) hardcodes NO_DEFAULT_PATH on both
+# its find_path/find_library calls and only searches CMAKE_INSTALL_PREFIX -- so apt's libnuma-dev (system-wide,
+# under /usr) is invisible to it too, exactly like Eigen3 above. Seed numa.h + libnuma.so into INSTALL_PREFIX.
+NUMA_HEADER="$(find /usr -maxdepth 6 -name 'numa.h' -print -quit 2>/dev/null || true)"
+NUMA_LIB="$(find /usr -maxdepth 6 -name 'libnuma.so' -print -quit 2>/dev/null || true)"
+if [ -z "${NUMA_HEADER}" ] || [ -z "${NUMA_LIB}" ]; then
+  echo "ERROR: numa.h/libnuma.so not found under /usr (expected from apt's libnuma-dev)." >&2
+  exit 1
+fi
+NUMA_INCLUDE_DIR="$(dirname "${NUMA_HEADER}")"
+mkdir -p "${INSTALL_PREFIX}/include" "${INSTALL_PREFIX}/lib"
+cp "${NUMA_INCLUDE_DIR}"/numa*.h "${INSTALL_PREFIX}/include/"
+cp -L "${NUMA_LIB}" "${INSTALL_PREFIX}/lib/libnuma.so"
+echo "==> Seeded numactl (numa.h + libnuma.so) into ${INSTALL_PREFIX}"
+
 # --------------------------------------------------------------------------------------------------------------------
 # Serial HDF5 discovery. Ubuntu's `libhdf5-dev` (already installed by the workflow for qdk-chemistry itself) puts
 # headers under a "serial" subdirectory and installs a pkg-config file on most releases; fall back to the
