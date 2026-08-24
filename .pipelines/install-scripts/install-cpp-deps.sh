@@ -3,6 +3,17 @@ set -e
 
 # install-cpp-deps.sh — build and install qdk-chemistry's C++ dependencies for CI pipelines.
 #
+# Builds from source (into install_prefix): spdlog, BLAS++, LAPACK++, LibInt2, ECPint (libecpint), GauXC.
+# Reused from the OS instead of built here: the actual BLAS/LAPACK implementation that BLAS++/LAPACK++ link
+# against (e.g. OpenBLAS via apt on Linux, Apple's Accelerate framework via macOS's "auto" vendor -- see
+# blas_vendor below).
+#
+# For context, qdk-chemistry's own C++ build (cpp/cmake/third_party.cmake, external/macis) also requires several
+# dependencies to already be installed on the system, independently of this script: Eigen3, HDF5, Boost, OpenMP,
+# Threads, MPI (only when built with ExaChem support), and GoogleTest (used if found, otherwise fetched). These
+# are installed via apt/brew by the pipeline before this script runs (see build-and-test.yaml), not by
+# install-cpp-deps.sh itself.
+#
 # Usage: install-cpp-deps.sh <cpp_cgmanifest_path> <macis_cgmanifest_path> [blas_vendor]
 #
 # Arguments:
