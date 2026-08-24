@@ -116,10 +116,10 @@ def execute_job(input_dir: str | Path, output_dir: str | Path) -> Any:
     input_path = Path(input_dir)
     output_path = Path(output_dir)
     cache, run_hash = _load_remote_cache(input_path)
-    result = _get_cached_result(cache, run_hash)
+    inputs = deserialize_inputs(input_path, cache=cache)
+    result = _CACHE_MISS if inputs["force_rerun"] else _get_cached_result(cache, run_hash)
 
     if result is _CACHE_MISS:
-        inputs = deserialize_inputs(input_path, cache=cache)
         algorithm = create_algorithm(inputs["algorithm_type"], inputs["algorithm_name"])
         for key, value in inputs["settings"].items():
             algorithm.settings().set(key, value)

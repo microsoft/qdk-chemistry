@@ -27,6 +27,18 @@ __all__ = ["Job"]
 _JOB_FILE_VERSION = 2
 
 
+def _prepare_persisted_value(value: Any, field: str) -> Any:
+    """Normalize supported values and verify that job metadata is JSON-safe."""
+    from qdk_chemistry.remote.serialization import _jsonable_settings_value  # noqa: PLC0415
+
+    try:
+        prepared = _jsonable_settings_value(value)
+        json.dumps(prepared)
+    except (TypeError, ValueError, RecursionError) as error:
+        raise TypeError(f"Persisted job {field} must be JSON-serializable: {error}") from error
+    return prepared
+
+
 class Job:
     """Persistent handle for a cached computation.
 
@@ -112,7 +124,7 @@ class Job:
             d["input_hashes"] = self.input_hashes
         if self.output_hashes is not None:
             d["output_hashes"] = self.output_hashes
-        return d
+        return _prepare_persisted_value(d, "metadata")
 
     def save(self, path: str | pathlib.Path | None = None) -> pathlib.Path:
         """Write the job file to disk atomically.

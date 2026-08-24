@@ -466,6 +466,32 @@ def test_worker_executes_serialized_algorithm(tmp_path, monkeypatch):
     algorithm.run.assert_called_once_with(2, scale=3)
 
 
+def test_worker_force_rerun_bypasses_remote_cache(tmp_path, monkeypatch):
+    """The compute node ignores a shared-cache result when forced to rerun."""
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    serialize_inputs(
+        input_dir,
+        args=(),
+        kwargs={},
+        algorithm_type="test_algorithm",
+        algorithm_name="plugin",
+        settings={},
+        run_hash="testhash",
+        force_rerun=True,
+    )
+    monkeypatch.setattr(remote_worker, "_load_remote_cache", MagicMock(return_value=(MagicMock(), "testhash")))
+    get_cached_result = MagicMock(return_value=-75.5)
+    monkeypatch.setattr(remote_worker, "_get_cached_result", get_cached_result)
+    algorithm = MagicMock()
+    algorithm.run.return_value = 6
+    monkeypatch.setattr(algorithms_module, "create", MagicMock(return_value=algorithm))
+
+    assert execute_job(input_dir, output_dir) == 6
+    get_cached_result.assert_not_called()
+    algorithm.run.assert_called_once_with()
+
+
 def test_worker_logs_remote_cache_load_failure(tmp_path, monkeypatch, caplog):
     input_dir = tmp_path / "input"
     input_dir.mkdir()
@@ -589,6 +615,26 @@ class TestJob:
         assert loaded.run_hash == "aaaa"
         assert loaded.input_hashes == {"args.arg_0": "hash0"}
 
+    def test_to_dict_normalizes_paths_and_algorithm_refs(self, tmp_path):
+        """Job metadata uses the same durable representation as remote settings."""
+        energy_calculator = AlgorithmRef("scf_solver", "qdk")
+        job = Job(
+            job_id="j1",
+            backend="local",
+            backend_config={"workdir": tmp_path},
+            backend_state={"output_dir": tmp_path / "output"},
+            algorithm_info={"settings": {"energy_calculator": energy_calculator}},
+        )
+
+        persisted = job.to_dict()
+
+        assert persisted["backend_config"]["workdir"] == str(tmp_path)
+        assert persisted["backend_state"]["output_dir"] == str(tmp_path / "output")
+        serialized_ref = persisted["algorithm_info"]["settings"]["energy_calculator"]
+        assert serialized_ref["__type__"] == "algorithm_ref"
+        assert serialized_ref["algorithm_type"] == "scf_solver"
+        json.dumps(persisted)
+
     def test_save_is_atomic(self, tmp_path, monkeypatch):
         """A failed temporary write must preserve the existing job handle."""
         path = tmp_path / "job_x.json"
@@ -618,6 +664,10 @@ class TestJob:
 
     def test_terminal_statuses_are_public(self):
         assert frozenset({"succeeded", "failed", "canceled", "cancelled", "retrieved"}) == JobStatus.TERMINAL_STATUSES
+
+    def test_job_states_are_case_insensitive(self):
+        assert remote_backends.JobState("RUNNING") is remote_backends.JobState.RUNNING
+        assert remote_backends.JobState("Succeeded") is remote_backends.JobState.SUCCEEDED
 
     @pytest.mark.parametrize("status", ["succeeded", "Succeeded", "SUCCEEDED"])
     def test_is_successful(self, status):
@@ -903,6 +953,69 @@ def backend(request):
 
 class TestBackendContract:
     """Shared tests every backend must satisfy. Parameterized via the `backend` fixture."""
+
+    @staticmethod
+    def _mock_backend(*, backend_config=None, backend_state=None):
+        """Create a backend double with configurable persisted metadata."""
+        backend = MagicMock(spec=RemoteBackend)
+        backend.name = "test-remote"
+        backend._backend_args = backend_config or {}
+        backend._submit.return_value = ("job-id", backend_state or {})
+        return backend
+
+    def test_submit_normalizes_persisted_metadata(self, tmp_path):
+        """Supported rich values are normalized before a job is returned."""
+        backend = self._mock_backend(
+            backend_config={"workdir": tmp_path},
+            backend_state={"output_dir": tmp_path / "output"},
+        )
+        energy_calculator = AlgorithmRef("scf_solver", "qdk")
+
+        job = RemoteBackend.submit(
+            backend,
+            {
+                "algorithm_type": "test_algorithm",
+                "algorithm_name": "plugin",
+                "settings": {"energy_calculator": energy_calculator},
+            },
+            job_dir=tmp_path,
+        )
+
+        loaded = Job.load(tmp_path / "job-id.job.json")
+        assert loaded.backend_config == {"workdir": str(tmp_path)}
+        assert loaded.backend_state == {"output_dir": str(tmp_path / "output")}
+        assert loaded.algorithm_info["settings"]["energy_calculator"]["__type__"] == "algorithm_ref"
+        assert job.to_dict() == loaded.to_dict()
+        backend._submit.assert_called_once()
+
+    @pytest.mark.parametrize(
+        ("backend_config", "payload", "field"),
+        [
+            ({"client": object()}, {"settings": {}}, "backend_config"),
+            ({}, {"settings": {"client": object()}}, "algorithm_info"),
+            ({}, {"settings": {}, "run_hash": object()}, "run_hash"),
+            ({}, {"settings": {}, "input_hashes": {"arg": object()}}, "input_hashes"),
+        ],
+    )
+    def test_submit_rejects_unpersistable_metadata_before_launch(self, backend_config, payload, field):
+        """Known unpersistable metadata prevents backend submission."""
+        backend = self._mock_backend(backend_config=backend_config)
+
+        with pytest.raises(TypeError, match=field):
+            RemoteBackend.submit(backend, payload)
+
+        backend._submit.assert_not_called()
+
+    def test_submit_discards_job_with_unpersistable_backend_state(self):
+        """Invalid state triggers best-effort cancellation and cleanup."""
+        backend_state = {"client": object()}
+        backend = self._mock_backend(backend_state=backend_state)
+
+        with pytest.raises(TypeError, match="backend_state"):
+            RemoteBackend.submit(backend, {"settings": {}})
+
+        backend.cancel.assert_called_once_with(backend_state)
+        backend.cleanup_job.assert_called_once_with(backend_state)
 
     def test_submit_and_wait_uses_backend_poll_interval(self, monkeypatch):
         """Blocking submission polls at the backend's configured interval."""
@@ -1342,6 +1455,24 @@ class TestRunWithCache:
 
         run(algo, "arg1", cache=cache, remote=None, force_rerun=True)
         algo.run.assert_called_once()
+
+    def test_force_rerun_reaches_remote_worker(self, tmp_path):
+        cache = FolderCache(path=tmp_path / "cache")
+        algo = self._mock_algorithm()
+        backend = MagicMock()
+        job = Job(
+            job_id="remote-job",
+            backend="test",
+            backend_config={},
+            backend_state={},
+            status="Succeeded",
+        )
+        job.fetch = MagicMock(return_value=-75.5)
+        backend.submit.return_value = job
+
+        assert run(algo, "arg1", cache=cache, remote=backend, force_rerun=True) == -75.5
+
+        assert backend.submit.call_args.args[0]["force_rerun"] is True
 
     def test_remote_submission_callback_runs_after_handle_is_persisted(self, tmp_path):
         cache = FolderCache(path=tmp_path / "cache")

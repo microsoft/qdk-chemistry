@@ -258,6 +258,11 @@ A remote backend implements the transport and job lifecycle required to execute 
 
    This example targets a directly SSH-accessible machine with ``python3`` and QDK/Chemistry available in its default environment. It does not submit through a queue scheduler such as SLURM or PBS. Queue-managed systems should provide a backend designed for their scheduler and site policy.
 
+   The example retains each remote job directory, including its inputs, outputs,
+   PID file, and logs, after the job reaches a terminal state. Applications are
+   responsible for removing these artifacts through job cleanup. That cleanup
+   does not remove caller-owned local job records or result directories.
+
 .. rubric:: Backend implementation
 
 Implement :class:`~qdk_chemistry.remote.backends.base.RemoteBackend` for the target transport and execution environment:

@@ -20,6 +20,8 @@ decorator remains available for direct registration.
 # Import the built-in backend to register it
 from qdk_chemistry.remote.backends import local
 from qdk_chemistry.remote.backends.base import (
+    DEFAULT_POLL_INTERVAL,
+    DEFAULT_TIMEOUT,
     available_backends,
     create_remote,
     get_backend,
@@ -27,6 +29,9 @@ from qdk_chemistry.remote.backends.base import (
 )
 
 __all__ = [
+    "DEFAULT_POLL_INTERVAL",
+    "DEFAULT_TIMEOUT",
+    "JobState",
     "JobStatus",
     "RemoteBackend",
     "available_backends",
@@ -38,6 +43,10 @@ __all__ = [
 
 def __getattr__(name: str):
     """Lazy import for re-exported types to avoid autodoc duplication."""
+    if name == "JobState":
+        from qdk_chemistry.remote.backends.base import JobState  # noqa: PLC0415
+
+        return JobState
     if name == "JobStatus":
         from qdk_chemistry.remote.backends.base import JobStatus  # noqa: PLC0415
 

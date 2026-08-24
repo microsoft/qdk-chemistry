@@ -363,6 +363,9 @@ def run(
                 if resolved_remote_cache.is_shared:
                     payload["remote_cache_backend"] = resolved_remote_cache
 
+            if force_rerun:
+                payload["force_rerun"] = True
+
             job = backend.submit(payload)
             job.run_hash = run_hash
             resolved_cache.put_job(run_hash, job)

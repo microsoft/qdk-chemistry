@@ -22,6 +22,7 @@ from pathlib import Path, PurePosixPath
 from qdk_chemistry.remote.backends import (
     DEFAULT_POLL_INTERVAL,
     DEFAULT_TIMEOUT,
+    JobState,
     JobStatus,
     RemoteBackend,
 )
@@ -44,6 +45,10 @@ class SSHBackend(RemoteBackend):
     ``NotImplementedError``, so a backend can leave unsupported hooks unchanged.
     This example overrides all five, including ``cleanup_job``, to support the
     complete asynchronous job lifecycle.
+
+    Job directories under ``remote_workdir`` are retained after they reach a
+    terminal state. Job cleanup removes only these remote directories; callers
+    remain responsible for local job records and result directories.
     """
 
     def __init__(
@@ -196,6 +201,7 @@ class SSHBackend(RemoteBackend):
                 settings=payload["settings"],
                 run_hash=payload.get("run_hash"),
                 input_hashes=payload.get("input_hashes"),
+                force_rerun=payload.get("force_rerun", False),
                 remote_cache=payload.get("remote_cache"),
                 remote_cache_backend=payload.get("remote_cache_backend"),
             )
@@ -231,13 +237,9 @@ class SSHBackend(RemoteBackend):
     def check(self, backend_state: dict) -> JobStatus:
         """Override the optional async status hook to inspect the SSH worker.
 
-        Status matching is case-insensitive. ``submitted`` and ``running`` are
-        polled, while ``succeeded``, ``failed``, ``canceled``/``cancelled``, and
-        ``retrieved`` are terminal. Only ``succeeded`` indicates success. Any
-        other value is nonterminal and will be polled until the job times out.
-        ``JobStatus.TERMINAL_STATUSES`` defines the current terminal strings;
-        use ``JobStatus.is_terminal_status`` and
-        ``JobStatus.is_successful_status`` to classify statuses.
+        ``JobState`` defines the canonical case-insensitive lifecycle states.
+        Backend-specific status strings are also supported and remain
+        nonterminal until mapped to a terminal state.
         """
         remote_job_dir = backend_state["remote_job_dir"]
 
@@ -245,12 +247,14 @@ class SSHBackend(RemoteBackend):
         pid_result = self._run_remote(f"cat {pid_path}", timeout=10)
         if pid_result.returncode != 0:
             return JobStatus(
-                job_id="", status="failed", error="Could not read PID file"
+                job_id="", status=JobState.FAILED, error="Could not read PID file"
             )
 
         pid = _parse_remote_pid(pid_result.stdout)
         if pid is None:
-            return JobStatus(job_id="", status="failed", error="Invalid PID file")
+            return JobStatus(
+                job_id="", status=JobState.FAILED, error="Invalid PID file"
+            )
 
         # ``kill -0`` is this transport's process-liveness probe. A scheduler
         # backend would query scheduler state using its persisted job ID.
@@ -258,14 +262,16 @@ class SSHBackend(RemoteBackend):
             f"kill -0 {pid} 2>/dev/null && echo alive || echo done", timeout=10
         )
         if "alive" in alive.stdout:
-            status = "running"
+            status = JobState.RUNNING
         else:
             manifest_path = shlex.quote(f"{remote_job_dir}/output/manifest.json")
             manifest_check = self._run_remote(
                 f"test -f {manifest_path} && echo ok || echo missing",
                 timeout=10,
             )
-            status = "succeeded" if "ok" in manifest_check.stdout else "failed"
+            status = (
+                JobState.SUCCEEDED if "ok" in manifest_check.stdout else JobState.FAILED
+            )
 
         stderr_path = shlex.quote(f"{remote_job_dir}/stderr.log")
         logs_result = self._run_remote(

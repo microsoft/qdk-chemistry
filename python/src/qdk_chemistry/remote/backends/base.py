@@ -12,17 +12,21 @@ status, and retrieve serialized outputs.
 
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Type  # noqa: UP035
 
 from qdk_chemistry._core import DuplicateRegistrationError as _DuplicateRegistrationError
+from qdk_chemistry.utils.enum import CaseInsensitiveStrEnum
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from qdk_chemistry.remote.job import Job
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_POLL_INTERVAL = 5.0
 DEFAULT_TIMEOUT = 3600.0
@@ -30,6 +34,7 @@ DEFAULT_TIMEOUT = 3600.0
 __all__ = [
     "DEFAULT_POLL_INTERVAL",
     "DEFAULT_TIMEOUT",
+    "JobState",
     "JobStatus",
     "RemoteBackend",
     "available_backends",
@@ -37,6 +42,18 @@ __all__ = [
     "get_backend",
     "register_backend",
 ]
+
+
+class JobState(CaseInsensitiveStrEnum):
+    """Canonical states in the remote job lifecycle."""
+
+    SUBMITTED = "submitted"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELED = "canceled"
+    CANCELLED = "cancelled"
+    RETRIEVED = "retrieved"
 
 
 @dataclass
@@ -47,7 +64,13 @@ class JobStatus:
     """
 
     TERMINAL_STATUSES: ClassVar[frozenset[str]] = frozenset(
-        {"succeeded", "failed", "canceled", "cancelled", "retrieved"}
+        {
+            JobState.SUCCEEDED,
+            JobState.FAILED,
+            JobState.CANCELED,
+            JobState.CANCELLED,
+            JobState.RETRIEVED,
+        }
     )
 
     job_id: str
@@ -94,7 +117,7 @@ class JobStatus:
             *True* if the status represents successful execution; otherwise, *False*.
 
         """
-        return cls.normalize_status(status) == "succeeded"
+        return cls.normalize_status(status) == JobState.SUCCEEDED
 
     @property
     def is_terminal(self) -> bool:
@@ -127,11 +150,16 @@ class RemoteBackend(ABC):
     - **_submit**: launch a job asynchronously (returns job_id + state)
     - **check**: poll job status
     - **fetch**: download and deserialize results
-    - **cleanup_job**: remove artifacts for a completed job
+    - **cleanup_job**: remove artifacts for a terminal job
 
     The remote node executes ``python -m qdk_chemistry.remote.worker`` which handles
     input deserialization, algorithm execution, caching, and output
     serialization.
+
+    Backend artifacts are retained after a job reaches a terminal state. Callers
+    are responsible for removing them with :meth:`Job.cleanup` or
+    :meth:`Job.fetch` with ``cleanup=True``. Backend cleanup does not remove
+    caller-owned local job records or result directories.
 
     To create a custom backend:
 
@@ -178,7 +206,9 @@ class RemoteBackend(ABC):
         """Store the arguments needed to recreate the concrete backend.
 
         Args:
-            **backend_args: JSON-safe constructor arguments supplied by the concrete backend.
+            **backend_args: Constructor arguments supplied by the concrete backend.
+                Persisted jobs normalize path-like values to strings and require
+                every remaining value to be JSON-serializable.
 
         """
         self._backend_args = backend_args
@@ -292,22 +322,46 @@ class RemoteBackend(ABC):
             A ``Job`` that tracks this submission.
 
         """
-        from qdk_chemistry.remote.job import Job  # noqa: PLC0415
+        from qdk_chemistry.remote.job import Job, _prepare_persisted_value  # noqa: PLC0415
 
-        job_id, backend_state = self._submit(payload)
-
-        job = Job(
-            job_id=job_id,
-            backend=self.name,
-            backend_config=dict(self._backend_args),
-            backend_state=backend_state,
-            algorithm_info={
+        backend_name = _prepare_persisted_value(self.name, "backend")
+        backend_config = _prepare_persisted_value(dict(self._backend_args), "backend_config")
+        algorithm_info = _prepare_persisted_value(
+            {
                 "type": payload.get("algorithm_type"),
                 "name": payload.get("algorithm_name"),
                 "settings": payload.get("settings"),
             },
-            run_hash=payload.get("run_hash"),
-            input_hashes=payload.get("input_hashes"),
+            "algorithm_info",
+        )
+        run_hash = _prepare_persisted_value(payload.get("run_hash"), "run_hash")
+        input_hashes = _prepare_persisted_value(payload.get("input_hashes"), "input_hashes")
+
+        job_id, backend_state = self._submit(payload)
+        try:
+            persisted_job_id = _prepare_persisted_value(job_id, "job_id")
+            persisted_backend_state = _prepare_persisted_value(backend_state, "backend_state")
+        except TypeError:
+            for operation, label in ((self.cancel, "cancel"), (self.cleanup_job, "clean up")):
+                try:
+                    operation(backend_state)
+                except Exception:  # noqa: BLE001
+                    logger.warning(
+                        "Failed to %s remote job %s after metadata validation failed",
+                        label,
+                        job_id,
+                        exc_info=True,
+                    )
+            raise
+
+        job = Job(
+            job_id=persisted_job_id,
+            backend=backend_name,
+            backend_config=backend_config,
+            backend_state=persisted_backend_state,
+            algorithm_info=algorithm_info,
+            run_hash=run_hash,
+            input_hashes=input_hashes,
         )
 
         if job_dir is not None:
@@ -325,7 +379,9 @@ class RemoteBackend(ABC):
         Returns:
             A ``(job_id, backend_state)`` tuple where *backend_state* is
             an opaque dict that will be passed back to :meth:`check`,
-            :meth:`cancel`, and :meth:`fetch`.
+            :meth:`cancel`, and :meth:`fetch`. Its values must be
+            JSON-serializable or path-like. Lifecycle methods must accept the
+            persisted representation, in which path-like values are strings.
 
         """
         raise NotImplementedError(f"Backend '{self.name}' does not support async submission")
@@ -372,10 +428,11 @@ class RemoteBackend(ABC):
         raise NotImplementedError(f"Backend '{self.name}' does not support result fetching")
 
     def cleanup_job(self, backend_state: dict) -> None:
-        """Remove artifacts owned by a completed job.
+        """Remove artifacts owned by a terminal job.
 
         Implementations must make repeated calls safe and must not remove
-        shared backend work directories.
+        shared backend work directories. Job artifacts are retained until a
+        caller invokes this method through job cleanup.
 
         Args:
             backend_state: The opaque state dict produced by ``_submit()``.

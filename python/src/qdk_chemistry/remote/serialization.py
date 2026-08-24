@@ -172,6 +172,8 @@ def _commit_staged_serialization(
 
 def _jsonable_settings_value(value: Any, setting_type: str | None = None) -> Any:
     """Convert a settings value to the tagged JSON form understood by Settings."""
+    if isinstance(value, os.PathLike):
+        return os.fspath(value)
     if isinstance(value, AlgorithmRef):
         settings = value.settings
         return {
@@ -587,6 +589,7 @@ def serialize_inputs(
     *,
     run_hash: str | None = None,
     input_hashes: dict[str, str] | None = None,
+    force_rerun: bool = False,
     remote_cache: dict[str, Any] | None = None,
     remote_cache_backend: CacheBackend | None = None,
     remote_cache_transport: bool = False,
@@ -602,6 +605,7 @@ def serialize_inputs(
         settings: Algorithm settings dictionary.
         run_hash: Optional pre-computed algorithm run hash.
         input_hashes: Optional dict mapping input names to their content hashes.
+        force_rerun: Whether the compute node must skip its cache lookup.
         remote_cache: Optional coordinates passed to the remote cache factory, ``get_cache()``.
         remote_cache_backend: Shared cache backend; existing cacheable values become ``"cached"`` manifest references.
         remote_cache_transport: Whether to seed shared-cache misses and use the cache as artifact transport.
@@ -626,6 +630,8 @@ def serialize_inputs(
         manifest["run_hash"] = run_hash
     if input_hashes is not None:
         manifest["input_hashes"] = input_hashes
+    if force_rerun:
+        manifest["force_rerun"] = True
     if remote_cache is not None:
         manifest["remote_cache"] = remote_cache
     if remote_cache_transport:
@@ -728,6 +734,7 @@ def deserialize_inputs(directory: str | Path, *, cache: CacheBackend | None = No
         "kwargs": kwargs,
         "run_hash": manifest.get("run_hash"),
         "input_hashes": manifest.get("input_hashes"),
+        "force_rerun": manifest.get("force_rerun", False),
         "remote_cache": manifest.get("remote_cache"),
         "remote_cache_transport": manifest.get("remote_cache_transport", False),
     }
