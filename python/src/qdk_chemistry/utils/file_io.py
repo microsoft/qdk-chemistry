@@ -14,6 +14,7 @@ import ntpath
 import os
 import stat
 import sys
+import time
 from collections.abc import Callable
 from ctypes import wintypes
 from pathlib import Path
@@ -21,6 +22,9 @@ from typing import TypeAlias, cast
 
 PathLike: TypeAlias = str | os.PathLike[str]
 AtomicFileWriter: TypeAlias = Callable[[Path], None]
+
+_DIRECTORY_CREATION_RETRY_DELAY_SECONDS = 0.001
+_DIRECTORY_CREATION_RETRY_TIMEOUT_SECONDS = 1.0
 
 __all__ = [
     "AtomicFileWriter",
@@ -712,7 +716,7 @@ def _set_permissions(descriptor: int, mode: int, path: Path) -> None:
         )
 
 
-def _create_private_directories(directory: Path) -> None:
+def _create_private_directories_once(directory: Path) -> None:
     missing: list[Path] = []
     current = directory
     while not current.is_dir():
@@ -754,6 +758,33 @@ def _create_private_directories(directory: Path) -> None:
         close_error = _close_descriptor(descriptor)
         if close_error is not None:
             raise close_error
+
+
+def _directory_may_be_initializing(directory: Path) -> bool:
+    access_options = {"effective_ids": True} if os.access in os.supports_effective_ids else {}
+    return not os.access(directory, os.W_OK | os.X_OK, **access_options)
+
+
+def _create_private_directories(directory: Path) -> None:
+    deadline = time.monotonic() + _DIRECTORY_CREATION_RETRY_TIMEOUT_SECONDS
+    while True:
+        permission_error: PermissionError | None = None
+        try:
+            _create_private_directories_once(directory)
+            if not _directory_may_be_initializing(directory):
+                return
+            permission_error = PermissionError(
+                errno.EACCES,
+                f"Directory is not ready for writing: '{directory}'",
+                os.fspath(directory),
+            )
+        except PermissionError as error:
+            permission_error = error
+
+        if time.monotonic() >= deadline:
+            assert permission_error is not None
+            raise permission_error
+        time.sleep(_DIRECTORY_CREATION_RETRY_DELAY_SECONDS)
 
 
 def write_text_file_atomically(

@@ -107,6 +107,83 @@ def test_create_private_parent_directories_under_restrictive_umask(tmp_path: Pat
     assert read_text_file(path) == "contents"
 
 
+@pytest.mark.skipif(os.name == "nt", reason="POSIX umask semantics")
+def test_serialize_concurrent_parent_creation_under_restrictive_umask(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    shared_parent = tmp_path / "shared"
+    first_path = shared_parent / "first" / "data.txt"
+    second_path = shared_parent / "second" / "data.txt"
+    mkdir = file_io_module.os.mkdir
+    parent_created = threading.Event()
+    release_creator = threading.Event()
+    second_finished = threading.Event()
+    paused = False
+    errors: list[Exception] = []
+
+    def pause_after_creating_parent(path: Path, mode: int) -> None:
+        nonlocal paused
+        mkdir(path, mode)
+        if Path(path) == shared_parent and not paused:
+            paused = True
+            parent_created.set()
+            if not release_creator.wait(timeout=10):
+                raise RuntimeError("timed out waiting to release directory creator")
+
+    def write(path: Path, finished: threading.Event | None = None) -> None:
+        try:
+            write_text_file_atomically(path, "contents", create_parent_directories=True)
+        except (OSError, RuntimeError, ValueError) as error:
+            errors.append(error)
+        finally:
+            if finished is not None:
+                finished.set()
+
+    monkeypatch.setattr(file_io_module.os, "mkdir", pause_after_creating_parent)
+    original_umask = os.umask(0o777)
+    first = threading.Thread(target=write, args=(first_path,))
+    second = threading.Thread(target=write, args=(second_path, second_finished))
+    try:
+        first.start()
+        assert parent_created.wait(timeout=10)
+        second.start()
+        assert not second_finished.wait(timeout=0.05)
+        release_creator.set()
+        first.join(timeout=10)
+        second.join(timeout=10)
+    finally:
+        release_creator.set()
+        first.join(timeout=10)
+        second.join(timeout=10)
+        os.umask(original_umask)
+
+    assert not first.is_alive()
+    assert not second.is_alive()
+    assert errors == []
+    assert read_text_file(first_path) == "contents"
+    assert read_text_file(second_path) == "contents"
+    assert stat.S_IMODE(shared_parent.stat().st_mode) == 0o700
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission semantics")
+def test_do_not_modify_permanently_inaccessible_parent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    parent = tmp_path / "inaccessible"
+    parent.mkdir()
+    parent.chmod(0)
+    monkeypatch.setattr(file_io_module, "_DIRECTORY_CREATION_RETRY_TIMEOUT_SECONDS", 0)
+
+    try:
+        with pytest.raises(PermissionError):
+            ensure_parent_directory(parent / "nested" / "data.txt")
+        assert stat.S_IMODE(parent.stat().st_mode) == 0
+    finally:
+        parent.chmod(0o700)
+
+
 def test_reject_missing_parent_directory_by_default(tmp_path: Path):
     path = tmp_path / "missing" / "data.txt"
 

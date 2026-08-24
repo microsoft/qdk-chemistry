@@ -10,6 +10,7 @@
 #include <qdk/chemistry/utils/file_io.hpp>
 #include <stdexcept>
 #include <system_error>
+#include <thread>
 #include <vector>
 
 #ifdef _WIN32
@@ -78,6 +79,24 @@ std::string display_path(const std::filesystem::path& path) {
   const auto value = path.u8string();
   return {value.begin(), value.end()};
 }
+
+#ifndef _WIN32
+class DirectoryPermissionError : public std::runtime_error {
+ public:
+  using std::runtime_error::runtime_error;
+};
+
+[[noreturn]] void throw_directory_error(const std::string& action,
+                                        const std::filesystem::path& path,
+                                        const std::error_code& error) {
+  const auto message =
+      action + " '" + display_path(path) + "': " + error.message();
+  if (error == std::errc::permission_denied) {
+    throw DirectoryPermissionError(message);
+  }
+  throw std::runtime_error(message);
+}
+#endif
 
 void validate_path(const std::filesystem::path& path) {
   const auto& native_path = path.native();
@@ -724,76 +743,115 @@ void create_private_directories(const std::filesystem::path& directory) {
                              display_path(directory) + "': " + error.message());
   }
 #else
-  std::vector<std::filesystem::path> missing;
-  auto current = directory;
-  std::error_code status_error;
-  while (!current.empty() &&
-         !std::filesystem::is_directory(current, status_error)) {
-    if (status_error && status_error != std::errc::no_such_file_or_directory) {
-      throw std::runtime_error("Could not inspect directory '" +
-                               display_path(current) +
-                               "': " + status_error.message());
-    }
-    status_error.clear();
-    missing.push_back(current);
-    const auto parent = current.parent_path();
-    if (parent == current) {
-      break;
-    }
-    current = parent;
-  }
+  constexpr auto retry_delay = std::chrono::milliseconds(1);
+  constexpr auto retry_timeout = std::chrono::seconds(1);
+  const auto deadline = std::chrono::steady_clock::now() + retry_timeout;
 
-  for (auto iterator = missing.rbegin(); iterator != missing.rend();
-       ++iterator) {
-    if (retry_on_eintr([&] { return ::mkdir(iterator->c_str(), S_IRWXU); }) !=
-        0) {
-      const int mkdir_error = errno;
-      if (mkdir_error == EEXIST && std::filesystem::is_directory(*iterator)) {
-        continue;
+  auto create_once = [&]() {
+    std::vector<std::filesystem::path> missing;
+    auto current = directory;
+    std::error_code status_error;
+    while (!current.empty() &&
+           !std::filesystem::is_directory(current, status_error)) {
+      if (status_error &&
+          status_error != std::errc::no_such_file_or_directory) {
+        throw_directory_error("Could not inspect directory", current,
+                              status_error);
       }
-      const std::error_code error(mkdir_error, std::generic_category());
-      throw std::runtime_error("Could not create directory '" +
-                               display_path(*iterator) +
-                               "': " + error.message());
-    }
-    if (retry_on_eintr([&] { return ::chmod(iterator->c_str(), S_IRWXU); }) !=
-        0) {
-      const std::error_code error(errno, std::generic_category());
-      std::error_code ignored;
-      std::filesystem::remove(*iterator, ignored);
-      throw std::runtime_error("Could not secure directory '" +
-                               display_path(*iterator) +
-                               "': " + error.message());
-    }
-    const int descriptor = retry_on_eintr([&] {
-      return ::open(iterator->c_str(),
-                    O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
-    });
-    struct stat status{};
-    int permission_error = 0;
-    if (descriptor == -1) {
-      permission_error = errno;
-    } else if (retry_on_eintr([&] { return ::fchmod(descriptor, S_IRWXU); }) !=
-               0) {
-      permission_error = errno;
-    } else if (retry_on_eintr([&] { return ::fstat(descriptor, &status); }) !=
-               0) {
-      permission_error = errno;
-    } else if ((status.st_mode & 0777) != S_IRWXU) {
-      permission_error = EPERM;
-    }
-    if (permission_error != 0) {
-      const std::error_code error(permission_error, std::generic_category());
-      if (descriptor != -1) {
-        ::close(descriptor);
+      status_error.clear();
+      missing.push_back(current);
+      const auto parent = current.parent_path();
+      if (parent == current) {
+        break;
       }
-      std::error_code ignored;
-      std::filesystem::remove(*iterator, ignored);
-      throw std::runtime_error("Could not secure directory '" +
-                               display_path(*iterator) +
-                               "': " + error.message());
+      current = parent;
     }
-    ::close(descriptor);
+
+    for (auto iterator = missing.rbegin(); iterator != missing.rend();
+         ++iterator) {
+      if (retry_on_eintr([&] { return ::mkdir(iterator->c_str(), S_IRWXU); }) !=
+          0) {
+        const int mkdir_error = errno;
+        if (mkdir_error == EEXIST) {
+          std::error_code existing_error;
+          if (std::filesystem::is_directory(*iterator, existing_error) &&
+              !existing_error) {
+            continue;
+          }
+          if (existing_error) {
+            throw_directory_error("Could not inspect directory", *iterator,
+                                  existing_error);
+          }
+        }
+        throw_directory_error(
+            "Could not create directory", *iterator,
+            std::error_code(mkdir_error, std::generic_category()));
+      }
+      if (retry_on_eintr([&] { return ::chmod(iterator->c_str(), S_IRWXU); }) !=
+          0) {
+        const std::error_code error(errno, std::generic_category());
+        std::error_code ignored;
+        std::filesystem::remove(*iterator, ignored);
+        throw_directory_error("Could not secure directory", *iterator, error);
+      }
+      const int descriptor = retry_on_eintr([&] {
+        return ::open(iterator->c_str(),
+                      O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+      });
+      struct stat status{};
+      int permission_error = 0;
+      if (descriptor == -1) {
+        permission_error = errno;
+      } else if (retry_on_eintr(
+                     [&] { return ::fchmod(descriptor, S_IRWXU); }) != 0) {
+        permission_error = errno;
+      } else if (retry_on_eintr([&] { return ::fstat(descriptor, &status); }) !=
+                 0) {
+        permission_error = errno;
+      } else if ((status.st_mode & 0777) != S_IRWXU) {
+        permission_error = EPERM;
+      }
+      if (permission_error != 0) {
+        const std::error_code error(permission_error, std::generic_category());
+        if (descriptor != -1) {
+          ::close(descriptor);
+        }
+        std::error_code ignored;
+        std::filesystem::remove(*iterator, ignored);
+        throw_directory_error("Could not secure directory", *iterator, error);
+      }
+      ::close(descriptor);
+    }
+  };
+
+  while (true) {
+    try {
+      create_once();
+      int access_flags = 0;
+#ifdef AT_EACCESS
+      access_flags = AT_EACCESS;
+#endif
+      if (retry_on_eintr([&] {
+            return ::faccessat(AT_FDCWD, directory.c_str(), W_OK | X_OK,
+                               access_flags);
+          }) != 0) {
+        const int access_error = errno;
+        if (access_error == EACCES || access_error == ENOENT) {
+          throw DirectoryPermissionError(
+              "Directory is not ready for writing: '" +
+              display_path(directory) + "'");
+        }
+        throw_directory_error(
+            "Could not inspect directory", directory,
+            std::error_code(access_error, std::generic_category()));
+      }
+      return;
+    } catch (const DirectoryPermissionError&) {
+      if (std::chrono::steady_clock::now() >= deadline) {
+        throw;
+      }
+      std::this_thread::sleep_for(retry_delay);
+    }
   }
 #endif
 }
