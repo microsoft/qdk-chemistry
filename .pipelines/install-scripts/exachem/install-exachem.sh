@@ -194,6 +194,14 @@ COMMON_CMAKE_ARGS=(
   -DTAMM_CXX_FLAGS="-DUSE_SERIAL_IO ${HDF5_CFLAGS}"
   -DLibInt2_ROOT="${CPP_DEPS_PREFIX}"
   -DGauXC_ROOT="${CPP_DEPS_PREFIX}"
+  # SPDLOG/EcpInt are, like BLAS/LAPACK above, DEP_ABUILD items (DEP_ABUILD_MISC is appended into DEP_ABUILD --
+  # see cmake/macros/DependencyMacros.cmake), so they only ever get a strict find_package(... CONFIG
+  # NO_DEFAULT_PATH) search of CMAKE_INSTALL_PREFIX (=INSTALL_PREFIX, deliberately kept separate from
+  # CPP_DEPS_PREFIX) and ${name}_ROOT -- CMAKE_PREFIX_PATH is NOT reliably honored there either (the same reason
+  # LibInt2_ROOT/GauXC_ROOT above are needed instead of relying on CMAKE_PREFIX_PATH). Point CMSB at where
+  # install-cpp-deps.sh actually built them, same as LibInt2/GauXC.
+  -DSPDLOG_ROOT="${CPP_DEPS_PREFIX}"
+  -DEcpInt_ROOT="${CPP_DEPS_PREFIX}"
   -DFETCHCONTENT_SOURCE_DIR_CMAKEBUILD="${CMSB_SRC_DIR}"
 )
 
