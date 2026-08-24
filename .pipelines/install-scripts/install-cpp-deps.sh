@@ -1,24 +1,27 @@
 #!/bin/bash
 set -e
 
-# install_cpp_dependencies.sh — build and install qdk-chemistry's C++ dependencies for CI pipelines.
+# install-cpp-deps.sh — build and install qdk-chemistry's C++ dependencies for CI pipelines.
 #
-# Usage: install_cpp_dependencies.sh <cpp_cgmanifest_path> <macis_cgmanifest_path>
+# Usage: install-cpp-deps.sh <cpp_cgmanifest_path> <macis_cgmanifest_path> [blas_vendor]
 #
 # Arguments:
 #   cpp_cgmanifest_path   - Full path to cpp/manifest/qdk-chemistry/cgmanifest.json
 #   macis_cgmanifest_path - Full path to external/macis/manifest/cgmanifest.json
+#   blas_vendor           - BLAS++'s `-Dblas=` value (default: "openblas" on Linux, "auto" on macOS -- see
+#                           install-blaspp.sh for the full set of supported values).
 
-if [[ $# -ne 2 ]]; then
-    echo "Usage: $0 <cpp_cgmanifest_path> <macis_cgmanifest_path>"
+if [[ $# -lt 2 || $# -gt 3 ]]; then
+    echo "Usage: $0 <cpp_cgmanifest_path> <macis_cgmanifest_path> [blas_vendor]"
     echo ""
     echo "Example:"
-    echo "  $0 /repo/cpp/manifest/qdk-chemistry/cgmanifest.json /repo/external/macis/manifest/cgmanifest.json"
+    echo "  $0 /repo/cpp/manifest/qdk-chemistry/cgmanifest.json /repo/external/macis/manifest/cgmanifest.json openblas"
     exit 1
 fi
 
 CGMANIFEST="$1"
 MACIS_CGMANIFEST="$2"
+BLAS_VENDOR="${3:-}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -55,9 +58,9 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
 fi
 
 # BLAS vendor for BLAS++: openblas on Linux (installed via apt); on macOS there's no BLAS package installed, so
-# leave it as "auto" so BLAS++ finds Apple's Accelerate framework itself. ADO's BLIS+LibFLAME pipeline overrides
-# this by setting BLAS_VENDOR=blis before calling this script.
-if [[ -z "${BLAS_VENDOR:-}" ]]; then
+# leave it as "auto" so BLAS++ finds Apple's Accelerate framework itself. Callers (e.g. the ADO BLIS+LibFLAME
+# pipeline) can override this by passing blas_vendor as the 3rd argument.
+if [[ -z "${BLAS_VENDOR}" ]]; then
     if [[ "$MAC_BUILD" == "ON" ]]; then
         BLAS_VENDOR="auto"
     else
