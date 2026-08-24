@@ -68,7 +68,7 @@ endif()
 
 list(REMOVE_AT CMAKE_MODULE_PATH 0)
 
-# Compare the vendor that was actually resolved, so a mismatch is reported here 
+# Compare the vendor that was actually resolved, so a mismatch is reported here
 # instead of as an unresolved openblas_/MKL_/bli_ symbol at the consumer's link
 # step.
 if(QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR AND BLAS_VENDOR AND
