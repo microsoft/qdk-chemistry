@@ -29,13 +29,15 @@ def qdk_ctx() -> qdk.Context:
     return create_qsharp_context()
 
 
-def _run_qrom_state_prep_and_dump(ctx: qdk.Context, amplitudes: list[float], num_qubits: int) -> np.ndarray:
+def _run_qrom_state_prep_and_dump(
+    ctx: qdk.Context, amplitudes: list[float], num_qubits: int, bits: int = 10
+) -> np.ndarray:
     """Run the QROM state preparation via qdk.Context and return the statevector.
 
     Loads the QROMStatePrep Q# sources and a thin wrapper that allocates
     qubits internally, then captures the statevector via ``ctx.dump_machine()``.
     """
-    ctx.code.QDKChemistry.Utils.QROMStatePrep.RunQROMStatePrep(amplitudes, 10, num_qubits)
+    ctx.code.QDKChemistry.Utils.QROMStatePrep.RunQROMStatePrep(amplitudes, bits, num_qubits)
     state = ctx.dump_machine()
     return np.array(state.as_dense_state())
 
@@ -128,17 +130,10 @@ class TestQROMStatePreparation:
         with pytest.raises(ValueError, match="at least one coefficient"):
             prep._run_impl(_EmptyCoefficientWavefunction())
 
-    def test_negative_coefficients_rejected(self):
-        """Negative coefficients produce a seed-dependent wrong state, so they are refused."""
+    def test_negative_coefficients_are_accepted(self):
+        """Signed coefficients are supported; only the imaginary part is refused."""
         prep = QROMStatePreparation(rotation_bit_precision=4)
         wf = _make_wavefunction([0.5, -0.5, 0.5, 0.5])
-        with pytest.raises(ValueError, match="negative coefficients"):
-            prep.run(wf)
-
-    def test_non_negative_coefficients_are_accepted(self):
-        """The negative-coefficient guard must not fire on ordinary input."""
-        prep = QROMStatePreparation(rotation_bit_precision=4)
-        wf = _make_wavefunction([0.5, 0.3, 0.7, 0.1])
         assert prep.run(wf) is not None
 
 
@@ -154,30 +149,74 @@ class _EmptyCoefficientWavefunction:
         return np.array([])
 
 
-class TestQROMNegativeAmplitudes:
+class TestQROMSignedAmplitudes:
     """The QROM loader's handling of signed amplitudes.
 
-    :class:`QROMStatePreparation` refuses negative coefficients, so this drives the Q#
-    operation directly. Magnitudes come from the multiplexed Ry rotations and are always
-    correct. Signs are applied by a separate QROM-loaded ``Z`` phase kickback whose
-    uncompute is not a faithful adjoint, so the sign ancilla is implicitly measured on
-    release and the sign pattern collapses at random -- which is why the Python entry
-    point rejects negative coefficients instead of silently returning a wrong state.
+    :math:`R_y` rotations only produce non-negative amplitudes, so the coefficient signs are
+    applied afterwards by a QROM-loaded ``Z`` phase kickback. Uncomputing that lookup is the
+    delicate part: its address register *is* the state register, so an adjoint that is not a
+    faithful inverse leaves an uncorrected phase and scrambles the signs. Routing the lookup
+    through ``Std.TableLookup.Select`` makes the adjoint ``Unlookup``, which repairs the phase
+    kickback its X-basis measurement leaves behind.
+
+    Every case is swept over several simulator seeds. The historical defect reproduced on
+    roughly seven seeds in eight, so a single-seed test would have passed straight through it.
     """
 
-    NEGATIVE_AMPLITUDES: ClassVar[list[float]] = [0.5, -0.5, 0.5, 0.5]
+    SIGNED_AMPLITUDES: ClassVar[list[float]] = [0.5, -0.5, 0.5, 0.5]
+    SEEDS: ClassVar[list[int]] = [1, 2, 3, 4, 5, 6, 7, 8]
 
     def test_magnitudes_are_correct(self, qdk_ctx):
         """Whatever happens to the signs, |amplitude| is still right."""
         qdk_ctx.set_quantum_seed(1)
         num_qubits = 2
-        sv = _run_qrom_state_prep_and_dump(qdk_ctx, self.NEGATIVE_AMPLITUDES, num_qubits)
+        sv = _run_qrom_state_prep_and_dump(qdk_ctx, self.SIGNED_AMPLITUDES, num_qubits, bits=4)
         actual = np.abs(_reduced_state(sv, num_qubits))
 
-        expected = np.abs(np.array(self.NEGATIVE_AMPLITUDES, dtype=float))
+        expected = np.abs(np.array(self.SIGNED_AMPLITUDES, dtype=float))
         expected /= np.linalg.norm(expected)
 
         np.testing.assert_allclose(actual, expected, atol=1e-3)
+
+    @pytest.mark.parametrize("seed", SEEDS)
+    def test_signs_are_preserved(self, qdk_ctx, seed):
+        r"""The prepared state matches the signed target on every seed.
+
+        Compared with :math:`|\langle \psi | \phi \rangle|`: the uncompute measures an
+        ancilla in the X basis, so the overall sign of the result depends on the seed even
+        when the relative signs are right.
+        """
+        qdk_ctx.set_quantum_seed(seed)
+        num_qubits = 2
+        sv = _run_qrom_state_prep_and_dump(qdk_ctx, self.SIGNED_AMPLITUDES, num_qubits, bits=4)
+        actual = _reduced_state(sv, num_qubits)
+
+        expected = _build_expected_from_amplitudes(self.SIGNED_AMPLITUDES, num_qubits)
+
+        fidelity = abs(np.vdot(actual, expected))
+        assert np.isclose(fidelity, 1.0, atol=1e-3)
+
+    @pytest.mark.parametrize("seed", [1, 2, 3, 4])
+    @pytest.mark.parametrize(
+        "amplitudes",
+        [
+            [-0.5, -0.5, -0.5, -0.5],
+            [0.1, -0.9, 0.3, -0.2],
+            [-0.2, 0.4, 0.4, -0.8],
+            [0.6, 0.3, -0.1, 0.0],
+        ],
+    )
+    def test_sign_patterns_are_preserved(self, qdk_ctx, amplitudes, seed):
+        """Sign preservation holds for all-negative, mixed, and zero-containing vectors."""
+        qdk_ctx.set_quantum_seed(seed)
+        num_qubits = 2
+        sv = _run_qrom_state_prep_and_dump(qdk_ctx, amplitudes, num_qubits, bits=8)
+        actual = _reduced_state(sv, num_qubits)
+
+        expected = _build_expected_from_amplitudes(amplitudes, num_qubits)
+
+        fidelity = abs(np.vdot(actual, expected))
+        assert np.isclose(fidelity, 1.0, atol=1e-3)
 
 
 def _reverse_bits(x: int, n: int) -> int:

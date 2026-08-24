@@ -28,6 +28,7 @@ namespace QDKChemistry.Utils.QROMStatePrep {
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
     import QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient;
     import QDKChemistry.Utils.SelectSwap.SelectSwap;
+    import Std.TableLookup.Select;
 
     /// Parameters for QROM-based state preparation.
     struct QROMStatePrepParams {
@@ -115,12 +116,20 @@ namespace QDKChemistry.Utils.QROMStatePrep {
 
         // Sign correction: Ry rotations produce |α_j| (positive amplitudes).
         // For negative coefficients, flip the phase via QROM-loaded Z.
+        //
+        // This uses Std.TableLookup.Select rather than SelectSwap. The address register
+        // here *is* the state register, so the uncompute must restore it exactly.
+        // Adjoint Select is Unlookup, which measures the target in the X basis and repairs
+        // the resulting phase kickback on the address. SelectSwap's swap path (which
+        // ComputeOptimalLambda1D selects for this table's shape) declares an adjoint that
+        // is not the inverse of its body, so it leaves an uncorrected phase and scrambles
+        // the signs.
         let signData = ComputeSignBits(params.amplitudes, n);
         if Any(row -> row[0], signData) {
             use signBit = Qubit[1];
             // Reversed(target) gives LE address so index j matches coefficient j.
             within {
-                SelectSwap(-1, signData, Reversed(target), signBit);
+                Select(signData, Reversed(target), signBit);
             } apply {
                 Z(signBit[0]);
             }

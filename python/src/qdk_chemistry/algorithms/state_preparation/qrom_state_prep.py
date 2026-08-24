@@ -17,11 +17,6 @@ from .state_preparation import StatePreparation
 
 __all__: list[str] = ["QROMStatePreparation", "QROMStatePreparationSettings"]
 
-# Relative bound for treating a complex coefficient vector as real. A bare absolute
-# tolerance would reject legitimately real vectors that are merely large and accept tiny
-# vectors whose imaginary part dominates, so the bound is scaled by the largest magnitude.
-_IMAG_TOLERANCE = 1e-8
-
 
 class QROMStatePreparationSettings(Settings):
     """Settings for :class:`QROMStatePreparation`."""
@@ -53,16 +48,12 @@ class QROMStatePreparation(StatePreparation):
     vector, not a Jordan-Wigner determinant bit pattern, so the returned circuit carries no
     fermionic encoding.
 
-    .. warning::
-
-        **Negative coefficients are not supported yet.** Ry rotations only generate
-        non-negative amplitudes, so signs are applied by a separate QROM-loaded ``Z`` phase
-        kickback. That lookup is not correctly uncomputed: the sign ancilla is released
-        while still entangled with the state register, so it is implicitly measured and the
-        signs collapse at random. Magnitudes remain correct, but the sign pattern varies
-        between simulator seeds. Passing a negative coefficient raises
-        :class:`ValueError`; use a signed algorithm such as ``dense_pure_state`` until
-        this is fixed.
+    Negative coefficients are supported. :math:`R_y` rotations only generate non-negative
+    amplitudes, so the signs are applied afterwards by a QROM-loaded ``Z`` phase kickback.
+    That lookup is uncomputed through ``Std.TableLookup``, whose adjoint repairs the phase
+    kickback its measurement-based uncompute leaves on the address register. The prepared
+    state is correct up to a global phase that depends on those measurement outcomes, so
+    compare states with :math:`|\langle \psi | \phi \rangle|` rather than element-wise.
     """
 
     def __init__(self, rotation_bit_precision: int = 10):
@@ -96,30 +87,17 @@ class QROMStatePreparation(StatePreparation):
             Circuit: A Circuit wrapping the Q# QROM state prep callable and factory.
 
         Raises:
-            ValueError: If the wavefunction has no coefficients, has a non-negligible
-                imaginary part, or contains a negative coefficient.
+            ValueError: If the wavefunction has no coefficients or has an imaginary part.
 
         """
         coeffs = np.asarray(wavefunction.get_coefficients())
         if coeffs.size == 0:
             raise ValueError("QROM state preparation requires at least one coefficient.")
         if np.iscomplexobj(coeffs):
-            scale = max(1.0, float(np.abs(coeffs).max()))
-            if not np.allclose(coeffs.imag, 0.0, rtol=0.0, atol=_IMAG_TOLERANCE * scale):
+            if np.any(coeffs.imag != 0.0):
                 raise ValueError("QROM state preparation requires real coefficients.")
             coeffs = coeffs.real
         coeffs = coeffs.astype(float, copy=False)
-
-        if np.any(coeffs < 0.0):
-            raise ValueError(
-                "QROM state preparation does not support negative coefficients. Ry rotations only "
-                "produce non-negative amplitudes, so the sign is applied by a separate QROM-loaded "
-                "Z phase kickback; that lookup is not correctly uncomputed, so the sign ancilla "
-                "stays entangled with the state register and is implicitly measured when released. "
-                "The magnitudes would be right but the signs collapse at random, and the result "
-                "varies between simulator seeds. Use an algorithm that supports signed amplitudes "
-                "(for example 'dense_pure_state') until this is fixed."
-            )
 
         amplitudes = coeffs.tolist()
         num_state_qubits = math.ceil(math.log2(len(amplitudes))) if len(amplitudes) > 1 else 1

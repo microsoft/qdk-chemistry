@@ -245,8 +245,8 @@ QROM
 
 This method prepares an :math:`n`-qubit state with :math:`n` layers of multiplexed :math:`R_y` rotations, where each layer's rotation angles are loaded from a QROM table and applied through a phase gradient register. It uses only :math:`n = \lceil \log_2 L \rceil` state qubits, plus scratch ancilla per lookup, in exchange for :math:`n` QROM lookups.
 
-.. warning::
-   **Negative coefficients are not supported yet.** :math:`R_y` rotations only generate non-negative amplitudes, so signs are applied by a separate QROM-loaded ``Z`` phase kickback. That lookup is not correctly uncomputed: the sign ancilla is released while still entangled with the state register, so it is implicitly measured and the signs collapse at random. Magnitudes remain correct, but the sign pattern varies between simulator seeds. Passing a negative coefficient raises :class:`ValueError`; use ``dense_pure_state`` for signed amplitudes until this is fixed.
+.. note::
+   :math:`R_y` rotations only generate non-negative amplitudes, so the coefficient signs are applied afterwards by a QROM-loaded ``Z`` phase kickback. That lookup is uncomputed through ``Std.TableLookup``, whose adjoint repairs the phase kickback its measurement-based uncompute leaves on the address register. The prepared state is therefore correct up to a global phase that depends on those measurement outcomes.
 
 .. rubric:: Settings
 

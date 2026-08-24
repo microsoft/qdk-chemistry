@@ -17,11 +17,6 @@ from .state_preparation import StatePreparation
 
 __all__: list[str] = ["AliasSamplingStatePreparation", "AliasSamplingStatePreparationSettings"]
 
-# Relative bound for treating a complex coefficient vector as real. A bare absolute
-# tolerance would reject legitimately real vectors that are merely large and accept tiny
-# vectors whose imaginary part dominates, so the bound is scaled by the largest magnitude.
-_IMAG_TOLERANCE = 1e-8
-
 
 class AliasSamplingStatePreparationSettings(Settings):
     """Settings for :class:`AliasSamplingStatePreparation`."""
@@ -119,16 +114,15 @@ class AliasSamplingStatePreparation(StatePreparation):
             Circuit: A Circuit wrapping the Q# alias sampling callable and factory.
 
         Raises:
-            ValueError: If the wavefunction has no coefficients, has a non-negligible
-                imaginary part, contains a negative coefficient, or is all zeros.
+            ValueError: If the wavefunction has no coefficients, has an imaginary part,
+                contains a negative coefficient, or is all zeros.
 
         """
         coeffs = np.asarray(wavefunction.get_coefficients())
         if coeffs.size == 0:
             raise ValueError("Alias sampling state preparation requires at least one coefficient.")
         if np.iscomplexobj(coeffs):
-            scale = max(1.0, float(np.abs(coeffs).max()))
-            if not np.allclose(coeffs.imag, 0.0, rtol=0.0, atol=_IMAG_TOLERANCE * scale):
+            if np.any(coeffs.imag != 0.0):
                 raise ValueError("Alias sampling state preparation requires real coefficients.")
             coeffs = coeffs.real
         coeffs = coeffs.astype(float, copy=False)
