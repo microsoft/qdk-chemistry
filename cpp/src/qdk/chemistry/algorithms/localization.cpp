@@ -15,6 +15,7 @@
 #include <variant>
 
 #include "microsoft/localization/active_space_qio.hpp"
+#include "microsoft/localization/gauge_fixing.hpp"
 #include "microsoft/localization/mp2_natural_orbitals.hpp"
 #include "microsoft/localization/natural_orbitals.hpp"
 #include "microsoft/localization/pipek_mezey.hpp"
@@ -192,6 +193,12 @@ std::unique_ptr<OrbitalLocalizer> make_natural_orbital_localizer() {
   return std::make_unique<microsoft::NaturalOrbitalLocalizer>();
 }
 
+std::unique_ptr<OrbitalLocalizer> make_gauge_fixing_localizer() {
+  QDK_LOG_TRACE_ENTERING();
+
+  return std::make_unique<microsoft::GaugeFixingLocalizer>();
+}
+
 std::unique_ptr<OrbitalLocalizer> make_active_space_qio_localizer() {
   QDK_LOG_TRACE_ENTERING();
 
@@ -211,6 +218,7 @@ void OrbitalLocalizerFactory::register_default_instances() {
   OrbitalLocalizerFactory::register_instance(
       &make_mp2_natural_orbital_localizer);
   OrbitalLocalizerFactory::register_instance(&make_natural_orbital_localizer);
+  OrbitalLocalizerFactory::register_instance(&make_gauge_fixing_localizer);
   OrbitalLocalizerFactory::register_instance(&make_active_space_qio_localizer);
   OrbitalLocalizerFactory::register_instance(&make_vvhv_localizer);
 }

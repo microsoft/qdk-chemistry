@@ -50,6 +50,7 @@ from qdk_chemistry.algorithms.nuclear_derivative import (
 from qdk_chemistry.algorithms.orbital_localizer import (
     OrbitalLocalizer,
     QdkActiveSpaceQIOLocalizer,
+    QdkGaugeFixingLocalizer,
     QdkMP2NaturalOrbitalLocalizer,
     QdkNaturalOrbitalLocalizer,
     QdkPipekMezeyLocalizer,
@@ -98,6 +99,7 @@ __all__ = [
     "QdkAutocasActiveSpaceSelector",
     "QdkAutocasEosActiveSpaceSelector",
     "QdkExpectationEstimator",
+    "QdkGaugeFixingLocalizer",
     "QdkHamiltonianConstructor",
     "QdkMP2Calculator",
     "QdkMP2NaturalOrbitalLocalizer",
