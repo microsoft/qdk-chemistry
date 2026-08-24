@@ -14,7 +14,7 @@ set -e
 #                        found via CMAKE_PREFIX_PATH.
 #   commit              - lapackpp commit hash, resolved from external/macis/manifest/cgmanifest.json.
 #   march               - -march= value for CMAKE_CXX_FLAGS (default: x86-64-v3).
-#   build_shared_libs   - ON/OFF (default: OFF, matches install_cpp_dependencies.sh's static default).
+#   build_shared_libs   - ON/OFF (default: OFF, matches its callers' static default).
 #
 # NOTE: LAPACK++ only accepts `-Dlapack=auto`/`generic` -- there's no vendor-specific value; vendor selection
 # belongs entirely to BLAS++'s `-Dblas=` option (install-blaspp.sh). `auto` link-tests against the already-found

@@ -15,7 +15,7 @@ set -e
 #                         vendor) or "blis" (for the ADO wheel pipeline's BLIS+LibFLAME stack). See BLAS++'s
 #                         cmake/BLASFinder.cmake for the full set of supported values.
 #   march               - -march= value for CMAKE_CXX_FLAGS (default: x86-64-v3).
-#   build_shared_libs   - ON/OFF (default: OFF, matches install_cpp_dependencies.sh's static default).
+#   build_shared_libs   - ON/OFF (default: OFF, matches its callers' static default).
 
 INSTALL_PREFIX=${1:-/usr/local}
 COMMIT=${2:?commit hash is required (resolve it from external/macis/manifest/cgmanifest.json)}

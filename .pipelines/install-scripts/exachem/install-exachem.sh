@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
-# install_exachem.sh — build and install ExaChem (+ its TAMM tensor backend) for CI, to run as an external MPI
+# install-exachem.sh — build and install ExaChem (+ its TAMM tensor backend) for CI, to run as an external MPI
 # process. Reuses OpenBLAS/BLAS++/LAPACK++/LibInt2/GauXC already built into CPP_DEPS_PREFIX by
-# install_cpp_dependencies.sh (TAMM finds BLAS++/LAPACK++ via its default find_package on CMAKE_PREFIX_PATH;
+# install-cpp-deps.sh (TAMM finds BLAS++/LAPACK++ via its default find_package on CMAKE_PREFIX_PATH;
 # LibInt2/GauXC via explicit -D*_ROOT below), and the system MPI (e.g. apt-installed openmpi-bin/libopenmpi-dev
 # on Ubuntu). GPU is not supported here.
 #
-# Usage: install_exachem.sh <cgmanifest_path>
+# Usage: install-exachem.sh <cgmanifest_path>
 #   cgmanifest_path - Full path to cpp/manifest/qdk-chemistry/cgmanifest.json (source of TAMM/ExaChem commits).
 # Required env vars: CPP_DEPS_PREFIX
 # Optional env vars: INSTALL_PREFIX, BUILD_ROOT, MARCH, JOBS, KEEP_BUILD_DIR
@@ -161,8 +161,7 @@ echo "=== Building TAMM (${TAMM_COMMIT}) ==="
 git clone "${TAMM_REPO}" "${BUILD_ROOT}/TAMM"
 git -C "${BUILD_ROOT}/TAMM" checkout "${TAMM_COMMIT}"
 # Use the default Unix Makefiles generator, not Ninja: CMSB's CMakeBuild_External sub-build invokes
-# "<generator-tool> install DESTDIR=<stage>", which make(1) accepts as a variable override but ninja rejects as
-# an unknown target.
+# "<generator-tool> install DESTDIR=<stage>", which ninja rejects as an unknown target.
 CC=gcc CXX=g++ FC=gfortran cmake -S "${BUILD_ROOT}/TAMM" -B "${BUILD_ROOT}/TAMM/build" \
   -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" \
   "${COMMON_CMAKE_ARGS[@]}" \
