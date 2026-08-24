@@ -4,9 +4,7 @@
 # process. Reuses OpenBLAS/BLAS++/LAPACK++/LibInt2/GauXC already built into CPP_DEPS_PREFIX by
 # install-cpp-deps.sh (TAMM finds BLAS++/LAPACK++ via its default find_package on CMAKE_PREFIX_PATH;
 # LibInt2/GauXC via explicit -D*_ROOT below), and the system MPI (e.g. apt-installed openmpi-bin/libopenmpi-dev
-# on Ubuntu). GPU is not supported here. TAMM's own CMSB superbuild (NWChemEx-Project/CMakeBuild) is patched
-# (see patches/cmsb-fix-blas-guard.patch) so it also reuses the system OpenBLAS/LAPACK instead of building its
-# own redundant copy.
+# on Ubuntu). GPU is not supported here.
 #
 # Usage: install-exachem.sh <cgmanifest_path>
 #   cgmanifest_path - Full path to cpp/manifest/qdk-chemistry/cgmanifest.json (source of TAMM/ExaChem commits).
@@ -157,26 +155,19 @@ else
 fi
 echo "==> HDF5: cflags='${HDF5_CFLAGS}' libs='${HDF5_LIBS}'"
 
-# TAMM's CMSB superbuild always rebuilds its own static, generic-target BLAS/LAPACK from source, even with
-# LINALG_VENDOR=OpenBLAS (apt's libopenblas-dev ships no BLASConfig.cmake/LAPACKConfig.cmake for CMSB's default
-# find_package(... CONFIG NO_DEFAULT_PATH) search to find) -- wasted CI time, and (worse) a second BLAS
-# implementation on the machine next to qdk-chemistry's own OpenBLAS. -DCMSB_DEBUG_CMAKE=OFF makes CMSB fall back
-# to a plain find_package(... QUIET) instead, which finds our system OpenBLAS -- but CMSB has its own bug that
-# breaks this: cmake/build_external/BuildGlobalArrays.cmake only calls find_or_build_dependency(BLAS) if a
-# "BLAS_External" target *already* exists, which it never does unless LAPACK itself had to be built from source
-# (BuildLAPACK.cmake incidentally creates it as a side effect); so once LAPACK is *found* instead (which is the
-# whole point of CMSB_DEBUG_CMAKE=OFF), BLAS_External is never created and a later unconditional
-# add_dependencies(GlobalArrays_External BLAS_External ...) then fails outright ("target ... does not exist").
-# Patch that one guard out of a local CMSB checkout (see patches/cmsb-fix-blas-guard.patch for the full writeup)
-# and point both configure lines at it via FETCHCONTENT_SOURCE_DIR_CMAKEBUILD, so CMSB uses the patched source
-# instead of git-cloning NWChemEx-Project/CMakeBuild@main itself.
-CMSB_SRC_DIR="${BUILD_ROOT}/CMakeBuild-patched"
-git clone --depth 1 https://github.com/NWChemEx-Project/CMakeBuild.git "${CMSB_SRC_DIR}"
-git -C "${CMSB_SRC_DIR}" apply --verbose "${SCRIPT_DIR}/patches/cmsb-fix-blas-guard.patch"
-
 # Flags shared by both the TAMM and ExaChem configure lines below. USE_HDF5=OFF disables TAMM's parallel-HDF5 layer
 # (the base HDF5 here, like qdk-chemistry's own, is serial-only); USE_SERIAL_IO selects ExaChem's serial-I/O SCF
 # path instead. These MUST be identical on both configure lines, or ExaChem's CMSB reconfigures/rebuilds TAMM.
+#
+# NOTE: TAMM's CMSB always rebuilds its own static, generic-target BLAS/LAPACK from source here, even with
+# LINALG_VENDOR=OpenBLAS (apt's libopenblas-dev ships no BLASConfig.cmake/LAPACKConfig.cmake for CMSB's
+# find_package(... CONFIG) to find). Tried passing -DCMSB_DEBUG_CMAKE=OFF (the option controlling that
+# CONFIG-only search, per cmake/macros/DependencyMacros.cmake in NWChemEx-Project/CMakeBuild) to make it fall
+# back to a plain find_package(... QUIET) that would find the system OpenBLAS instead -- but CMSB's own
+# BuildGlobalArrays.cmake unconditionally does add_dependencies(GlobalArrays_External BLAS_External), which
+# breaks the moment BLAS is found (skipping the ExternalProject_Add that normally creates that target) instead
+# of built. Confirmed via a live CI run (CMake Generate step failure: "target BLAS_External does not exist").
+# Not worth patching further: the rebuild is fast (~20-30s) and fully contained in EXACHEM_INSTALL_PREFIX.
 COMMON_CMAKE_ARGS=(
   -DCMAKE_BUILD_TYPE=Release
   -DMODULES="${MODULES}"
@@ -186,8 +177,6 @@ COMMON_CMAKE_ARGS=(
   -DTAMM_CXX_FLAGS="-DUSE_SERIAL_IO ${HDF5_CFLAGS}"
   -DLibInt2_ROOT="${CPP_DEPS_PREFIX}"
   -DGauXC_ROOT="${CPP_DEPS_PREFIX}"
-  -DCMSB_DEBUG_CMAKE=OFF
-  -DFETCHCONTENT_SOURCE_DIR_CMAKEBUILD="${CMSB_SRC_DIR}"
 )
 
 # --------------------------------------------------------------------------------------------------------------------
