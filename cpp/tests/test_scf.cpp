@@ -7,8 +7,10 @@
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
+#include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/algorithms/stability.hpp>
+#include <qdk/chemistry/data/ansatz.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/orbital_rotation.hpp>
@@ -765,10 +767,36 @@ TEST_F(ScfTest, AgHDef2SvpWithEcp) {
   EXPECT_EQ(ecp_electrons[0], 28);  // Ag has 28 core electrons replaced by ECP
   EXPECT_EQ(ecp_electrons[1], 0);   // H has no ECP (0 core electrons)
 
-  // Verify the electronic energy matches expected value
-  double nuclear_repulsion = agh->calculate_nuclear_repulsion_energy();
-  double electronic_energy = energy - nuclear_repulsion;
-  EXPECT_NEAR(electronic_energy, -162.0054639312,
+  const auto& nuclear_charges = agh->get_nuclear_charges();
+  ASSERT_EQ(nuclear_charges.size(), 2);
+  EXPECT_DOUBLE_EQ(nuclear_charges(0), 47.0);
+  EXPECT_DOUBLE_EQ(nuclear_charges(1), 1.0);
+
+  const auto effective_charges = basis_set->get_effective_nuclear_charges();
+  ASSERT_EQ(effective_charges.size(), 2);
+  EXPECT_DOUBLE_EQ(effective_charges(0), 19.0);
+  EXPECT_DOUBLE_EQ(effective_charges(1), 1.0);
+
+  const double bond_length =
+      (agh->get_atom_coordinates(1) - agh->get_atom_coordinates(0)).norm();
+  const double expected_nuclear_repulsion = 47.0 / bond_length;
+  const double expected_effective_nuclear_repulsion = 19.0 / bond_length;
+  EXPECT_NEAR(agh->calculate_nuclear_repulsion_energy(),
+              expected_nuclear_repulsion, testing::numerical_zero_tolerance);
+  EXPECT_NEAR(basis_set->calculate_effective_nuclear_repulsion_energy(),
+              expected_effective_nuclear_repulsion,
+              testing::numerical_zero_tolerance);
+
+  auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
+  auto hamiltonian = hamiltonian_constructor->run(orbitals);
+  EXPECT_NEAR(hamiltonian->get_core_energy(),
+              expected_effective_nuclear_repulsion,
+              testing::scf_energy_tolerance);
+
+  Ansatz mean_field_ansatz(hamiltonian, wfn);
+  EXPECT_NEAR(mean_field_ansatz.calculate_energy(), energy,
+              testing::scf_energy_tolerance);
+  EXPECT_NEAR(mean_field_ansatz.calculate_energy(), -146.62430815169887,
               testing::scf_energy_tolerance);
 
   // Check electron count - with ECP, should have 20 valence electrons
@@ -776,6 +804,17 @@ TEST_F(ScfTest, AgHDef2SvpWithEcp) {
       wfn->get_total_orbital_occupations();
   double total_electrons = occupations_alpha.sum() + occupations_beta.sum();
   EXPECT_NEAR(total_electrons, 20.0, testing::numerical_zero_tolerance);
+
+  auto restart_solver = ScfSolverFactory::create();
+  restart_solver->settings().set("method", "hf");
+  restart_solver->settings().set("max_iterations", 2);
+  auto [restart_energy, restart_wfn] = restart_solver->run(agh, 0, 1, orbitals);
+
+  EXPECT_NEAR(restart_energy, energy, testing::scf_energy_tolerance);
+  auto [restart_n_alpha, restart_n_beta] =
+      restart_wfn->get_total_num_electrons();
+  EXPECT_EQ(restart_n_alpha, 10);
+  EXPECT_EQ(restart_n_beta, 10);
 
   // Verify ECP angular momentum types are present
   // def2-svp ECP for Ag includes different angular momentum shells
