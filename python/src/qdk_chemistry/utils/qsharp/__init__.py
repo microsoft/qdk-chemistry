@@ -41,6 +41,7 @@ _BASE_PROFILE_FILES = (
     "Select.qs",
     "PrepSelPrep.qs",
     "AmplitudeAmplification.qs",
+    "Foqcs.qs",
 )
 
 

@@ -43,7 +43,7 @@ class FoqcsFamily:
 class FoqcsContainer(BlockEncodingContainer):
     r"""Container for a FOQCS-LCU block encoding of a spin-model Hamiltonian.
 
-    FOQCS-LCU (Fast One-Qubit Control Select – Linear Combination of Unitaries)
+    FOQCS-LCU (Fast One-Qubit-Controlled Select - Linear Combination of Unitaries)
     block-encodes a translationally-structured spin Hamiltonian by grouping its
     terms into homogeneous :class:`FoqcsFamily` blocks.  Each family is loaded
     with a balanced Dicke state and selected transversally, giving the block
@@ -61,8 +61,8 @@ class FoqcsContainer(BlockEncodingContainer):
 
     References:
         F. Della Chiara, M. Nibbi, Y. Shen, D. Camps, R. Van Beeumen,
-        "Efficient LCU block encodings through Dicke states preparation",
-        2025, arXiv:2507.20887.
+        `Efficient LCU block encodings through Dicke states preparation
+        <https://arxiv.org/abs/2507.20887>`_, 2025, arXiv:2507.20887.
 
     """
 

@@ -1,9 +1,9 @@
 r"""QDK/Chemistry FOQCS-LCU block encoding builder for spin-model Hamiltonians.
 
 References:
-    F. Della Chiara, M. Nibbi, Y. Shen, D. Camps, R. Van Beeumen, "Efficient
-    LCU block encodings through Dicke states preparation", 2025,
-    arXiv:2507.20887.
+    F. Della Chiara, M. Nibbi, Y. Shen, D. Camps, R. Van Beeumen, `Efficient
+    LCU block encodings through Dicke states preparation
+    <https://arxiv.org/abs/2507.20887>`_, 2025, arXiv:2507.20887.
 
 """
 
@@ -24,14 +24,14 @@ from qdk_chemistry.data import QubitOperator, UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.foqcs import FoqcsContainer, FoqcsFamily
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 
-__all__: list[str] = ["FoqcsBuilder", "FoqcsSettings"]
+__all__: list[str] = ["LCUFoqcsBuilder", "LCUFoqcsSettings"]
 
 
-class FoqcsSettings(HamiltonianUnitaryBuilderSettings):
+class LCUFoqcsSettings(HamiltonianUnitaryBuilderSettings):
     """Settings for the FOQCS-LCU block encoding builder."""
 
     def __init__(self):
-        """Initialize FoqcsSettings with default values.
+        """Initialize LCUFoqcsSettings with default values.
 
         Attributes:
             power: The power to which the block encoding is raised.
@@ -56,8 +56,8 @@ class FoqcsSettings(HamiltonianUnitaryBuilderSettings):
         )
 
 
-class FoqcsBuilder(HamiltonianUnitaryBuilder):
-    r"""FOQCS-LCU block encoding builder for translationally-structured spin models.
+class LCUFoqcsBuilder(HamiltonianUnitaryBuilder):
+    r"""Fast One-Qubit-Controlled Select LCU block encoding builder for translationally-structured spin models.
 
     Block-encodes a spin Hamiltonian by grouping its terms into homogeneous
     Pauli-term *families*.  Each family is a single Pauli letter (``X``/``Y``/``Z``)
@@ -96,7 +96,7 @@ class FoqcsBuilder(HamiltonianUnitaryBuilder):
 
         """
         super().__init__()
-        self._settings = FoqcsSettings()
+        self._settings = LCUFoqcsSettings()
         self._settings.set("power", power)
         self._settings.set("quantum_walk", quantum_walk)
 
@@ -104,10 +104,10 @@ class FoqcsBuilder(HamiltonianUnitaryBuilder):
         """Return the algorithm name.
 
         Returns:
-            str: The name ``"foqcs"``.
+            str: The name ``"lcu_foqcs"``.
 
         """
-        return "foqcs"
+        return "lcu_foqcs"
 
     def type_name(self) -> str:
         """Return the algorithm type name.
@@ -146,7 +146,7 @@ class FoqcsBuilder(HamiltonianUnitaryBuilder):
         grouped = self._group_families(qubit_hamiltonian, num_sites, tolerance)
 
         # Compute normalization: lambda = sum_f |coeff_f| * count_f.
-        mags = [math.sqrt(abs(coeff) * count) for (_letter, _weight, _offset, coeff, count, _positions) in grouped]
+        mags = [math.sqrt(abs(coeff) * count) for (_letter, _weight, _offset, coeff, count) in grouped]
         norm_sq = float(sum(m * m for m in mags))
         if norm_sq <= tolerance:
             raise ValueError("FOQCS block encoding requires a Hamiltonian with a positive 1-norm.")
@@ -154,7 +154,7 @@ class FoqcsBuilder(HamiltonianUnitaryBuilder):
         lambda_ = norm_sq
 
         families: list[FoqcsFamily] = []
-        for (letter, weight, offset, coeff, count, _positions), mag in zip(grouped, mags, strict=True):
+        for (letter, weight, offset, coeff, _count), mag in zip(grouped, mags, strict=True):
             num_y = weight if letter == "Y" else 0
             phase = (math.pi / 2.0 if coeff < 0 else 0.0) - (math.pi / 4.0) * num_y
             families.append(
@@ -186,7 +186,7 @@ class FoqcsBuilder(HamiltonianUnitaryBuilder):
         qubit_hamiltonian: QubitOperator,
         num_sites: int,
         tolerance: float,
-    ) -> list[tuple[str, int, int, float, int, frozenset[tuple[int, ...]]]]:
+    ) -> list[tuple[str, int, int, float, int]]:
         """Group Hamiltonian terms into homogeneous FOQCS families.
 
         Args:
@@ -195,7 +195,7 @@ class FoqcsBuilder(HamiltonianUnitaryBuilder):
             tolerance: Coefficient-comparison tolerance.
 
         Returns:
-            A list of ``(letter, weight, offset, coeff, count, positions)`` tuples,
+            A list of ``(letter, weight, offset, coeff, count)`` tuples,
             ordered fields-first (X, Y, Z) then couplings by ``(letter, offset)``.
 
         Raises:
@@ -237,7 +237,7 @@ class FoqcsBuilder(HamiltonianUnitaryBuilder):
         letter_rank = {"X": 0, "Y": 1, "Z": 2}
         ordered_keys = sorted(acc.keys(), key=lambda k: (k[1], letter_rank[k[0]], k[2]))
 
-        grouped: list[tuple[str, int, int, float, int, frozenset[tuple[int, ...]]]] = []
+        grouped: list[tuple[str, int, int, float, int]] = []
         for key in ordered_keys:
             letter, weight, offset = key
             terms = acc[key]
@@ -254,7 +254,7 @@ class FoqcsBuilder(HamiltonianUnitaryBuilder):
                 )
 
             self._validate_geometry(letter, weight, offset, positions, count, num_sites)
-            grouped.append((letter, weight, offset, float(coeffs[0]), count, positions))
+            grouped.append((letter, weight, offset, float(coeffs[0]), count))
 
         return grouped
 
@@ -291,7 +291,8 @@ class FoqcsBuilder(HamiltonianUnitaryBuilder):
         else:
             if offset < 1 or offset > num_sites - 1:
                 raise ValueError(
-                    f"FOQCS block encoding: 2-body '{letter * 2}' offset {offset} is out of range for {num_sites} sites."
+                    f"FOQCS block encoding: 2-body '{letter * 2}' offset {offset} "
+                    f"is out of range for {num_sites} sites."
                 )
             expected = {(i, i + offset) for i in range(num_sites - offset)}
             if positions != expected:

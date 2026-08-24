@@ -1,5 +1,5 @@
 /// # Summary
-/// FOQCS-LCU (Fast One-Qubit Control Select – Linear Combination of Unitaries)
+/// FOQCS-LCU (Fast One-Qubit-Controlled Select - Linear Combination of Unitaries)
 /// block encoding of the 1D Heisenberg Hamiltonian, vendored from
 /// [QuantumComputingLab/foqcs-lcu](https://github.com/QuantumComputingLab/foqcs-lcu).
 ///
@@ -52,7 +52,7 @@ operation BalancedDicke1Excitation(
         if fromZero {
             X(qubits[L - 1]);
         }
-        for idx in 0 .. L - 2 {
+        for idx in 0..L - 2 {
             let i = L - 1 - idx; // i goes L-1, L-2, …, 1
             let theta = 2.0 * ArcCos(Sqrt(1.0 / IntAsDouble(i + 1 + offsetIter)));
             Gamma(theta, qubits[i - 1], qubits[i]);
@@ -64,7 +64,7 @@ operation BalancedDicke1Excitation(
         if fromZero {
             Controlled X(ctls, qubits[L - 1]);
         }
-        for idx in 0 .. L - 2 {
+        for idx in 0..L - 2 {
             let i = L - 1 - idx;
             let theta = 2.0 * ArcCos(Sqrt(1.0 / IntAsDouble(i + 1 + offsetIter)));
             Gamma(theta, qubits[i - 1], qubits[i]);
@@ -76,7 +76,7 @@ operation BalancedDicke1Excitation(
 /// Element-wise CNOT from reg1 to reg2 (same length).
 /// All CNOTs can be done in parallel.
 operation ElementWiseCnot(reg1 : Qubit[], reg2 : Qubit[]) : Unit is Adj + Ctl {
-    for i in 0 .. Length(reg1) - 1 {
+    for i in 0..Length(reg1) - 1 {
         CNOT(reg1[i], reg2[i]);
     }
 }
@@ -100,13 +100,13 @@ operation BalancedDoubleDicke1Excitation(
 operation CnotLadder(qubits : Qubit[], k : Int) : Unit is Adj + Ctl {
     let L = Length(qubits);
     if k > 0 {
-        for idx in 0 .. L - k - 1 {
+        for idx in 0..L - k - 1 {
             let i = L - k - 1 - idx;
             CNOT(qubits[i], qubits[i + k]);
         }
     } elif k < 0 {
         let absK = -k;
-        for i in absK .. L - 1 {
+        for i in absK..L - 1 {
             CNOT(qubits[i], qubits[i + k]);
         }
     }
@@ -121,7 +121,7 @@ operation BalancedDicke2KNNExcitation(
     offsetIter : Int
 ) : Unit is Adj + Ctl {
     let L = Length(qubits);
-    BalancedDicke1Excitation(qubits[0 .. L - k - 1], fromZero, offsetIter);
+    BalancedDicke1Excitation(qubits[0..L - k - 1], fromZero, offsetIter);
     CnotLadder(qubits, k);
 }
 
@@ -305,7 +305,7 @@ function ComputeAngles(absCoeffs : Double[]) : (Double[], Int) {
     mutable sumSq = 0.0;
     mutable cutoff = L - 1;
     mutable found = false;
-    for idx in 0 .. L - 1 {
+    for idx in 0..L - 1 {
         let i = L - 1 - idx;
         if not found {
             if sumSq >= 1.0 - 1e-15 {
@@ -314,8 +314,12 @@ function ComputeAngles(absCoeffs : Double[]) : (Double[], Int) {
             } else {
                 let denom = Sqrt(1.0 - sumSq);
                 mutable cosArg = absCoeffs[i] / denom;
-                if cosArg > 1.0 { set cosArg = 1.0; }
-                if cosArg < -1.0 { set cosArg = -1.0; }
+                if cosArg > 1.0 {
+                    set cosArg = 1.0;
+                }
+                if cosArg < -1.0 {
+                    set cosArg = -1.0;
+                }
                 set angles += [2.0 * ArcCos(cosArg)];
                 set sumSq += absCoeffs[i] * absCoeffs[i];
             }
@@ -341,11 +345,11 @@ operation UnbalancedDicke1Excitation(
         let (angles, cutoff) = ComputeAngles(absCoeffs);
 
         X(qubits[L - 1]);
-        for idx in 0 .. cutoff - 1 {
+        for idx in 0..cutoff - 1 {
             Gamma(angles[idx], qubits[L - idx - 2], qubits[L - idx - 1]);
         }
         // Per-qubit phase correction (R1(0) = identity, so safe to apply to all).
-        for i in 0 .. L - 1 {
+        for i in 0..L - 1 {
             if AbsD(phases[i]) > 1e-15 {
                 R1(phases[i], qubits[i]);
             }
@@ -357,10 +361,10 @@ operation UnbalancedDicke1Excitation(
         let (angles, cutoff) = ComputeAngles(absCoeffs);
 
         Controlled X(ctls, qubits[L - 1]);
-        for idx in 0 .. cutoff - 1 {
+        for idx in 0..cutoff - 1 {
             Gamma(angles[idx], qubits[L - idx - 2], qubits[L - idx - 1]);
         }
-        for i in 0 .. L - 1 {
+        for i in 0..L - 1 {
             if AbsD(phases[i]) > 1e-15 {
                 R1(phases[i], qubits[i]);
             }
@@ -392,12 +396,12 @@ operation SelectFoqcsLcu(
     systemReg : Qubit[]
 ) : Unit is Adj + Ctl {
     let L = Length(systemReg);
-    let xReg = ancilla[numSubPrep .. numSubPrep + L - 1];
-    let zReg = ancilla[numSubPrep + L .. numSubPrep + 2 * L - 1];
-    for i in 0 .. L - 1 {
+    let xReg = ancilla[numSubPrep..numSubPrep + L - 1];
+    let zReg = ancilla[numSubPrep + L..numSubPrep + 2 * L - 1];
+    for i in 0..L - 1 {
         CNOT(xReg[i], systemReg[i]);
     }
-    for i in 0 .. L - 1 {
+    for i in 0..L - 1 {
         Controlled Z([zReg[i]], systemReg[i]);
     }
 }
@@ -439,7 +443,7 @@ function ComputeHeisenbergCoeffs(
     let norm = Sqrt(normSq);
 
     mutable absCoeffs = [0.0, size = 6];
-    for i in 0 .. 5 {
+    for i in 0..5 {
         absCoeffs w/= i <- mags[i] / norm;
     }
 
@@ -455,7 +459,7 @@ function ComputeHeisenbergCoeffs(
 /// Negate all phase angles (used for conjugated PREP in the block encoding).
 function NegatePhases(phases : Double[]) : Double[] {
     mutable result = [0.0, size = Length(phases)];
-    for i in 0 .. Length(phases) - 1 {
+    for i in 0..Length(phases) - 1 {
         result w/= i <- -phases[i];
     }
     result
@@ -490,9 +494,9 @@ operation PrepFoqcsLcuHeisenberg(
     body ... {
         let numSubPrep = Length(absCoeffs);
         let L = (Length(ancilla) - numSubPrep) / 2;
-        let subPrepReg = ancilla[0 .. numSubPrep - 1];
-        let xReg = ancilla[numSubPrep .. numSubPrep + L - 1];
-        let zReg = ancilla[numSubPrep + L .. numSubPrep + 2 * L - 1];
+        let subPrepReg = ancilla[0..numSubPrep - 1];
+        let xReg = ancilla[numSubPrep..numSubPrep + L - 1];
+        let zReg = ancilla[numSubPrep + L..numSubPrep + 2 * L - 1];
 
         // 1. Sub-PREP: create one-hot superposition on 6 ancilla qubits.
         UnbalancedDicke1Excitation(absCoeffs, phases, subPrepReg);
@@ -515,9 +519,9 @@ operation PrepFoqcsLcuHeisenberg(
     controlled (ctls, ...) {
         let numSubPrep = Length(absCoeffs);
         let L = (Length(ancilla) - numSubPrep) / 2;
-        let subPrepReg = ancilla[0 .. numSubPrep - 1];
-        let xReg = ancilla[numSubPrep .. numSubPrep + L - 1];
-        let zReg = ancilla[numSubPrep + L .. numSubPrep + 2 * L - 1];
+        let subPrepReg = ancilla[0..numSubPrep - 1];
+        let xReg = ancilla[numSubPrep..numSubPrep + L - 1];
+        let zReg = ancilla[numSubPrep + L..numSubPrep + 2 * L - 1];
 
         // Only the sub-PREP is controlled; the Dicke preparations are
         // self-gated by the one-hot ancilla pattern and left unconditional.
@@ -551,8 +555,8 @@ operation PrepFoqcsLcuHeisenbergOptimalRouting(
 
     if L > 1 {
         // First Dicke_1 iteration on the tail pair, reusing the starters above.
-        BalancedDicke1Excitation(xReg[L - 2 .. L - 1], false, L - 2);
-        BalancedDicke1Excitation(zReg[L - 2 .. L - 1], false, L - 2);
+        BalancedDicke1Excitation(xReg[L - 2..L - 1], false, L - 2);
+        BalancedDicke1Excitation(zReg[L - 2..L - 1], false, L - 2);
 
         // Starters for the Jx, Jz, and Jy Dicke_2,1NN branches.
         CNOT(subPrepReg[3], xReg[L - 2]);
@@ -560,8 +564,8 @@ operation PrepFoqcsLcuHeisenbergOptimalRouting(
         CNOT(subPrepReg[4], xReg[L - 2]);
 
         // Complete the remaining shared Dicke_1 preparation on each prefix.
-        BalancedDicke1Excitation(xReg[0 .. L - 2], false, 0);
-        BalancedDicke1Excitation(zReg[0 .. L - 2], false, 0);
+        BalancedDicke1Excitation(xReg[0..L - 2], false, 0);
+        BalancedDicke1Excitation(zReg[0..L - 2], false, 0);
 
         // Activate Jx and Jy on xReg at the same time, while Jz acts on zReg.
         CNOT(subPrepReg[3], subPrepReg[4]);
@@ -596,9 +600,9 @@ operation PrepFoqcsLcuHeisenbergOptimal(
     body ... {
         let numSubPrep = Length(absCoeffs);
         let L = (Length(ancilla) - numSubPrep) / 2;
-        let subPrepReg = ancilla[0 .. numSubPrep - 1];
-        let xReg = ancilla[numSubPrep .. numSubPrep + L - 1];
-        let zReg = ancilla[numSubPrep + L .. numSubPrep + 2 * L - 1];
+        let subPrepReg = ancilla[0..numSubPrep - 1];
+        let xReg = ancilla[numSubPrep..numSubPrep + L - 1];
+        let zReg = ancilla[numSubPrep + L..numSubPrep + 2 * L - 1];
         if numSubPrep != 6 {
             fail $"optimal subPrepReg must have 6 qubits, got {numSubPrep}.";
         }
@@ -616,9 +620,9 @@ operation PrepFoqcsLcuHeisenbergOptimal(
     controlled (ctls, ...) {
         let numSubPrep = Length(absCoeffs);
         let L = (Length(ancilla) - numSubPrep) / 2;
-        let subPrepReg = ancilla[0 .. numSubPrep - 1];
-        let xReg = ancilla[numSubPrep .. numSubPrep + L - 1];
-        let zReg = ancilla[numSubPrep + L .. numSubPrep + 2 * L - 1];
+        let subPrepReg = ancilla[0..numSubPrep - 1];
+        let xReg = ancilla[numSubPrep..numSubPrep + L - 1];
+        let zReg = ancilla[numSubPrep + L..numSubPrep + 2 * L - 1];
         if numSubPrep != 6 {
             fail $"optimal subPrepReg must have 6 qubits, got {numSubPrep}.";
         }
@@ -714,7 +718,7 @@ operation HeisenbergFoqcsBlockEncoding(
     J : Double[],
     g : Double[],
     optimal : Bool,
-    systemReg: Qubit[],
+    systemReg : Qubit[],
     targetRegister : Qubit[]
 ) : Unit is Adj + Ctl {
     body ... {

@@ -866,20 +866,20 @@ def _register_python_algorithms():
     )
     from qdk_chemistry.algorithms.circuit_mapper import PauliSequenceMapper, PSPMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
-        ControlledFoqcsMapper,
         ControlledPauliSequenceMapper,
         ControlledPSPMapper,
+        FoqcsMapper,
     )
     from qdk_chemistry.algorithms.expectation_estimator.qdk import QdkExpectationEstimator  # noqa: PLC0415
     from qdk_chemistry.algorithms.hadamard_test.circuit_builder.qdk_builder import (  # noqa: PLC0415
         QdkHadamardTestCircuitBuilder,
     )
     from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTest  # noqa: PLC0415
-    from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.foqcs import (  # noqa: PLC0415
-        FoqcsBuilder,
-    )
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import (  # noqa: PLC0415
         LCUBuilder,
+    )
+    from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu_foqcs import (  # noqa: PLC0415
+        LCUFoqcsBuilder,
     )
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized import (  # noqa: PLC0415
         PartiallyRandomized,
@@ -912,7 +912,6 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import SparseIsometryStatePreparation  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation.dense_pure_state import DensePureStatePreparation  # noqa: PLC0415
-    from qdk_chemistry.algorithms.state_preparation.dicke import DickeStatePreparation  # noqa: PLC0415
     from qdk_chemistry.algorithms.term_grouper import (  # noqa: PLC0415
         FullCommutingTermGrouper,
         IdentityTermGrouper,
@@ -938,12 +937,11 @@ def _register_python_algorithms():
     register(lambda: QDrift())
     register(lambda: PartiallyRandomized())
     register(lambda: LCUBuilder())
-    register(lambda: FoqcsBuilder())
+    register(lambda: LCUFoqcsBuilder())
     register(lambda: PauliSequenceMapper())
     register(lambda: PSPMapper())
     register(lambda: ControlledPSPMapper())
-    register(lambda: ControlledFoqcsMapper())
-    register(lambda: DickeStatePreparation())
+    register(lambda: FoqcsMapper())
     register(lambda: ControlledPauliSequenceMapper())
     register(lambda: EulerIntegrator())
     register(lambda: EulerEvolutionCircuitBuilder())

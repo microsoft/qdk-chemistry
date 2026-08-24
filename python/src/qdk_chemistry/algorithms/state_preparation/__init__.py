@@ -12,7 +12,6 @@ import warnings
 from typing import Any
 
 from qdk_chemistry.algorithms.state_preparation.dense_pure_state import DensePureStatePreparation
-from qdk_chemistry.algorithms.state_preparation.dicke import DickeStatePreparation
 from qdk_chemistry.algorithms.state_preparation.identity import identity_state_prep
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
     SparseIsometryStatePreparation,
@@ -27,7 +26,6 @@ from qdk_chemistry.algorithms.state_preparation.state_preparation import (
 # working, but is intentionally omitted from ``__all__`` so ``import *`` does not pull it in.
 __all__ = [
     "DensePureStatePreparation",
-    "DickeStatePreparation",
     "SparseIsometryStatePreparation",
     "StatePreparationFactory",
     "identity_state_prep",

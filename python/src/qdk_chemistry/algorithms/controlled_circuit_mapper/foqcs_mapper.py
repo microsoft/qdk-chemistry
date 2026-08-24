@@ -15,15 +15,15 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import ControlledCircuitMapper
 
-__all__: list[str] = ["ControlledFoqcsMapper"]
+__all__: list[str] = ["FoqcsMapper"]
 
 
-class ControlledFoqcsMapper(ControlledCircuitMapper):
+class FoqcsMapper(ControlledCircuitMapper):
     r"""Controlled block-encoding mapper for FOQCS spin-model Hamiltonians.
 
     Builds a controlled block encoding for a
     :class:`~qdk_chemistry.data.unitary_representation.containers.foqcs.FoqcsContainer`
-    using the FOQCS (First-Order-Quantized Check-matrix Sparse) construction, in
+    using the FOQCS (Fast One-Qubit-Controlled Select) construction, in
     which the Pauli-term families are loaded as balanced Dicke states and the
     SELECT oracle is realized as a constant-depth transversal layer of CX gates
     (from the ``xReg`` ancilla) and CZ gates (from the ``zReg`` ancilla):
@@ -52,10 +52,15 @@ class ControlledFoqcsMapper(ControlledCircuitMapper):
         * Currently supports only single-control-qubit scenarios.
         * Requires a ``FoqcsContainer`` (optionally wrapped in an ``LCUWalkContainer``).
 
+    References:
+        F. Della Chiara, M. Nibbi, Y. Shen, D. Camps, R. Van Beeumen,
+        `Efficient LCU block encodings through Dicke states preparation
+        <https://arxiv.org/abs/2507.20887>`_, 2025, arXiv:2507.20887.
+
     """
 
     def __init__(self):
-        """Initialize the ControlledFoqcsMapper."""
+        """Initialize the FoqcsMapper."""
         super().__init__()
 
     def name(self) -> str:
@@ -103,12 +108,12 @@ class ControlledFoqcsMapper(ControlledCircuitMapper):
         if not isinstance(block, FoqcsContainer):
             raise ValueError(
                 f"Container type '{unitary.get_container_type()}' is not supported. "
-                "ControlledFoqcsMapper requires a FoqcsContainer, or an LCUWalkContainer wrapping one."
+                "FoqcsMapper requires a FoqcsContainer, or an LCUWalkContainer wrapping one."
             )
 
         control_indices = self._get_control_indices()
         if len(control_indices) != 1:
-            raise ValueError("ControlledFoqcsMapper currently only supports a single control qubit.")
+            raise ValueError("FoqcsMapper currently only supports a single control qubit.")
 
         params = self._build_foqcs_params(block)
         phases = [family.phase for family in block.families]
@@ -163,12 +168,10 @@ class ControlledFoqcsMapper(ControlledCircuitMapper):
         ]
         offsets = [family.offset for family in container.families]
         abs_coeffs = [family.abs_coeff for family in container.families]
-        phases = [family.phase for family in container.families]
 
         return QSHARP_UTILS.Foqcs.FoqcsParams(
             paulisPerFamily=paulis_per_family,
             offsets=offsets,
             absCoeffs=abs_coeffs,
-            phases=phases,
             numSites=container.num_sites,
         )

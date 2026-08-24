@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-/// FOQCS-LCU (Fast One-Qubit Control Select – Linear Combination of Unitaries)
+/// FOQCS-LCU (Fast One-Qubit-Controlled Select - Linear Combination of Unitaries)
 /// block encoding of translationally-structured spin-model Hamiltonians.
 ///
 /// A spin Hamiltonian is described as a sum of homogeneous Pauli-term
@@ -20,9 +20,9 @@
 /// ``numSites``.
 ///
 /// # References
-/// - F. Della Chiara, M. Nibbi, Y. Shen, D. Camps, R. Van Beeumen, "Efficient
-///   LCU block encodings through Dicke states preparation", 2025,
-///   arXiv:2507.20887.
+/// - F. Della Chiara, M. Nibbi, Y. Shen, D. Camps, R. Van Beeumen, [Efficient
+///   LCU block encodings through Dicke states preparation](https://arxiv.org/abs/2507.20887),
+///   2025, arXiv:2507.20887.
 namespace QDKChemistry.Utils.Foqcs {
 
     import Std.Convert.IntAsDouble;
@@ -40,13 +40,15 @@ namespace QDKChemistry.Utils.Foqcs {
     /// Each family ``f`` contributes one sub-PREP qubit.  ``paulisPerFamily[f]``
     /// is the homogeneous Pauli pattern (length 1 for a field term, length 2 for
     /// a coupling term); ``offsets[f]`` is the nearest-neighbour separation ``k``
-    /// for 2-body families (ignored for 1-body).  ``absCoeffs`` and ``phases``
-    /// are the normalized sub-PREP amplitudes and phase corrections.
+    /// for 2-body families (ignored for 1-body).  ``absCoeffs`` are the
+    /// normalized sub-PREP amplitudes.
+    ///
+    /// Phases are supplied per call rather than stored here, since the forward
+    /// PREP and the un-PREP require conjugate phase vectors.
     struct FoqcsParams {
         paulisPerFamily : Pauli[][],
         offsets : Int[],
         absCoeffs : Double[],
-        phases : Double[],
         numSites : Int,
     }
 
@@ -313,8 +315,8 @@ namespace QDKChemistry.Utils.Foqcs {
     /// over the families (weighted by `absCoeffs`, `phases`) then spreads each
     /// family across the target register via its Dicke preparation.
     ///
-    /// `phases` is passed separately from `params.phases` so the block encoding
-    /// can supply the conjugated angles for the un-PREP.
+    /// `phases` is passed separately from `params` so the block encoding can
+    /// supply the conjugated angles for the un-PREP.
     ///
     /// ## Controlled specialization
     /// Only the sub-PREP step is controlled; the Dicke routing is self-gated by
@@ -360,8 +362,8 @@ namespace QDKChemistry.Utils.Foqcs {
     ///
     /// Partially applies :code:`FoqcsPrepare` over the ancilla register so it can
     /// be composed by the generic ``PrepSelPrep`` block-encoding framework.  The
-    /// forward preparation passes ``params.phases``; the un-preparation passes the
-    /// conjugated (negated) phases via :code:`NegatePhases`.
+    /// forward preparation passes the family phases; the un-preparation passes
+    /// the conjugated (negated) phases via :code:`NegatePhases`.
     function MakeFoqcsPrepareOp(
         params : FoqcsParams,
         phases : Double[]

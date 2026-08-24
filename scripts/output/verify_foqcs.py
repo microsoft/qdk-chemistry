@@ -1,9 +1,9 @@
 """Numeric verification of the FOQCS block encoding via the standalone FOQCS mapper."""
 
 import numpy as np
-from qdk_chemistry.algorithms.controlled_circuit_mapper import ControlledFoqcsMapper
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.foqcs import (
-    FoqcsBuilder,
+from qdk_chemistry.algorithms.controlled_circuit_mapper import FoqcsMapper
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu_foqcs import (
+    LCUFoqcsBuilder,
 )
 from qdk_chemistry.data import QubitOperator
 from qiskit.quantum_info import Operator
@@ -27,8 +27,8 @@ def check(name, pauli_strings, coefficients):
     ham = QubitOperator(pauli_strings=pauli_strings, coefficients=coefficients)
     num_target = ham.num_qubits
 
-    unitary_rep = FoqcsBuilder().run(ham)
-    circuit = ControlledFoqcsMapper().run(unitary_rep)
+    unitary_rep = LCUFoqcsBuilder().run(ham)
+    circuit = FoqcsMapper().run(unitary_rep)
     qc = circuit.get_qiskit_circuit()
     full_u = Operator(qc).data
 
