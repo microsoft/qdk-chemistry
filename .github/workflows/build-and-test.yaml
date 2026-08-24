@@ -220,7 +220,7 @@ jobs:
           ${{ env.CPP_DEPS_PREFIX }}
         key: >-
           cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
-          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/install_cpp_dependencies.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh') }}
+          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/install-cpp-deps.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh') }}
 
     - name: Add C++ deps prefix to CMake search path
       run: |
@@ -236,7 +236,7 @@ jobs:
         MARCH: ${{ matrix.uarch }}
         KEEP_BUILD_DIR: 1
       run: |
-        bash ${{ github.workspace }}/.pipelines/install-scripts/install_cpp_dependencies.sh \
+        bash ${{ github.workspace }}/.pipelines/install-scripts/install-cpp-deps.sh \
           ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json \
           ${{ github.workspace }}/external/macis/manifest/cgmanifest.json
 
@@ -248,7 +248,7 @@ jobs:
           ${{ env.CPP_DEPS_PREFIX }}
         key: >-
           cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
-          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/install_cpp_dependencies.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh') }}
+          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/install-cpp-deps.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh') }}
 
     # TODO: this currently builds (and, after the first run, restores from cache) on every Linux job regardless of
     # whether slow tests will actually run, to make initial CI bring-up/debugging easier. Once this is verified
@@ -264,7 +264,7 @@ jobs:
         key: >-
           exachem-${{ runner.os }}-${{ matrix.uarch }}-
           ${{ hashFiles('.pipelines/install-scripts/exachem/**') }}-
-          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/install_cpp_dependencies.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh') }}
+          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/install-cpp-deps.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh') }}
 
     - name: Install ExaChem + TAMM (Linux)
       if: matrix.os-name == 'Linux' && steps.cache-exachem.outputs.cache-hit != 'true'
@@ -274,7 +274,7 @@ jobs:
         MARCH: ${{ matrix.uarch }}
         JOBS: ${{ matrix.build-parallel }}
       run: |
-        bash ${{ github.workspace }}/.pipelines/install-scripts/exachem/install_exachem.sh \
+        bash ${{ github.workspace }}/.pipelines/install-scripts/exachem/install-exachem.sh \
           ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json
 
     - name: Save ExaChem cache
@@ -286,7 +286,7 @@ jobs:
         key: >-
           exachem-${{ runner.os }}-${{ matrix.uarch }}-
           ${{ hashFiles('.pipelines/install-scripts/exachem/**') }}-
-          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/install_cpp_dependencies.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh') }}
+          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/install-cpp-deps.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh') }}
 
     - name: Add ExaChem/MPI to PATH (Linux)
       if: matrix.os-name == 'Linux'
