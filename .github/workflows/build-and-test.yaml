@@ -201,7 +201,7 @@ jobs:
     - name: Add C++ deps prefix to CMake search path
       run: |
         echo "CMAKE_PREFIX_PATH=${{ env.CPP_DEPS_PREFIX }}:${CMAKE_PREFIX_PATH}" >> $GITHUB_ENV
-        echo "LD_LIBRARY_PATH=${{ env.CPP_DEPS_PREFIX }}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=${{ env.CPP_DEPS_PREFIX }}/lib:${{ env.CPP_DEPS_PREFIX }}/lib64:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
         echo "PATH=${{ env.CPP_DEPS_PREFIX }}/bin:${PATH}" >> $GITHUB_ENV
 
     # TODO: ExaChem currently builds (and, after the first run, restores from cache) on every Linux job regardless
@@ -245,13 +245,6 @@ jobs:
         key: >-
           cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
           ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/install-cpp-deps.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh', '.pipelines/install-scripts/exachem/**') }}
-
-    - name: Add ExaChem/MPI to PATH (Linux)
-      if: matrix.os-name == 'Linux'
-      run: |
-        # bin/ and lib/ are already on PATH/LD_LIBRARY_PATH via CPP_DEPS_PREFIX above (ExaChem/TAMM install into
-        # the same prefix); only lib64/ (used by some of TAMM's CMSB-built dependencies, e.g. GlobalArrays) is new.
-        echo "LD_LIBRARY_PATH=${{ env.CPP_DEPS_PREFIX }}/lib64:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
 
     - name: Configure C++ RelWithDebInfo/Coverage build
       run: |
