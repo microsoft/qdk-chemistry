@@ -1,0 +1,87 @@
+# cmsb-fix-njson-reuse.patch
+# ----------------------------------------------------------------------------------------------------------------------
+# Make NWChemEx-Project/CMakeBuild (CMSB) properly reuse an already-installed nlohmann_json (NJSON) when TAMM's
+# exported tamm-config.cmake is consumed by a downstream project (e.g. ExaChem) whose own build re-resolves
+# TAMM's transitive dependencies via CMSBTargetConfig.cmake.in's dependency loop.
+#
+# Same root cause and same fix pattern as cmsb-fix-spdlog-ecpint-reuse.patch (see that patch for the full
+# writeup): CMSBTargetConfig.cmake.in's per-dependency find_path(... NO_DEFAULT_PATH) re-resolution loop only
+# ever gets a meaningful `_dep_pp` hint for LibInt2/HDF5/HPTT/numactl and the GauXC/Librett/NWQSim group (via
+# __depends_tlist). NJSON's elseif branch sets __cur_dep/__depend_cfg/CMAKE_FIND_PACKAGE_NAME and appends the
+# library alias, but never sets `_dep_pp`, so it relies entirely on CMAKE_PREFIX_PATH being correctly forwarded
+# through CMSB's nested ExternalProject_Add(*_External ...) machinery -- unreliable in practice (see the sibling
+# patch's writeup for a concrete example of this failing for a different dependency in the same loop).
+#
+# Unlike SPDLOG/EcpInt (built from source into a build-specific prefix), NJSON is typically satisfied by the
+# system's own nlohmann_json package (e.g. apt's nlohmann-json3-dev on Ubuntu/Debian, which installs its CMake
+# config to /usr/lib/cmake/nlohmann_json/nlohmann_jsonConfig.cmake) -- so this fix lets callers point NJSON_ROOT
+# at the system prefix (e.g. /usr) rather than a project-specific build directory.
+#
+# Two-part fix, mirroring the existing, working LibInt2/HDF5/HPTT pattern exactly:
+#
+# 1. cmake/CMSBTargetConfig.cmake.in:
+#    a. Add `set(NJSON_ROOT @NJSON_ROOT@)` alongside the existing LibInt2_ROOT/HDF5_ROOT/HPTT_ROOT (and, with
+#       cmsb-fix-spdlog-ecpint-reuse.patch applied, SPDLOG_ROOT/EcpInt_ROOT) lines, so this gets baked into the
+#       generated tamm-config.cmake at TAMM's own build time (independent of whatever CMAKE_PREFIX_PATH state
+#       the consuming project's own build happens to have).
+#    b. Set `_dep_pp` in the NJSON elseif branch of the dependency loop, so the subsequent generic find_path(...)
+#       call actually uses this baked-in ROOT hint.
+#
+# 2. cmake/macros/BuildCMSBModule.cmake: add NJSON_ROOT to the existing
+#    bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS BLAS_ARCH GCCROOT HDF5_ROOT HPTT_ROOT LibInt2_ROOT ...) call, so
+#    whatever value a caller passes as -DNJSON_ROOT=... on the outer project's cmake invocation is actually
+#    forwarded into the nested *_External ExternalProject_Add sub-build (the same forwarding LibInt2_ROOT/
+#    HDF5_ROOT/HPTT_ROOT already rely on), making it visible when CMSBTargetConfig.cmake.in's configure_file()
+#    call (inside cmsb_add_library, cmake/macros/TargetMacros.cmake) substitutes @NJSON_ROOT@ into the generated
+#    config file.
+#
+# Callers wanting NJSON reused (not rebuilt) should pass -DNJSON_ROOT=<prefix> (e.g. /usr on Debian/Ubuntu) on
+# BOTH the outer TAMM and outer ExaChem (or any other CMSB_PROJECTS consumer) cmake invocations, exactly like
+# -DLibInt2_ROOT/-DGauXC_ROOT/-DSPDLOG_ROOT/-DEcpInt_ROOT are already used in install-exachem.sh.
+#
+# APPLY ORDER: this patch's context lines assume cmsb-fix-spdlog-ecpint-reuse.patch has ALREADY been applied
+# (both patches touch the same `set(...ROOT @...ROOT@)` block and the same bundle_cmake_args(...) line in the
+# same two files) -- apply cmsb-fix-blas-lapack-reuse.patch, then cmsb-fix-spdlog-ecpint-reuse.patch, then this
+# one, in that order (see install-exachem.sh).
+#
+# Applied to a local FetchContent_MakeAvailable(CMakeBuild) source checkout via -DFETCHCONTENT_SOURCE_DIR_CMAKEBUILD
+# (see install-exachem.sh) rather than to a vendored copy in this repo, since CMSB isn't a qdk-chemistry dependency
+# in its own right -- it's fetched fresh (from NWChemEx-Project/CMakeBuild@main) as part of TAMM/ExaChem's own build.
+# Candidate for upstreaming to NWChemEx-Project/CMakeBuild: this is a genuine gap (not qdk-chemistry-specific
+# behavior), following the exact pattern CMSB already uses for LibInt2/HDF5/HPTT.
+#
+# Apply: git -C <cmsb-src> apply cmsb-fix-blas-lapack-reuse.patch cmsb-fix-spdlog-ecpint-reuse.patch cmsb-fix-njson-reuse.patch
+# ----------------------------------------------------------------------------------------------------------------------
+diff --git a/cmake/CMSBTargetConfig.cmake.in b/cmake/CMSBTargetConfig.cmake.in
+index 9bd5ceb..d3f3235 100644
+--- a/cmake/CMSBTargetConfig.cmake.in
++++ b/cmake/CMSBTargetConfig.cmake.in
+@@ -167,6 +167,7 @@ set(HDF5_ROOT @HDF5_ROOT@)
+ set(HPTT_ROOT @HPTT_ROOT@)
+ set(SPDLOG_ROOT @SPDLOG_ROOT@)
+ set(EcpInt_ROOT @EcpInt_ROOT@)
++set(NJSON_ROOT @NJSON_ROOT@)
+ 
+ #list(PREPEND CMAKE_MODULE_PATH @STAGE_DIR@/@CMAKE_INSTALL_PREFIX@)
+ #list(PREPEND CMAKE_MODULE_PATH @CMAKE_INSTALL_PREFIX@)
+@@ -185,6 +186,7 @@ foreach(__depend_i ${__depends_${__cmsb_libname}})
+       set(__depend_cfg "Microsoft.GSLConfig.cmake")
+       list(APPEND ${__CMSB_LIBNAME}_LIBRARIES Microsoft.GSL::GSL)
+     elseif(${__depend_i} STREQUAL "NJSON")
++      set(_dep_pp ${${__depend_i}_ROOT})
+       set(__cur_dep "nlohmann_json")
+       set(__depend_cfg "nlohmann_jsonConfig.cmake")
+       set(CMAKE_FIND_PACKAGE_NAME nlohmann_json)
+diff --git a/cmake/macros/BuildCMSBModule.cmake b/cmake/macros/BuildCMSBModule.cmake
+index 302b97e..9b0d24d 100644
+--- a/cmake/macros/BuildCMSBModule.cmake
++++ b/cmake/macros/BuildCMSBModule.cmake
+@@ -249,7 +249,7 @@ function(build_cmsb_module SUPER_PROJECT_ROOT)
+     bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS ${CMSB_CORE_OPTIONS})
+ 
+     bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS BLAS_INT4 LINALG_VENDOR LINALG_PREFIX ENABLE_COVERAGE USE_SCALAPACK USE_HDF5 USE_LIBNUMA USE_ONEMATH ONEMATH_PREFIX USE_NWQSIM)
+-    bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS BLAS_ARCH GCCROOT HDF5_ROOT HPTT_ROOT LibInt2_ROOT SPDLOG_ROOT EcpInt_ROOT)
++    bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS BLAS_ARCH GCCROOT HDF5_ROOT HPTT_ROOT LibInt2_ROOT SPDLOG_ROOT EcpInt_ROOT NJSON_ROOT)
+ 
+     bundle_cmake_strings(CORE_CMAKE_STRINGS CMSB_PROJECTS ENABLE_DEV_MODE GPU_ARCH MARCH_FLAGS USE_TAMM_DEV CMSB_TAG)
+     bundle_cmake_strings(CORE_CMAKE_STRINGS USE_UPCXX BLAS_INT4 LINALG_PREFIX USE_SCALAPACK USE_HDF5 USE_LIBNUMA USE_NWQSIM LINK_STATIC_GPU_LIBS)

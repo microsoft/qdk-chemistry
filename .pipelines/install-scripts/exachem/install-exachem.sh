@@ -3,11 +3,11 @@
 # install-exachem.sh — build and install ExaChem (+ its TAMM tensor backend) for CI, to run as an external MPI
 # process. Reuses OpenBLAS/BLAS++/LAPACK++/LibInt2/GauXC/spdlog/EcpInt already built into CPP_DEPS_PREFIX by
 # install-cpp-deps.sh (TAMM finds BLAS++/LAPACK++ via its default find_package on CMAKE_PREFIX_PATH;
-# LibInt2/GauXC/spdlog/EcpInt via explicit -D*_ROOT below), and the system MPI (e.g. apt-installed
-# openmpi-bin/libopenmpi-dev on Ubuntu). GPU is not supported here. TAMM's own CMSB superbuild
-# (NWChemEx-Project/CMakeBuild) is patched (see patches/cmsb-fix-blas-lapack-reuse.patch and
-# patches/cmsb-fix-spdlog-ecpint-reuse.patch) so it also reuses the system OpenBLAS/LAPACK/spdlog/EcpInt instead
-# of building its own redundant copies.
+# LibInt2/GauXC/spdlog/EcpInt via explicit -D*_ROOT below), apt's nlohmann_json (via -DNJSON_ROOT=/usr), and the
+# system MPI (e.g. apt-installed openmpi-bin/libopenmpi-dev on Ubuntu). GPU is not supported here. TAMM's own
+# CMSB superbuild (NWChemEx-Project/CMakeBuild) is patched (see patches/cmsb-fix-blas-lapack-reuse.patch,
+# patches/cmsb-fix-spdlog-ecpint-reuse.patch, and patches/cmsb-fix-njson-reuse.patch) so it also reuses the
+# system OpenBLAS/LAPACK/spdlog/EcpInt/nlohmann_json instead of building its own redundant copies.
 #
 # Usage: install-exachem.sh <cgmanifest_path>
 #   cgmanifest_path - Full path to cpp/manifest/qdk-chemistry/cgmanifest.json (source of TAMM/ExaChem commits).
@@ -198,10 +198,16 @@ echo "==> HDF5: cflags='${HDF5_CFLAGS}' libs='${HDF5_LIBS}'"
 # upstreaming): extends the exact same baked-@ROOT@ mechanism CMSB already uses for LibInt2/HDF5/HPTT to
 # SPDLOG/EcpInt too, and forwards -DSPDLOG_ROOT/-DEcpInt_ROOT into CMSB's nested *_External sub-builds the same
 # way -DHDF5_ROOT/-DHPTT_ROOT/-DLibInt2_ROOT already are.
+#
+# NJSON (nlohmann_json): same gap/fix as SPDLOG/EcpInt above (patches/cmsb-fix-njson-reuse.patch, applied after
+# the spdlog/ecpint patch since both touch the same lines in the same two CMSB files). Unlike SPDLOG/EcpInt,
+# NJSON is satisfied by apt's nlohmann-json3-dev (already installed for qdk-chemistry's own build), which
+# installs its CMake config under /usr -- so NJSON_ROOT points at "/usr", not CPP_DEPS_PREFIX.
 CMSB_SRC_DIR="${BUILD_ROOT}/CMakeBuild-patched"
 git clone --depth 1 https://github.com/NWChemEx-Project/CMakeBuild.git "${CMSB_SRC_DIR}"
 git -C "${CMSB_SRC_DIR}" apply --verbose "${SCRIPT_DIR}/patches/cmsb-fix-blas-lapack-reuse.patch"
 git -C "${CMSB_SRC_DIR}" apply --verbose "${SCRIPT_DIR}/patches/cmsb-fix-spdlog-ecpint-reuse.patch"
+git -C "${CMSB_SRC_DIR}" apply --verbose "${SCRIPT_DIR}/patches/cmsb-fix-njson-reuse.patch"
 
 COMMON_CMAKE_ARGS=(
   -DCMAKE_BUILD_TYPE=Release
@@ -214,6 +220,7 @@ COMMON_CMAKE_ARGS=(
   -DGauXC_ROOT="${CPP_DEPS_PREFIX}"
   -DSPDLOG_ROOT="${CPP_DEPS_PREFIX}"
   -DEcpInt_ROOT="${CPP_DEPS_PREFIX}"
+  -DNJSON_ROOT=/usr
   -DFETCHCONTENT_SOURCE_DIR_CMAKEBUILD="${CMSB_SRC_DIR}"
 )
 
