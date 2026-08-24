@@ -127,6 +127,7 @@ class RemoteBackend(ABC):
     - **_submit**: launch a job asynchronously (returns job_id + state)
     - **check**: poll job status
     - **fetch**: download and deserialize results
+    - **cleanup_job**: remove artifacts for a completed job
 
     The remote node executes ``python -m qdk_chemistry.remote.worker`` which handles
     input deserialization, algorithm execution, caching, and output
@@ -143,12 +144,18 @@ class RemoteBackend(ABC):
         >>> class SlurmBackend(RemoteBackend):
         ...     name = "slurm"
         ...
-        ...     def __init__(self, **config):
-        ...         super().__init__(**config)
-        ...         self.partition = config.get("partition", "default")
+        ...     def __init__(self, *, host, partition="default", poll_interval=5.0, timeout=3600.0):
+        ...         super().__init__(
+        ...             host=host,
+        ...             partition=partition,
+        ...             poll_interval=poll_interval,
+        ...             timeout=timeout,
+        ...         )
+        ...         self.host = host
+        ...         self.partition = partition
         ...
         ...     def connect(self):
-        ...         self._client = SlurmClient(self.config.get("host"))
+        ...         self._client = SlurmClient(self.host)
         ...
         ...     def upload(self, local_path, remote_path):
         ...         self._client.sftp_put(local_path, remote_path)
@@ -167,25 +174,14 @@ class RemoteBackend(ABC):
 
     name: str  # Backend name (e.g., "scheduler", "local")
 
-    def __init__(self, *, poll_interval: float = DEFAULT_POLL_INTERVAL, **config: Any):
-        """Initialize the backend with configuration options.
+    def __init__(self, **backend_args: Any) -> None:
+        """Store the arguments needed to recreate the concrete backend.
 
         Args:
-            poll_interval: Seconds between remote job status checks.
-            **config: Backend-specific options such as:
-
-                - host: Remote host to connect to
-                - timeout: Maximum execution time in seconds
-                - remote_workdir: Working directory on remote system
-                - Any other backend-specific settings
+            **backend_args: JSON-safe constructor arguments supplied by the concrete backend.
 
         """
-        self.config = {**config, "poll_interval": poll_interval}
-
-        # Common defaults
-        self.poll_interval = poll_interval
-        self.remote_workdir = config.get("remote_workdir", "/tmp/qdk_remote")
-        self.timeout = config.get("timeout", DEFAULT_TIMEOUT)
+        self._backend_args = backend_args
 
     @abstractmethod
     def connect(self) -> None:
@@ -198,10 +194,10 @@ class RemoteBackend(ABC):
 
     @abstractmethod
     def disconnect(self) -> None:
-        """Clean up connection to the remote system.
+        """Close the connection to the remote system.
 
-        Called after all operations are complete. Use this to close connections,
-        clean up temporary files, etc.
+        Called after connection-scoped operations are complete. This must not
+        cancel submitted jobs or remove artifacts referenced by persisted jobs.
 
         """
 
@@ -225,7 +221,7 @@ class RemoteBackend(ABC):
 
         """
 
-    def submit_and_wait(self, payload: dict) -> Any:
+    def submit_and_wait(self, payload: dict, *, cleanup: bool = False) -> Any:
         """Submit a job and block until results are available.
 
         Uses ``_submit()`` to launch the job asynchronously, polls via
@@ -234,6 +230,8 @@ class RemoteBackend(ABC):
         Args:
             payload: Execution request containing algorithm_type,
                 algorithm_name, settings, args, kwargs.
+            cleanup: Whether to remove backend job artifacts after successful
+                result retrieval.
 
         Returns:
             The deserialized result from the algorithm.
@@ -242,7 +240,8 @@ class RemoteBackend(ABC):
         import time  # noqa: PLC0415
 
         job_id, backend_state = self._submit(payload)
-        timeout = getattr(self, "timeout", DEFAULT_TIMEOUT)
+        timeout = self._backend_args.get("timeout", DEFAULT_TIMEOUT)
+        poll_interval = self._backend_args.get("poll_interval", DEFAULT_POLL_INTERVAL)
         deadline = time.monotonic() + timeout
 
         while True:
@@ -256,7 +255,7 @@ class RemoteBackend(ABC):
                     f"Last status: {status.status}\n"
                     f"Error: {status.error or 'unknown'}\nLogs:\n{status.logs}"
                 )
-            time.sleep(min(self.poll_interval, remaining))
+            time.sleep(min(poll_interval, remaining))
 
         if not status.is_successful:
             raise RuntimeError(
@@ -264,7 +263,10 @@ class RemoteBackend(ABC):
                 f"Error: {status.error or 'unknown'}\nLogs:\n{status.logs}"
             )
 
-        return self.fetch(backend_state)
+        result = self.fetch(backend_state)
+        if cleanup:
+            self.cleanup_job(backend_state)
+        return result
 
     # ── Async job primitives ─────────────────────────────────────────────
 
@@ -297,7 +299,7 @@ class RemoteBackend(ABC):
         job = Job(
             job_id=job_id,
             backend=self.name,
-            backend_config=self.config,
+            backend_config=dict(self._backend_args),
             backend_state=backend_state,
             algorithm_info={
                 "type": payload.get("algorithm_type"),
@@ -349,7 +351,11 @@ class RemoteBackend(ABC):
         """
         raise NotImplementedError(f"Backend '{self.name}' does not support cancellation")
 
-    def fetch(self, backend_state: dict, local_dir: str | Path | None = None) -> dict:
+    def fetch(
+        self,
+        backend_state: dict,
+        local_dir: str | Path | None = None,
+    ) -> Any:
         """Download and deserialize results for a completed job.
 
         Args:
@@ -364,6 +370,18 @@ class RemoteBackend(ABC):
 
         """
         raise NotImplementedError(f"Backend '{self.name}' does not support result fetching")
+
+    def cleanup_job(self, backend_state: dict) -> None:
+        """Remove artifacts owned by a completed job.
+
+        Implementations must make repeated calls safe and must not remove
+        shared backend work directories.
+
+        Args:
+            backend_state: The opaque state dict produced by ``_submit()``.
+
+        """
+        raise NotImplementedError(f"Backend '{self.name}' does not support job cleanup")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

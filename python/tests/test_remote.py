@@ -11,6 +11,7 @@ import gc
 import json
 import logging
 import shutil
+import signal
 import time
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -23,6 +24,7 @@ import qdk_chemistry.remote.backends as remote_backends
 import qdk_chemistry.remote.backends.base as remote_backend_registry
 import qdk_chemistry.remote.backends.local as local_backend_module
 import qdk_chemistry.remote.cache as remote_cache_module
+import qdk_chemistry.remote.job as job_module
 import qdk_chemistry.remote.serialization as serialization_module
 import qdk_chemistry.remote.worker as remote_worker
 from qdk_chemistry.data import AlgorithmRef, Orbitals, Settings, Structure
@@ -468,7 +470,7 @@ def test_worker_logs_remote_cache_load_failure(tmp_path, monkeypatch, caplog):
     input_dir = tmp_path / "input"
     input_dir.mkdir()
     (input_dir / "manifest.json").write_text(
-        json.dumps({"run_hash": "testhash", "remote_cache": {"name": "unavailable"}})
+        json.dumps({"version": 1, "run_hash": "testhash", "remote_cache": {"name": "unavailable"}})
     )
     monkeypatch.setattr(remote_cache_module, "get_cache", MagicMock(side_effect=RuntimeError("cache unavailable")))
 
@@ -481,6 +483,25 @@ def test_worker_logs_remote_cache_load_failure(tmp_path, monkeypatch, caplog):
     assert record.levelno == logging.WARNING
     assert record.exc_info is not None
     assert "Failed to load remote cache" in record.message
+
+
+def test_worker_validates_manifest_before_loading_remote_cache(tmp_path, monkeypatch, caplog):
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    (input_dir / "manifest.json").write_text(
+        json.dumps({"version": 2, "run_hash": "testhash", "remote_cache": {"name": "shared"}})
+    )
+    get_cache = MagicMock()
+    monkeypatch.setattr(remote_cache_module, "get_cache", get_cache)
+
+    with caplog.at_level(logging.WARNING, logger=remote_worker.__name__):
+        cache, run_hash = remote_worker._load_remote_cache(input_dir)
+
+    assert cache is None
+    assert run_hash is None
+    get_cache.assert_not_called()
+    record = next(record for record in caplog.records if record.name == remote_worker.__name__)
+    assert "Unsupported manifest version 2; expected 1" in record.exc_text
 
 
 def test_worker_logs_cache_read_failure(caplog):
@@ -567,6 +588,25 @@ class TestJob:
         assert loaded.backend_state == {"pid": 1234}
         assert loaded.run_hash == "aaaa"
         assert loaded.input_hashes == {"arg_0": "hash0"}
+
+    def test_save_is_atomic(self, tmp_path, monkeypatch):
+        """A failed temporary write must preserve the existing job handle."""
+        path = tmp_path / "job_x.json"
+        original_job = '{"job_id": "x", "status": "submitted"}'
+        path.write_text(original_job)
+
+        def fail_after_partial_write(_value, file, **_kwargs):
+            file.write('{"partial"')
+            raise OSError("simulated job write failure")
+
+        monkeypatch.setattr(job_module.json, "dump", fail_after_partial_write)
+        job = Job(job_id="x", backend="local", backend_config={}, backend_state={}, status="running")
+
+        with pytest.raises(OSError, match="simulated job write failure"):
+            job.save(path)
+
+        assert path.read_text() == original_job
+        assert not list(tmp_path.glob("*.tmp"))
 
     @pytest.mark.parametrize(
         "status",
@@ -703,7 +743,8 @@ class TestJob:
         backend.disconnect.assert_called_once_with()
         assert Job.load(tmp_path / "job_x.json").status == "canceled"
 
-    def test_fetch_delegates_to_backend_and_persists_results(self, tmp_path, monkeypatch):
+    @pytest.mark.parametrize("cleanup", [False, True])
+    def test_fetch_delegates_to_backend_and_persists_results(self, tmp_path, monkeypatch, cleanup):
         backend = MagicMock()
         backend.fetch.return_value = (-1.0, "wavefunction.h5")
         monkeypatch.setattr(remote_backends, "get_backend", MagicMock(return_value=backend))
@@ -716,15 +757,72 @@ class TestJob:
         )
         result_dir = tmp_path / "results"
 
-        result = job.fetch(local_dir=result_dir)
+        def assert_persisted_before_cleanup(backend_state):
+            assert backend_state == {"operation_id": "operation"}
+            persisted = Job.load(tmp_path / "job_x.json")
+            assert persisted.status == "retrieved"
+            assert persisted.output_hashes is not None
+
+        backend.cleanup_job.side_effect = assert_persisted_before_cleanup
+
+        result = job.fetch(local_dir=result_dir, cleanup=cleanup)
 
         backend.connect.assert_called_once_with()
         backend.fetch.assert_called_once_with({"operation_id": "operation"}, local_dir=result_dir)
+        if cleanup:
+            backend.cleanup_job.assert_called_once_with({"operation_id": "operation"})
+        else:
+            backend.cleanup_job.assert_not_called()
         backend.disconnect.assert_called_once_with()
         assert result == (-1.0, "wavefunction.h5")
         persisted = Job.load(tmp_path / "job_x.json")
         assert persisted.status == "retrieved"
         assert persisted.output_hashes is not None
+
+    def test_fetch_failure_preserves_backend_artifacts(self, monkeypatch):
+        backend = MagicMock()
+        backend.fetch.side_effect = ValueError("invalid output")
+        monkeypatch.setattr(remote_backends, "get_backend", MagicMock(return_value=backend))
+        job = Job(
+            job_id="x",
+            backend="discovery",
+            backend_config={},
+            backend_state={"operation_id": "operation"},
+        )
+
+        with pytest.raises(ValueError, match="invalid output"):
+            job.fetch(cleanup=True)
+
+        backend.cleanup_job.assert_not_called()
+        backend.disconnect.assert_called_once_with()
+
+    def test_cleanup_delegates_for_terminal_job(self, monkeypatch):
+        backend = MagicMock()
+        monkeypatch.setattr(remote_backends, "get_backend", MagicMock(return_value=backend))
+        job = Job(
+            job_id="x",
+            backend="discovery",
+            backend_config={},
+            backend_state={"operation_id": "operation"},
+            status="succeeded",
+        )
+
+        job.cleanup()
+
+        backend.connect.assert_called_once_with()
+        backend.cleanup_job.assert_called_once_with({"operation_id": "operation"})
+        backend.disconnect.assert_called_once_with()
+
+    def test_cleanup_rejects_nonterminal_job(self):
+        job = Job(
+            job_id="x",
+            backend="discovery",
+            backend_config={},
+            backend_state={"operation_id": "operation"},
+        )
+
+        with pytest.raises(RuntimeError, match="terminal state"):
+            job.cleanup()
 
     def test_output_hashes_round_trip(self, tmp_path):
         hashes = [{"hash": "h1", "type": "float", "value": -75.5}, {"hash": "h2", "type": "wavefunction"}]
@@ -822,11 +920,12 @@ class TestBackendContract:
 
         assert backend.submit_and_wait({}) == {"result": 42}
 
-        assert backend.config["poll_interval"] == 0.25
+        assert backend._backend_args["poll_interval"] == 0.25
         sleep.assert_called_once_with(0.25)
 
     def test_submit_and_wait_accepts_lowercase_success(self):
         backend = MagicMock(spec=RemoteBackend)
+        backend._backend_args = {"poll_interval": 0, "timeout": 1}
         backend._submit.return_value = ("job-id", {"backend": "state"})
         backend.check.return_value = JobStatus(job_id="job-id", status="succeeded")
         backend.fetch.return_value = {"result": 42}
@@ -834,6 +933,17 @@ class TestBackendContract:
         assert RemoteBackend.submit_and_wait(backend, {}) == {"result": 42}
 
         backend.fetch.assert_called_once_with({"backend": "state"})
+
+    def test_submit_and_wait_optionally_cleans_job(self):
+        backend = MagicMock(spec=RemoteBackend)
+        backend._backend_args = {"poll_interval": 0, "timeout": 1}
+        backend._submit.return_value = ("job-id", {"backend": "state"})
+        backend.check.return_value = JobStatus(job_id="job-id", status="succeeded")
+        backend.fetch.return_value = {"result": 42}
+
+        assert RemoteBackend.submit_and_wait(backend, {}, cleanup=True) == {"result": 42}
+
+        backend.cleanup_job.assert_called_once_with({"backend": "state"})
 
     def test_submit_and_wait_times_out_with_backend_error(self, monkeypatch):
         backend = LocalBackend(timeout=0)
@@ -884,26 +994,100 @@ class TestBackendContract:
 
 
 class TestLocalBackendSpecific:
+    def test_constructor_arguments_are_persisted(self, monkeypatch):
+        backend = LocalBackend(
+            poll_interval=0.25,
+            timeout=60,
+            python_path="/custom/python",
+        )
+        monkeypatch.setattr(backend, "_submit", MagicMock(return_value=("job-id", {})))
+
+        job = backend.submit({})
+
+        assert job.backend_config == {
+            "poll_interval": 0.25,
+            "timeout": 60,
+            "python_path": "/custom/python",
+        }
+        assert backend._backend_args == job.backend_config
+
+    def test_constructor_rejects_unknown_arguments(self):
+        with pytest.raises(TypeError, match="unexpected keyword argument"):
+            get_backend("local", timeot=60)
+
     def test_connect_creates_workdir(self):
-        b = LocalBackend()
-        b.connect()
-        assert Path(b.remote_workdir).exists()
-        b.disconnect()
+        backend = LocalBackend()
+        backend.connect()
+        assert Path(backend.remote_workdir).exists()
+        backend.disconnect()
 
     def test_disconnect_removes_workdir(self):
-        b = LocalBackend()
-        b.connect()
-        workdir = b.remote_workdir
-        b.disconnect()
+        backend = LocalBackend()
+        backend.connect()
+        workdir = backend.remote_workdir
+        backend.disconnect()
         assert not Path(workdir).exists()
 
-    def test_keep_workdir_option(self):
-        b = LocalBackend(keep_workdir=True)
-        b.connect()
-        workdir = b.remote_workdir
-        b.disconnect()
+    def test_disconnect_preserves_nonempty_workdir(self):
+        backend = LocalBackend()
+        backend.connect()
+        workdir = Path(backend.remote_workdir)
+        (workdir / "job_running").mkdir()
+
+        backend.disconnect()
+
         assert Path(workdir).exists()
         shutil.rmtree(workdir, ignore_errors=True)
+
+    def test_cleanup_job_is_idempotent_and_removes_empty_workdir(self, tmp_path):
+        workdir = tmp_path / "qdk_local"
+        job_workdir = workdir / "job_x"
+        output_dir = job_workdir / "output"
+        output_dir.mkdir(parents=True)
+        state = {
+            "workdir": str(workdir),
+            "job_workdir": str(job_workdir),
+            "output_dir": str(output_dir),
+        }
+        backend = LocalBackend()
+
+        backend.cleanup_job(state)
+        backend.cleanup_job(state)
+
+        assert not job_workdir.exists()
+        assert not workdir.exists()
+
+    def test_cleanup_job_preserves_sibling_jobs(self, tmp_path):
+        workdir = tmp_path / "qdk_local"
+        job_workdir = workdir / "job_x"
+        output_dir = job_workdir / "output"
+        output_dir.mkdir(parents=True)
+        sibling = workdir / "job_y"
+        sibling.mkdir()
+        backend = LocalBackend()
+
+        backend.cleanup_job(
+            {
+                "workdir": str(workdir),
+                "job_workdir": str(job_workdir),
+                "output_dir": str(output_dir),
+            }
+        )
+
+        assert not job_workdir.exists()
+        assert sibling.exists()
+
+    def test_cleanup_job_rejects_inconsistent_paths(self, tmp_path):
+        backend = LocalBackend()
+
+        with pytest.raises(ValueError, match="inconsistent"):
+            backend.cleanup_job(
+                {
+                    "workdir": str(tmp_path / "workdir"),
+                    "job_workdir": str(tmp_path / "other" / "job_x"),
+                    "output_dir": str(tmp_path / "other" / "job_x" / "output"),
+                }
+            )
 
     def test_submit_launches_remote_worker_module(self, monkeypatch):
         backend = LocalBackend()
@@ -960,6 +1144,27 @@ class TestLocalBackendSpecific:
 
         assert backend.check(state).status == "Failed"
         process_is_running.assert_called_once_with(1234)
+
+    def test_cancel_rehydrated_job_requires_matching_process_identity(self, monkeypatch):
+        backend = LocalBackend()
+        kill = MagicMock()
+        monkeypatch.setattr("os.kill", kill)
+        monkeypatch.setattr(local_backend_module, "_process_identity", MagicMock(return_value="linux:456"))
+
+        backend.cancel({"pid": 1234, "process_identity": "linux:456"})
+
+        kill.assert_called_once_with(1234, signal.SIGTERM)
+
+    def test_cancel_rehydrated_job_refuses_unverified_process(self, monkeypatch):
+        backend = LocalBackend()
+        kill = MagicMock()
+        monkeypatch.setattr("os.kill", kill)
+        monkeypatch.setattr(local_backend_module, "_process_identity", MagicMock(return_value="linux:789"))
+
+        with pytest.raises(RuntimeError, match="Cannot verify local job process identity"):
+            backend.cancel({"pid": 1234, "process_identity": "linux:456"})
+
+        kill.assert_not_called()
 
 
 class TestRunWithCache:

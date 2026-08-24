@@ -25,7 +25,9 @@ def _load_remote_cache(input_dir: Path) -> tuple[Any, str | None]:
     """Create the cache described by an input manifest, when available."""
     run_hash = None
     try:
-        manifest = json.loads((input_dir / "manifest.json").read_text())
+        from qdk_chemistry.remote.serialization import _load_manifest  # noqa: PLC0415
+
+        manifest = _load_manifest(input_dir / "manifest.json")
         run_hash = manifest.get("run_hash")
         cache_info = manifest.get("remote_cache")
         if not cache_info or not cache_info.get("name"):

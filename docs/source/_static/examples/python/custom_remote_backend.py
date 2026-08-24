@@ -17,9 +17,14 @@ from __future__ import annotations
 import shlex
 import subprocess
 import uuid
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
-from qdk_chemistry.remote.backends import JobStatus, RemoteBackend
+from qdk_chemistry.remote.backends import (
+    DEFAULT_POLL_INTERVAL,
+    DEFAULT_TIMEOUT,
+    JobStatus,
+    RemoteBackend,
+)
 
 
 def _parse_remote_pid(output: str) -> str | None:
@@ -37,19 +42,39 @@ class SSHBackend(RemoteBackend):
     in ``RemoteBackend``. The asynchronous job hooks ``_submit``, ``check``,
     ``cancel``, and ``fetch`` have default implementations that raise
     ``NotImplementedError``, so a backend can leave unsupported hooks unchanged.
-    This example overrides all four to support the complete asynchronous job
-    lifecycle.
+    This example overrides all five, including ``cleanup_job``, to support the
+    complete asynchronous job lifecycle.
     """
 
-    def __init__(self, **config):
+    def __init__(
+        self,
+        *,
+        host: str,
+        poll_interval: float = DEFAULT_POLL_INTERVAL,
+        timeout: float = DEFAULT_TIMEOUT,
+        remote_workdir: str = "/tmp/qdk_remote",
+        identity_file: str | Path | None = None,
+        ssh_options: list[str] | None = None,
+        python_path: str = "python3",
+    ) -> None:
         """Initialize the backend with a required SSH host."""
-        super().__init__(**config)
-        host = config.get("host")
         if not host:
-            raise ValueError(
-                "SSHBackend requires 'host' config option (e.g., 'user@hostname')"
-            )
+            raise ValueError("SSHBackend requires a host (e.g., 'user@hostname')")
+        super().__init__(
+            host=host,
+            poll_interval=poll_interval,
+            timeout=timeout,
+            remote_workdir=remote_workdir,
+            identity_file=str(identity_file) if identity_file else None,
+            ssh_options=list(ssh_options or []),
+            python_path=python_path,
+        )
         self.host: str = host
+        self.timeout = timeout
+        self.remote_workdir = remote_workdir
+        self.identity_file = identity_file
+        self.ssh_options = list(ssh_options or [])
+        self.python_path = python_path
 
     def connect(self) -> None:
         """Implement the abstract connection hook by testing SSH and creating a workdir."""
@@ -119,10 +144,9 @@ class SSHBackend(RemoteBackend):
     def _ssh_options(self) -> list[str]:
         """Build the common SSH and SCP options."""
         options = []
-        if "identity_file" in self.config:
-            options.extend(["-i", str(Path(self.config["identity_file"]).expanduser())])
-        if "ssh_options" in self.config:
-            options.extend(self.config["ssh_options"])
+        if self.identity_file is not None:
+            options.extend(["-i", str(Path(self.identity_file).expanduser())])
+        options.extend(self.ssh_options)
         return options
 
     def _ssh_cmd(self, remote_command: list[str]) -> list[str]:
@@ -181,14 +205,12 @@ class SSHBackend(RemoteBackend):
         finally:
             shutil.rmtree(local_input_dir, ignore_errors=True)
 
-        python_path = str(self.config.get("python_path", "python3"))
-
         # A detached worker and PID file are choices made by this direct-SSH
         # transport. A scheduler backend would submit through its scheduler and
         # record the resulting scheduler job ID instead.
         background_command = (
             f"cd {shlex.quote(remote_job_dir)} && "
-            f"nohup {shlex.quote(python_path)} -m qdk_chemistry.remote.worker "
+            f"nohup {shlex.quote(self.python_path)} -m qdk_chemistry.remote.worker "
             f"--input-dir {shlex.quote(remote_input_dir)} --output-dir {shlex.quote(remote_output_dir)} "
             f"> {shlex.quote(f'{remote_job_dir}/stdout.log')} "
             f"2> {shlex.quote(f'{remote_job_dir}/stderr.log')} & "
@@ -268,7 +290,11 @@ class SSHBackend(RemoteBackend):
             if pid is not None:
                 self._run_remote(f"kill {pid} 2>/dev/null", timeout=10)
 
-    def fetch(self, backend_state: dict, local_dir: str | Path | None = None) -> dict:
+    def fetch(
+        self,
+        backend_state: dict,
+        local_dir: str | Path | None = None,
+    ) -> dict:
         """Override the optional async fetch hook to download and deserialize results."""
         import json
         import shutil
@@ -308,6 +334,25 @@ class SSHBackend(RemoteBackend):
             if own_temporary_directory:
                 shutil.rmtree(local_dir, ignore_errors=True)
 
+    def cleanup_job(self, backend_state: dict) -> None:
+        """Remove artifacts owned by one completed SSH job."""
+        remote_workdir = PurePosixPath(self.remote_workdir)
+        remote_job_dir = PurePosixPath(backend_state["remote_job_dir"])
+        remote_output_dir = PurePosixPath(backend_state["remote_output_dir"])
+        if (
+            remote_job_dir.parent != remote_workdir
+            or remote_output_dir.parent != remote_job_dir
+        ):
+            raise ValueError(
+                "Remote job paths are inconsistent with the configured work directory"
+            )
+
+        result = self._run_remote(
+            f"rm -rf -- {shlex.quote(str(remote_job_dir))}", timeout=30
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"Failed to clean up remote job: {result.stderr}")
+
 
 # end-cell-custom-remote-backend
 ################################################################################
@@ -340,4 +385,45 @@ def create_ssh_backend():
 
 
 # end-cell-custom-remote-usage
+################################################################################
+
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    structure: Any
+    algorithm: Any
+    args: tuple[Any, ...]
+
+
+################################################################################
+# start-cell-custom-remote-run
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.remote import create_remote
+
+scf = create("scf_solver")
+remote = create_remote("ssh", host="user@compute.example.com")
+try:
+    energy, wavefunction = scf.run(
+        structure,
+        0,
+        1,
+        "cc-pvdz",
+        remote=remote,
+        cache="./cache",
+    )
+finally:
+    remote.disconnect()
+
+# end-cell-custom-remote-run
+################################################################################
+
+
+################################################################################
+# start-cell-custom-remote-shared-cache
+from qdk_chemistry.remote.cache import FolderCache
+
+cache = FolderCache("/mnt/shared/qdk-cache", is_shared=True)
+result = algorithm.run(*args, remote=remote, cache=cache)
+
+# end-cell-custom-remote-shared-cache
 ################################################################################

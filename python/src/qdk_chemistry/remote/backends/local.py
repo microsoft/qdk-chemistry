@@ -18,8 +18,9 @@ import sys
 import tempfile
 import uuid
 from pathlib import Path
+from typing import Any
 
-from .base import JobStatus, RemoteBackend, register_backend
+from .base import DEFAULT_POLL_INTERVAL, DEFAULT_TIMEOUT, JobStatus, RemoteBackend, register_backend
 
 __all__ = ["LocalBackend"]
 
@@ -75,6 +76,58 @@ def _process_is_running(pid: int) -> bool:
     return True
 
 
+def _windows_process_identity(pid: int) -> str | None:
+    """Return the immutable creation time for a Windows process."""
+    import ctypes  # noqa: PLC0415
+    from ctypes import wintypes  # noqa: PLC0415
+
+    process_query_limited_information = 0x1000
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
+    kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.GetProcessTimes.argtypes = (
+        wintypes.HANDLE,
+        ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME),
+    )
+    kernel32.GetProcessTimes.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    kernel32.CloseHandle.restype = wintypes.BOOL
+
+    handle = kernel32.OpenProcess(process_query_limited_information, False, pid)
+    if not handle:
+        return None
+
+    try:
+        creation_time = wintypes.FILETIME()
+        exit_time = wintypes.FILETIME()
+        kernel_time = wintypes.FILETIME()
+        user_time = wintypes.FILETIME()
+        if not kernel32.GetProcessTimes(handle, creation_time, exit_time, kernel_time, user_time):
+            return None
+        return f"windows:{creation_time.dwHighDateTime}:{creation_time.dwLowDateTime}"
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def _process_identity(pid: int) -> str | None:
+    """Return an immutable OS identity for a process, when supported."""
+    if sys.platform == "win32":
+        return _windows_process_identity(pid)
+
+    if sys.platform.startswith("linux"):
+        try:
+            process_stat = Path(f"/proc/{pid}/stat").read_text()
+            stat_fields = process_stat.rsplit(")", maxsplit=1)[1].split()
+            return f"linux:{stat_fields[19]}"
+        except (FileNotFoundError, IndexError, OSError):
+            return None
+
+    return None
+
+
 @register_backend("local")
 class LocalBackend(RemoteBackend):
     """Backend for local execution (useful for testing remote workflows).
@@ -93,7 +146,6 @@ class LocalBackend(RemoteBackend):
 
     Config options:
         timeout (int): Execution timeout in seconds (default: 3600).
-        keep_workdir (bool): If True, don't delete temp workdir (for debugging).
 
     Example:
         >>> from qdk_chemistry.algorithms import create
@@ -104,14 +156,27 @@ class LocalBackend(RemoteBackend):
 
     """
 
-    def __init__(self, **config):
+    def __init__(
+        self,
+        *,
+        poll_interval: float = DEFAULT_POLL_INTERVAL,
+        timeout: float = DEFAULT_TIMEOUT,
+        python_path: str | Path = sys.executable,
+    ) -> None:
         """Initialize the local backend.
 
         Args:
-            **config: Configuration options.
+            poll_interval: Seconds between job status checks.
+            timeout: Maximum execution time in seconds.
+            python_path: Python executable used to launch the remote worker.
 
         """
-        super().__init__(**config)
+        super().__init__(
+            poll_interval=poll_interval,
+            timeout=timeout,
+            python_path=str(python_path),
+        )
+        self.python_path = python_path
         self._workdir: Path | None = None
         self._processes: dict[int, subprocess.Popen] = {}
 
@@ -121,9 +186,10 @@ class LocalBackend(RemoteBackend):
         self.remote_workdir = str(self._workdir)
 
     def disconnect(self) -> None:
-        """Clean up the temporary working directory."""
-        if self._workdir and self._workdir.exists() and not self.config.get("keep_workdir", False):
-            shutil.rmtree(self._workdir, ignore_errors=True)
+        """Remove the connection workspace when it contains no jobs."""
+        if self._workdir is not None:
+            with contextlib.suppress(OSError):
+                self._workdir.rmdir()
 
     def upload(self, local_path: str | Path, remote_path: str) -> None:
         """Copy a file to the 'remote' working directory.
@@ -181,7 +247,7 @@ class LocalBackend(RemoteBackend):
             remote_cache_backend=payload.get("remote_cache_backend"),
         )
 
-        python_path = str(self.config.get("python_path", sys.executable))
+        python_path = str(self.python_path)
         with (job_workdir / "stdout.log").open("w") as stdout, (job_workdir / "stderr.log").open("w") as stderr:
             proc = subprocess.Popen(
                 [
@@ -200,6 +266,8 @@ class LocalBackend(RemoteBackend):
 
         backend_state = {
             "pid": proc.pid,
+            "process_identity": _process_identity(proc.pid),
+            "workdir": str(self._workdir),
             "output_dir": str(output_dir),
             "job_workdir": str(job_workdir),
         }
@@ -249,10 +317,18 @@ class LocalBackend(RemoteBackend):
             process.terminate()
             return
 
+        expected_identity = backend_state.get("process_identity")
+        if expected_identity is None or _process_identity(backend_state["pid"]) != expected_identity:
+            raise RuntimeError("Cannot verify local job process identity; refusing to terminate it.")
+
         with contextlib.suppress(ProcessLookupError):
             os.kill(backend_state["pid"], signal.SIGTERM)
 
-    def fetch(self, backend_state: dict, local_dir: str | Path | None = None) -> dict:
+    def fetch(
+        self,
+        backend_state: dict,
+        local_dir: str | Path | None = None,
+    ) -> Any:
         """Deserialize results from a completed local job."""
         from qdk_chemistry.remote.serialization import (  # noqa: PLC0415
             deserialize_outputs,
@@ -268,6 +344,21 @@ class LocalBackend(RemoteBackend):
             local_dir.mkdir(parents=True, exist_ok=True)
             for f in output_path.iterdir():
                 shutil.copy2(f, local_dir / f.name)
-            return deserialize_outputs(local_dir)
+            result = deserialize_outputs(local_dir)
+        else:
+            result = deserialize_outputs(output_path)
 
-        return deserialize_outputs(output_path)
+        return result
+
+    def cleanup_job(self, backend_state: dict) -> None:
+        """Remove one local job directory and its parent when empty."""
+        workdir = Path(backend_state["workdir"]).resolve()
+        job_workdir = Path(backend_state["job_workdir"]).resolve()
+        output_dir = Path(backend_state["output_dir"]).resolve()
+        if job_workdir.parent != workdir or output_dir.parent != job_workdir:
+            raise ValueError("Local job paths are inconsistent with the backend work directory")
+
+        with contextlib.suppress(FileNotFoundError):
+            shutil.rmtree(job_workdir)
+        with contextlib.suppress(OSError):
+            workdir.rmdir()

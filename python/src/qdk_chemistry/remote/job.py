@@ -13,7 +13,9 @@ be recovered across sessions.
 from __future__ import annotations
 
 import json
+import os
 import pathlib
+import tempfile
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
@@ -112,7 +114,7 @@ class Job:
         return d
 
     def save(self, path: str | pathlib.Path | None = None) -> pathlib.Path:
-        """Write the job file to disk.
+        """Write the job file to disk atomically.
 
         Args:
             path: Explicit file path.  If *None*, uses :attr:`file_path`
@@ -131,7 +133,22 @@ class Job:
             raise ValueError("No file path specified.  Pass a path or set job.file_path.")
         path = pathlib.Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(self.to_dict(), indent=2))
+        temporary_path: pathlib.Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=path.parent,
+                suffix=".tmp",
+                delete=False,
+            ) as file:
+                temporary_path = pathlib.Path(file.name)
+                json.dump(self.to_dict(), file, indent=2)
+            os.replace(temporary_path, path)
+        except BaseException:
+            if temporary_path is not None:
+                temporary_path.unlink(missing_ok=True)
+            raise
         self.file_path = path
         return path
 
@@ -227,24 +244,59 @@ class Job:
         if self.file_path is not None:
             self.save()
 
-    def fetch(self, local_dir: str | pathlib.Path | None = None) -> Any:
-        """Download results, persist their hashes, and return the result."""
+    def fetch(
+        self,
+        local_dir: str | pathlib.Path | None = None,
+        *,
+        cleanup: bool = False,
+    ) -> Any:
+        """Download and persist results, then optionally remove backend artifacts.
+
+        Args:
+            local_dir: Optional directory to download result files into.
+            cleanup: Whether to remove backend job artifacts after successful
+                retrieval and persistence.
+
+        Returns:
+            The deserialized algorithm results.
+
+        """
         backend = self._get_backend()
         try:
             result = backend.fetch(self.backend_state, local_dir=local_dir)
+
+            self.status = "retrieved"
+            try:
+                from qdk_chemistry.data._hashing import collect_content_hashes  # noqa: PLC0415
+
+                self.output_hashes = collect_content_hashes(result)
+            except Exception:  # noqa: BLE001
+                pass
+            if self.file_path is not None:
+                self.save()
+            if cleanup:
+                backend.cleanup_job(self.backend_state)
+            return result
         finally:
             backend.disconnect()
 
-        self.status = "retrieved"
-        try:
-            from qdk_chemistry.data._hashing import collect_content_hashes  # noqa: PLC0415
+    def cleanup(self) -> None:
+        """Remove backend artifacts for this terminal job.
 
-            self.output_hashes = collect_content_hashes(result)
-        except Exception:  # noqa: BLE001
-            pass
-        if self.file_path is not None:
-            self.save()
-        return result
+        Repeated cleanup is safe when supported by the backend.
+
+        Raises:
+            RuntimeError: If the job has not reached a terminal state.
+
+        """
+        if not self.is_terminal:
+            raise RuntimeError("Cannot clean up a job before it reaches a terminal state")
+
+        backend = self._get_backend()
+        try:
+            backend.cleanup_job(self.backend_state)
+        finally:
+            backend.disconnect()
 
     # ── Conveniences ─────────────────────────────────────────────────────
 

@@ -436,4 +436,4 @@ def test_unified_plugin_registers_remote_backend(monkeypatch):
 
     backend = get_backend("plugin-remote", endpoint="compute.example.com")
     assert isinstance(backend, PluginRemoteBackend)
-    assert backend.config["endpoint"] == "compute.example.com"
+    assert backend._backend_args["endpoint"] == "compute.example.com"

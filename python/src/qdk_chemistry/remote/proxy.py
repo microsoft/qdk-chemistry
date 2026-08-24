@@ -86,8 +86,10 @@ class RemoteAlgorithmProxy:
         This method:
         1. Serializes all arguments to HDF5
         2. Uploads to the remote system
-        3. Generates and executes a Python script
-        4. Downloads and deserializes the results
+        3. Generates a python script that deserializes the inputs, runs the algorithm, and serializes the outputs
+        4. Executes the script on the remote system (possible polling)
+        5. Downloads the results
+        6. Deserializes all results
 
         Args:
             *args: Positional arguments for the algorithm's run method.
