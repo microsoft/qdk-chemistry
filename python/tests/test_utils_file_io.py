@@ -251,28 +251,37 @@ def test_clean_up_after_initial_reservation_fstat_failure(
 ):
     destination = tmp_path / "data.txt"
     fstat = file_io_module.os.fstat
-    fstat_calls = 0
+    create_exclusive_file = file_io_module._create_exclusive_file
+    reservation_descriptor: int | None = None
+    reservation_fstat_calls = 0
     closed_descriptors: list[int] = []
     close_descriptor = file_io_module._close_descriptor
 
+    def create_and_track_reservation(temporary_path: Path) -> int:
+        nonlocal reservation_descriptor
+        reservation_descriptor = create_exclusive_file(temporary_path)
+        return reservation_descriptor
+
     def fail_initial_reservation_fstat(descriptor: int) -> os.stat_result:
-        nonlocal fstat_calls
-        fstat_calls += 1
-        if fstat_calls == 2:
-            raise OSError("identity snapshot failed")
+        nonlocal reservation_fstat_calls
+        if descriptor == reservation_descriptor:
+            reservation_fstat_calls += 1
+            if reservation_fstat_calls == 1:
+                raise OSError("identity snapshot failed")
         return fstat(descriptor)
 
     def record_close(descriptor: int) -> OSError | None:
         closed_descriptors.append(descriptor)
         return close_descriptor(descriptor)
 
+    monkeypatch.setattr(file_io_module, "_create_exclusive_file", create_and_track_reservation)
     monkeypatch.setattr(file_io_module.os, "fstat", fail_initial_reservation_fstat)
     monkeypatch.setattr(file_io_module, "_close_descriptor", record_close)
 
     with pytest.raises(OSError, match="identity snapshot failed"):
         write_text_file_atomically(destination, "contents")
 
-    assert fstat_calls == 3
+    assert reservation_fstat_calls == 2
     assert len(closed_descriptors) == 1
     assert list(tmp_path.iterdir()) == []
 
