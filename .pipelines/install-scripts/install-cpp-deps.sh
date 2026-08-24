@@ -202,9 +202,6 @@ wget -q "$LIBINT_URL"
 if [[ "$MAC_BUILD" == "ON" ]]; then
     tar xzf "$LIBINT_TARBALL"
 else
-    # This release tarball was packaged on macOS and carries a macOS-specific extended tar header
-    # (LIBARCHIVE.xattr.com.apple.provenance) that GNU tar (Linux) doesn't understand; it's harmless, but GNU tar
-    # prints one warning per archive entry for it, so silence just that one warning category.
     tar xzf "$LIBINT_TARBALL" --warning=no-unknown-keyword
 fi
 # The tarball libint-2.9.0-mpqc4.tgz extracts to libint-2.9.0, not libint-2.9.0-mpqc4
