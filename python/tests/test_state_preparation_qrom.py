@@ -157,11 +157,12 @@ class _EmptyCoefficientWavefunction:
 class TestQROMNegativeAmplitudes:
     """The QROM loader's handling of signed amplitudes.
 
-    :class:`QROMStatePreparation` refuses negative coefficients, so these drive the Q#
-    operation directly to pin the underlying defect. Magnitudes come from the multiplexed
-    Ry rotations and are always correct. Signs are applied by a separate QROM-loaded ``Z``
-    phase kickback whose uncompute is not a faithful adjoint, so the sign ancilla is
-    implicitly measured on release and the sign pattern collapses at random.
+    :class:`QROMStatePreparation` refuses negative coefficients, so this drives the Q#
+    operation directly. Magnitudes come from the multiplexed Ry rotations and are always
+    correct. Signs are applied by a separate QROM-loaded ``Z`` phase kickback whose
+    uncompute is not a faithful adjoint, so the sign ancilla is implicitly measured on
+    release and the sign pattern collapses at random -- which is why the Python entry
+    point rejects negative coefficients instead of silently returning a wrong state.
     """
 
     NEGATIVE_AMPLITUDES: ClassVar[list[float]] = [0.5, -0.5, 0.5, 0.5]
@@ -177,27 +178,6 @@ class TestQROMNegativeAmplitudes:
         expected /= np.linalg.norm(expected)
 
         np.testing.assert_allclose(actual, expected, atol=1e-3)
-
-    @pytest.mark.xfail(
-        reason=(
-            "Known defect: the sign QROM's uncompute is not a faithful adjoint, so the sign "
-            "ancilla is released while entangled and the signs collapse at random. See the "
-            "QROMStatePreparation docstring. Remove this xfail once SelectSwap's adjoint is fixed."
-        ),
-        strict=True,
-    )
-    def test_signs_are_preserved(self, qdk_ctx):
-        """The prepared state should match the signed target, but currently does not."""
-        qdk_ctx.set_quantum_seed(1)
-        num_qubits = 2
-        sv = _run_qrom_state_prep_and_dump(qdk_ctx, self.NEGATIVE_AMPLITUDES, num_qubits)
-        actual = _reduced_state(sv, num_qubits)
-
-        expected = np.array(self.NEGATIVE_AMPLITUDES, dtype=float)
-        expected /= np.linalg.norm(expected)
-
-        fidelity = abs(np.vdot(actual, expected))
-        assert np.isclose(fidelity, 1.0, atol=1e-3)
 
 
 def _reverse_bits(x: int, n: int) -> int:

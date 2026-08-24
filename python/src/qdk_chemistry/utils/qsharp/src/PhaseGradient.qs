@@ -85,7 +85,7 @@ namespace QDKChemistry.Utils.PhaseGradient {
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// Test wrapper: apply Ry via phase gradient on |0⟩ and leave state.
-    operation TestRy(angleValue : Int, nBits : Int) : Unit {
+    internal operation TestRy(angleValue : Int, nBits : Int) : Unit {
         let target = QIR.Runtime.AllocateQubitArray(1);
         let angle = QIR.Runtime.AllocateQubitArray(nBits);
         let pg = QIR.Runtime.AllocateQubitArray(nBits);
@@ -123,7 +123,7 @@ namespace QDKChemistry.Utils.PhaseGradient {
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// Test wrapper: apply Ry then Adjoint Ry (round-trip identity check).
-    operation TestRyRoundtrip(angleValue : Int, nBits : Int) : Unit {
+    internal operation TestRyRoundtrip(angleValue : Int, nBits : Int) : Unit {
         let target = QIR.Runtime.AllocateQubitArray(1);
         let angle = QIR.Runtime.AllocateQubitArray(nBits);
         let pg = QIR.Runtime.AllocateQubitArray(nBits);

@@ -249,7 +249,7 @@ namespace QDKChemistry.Utils.QROMStatePrep {
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// Test wrapper: run QROM state preparation and leave state for dump_machine.
-    operation RunQROMStatePrep(
+    internal operation RunQROMStatePrep(
         amplitudes : Double[],
         rotationBitPrecision : Int,
         numStateQubits : Int,

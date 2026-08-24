@@ -426,7 +426,7 @@ namespace QDKChemistry.Utils.AliasSampling {
     ///
     /// The register is intentionally leaked (``AllocateQubitArray`` rather than ``use``)
     /// so the prepared state survives the call and can be read with ``dump_machine``.
-    operation RunAliasSamplingPrep(
+    internal operation RunAliasSamplingPrep(
         coefficients : Double[],
         bitsPrecision : Int,
         numIndexQubits : Int,
@@ -443,7 +443,7 @@ namespace QDKChemistry.Utils.AliasSampling {
     }
 
     /// Test wrapper: run conditional alias sampling and leave state for dump_machine.
-    operation RunConditionalAliasSamplingPrep(
+    internal operation RunConditionalAliasSamplingPrep(
         coefficients : Double[][],
         bitsPrecision : Int,
         conditionValue : Int,
@@ -479,7 +479,7 @@ namespace QDKChemistry.Utils.AliasSampling {
     }
 
     /// Test wrapper: run conditional alias sampling with free-rider data.
-    operation RunConditionalAliasSamplingPrepWithFreeRider(
+    internal operation RunConditionalAliasSamplingPrepWithFreeRider(
         coefficients : Double[][],
         freeRiderData : Bool[][],
         bitsPrecision : Int,

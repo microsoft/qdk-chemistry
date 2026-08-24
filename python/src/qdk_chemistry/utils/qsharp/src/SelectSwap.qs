@@ -263,7 +263,7 @@ namespace QDKChemistry.Utils.SelectSwap {
 
     /// 1D SelectSwap correctness: set address to |addr⟩, apply SelectSwap in within/apply,
     /// CNOT result to persistent copy register, then verify copy matches expected data.
-    operation TestSelectSwap1DCorrectness(
+    internal operation TestSelectSwap1DCorrectness(
         data : Bool[][],
         numSwapBits : Int
     ) : Bool {
@@ -300,7 +300,7 @@ namespace QDKChemistry.Utils.SelectSwap {
 
     /// 2D Select2DLoad correctness: for each (i,j), load data[i][j] into target,
     /// CNOT to copy, verify.
-    operation TestSelect2DLoadCorrectness(
+    internal operation TestSelect2DLoadCorrectness(
         data : Bool[][][],
         numSwapBits : Int
     ) : Bool {
