@@ -8,8 +8,8 @@ set -e
 # Arguments:
 #   cpp_cgmanifest_path   - Full path to cpp/manifest/qdk-chemistry/cgmanifest.json
 #   macis_cgmanifest_path - Full path to external/macis/manifest/cgmanifest.json
-#   blas_vendor           - BLAS++'s `-Dblas=` value (default: "openblas" on Linux, "auto" on macOS -- see
-#                           install-blaspp.sh for the full set of supported values).
+#   blas_vendor           - BLAS++'s `-Dblas=` value (default: "auto" -- see install-blaspp.sh for the full set
+#                           of supported values).
 
 if [[ $# -lt 2 || $# -gt 3 ]]; then
     echo "Usage: $0 <cpp_cgmanifest_path> <macis_cgmanifest_path> [blas_vendor]"
@@ -21,7 +21,7 @@ fi
 
 CGMANIFEST="$1"
 MACIS_CGMANIFEST="$2"
-BLAS_VENDOR="${3:-}"
+BLAS_VENDOR="${3:-auto}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -55,17 +55,6 @@ fi
 MAC_BUILD="OFF"
 if [[ "$OSTYPE" == "darwin"* ]]; then
     MAC_BUILD="ON"
-fi
-
-# BLAS vendor for BLAS++: openblas on Linux (installed via apt); on macOS there's no BLAS package installed, so
-# leave it as "auto" so BLAS++ finds Apple's Accelerate framework itself. Callers (e.g. the ADO BLIS+LibFLAME
-# pipeline) can override this by passing blas_vendor as the 3rd argument.
-if [[ -z "${BLAS_VENDOR}" ]]; then
-    if [[ "$MAC_BUILD" == "ON" ]]; then
-        BLAS_VENDOR="auto"
-    else
-        BLAS_VENDOR="openblas"
-    fi
 fi
 
 # Helper function to extract commit hash from cgmanifest by repository URL pattern
