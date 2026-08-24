@@ -158,6 +158,16 @@ echo "==> HDF5: cflags='${HDF5_CFLAGS}' libs='${HDF5_LIBS}'"
 # Flags shared by both the TAMM and ExaChem configure lines below. USE_HDF5=OFF disables TAMM's parallel-HDF5 layer
 # (the base HDF5 here, like qdk-chemistry's own, is serial-only); USE_SERIAL_IO selects ExaChem's serial-I/O SCF
 # path instead. These MUST be identical on both configure lines, or ExaChem's CMSB reconfigures/rebuilds TAMM.
+#
+# CMSB_DEBUG_CMAKE=OFF: despite its name (upstream's own comment calls it "enable lots of extra CMake printing"),
+# this NWChemEx-Project/CMakeBuild option also controls the *search strategy* for its externally-buildable
+# dependencies (cmake/macros/DependencyMacros.cmake: cmsb_find_dependency): when ON (the CMSB default), BLAS and
+# LAPACK are looked up via find_package(... CONFIG NO_DEFAULT_PATH), which apt's libopenblas-dev satisfies for
+# neither (it ships no BLASConfig.cmake/LAPACKConfig.cmake), so CMSB always rebuilds its own static, generic-target
+# OpenBLAS from source -- wasted CI time, and a real risk if that build ever ended up sharing a prefix with
+# anything else. With CMSB_DEBUG_CMAKE=OFF, the same dependencies fall back to a plain find_package(... QUIET),
+# which uses CMake's stock FindBLAS.cmake/FindLAPACK.cmake (MODULE mode, default search path, no NO_DEFAULT_PATH)
+# and correctly finds the system OpenBLAS instead of rebuilding it.
 COMMON_CMAKE_ARGS=(
   -DCMAKE_BUILD_TYPE=Release
   -DMODULES="${MODULES}"
@@ -167,6 +177,7 @@ COMMON_CMAKE_ARGS=(
   -DTAMM_CXX_FLAGS="-DUSE_SERIAL_IO ${HDF5_CFLAGS}"
   -DLibInt2_ROOT="${CPP_DEPS_PREFIX}"
   -DGauXC_ROOT="${CPP_DEPS_PREFIX}"
+  -DCMSB_DEBUG_CMAKE=OFF
 )
 
 # --------------------------------------------------------------------------------------------------------------------
