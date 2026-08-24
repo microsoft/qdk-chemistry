@@ -91,13 +91,17 @@ def test_tutorial_graphviz_figures_render_as_transparent_svg():
     assert "<SUB>" not in unapproved_subscripts
 
     configuration = ast.parse((REPOSITORY_ROOT / "docs" / "source" / "conf.py").read_text(encoding="utf-8"))
-    output_formats = [
-        node.value.value
-        for node in configuration.body
-        if isinstance(node, ast.Assign)
-        and any(isinstance(target, ast.Name) and target.id == "graphviz_output_format" for target in node.targets)
-        and isinstance(node.value, ast.Constant)
-    ]
+    output_formats = []
+    for node in configuration.body:
+        if isinstance(node, ast.Assign):
+            targets = node.targets
+        elif isinstance(node, ast.AnnAssign):
+            targets = [node.target]
+        else:
+            continue
+        if any(isinstance(target, ast.Name) and target.id == "graphviz_output_format" for target in targets):
+            assert isinstance(node.value, ast.Constant)
+            output_formats.append(node.value.value)
     assert output_formats == ["svg"]
 
 

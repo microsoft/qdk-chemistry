@@ -154,7 +154,7 @@ breathe_default_members = (
     "show-inheritance",  # Show base classes in documentation
 )
 
-# Render Graphviz diagrams as scalable assets with transparent backgrounds.
+# Render Graphviz diagrams as SVG; each DOT source controls its canvas background.
 graphviz_output_format = "svg"
 
 # HTML output and theme settings

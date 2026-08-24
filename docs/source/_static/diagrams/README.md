@@ -1,8 +1,9 @@
 # Ground-state QPE tutorial figures
 
 The ground-state molecular-QPE tutorial uses Graphviz diagrams, generated plots,
-orbital renders, and logical-circuit diagrams. Generation is a documentation
-maintenance task and does not run during a Sphinx build.
+orbital renders, and logical-circuit diagrams. PNG regeneration is a
+documentation-maintenance task outside the Sphinx build; Sphinx renders the
+committed DOT sources through Graphviz during the build.
 
 ## Generated plots
 
