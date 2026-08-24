@@ -697,6 +697,22 @@ class BasisSet : public DataClass,
   const std::vector<size_t>& get_ecp_electrons() const;
 
   /**
+   * @brief Get effective nuclear charges after accounting for ECP electrons
+   * @return Vector of effective nuclear charges for each atom
+   * @throws std::runtime_error if no structure is associated with this basis
+   * set
+   */
+  Eigen::VectorXd get_effective_nuclear_charges() const;
+
+  /**
+   * @brief Calculate nuclear repulsion using ECP-adjusted nuclear charges
+   * @return Effective nuclear repulsion energy in atomic units (Hartree)
+   * @throws std::runtime_error if no structure is associated with this basis
+   * set
+   */
+  double calculate_effective_nuclear_repulsion_energy() const;
+
+  /**
    * @brief Check if ECP electrons are present
    * @return True if ECP electrons are present
    */
