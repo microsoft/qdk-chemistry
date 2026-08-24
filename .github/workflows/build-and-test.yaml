@@ -82,29 +82,6 @@ jobs:
       CMAKE_BUILD_PARALLEL_LEVEL: ${{ matrix.build-parallel }}
       QDK_UARCH: ${{ matrix.uarch }}
     steps:
-    - name: Free up disk space (Linux)
-      if: matrix.os-name == 'Linux'
-      run: |
-        echo "=== Disk space before cleanup ==="
-        df -h
-
-        # Remove unnecessary large packages commonly present on GitHub runners
-        sudo rm -rf /usr/share/dotnet || true
-        sudo rm -rf /usr/local/lib/android || true
-        sudo rm -rf /opt/ghc || true
-        sudo rm -rf /opt/hostedtoolcache/go || true
-        sudo rm -rf /opt/hostedtoolcache/Ruby || true
-
-        # Clean apt cache
-        sudo apt-get clean || true
-
-        echo "=== Disk space after cleanup ==="
-        df -h
-
-        echo "Workspace path: ${{ github.workspace }}"
-        echo "Space available:"
-        df -h "${{ github.workspace }}"
-
     - name: Checkout repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
