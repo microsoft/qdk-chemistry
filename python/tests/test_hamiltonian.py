@@ -1265,7 +1265,7 @@ class TestX2CHamiltonian:
         assert not h.is_unrestricted()
 
     def test_unrestricted_reference(self, x2c_unrestricted_hamiltonian):
-        """Verify unrestricted X2C against exact-QDK-input PySCF references."""
+        """Verify unrestricted X2C one-body reference traces."""
         hamiltonian = x2c_unrestricted_hamiltonian
         assert hamiltonian.is_unrestricted()
         one_body_alpha, one_body_beta = hamiltonian.get_one_body_integrals()

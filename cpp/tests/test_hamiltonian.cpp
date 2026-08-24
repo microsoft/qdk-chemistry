@@ -28,9 +28,9 @@
 #include <sstream>
 #include <stdexcept>
 
-#include "qdk/chemistry/algorithms/microsoft/scalar_relativistic_hamiltonian.hpp"
 #include "qdk/chemistry/algorithms/microsoft/utils.hpp"
 #include "ut_common.hpp"
+#include "util/one_body.h"
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
 
@@ -2955,7 +2955,7 @@ TEST_F(HamiltonianConstructorTest, X2CDecontractionUsesExactExponentKeys) {
     BasisSet basis_set("exponent-keys", shells, structure);
     auto internal =
         qdk::chemistry::utils::microsoft::convert_basis_set_from_qdk(basis_set);
-    return microsoft::detail::decontract_basis(internal);
+    return qdk::chemistry::scf::detail::decontract_basis(internal);
   };
 
   const auto exact_duplicates = decontract({1.0, 1.0});
@@ -2992,7 +2992,7 @@ TEST_F(HamiltonianConstructorTest, X2CRestrictedOpenShellOrbitals) {
   auto h_x2c = x2c->run(explicit_rohf_orbitals);
   ASSERT_TRUE(h_x2c->is_restricted());
   auto [one_body_alpha, one_body_beta] = h_x2c->get_one_body_integrals();
-  // Generated with PySCF using exact QDK STO-3G shells, QDK's speed of light,
+  // Reference uses exact QDK STO-3G shells, QDK's speed of light,
   // and QDK ROHF coefficients. The default integral_dressing="x2c_1e" path
   // is used.
   constexpr double expected_trace = -64.643371650436904;
@@ -3003,7 +3003,7 @@ TEST_F(HamiltonianConstructorTest, X2CRestrictedOpenShellOrbitals) {
 }
 
 TEST_F(HamiltonianConstructorTest, X2CAbsoluteOneBodyReferences) {
-  // Generated with PySCF using exact QDK basis shells, QDK's speed of light,
+  // Reference uses exact QDK basis shells, QDK's speed of light,
   // and QDK SCF orbital coefficients.
   for (const std::string factory_name : {"qdk", "qdk_cholesky"}) {
     for (const auto& [integral_dressing, expected_trace] :
@@ -3033,7 +3033,7 @@ TEST_F(HamiltonianConstructorTest, X2CUnrestrictedO2Reference) {
   ASSERT_TRUE(h_x2c->is_unrestricted());
 
   auto [one_body_alpha, one_body_beta] = h_x2c->get_one_body_integrals();
-  // Generated with PySCF using exact QDK cc-pVDZ shells, QDK's speed of light,
+  // Reference uses exact QDK cc-pVDZ shells, QDK's speed of light,
   // and QDK UHF orbital coefficients. The default
   // integral_dressing="x2c_1e" path is used.
   EXPECT_NEAR(one_body_alpha.trace(), -267.86977556398796,

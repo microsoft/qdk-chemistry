@@ -114,44 +114,20 @@ The native QDK/Chemistry implementation for Hamiltonian construction. Transforms
 
 .. list-table::
    :header-rows: 1
-   :widths: 25 25 50
+   :widths: 25 15 15 45
 
    * - Setting
      - Type
+     - Default
      - Description
    * - ``eri_method``
      - string
+     - ``"direct"``
      - Method for computing electron repulsion integrals ("direct" or "incore")
    * - ``integral_dressing``
      - string
-     - One-electron integral dressing ("", "x2c_1e", or "x2c_1e_contracted"). Default: ""
-
-Spin-Free X2C-1e Option
-~~~~~~~~~~~~~~~~~~~~~~~
-
-.. rubric:: Setting: ``integral_dressing="x2c_1e"`` or ``integral_dressing="x2c_1e_contracted"``
-
-The ``integral_dressing`` setting applies spin-free exact-two-component scalar-relativistic corrections to the one-electron Hamiltonian using the exact-decoupling formulation :cite:`Kutzelnigg2005,Liu2009X2C`.
-The X2C-1e path constructs the modified Dirac Hamiltonian from the :term:`AO` overlap, kinetic, nuclear-attraction, and spin-free :math:`\boldsymbol{p}V\boldsymbol{p}` integrals, selects its electronic states, and projects their energies back into the original AO metric.
-
-This implementation uses the X2C-1e approximation: the two-electron integrals are not transformed, and spin-orbit terms are not included.
-ECPs and Cartesian atomic orbitals are not supported.
-With ``integral_dressing="x2c_1e"``, contracted basis functions are decontracted for the X2C transformation and the resulting one-electron Hamiltonian is then exactly recontracted.
-Use ``integral_dressing="x2c_1e_contracted"`` to perform the X2C transformation directly in the supplied contracted basis.
-
-.. tab:: Python API
-
-    .. literalinclude:: ../../../_static/examples/python/hamiltonian_constructor.py
-         :language: python
-         :start-after: # start-cell-x2c
-         :end-before: # end-cell-x2c
-
-.. tab:: C++ API
-
-    .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
-         :language: cpp
-         :start-after: // start-cell-x2c
-         :end-before: // end-cell-x2c
+     - ``""``
+     - One-electron integral dressing: ``""``, ``"x2c_1e"``, or ``"x2c_1e_contracted"``
 
 QDK Cholesky
 ~~~~~~~~~~~~
