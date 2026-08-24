@@ -310,6 +310,21 @@ def test_amplified_qpe_acceptance_at_an_interior_eigenvalue():
         assert abs(probability - expected) < 0.05, f"rounds={rounds}: {probability} != {expected}"
 
 
+def test_a_declared_register_width_is_used_without_a_resource_estimate():
+    """A state prep circuit carrying ``num_qubits`` reports that width instead of estimating one."""
+    prepared = _guiding_state(0.3, 3)
+    # Declare a width the resource estimate would never return, so the source of the value is unambiguous.
+    state_prep_oracle = Circuit(
+        qsharp_op=prepared._qsharp_op,
+        qsharp_factory=prepared._qsharp_factory,
+        num_qubits=3,
+    )
+    good_state_oracle = _all_ones_marking_oracle()
+
+    circuit = create("amplitude_amplification", rounds=1).run(state_prep_oracle, good_state_oracle)
+    assert circuit._qsharp_factory.parameter["numQubits"] == 3
+
+
 def test_amplification_matches_the_closed_form_and_overshoots():
     r"""P(good) tracks :math:`\sin^2((2k+1)\vartheta)` for k = 0..5, decline included."""
     amplitude = 0.3
