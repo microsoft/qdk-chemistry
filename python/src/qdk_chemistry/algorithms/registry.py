@@ -127,7 +127,9 @@ class _AlgorithmWrapper:
 
         # Cache miss — execute locally and store
         result = self._algo.run(*args, **kwargs)
-        _store_result(resolved_cache, run_hash, self._algo, result, args, kwargs)
+        stored = _store_result(resolved_cache, run_hash, self._algo, result, args, kwargs)
+        if force_rerun and not stored:
+            _invalidate_cached_job(resolved_cache, run_hash, self._algo)
         return result
 
     def __getattr__(self, name: str) -> Any:
@@ -165,8 +167,8 @@ def _store_result(
     result: Any,
     args: tuple,
     kwargs: dict,
-) -> None:
-    """Store a computation result in the cache."""
+) -> bool:
+    """Store a computation result in the cache and report success."""
     from qdk_chemistry.data._hashing import _item_content_hash, collect_content_hashes  # noqa: PLC0415
     from qdk_chemistry.remote.job import Job  # noqa: PLC0415
 
@@ -179,7 +181,7 @@ def _store_result(
             UserWarning,
             stacklevel=2,
         )
-        return
+        return False
 
     input_hashes: dict[str, str] = {}
     for i, arg in enumerate(args):
@@ -216,9 +218,23 @@ def _store_result(
                     UserWarning,
                     stacklevel=2,
                 )
-                return
+                return False
 
     cache.put_job(run_hash, job)
+    return True
+
+
+def _invalidate_cached_job(cache: Any, run_hash: str, algorithm: Any) -> None:
+    """Best-effort removal of stale metadata after a forced rerun."""
+    try:
+        cache.delete_job(run_hash)
+    except (AttributeError, OSError, TypeError, ValueError) as exc:
+        warnings.warn(
+            f"Caching skipped for {algorithm.type_name()}/{algorithm.name()}, and the previous "
+            f"cached result could not be invalidated: {exc}",
+            UserWarning,
+            stacklevel=2,
+        )
 
 
 __all__ = [

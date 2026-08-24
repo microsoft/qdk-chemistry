@@ -325,6 +325,105 @@ class TestRegistryCachingWarnings:
 
         assert isinstance(result, UnsupportedResult)
 
+    def test_force_rerun_invalidates_stale_cache_when_output_is_not_hashable(self, tmp_path):
+        """A successful forced rerun cannot leave an older cached result active."""
+
+        class UnsupportedResult:
+            """Result type that does not implement content hashing."""
+
+        class AlgorithmWithChangingResult:
+            """Algorithm that changes from a cacheable to unsupported result."""
+
+            def __init__(self):
+                self.calls = 0
+
+            def hash(self):
+                """Return a stable run hash."""
+                return "hash"
+
+            def run(self):
+                """Return a cacheable result once, then unsupported results."""
+                self.calls += 1
+                return "cached" if self.calls == 1 else UnsupportedResult()
+
+            def type_name(self):
+                """Return the test algorithm type."""
+                return "test_algorithm"
+
+            def name(self):
+                """Return the test algorithm name."""
+                return "changing_result"
+
+            def settings(self):
+                """Return serializable settings metadata."""
+                settings = MagicMock()
+                settings.to_dict.return_value = {}
+                return settings
+
+        implementation = AlgorithmWithChangingResult()
+        algorithm = registry._AlgorithmWrapper(implementation)
+
+        assert algorithm.run(cache=tmp_path) == "cached"
+
+        with pytest.warns(UserWarning, match="output could not be hashed"):
+            forced_result = algorithm.run(cache=tmp_path, force_rerun=True)
+
+        assert isinstance(forced_result, UnsupportedResult)
+
+        with pytest.warns(UserWarning, match="output could not be hashed"):
+            next_result = algorithm.run(cache=tmp_path)
+
+        assert isinstance(next_result, UnsupportedResult)
+        assert implementation.calls == 3
+
+    def test_force_rerun_preserves_cache_when_execution_fails(self, tmp_path):
+        """A failed forced execution leaves the previous cached result available."""
+
+        class FailingAlgorithm:
+            """Algorithm that can fail after initially populating the cache."""
+
+            def __init__(self):
+                self.calls = 0
+                self.should_fail = False
+
+            def hash(self):
+                """Return a stable run hash."""
+                return "hash"
+
+            def run(self):
+                """Return a cacheable result or fail before cache invalidation."""
+                self.calls += 1
+                if self.should_fail:
+                    raise RuntimeError("execution failed")
+                return "cached"
+
+            def type_name(self):
+                """Return the test algorithm type."""
+                return "test_algorithm"
+
+            def name(self):
+                """Return the test algorithm name."""
+                return "failing_algorithm"
+
+            def settings(self):
+                """Return serializable settings metadata."""
+                settings = MagicMock()
+                settings.to_dict.return_value = {}
+                return settings
+
+        implementation = FailingAlgorithm()
+        algorithm = registry._AlgorithmWrapper(implementation)
+
+        assert algorithm.run(cache=tmp_path) == "cached"
+
+        implementation.should_fail = True
+        with pytest.raises(RuntimeError, match="execution failed"):
+            algorithm.run(cache=tmp_path, force_rerun=True)
+
+        implementation.should_fail = False
+        assert algorithm.run(cache=tmp_path) == "cached"
+        assert implementation.calls == 2
+
 
 class TestRegistryAvailable:
     """Test the available function in the registry module."""
