@@ -121,8 +121,8 @@ controlled-:math:`U` up to a global phase for any :math:`E_0`.
 
 The vacuum must remain an eigenstate of the evolution, which is exactly what particle
 conservation buys: :math:`H` cannot connect :math:`|0\ldots0\rangle` to any other occupation
-number. Leaked amplitude entangles the vacuum register with the control, and resetting it at the
-end destroys the control coherence, the phase the algorithm is trying to measure is lost.
+number. Leaked amplitude entangles the vacuum register with the control and destroys the control
+coherence, losing the very phase the algorithm is trying to measure.
 
 For a molecular Hamiltonian every fermionic term (:math:`a_p^\dagger a_q` and
 :math:`a_p^\dagger a_r^\dagger a_s a_q`) annihilates the vacuum. A single Pauli string is unitary

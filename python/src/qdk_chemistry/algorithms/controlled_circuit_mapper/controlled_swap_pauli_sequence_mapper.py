@@ -131,8 +131,8 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
 
     **Grouping requirement.** The vacuum must stay an eigenstate, which is what particle
     conservation buys: :math:`H` cannot connect :math:`|0\ldots0\rangle` to any other occupation
-    number.  Leaked amplitude entangles the vacuum register with the control, and the final reset
-    destroys the control coherence.  A fermionic term annihilates the vacuum only through the
+    number.  Leaked amplitude entangles the vacuum register with the control and destroys the
+    control coherence.  A fermionic term annihilates the vacuum only through the
     weighted sum of its Pauli strings, so a Trotterised :math:`U` preserves the vacuum only when
     those strings are exponentiated as one contiguous, mutually commuting block:
 
@@ -235,7 +235,7 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
         r"""Return the phase the repeated evolution imprints on the vacuum register.
 
         The vacuum must remain an eigenstate: leaked amplitude entangles the vacuum register
-        with the control, and the final reset then destroys the control coherence.
+        with the control and destroys the control coherence.
 
         Args:
             container: The Pauli product formula to validate.
