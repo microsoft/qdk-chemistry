@@ -77,6 +77,7 @@ jobs:
       QSHARP_PYTHON_TELEMETRY: 'false'
       CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
       CPP_DEPS_PREFIX: ${{ github.workspace }}/cpp_deps_install
+      EXACHEM_INSTALL_PREFIX: ${{ github.workspace }}/exachem_install
       CTEST_OUTPUT_ON_FAILURE: 1
       CMAKE_BUILD_PARALLEL_LEVEL: ${{ matrix.build-parallel }}
       QDK_UARCH: ${{ matrix.uarch }}
@@ -194,6 +195,7 @@ jobs:
       with:
         path: |
           ${{ env.CPP_DEPS_PREFIX }}
+          ${{ env.EXACHEM_INSTALL_PREFIX }}
         key: >-
           cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
           ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/install-cpp-deps.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh', '.pipelines/install-scripts/exachem/**') }}
@@ -201,7 +203,7 @@ jobs:
     - name: Add C++ deps prefix to CMake search path
       run: |
         echo "CMAKE_PREFIX_PATH=${{ env.CPP_DEPS_PREFIX }}:${CMAKE_PREFIX_PATH}" >> $GITHUB_ENV
-        echo "LD_LIBRARY_PATH=${{ env.CPP_DEPS_PREFIX }}/lib:${{ env.CPP_DEPS_PREFIX }}/lib64:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=${{ env.CPP_DEPS_PREFIX }}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
         echo "PATH=${{ env.CPP_DEPS_PREFIX }}/bin:${PATH}" >> $GITHUB_ENV
 
     # TODO: ExaChem currently builds (and, after the first run, restores from cache) on every Linux job regardless
@@ -229,7 +231,11 @@ jobs:
           "$BLAS_VENDOR"
 
         if [ "${{ matrix.os-name }}" == "Linux" ]; then
-          INSTALL_PREFIX="${{ env.CPP_DEPS_PREFIX }}" \
+          # ExaChem/TAMM installs into its own EXACHEM_INSTALL_PREFIX, not CPP_DEPS_PREFIX: TAMM's CMSB superbuild
+          # cannot avoid rebuilding its own (static, generic-target) BLAS/LAPACK from source regardless of
+          # LINALG_VENDOR, and if that landed in the shared CPP_DEPS_PREFIX it would shadow the real system
+          # OpenBLAS for the main qdk-chemistry/MACIS build too (verified: caused widespread SEGFAULTs).
+          INSTALL_PREFIX="${{ env.EXACHEM_INSTALL_PREFIX }}" \
           BUILD_ROOT="${{ github.workspace }}/exachem_build" \
           JOBS="${{ matrix.build-parallel }}" \
             bash ${{ github.workspace }}/.pipelines/install-scripts/exachem/install-exachem.sh \
@@ -242,9 +248,16 @@ jobs:
       with:
         path: |
           ${{ env.CPP_DEPS_PREFIX }}
+          ${{ env.EXACHEM_INSTALL_PREFIX }}
         key: >-
           cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
           ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/install-cpp-deps.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh', '.pipelines/install-scripts/exachem/**') }}
+
+    - name: Add ExaChem/MPI to PATH (Linux)
+      if: matrix.os-name == 'Linux'
+      run: |
+        echo "PATH=${{ env.EXACHEM_INSTALL_PREFIX }}/bin:${PATH}" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=${{ env.EXACHEM_INSTALL_PREFIX }}/lib:${{ env.EXACHEM_INSTALL_PREFIX }}/lib64:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
 
     - name: Configure C++ RelWithDebInfo/Coverage build
       run: |
