@@ -10,19 +10,11 @@
 #cmakedefine QDK_CHEMISTRY_ENABLE_PCM
 #cmakedefine QDK_CHEMISTRY_ENABLE_DFTD3
 
-// BLAS backend from the configure-time search; empty if none was reported.
-#define QDK_CHEMISTRY_BLAS_VENDOR "@QDK_CHEMISTRY_BLAS_VENDOR@"
-
-// Candidate thread-control APIs, in probe order, from the table in
-// src/CMakeLists.txt. Columns: token, enumerator, label, setter, getter, type.
-#define QDK_CHEMISTRY_BLAS_BACKEND_TABLE(X) \
-@QDK_CHEMISTRY_BLAS_BACKEND_TABLE@
-
-// The row bound at link time; undefined when none, making the guard a no-op.
-#cmakedefine QDK_CHEMISTRY_BLAS_LINKED_VENDOR @QDK_CHEMISTRY_BLAS_LINKED_VENDOR@
-#cmakedefine QDK_CHEMISTRY_BLAS_LINKED_SET_FN @QDK_CHEMISTRY_BLAS_LINKED_SET_FN@
-#cmakedefine QDK_CHEMISTRY_BLAS_LINKED_GET_FN @QDK_CHEMISTRY_BLAS_LINKED_GET_FN@
-#cmakedefine QDK_CHEMISTRY_BLAS_LINKED_TYPE @QDK_CHEMISTRY_BLAS_LINKED_TYPE@
+// BLAS vendor whose thread-control API is bound into this build; at most one is
+// defined, and none means ScopedBlasThreads is a no-op. See util/blas_threads.h.
+#cmakedefine QDK_CHEMISTRY_BLAS_VENDOR_OPENBLAS
+#cmakedefine QDK_CHEMISTRY_BLAS_VENDOR_INTELMKL
+#cmakedefine QDK_CHEMISTRY_BLAS_VENDOR_BLIS
 
 namespace qdk::chemistry::scf {
 

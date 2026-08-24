@@ -4,20 +4,12 @@
 
 #pragma once
 
-#include <qdk/chemistry/scf/config.h>
-
 namespace qdk::chemistry::scf::util {
 
-/// @brief BLAS backends whose threading can be controlled at runtime.
-/// Enumerators come from QDK_CHEMISTRY_BLAS_BACKEND_TABLE in scf/config.h.
-enum class BlasVendor {
-  Unknown,
-#define QDK_CHEMISTRY_BLAS_VENDOR_ENUMERATOR(token, vendor, label, set_fn, \
-                                             get_fn, type)                 \
-  vendor,
-  QDK_CHEMISTRY_BLAS_BACKEND_TABLE(QDK_CHEMISTRY_BLAS_VENDOR_ENUMERATOR)
-#undef QDK_CHEMISTRY_BLAS_VENDOR_ENUMERATOR
-};
+/// @brief BLAS backends whose threading this build knows how to control.
+/// Which one (if any) is bound is decided at configure time; see the BLAS
+/// section of scf/src/CMakeLists.txt.
+enum class BlasVendor { Unknown, OpenBLAS, IntelMKL, BLIS };
 
 /// @brief Human readable name of a BLAS vendor.
 const char* to_string(BlasVendor vendor);
