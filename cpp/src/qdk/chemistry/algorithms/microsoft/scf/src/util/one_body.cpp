@@ -448,6 +448,10 @@ RowMajorMatrix build_nonrelativistic_one_body_ao(const BasisSet& basis_set,
     integrals.ecp_integral(ecp.data());
     one_body_ao += ecp;
   }
+#ifdef QDK_CHEMISTRY_ENABLE_MPI
+  MPI_Bcast(one_body_ao.data(), static_cast<int>(one_body_ao.size()),
+            MPI_DOUBLE, 0, MPI_COMM_WORLD);
+#endif
   return one_body_ao;
 }
 
