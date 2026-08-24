@@ -43,6 +43,11 @@ class QubitOperator(DataClass):
     _data_type_name = "qubit_hamiltonian"
     _serialization_version = "0.1.0"
 
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for qubit operators."""
+        return "qubit_hamiltonian"
+
     def __init__(
         self,
         container: QubitOperatorContainer | list[str] | None = None,

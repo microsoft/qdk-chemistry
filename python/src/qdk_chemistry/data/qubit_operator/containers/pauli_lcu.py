@@ -89,6 +89,16 @@ class PauliLCUContainer(QubitOperatorContainer):
     # Class attribute for filename validation
     _data_type_name = "pauli_lcu_container"
 
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for Pauli-LCU containers.
+
+        Returns:
+            ``"pauli_lcu_container"``.
+
+        """
+        return "pauli_lcu_container"
+
     # Serialization version for this class
     _serialization_version = "0.1.0"
 

@@ -9,6 +9,9 @@ function(handle_dependency NAME)
   #
   # Options:
   # REQUIRED - Indicates that the dependency is required
+  # FORCE_FETCH - Skip discovery and always build the pinned source. Use when
+  #               the pin is a specific unreleased commit, so that an installed
+  #               package cannot silently substitute for it.
   #
   # Single value arguments:
   # GIT_REPOSITORY - URL of the git repository (for git mode)
@@ -19,6 +22,7 @@ function(handle_dependency NAME)
   # DOWNLOAD_EXTRACT_TIMESTAMP - Control timestamp extraction (for URL/tarball mode)
   # BUILD_TARGET - The CMake target to build
   # INSTALL_TARGET - The CMake target to install
+  # REQUIRED_HEADER - Header that a discovered package must provide
   #
   # Multi-value arguments:
   # EXPORTED_VARIABLES - Variables to export
@@ -26,6 +30,7 @@ function(handle_dependency NAME)
 
   set(options
     REQUIRED
+    FORCE_FETCH
   ) # Flags with no values
   set(oneValueArgs
     GIT_REPOSITORY
@@ -37,6 +42,7 @@ function(handle_dependency NAME)
     SOURCE_SUBDIR
     BUILD_TARGET
     INSTALL_TARGET
+    REQUIRED_HEADER
     BUILD_ARGS
   )
   set(multiValueArgs
@@ -51,12 +57,45 @@ function(handle_dependency NAME)
 
 
 
-  message(STATUS "  Attempting to Discover ${NAME} -")
-  find_package(${NAME} ${ARG_FIND_PACKAGE_ARGS} QUIET)
-  if(${NAME}_FOUND)
-    message(STATUS "  Attempting to Discover ${NAME} - Found ${NAME}: ${${NAME}_DIR}")
+  # FORCE_FETCH dependencies are pinned to a specific commit, so an installed
+  # package must not stand in for them: version metadata cannot distinguish the
+  # pinned revision from an older release carrying the same version number.
+  # Discovery is still attempted when fetching is unavailable, since a system
+  # package is then the only way to satisfy the dependency at all.
+  if(ARG_FORCE_FETCH AND QDK_ALLOW_DEPENDENCY_FETCH)
+    message(STATUS "  Skipping discovery for ${NAME} - building pinned source")
+    set(${NAME}_FOUND FALSE)
   else()
-    message(STATUS "  Attempting to Discover ${NAME} - WARNING: ${NAME} not found")
+    if(ARG_FORCE_FETCH)
+      message(STATUS "  ${NAME} is pinned, but dependency fetch is disabled - "
+                     "falling back to discovery")
+    endif()
+    message(STATUS "  Attempting to Discover ${NAME} -")
+    find_package(${NAME} ${ARG_FIND_PACKAGE_ARGS} QUIET)
+    if(${NAME}_FOUND)
+      message(STATUS "  Attempting to Discover ${NAME} - Found ${NAME}: ${${NAME}_DIR}")
+      if(ARG_REQUIRED_HEADER)
+        include(CheckIncludeFileCXX)
+        string(MAKE_C_IDENTIFIER
+               "${NAME}_${ARG_REQUIRED_HEADER}_AVAILABLE"
+               _required_header_check)
+        string(TOUPPER "${_required_header_check}" _required_header_check)
+        unset(${_required_header_check} CACHE)
+        set(_saved_cmake_required_libraries "${CMAKE_REQUIRED_LIBRARIES}")
+        set(CMAKE_REQUIRED_LIBRARIES "${ARG_INSTALL_TARGET}")
+        check_include_file_cxx("${ARG_REQUIRED_HEADER}"
+                               ${_required_header_check})
+        set(CMAKE_REQUIRED_LIBRARIES "${_saved_cmake_required_libraries}")
+        if(NOT ${_required_header_check})
+          message(STATUS
+                  "  Discovered ${NAME} is missing required header "
+                  "${ARG_REQUIRED_HEADER}")
+          set(${NAME}_FOUND FALSE)
+        endif()
+      endif()
+    else()
+      message(STATUS "  Attempting to Discover ${NAME} - WARNING: ${NAME} not found")
+    endif()
   endif()
 
   if(NOT ${NAME}_FOUND)

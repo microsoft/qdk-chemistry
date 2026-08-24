@@ -206,7 +206,10 @@ __all__ = [
     "Wavefunction",
     "WavefunctionContainer",
     "WavefunctionType",
+    "available_dataclasses",
     "get_current_ciaaw_version",
+    "get_dataclass_type",
+    "register_dataclass",
 ]
 
 

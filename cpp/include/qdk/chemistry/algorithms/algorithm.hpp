@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "qdk/chemistry/data/settings.hpp"
+#include "qdk/chemistry/exceptions.hpp"
 #include "qdk/chemistry/utils/hash_context.hpp"
 #include "qdk/chemistry/utils/logger.hpp"
 
@@ -302,7 +303,9 @@ class AlgorithmFactory {
    * The algorithm is registered under its primary name and all its aliases.
    *
    * @param func The function that creates the algorithm instance.
-   * @throws std::runtime_error if the key already exists or if type mismatch.
+   * @throws DuplicateRegistrationError if a name or alias already exists.
+   * @throws std::runtime_error if the algorithm type does not match the
+   * factory.
    */
   static void register_instance(functor_type func) {
     auto& reg = registry();
@@ -323,10 +326,10 @@ class AlgorithmFactory {
     // Check for name clashes first
     for (const auto& alias : aliases) {
       if (reg.find(alias) != reg.end()) {
-        throw std::runtime_error("Algorithm factory for " +
-                                 Derived::algorithm_type_name() +
-                                 ": algorithm with name/alias '" + alias +
-                                 "' already exists in registry");
+        throw DuplicateRegistrationError(
+            "Algorithm factory for " + Derived::algorithm_type_name() +
+            ": algorithm with name/alias '" + alias +
+            "' already exists in registry");
       }
     }
 

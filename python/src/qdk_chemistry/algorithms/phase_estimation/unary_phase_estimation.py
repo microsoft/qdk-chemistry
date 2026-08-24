@@ -1,25 +1,4 @@
-r"""Unary-iteration phase estimation with an arbitrary number of walk queries.
-
-This module implements phase estimation whose query schedule is driven by
-unary iteration over the phase register rather than by controlled powers of the walk
-operator. A single chain of ``num_queries`` self-inverse blocks is applied, and the
-branch that omits reflection slot :math:`t` realizes :math:`W^{p-2t}`, so the total
-query count need not be a power of two.
-
-Because every branch phase is doubled relative to the walk phase, the measured
-fraction :math:`y` satisfies :math:`y = \pm 2\varphi \bmod 1`. The conjugate bins
-are merged before the winner is chosen, and the ``phase_band`` builder setting selects
-which half-band the result is reported in.
-
-References:
-    * :cite:`Berry2024`, Appendix D.
-    * :cite:`Lee2021` — tensor hypercontraction; prescription for a
-      non-power-of-two number of queries.
-    * :cite:`Babbush2018` — Heisenberg-limited phase estimation with a
-      sine-window control state, where each block applies :math:`W` or
-      :math:`W^\dagger` and hence doubles the phase.
-
-"""
+r"""Unary-iteration phase estimation with a number of walk queries."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -38,43 +17,80 @@ from qdk_chemistry.data import (
 from qdk_chemistry.utils import Logger
 
 from .base import PhaseEstimation, PhaseEstimationSettings
-from .circuit_builder.unary_phase_estimation_builder import QdkUnaryQpeCircuitBuilder, num_phase_bits
+from .circuit_builder.unary_phase_estimation_builder import QdkUnaryQpeCircuitBuilder
 
 __all__: list[str] = [
     "UnaryPhaseEstimation",
     "UnaryPhaseEstimationSettings",
 ]
 
+# Unary iteration threads a callable through a recursive Q# operation, which cannot be
+# defunctionalized, so the circuit never lowers to QIR. Only the sparse-state simulator
+# interprets Q# directly and can run it.
+_SUPPORTED_CIRCUIT_EXECUTOR = "qdk_sparse_state_simulator"
 
-def _select_dominant_decoded_phase(
+
+def _post_process_phase_estimation(
     counts: dict[str, int],
     num_bits: int,
-    decoder: Callable[[float], float],
-) -> tuple[float, str, float]:
-    """Aggregate raw bitstrings by decoded phase before selecting the winner.
+    method: str,
+    resolve_positive_branch: bool,
+    eigenvalue_from_phase: Callable[[float], float],
+) -> QpeResult:
+    r"""Process the measured results from unary-iteration phase estimation into a QpeResult.
+
+    Every branch phase is doubled relative to the walk phase, so a measured bin
+    :math:`y` satisfies :math:`y = \pm 2\varphi \bmod 1`, where :math:`\varphi` is the walk
+    phase fraction of :math:`E = \lambda \cos(2\pi\varphi)`. Since :math:`\varphi` and
+    :math:`1/2 - \varphi` are observationally identical and map to :math:`E` and :math:`-E`,
+    the two eigenvalue signs cannot be distinguished, and ``resolve_positive_branch`` supplies the
+    missing information:
+
+    * ``False`` (the default) returns :math:`\varphi \in [1/4, 1/2]`, hence
+      :math:`\cos(2\pi\varphi) \le 0` and :math:`E \le 0` for every input.
+    * ``True`` returns :math:`\varphi \in [0, 1/4]`, hence :math:`E \ge 0`.
 
     Args:
         counts: Measured bitstring counts, most-significant bit first.
         num_bits: Size of the phase register.
-        decoder: Maps a measured fraction to the walk phase fraction.
+        method: Phase estimation algorithm label recorded on the result.
+        resolve_positive_branch: ``True`` selects the non-negative eigenvalue branch,
+            ``False`` the non-positive one, as wanted for a ground state.
+        eigenvalue_from_phase: A callable mapping a walk phase fraction to a Hamiltonian eigenvalue.
 
     Returns:
-        A tuple of (decoded phase fraction, representative bitstring, its raw measured fraction).
+        A :class:`~qdk_chemistry.data.QpeResult` whose ``phase_fraction`` is the measured bin,
+        ``canonical_phase_fraction`` is the decoded walk phase, and ``branching``
+        holds both sign candidates.
 
     """
-    decoded_counts: dict[float, int] = {}
-    representatives: dict[float, tuple[str, float, int]] = {}
+    num_bins = 2**num_bits
+    canonical_counts: dict[float, int] = {}
     for bitstring, count in counts.items():
-        measured_phase = int(bitstring, 2) / (2**num_bits)
-        decoded_phase = decoder(measured_phase)
-        decoded_counts[decoded_phase] = decoded_counts.get(decoded_phase, 0) + count
-        representative = representatives.get(decoded_phase)
-        if representative is None or count > representative[2]:
-            representatives[decoded_phase] = (bitstring, measured_phase, count)
+        measured = int(bitstring, 2) / num_bins
+        folded = min(measured, (-measured) % 1.0) / 2.0
+        canonical = folded if resolve_positive_branch else 0.5 - folded
+        canonical_counts[canonical] = canonical_counts.get(canonical, 0) + count
 
-    phase_fraction = max(decoded_counts, key=decoded_counts.__getitem__)
-    dominant_bitstring, measured_phase, _ = representatives[phase_fraction]
-    return phase_fraction, dominant_bitstring, measured_phase
+    # Ties are broken toward the smaller phase fraction so that equal counts decode
+    # to the same phase regardless of the order the shots arrive in.
+    canonical_phase_fraction = max(canonical_counts, key=lambda phase: (canonical_counts[phase], -phase))
+    raw_energy = eigenvalue_from_phase(canonical_phase_fraction)
+    mirror_energy = eigenvalue_from_phase(0.5 - canonical_phase_fraction)
+
+    phase_fraction = 2.0 * min(canonical_phase_fraction, 0.5 - canonical_phase_fraction)
+    bitstring_msb_first = format(round(phase_fraction * num_bins), f"0{num_bits}b")
+
+    return QpeResult.from_phase_fraction(
+        method=method,
+        phase_fraction=phase_fraction,
+        eigenvalue_from_phase=eigenvalue_from_phase,
+        canonical_phase_fraction=canonical_phase_fraction,
+        branching=tuple(sorted((raw_energy, mirror_energy))),
+        resolved_energy=raw_energy,
+        bits_msb_first=tuple(int(bit) for bit in bitstring_msb_first),
+        bitstring_msb_first=bitstring_msb_first,
+    )
 
 
 class UnaryPhaseEstimationSettings(PhaseEstimationSettings):
@@ -86,27 +102,35 @@ class UnaryPhaseEstimationSettings(PhaseEstimationSettings):
         self._set_default(
             "shots",
             "int",
-            100,
+            3,
             "The number of shots to execute the circuit.",
         )
-        # The inherited key already exists, and set_default is a no-op for those.
+        self._set_default(
+            "resolve_positive_branch",
+            "bool",
+            False,
+            "Whether the doubled measured phase resolves to a positive eigenvalue rather than a negative one.",
+        )
         self.set("qpe_circuit_builder", AlgorithmRef("qpe_circuit_builder", "qdk_unary"))
 
 
 class UnaryPhaseEstimation(PhaseEstimation):
     """Phase estimation using unary iteration over an arbitrary-length query schedule."""
 
-    def __init__(self, shots: int = 100) -> None:
+    def __init__(self, shots: int = 3, resolve_positive_branch: bool = False) -> None:
         """Initialize the unary-iteration phase estimation routine.
 
         Args:
             shots: The number of shots to execute the circuit.
+            resolve_positive_branch: ``True`` selects the non-negative eigenvalue branch,
+                ``False`` (the default) the non-positive one, as wanted for a ground state.
 
         """
         Logger.trace_entering()
         super().__init__()
         self._settings = UnaryPhaseEstimationSettings()
         self._settings.set("shots", shots)
+        self._settings.set("resolve_positive_branch", resolve_positive_branch)
 
     def _run_impl(
         self,
@@ -126,11 +150,17 @@ class UnaryPhaseEstimation(PhaseEstimation):
             A QpeResult object containing the results of the phase estimation.
 
         Raises:
-            TypeError: If the configured circuit builder is not a unary-iteration builder.
+            TypeError: If the configured circuit builder is not a unary-iteration builder,
+                or if the configured circuit executor is not the sparse-state simulator.
 
         """
         Logger.trace_entering()
         circuit_executor = self._create_nested("circuit_executor")
+        if circuit_executor.name() != _SUPPORTED_CIRCUIT_EXECUTOR:
+            raise TypeError(
+                f"Unary-iteration phase estimation only supports the '{_SUPPORTED_CIRCUIT_EXECUTOR}' "
+                f"circuit executor, but got '{circuit_executor.name()}' instead."
+            )
         circuit_builder = self._create_nested("qpe_circuit_builder")
         if not isinstance(circuit_builder, QdkUnaryQpeCircuitBuilder):
             raise TypeError(
@@ -143,7 +173,7 @@ class UnaryPhaseEstimation(PhaseEstimation):
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
         container = unitary_rep.get_container()
 
-        num_bits = num_phase_bits(circuit_builder.resolve_num_queries(unitary_rep))
+        _, num_bits = circuit_builder.resolve_num_queries()
         circuits = circuit_builder.run(
             state_preparation=state_preparation,
             qubit_hamiltonian=qubit_hamiltonian,
@@ -151,18 +181,12 @@ class UnaryPhaseEstimation(PhaseEstimation):
         execution_data = circuit_executor.run(circuits[0], shots=self._settings.get("shots"), noise=noise)
         counts = execution_data.bitstring_counts
 
-        phase_fraction, dominant_bitstring, measured_phase = _select_dominant_decoded_phase(
+        return _post_process_phase_estimation(
             counts,
             num_bits,
-            circuit_builder.phase_fraction_from_measurement,
-        )
-
-        return QpeResult.from_phase_fraction(
             method=self.name(),
-            phase_fraction=phase_fraction,
+            resolve_positive_branch=self._settings.get("resolve_positive_branch"),
             eigenvalue_from_phase=container.eigenvalue_from_phase,
-            bits_msb_first=dominant_bitstring,
-            metadata={"measured_phase_fraction": measured_phase},
         )
 
     def name(self) -> str:

@@ -63,7 +63,13 @@ class SOSSAContainer(QubitOperatorContainer):
     coefficients, and normalization from these blocks.
     """
 
+    _data_type_name = "sossa_container"
     _serialization_version = "0.2.0"
+
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for SOSSA containers."""
+        return "sossa_container"
 
     def __init__(
         self,

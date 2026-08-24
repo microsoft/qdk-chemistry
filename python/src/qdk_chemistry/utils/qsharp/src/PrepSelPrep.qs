@@ -10,10 +10,12 @@
 /// the two callables and this module handles the stitching.
 namespace QDKChemistry.Utils.PrepSelPrep {
 
+    import Std.Arrays.Subarray;
     import Std.Canon.ApplyToEachCA;
     import Std.Core.Length;
-    import Std.Math.PI;
+    import Std.Intrinsic.AND;
     import Std.Intrinsic.R;
+    import Std.Math.PI;
     import Std.ResourceEstimation.BeginEstimateCaching;
     import Std.ResourceEstimation.EndEstimateCaching;
     import Std.ResourceEstimation.SingleVariant;
@@ -63,8 +65,8 @@ namespace QDKChemistry.Utils.PrepSelPrep {
 
         ApplyToEachCA(X, qs);
 
-        if nAll == 2 {
-            Controlled Z([allQubits[0]], allQubits[1]);
+        if nAll <= 3 {
+            Controlled Z(allQubits[0..nAll - 2], allQubits[nAll - 1]);
         } else {
             let nAnc = nAll - 2;
             use anc = Qubit[nAnc];
@@ -95,16 +97,6 @@ namespace QDKChemistry.Utils.PrepSelPrep {
 
     /// # Summary
     /// Block encoding: PREPARE† · SELECT · PREPARE.
-    ///
-    /// Takes `prepareOp` and `selectOp` as callables so they can be swapped
-    /// for different implementations.
-    ///
-    /// When controlled (via `within/apply`), only SELECT is controlled while
-    /// PREPARE and UNPREPARE run unconditionally.
-    ///
-    /// $$
-    ///     B[H] = \mathrm{PREPARE}^\dagger \cdot \mathrm{SELECT} \cdot \mathrm{PREPARE}
-    /// $$
     operation PrepSelPrep(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
@@ -139,16 +131,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         controlled adjoint auto;
     }
 
-    /// # Summary
-    /// PSP-based quantum walk: W = REFLECT · B[H].
-    ///
-    /// When controlled, both SELECT (inside B[H]) and REFLECT are controlled,
-    /// while PREPARE/PREPARE† run unconditionally (via within/apply semantics).
-    /// This follows Babbush et al. (arXiv:1805.03662): c-W = c-R · (PREP† · c-SEL · PREP).
-    ///
-    /// $$
-    ///     W = (2|0\rangle\langle 0| - I) \cdot \mathrm{PREPARE}^\dagger \cdot \mathrm{SELECT} \cdot \mathrm{PREPARE}
-    /// $$
+    /// Qubitization walk: PREPARE† · SELECT · PREPARE followed by REFLECT.
     operation PSPWalk(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
@@ -162,31 +145,62 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         adjoint auto;
         controlled (ctls, ...) {
             Controlled PrepSelPrep(ctls, (prepareOp, selectOp, targetRegister, ancillaRegister));
-            Controlled Reflect(ctls, (ancillaRegister));
+            Controlled Reflect(ctls, ancillaRegister);
         }
         controlled adjoint auto;
     }
 
     /// # Summary
-    /// Creates a controlled block-encoding callable.
-    ///
-    /// The caller passes system + ancilla qubits together since the ancilla
-    /// becomes entangled with the control qubit during the controlled operation.
-    function MakeControlledPrepSelPrepOp(
+    /// Reflection about the all-zero state of the block-encoding ancillas of a flat
+    /// `[systemReg | ancillaReg]` register.
+    function MakeAncillaReflectionOp(numSystemQubits : Int) : (Qubit[] => Unit is Adj + Ctl) {
+        (allQubits) => Reflect(allQubits[numSystemQubits...])
+    }
+
+    /// Block encoding on the flat `[systemReg | ancillaReg]` register.
+    function MakePrepSelPrepOp(
+        prepareOp : Qubit[] => Unit is Adj + Ctl,
+        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        numSystemQubits : Int,
+    ) : (Qubit[] => Unit is Adj + Ctl) {
+        (allQubits) => PrepSelPrep(
+            prepareOp,
+            selectOp,
+            allQubits[0..numSystemQubits - 1],
+            allQubits[numSystemQubits...]
+        )
+    }
+
+    /// Qubitization walk `W = REFLECT · B` on the flat `[systemReg | ancillaReg]` register.
+    function MakeWalkOp(
+        blockEncoding : Qubit[] => Unit is Adj + Ctl,
+        applyReflection : Qubit[] => Unit is Adj + Ctl,
+    ) : (Qubit[] => Unit is Adj + Ctl) {
+        (allQubits) => {
+            blockEncoding(allQubits);
+            applyReflection(allQubits);
+        }
+    }
+
+    /// Circuit entry point: allocates the register and applies the block encoding `power` times.
+    operation MakePrepSelPrepCircuit(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
         numSystemQubits : Int,
         numAncillaQubits : Int,
         power : Int,
-    ) : (Qubit, Qubit[]) => Unit is Adj + Ctl {
-        (control, allQubits) => {
-            let systems = allQubits[0..numSystemQubits - 1];
-            let ancilla = allQubits[numSystemQubits...];
-            for _ in 0..power - 1 {
-                if BeginEstimateCaching("ControlledPrepSelPrep", SingleVariant()) {
-                    Controlled PrepSelPrep([control], (prepareOp, selectOp, systems, ancilla));
-                    EndEstimateCaching();
+        useWalk : Bool,
+    ) : Unit {
+        use register = Qubit[numSystemQubits + numAncillaQubits];
+        let systems = register[0..numSystemQubits - 1];
+        let ancilla = register[numSystemQubits...];
+        for _ in 1..power {
+            if BeginEstimateCaching(useWalk ? "PSPWalk" | "PrepSelPrep", SingleVariant()) {
+                PrepSelPrep(prepareOp, selectOp, systems, ancilla);
+                if useWalk {
+                    Reflect(ancilla);
                 }
+                EndEstimateCaching();
             }
         }
     }
@@ -215,32 +229,39 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         }
     }
 
-    /// Circuit entry point for prep-sel-prep (allocates qubits).
+    /// Circuit entry point for the singly-controlled block encoding
     operation MakeControlledPrepSelPrepCircuit(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
         numSystemQubits : Int,
         numAncillaQubits : Int,
         power : Int,
+        useWalk : Bool,
     ) : Unit {
         use control = Qubit();
-        use systems = Qubit[numSystemQubits + numAncillaQubits];
-        let op = MakeControlledPrepSelPrepOp(prepareOp, selectOp, numSystemQubits, numAncillaQubits, power);
-        op(control, systems);
+        use register = Qubit[numSystemQubits + numAncillaQubits];
+        let systems = register[0..numSystemQubits - 1];
+        let ancilla = register[numSystemQubits...];
+        for _ in 1..power {
+            if BeginEstimateCaching(useWalk ? "ControlledPSPWalk" | "ControlledPrepSelPrep", SingleVariant()) {
+                Controlled PrepSelPrep([control], (prepareOp, selectOp, systems, ancilla));
+                if useWalk {
+                    Controlled Reflect([control], ancilla);
+                }
+                EndEstimateCaching();
+            }
+        }
     }
 
-    /// Circuit entry point for quantum walk (allocates qubits).
-    operation MakeControlledPSPWalkCircuit(
-        prepareOp : Qubit[] => Unit is Adj + Ctl,
-        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
-        numSystemQubits : Int,
-        numAncillaQubits : Int,
-        power : Int,
-    ) : Unit {
-        use control = Qubit();
-        use systems = Qubit[numSystemQubits + numAncillaQubits];
-        let op = MakeControlledPSPWalkOp(prepareOp, selectOp, numSystemQubits, numAncillaQubits, power);
-        op(control, systems);
+    /// # Summary
+    /// One-system-qubit, one-ancilla block encoding used to drive block-encoding-agnostic
+    /// schedules from a test.
+    internal function MakeTestBlockEncodingOp(theta : Double) : (Qubit[] => Unit is Adj + Ctl) {
+        MakePrepSelPrepOp(
+            (ancilla) => Ry(theta, ancilla[0]),
+            (ancilla, system) => Controlled Z(ancilla, system[0]),
+            1
+        )
     }
 
     /// Applies the PSP walk to a computational basis state, leaking the qubits.

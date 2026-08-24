@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import math
+from typing import ClassVar
 
 import numpy as np
 import pytest
@@ -13,15 +14,30 @@ import qdk
 
 from qdk_chemistry.algorithms.state_preparation.qrom_state_prep import QROMStatePreparation
 from qdk_chemistry.data import Configuration, ModelOrbitals, StateVectorContainer, Wavefunction
+from qdk_chemistry.utils.qsharp import create_qsharp_context
 
 
-def _run_qrom_state_prep_and_dump(ctx: qdk.Context, amplitudes: list[float], num_qubits: int) -> np.ndarray:
+@pytest.fixture
+def qdk_ctx() -> qdk.Context:
+    """Fresh Q# context for a single test.
+
+    Every test here simulates a program and reads the result off ``dump_machine``. A
+    context that has already run one program reports that program's state on the next
+    read, so sharing one across tests silently compares a vector against the previous
+    test's output.
+    """
+    return create_qsharp_context()
+
+
+def _run_qrom_state_prep_and_dump(
+    ctx: qdk.Context, amplitudes: list[float], num_qubits: int, bits: int = 10
+) -> np.ndarray:
     """Run the QROM state preparation via qdk.Context and return the statevector.
 
     Loads the QROMStatePrep Q# sources and a thin wrapper that allocates
     qubits internally, then captures the statevector via ``ctx.dump_machine()``.
     """
-    ctx.code.QDKChemistry.Utils.QROMStatePrep.RunQROMStatePrep(amplitudes, 10, num_qubits)
+    ctx.code.QDKChemistry.Utils.QROMStatePrep.RunQROMStatePrep(amplitudes, bits, num_qubits)
     state = ctx.dump_machine()
     return np.array(state.as_dense_state())
 
@@ -44,18 +60,30 @@ def _build_expected_from_amplitudes(amplitudes: list[float], num_qubits: int) ->
 
 
 def _make_wavefunction(amplitudes: list[float]) -> Wavefunction:
-    """Create a Wavefunction from a list of amplitudes."""
+    """Create a Wavefunction from a list of amplitudes.
+
+    Zero amplitudes are kept so that determinant ``idx`` stays aligned with position ``idx``
+    in the coefficient vector, which is the index the QROM circuit addresses.
+    """
     num_qubits = math.ceil(math.log2(len(amplitudes))) if len(amplitudes) > 1 else 1
-    coeffs_list: list[float] = []
-    dets: list[Configuration] = []
-    for idx, amp in enumerate(amplitudes):
-        if amp != 0.0:
-            bitstring = format(idx, f"0{num_qubits}b")
-            dets.append(Configuration.from_bitstring(bitstring))
-            coeffs_list.append(float(amp))
+    dets = [Configuration.from_bitstring(format(idx, f"0{num_qubits}b")) for idx in range(len(amplitudes))]
     orbitals = ModelOrbitals(num_qubits)
-    container = StateVectorContainer(np.array(coeffs_list), dets, orbitals)
+    container = StateVectorContainer(np.array([float(a) for a in amplitudes]), dets, orbitals)
     return Wavefunction(container)
+
+
+def _reduced_state(sv: np.ndarray, num_qubits: int) -> np.ndarray:
+    """Project the full statevector onto the ``num_qubits`` state qubits.
+
+    ``dump_machine`` is big-endian (qubit 0 = MSB) and the state register is allocated
+    first, so it occupies the top ``num_qubits`` bits of the dense index.
+    """
+    reduced = np.zeros(2**num_qubits, dtype=complex)
+    stride = len(sv) // (2**num_qubits)
+    for i, amp in enumerate(sv):
+        if abs(amp) > 1e-12:
+            reduced[i // stride] += amp
+    return reduced
 
 
 class TestQROMStatePreparation:
@@ -85,6 +113,109 @@ class TestQROMStatePreparation:
         expected = _build_expected_from_amplitudes(amplitudes, num_qubits)
 
         fidelity = abs(np.dot(np.conj(actual_sv), expected))
+        assert np.isclose(fidelity, 1.0, atol=1e-3)
+
+    def test_settings_expose_rotation_bit_precision(self):
+        """The constructor argument is stored in settings so create() can reach it."""
+        prep = QROMStatePreparation(rotation_bit_precision=6)
+        assert prep.rotation_bit_precision == 6
+        assert prep.settings().get("rotation_bit_precision") == 6
+
+        prep.settings().set("rotation_bit_precision", 8)
+        assert prep.rotation_bit_precision == 8
+
+    def test_empty_coefficients_rejected(self):
+        """An empty coefficient vector is rejected rather than reaching log2(0)."""
+        prep = QROMStatePreparation(rotation_bit_precision=4)
+        with pytest.raises(ValueError, match="at least one coefficient"):
+            prep._run_impl(_EmptyCoefficientWavefunction())
+
+    def test_negative_coefficients_are_accepted(self):
+        """Signed coefficients are supported; only the imaginary part is refused."""
+        prep = QROMStatePreparation(rotation_bit_precision=4)
+        wf = _make_wavefunction([0.5, -0.5, 0.5, 0.5])
+        assert prep.run(wf) is not None
+
+
+class _EmptyCoefficientWavefunction:
+    """Stand-in wavefunction whose coefficient vector is empty.
+
+    ``StateVectorContainer`` will not build a determinant-free wavefunction, so the empty
+    input guard is exercised through the minimal interface ``_run_impl`` actually uses.
+    """
+
+    def get_coefficients(self) -> np.ndarray:
+        """Return an empty coefficient vector."""
+        return np.array([])
+
+
+class TestQROMSignedAmplitudes:
+    """The QROM loader's handling of signed amplitudes.
+
+    :math:`R_y` rotations only produce non-negative amplitudes, so the coefficient signs are
+    applied afterwards by a QROM-loaded ``Z`` phase kickback. Uncomputing that lookup is the
+    delicate part: its address register *is* the state register, so an adjoint that is not a
+    faithful inverse leaves an uncorrected phase and scrambles the signs. Routing the lookup
+    through ``Std.TableLookup.Select`` makes the adjoint ``Unlookup``, which repairs the phase
+    kickback its X-basis measurement leaves behind.
+
+    Every case is swept over several simulator seeds. The historical defect reproduced on
+    roughly seven seeds in eight, so a single-seed test would have passed straight through it.
+    """
+
+    SIGNED_AMPLITUDES: ClassVar[list[float]] = [0.5, -0.5, 0.5, 0.5]
+    SEEDS: ClassVar[list[int]] = [1, 2, 3, 4, 5, 6, 7, 8]
+
+    def test_magnitudes_are_correct(self, qdk_ctx):
+        """Whatever happens to the signs, |amplitude| is still right."""
+        qdk_ctx.set_quantum_seed(1)
+        num_qubits = 2
+        sv = _run_qrom_state_prep_and_dump(qdk_ctx, self.SIGNED_AMPLITUDES, num_qubits, bits=4)
+        actual = np.abs(_reduced_state(sv, num_qubits))
+
+        expected = np.abs(np.array(self.SIGNED_AMPLITUDES, dtype=float))
+        expected /= np.linalg.norm(expected)
+
+        np.testing.assert_allclose(actual, expected, atol=1e-3)
+
+    @pytest.mark.parametrize("seed", SEEDS)
+    def test_signs_are_preserved(self, qdk_ctx, seed):
+        r"""The prepared state matches the signed target on every seed.
+
+        Compared with :math:`|\langle \psi | \phi \rangle|`: the uncompute measures an
+        ancilla in the X basis, so the overall sign of the result depends on the seed even
+        when the relative signs are right.
+        """
+        qdk_ctx.set_quantum_seed(seed)
+        num_qubits = 2
+        sv = _run_qrom_state_prep_and_dump(qdk_ctx, self.SIGNED_AMPLITUDES, num_qubits, bits=4)
+        actual = _reduced_state(sv, num_qubits)
+
+        expected = _build_expected_from_amplitudes(self.SIGNED_AMPLITUDES, num_qubits)
+
+        fidelity = abs(np.vdot(actual, expected))
+        assert np.isclose(fidelity, 1.0, atol=1e-3)
+
+    @pytest.mark.parametrize("seed", [1, 2, 3, 4])
+    @pytest.mark.parametrize(
+        "amplitudes",
+        [
+            [-0.5, -0.5, -0.5, -0.5],
+            [0.1, -0.9, 0.3, -0.2],
+            [-0.2, 0.4, 0.4, -0.8],
+            [0.6, 0.3, -0.1, 0.0],
+        ],
+    )
+    def test_sign_patterns_are_preserved(self, qdk_ctx, amplitudes, seed):
+        """Sign preservation holds for all-negative, mixed, and zero-containing vectors."""
+        qdk_ctx.set_quantum_seed(seed)
+        num_qubits = 2
+        sv = _run_qrom_state_prep_and_dump(qdk_ctx, amplitudes, num_qubits, bits=8)
+        actual = _reduced_state(sv, num_qubits)
+
+        expected = _build_expected_from_amplitudes(amplitudes, num_qubits)
+
+        fidelity = abs(np.vdot(actual, expected))
         assert np.isclose(fidelity, 1.0, atol=1e-3)
 
 

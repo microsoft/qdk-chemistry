@@ -5,8 +5,12 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from collections.abc import Iterator
+
 import numpy as np
 import pytest
+import qdk
+from qdk import TargetProfile
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import IterativePhaseEstimation
@@ -14,7 +18,7 @@ from qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation import 
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_AER
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, use_qsharp_context
 
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
@@ -100,6 +104,18 @@ def h2_hamiltonian() -> QubitOperator:
     )
 
 
+# The qubitization walk lowers to measurement-based AND uncompute under the default
+# Adaptive_RIF profile, so its QIR carries `mz`/`read_result` and converts to a Qiskit
+# circuit that owns classical bits. These two tests then feed that circuit to
+# `to_gate()`/`compose()`, which reject classical bits. The Base profile emits the
+# ancilla-free form instead, so pin just these two.
+@pytest.fixture
+def use_base_qdk_ctx() -> Iterator[qdk.Context]:
+    """Route the library's shared context to a ``TargetProfile.Base`` build."""
+    with use_qsharp_context(create_qsharp_context(TargetProfile.Base)) as context:
+        yield context
+
+
 class TestQPEWithQubitization:
     """Integration tests for iterative QPE with qubitization (LCU quantum walk)."""
 
@@ -153,6 +169,7 @@ class TestQPEWithQubitization:
         )
 
     @pytest.mark.parametrize("builder_name", _builder_params)
+    @pytest.mark.usefixtures("use_base_qdk_ctx")
     def test_iterative_qpe_with_qubitization_h2(self, builder_name, h2_hamiltonian):
         """Verify QPE with qubitization recovers H2 ground-state energy.
 
@@ -232,6 +249,7 @@ class TestQPEWithQubitization:
     @pytest.mark.skipif(
         not QDK_CHEMISTRY_HAS_QISKIT_AER or not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit Aer not available."
     )
+    @pytest.mark.usefixtures("use_base_qdk_ctx")
     def test_standard_qpe_with_qubitization_h2(self, h2_hamiltonian):
         """Verify standard QPE with qubitization recovers H2 ground-state energy."""
         # Exact ground state from qubit Hamiltonian solver (dense diagonalization)

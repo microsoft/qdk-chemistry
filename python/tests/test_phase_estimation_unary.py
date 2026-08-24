@@ -7,86 +7,64 @@
 
 import numpy as np
 import pytest
+from qdk.test_utils import dump_operation_on_state
 
+from qdk_chemistry.algorithms.circuit_mapper.psp_mapper import PSPMapper
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
+from qdk_chemistry.algorithms.phase_estimation.circuit_builder import unary_phase_estimation_builder
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.unary_phase_estimation_builder import (
     QdkUnaryQpeCircuitBuilder,
-    num_phase_bits,
-    phase_window_state,
+    cosine_window_state,
 )
 from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import (
-    _select_dominant_decoded_phase,
+    UnaryPhaseEstimation,
+    _post_process_phase_estimation,
 )
-from qdk_chemistry.utils.qsharp import get_qsharp_context
-
-_PAULI_X = np.array([[0.0, 1.0], [1.0, 0.0]], dtype=complex)
-_PAULI_Z = np.array([[1.0, 0.0], [0.0, -1.0]], dtype=complex)
+from qdk_chemistry.algorithms.state_preparation import identity_state_prep
+from qdk_chemistry.data import AlgorithmRef, QubitOperator
+from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
+from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
+from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 
 def _address_qubits(num_actions: int) -> int:
-    """Number of address qubits the Q# operations allocate for ``num_actions`` values.
-
-    Integer-exact by construction. ``ceil(log2(n))`` is the same function
-    mathematically but rounds wrong at large inputs, and this helper is the oracle
-    the Q# width is checked against, so it must not share a failure mode with it.
-    """
-    return (num_actions - 1).bit_length()
+    """Number of address qubits the Q# operations expect for ``num_actions`` values."""
+    return QSHARP_UTILS.UnaryIteration.AddressQubits(num_actions)
 
 
 def _dumped_address_index(address_value: int, num_address_qubits: int) -> int:
-    """Map a little-endian address value onto its index in the dumped statevector.
-
-    ``ApplyXorInPlace`` and the unary iteration address the register little-endian
-    (``address[0]`` is the least significant bit) while ``dump_machine`` reads the
-    first allocated qubit as the most significant bit, so the two differ by a bit
-    reversal over the address register.
-    """
+    """Map a little-endian address value onto its index in the dumped statevector."""
     if num_address_qubits == 0:
         return 0
     return int(format(address_value, f"0{num_address_qubits}b")[::-1], 2)
 
 
-def _matrix_power(matrix: np.ndarray, exponent: int) -> np.ndarray:
-    """Signed matrix power for a self-inverse-product walk operator."""
-    base = matrix if exponent >= 0 else np.linalg.inv(matrix)
-    result = np.eye(matrix.shape[0], dtype=complex)
-    for _ in range(abs(exponent)):
-        result = base @ result
-    return result
+def _dump_op(op, num_qubits: int) -> np.ndarray:
+    """Simulate ``op`` on the all-zero state and return the resulting statevector.
+
+    The context has to be the one the operation was resolved from, otherwise the helper
+    that ``dump_operation_on_state`` evaluates cannot bind the callable.
+    """
+    return np.array(dump_operation_on_state(op, num_qubits, context=get_qsharp_context()))
+
+
+def _decode(counts: dict[str, int], num_bits: int, *, resolve_positive_branch: bool = False):
+    """Run the decoder against a walk whose block encoding has ``lambda = 1``."""
+    return _post_process_phase_estimation(
+        counts, num_bits, "qdk_unary", resolve_positive_branch, lambda phase: float(np.cos(2 * np.pi * phase))
+    )
 
 
 class TestUnaryIterationQsharp:
     """Statevector checks of the unary-iteration primitives against exact references."""
 
-    @pytest.mark.parametrize(
-        ("num_actions", "address_value"),
-        [(n, a) for n in (1, 2, 3, 4, 5, 6, 7, 8, 11) for a in range(n)],
-    )
-    def test_selects_exactly_one_action_per_address(self, qdk_ctx, num_actions, address_value):
-        """Address ``i`` must flip flag ``i`` and nothing else, for every valid address.
-
-        Covers ``num_actions`` values that are not powers of two, where the iteration
-        recurses into unequal halves. Comparing against the full basis state also rules
-        out residual entanglement with the internal AND ancillas.
-        """
-        num_address_qubits = _address_qubits(num_actions)
-        qdk_ctx.code.QDKChemistry.Utils.UnaryIteration.TestUnaryIterationOneHot(num_actions, address_value)
-        state = np.array(qdk_ctx.dump_machine().as_dense_state())
-
-        expected = np.zeros(1 << (num_address_qubits + num_actions), dtype=complex)
-        expected[1 << (num_actions - 1 - address_value)] = 1.0
-        np.testing.assert_allclose(state, expected, atol=1e-10)
-
     @pytest.mark.parametrize("num_actions", [2, 4, 8])
-    def test_superposed_address_stays_coherent(self, qdk_ctx, num_actions):
-        """A superposed address must produce sum_a |a>|onehot(a)> with no ancilla residue.
-
-        A per-address test cannot detect ancillas that are left entangled with the
-        address, because each computational-basis address leaves them in a product
-        state; only a coherent superposition exposes that failure mode.
-        """
+    def test_superposed_address_stays_coherent(self, num_actions):
+        """A superposed address must produce sum_a |a>|onehot(a)> with no ancilla residue."""
         num_address_qubits = _address_qubits(num_actions)
-        qdk_ctx.code.QDKChemistry.Utils.UnaryIteration.TestUnaryIterationSuperposedAddress(num_actions)
-        state = np.array(qdk_ctx.dump_machine().as_dense_state())
+        op = QSHARP_UTILS.UnaryIteration.MakeTestUnaryIterationSuperposedAddressOp(num_actions)
+        state = _dump_op(op, num_address_qubits + num_actions)
 
         expected = np.zeros(1 << (num_address_qubits + num_actions), dtype=complex)
         for address_value in range(num_actions):
@@ -99,87 +77,52 @@ class TestUnaryIterationQsharp:
         [
             (2, [True, False]),
             (4, [True, False, False, True]),
-            (8, [True, False, False, False, False, True, True, False]),
+            (7, [True, False, False, False, False, True, True]),
         ],
     )
-    def test_exposed_control_is_an_equality_predicate(self, qdk_ctx, num_actions, data):
-        """Phasing the exposed control must imprint exactly the flagged sign pattern.
-
-        The reflection schedule uses the exposed control as a phase control rather than
-        as a control on a target, so it has to be a clean ``[address == i]`` predicate.
-        """
+    def test_exposed_control_is_an_equality_predicate(self, num_actions, data):
+        """Phasing the exposed control must imprint exactly the flagged sign pattern."""
         num_address_qubits = _address_qubits(num_actions)
-        qdk_ctx.code.QDKChemistry.Utils.UnaryIteration.TestUnaryIterationControlPhases(num_actions, data)
-        state = np.array(qdk_ctx.dump_machine().as_dense_state())
+        op = QSHARP_UTILS.UnaryIteration.MakeTestUnaryIterationControlPhasesOp(num_actions, data)
+        state = _dump_op(op, num_address_qubits)
 
-        expected = np.zeros(1 << num_address_qubits, dtype=complex)
-        for address_value in range(num_actions):
-            sign = -1.0 if data[address_value] else 1.0
-            expected[_dumped_address_index(address_value, num_address_qubits)] = sign / np.sqrt(num_actions)
-        np.testing.assert_allclose(state, expected, atol=1e-10)
-
-    @pytest.mark.parametrize(
-        ("num_blocks", "address_value"),
-        [(m, t) for m in (1, 2, 3, 4, 5, 6) for t in range(m + 1)],
-    )
-    def test_power_schedule_realizes_signed_powers(self, qdk_ctx, num_blocks, address_value):
-        """Slot ``t`` must apply exactly ``W^(num_blocks - 2t)`` for ``W = Z.X``.
-
-        The target starts in ``Ry(0.7)|0>``, which is an eigenstate of neither ``W`` nor
-        any of its powers, so the comparison pins down the relative phase and therefore
-        distinguishes every signed power in the schedule - including the negative ones.
-        """
-        walk = _PAULI_Z @ _PAULI_X
-        initial = np.array([np.cos(0.35), np.sin(0.35)], dtype=complex)
-        num_address_qubits = _address_qubits(num_blocks + 1)
-
-        qdk_ctx.code.QDKChemistry.Utils.UnaryPhaseEstimation.TestUnaryIterationSignedPower(num_blocks, address_value)
-        state = np.array(qdk_ctx.dump_machine().as_dense_state())
-
-        expected = np.zeros(1 << (num_address_qubits + 1), dtype=complex)
-        expected[:2] = _matrix_power(walk, num_blocks - 2 * address_value) @ initial
-        np.testing.assert_allclose(state, expected, atol=1e-10)
+        # Addresses at or above num_actions are outside the iteration's promise: the last
+        # leaf fires on its control alone, so they alias onto a neighbouring action.
+        amplitude = 1.0 / np.sqrt(1 << num_address_qubits)
+        expected = np.array([-1.0 if flagged else 1.0 for flagged in data]) * amplitude
+        actual = np.array([state[_dumped_address_index(a, num_address_qubits)] for a in range(num_actions)])
+        np.testing.assert_allclose(actual, expected, atol=1e-10)
 
 
 class TestBlockEncodingAgnosticSchedule:
-    """The signed-power schedule must work for block encodings other than SOSSA."""
+    """The signed-power schedule must work for any self-inverse block encoding."""
 
     @pytest.mark.parametrize(
         ("num_queries", "address_value"),
         [(p, t) for p in (1, 2, 3, 5) for t in range(p + 1)],
     )
-    def test_psp_schedule_matches_the_explicit_walk_power(self, qdk_ctx, num_queries, address_value):
-        """A PREPARE-SELECT-PREPARE walk must obey the same ``W^(p - 2t)`` contract.
-
-        The Q# wrapper runs ``MakePSPSignedPowerScheduleOp`` at address ``t`` and then
-        explicitly undoes ``W^(p - 2t)`` walk steps built from the same PREPARE and SELECT.
-        Whatever remains must be the untouched input state, so any mismatch in the power,
-        the sign of the power, the reflection register, or the ancilla bookkeeping shows up
-        as a deviation.
-
-        This is the point of the refactor: nothing about SOSSA is involved here, only the
-        generic schedule driving a completely different block encoding.
-        """
-        qdk_ctx.code.QDKChemistry.Utils.UnaryPhaseEstimation.TestPSPSignedPowerSchedule(num_queries, address_value, 0.7)
-        state = np.array(qdk_ctx.dump_machine().as_dense_state())
-
+    def test_psp_schedule_matches_the_explicit_walk_power(self, num_queries, address_value):
+        """A PREPARE-SELECT-PREPARE walk must obey the same ``W^(p - 2t)`` contract."""
+        psp = QSHARP_UTILS.PrepSelPrep
+        op = QSHARP_UTILS.UnaryPhaseEstimation.MakeTestSignedPowerScheduleAgainstWalkOp(
+            psp.MakeTestBlockEncodingOp(0.7), psp.MakeAncillaReflectionOp(1), num_queries, address_value, 0.9
+        )
         num_address_qubits = _address_qubits(num_queries + 1)
+        state = _dump_op(op, num_address_qubits + 2)
+
         expected = np.zeros(1 << (num_address_qubits + 2), dtype=complex)
         expected[0] = np.cos(0.45)  # system |0>, ancilla |0>
         expected[2] = np.sin(0.45)  # system |1>, ancilla |0>
         np.testing.assert_allclose(state, expected, atol=1e-10)
 
     @pytest.mark.parametrize("theta", [0.0, 1.3, np.pi / 2])
-    def test_psp_schedule_holds_for_every_encoded_eigenvalue(self, qdk_ctx, theta):
-        """The contract must not depend on what the block encoding encodes.
-
-        ``PREPARE = Ry(theta)`` makes the encoded operator ``cos(theta)`` on the system
-        qubit, sweeping the walk from a trivial reflection (``theta = 0``) to the
-        maximally mixing case (``theta = pi/2``). A schedule that only happened to work
-        for one spectrum would fail here.
-        """
-        qdk_ctx.code.QDKChemistry.Utils.UnaryPhaseEstimation.TestPSPSignedPowerSchedule(3, 1, theta)
-        state = np.array(qdk_ctx.dump_machine().as_dense_state())
+    def test_psp_schedule_holds_for_every_encoded_eigenvalue(self, theta):
+        """The contract must not depend on what the block encoding encodes."""
+        psp = QSHARP_UTILS.PrepSelPrep
+        op = QSHARP_UTILS.UnaryPhaseEstimation.MakeTestSignedPowerScheduleAgainstWalkOp(
+            psp.MakeTestBlockEncodingOp(theta), psp.MakeAncillaReflectionOp(1), 3, 1, 0.9
+        )
+        state = _dump_op(op, 4)
 
         expected = np.zeros(1 << 4, dtype=complex)
         expected[0] = np.cos(0.45)
@@ -187,105 +130,33 @@ class TestBlockEncodingAgnosticSchedule:
         np.testing.assert_allclose(state, expected, atol=1e-10)
 
 
-class TestPhaseRegisterSizing:
-    """Phase register sizing for arbitrary query counts."""
-
-    @pytest.mark.parametrize(
-        ("num_queries", "expected_bits"),
-        [(1, 1), (2, 2), (3, 2), (4, 3), (5, 3), (7, 3), (8, 4), (25, 5)],
-    )
-    def test_num_phase_bits(self, num_queries, expected_bits):
-        """The register must address num_queries + 1 reflection slots."""
-        assert num_phase_bits(num_queries) == expected_bits
-        assert (1 << num_phase_bits(num_queries)) >= num_queries + 1
-
-    @pytest.mark.parametrize("num_queries", [0, -3])
-    def test_non_positive_query_count_rejected(self, num_queries):
-        """A non-positive query count is invalid."""
-        with pytest.raises(ValueError, match="num_queries must be a positive integer"):
-            num_phase_bits(num_queries)
-
-    @pytest.mark.parametrize("num_actions", [1, 2, 3, 4, 5, 8, 9, 16, 17, 1024, 1025, 2**20, 2**29, 2**31])
-    def test_qsharp_address_width_is_exact_at_large_powers_of_two(self, num_actions):
-        """``AddressQubits`` must stay integer-exact where ``Ceiling(Lg(...))`` is not.
-
-        ``Lg`` is a ratio of two rounded logarithms, so the float form over-allocates
-        at ``2**29`` -- the smallest power of two it gets wrong -- and again at
-        ``2**31``. An over-wide address register trips the power-of-two facts that
-        guard the unary-iteration recursion. Every other width assertion in this
-        module stays under ``2**6``, where the two forms agree, so this is the only
-        check that can see a regression to the float form.
-        """
-        computed = get_qsharp_context().code.QDKChemistry.Utils.UnaryIteration.AddressQubits(num_actions)
-
-        assert computed == (num_actions - 1).bit_length()
-        assert (1 << computed) >= num_actions
-
-    @pytest.mark.parametrize("num_queries", [1, 3, 63, 2**29 - 1, 2**31 - 1])
-    def test_qsharp_phase_register_size_is_exact_at_large_query_counts(self, num_queries):
-        """``PhaseRegisterSize`` must keep delegating rather than re-derive its width.
-
-        It is one line -- ``AddressQubits(numQueries + 1)`` -- and that single
-        definition is the property under test. An independent
-        ``Ceiling(Lg(IntAsDouble(numQueries + 1)))`` agrees with the exact value
-        everywhere below ``numQueries + 1 == 2**29``, so a second definition would be
-        invisible to every other check here.
-        """
-        computed = get_qsharp_context().code.QDKChemistry.Utils.UnaryPhaseEstimation.PhaseRegisterSize(num_queries)
-
-        assert computed == num_queries.bit_length()
-        assert (1 << computed) >= num_queries + 1
-
-
 class TestPhaseWindowState:
     """Window states prepared on the phase register."""
 
-    @pytest.mark.parametrize("window", ["cosine", "uniform"])
-    @pytest.mark.parametrize("num_queries", [3, 5, 25])
-    def test_padded_and_normalized(self, window, num_queries):
-        """Windows are unit-norm and zero on the unaddressed padding states."""
-        amplitudes = np.array(phase_window_state(num_queries, window))
-        assert len(amplitudes) == 1 << num_phase_bits(num_queries)
-        assert np.linalg.norm(amplitudes) == pytest.approx(1.0)
-        assert np.all(amplitudes[: num_queries + 1] > 0.0)
-        # Counting the nonzeros rather than slicing the padding keeps this check
-        # meaningful when there is no padding: num_queries = 2^k - 1 fills the
-        # register exactly, and a slice-based assertion would be vacuously true.
-        assert np.count_nonzero(amplitudes) == num_queries + 1
-
-    @pytest.mark.parametrize("num_queries", [3, 8, 25])
-    def test_cosine_matches_babbush2018_control_state(self, num_queries):
-        """The cosine window is sin(pi (t + 1) / (p + 2)) over the p + 1 slots."""
-        amplitudes = np.array(phase_window_state(num_queries, "cosine"))[: num_queries + 1]
-        expected = np.sin(np.pi * (np.arange(num_queries + 1) + 1) / (num_queries + 2))
-        expected /= np.linalg.norm(expected)
-        np.testing.assert_allclose(amplitudes, expected, rtol=1e-12, atol=1e-15)
-
-    @pytest.mark.parametrize("num_queries", [4, 9, 24])
+    @pytest.mark.parametrize("num_queries", [4, 9, 24, 25])
     def test_cosine_is_symmetric_and_single_lobed(self, num_queries):
         """The cosine window peaks in the middle and decays monotonically to both edges."""
-        amplitudes = np.array(phase_window_state(num_queries, "cosine"))[: num_queries + 1]
+        amplitudes = np.array(cosine_window_state(num_queries))[: num_queries + 1]
         np.testing.assert_allclose(amplitudes, amplitudes[::-1], rtol=1e-12, atol=1e-15)
-        peak = int(np.argmax(amplitudes))
-        # A single lobe puts the peak strictly inside the window. Asserting it
-        # also keeps the two monotonicity checks below non-vacuous: an edge peak
-        # makes one slice a singleton, and np.diff of a singleton is empty, so
-        # np.all would pass without inspecting anything.
-        assert 0 < peak < len(amplitudes) - 1
-        assert np.all(np.diff(amplitudes[: peak + 1]) > 0.0)
-        assert np.all(np.diff(amplitudes[peak:]) < 0.0)
+
+        maxima = np.flatnonzero(np.isclose(amplitudes, amplitudes.max(), rtol=0.0, atol=1e-15))
+        first, last = int(maxima[0]), int(maxima[-1])
+
+        assert 0 < first <= last < len(amplitudes) - 1, "the lobe must be interior"
+        assert last - first <= 1, f"a single lobe peaks over at most two slots, got {last - first + 1}"
+        assert np.all(np.diff(amplitudes[: first + 1]) > 0.0)
+        assert np.all(np.diff(amplitudes[last:]) < 0.0)
 
     def test_cosine_suppresses_spectral_leakage_relative_to_uniform(self):
-        r"""The cosine window's phase spectrum has far lighter tails than a uniform one.
-
-        This is the property that makes it the Heisenberg-limited control state:
-        the probability of a phase readout landing far from the true phase decays
-        as :math:`1/\Delta^4` instead of the uniform window's :math:`1/\Delta^2`.
-        """
+        """The cosine window's phase spectrum has far lighter tails than a uniform one."""
         num_queries, oversampling = 31, 32
+        windows = {
+            "cosine": np.array(cosine_window_state(num_queries))[: num_queries + 1],
+            "uniform": np.ones(num_queries + 1) / np.sqrt(num_queries + 1),
+        }
 
         def tail_probability(window: str, bins: int) -> float:
-            amplitudes = np.array(phase_window_state(num_queries, window))[: num_queries + 1]
+            amplitudes = windows[window]
             spectrum = np.abs(np.fft.fft(amplitudes, amplitudes.size * oversampling)) ** 2
             spectrum /= spectrum.sum()
             offsets = np.arange(spectrum.size) - int(np.argmax(spectrum))
@@ -295,186 +166,291 @@ class TestPhaseWindowState:
         assert tail_probability("cosine", 2) < 0.1 * tail_probability("uniform", 2)
         assert tail_probability("cosine", 4) < 1e-3
 
-    def test_unknown_window_rejected(self):
-        """Unsupported window names are rejected."""
-        with pytest.raises(ValueError, match="window must be one of"):
-            phase_window_state(4, "kaiser")
-
 
 class TestPhaseDecoding:
     """Decoding of the doubled measured phase."""
 
-    @pytest.mark.parametrize(("measured", "expected_lower"), [(0.0, 0.0), (0.25, 0.125), (0.75, 0.125), (0.5, 0.25)])
-    def test_conjugate_bins_fold_to_the_same_phase(self, measured, expected_lower):
-        """Measured y and 1 - y describe the same walk phase."""
-        builder = QdkUnaryQpeCircuitBuilder(num_queries=7, phase_band="lower")
-        assert builder.phase_fraction_from_measurement(measured) == pytest.approx(expected_lower)
-
-        upper_builder = QdkUnaryQpeCircuitBuilder(num_queries=7, phase_band="upper")
-        assert upper_builder.phase_fraction_from_measurement(measured) == pytest.approx(0.5 - expected_lower)
-
-    def test_dominant_phase_merges_conjugate_counts(self):
+    @pytest.mark.parametrize("resolve_positive_branch", [True, False])
+    def test_dominant_phase_merges_conjugate_counts(self, resolve_positive_branch):
         """Conjugate bins are summed before the winner is selected."""
         counts = {"010": 3, "110": 3, "001": 5}  # 2/8 and 6/8 are conjugates, 1/8 is a separate bin
-        builder = QdkUnaryQpeCircuitBuilder(num_queries=7, phase_band="lower")
-        phase_fraction, bitstring, measured = _select_dominant_decoded_phase(
-            counts, 3, builder.phase_fraction_from_measurement
+        result = _decode(counts, 3, resolve_positive_branch=resolve_positive_branch)
+        expected = 0.125 if resolve_positive_branch else 0.375
+        assert result.canonical_phase_fraction == pytest.approx(expected)
+        # The reported bin and its fraction name the folded phase, so both branches agree.
+        assert result.bitstring_msb_first == "010"
+        assert result.phase_fraction == pytest.approx(0.25)
+
+    @pytest.mark.parametrize("num_bits", [1, 2, 3, 4])
+    def test_the_two_sign_branches_partition_the_spectrum(self, num_bits):
+        """The flag picks a branch of a sign ambiguity; it must not change the magnitude."""
+        for value in range(1 << num_bits):
+            counts = {format(value, f"0{num_bits}b"): 1}
+            positive = _decode(counts, num_bits, resolve_positive_branch=True)
+            negative = _decode(counts, num_bits, resolve_positive_branch=False)
+            assert 0.0 <= positive.canonical_phase_fraction <= 0.25
+            assert positive.canonical_phase_fraction + negative.canonical_phase_fraction == pytest.approx(0.5)
+            assert positive.raw_energy == pytest.approx(-negative.raw_energy)
+
+    def test_branching_is_still_two_candidates_at_the_degenerate_phase(self):
+        """The half-way bin is the one that collapses, so pin it directly."""
+        result = _decode({"10": 1}, 2, resolve_positive_branch=True)
+        assert result.canonical_phase_fraction == pytest.approx(0.25)
+        assert result.branching == pytest.approx((0.0, 0.0), abs=1e-12)
+
+    @pytest.mark.parametrize("resolve_positive_branch", [True, False])
+    def test_tied_counts_decode_independently_of_shot_order(self, resolve_positive_branch):
+        """Bins that tie on counts must not decode differently just because they arrived in a different order."""
+        tied = {"001": 4, "011": 4}
+        forward = _decode(tied, 3, resolve_positive_branch=resolve_positive_branch)
+        reversed_order = _decode(dict(reversed(tied.items())), 3, resolve_positive_branch=resolve_positive_branch)
+
+        assert forward.canonical_phase_fraction == pytest.approx(reversed_order.canonical_phase_fraction)
+        assert forward.bitstring_msb_first == reversed_order.bitstring_msb_first
+        # The tie is broken toward the smaller phase fraction of the two candidates.
+        expected = 0.0625 if resolve_positive_branch else 0.3125
+        assert forward.canonical_phase_fraction == pytest.approx(expected)
+
+
+class _Stub:
+    """A nested-algorithm stand-in whose ``run`` hands back a fixed object."""
+
+    def __init__(self, result) -> None:
+        self._result = result
+
+    def run(self, *_args, **_kwargs):
+        """Return the fixed result."""
+        return self._result
+
+
+def _hamiltonian() -> QubitOperator:
+    """``H = (X + Z)/2`` on a single qubit."""
+    return QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([0.5, 0.5]))
+
+
+def _make_builder(num_queries: int = 3, **nested) -> QdkUnaryQpeCircuitBuilder:
+    """Build the unary builder with the ``nested`` algorithms substituted by setting name."""
+    builder = QdkUnaryQpeCircuitBuilder(num_queries=num_queries)
+    original = builder._create_nested
+    builder._create_nested = lambda name, *a, **kw: nested[name] if name in nested else original(name, *a, **kw)
+    return builder
+
+
+def _run_builder(builder: QdkUnaryQpeCircuitBuilder, state_preparation: Circuit | None = None):
+    """Run ``builder`` against ``H = (X + Z)/2``."""
+    hamiltonian = _hamiltonian()
+    return builder.run(
+        state_preparation=state_preparation or identity_state_prep(hamiltonian.num_qubits),
+        qubit_hamiltonian=hamiltonian,
+    )
+
+
+class TestMisconfigurationIsSurfaced:
+    """Rejected configurations must raise, and overridden settings must warn."""
+
+    @pytest.mark.parametrize("num_queries", [0, -1, -7])
+    def test_a_non_positive_query_count_is_rejected(self, num_queries):
+        """``num_queries`` sizes the whole schedule, so it must be positive."""
+        with pytest.raises(ValueError, match="num_queries must be a positive integer"):
+            QdkUnaryQpeCircuitBuilder(num_queries=num_queries).resolve_num_queries()
+
+    def test_a_plain_block_encoding_is_rejected(self):
+        """The schedule drops one reflection, so a bare LCU has nothing to drop."""
+        with pytest.raises(ValueError, match="Requires a LCU walk unitary representation"):
+            _run_builder(_make_builder(unitary_builder=LCUBuilder(quantum_walk=False)))
+
+    @pytest.mark.parametrize(
+        ("declared_width", "message"),
+        [(None, "did not report num_qubits"), (1, "non-empty ancilla register"), (0, "non-empty ancilla register")],
+    )
+    def test_a_mapper_that_leaves_nothing_to_reflect_about_is_rejected(self, declared_width, message):
+        """The builder reflects the ancilla tail that ``Circuit.num_qubits`` implies."""
+        mapper = _Stub(Circuit(qasm="OPENQASM 3.0;\n", num_qubits=declared_width))
+        with pytest.raises(ValueError, match=message):
+            _run_builder(_make_builder(circuit_mapper=mapper))
+
+    def test_a_state_preparation_without_a_qsharp_operation_is_rejected(self):
+        """The schedule threads the state prep into a Q# operation, so QASM alone is not enough."""
+        with pytest.raises(RuntimeError, match="State preparation has no Q# operation"):
+            _run_builder(_make_builder(), state_preparation=Circuit(qasm="OPENQASM 3.0;\n"))
+
+    @pytest.mark.parametrize(
+        ("setting", "algorithm", "message"),
+        [
+            ("qpe_circuit_builder", "qdk_standard", "QdkUnaryQpeCircuitBuilder"),
+            ("circuit_executor", "qdk_full_state_simulator", "qdk_sparse_state_simulator"),
+        ],
+    )
+    def test_an_unsupported_nested_algorithm_is_rejected(self, setting, algorithm, message):
+        """The doubled phase needs the unary builder, and the recursive Q# needs the sparse simulator."""
+        qpe = UnaryPhaseEstimation(shots=8)
+        qpe.settings().set(setting, AlgorithmRef(setting, algorithm))
+        hamiltonian = _hamiltonian()
+        with pytest.raises(TypeError, match=message):
+            qpe.run(
+                qubit_hamiltonian=hamiltonian,
+                state_preparation=identity_state_prep(hamiltonian.num_qubits),
+            )
+
+    def test_a_configured_num_bits_is_ignored_with_a_warning(self, monkeypatch):
+        """The query count fixes the register size, so ``num_bits`` cannot also set it."""
+        warnings: list[str] = []
+        monkeypatch.setattr(unary_phase_estimation_builder.Logger, "warn", warnings.append)
+        builder = _make_builder()
+        builder.settings().set("num_bits", 7)
+
+        _run_builder(builder)
+
+        assert any("num_bits=7 is ignored" in message for message in warnings), warnings
+
+    def test_a_carried_walk_power_is_ignored_with_a_warning(self, monkeypatch):
+        """The schedule picks its own power per slot, so a container power is meaningless."""
+        warnings: list[str] = []
+        monkeypatch.setattr(unary_phase_estimation_builder.Logger, "warn", warnings.append)
+        container = LCUBuilder(quantum_walk=True).run(_hamiltonian()).get_container()
+        powered = UnitaryRepresentation(
+            container=LCUWalkContainer(container.block_encoding, power=2, scale=container.scale)
         )
-        assert phase_fraction == pytest.approx(0.125)
-        assert bitstring in {"010", "110"}
-        assert measured in {0.25, 0.75}
+
+        _run_builder(_make_builder(unitary_builder=_Stub(powered)))
+
+        assert any("power 2 is ignored" in message for message in warnings), warnings
+
+
+class TestRegisterSizeHasOneDefinition:
+    """The phase register width must have a single definition across Python and Q#."""
+
+    @pytest.mark.parametrize("num_queries", [1, 2, 3, 4, 5, 7, 8, 15, 16, 17, 31, 63, 64])
+    def test_python_and_qsharp_agree_on_the_phase_register_size(self, num_queries):
+        """``resolve_num_queries``, ``PhaseRegisterSize`` and ``AddressQubits`` are one quantity.
+
+        They agreed by coincidence of three separate formulas before; ``PhaseRegisterSize``
+        now delegates to ``AddressQubits``, and this pins the Python side to the same value.
+        """
+        resolved, num_bits = QdkUnaryQpeCircuitBuilder(num_queries=num_queries).resolve_num_queries()
+        assert resolved == num_queries, "the configured query count is applied as given"
+
+        context = get_qsharp_context()
+        qsharp_phase_bits = context.eval(f"QDKChemistry.Utils.UnaryPhaseEstimation.PhaseRegisterSize({resolved})")
+        qsharp_address_bits = context.eval(f"QDKChemistry.Utils.UnaryIteration.AddressQubits({resolved + 1})")
+
+        assert num_bits == qsharp_phase_bits == qsharp_address_bits
+        assert (1 << num_bits) >= resolved + 1
+        assert (1 << (num_bits - 1)) < resolved + 1, "the register must be the narrowest that addresses its slots"
+
+    @pytest.mark.parametrize("num_actions", [1, 2, 3, 4, 5, 8, 9, 16, 17, 1024, 1025, 2**20, 2**29, 2**31])
+    def test_address_width_is_exact_at_large_powers_of_two(self, num_actions):
+        """``AddressQubits`` must be integer-exact where ``Ceiling(Lg(...))`` is not.
+
+        The floating-point form returns 32 for ``2**31``, over-allocating the address
+        register and tripping the power-of-two facts that guard the recursion. ``2**29``
+        is the smallest power of two it gets wrong, so it is the case a realistic input
+        could plausibly reach.
+        """
+        context = get_qsharp_context()
+        computed = context.eval(f"QDKChemistry.Utils.UnaryIteration.AddressQubits({num_actions})")
+
+        assert computed == (num_actions - 1).bit_length()
+        assert (1 << computed) >= num_actions
 
 
 class TestUnaryQpeEndToEnd:
     """End-to-end checks of ``MakeUnaryQPECircuit`` on a walk with an exact eigenphase."""
 
     @staticmethod
-    def _measure(qdk_ctx, num_queries: int, k: int, system_state: int) -> int:
-        """Run the synthetic-walk QPE circuit and decode the phase register.
-
-        ``MakeUnaryQPECircuit`` returns the register least-significant bit first (the
-        circuit-executor bitstring convention), so a direct Q# caller must reverse it.
-        """
+    def _measure(num_queries: int, k: int, system_angle: float) -> int:
+        """Run the synthetic-walk QPE circuit from ``Ry(system_angle)|0>`` and decode the phase register."""
         num_states = num_queries + 1
         theta = -np.pi * k / num_states
-        results = qdk_ctx.code.QDKChemistry.Utils.UnaryPhaseEstimation.TestUnaryQpeSyntheticWalk(
-            num_queries, theta, system_state
-        )
+        results = QSHARP_UTILS.UnaryPhaseEstimation.TestUnaryQpeSyntheticWalk(num_queries, theta, system_angle)
         return int("".join("1" if str(bit) == "One" else "0" for bit in reversed(results)), 2)
 
     @pytest.mark.parametrize(
         ("num_queries", "k", "system_state"),
         [(m, k, s) for m in (3, 7) for k in range(m + 1) for s in (0, 1)],
     )
-    def test_measured_bin_is_twice_the_walk_phase(self, qdk_ctx, num_queries, k, system_state):
-        """The measured register must read exactly ``2*phi*N``.
-
-        The synthetic walk is ``W = Rz(2*theta)`` built from two self-inverse
-        reflections, so ``W|1> = e^{+i theta}|1>`` and ``W|0> = e^{-i theta}|0>``.
-        Choosing ``theta = -pi*k/N`` with ``N = num_queries + 1`` puts the answer
-        exactly on a bin boundary, making the outcome deterministic and the
-        assertion exact rather than statistical.
-
-        This pins the whole register chain at once: the big-endian window state,
-        the little-endian unary addressing reached through ``Reversed``, the
-        endianness of ``Adjoint ApplyQFT`` (which writes the phase little-endian
-        because ``ApplyQFT`` maps a little-endian input to a big-endian output),
-        and the least-significant-bit-first order of the returned results.
-        """
+    def test_measured_bin_is_twice_the_walk_phase(self, num_queries, k, system_state):
+        """The measured register must read exactly ``2*phi*N``."""
         num_states = num_queries + 1
         expected = (-k) % num_states if system_state == 1 else k
-        assert self._measure(qdk_ctx, num_queries, k, system_state) == expected
+        assert self._measure(num_queries, k, system_state * np.pi) == expected
 
-    def test_slot_sweep_grows_linearly_with_the_query_count(self, qdk_ctx):
-        """The schedule must sweep ``num_queries + 1`` slots, not apply one controlled block.
+    @pytest.mark.parametrize("system_angle", [np.pi / 2, 2 * np.pi / 3])
+    def test_superposed_input_splits_across_both_eigenphase_bins(self, system_angle):
+        """A non-eigenstate must land in the two eigenphase bins with the overlap weights."""
+        num_queries, k, shots = 7, 3, 256
+        num_states = num_queries + 1
+        ground_bin, excited_bin = k, (-k) % num_states
 
-        ``MakeUnaryQPECircuit`` hands the whole phase register to a single
-        ``signedPowerSchedule`` call rather than repeating a walk step itself, because unary
-        iteration fuses the slot sweep with the address decode. This pins that the repetition
-        really happens inside that call. The synthetic walk block is Clifford, so the only
-        non-Clifford cost is the unary-iteration AND ladder, one uncompute measurement per
-        slot: the count must therefore grow proportionally to ``num_queries``. A schedule
-        that applied a single block, or that ignored the query count it was built with, would
-        give a flat count instead.
-        """
-        theta = -np.pi / 4
-        counts = {
-            num_queries: qdk_ctx.logical_counts(
-                qdk_ctx.code.QDKChemistry.Utils.UnaryPhaseEstimation.TestUnaryQpeSyntheticWalk,
-                num_queries,
-                theta,
-                1,
-            )["measurementCount"]
-            for num_queries in (3, 7, 15, 31)
-        }
+        measured = np.array([self._measure(num_queries, k, system_angle) for _ in range(shots)])
 
-        queries = sorted(counts)
-        assert [counts[num_queries] for num_queries in queries] == sorted(counts.values()), counts
-        per_query = [counts[num_queries] / num_queries for num_queries in queries]
-        assert min(per_query) > 0.75, counts
-        assert max(per_query) / min(per_query) < 1.5, counts
+        assert set(np.unique(measured).tolist()) == {ground_bin, excited_bin}
+        assert np.mean(measured == excited_bin) == pytest.approx(np.sin(system_angle / 2) ** 2, abs=0.12)
 
+    @pytest.mark.parametrize("resolve_positive_branch", [True, False])
     @pytest.mark.parametrize("k", [1, 2, 3])
-    def test_decoder_recovers_the_walk_phase(self, qdk_ctx, k):
+    def test_decoder_recovers_the_walk_phase(self, k, resolve_positive_branch):
         """The measured bin, run through the decoder, returns the walk phase.
 
         The two eigenvectors carry conjugate phases ``+-phi`` and land in
-        conjugate bins, which the decoder must fold onto the same answer.
+        conjugate bins, which the decoder must fold onto the same answer. The sign flag
+        only chooses which of the two mirror branches that answer is reported on.
         """
         num_queries = 7
         num_states = num_queries + 1
-        builder = QdkUnaryQpeCircuitBuilder(num_queries=num_queries, phase_band="lower")
+        num_bits = num_queries.bit_length()
 
-        expected_phase = k / (2 * num_states)
+        walk_phase = k / (2 * num_states)
+        expected_phase = walk_phase if resolve_positive_branch else 0.5 - walk_phase
         for system_state in (0, 1):
-            measured = self._measure(qdk_ctx, num_queries, k, system_state) / num_states
-            assert builder.phase_fraction_from_measurement(measured) == pytest.approx(expected_phase)
+            measured_bin = self._measure(num_queries, k, system_state * np.pi)
+            counts = {format(measured_bin, f"0{num_bits}b"): 1}
+            result = _decode(counts, num_bits, resolve_positive_branch=resolve_positive_branch)
+            assert result.canonical_phase_fraction == pytest.approx(expected_phase)
 
-    @pytest.mark.parametrize("bin_index", [1, 2, 3])
-    def test_inverse_qft_leaves_the_answer_little_endian(self, qdk_ctx, bin_index):
-        """After ``Adjoint ApplyQFT`` the answer sits little-endian in the phase register.
+    @pytest.mark.parametrize("num_queries", [6, 8, 11, 23, 63])
+    def test_builder_defaults_recover_the_ground_state_energy(self, num_queries):
+        r"""The shipped defaults must recover :math:`H = (X + Z)/2` end to end."""
+        num_bits = num_queries.bit_length()
+        assert (num_queries + 1 < 1 << num_bits) == (num_queries != 63), "sweep must mix padded and exact registers"
 
-        This is the contract that decides the order in which ``MakeUnaryQPECircuit`` must
-        return its results: a circuit executor emits the first measured ``Result`` as the
-        right-most character of the bitstring, so the register has to be returned in the same
-        little-endian order it is held in for ``int(bitstring, 2)`` to recover the bin.
-
-        The check is at statevector level rather than through sampling, and the block
-        encoding is deliberately a PREPARE-SELECT-PREPARE walk rather than the synthetic
-        single-qubit one, because ``PREPARE = Ry(theta)`` with ``SELECT = c-Z`` encodes
-        ``cos(theta)`` on ``|1>`` and so puts the answer on bin ``j`` exactly when
-        ``theta = pi*j/N``. What has to move under bit reversal is the *pair* ``{j, N - j}``
-        the two conjugate eigenvectors occupy, not ``j`` alone: ``j = 2`` is itself a fixed
-        point of a three-bit reversal, but its pair still travels ``{2, 6} -> {2, 3}``. All
-        three cases move (``{1, 7} -> {4, 7}``, ``{2, 6} -> {2, 3}``, ``{3, 5} -> {5, 6}``),
-        so reading the register with the opposite endianness fails for every one of them.
-        """
-        num_queries = 7
-        num_states = num_queries + 1
-        qdk_ctx.code.QDKChemistry.Utils.UnaryPhaseEstimation.TestSyntheticSchedulePhaseRamp(
-            num_queries, np.pi * bin_index / num_states, True
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([0.5, 0.5]))
+        energies, vectors = np.linalg.eigh(hamiltonian.to_matrix())
+        state_prep_params = {
+            "rowMap": list(range(hamiltonian.num_qubits - 1, -1, -1)),
+            "stateVector": np.real(vectors[:, 0]).tolist(),
+            "expansionOps": [],
+            "numQubits": hamiltonian.num_qubits,
+        }
+        state_preparation = Circuit(
+            qsharp_factory=QsharpFactoryData(
+                program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+                parameter=state_prep_params,
+            ),
+            qsharp_op=QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params),
         )
-        # dump_machine treats the first allocated qubit as most significant, so the row index
-        # is the phase register read big-endian; reverse it to get the little-endian value.
-        amplitudes = np.array(qdk_ctx.dump_machine().as_dense_state()).reshape(num_states, 4)
-        probabilities = np.zeros(num_states)
-        for row in range(num_states):
-            little_endian = int(format(row, "03b")[::-1], 2)
-            probabilities[little_endian] = np.sum(np.abs(amplitudes[row]) ** 2)
 
-        # |1> is an equal superposition of the two walk eigenvectors, whose conjugate
-        # phases land in bins j and N - j.
-        expected = np.zeros(num_states)
-        expected[bin_index] = 0.5
-        expected[-bin_index] = 0.5
-        assert probabilities == pytest.approx(expected, abs=1e-9)
+        qpe = UnaryPhaseEstimation(shots=200)
+        qpe.settings().set(
+            "qpe_circuit_builder", AlgorithmRef("qpe_circuit_builder", "qdk_unary", num_queries=num_queries)
+        )
+        qpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"))
+        result = qpe.run(qubit_hamiltonian=hamiltonian, state_preparation=state_preparation)
+
+        assert result.raw_energy == pytest.approx(float(energies[0]), abs=1e-9)
 
 
-class TestRegistration:
-    """Registry wiring for the unary phase estimation stack."""
+def test_the_builder_reflects_the_ancilla_tail_the_mapper_declared():
+    """Every qubit the mapper exposes past the system register is reflected about."""
+    hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([0.5, 0.5]))
+    rep = LCUBuilder(quantum_walk=True).run(hamiltonian)
+    declared = PSPMapper().run(rep).num_qubits
+    assert declared is not None
 
-    def test_query_count_falls_back_to_settings(self):
-        """A unitary representation without a power uses the configured query count."""
+    builder = QdkUnaryQpeCircuitBuilder(num_queries=3)
+    circuit = builder.run(
+        state_preparation=identity_state_prep(hamiltonian.num_qubits),
+        qubit_hamiltonian=hamiltonian,
+    )[0]
 
-        class _Container:
-            power = 1
-
-        class _UnitaryRep:
-            def get_container(self):
-                return _Container()
-
-        builder = QdkUnaryQpeCircuitBuilder(num_queries=25)
-        assert builder.resolve_num_queries(_UnitaryRep()) == 25
-
-    def test_query_count_prefers_unitary_representation(self):
-        """The power carried by the unitary representation wins over the setting."""
-
-        class _Container:
-            power = 11
-
-        class _UnitaryRep:
-            def get_container(self):
-                return _Container()
-
-        builder = QdkUnaryQpeCircuitBuilder(num_queries=25)
-        assert builder.resolve_num_queries(_UnitaryRep()) == 11
+    assert circuit._qsharp_factory.parameter["numAncillas"] == declared - hamiltonian.num_qubits

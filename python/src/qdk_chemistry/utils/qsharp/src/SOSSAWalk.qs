@@ -41,7 +41,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     import QDKChemistry.Utils.PhaseGradient.MakePhaseGradientAncillaPrep;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState, QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient;
     import QDKChemistry.Utils.PrepSelPrep.Reflect;
-    import QDKChemistry.Utils.UnaryPhaseEstimation.MakeSignedPowerScheduleOp;
+    import QDKChemistry.Utils.UnaryPhaseEstimation.ApplySignedPowerSchedule;
 
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -423,10 +423,12 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         layout : SOSSAWalkLayout,
         numWalkSteps : Int,
     ) : (Qubit[], Qubit[]) => Unit {
-        MakeSignedPowerScheduleOp(
+        (phaseReg, allQubits) => ApplySignedPowerSchedule(
             SOSSABlockEncodingOnRegister(outerPrepareOp, innerPrepareOp, selectOp, layout, _),
-            SOSSAReflectionRegister(layout, _),
-            numWalkSteps
+            (register) => Reflect(SOSSAReflectionRegister(layout, register)),
+            numWalkSteps,
+            phaseReg,
+            allQubits
         )
     }
 

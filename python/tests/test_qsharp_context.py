@@ -7,19 +7,24 @@
 
 from __future__ import annotations
 
+import inspect
 import threading
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
 from qdk import TargetProfile
+from qdk.qsharp import Pauli
 
+import qdk_chemistry.utils.qsharp as qsharp_package
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder import (
     QdkStandardQpeCircuitBuilder,
 )
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils.qsharp import (
+    _BASE_PROFILE_FILES,
     QSHARP_UTILS,
     create_qsharp_context,
     get_qsharp_context,
@@ -31,6 +36,29 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     import qdk
+
+#: Modules the vendored Q# project exposes under every target profile. Derived from the
+#: shipped staging list so that list, not a copy of it, is what the classification pins.
+_PORTABLE_MODULES = tuple(Path(name).stem for name in _BASE_PROFILE_FILES)
+
+#: Modules withheld from ``TargetProfile.Base``. Most uncompute through measurement, which
+#: Base cannot express, so they are made to fail as missing rather than compile and mislead.
+#: ``PhaseGradient`` is pure unitary but is only reachable from ``QROMStatePrep``, so it is
+#: withheld with it rather than carried into the Base build unused.
+_ADAPTIVE_ONLY_MODULES = (
+    "UnaryIteration",
+    "UnaryPhaseEstimation",
+    "SelectSwap",
+    "AliasSamplingStatePrep",
+    "QROMStatePrep",
+    "PhaseGradient",
+)
+
+
+@pytest.fixture(scope="module")
+def base_context() -> qdk.Context:
+    """A ``TargetProfile.Base`` context, built once for this module."""
+    return create_qsharp_context(TargetProfile.Base)
 
 
 @pytest.fixture(autouse=True)
@@ -138,3 +166,36 @@ class TestCrossContextComposition:
         state_prep = _make_state_prep_from_context(user_context)
         circuit = _build_standard_qpe(state_prep)
         circuit.get_qsharp_circuit()
+
+
+class TestTargetProfiles:
+    """Which Q# sources each target profile is allowed to see, and what it can lower to."""
+
+    def test_the_default_profile_is_adaptive_rif(self) -> None:
+        """Adaptive_RIF is the profile the vendored project is compiled for."""
+        default = inspect.signature(create_qsharp_context).parameters["target_profile"].default
+        assert default == TargetProfile.Adaptive_RIF
+
+    @pytest.mark.parametrize("module", _PORTABLE_MODULES)
+    def test_base_exposes_the_portable_modules(self, base_context: qdk.Context, module: str) -> None:
+        """Everything the Qiskit interop lowers has to survive the Base build."""
+        assert hasattr(base_context.code.QDKChemistry.Utils, module)
+
+    @pytest.mark.parametrize("module", _ADAPTIVE_ONLY_MODULES)
+    def test_base_withholds_the_measurement_based_modules(self, base_context: qdk.Context, module: str) -> None:
+        """Withheld sources must fail loudly as missing rather than return wrong results."""
+        assert not hasattr(base_context.code.QDKChemistry.Utils, module)
+
+    def test_every_vendored_module_is_classified(self) -> None:
+        """A module in neither list is silently untested, so require the split to be total."""
+        vendored = {path.stem for path in (Path(qsharp_package.__file__).parent / "src").glob("*.qs")}
+        assert vendored == set(_PORTABLE_MODULES) | set(_ADAPTIVE_ONLY_MODULES)
+
+    def test_base_lowers_a_circuit_to_qir(self, base_context: qdk.Context) -> None:
+        """The Base build exists to be lowered through QIR, so prove that it compiles."""
+        utils = base_context.code.QDKChemistry.Utils
+        state_prep = utils.StatePreparation.MakeStatePreparationCircuit
+        assert "define" in str(base_context.compile(state_prep, [0], [1.0, 0.0], [], 1))
+
+        pauli_exp = utils.ControlledPauliExp.MakeRepControlledPauliExpCircuit
+        assert "define" in str(base_context.compile(pauli_exp, [[Pauli.X, Pauli.Z]], [0.5], 2, 0, [1, 2]))

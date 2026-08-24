@@ -9,13 +9,30 @@ import math
 
 import numpy as np
 
-from qdk_chemistry.data import Wavefunction
+from qdk_chemistry.data import Settings, Wavefunction
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .state_preparation import StatePreparation
 
-__all__: list[str] = ["QROMStatePreparation"]
+__all__: list[str] = ["QROMStatePreparation", "QROMStatePreparationSettings"]
+
+
+class QROMStatePreparationSettings(Settings):
+    """Settings for :class:`QROMStatePreparation`."""
+
+    def __init__(self):
+        """Initialize the QROMStatePreparationSettings."""
+        super().__init__()
+        self._set_default(
+            "rotation_bit_precision",
+            "int",
+            10,
+            "Number of bits of precision used for the QROM-loaded Ry rotation angles. Higher "
+            "values reduce the synthesis error of each multiplexed rotation at the cost of a "
+            "wider QROM output register.",
+            (1, 30),
+        )
 
 
 class QROMStatePreparation(StatePreparation):
@@ -24,8 +41,19 @@ class QROMStatePreparation(StatePreparation):
     Prepares an arbitrary n-qubit state using n layers of multiplexed Ry rotations,
     where each layer's angles are loaded from a QROM table.
 
-    This approach uses only :math:`n = \lceil\log_2 L\rceil` qubits, but requires
-    n QROM lookups.
+    This approach uses only :math:`n = \lceil\log_2 L\rceil` state qubits, but requires
+    n QROM lookups (plus scratch ancilla for each lookup).
+
+    Index :math:`\ell` is the *position* of a coefficient in the wavefunction's coefficient
+    vector, not a Jordan-Wigner determinant bit pattern, so the returned circuit carries no
+    fermionic encoding.
+
+    Negative coefficients are supported. :math:`R_y` rotations only generate non-negative
+    amplitudes, so the signs are applied afterwards by a QROM-loaded ``Z`` phase kickback.
+    That lookup is uncomputed through ``Std.TableLookup``, whose adjoint repairs the phase
+    kickback its measurement-based uncompute leaves on the address register. The prepared
+    state is correct up to a global phase that depends on those measurement outcomes, so
+    compare states with :math:`|\langle \psi | \phi \rangle|` rather than element-wise.
     """
 
     def __init__(self, rotation_bit_precision: int = 10):
@@ -34,11 +62,13 @@ class QROMStatePreparation(StatePreparation):
         Args:
             rotation_bit_precision: Number of bits for Givens rotation angle
                 precision. Higher values give more accurate rotations.
-                Defaults to 10.
+                Defaults to 10. Equivalent to setting the ``rotation_bit_precision``
+                entry of ``settings()``.
 
         """
         super().__init__()
-        self._rotation_bit_precision = rotation_bit_precision
+        self._settings = QROMStatePreparationSettings()
+        self._settings.set("rotation_bit_precision", rotation_bit_precision)
 
     def name(self) -> str:
         """Return the algorithm name."""
@@ -56,19 +86,26 @@ class QROMStatePreparation(StatePreparation):
         Returns:
             Circuit: A Circuit wrapping the Q# QROM state prep callable and factory.
 
+        Raises:
+            ValueError: If the wavefunction has no coefficients or has an imaginary part.
+
         """
         coeffs = np.asarray(wavefunction.get_coefficients())
+        if coeffs.size == 0:
+            raise ValueError("QROM state preparation requires at least one coefficient.")
         if np.iscomplexobj(coeffs):
-            if not np.allclose(coeffs.imag, 0.0):
+            if np.any(coeffs.imag != 0.0):
                 raise ValueError("QROM state preparation requires real coefficients.")
             coeffs = coeffs.real
+        coeffs = coeffs.astype(float, copy=False)
 
         amplitudes = coeffs.tolist()
         num_state_qubits = math.ceil(math.log2(len(amplitudes))) if len(amplitudes) > 1 else 1
+        rotation_bit_precision = self.rotation_bit_precision
 
         params = QSHARP_UTILS.QROMStatePrep.QROMStatePrepParams(
             amplitudes=amplitudes,
-            rotationBitPrecision=self._rotation_bit_precision,
+            rotationBitPrecision=rotation_bit_precision,
             numStateQubits=num_state_qubits,
         )
 
@@ -77,7 +114,7 @@ class QROMStatePreparation(StatePreparation):
             program=QSHARP_UTILS.QROMStatePrep.MakeQROMStatePrepCircuit,
             parameter={
                 "amplitudes": amplitudes,
-                "rotationBitPrecision": self._rotation_bit_precision,
+                "rotationBitPrecision": rotation_bit_precision,
                 "numStateQubits": num_state_qubits,
             },
         )
@@ -87,4 +124,8 @@ class QROMStatePreparation(StatePreparation):
     @property
     def rotation_bit_precision(self) -> int:
         """Number of bits for rotation angle precision."""
-        return self._rotation_bit_precision
+        return int(self._settings.get("rotation_bit_precision"))
+
+    @rotation_bit_precision.setter
+    def rotation_bit_precision(self, value: int) -> None:
+        self._settings.set("rotation_bit_precision", value)
