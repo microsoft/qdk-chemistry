@@ -199,7 +199,14 @@ bash "${SCRIPT_DIR}/install-lapackpp.sh" "$INSTALL_PREFIX" "$LAPACKPP_COMMIT" "$
 echo "=== Installing libint2 ==="
 LIBINT_TARBALL=$(basename "$LIBINT_URL")
 wget -q "$LIBINT_URL"
-tar xzf "$LIBINT_TARBALL"
+if [[ "$MAC_BUILD" == "ON" ]]; then
+    tar xzf "$LIBINT_TARBALL"
+else
+    # This release tarball was packaged on macOS and carries a macOS-specific extended tar header
+    # (LIBARCHIVE.xattr.com.apple.provenance) that GNU tar (Linux) doesn't understand; it's harmless, but GNU tar
+    # prints one warning per archive entry for it, so silence just that one warning category.
+    tar xzf "$LIBINT_TARBALL" --warning=no-unknown-keyword
+fi
 # The tarball libint-2.9.0-mpqc4.tgz extracts to libint-2.9.0, not libint-2.9.0-mpqc4
 # Find the actual extracted directory (excluding macOS metadata files starting with ._)
 LIBINT_DIR=$(ls -d libint-*/ 2>/dev/null | grep -v '^\._' | head -1 | tr -d '/')
