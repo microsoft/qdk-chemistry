@@ -1,0 +1,87 @@
+# cmsb-fix-spdlog-ecpint-reuse.patch
+# ----------------------------------------------------------------------------------------------------------------------
+# Make NWChemEx-Project/CMakeBuild (CMSB) properly reuse an already-installed SPDLOG/EcpInt when TAMM's exported
+# tamm-config.cmake is consumed by a DOWNSTREAM project (e.g. ExaChem) whose own build re-resolves TAMM's
+# transitive dependencies via CMSBTargetConfig.cmake.in's dependency loop.
+#
+# Root cause: cmake/CMSBTargetConfig.cmake.in's per-dependency find_path(... NO_DEFAULT_PATH) re-resolution loop
+# searches HINTS ${__tip} ${__tip_stage} ${_dep_pp} ${CMAKE_PREFIX_PATH} for each of TAMM's own dependencies --
+# but only some of them (LibInt2, HDF5, numactl, and the GauXC/HPTT/Librett/NWQSim group via __depends_tlist) ever
+# get `_dep_pp` set to a meaningful hint at all. SPDLOG and EcpInt's elseif branches set __depend_cfg and the
+# library alias to link against, but never set `_dep_pp` -- so their re-resolution here relies ENTIRELY on
+# CMAKE_PREFIX_PATH being correctly forwarded from the outer build all the way through CMSB's nested
+# ExternalProject_Add(*_External ...) sub-build machinery, which in practice is unreliable (confirmed via a live
+# CI run: EcpInt happened to resolve, SPDLOG did not, with the *SAME* CMAKE_PREFIX_PATH forwarding path -- the
+# outcome plainly should not depend on which dependency it is). LibInt2/HDF5/HPTT avoid this fragility because
+# CMSBTargetConfig.cmake.in ALSO bakes their _ROOT value as a literal `set(<name>_ROOT @<name>_ROOT@)` at the very
+# top of the file, generated once (via configure_file) at TAMM's own build time -- independent of whatever
+# CMAKE_PREFIX_PATH state the CONSUMING project's build happens to have. SPDLOG_ROOT/EcpInt_ROOT never got this
+# same treatment; this patch extends it to them, mirroring the existing, working LibInt2/HDF5/HPTT pattern
+# exactly, changing nothing about how any other dependency is resolved.
+#
+# Two-part fix:
+#
+# 1. cmake/CMSBTargetConfig.cmake.in:
+#    a. Add `set(SPDLOG_ROOT @SPDLOG_ROOT@)` / `set(EcpInt_ROOT @EcpInt_ROOT@)` alongside the existing
+#       LibInt2_ROOT/HDF5_ROOT/HPTT_ROOT lines, so these get baked into the generated tamm-config.cmake.
+#    b. Set `_dep_pp` in the SPDLOG/EcpInt elseif branches of the dependency loop (mirroring LibInt2/HDF5/
+#       numactl), so the subsequent generic find_path(...) call actually uses these baked-in ROOT hints.
+#
+# 2. cmake/macros/BuildCMSBModule.cmake: add SPDLOG_ROOT/EcpInt_ROOT to the existing
+#    bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS BLAS_ARCH GCCROOT HDF5_ROOT HPTT_ROOT LibInt2_ROOT) call, so
+#    whatever value a caller passes as -DSPDLOG_ROOT=.../-DEcpInt_ROOT=... on the outer project's cmake
+#    invocation is actually forwarded into the nested *_External ExternalProject_Add sub-build -- the exact
+#    same forwarding LibInt2_ROOT/HDF5_ROOT/HPTT_ROOT already rely on -- so it's visible when
+#    CMSBTargetConfig.cmake.in's configure_file() call (inside cmsb_add_library, cmake/macros/TargetMacros.cmake)
+#    actually substitutes @SPDLOG_ROOT@/@EcpInt_ROOT@ into the generated config file.
+#
+# Callers wanting SPDLOG/EcpInt reused (not rebuilt) should pass -DSPDLOG_ROOT=<prefix> -DEcpInt_ROOT=<prefix> on
+# BOTH the outer TAMM and outer ExaChem (or any other CMSB_PROJECTS consumer) cmake invocations, exactly like
+# -DLibInt2_ROOT/-DGauXC_ROOT are already used in install-exachem.sh.
+#
+# Applied to a local FetchContent_MakeAvailable(CMakeBuild) source checkout via -DFETCHCONTENT_SOURCE_DIR_CMAKEBUILD
+# (see install-exachem.sh) rather than to a vendored copy in this repo, since CMSB isn't a qdk-chemistry dependency
+# in its own right -- it's fetched fresh (from NWChemEx-Project/CMakeBuild@main) as part of TAMM/ExaChem's own build.
+# Candidate for upstreaming to NWChemEx-Project/CMakeBuild: this is a genuine gap (not qdk-chemistry-specific
+# behavior), following the exact pattern CMSB already uses for LibInt2/HDF5/HPTT.
+#
+# Apply: git -C <cmsb-src> apply cmsb-fix-spdlog-ecpint-reuse.patch
+# ----------------------------------------------------------------------------------------------------------------------
+diff --git a/cmake/CMSBTargetConfig.cmake.in b/cmake/CMSBTargetConfig.cmake.in
+index a6437aa..9bd5ceb 100644
+--- a/cmake/CMSBTargetConfig.cmake.in
++++ b/cmake/CMSBTargetConfig.cmake.in
+@@ -165,6 +165,8 @@ set(__tip_stage_${__cmsb_libname} @STAGE_DIR@/@CMAKE_INSTALL_PREFIX@)
+ set(LibInt2_ROOT @LibInt2_ROOT@)
+ set(HDF5_ROOT @HDF5_ROOT@)
+ set(HPTT_ROOT @HPTT_ROOT@)
++set(SPDLOG_ROOT @SPDLOG_ROOT@)
++set(EcpInt_ROOT @EcpInt_ROOT@)
+ 
+ #list(PREPEND CMAKE_MODULE_PATH @STAGE_DIR@/@CMAKE_INSTALL_PREFIX@)
+ #list(PREPEND CMAKE_MODULE_PATH @CMAKE_INSTALL_PREFIX@)
+@@ -209,9 +211,11 @@ foreach(__depend_i ${__depends_${__cmsb_libname}})
+       set(__depend_cfg macis-config.cmake)
+       list(APPEND ${__CMSB_LIBNAME}_LIBRARIES macis::macis)
+     elseif(${__depend_i} STREQUAL "SPDLOG")
++      set(_dep_pp ${${__depend_i}_ROOT})
+       set(__depend_cfg ${__depend_lc}Config.cmake)
+       list(APPEND ${__CMSB_LIBNAME}_LIBRARIES spdlog::spdlog)
+     elseif(${__depend_i} STREQUAL "EcpInt")
++      set(_dep_pp ${${__depend_i}_ROOT})
+       set(__depend_cfg ecpint-config.cmake)
+       list(APPEND ${__CMSB_LIBNAME}_LIBRARIES ECPINT::ecpint)
+     elseif(${__depend_i} STREQUAL "pybind11")
+diff --git a/cmake/macros/BuildCMSBModule.cmake b/cmake/macros/BuildCMSBModule.cmake
+index 9d689b6..302b97e 100644
+--- a/cmake/macros/BuildCMSBModule.cmake
++++ b/cmake/macros/BuildCMSBModule.cmake
+@@ -249,7 +249,7 @@ function(build_cmsb_module SUPER_PROJECT_ROOT)
+     bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS ${CMSB_CORE_OPTIONS})
+ 
+     bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS BLAS_INT4 LINALG_VENDOR LINALG_PREFIX ENABLE_COVERAGE USE_SCALAPACK USE_HDF5 USE_LIBNUMA USE_ONEMATH ONEMATH_PREFIX USE_NWQSIM)
+-    bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS BLAS_ARCH GCCROOT HDF5_ROOT HPTT_ROOT LibInt2_ROOT)
++    bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS BLAS_ARCH GCCROOT HDF5_ROOT HPTT_ROOT LibInt2_ROOT SPDLOG_ROOT EcpInt_ROOT)
+ 
+     bundle_cmake_strings(CORE_CMAKE_STRINGS CMSB_PROJECTS ENABLE_DEV_MODE GPU_ARCH MARCH_FLAGS USE_TAMM_DEV CMSB_TAG)
+     bundle_cmake_strings(CORE_CMAKE_STRINGS USE_UPCXX BLAS_INT4 LINALG_PREFIX USE_SCALAPACK USE_HDF5 USE_LIBNUMA USE_NWQSIM LINK_STATIC_GPU_LIBS)
