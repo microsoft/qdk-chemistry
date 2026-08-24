@@ -116,7 +116,7 @@ def codespace_block(circuit):
     unitary_part = qc.copy_empty_like()
     for instruction in qc.data:
         if instruction.operation.name != "reset":
-            unitary_part.append(instruction)
+            unitary_part.append(instruction.operation, instruction.qubits, instruction.clbits)
     return Operator(unitary_part).data[0:8, 0:8]
 
 
