@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import QdkHamiltonianBasisTransformer, available, create, inspect_settings
-from qdk_chemistry.data import CholeskyHamiltonianContainer, Hamiltonian, Orbitals
+from qdk_chemistry.data import CholeskyHamiltonianContainer, Hamiltonian, Orbitals, SettingsAreLocked
 from qdk_chemistry.data.symmetry import spin_index_set
 
 from .test_helpers import create_test_basis_set, create_test_hamiltonian
@@ -34,6 +34,53 @@ def test_qdk_transformer_rejects_non_cholesky_hamiltonian():
 
     with pytest.raises(ValueError, match="requires a Cholesky Hamiltonian"):
         transformer.run(source, source.get_orbitals())
+
+    with pytest.raises(SettingsAreLocked):
+        transformer.settings().set("validation_tolerance", 1.0e-9)
+
+
+@pytest.mark.parametrize("source_null_eigenvalue", [0.0, 1.0e-30])
+def test_qdk_transformer_rejects_target_metric_null_mode_amplification(source_null_eigenvalue):
+    """Differences in a source-null AO mode cannot become large in the target metric."""
+    angle = 0.3
+    source_coefficients = np.eye(3)
+    target_coefficients = source_coefficients.copy()
+    target_coefficients[:, 0] = [np.cos(angle), np.sin(angle), 1.0e6]
+    target_coefficients[:, 1] = [-np.sin(angle), np.cos(angle), 0.0]
+    source_overlap = np.diag([1.0, 1.0, source_null_eigenvalue])
+    target_overlap = source_overlap.copy()
+    target_overlap[2, 2] = 5.0e-11
+    basis_set = create_test_basis_set(3, "test-python-target-metric-transform")
+    active_indices = spin_index_set(3, [0, 1], [0, 1])
+    inactive_indices = spin_index_set(3, [2], [2])
+    source_orbitals = Orbitals(
+        source_coefficients,
+        None,
+        source_overlap,
+        basis_set,
+        active_indices,
+        inactive_indices,
+    )
+    target_orbitals = Orbitals(
+        target_coefficients,
+        None,
+        target_overlap,
+        basis_set,
+        active_indices,
+        inactive_indices,
+    )
+    source = Hamiltonian(
+        CholeskyHamiltonianContainer(
+            np.eye(2),
+            np.ones((4, 1)),
+            source_orbitals,
+            0.0,
+            np.empty((0, 0)),
+        )
+    )
+
+    with pytest.raises(ValueError, match="target AO metric"):
+        create("hamiltonian_basis_transformer").run(source, target_orbitals)
 
 
 def test_qdk_transformer_runs_successfully():
