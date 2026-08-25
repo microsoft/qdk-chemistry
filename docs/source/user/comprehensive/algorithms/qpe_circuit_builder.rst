@@ -160,12 +160,12 @@ Use ``schedule`` followed by ``iter_build`` when workload metadata or bounded-me
    :header-rows: 1
    :widths: 25 20 55
 
-    * - Setting
-       - Type
-       - Description
-    * - ``experiment_scheduler``
-       - :class:`~qdk_chemistry.data.AlgorithmRef`
-       - Reference to the ``"rpe_experiment_scheduler"`` that resolves rounds, error budgets, randomized draws, and nested construction settings.
+   * - Setting
+     - Type
+     - Description
+   * - ``experiment_scheduler``
+     - :class:`~qdk_chemistry.data.AlgorithmRef`
+     - Reference to the ``"rpe_experiment_scheduler"`` that resolves rounds, error budgets, randomized draws, and nested construction settings.
 
 See :doc:`robust_phase_estimation_circuit_builder` for the scheduler settings and workload APIs.
 
