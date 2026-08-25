@@ -74,19 +74,19 @@ def test_freeze_relative_parent_before_creation(tmp_path: Path, monkeypatch: pyt
     if os.name == "nt":
         mkdir = Path.mkdir
 
-        def change_directory_then_create(directory: Path, *args, **kwargs) -> None:
+        def change_directory_then_mkdir(directory: Path, *args, **kwargs) -> None:
             os.chdir(second_directory)
             mkdir(directory, *args, **kwargs)
 
-        monkeypatch.setattr(Path, "mkdir", change_directory_then_create)
+        monkeypatch.setattr(Path, "mkdir", change_directory_then_mkdir)
     else:
         create_private_directories = file_io_module._create_private_directories
 
-        def change_directory_then_create(directory: Path) -> None:
+        def change_directory_then_create_private(directory: Path) -> None:
             os.chdir(second_directory)
             create_private_directories(directory)
 
-        monkeypatch.setattr(file_io_module, "_create_private_directories", change_directory_then_create)
+        monkeypatch.setattr(file_io_module, "_create_private_directories", change_directory_then_create_private)
 
     ensure_parent_directory("nested/data.txt")
 
