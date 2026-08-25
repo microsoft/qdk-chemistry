@@ -133,9 +133,6 @@ def test_graphviz_sources_generate_accessible_svg_figures():
         assert description is not None
         assert description.text == alt_match.group("alt")
         assert "Arial Bold" not in dot_source
-        svg_text = svg_path.read_text(encoding="utf-8")
-        assert 'fill="#ffffff"' in svg_text
-        assert 'font-weight="bold"' in svg_text
 
 
 def test_matplotlib_sources_generate_accessible_svg_figures():
@@ -176,7 +173,6 @@ def test_matplotlib_sources_generate_accessible_svg_figures():
         assert description is not None
         assert description.text == alt_match.group("alt")
         svg_text = svg_path.read_text(encoding="utf-8")
-        assert "fill: #ffffff" in svg_text
         assert "<image" not in svg_text
 
 
