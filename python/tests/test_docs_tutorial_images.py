@@ -224,6 +224,12 @@ def test_screenshot_derived_images_match_local_sources():
     finally:
         sys.path.pop(0)
 
+    near_white_source = Image.new("RGB", (3, 3), (254, 254, 254))
+    near_white_source.putpixel((1, 1), (0, 0, 0))
+    normalized = module.replace_circuit_background(near_white_source)
+    assert normalized.getpixel((0, 0)) == (255, 255, 255)
+    assert normalized.getpixel((1, 1)) == (0, 0, 0)
+
     for name in module.ORBITAL_SCREENSHOTS:
         with Image.open(source_dir / name) as source_image:
             expected = module.white_to_alpha(source_image)

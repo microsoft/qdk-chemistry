@@ -54,11 +54,7 @@ def replace_circuit_background(image: Image.Image) -> Image.Image:
         if index in border_components or areas[index] >= MIN_BACKGROUND_COMPONENT_AREA
     }
     background = np.isin(components, list(background_components))
-    offset = 255 - CIRCUIT_BACKGROUND
-    rgb[background] = np.maximum(
-        rgb[background].astype(np.int16) - offset,
-        0,
-    ).astype(np.uint8)
+    rgb[background] = CIRCUIT_BACKGROUND
     return Image.fromarray(rgb, mode="RGB")
 
 
