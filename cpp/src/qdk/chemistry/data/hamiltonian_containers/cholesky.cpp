@@ -292,17 +292,21 @@ void CholeskyHamiltonianContainer::validate_integral_dimensions() const {
         "dimensions");
   }
   auto naux = _three_center->extents()[2].at(SymmetryLabel{});
-  auto expected_rows = static_cast<size_t>(norb_alpha * norb_alpha);
+  const auto expected_alpha_rows =
+      static_cast<size_t>(norb_alpha) * static_cast<size_t>(norb_alpha);
+  const auto expected_beta_rows =
+      static_cast<size_t>(norb_beta) * static_cast<size_t>(norb_beta);
 
   const auto& aa =
       _three_center->block({axes::alpha(), axes::alpha(), SymmetryLabel{}});
-  if (static_cast<size_t>(aa.rows()) != expected_rows ||
+  if (static_cast<size_t>(aa.rows()) != expected_alpha_rows ||
       static_cast<size_t>(aa.cols()) != naux) {
-    throw std::invalid_argument(
-        "Alpha-alpha three-center integrals shape (" +
-        std::to_string(aa.rows()) + ", " + std::to_string(aa.cols()) +
-        ") does not match expected (norb^2, naux) = (" +
-        std::to_string(expected_rows) + ", " + std::to_string(naux) + ")");
+    throw std::invalid_argument("Alpha-alpha three-center integrals shape (" +
+                                std::to_string(aa.rows()) + ", " +
+                                std::to_string(aa.cols()) +
+                                ") does not match expected (norb^2, naux) = (" +
+                                std::to_string(expected_alpha_rows) + ", " +
+                                std::to_string(naux) + ")");
   }
 
   if (!_three_center->all_aliased(
@@ -310,11 +314,14 @@ void CholeskyHamiltonianContainer::validate_integral_dimensions() const {
             {axes::beta(), axes::beta(), SymmetryLabel{}}}})) {
     const auto& bb =
         _three_center->block({axes::beta(), axes::beta(), SymmetryLabel{}});
-    if (static_cast<size_t>(bb.rows()) != expected_rows ||
+    if (static_cast<size_t>(bb.rows()) != expected_beta_rows ||
         static_cast<size_t>(bb.cols()) != naux) {
       throw std::invalid_argument(
-          "Beta-beta three-center integrals shape does not match expected "
-          "(norb^2, naux)");
+          "Beta-beta three-center integrals shape (" +
+          std::to_string(bb.rows()) + ", " + std::to_string(bb.cols()) +
+          ") does not match expected (norb^2, naux) = (" +
+          std::to_string(expected_beta_rows) + ", " + std::to_string(naux) +
+          ")");
     }
   }
 }
