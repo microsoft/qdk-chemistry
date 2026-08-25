@@ -32,16 +32,54 @@ namespace {
 class FileIoTest : public ::testing::Test {
  protected:
   void SetUp() override {
-    root_ = std::filesystem::temp_directory_path() /
-            ("qdk_file_io_test_" +
-             std::to_string(
-                 std::chrono::steady_clock::now().time_since_epoch().count()));
-    std::filesystem::create_directories(root_);
+    const auto timestamp =
+        std::chrono::steady_clock::now().time_since_epoch().count();
+#ifdef _WIN32
+    const auto process_id = GetCurrentProcessId();
+#else
+    const auto process_id = ::getpid();
+#endif
+    for (int attempt = 0; attempt < 64; ++attempt) {
+      const auto candidate =
+          std::filesystem::temp_directory_path() /
+          ("qdk_file_io_test_" + std::to_string(process_id) + "_" +
+           std::to_string(timestamp) + "_" + std::to_string(attempt));
+      std::error_code error;
+      if (std::filesystem::create_directory(candidate, error)) {
+        root_ = candidate;
+        return;
+      }
+      ASSERT_FALSE(error) << "Could not create test directory '" << candidate
+                          << "': " << error.message();
+    }
+    FAIL() << "Could not create a unique FileIO test directory";
   }
 
   void TearDown() override {
-    std::error_code ignored;
-    std::filesystem::remove_all(root_, ignored);
+    if (root_.empty()) {
+      return;
+    }
+#ifdef _WIN32
+    if (std::filesystem::exists(root_)) {
+      for (const auto& entry :
+           std::filesystem::recursive_directory_iterator(root_)) {
+        const DWORD attributes = GetFileAttributesW(entry.path().c_str());
+        ASSERT_NE(attributes, INVALID_FILE_ATTRIBUTES);
+        if ((attributes & FILE_ATTRIBUTE_READONLY) != 0) {
+          const DWORD writable_attributes =
+              (attributes & ~FILE_ATTRIBUTE_READONLY) == 0
+                  ? FILE_ATTRIBUTE_NORMAL
+                  : attributes & ~FILE_ATTRIBUTE_READONLY;
+          ASSERT_NE(
+              SetFileAttributesW(entry.path().c_str(), writable_attributes), 0);
+        }
+      }
+    }
+#endif
+    std::error_code error;
+    std::filesystem::remove_all(root_, error);
+    EXPECT_FALSE(error) << "Could not remove test directory '" << root_
+                        << "': " << error.message();
   }
 
   std::filesystem::path root_;
@@ -609,7 +647,11 @@ TEST_F(FileIoTest, RejectsReplacedTemporaryFile) {
           }),
       std::runtime_error);
   EXPECT_FALSE(std::filesystem::exists(path));
+#ifdef _WIN32
+  EXPECT_FALSE(std::filesystem::exists(replacement_path));
+#else
   EXPECT_TRUE(std::filesystem::exists(replacement_path));
+#endif
 }
 
 #ifndef _WIN32

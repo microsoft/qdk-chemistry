@@ -92,12 +92,11 @@ def ensure_parent_directory(path: PathLike) -> None:
 
 def _validate_destination_path(path: PathLike) -> None:
     value = os.fspath(path)
-    separators = tuple(separator for separator in (os.sep, os.altsep) if separator)
     path_module = ntpath if sys.platform == "win32" else os.path
     final_component = path_module.basename(value)
     if "\0" in value:
         raise ValueError(f"Path contains an embedded NUL character: '{value}'")
-    if not value or value.endswith(separators) or final_component in ("", ".", ".."):
+    if not value or final_component in ("", ".", ".."):
         raise ValueError(f"Destination path must name a file: '{value}'")
     if sys.platform == "win32" and ":" in ntpath.splitdrive(value)[1]:
         raise ValueError(f"Windows alternate data streams are not supported: '{value}'")
