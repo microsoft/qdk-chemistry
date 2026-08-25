@@ -235,8 +235,7 @@ jobs:
           INSTALL_PREFIX="${{ env.EXACHEM_INSTALL_PREFIX }}" \
           BUILD_ROOT="${{ github.workspace }}/exachem_build" \
           JOBS="${{ matrix.build-parallel }}" \
-            bash ${{ github.workspace }}/.pipelines/install-scripts/exachem/install-exachem.sh \
-            ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json
+            bash ${{ github.workspace }}/.pipelines/install-scripts/exachem/install-exachem.sh
         fi
 
     - name: Save C++ dependencies and ExaChem cache

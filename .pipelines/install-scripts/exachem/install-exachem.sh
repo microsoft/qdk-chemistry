@@ -8,22 +8,16 @@
 # superbuild (NWChemEx-Project/CMakeBuild) is patched (see patches/cmsb-fix-dependency-reuse.patch) so it also
 # reuses the system OpenBLAS/LAPACK/spdlog/EcpInt/nlohmann_json instead of building its own redundant copies.
 #
-# Usage: install-exachem.sh <cgmanifest_path>
-#   cgmanifest_path - Full path to cpp/manifest/qdk-chemistry/cgmanifest.json (source of TAMM/ExaChem commits).
+# TAMM/ExaChem's commits are hardcoded below (TAMM_COMMIT/EXACHEM_COMMIT), not read from
+# cpp/manifest/qdk-chemistry/cgmanifest.json: unlike the deps install-cpp-deps.sh builds, TAMM/ExaChem are never
+# shipped in the qdk-chemistry wheel or linked into its binary -- they're only used as an external MPI
+# subprocess in GHA CI test runs -- so they aren't Component Governance-relevant and don't belong in cgmanifest.
+#
+# Usage: install-exachem.sh
 # Required env vars: CPP_DEPS_PREFIX
 # Optional env vars: INSTALL_PREFIX, BUILD_ROOT, MARCH, JOBS, KEEP_BUILD_DIR
 #
 set -euo pipefail
-
-if [[ $# -ne 1 ]]; then
-  echo "Usage: $0 <cgmanifest_path>" >&2
-  exit 1
-fi
-CGMANIFEST="$1"
-if [[ ! -f "${CGMANIFEST}" ]]; then
-  echo "Error: cgmanifest.json not found at ${CGMANIFEST}" >&2
-  exit 1
-fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -46,48 +40,12 @@ MODULES="${MODULES:-CC}"
 # NIC on these runners); it requires >= 2 MPI ranks (1 data-server rank + >= 1 compute rank).
 GA_RUNTIME="${GA_RUNTIME:-MPI_PROGRESS_RANK}"
 
-get_commit_hash() {
-    local repo_pattern="$1"
-    python3 -c "
-import json
-with open('${CGMANIFEST}') as f:
-    data = json.load(f)
-for reg in data['registrations']:
-    comp = reg['component']
-    if comp['type'] == 'git' and '${repo_pattern}' in comp['git'].get('repositoryUrl', ''):
-        print(comp['git']['commitHash'].strip())
-        break
-"
-}
-
-get_repo_url() {
-    local repo_pattern="$1"
-    python3 -c "
-import json
-with open('${CGMANIFEST}') as f:
-    data = json.load(f)
-for reg in data['registrations']:
-    comp = reg['component']
-    if comp['type'] == 'git' and '${repo_pattern}' in comp['git'].get('repositoryUrl', ''):
-        print(comp['git']['repositoryUrl'].strip())
-        break
-"
-}
-
 # TAMM/ExaChem are pinned to specific commits rather than tagged releases: newer upstream main requires GCC >= 14.1
 # for C++20 features GCC 13 miscompiles at -O2/-O3, and GitHub's Ubuntu runners default to GCC 13.
-TAMM_REPO="$(get_repo_url "NWChemEx/TAMM")"
-TAMM_COMMIT="$(get_commit_hash "NWChemEx/TAMM")"
-EXACHEM_REPO="$(get_repo_url "ExaChem/exachem")"
-EXACHEM_COMMIT="$(get_commit_hash "ExaChem/exachem")"
-if [[ -z "${TAMM_REPO}" || -z "${TAMM_COMMIT}" ]]; then
-  echo "Error: could not find TAMM repositoryUrl/commitHash in ${CGMANIFEST}" >&2
-  exit 1
-fi
-if [[ -z "${EXACHEM_REPO}" || -z "${EXACHEM_COMMIT}" ]]; then
-  echo "Error: could not find ExaChem repositoryUrl/commitHash in ${CGMANIFEST}" >&2
-  exit 1
-fi
+TAMM_REPO="https://github.com/NWChemEx/TAMM.git"
+TAMM_COMMIT="63c274e37c102a316e844f954bb2387988b0256c"
+EXACHEM_REPO="https://github.com/ExaChem/exachem.git"
+EXACHEM_COMMIT="45c192e840fd1e0417871d926e9ab87748111e53"
 
 echo "==> ExaChem CI build: march=${MARCH} jobs=${JOBS} modules=${MODULES} ga_runtime=${GA_RUNTIME}"
 echo "==> TAMM: ${TAMM_COMMIT} / ExaChem: ${EXACHEM_COMMIT}"
