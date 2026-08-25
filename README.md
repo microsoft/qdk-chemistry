@@ -53,32 +53,7 @@ python3 -m pip install 'qdk-chemistry[all]'
 
 The `[all]` extra pulls in all optional dependencies so that examples and tests work without chasing missing packages. For other installation methods (Dev Container, building from source) and platform-specific notes, see [INSTALL.md](./INSTALL.md).
 
-## Quick Start
-
-Once installed, QDK/Chemistry lets you run a full quantum chemistry pipeline in a few lines of Python:
-
-```python
-from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Structure
-
-# Build a molecular structure
-structure = Structure.from_xyz("""\
-3
-Water molecule
-O    0.000000    0.000000    0.000000
-H    0.758602    0.000000    0.504284
-H    0.758602    0.000000   -0.504284
-""")
-
-# Run a self-consistent field (SCF) calculation
-scf_solver = create("scf_solver")
-energy, wavefunction = scf_solver.run(
-    structure, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz"
-)
-print(f"SCF energy is {energy:.6f} Hartree")
-```
-
-For a complete, end-to-end walkthrough that continues from this example through active space selection, mapping to qubits, and quantum simulation, see the [Quickstart guide](https://microsoft.github.io/qdk-chemistry/user/quickstart.html) and the [examples/](./examples/) directory.
+For a complete, end-to-end walkthrough from installation through a full quantum chemistry pipeline, see the [Quickstart guide](https://microsoft.github.io/qdk-chemistry/user/quickstart.html) and the [examples/](./examples/) directory.
 
 ## Telemetry
 
