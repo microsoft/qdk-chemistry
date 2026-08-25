@@ -22,7 +22,6 @@
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <random>
-#include <type_traits>
 
 #include "qdk/chemistry/utils/golden_section.hpp"
 #include "testing_utilities.hpp"
@@ -34,12 +33,6 @@ using namespace qdk::chemistry::algorithms;
 namespace {
 constexpr double kHalfPi = 1.57079632679489661923;
 }
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-static_assert(std::is_same_v<OrbitalLocalizer, Localizer>);
-static_assert(std::is_same_v<OrbitalLocalizerFactory, LocalizerFactory>);
-#pragma GCC diagnostic pop
 
 class LocalizationTest : public ::testing::Test {};
 
