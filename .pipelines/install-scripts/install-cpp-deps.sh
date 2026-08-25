@@ -3,7 +3,8 @@ set -e
 
 # install-cpp-deps.sh — build and install qdk-chemistry's C++ dependencies for CI pipelines.
 #
-# Builds from source (into install_prefix): spdlog, BLAS++, LAPACK++, LibInt2, ECPint (libecpint), GauXC.
+# Builds from source (into install_prefix): nlohmann_json, spdlog, BLAS++, LAPACK++, LibInt2, ECPint (libecpint),
+# GauXC.
 # Reused from the OS instead of built here: the actual BLAS/LAPACK implementation that BLAS++/LAPACK++ link
 # against (e.g. OpenBLAS via apt on Linux, Apple's Accelerate framework via macOS's "auto" vendor -- see
 # blas_vendor below).
@@ -137,6 +138,16 @@ if [[ -z "$LIBECPINT_TAG" ]]; then
     echo "Error: Could not find libecpint tag in $CGMANIFEST"
     exit 1
 fi
+NJSON_COMMIT=$(get_commit_hash "$CGMANIFEST" "nlohmann/json")
+if [[ -z "$NJSON_COMMIT" ]]; then
+    echo "Error: Could not find nlohmann_json commit hash in $CGMANIFEST"
+    exit 1
+fi
+NJSON_TAG=$(get_tag "$CGMANIFEST" "nlohmann/json")
+if [[ -z "$NJSON_TAG" ]]; then
+    echo "Error: Could not find nlohmann_json tag in $CGMANIFEST"
+    exit 1
+fi
 LIBINT_URL=$(get_download_url "$CGMANIFEST" "Libint")
 if [[ -z "$LIBINT_URL" ]]; then
     echo "Error: Could not find Libint download URL in $CGMANIFEST"
@@ -167,9 +178,24 @@ echo "  lapackpp: $LAPACKPP_COMMIT"
 echo "  libecpint: ${LIBECPINT_TAG:-$LIBECPINT_COMMIT}"
 echo "  libint: $LIBINT_URL"
 echo "  gauxc: $GAUXC_COMMIT"
+echo "  nlohmann_json: ${NJSON_TAG:-$NJSON_COMMIT}"
 
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
+
+# Install nlohmann_json (header-only: no compilation, just installs headers + CMake config)
+echo "=== Installing nlohmann_json ==="
+git clone https://github.com/nlohmann/json.git nlohmann_json
+cd nlohmann_json
+git checkout "$NJSON_COMMIT"
+mkdir -p build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
+         -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
+         -DJSON_BuildTests=OFF
+make install
+cd "$BUILD_DIR"
+rm -rf nlohmann_json
 
 # Install spdlog
 echo "=== Installing spdlog ==="

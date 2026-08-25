@@ -134,7 +134,6 @@ jobs:
           gcovr \
           gfortran \
           libnuma-dev \
-          nlohmann-json3-dev \
           openmpi-bin \
           libopenmpi-dev
 
