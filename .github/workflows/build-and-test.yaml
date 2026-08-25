@@ -185,16 +185,17 @@ jobs:
       run: |
         echo "PATH=${{ github.workspace }}/doxygen_install/bin:$PATH" >> $GITHUB_ENV
 
-    - name: Cache C++ dependencies # Checks if manifest files or build scripts have changed to rebuild dependencies
+    - name: Cache C++ dependencies and ExaChem install # Checks if manifest files or build scripts have changed to rebuild dependencies
       id: cache-cpp-deps
       if: ${{ !inputs.rebuild_dep_cache }}
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           ${{ env.CPP_DEPS_PREFIX }}
+          ${{ env.EXACHEM_INSTALL_PREFIX }}
         key: >-
           cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
-          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/install-cpp-deps.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh') }}
+          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/install-cpp-deps.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh', '.pipelines/install-scripts/exachem/**') }}
 
     - name: Add C++ deps prefix to CMake search path
       run: |
@@ -202,7 +203,11 @@ jobs:
         echo "LD_LIBRARY_PATH=${{ env.CPP_DEPS_PREFIX }}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
         echo "PATH=${{ env.CPP_DEPS_PREFIX }}/bin:${PATH}" >> $GITHUB_ENV
 
-    - name: Install C++ dependencies
+    # TODO: ExaChem currently builds (and, after the first run, restores from cache) on every Linux job regardless
+    # of whether slow tests will actually run, to make initial CI bring-up/debugging easier. Once this is verified
+    # working end-to-end, gate it behind the same condition used for QDK_CHEMISTRY_RUN_SLOW_TESTS below (only build
+    # when slow tests are requested) to avoid the cache-miss cost on every regular PR.
+    - name: Install C++ dependencies and ExaChem (Linux)
       if: steps.cache-cpp-deps.outputs.cache-hit != 'true' # Run the dependency build if we don't find the right hash in the cache
       env:
         BUILD_DIR: ${{ github.workspace }}/cpp_deps_build
@@ -222,56 +227,28 @@ jobs:
           ${{ github.workspace }}/external/macis/manifest/cgmanifest.json \
           "$BLAS_VENDOR"
 
-    - name: Save C++ dependencies cache
+        if [ "${{ matrix.os-name }}" == "Linux" ]; then
+          # ExaChem/TAMM installs into its own EXACHEM_INSTALL_PREFIX, not CPP_DEPS_PREFIX: TAMM's CMSB superbuild
+          # cannot avoid rebuilding its own (static, generic-target) BLAS/LAPACK from source regardless of
+          # LINALG_VENDOR, and if that landed in the shared CPP_DEPS_PREFIX it would shadow the real system
+          # OpenBLAS for the main qdk-chemistry/MACIS build too (verified: caused widespread SEGFAULTs).
+          INSTALL_PREFIX="${{ env.EXACHEM_INSTALL_PREFIX }}" \
+          BUILD_ROOT="${{ github.workspace }}/exachem_build" \
+          JOBS="${{ matrix.build-parallel }}" \
+            bash ${{ github.workspace }}/.pipelines/install-scripts/exachem/install-exachem.sh \
+            ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json
+        fi
+
+    - name: Save C++ dependencies and ExaChem cache
       if: steps.cache-cpp-deps.outputs.cache-hit != 'true'
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           ${{ env.CPP_DEPS_PREFIX }}
+          ${{ env.EXACHEM_INSTALL_PREFIX }}
         key: >-
           cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
-          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/install-cpp-deps.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh') }}
-
-    # TODO: this cache/build is temporarily split out from the "C++ dependencies" one above (which was merged with
-    # this one previously) to speed up CMSB/ExaChem debugging iteration -- re-merge them once ExaChem CI is stable.
-    - name: Cache ExaChem install (Linux)
-      id: cache-exachem
-      if: matrix.os-name == 'Linux' && !inputs.rebuild_dep_cache
-      uses: actions/cache/restore@v5
-      with:
-        path: |
-          ${{ env.EXACHEM_INSTALL_PREFIX }}
-        key: >-
-          exachem-${{ runner.os }}-${{ matrix.uarch }}-
-          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', '.pipelines/install-scripts/exachem/**') }}
-
-    # TODO: ExaChem currently builds (and, after the first run, restores from cache) on every Linux job regardless
-    # of whether slow tests will actually run, to make initial CI bring-up/debugging easier. Once this is verified
-    # working end-to-end, gate it behind the same condition used for QDK_CHEMISTRY_RUN_SLOW_TESTS below (only build
-    # when slow tests are requested) to avoid the cache-miss cost on every regular PR.
-    - name: Install ExaChem + TAMM (Linux)
-      if: matrix.os-name == 'Linux' && steps.cache-exachem.outputs.cache-hit != 'true'
-      env:
-        # ExaChem/TAMM installs into its own EXACHEM_INSTALL_PREFIX, not CPP_DEPS_PREFIX: TAMM's CMSB superbuild
-        # cannot avoid rebuilding its own (static, generic-target) BLAS/LAPACK from source regardless of
-        # LINALG_VENDOR, and if that landed in the shared CPP_DEPS_PREFIX it would shadow the real system
-        # OpenBLAS for the main qdk-chemistry/MACIS build too (verified: caused widespread SEGFAULTs).
-        INSTALL_PREFIX: ${{ env.EXACHEM_INSTALL_PREFIX }}
-        BUILD_ROOT: ${{ github.workspace }}/exachem_build
-        JOBS: ${{ matrix.build-parallel }}
-      run: |
-        bash ${{ github.workspace }}/.pipelines/install-scripts/exachem/install-exachem.sh \
-          ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json
-
-    - name: Save ExaChem cache (Linux)
-      if: matrix.os-name == 'Linux' && steps.cache-exachem.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v5
-      with:
-        path: |
-          ${{ env.EXACHEM_INSTALL_PREFIX }}
-        key: >-
-          exachem-${{ runner.os }}-${{ matrix.uarch }}-
-          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', '.pipelines/install-scripts/exachem/**') }}
+          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/install-cpp-deps.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh', '.pipelines/install-scripts/exachem/**') }}
 
     - name: Configure C++ RelWithDebInfo/Coverage build
       run: |
