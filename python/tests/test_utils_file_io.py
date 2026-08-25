@@ -107,14 +107,28 @@ def test_create_private_parent_directories_under_restrictive_umask(tmp_path: Pat
     assert read_text_file(path) == "contents"
 
 
+@pytest.mark.parametrize("use_setgid_parent", [False, True])
+@pytest.mark.parametrize("use_descendant_parent", [False, True])
 @pytest.mark.skipif(os.name == "nt", reason="POSIX umask semantics")
 def test_serialize_concurrent_parent_creation_under_restrictive_umask(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    use_setgid_parent: bool,
+    use_descendant_parent: bool,
 ):
-    shared_parent = tmp_path / "shared"
-    first_path = shared_parent / "first.txt"
-    second_path = shared_parent / "second.txt"
+    root = tmp_path / "root"
+    root.mkdir()
+    if use_setgid_parent:
+        if sys.platform != "linux":
+            pytest.skip("setgid directory inheritance is verified on Linux")
+        root.chmod(0o2700)
+    shared_parent = root / "shared"
+    if use_descendant_parent:
+        first_path = shared_parent / "first" / "data.txt"
+        second_path = shared_parent / "second" / "data.txt"
+    else:
+        first_path = shared_parent / "first.txt"
+        second_path = shared_parent / "second.txt"
     mkdir = file_io_module.os.mkdir
     parent_created = threading.Event()
     release_creator = threading.Event()
@@ -164,6 +178,67 @@ def test_serialize_concurrent_parent_creation_under_restrictive_umask(
     assert read_text_file(first_path) == "contents"
     assert read_text_file(second_path) == "contents"
     assert stat.S_IMODE(shared_parent.stat().st_mode) == 0o700
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission semantics")
+def test_retry_after_directory_initialization_completes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    directory = tmp_path / "shared"
+    directory.mkdir()
+    directory.chmod(0)
+    create_private_directories_once = file_io_module._create_private_directories_once
+    calls = 0
+
+    def fail_with_stale_permission_error(path: Path) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            directory.chmod(0o700)
+            raise PermissionError(errno.EACCES, "initializing", os.fspath(path))
+        create_private_directories_once(path)
+
+    monkeypatch.setattr(
+        file_io_module,
+        "_create_private_directories_once",
+        fail_with_stale_permission_error,
+    )
+
+    file_io_module._create_private_directories(directory)
+
+    assert calls == 2
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission semantics")
+def test_retry_reservation_after_directory_initialization_completes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    directory = tmp_path / "shared"
+    directory.mkdir()
+    directory.chmod(0)
+    destination = directory / "data.txt"
+    reservation = object()
+    calls = 0
+
+    def fail_with_stale_permission_error(path: Path) -> object:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            directory.chmod(0o700)
+            raise PermissionError(errno.EACCES, "initializing", os.fspath(path))
+        assert path == destination
+        return reservation
+
+    monkeypatch.setattr(
+        file_io_module,
+        "_reserve_temporary_file",
+        fail_with_stale_permission_error,
+    )
+
+    assert file_io_module._reserve_temporary_file_with_parent_retry(destination) is reservation
+    assert calls == 2
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX permission semantics")

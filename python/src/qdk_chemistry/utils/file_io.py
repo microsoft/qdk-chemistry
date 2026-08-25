@@ -772,7 +772,7 @@ def _has_initializing_directory(directory: Path) -> bool:
         except (FileNotFoundError, PermissionError):
             pass
         else:
-            if stat.S_ISDIR(status.st_mode) and status.st_uid == os.geteuid() and stat.S_IMODE(status.st_mode) == 0:
+            if stat.S_ISDIR(status.st_mode) and status.st_uid == os.geteuid() and status.st_mode & 0o777 == 0:
                 return True
         parent = current.parent
         if parent == current:
@@ -782,13 +782,19 @@ def _has_initializing_directory(directory: Path) -> bool:
 
 def _create_private_directories(directory: Path) -> None:
     deadline = time.monotonic() + _DIRECTORY_CREATION_RETRY_TIMEOUT_SECONDS
+    retry_without_marker = True
     while True:
         permission_error: PermissionError | None = None
         try:
             _create_private_directories_once(directory)
             return
         except PermissionError as error:
-            if not _has_initializing_directory(directory):
+            if _has_initializing_directory(directory):
+                retry_without_marker = True
+            elif retry_without_marker:
+                retry_without_marker = False
+                continue
+            else:
                 raise
             permission_error = error
 
@@ -800,11 +806,19 @@ def _create_private_directories(directory: Path) -> None:
 
 def _reserve_temporary_file_with_parent_retry(destination: Path) -> _TemporaryFileReservation:
     deadline = time.monotonic() + _DIRECTORY_CREATION_RETRY_TIMEOUT_SECONDS
+    retry_without_marker = True
     while True:
         try:
             return _reserve_temporary_file(destination)
         except PermissionError:
-            if not _has_initializing_directory(destination.parent) or time.monotonic() >= deadline:
+            if _has_initializing_directory(destination.parent):
+                retry_without_marker = True
+            elif retry_without_marker:
+                retry_without_marker = False
+                continue
+            else:
+                raise
+            if time.monotonic() >= deadline:
                 raise
             time.sleep(_DIRECTORY_CREATION_RETRY_DELAY_SECONDS)
 

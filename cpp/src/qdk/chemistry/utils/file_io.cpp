@@ -847,13 +847,21 @@ void create_private_directories(const std::filesystem::path& directory) {
     }
   };
 
+  bool retry_without_marker = true;
   while (true) {
     try {
       create_once();
       return;
     } catch (const TransientPermissionError&) {
-      if (!has_initializing_directory(directory) ||
-          std::chrono::steady_clock::now() >= deadline) {
+      if (has_initializing_directory(directory)) {
+        retry_without_marker = true;
+      } else if (retry_without_marker) {
+        retry_without_marker = false;
+        continue;
+      } else {
+        throw;
+      }
+      if (std::chrono::steady_clock::now() >= deadline) {
         throw;
       }
       std::this_thread::sleep_for(retry_delay);
@@ -979,13 +987,23 @@ void write_file_atomically(const std::filesystem::path& path,
 #else
     const auto deadline =
         std::chrono::steady_clock::now() + std::chrono::seconds(1);
+    bool retry_without_marker = true;
     while (true) {
       try {
         return reserve_temporary_file(destination);
       } catch (const TransientPermissionError&) {
-        if (!create_parent_directories ||
-            !has_initializing_directory(destination.parent_path()) ||
-            std::chrono::steady_clock::now() >= deadline) {
+        if (!create_parent_directories) {
+          throw;
+        }
+        if (has_initializing_directory(destination.parent_path())) {
+          retry_without_marker = true;
+        } else if (retry_without_marker) {
+          retry_without_marker = false;
+          continue;
+        } else {
+          throw;
+        }
+        if (std::chrono::steady_clock::now() >= deadline) {
           throw;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
