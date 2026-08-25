@@ -192,7 +192,7 @@
         "type": "git",
         "git": {
           "repositoryUrl": "https://github.com/wavefunction91/gauxc.git",
-          "commitHash": "f05cd68e1fd549cc45a318e6d039f49d044d3e1d"
+          "commitHash": "162e4562552323a871af17ae4acd73b71071bd24"
         }
       },
       "developmentDependency": false
