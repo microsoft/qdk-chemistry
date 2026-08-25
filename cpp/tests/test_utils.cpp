@@ -27,6 +27,26 @@ using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
 using namespace qdk::chemistry::utils;
 
+TEST(MicrosoftUtilsTest, ConvertsNearlyIntegralNuclearCharges) {
+  Eigen::VectorXd charges(3);
+  charges << 0.0, 6.0 + 5e-13, 8.0 - 5e-13;
+
+  const auto integral_charges = microsoft::to_integral_nuclear_charges(charges);
+
+  ASSERT_EQ(integral_charges.size(), 3);
+  EXPECT_EQ(integral_charges[0], 0u);
+  EXPECT_EQ(integral_charges[1], 6u);
+  EXPECT_EQ(integral_charges[2], 8u);
+}
+
+TEST(MicrosoftUtilsTest, RejectsFractionalNuclearCharges) {
+  Eigen::VectorXd charges(1);
+  charges << 6.0000000001;
+
+  EXPECT_THROW(microsoft::to_integral_nuclear_charges(charges),
+               std::invalid_argument);
+}
+
 class ValenceActiveParametersTest : public ::testing::Test {
  protected:
   void SetUp() override {

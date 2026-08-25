@@ -703,8 +703,8 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
         ", Beta: " + std::to_string(nactive_beta));
   }
 
-  // Create internal Molecule
-  auto structure = basis_set->get_structure();
+  const double effective_nuclear_repulsion =
+      basis_set->calculate_effective_nuclear_repulsion_energy();
 
   // Create internal BasisSet (includes ECP-adjusted nuclear charges)
   auto internal_basis_set =
@@ -840,14 +840,13 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
       if (_settings->get<bool>("store_ao_cholesky_vectors")) {
         return std::make_shared<data::Hamiltonian>(
             std::make_unique<data::CholeskyHamiltonianContainer>(
-                H_active, L_mo, orbitals,
-                structure->calculate_nuclear_repulsion_energy(), dummy_fock,
-                L_ao));
+                H_active, L_mo, orbitals, effective_nuclear_repulsion,
+                dummy_fock, L_ao));
       }
       return std::make_shared<data::Hamiltonian>(
           std::make_unique<data::CholeskyHamiltonianContainer>(
-              H_active, L_mo, orbitals,
-              structure->calculate_nuclear_repulsion_energy(), dummy_fock));
+              H_active, L_mo, orbitals, effective_nuclear_repulsion,
+              dummy_fock));
     } else {
       // Use unrestricted constructor
       Eigen::MatrixXd H_active_alpha(nactive, nactive);
@@ -860,14 +859,13 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
         return std::make_shared<data::Hamiltonian>(
             std::make_unique<data::CholeskyHamiltonianContainer>(
                 H_active_alpha, H_active_beta, L_mo_alpha, L_mo_beta, orbitals,
-                structure->calculate_nuclear_repulsion_energy(),
-                dummy_fock_alpha, dummy_fock_beta, L_ao));
+                effective_nuclear_repulsion, dummy_fock_alpha, dummy_fock_beta,
+                L_ao));
       }
       return std::make_shared<data::Hamiltonian>(
           std::make_unique<data::CholeskyHamiltonianContainer>(
               H_active_alpha, H_active_beta, L_mo_alpha, L_mo_beta, orbitals,
-              structure->calculate_nuclear_repulsion_energy(), dummy_fock_alpha,
-              dummy_fock_beta));
+              effective_nuclear_repulsion, dummy_fock_alpha, dummy_fock_beta));
     }
   }
 
@@ -929,13 +927,11 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
       return std::make_shared<data::Hamiltonian>(
           std::make_unique<data::CholeskyHamiltonianContainer>(
               H_active, L_mo, orbitals,
-              E_inactive + structure->calculate_nuclear_repulsion_energy(),
-              F_inactive, L_ao));
+              E_inactive + effective_nuclear_repulsion, F_inactive, L_ao));
     }
     return std::make_shared<data::Hamiltonian>(
         std::make_unique<data::CholeskyHamiltonianContainer>(
-            H_active, L_mo, orbitals,
-            E_inactive + structure->calculate_nuclear_repulsion_energy(),
+            H_active, L_mo, orbitals, E_inactive + effective_nuclear_repulsion,
             F_inactive));
   } else {
     // Unrestricted case
@@ -1041,14 +1037,14 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
       return std::make_shared<data::Hamiltonian>(
           std::make_unique<data::CholeskyHamiltonianContainer>(
               H_active_alpha, H_active_beta, L_mo_alpha, L_mo_beta, orbitals,
-              E_inactive + structure->calculate_nuclear_repulsion_energy(),
-              F_inactive_alpha, F_inactive_beta, L_ao));
+              E_inactive + effective_nuclear_repulsion, F_inactive_alpha,
+              F_inactive_beta, L_ao));
     }
     return std::make_shared<data::Hamiltonian>(
         std::make_unique<data::CholeskyHamiltonianContainer>(
             H_active_alpha, H_active_beta, L_mo_alpha, L_mo_beta, orbitals,
-            E_inactive + structure->calculate_nuclear_repulsion_energy(),
-            F_inactive_alpha, F_inactive_beta));
+            E_inactive + effective_nuclear_repulsion, F_inactive_alpha,
+            F_inactive_beta));
   }
 }
 }  // namespace qdk::chemistry::algorithms::microsoft
