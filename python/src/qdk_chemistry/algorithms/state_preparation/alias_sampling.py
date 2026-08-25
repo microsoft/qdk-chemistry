@@ -128,21 +128,11 @@ class AliasSamplingStatePreparation(StatePreparation):
                 raise ValueError("Alias sampling state preparation requires real coefficients.")
             coeffs = coeffs.real
         coeffs = coeffs.astype(float, copy=False)
-
         if not np.all(np.isfinite(coeffs)):
             raise ValueError("Alias sampling state preparation requires finite coefficients.")
         if np.any(coeffs < 0.0):
             raise ValueError(
-                "Alias sampling state preparation requires non-negative coefficients. It is an LCU "
-                "PREPARE oracle: it prepares amplitudes sqrt(|c_l| / sum_k |c_k|) and has no way to "
-                "represent a coefficient's sign, so accepting a negative value would silently "
-                "prepare the wrong state. Pass the absolute values and carry the signs in the "
-                "accompanying SELECT oracle, or use a signed algorithm such as 'dense_pure_state'."
-            )
-        if not np.any(coeffs > 0.0):
-            raise ValueError(
-                "Alias sampling state preparation requires at least one non-zero coefficient; "
-                "an all-zero vector has no probability distribution to prepare."
+                "Alias sampling state preparation requires non-negative coefficients."
             )
 
         coefficients = coeffs.tolist()

@@ -30,6 +30,7 @@ namespace QDKChemistry.Utils.AliasSampling {
     import Std.Convert.IntAsBoolArray;
     import Std.Convert.IntAsDouble;
     import Std.Core.Length;
+    import Std.Diagnostics.Fact;
     import Std.Math.AbsD;
     import Std.Math.Ceiling;
     import Std.Math.Lg;
@@ -78,7 +79,12 @@ namespace QDKChemistry.Utils.AliasSampling {
             set total += AbsD(coefficients[i]);
         }
 
+        // An all-zero vector has no distribution to sample; without this the division
+        // below would silently seed the alias table with NaN.
+        Fact(total > 0.0, "alias sampling requires at least one non-zero coefficient");
+
         // Scale to bar height × nCoeffs, rounding to nearest.
+
         let targetTotal = barHeight * nCoeffs;
         mutable scaledProbs : Int[] = [];
         mutable scaledTotal = 0;

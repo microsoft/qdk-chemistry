@@ -30,30 +30,17 @@ class QROMStatePreparationSettings(Settings):
             10,
             "Number of bits of precision used for the QROM-loaded Ry rotation angles. Higher "
             "values reduce the synthesis error of each multiplexed rotation at the cost of a "
-            "wider QROM output register. The upper bound of 30 is a sanity limit rather than an "
-            "algorithmic one: 2^-30 is already far below chemical accuracy.",
+            "wider QROM output register. The upper bound of 30 is a sanity limit as 2^-30 is already far "
+            "below chemical accuracy.",
             (1, 30),
         )
 
 
 class QROMStatePreparation(StatePreparation):
-    r"""State preparation using QROM-based multiplexed rotations.
+    r"""State preparation using Quantum Read-Only Memory (QROM) based multiplexed rotations.
 
     Prepares an arbitrary n-qubit state using n layers of multiplexed Ry rotations,
     where each layer's angles are loaded from a QROM table.
-
-    This approach uses only :math:`n = \lceil\log_2 L\rceil` state qubits, but requires
-    n QROM lookups (plus scratch ancilla for each lookup).
-
-    Index :math:`\ell` is the *position* of a coefficient in the wavefunction's coefficient
-    vector, not a Jordan-Wigner determinant bit pattern, so the returned circuit carries no
-    fermionic encoding.
-
-    Negative coefficients are supported. :math:`R_y` rotations only generate non-negative
-    amplitudes, so the signs are applied afterwards by a QROM-loaded ``Z`` phase kickback.
-    The lookups uncompute through measurement, which leaves an unobservable global phase
-    that varies between runs, so tests must compare with
-    :math:`|\langle \psi | \phi \rangle|` rather than element-wise.
     """
 
     def __init__(self, rotation_bit_precision: int = 10):

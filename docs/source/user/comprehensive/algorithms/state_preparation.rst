@@ -213,7 +213,7 @@ Alias Sampling
 
 .. rubric:: Factory name: ``"alias_sampling"``
 
-This method implements the coherent alias sampling PREPARE oracle of Babbush et al. :cite:`Babbush2018` (section III.D). Given :math:`L` non-negative coefficients :math:`c_\ell`, it prepares
+This method implements the coherent alias sampling oracle of Babbush et al. :cite:`Babbush2018` (section III.D). Given :math:`L` non-negative coefficients :math:`c_\ell`, it prepares
 
 .. math::
 
@@ -245,8 +245,8 @@ To use it, pass it as the ``prepare`` setting of the ``prepare_select_prepare`` 
    :start-after: start-cell-lcu-prepare
    :end-before: end-cell-lcu-prepare
 
-QROM
-~~~~
+Quantum Read-Only Memory (QROM) 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. rubric:: Factory name: ``"qrom"``
 

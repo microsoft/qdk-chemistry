@@ -48,6 +48,14 @@ def _run_alias_sampling_and_dump(
     return np.array(state.as_dense_state())
 
 
+def _reverse_bits(values: np.ndarray, num_bits: int) -> np.ndarray:
+    """Reverse the bit order of each entry of *values* within a *num_bits* field."""
+    reversed_values = np.zeros_like(values)
+    for k in range(num_bits):
+        reversed_values |= ((values >> k) & 1) << (num_bits - 1 - k)
+    return reversed_values
+
+
 def _compute_marginal_probs(
     full_sv: np.ndarray,
     num_index_qubits: int,
@@ -63,12 +71,10 @@ def _compute_marginal_probs(
     n_index = 2**num_index_qubits
     total_qubits = int(np.log2(len(full_sv)))
     shift = total_qubits - num_index_qubits
+
+    be_index = (np.arange(len(full_sv)) >> shift) & (n_index - 1)
     probs = np.zeros(n_index)
-    for i in range(len(full_sv)):
-        # Extract top num_index_qubits bits (BE) and reverse for LE value
-        be_idx = (i >> shift) & (n_index - 1)
-        index_val = int("{:0{w}b}".format(be_idx, w=num_index_qubits)[::-1], 2)
-        probs[index_val] += abs(full_sv[i]) ** 2
+    np.add.at(probs, _reverse_bits(be_index, num_index_qubits), np.abs(full_sv) ** 2)
     return probs
 
 
@@ -254,21 +260,18 @@ def _compute_conditional_marginal_probs(
     """
     total_qubits = int(np.log2(len(full_sv)))
     n_index = 2**n_index_bits
+    indices = np.arange(len(full_sv))
+
+    cond_be = (indices >> (total_qubits - n_cond_bits)) & ((1 << n_cond_bits) - 1)
+    index_be = (indices >> (total_qubits - n_cond_bits - n_index_bits)) & (n_index - 1)
+    on_condition = _reverse_bits(cond_be, n_cond_bits) == condition_value
+
     probs = np.zeros(n_index)
-
-    for i in range(len(full_sv)):
-        amp = full_sv[i]
-        if abs(amp) < 1e-15:
-            continue
-        bits = format(i, f"0{total_qubits}b")
-        cond_be = bits[:n_cond_bits]
-        cond_val = int(cond_be[::-1], 2)  # reverse for LE
-        if cond_val != condition_value:
-            continue
-        idx_be = bits[n_cond_bits : n_cond_bits + n_index_bits]
-        idx_val = int(idx_be[::-1], 2)  # reverse for LE
-        probs[idx_val] += abs(amp) ** 2
-
+    np.add.at(
+        probs,
+        _reverse_bits(index_be[on_condition], n_index_bits),
+        np.abs(full_sv[on_condition]) ** 2,
+    )
     return probs
 
 

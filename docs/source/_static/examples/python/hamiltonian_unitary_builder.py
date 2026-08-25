@@ -153,7 +153,7 @@ print(unitary.get_summary())
 # start-cell-lcu-prepare
 from qdk_chemistry.data import AlgorithmRef
 
-# Load the PREPARE amplitudes with alias sampling instead of the default dense synthesis
+# Load the amplitudes with alias sampling instead of the default dense state prep
 psp_mapper = create(
     "circuit_mapper",
     "prepare_select_prepare",
