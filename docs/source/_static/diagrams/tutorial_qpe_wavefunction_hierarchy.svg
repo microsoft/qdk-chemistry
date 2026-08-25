@@ -5,7 +5,7 @@
  -->
 <!-- Title: TutorialQpeWavefunctionHierarchy Pages: 1 -->
 <svg width="1145pt" height="386pt"
- viewBox="0.00 0.00 1145.00 386.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" role="img" aria-labelledby="tutorial-qpe-wavefunction-hierarchy-title tutorial-qpe-wavefunction-hierarchy-desc" data-source-sha256="9415a0f3ec64bf26409eddac2242d2ac1d7539d01b66793c213c0ad1f21cae87">
+ viewBox="0.00 0.00 1145.00 386.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" role="img" aria-labelledby="tutorial-qpe-wavefunction-hierarchy-title tutorial-qpe-wavefunction-hierarchy-desc" data-source-sha256="a0d41290df7940cf507f374399481fa163934ea38df5b9aba26d369d8566864b">
 <title id="tutorial-qpe-wavefunction-hierarchy-title">Wavefunction representation hierarchy</title>
 <desc id="tutorial-qpe-wavefunction-hierarchy-desc">Flow from one-electron functions to many-electron wavefunctions. Nucleus-centered basis functions combine into spatial molecular orbitals; pairing a spatial orbital with alpha or beta spin gives a spin orbital. Choosing occupied spin orbitals defines an electron configuration, and its antisymmetric state is a Slater determinant. Hartree--Fock uses one optimized determinant, while a multiconfigurational wavefunction combines several determinants with coefficients.</desc>
 <g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(14.4 371.3)">

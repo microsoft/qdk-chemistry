@@ -30,6 +30,7 @@ def accessible_svg(dot_path: Path, title: str, description: str) -> str:
         ["dot", "-Tsvg", str(dot_path)],
         check=True,
         capture_output=True,
+        encoding="utf-8",
         text=True,
     )
     svg_id = dot_path.stem.replace("_", "-")

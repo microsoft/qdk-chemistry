@@ -5,7 +5,7 @@
  -->
 <!-- Title: TutorialQpeOrbitalPartition Pages: 1 -->
 <svg width="802pt" height="171pt"
- viewBox="0.00 0.00 802.00 171.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" role="img" aria-labelledby="tutorial-qpe-orbital-partition-title tutorial-qpe-orbital-partition-desc" data-source-sha256="6123ab17799c1dad56d79fc7e8221e90dfd60651222c6892c843a8819031ddb7">
+ viewBox="0.00 0.00 802.00 171.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" role="img" aria-labelledby="tutorial-qpe-orbital-partition-title tutorial-qpe-orbital-partition-desc" data-source-sha256="fb6da263964624caebd9b8b613d22b38d0d19ec96c4074d9dcd9d0d6577252e3">
 <title id="tutorial-qpe-orbital-partition-title">Active-space orbital partition</title>
 <desc id="tutorial-qpe-orbital-partition-desc">The spatial molecular orbitals are partitioned into inactive orbitals that remain doubly occupied and contribute to the core energy, active orbitals whose occupations vary among determinants and whose correlation is treated explicitly, and virtual orbitals that remain empty and are excluded from the correlated calculation.</desc>
 <g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(14.4 156.4)">

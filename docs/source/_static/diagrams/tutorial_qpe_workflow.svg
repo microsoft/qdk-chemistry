@@ -5,7 +5,7 @@
  -->
 <!-- Title: TutorialQpeWorkflow Pages: 1 -->
 <svg width="1002pt" height="539pt"
- viewBox="0.00 0.00 1002.00 539.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" role="img" aria-labelledby="tutorial-qpe-workflow-title tutorial-qpe-workflow-desc" data-source-sha256="dd4c1655730b5cac40c481f79e3208fe852759b2713141d00983f9f9da344201">
+ viewBox="0.00 0.00 1002.00 539.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" role="img" aria-labelledby="tutorial-qpe-workflow-title tutorial-qpe-workflow-desc" data-source-sha256="e8b2b95b8a66b2df6ac8cc6eb7537cfef8472e528d49f1192a2bb900ee7f82ff">
 <title id="tutorial-qpe-workflow-title">Molecular QPE tutorial workflow</title>
 <desc id="tutorial-qpe-workflow-desc">Six-stage workflow. Define the energy target and matching classical reference; describe stretched nitrogen and select its correlated active space; map that model to qubits and prepare a trial state; estimate the active energy with IQPE; then add the core energy and compare the reconstructed total with the matching CASCI reference.</desc>
 <g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(14.4 524.35)">
