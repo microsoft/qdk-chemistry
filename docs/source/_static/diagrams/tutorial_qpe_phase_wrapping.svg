@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
   "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="641.99952pt" height="325.19952pt" viewBox="0 0 641.99952 325.19952" xmlns="http://www.w3.org/2000/svg" version="1.1" role="img" aria-labelledby="tutorial-qpe-phase-wrapping-title tutorial-qpe-phase-wrapping-desc" data-source-sha256="1da72fb8e701d6a075d7b4040f5cb1b2e13e4d3a21503753df929fb46ab49972">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="641.99952pt" height="325.19952pt" viewBox="0 0 641.99952 325.19952" xmlns="http://www.w3.org/2000/svg" version="1.1" role="img" aria-labelledby="tutorial-qpe-phase-wrapping-title tutorial-qpe-phase-wrapping-desc" data-source-sha256="0060271bcf8aaa11a421c05f09dd8c82bbd7f4448d6ef80e7feae37b0d9d1c55">
 <title id="tutorial-qpe-phase-wrapping-title">Signed phase-to-energy wrapping</title>
 <desc id="tutorial-qpe-phase-wrapping-desc">Signed reconstructed energy plotted against phase fraction from zero to one. Phase fractions from zero through one half map from zero down to minus pi over t. Immediately above one half, the signed branch wraps to just below plus pi over t and returns toward zero as the phase approaches one. A neutral dashed guide connects the included minus pi over t point and excluded plus pi over t point at phase one half. A red bracket beside the plot spans their energy difference of two pi over t. Phase one wraps to phase zero.</desc>
  <metadata>

@@ -153,6 +153,7 @@ def generate_phase_wrapping_figure(evolution_time: float) -> plt.Figure:
 
 def main() -> None:
     """Write committed visual and table artifacts from the Chapter 6 constants."""
+    description = figure_descriptions()[SVG_FILENAME]
     grid_size = 2**NUM_PHASE_BITS
     selected_phase = SELECTED_GRID_INDEX / grid_size
     selected_energy = REFERENCE_ENERGY_HARTREE + TARGET_OFFSET_HARTREE
@@ -189,13 +190,12 @@ def main() -> None:
             metadata={"Date": None},
         )
         plt.close(figure)
-        descriptions = figure_descriptions()
         output_path.write_text(
             add_accessibility_metadata(
                 output_path.read_text(encoding="utf-8"),
                 identifier="tutorial-qpe-phase-wrapping",
                 title="Signed phase-to-energy wrapping",
-                description=descriptions[SVG_FILENAME],
+                description=description,
                 source_hash=source_sha256(
                     Path(__file__),
                     Path(__file__).with_name("tutorial_qpe_svg.py"),

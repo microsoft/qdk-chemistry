@@ -30,6 +30,7 @@ SVG_FILENAME = "tutorial_qpe_orbital_entropy.svg"
 
 def main() -> None:
     """Run the shared workflow and write the committed entropy figure."""
+    description = figure_descriptions()[SVG_FILENAME]
     Logger.set_global_level(Logger.LogLevel.off)
     result = run_active_space_workflow()
     with mpl.rc_context(
@@ -50,13 +51,12 @@ def main() -> None:
             facecolor=PLOT_BACKGROUND,
             metadata={"Date": None},
         )
-        descriptions = figure_descriptions()
         output_path.write_text(
             add_accessibility_metadata(
                 output_path.read_text(encoding="utf-8"),
                 identifier="tutorial-qpe-orbital-entropy",
                 title="Natural-orbital entropy selection",
-                description=descriptions[SVG_FILENAME],
+                description=description,
                 source_hash=source_sha256(
                     Path(__file__),
                     Path(__file__).with_name("tutorial_qpe_svg.py"),
