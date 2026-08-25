@@ -71,6 +71,7 @@ namespace QDKChemistry.Utils.SelectSwap {
             });
         } else {
             let (n, nRequired) = DimensionsForSelect(data[0], innerAddress);
+            Fact(numSwapBits <= nRequired, "Too many bits for SWAP network");
             let innerAddressFitted = innerAddress[...nRequired - 1];
 
             let m = Length(data[0][0]);

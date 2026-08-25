@@ -74,8 +74,8 @@ class QROMStatePreparation(StatePreparation):
             Circuit: A Circuit wrapping the Q# QROM state prep callable and factory.
 
         Raises:
-            ValueError: If the wavefunction has no coefficients, has an imaginary part, or
-                contains a non-finite coefficient.
+            ValueError: If the wavefunction has no coefficients, has an imaginary part,
+                contains a non-finite coefficient, or is all zeros.
 
         """
         params = self._build_params(wavefunction)
@@ -106,8 +106,8 @@ class QROMStatePreparation(StatePreparation):
             The Q# ``QROMStatePrepParams`` record.
 
         Raises:
-            ValueError: If the wavefunction has no coefficients, has an imaginary part, or
-                contains a non-finite coefficient.
+            ValueError: If the wavefunction has no coefficients, has an imaginary part,
+                contains a non-finite coefficient, or is all zeros.
 
         """
         coeffs = np.asarray(wavefunction.get_coefficients())

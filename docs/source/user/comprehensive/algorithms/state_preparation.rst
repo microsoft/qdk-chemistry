@@ -218,12 +218,12 @@ This method implements the coherent alias sampling oracle of Babbush et al. :cit
 .. math::
 
    \sum_{\ell} \sqrt{\tilde{p}_\ell} \left| \ell \right\rangle \left| \mathrm{garbage}_\ell \right\rangle ,
-   \qquad \tilde{p}_\ell \approx \frac{|c_\ell|}{\sum_k |c_k|} ,
+   \qquad \tilde{p}_\ell \approx \frac{c_\ell^2}{\sum_k c_k^2} ,
 
 where :math:`\tilde{p}` is the target distribution discretized to :math:`\mu` bits.
 
 .. warning::
-   This is a **block-encoding subroutine, not a general-purpose state preparation**. The index register is left entangled with ancilla, so the output is only meaningful inside an :term:`LCU` or qubitization circuit where :math:`\mathrm{PREPARE}^\dagger` later uncomputes the garbage. It realizes :math:`\sqrt{|c_\ell| / \sum_k |c_k|}` rather than :math:`c_\ell / \lVert c \rVert_2`, and has no way to represent a coefficient's sign, so negative coefficients are rejected.
+   This is a **block-encoding subroutine, not a general-purpose state preparation**. The index register is left entangled with ancilla, so the output is only meaningful inside an :term:`LCU` or qubitization circuit where :math:`\mathrm{PREPARE}^\dagger` later uncomputes the garbage. It has no way to represent a coefficient's sign, so negative coefficients are rejected.
 
 .. rubric:: Settings
 
@@ -236,7 +236,7 @@ where :math:`\tilde{p}` is the target distribution discretized to :math:`\mu` bi
      - Description
    * - ``bits_precision``
      - int
-     - Number of bits :math:`\mu` of precision for the alias table's keep probabilities. Each prepared probability is within :math:`1/(L 2^{\mu})` of the target for :math:`L` coefficients, at the cost of one extra uniform qubit and one extra Quantum Read-Only Memory (QROM) output qubit per bit. The upper bound of 30 is a sanity limit rather than an algorithmic one: :math:`2^{-30}` is already far below chemical accuracy. Default is 10.
+     - Number of bits :math:`\mu` of precision for the alias table's keep probabilities. Each prepared probability is within :math:`1/(L 2^{\mu})` of the target for :math:`L` coefficients. The upper bound of 30 is a sanity limit as :math:`2^{-30}` is far below chemical accuracy. Default is 10.
 
 The prepared index register stays entangled with the ancillas, so this method is only meaningful inside a block encoding that applies :math:`\mathrm{PREPARE}^\dagger` to uncompute them. The ``prepare_select_prepare`` circuit mapper supplies those ancillas and uncomputes them after SELECT.
 
