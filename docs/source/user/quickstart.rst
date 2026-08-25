@@ -33,7 +33,7 @@ To run the examples, either clone the repository or download the packaged exampl
    If you installed ``qdk-chemistry`` from PyPI, use the ``stable/major.minor`` branch
    when cloning the repository for examples.
    The ``main`` branch is the active development branch and may be incompatible with
-   the released pip package. For example, if you have ``qdk-chemistry`` ``<major>.<minor>.x``
+   the released pip package. For example, if you have version ``<major>.<minor>.x``
    installed (check with ``pip show qdk-chemistry``), use:
 
    .. code-block:: bash
