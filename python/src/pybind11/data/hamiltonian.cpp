@@ -422,11 +422,8 @@ Raises:
         const auto& opt = self.get_ao_cholesky_vectors();
         if (!opt) return py::none();
         const Eigen::MatrixXd& mat = *opt;
-        // Return a zero-copy view. We tie lifetime to self via
-        // py::return_value_policy semantics by passing a capsule that
-        // prevents GC.  The reference is valid as long as the container
-        // (and thus `self`) is alive; pybind11's prevent-gc mechanism
-        // handles that through the `self` capture in the keep-alive.
+        // Use the container as the NumPy base object so its storage remains
+        // alive for as long as the zero-copy array view.
         py::array_t<double> result(
             {mat.rows(), mat.cols()},  // shape
             {static_cast<py::ssize_t>(sizeof(double)),

@@ -17,15 +17,17 @@ Cholesky decomposition.
       from qdk_chemistry.algorithms import create
 
       transformer = create("hamiltonian_basis_transformer")
-      no_hamiltonian = transformer.run(source_hamiltonian, no_orbitals)
+      transformed_hamiltonian = transformer.run(
+          source_hamiltonian, target_orbitals
+      )
 
 .. tab:: C++ API
 
    .. code-block:: cpp
 
       auto transformer = HamiltonianBasisTransformerFactory::create("qdk");
-      auto no_hamiltonian =
-          transformer->run(source_hamiltonian, no_orbitals);
+      auto transformed_hamiltonian =
+          transformer->run(source_hamiltonian, target_orbitals);
 
 The source and target orbitals must have the same AO basis, overlap matrix,
 active/inactive index sets, and molecular orbitals outside the active space.
