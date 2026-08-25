@@ -157,8 +157,9 @@ class RemoteBackend(ABC):
     serialization.
 
     Backend artifacts are retained after a job reaches a terminal state. Callers
-    are responsible for removing them with :meth:`Job.cleanup` or
-    :meth:`Job.fetch` with ``cleanup=True``. Backend cleanup does not remove
+    are responsible for removing them with
+    :meth:`~qdk_chemistry.remote.job.Job.cleanup` or
+    :meth:`~qdk_chemistry.remote.job.Job.fetch` with ``cleanup=True``. Backend cleanup does not remove
     caller-owned local job records or result directories.
 
     To create a custom backend:

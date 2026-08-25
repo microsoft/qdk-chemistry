@@ -1282,7 +1282,7 @@ class TestLocalBackendSpecific:
         process.poll.side_effect = [None, 1]
         monkeypatch.setattr("subprocess.Popen", MagicMock(return_value=process))
         try:
-            _, state = backend._submit(
+            job_id, state = backend._submit(
                 {
                     "algorithm_type": "test_algorithm",
                     "algorithm_name": "plugin",
@@ -1292,8 +1292,13 @@ class TestLocalBackendSpecific:
                 }
             )
 
-            assert backend.check(state).status == "running"
-            assert backend.check(state).status == "Failed"
+            assert state["job_id"] == job_id
+            running_status = backend.check(state)
+            failed_status = backend.check(state)
+            assert running_status.status == "running"
+            assert running_status.job_id == job_id
+            assert failed_status.status == "Failed"
+            assert failed_status.job_id == job_id
         finally:
             backend.disconnect()
 
@@ -1302,12 +1307,15 @@ class TestLocalBackendSpecific:
         monkeypatch.setattr(local_backend_module, "_process_is_running", process_is_running)
         backend = LocalBackend()
         state = {
+            "job_id": "job-id",
             "pid": 1234,
             "output_dir": str(tmp_path / "output"),
             "job_workdir": str(tmp_path),
         }
 
-        assert backend.check(state).status == "Failed"
+        status = backend.check(state)
+        assert status.status == "Failed"
+        assert status.job_id == "job-id"
         process_is_running.assert_called_once_with(1234)
 
     def test_cancel_rehydrated_job_requires_matching_process_identity(self, monkeypatch):

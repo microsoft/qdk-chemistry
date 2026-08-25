@@ -12,6 +12,7 @@ local machine. Useful for testing and development.
 from __future__ import annotations
 
 import contextlib
+import pathlib
 import shutil
 import subprocess
 import sys
@@ -181,7 +182,7 @@ class LocalBackend(RemoteBackend):
         *,
         poll_interval: float = DEFAULT_POLL_INTERVAL,
         timeout: float = DEFAULT_TIMEOUT,
-        python_path: str | Path = sys.executable,
+        python_path: str | pathlib.Path = sys.executable,
     ) -> None:
         """Initialize the local backend.
 
@@ -211,7 +212,7 @@ class LocalBackend(RemoteBackend):
             with contextlib.suppress(OSError):
                 self._workdir.rmdir()
 
-    def upload(self, local_path: str | Path, remote_path: str) -> None:
+    def upload(self, local_path: str | pathlib.Path, remote_path: str) -> None:
         """Copy a file to the 'remote' working directory.
 
         Args:
@@ -229,7 +230,7 @@ class LocalBackend(RemoteBackend):
 
         shutil.copy2(local_path, dest_path)
 
-    def download(self, remote_path: str, local_path: str | Path) -> None:
+    def download(self, remote_path: str, local_path: str | pathlib.Path) -> None:
         """Copy a file from the 'remote' working directory.
 
         Args:
@@ -294,6 +295,7 @@ class LocalBackend(RemoteBackend):
             )
 
         backend_state = {
+            "job_id": job_id,
             "pid": proc.pid,
             "process_identity": _process_identity(proc.pid),
             "workdir": str(self._workdir),
@@ -335,7 +337,7 @@ class LocalBackend(RemoteBackend):
             logs = stderr_log.read_text()[-2000:]
 
         return JobStatus(
-            job_id="",
+            job_id=backend_state["job_id"],
             status=status,
             logs=logs,
             metadata={"pid": pid},
@@ -366,7 +368,7 @@ class LocalBackend(RemoteBackend):
     def fetch(
         self,
         backend_state: dict,
-        local_dir: str | Path | None = None,
+        local_dir: str | pathlib.Path | None = None,
     ) -> Any:
         """Deserialize results from a completed local job.
 

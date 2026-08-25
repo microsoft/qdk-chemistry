@@ -5,12 +5,12 @@ This example targets a directly SSH-accessible machine with ``ssh``, ``scp``,
 not submit work through a queue scheduler such as SLURM or PBS.
 """
 
-# docs-example: requires-external-service
-
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+
+# docs-example: requires-external-service
 
 ################################################################################
 # start-cell-custom-remote-backend
