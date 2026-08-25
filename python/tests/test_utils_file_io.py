@@ -380,6 +380,17 @@ def test_retry_reservation_while_directory_state_is_unresolved(
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX permission semantics")
+def test_missing_directory_state_is_resolved(tmp_path: Path):
+    directory = tmp_path / "missing" / "nested"
+
+    initializing, unresolved, state = file_io_module._directory_initialization_state(directory)
+
+    assert not initializing
+    assert not unresolved
+    assert state[0][3] == errno.ENOENT
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission semantics")
 def test_do_not_modify_permanently_inaccessible_parent(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -122,7 +122,7 @@ directory_initialization_state(const std::filesystem::path& directory) {
       }
     } else {
       const int status_error = errno;
-      unresolved = true;
+      unresolved = unresolved || status_error == EACCES;
       state.emplace_back(0, 0, 0, status_error);
     }
     const auto parent = current.parent_path();

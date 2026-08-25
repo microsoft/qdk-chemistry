@@ -775,7 +775,6 @@ def _directory_initialization_state(
         try:
             status = current.stat()
         except FileNotFoundError:
-            unresolved = True
             state.append((os.fspath(current), -1, -1, errno.ENOENT))
         except PermissionError:
             unresolved = True
