@@ -81,20 +81,45 @@ std::string display_path(const std::filesystem::path& path) {
 }
 
 #ifndef _WIN32
-class DirectoryPermissionError : public std::runtime_error {
+class TransientPermissionError : public std::runtime_error {
  public:
   using std::runtime_error::runtime_error;
 };
+#endif
 
 [[noreturn]] void throw_directory_error(const std::string& action,
                                         const std::filesystem::path& path,
                                         const std::error_code& error) {
   const auto message =
       action + " '" + display_path(path) + "': " + error.message();
+#ifndef _WIN32
   if (error == std::errc::permission_denied) {
-    throw DirectoryPermissionError(message);
+    throw TransientPermissionError(message);
   }
+#endif
   throw std::runtime_error(message);
+}
+
+#ifndef _WIN32
+bool has_initializing_directory(const std::filesystem::path& directory) {
+  auto current = directory;
+  while (!current.empty()) {
+    struct stat status{};
+    if (retry_on_eintr([&] { return ::stat(current.c_str(), &status); }) == 0) {
+      if (S_ISDIR(status.st_mode) && status.st_uid == geteuid() &&
+          (status.st_mode & 0777) == 0) {
+        return true;
+      }
+    } else if (errno != EACCES && errno != ENOENT) {
+      return false;
+    }
+    const auto parent = current.parent_path();
+    if (parent == current) {
+      return false;
+    }
+    current = parent;
+  }
+  return false;
 }
 #endif
 
@@ -508,9 +533,8 @@ ReservedTemporaryFile reserve_temporary_file(
       if (is_name_too_long(error, destination)) {
         break;
       }
-      throw std::runtime_error("Could not create temporary file beside '" +
-                               display_path(destination) +
-                               "': " + error.message());
+      throw_directory_error("Could not create temporary file beside",
+                            destination, error);
     }
   }
 
@@ -540,9 +564,8 @@ ReservedTemporaryFile reserve_temporary_file(
       if (is_name_too_long(error, destination)) {
         break;
       }
-      throw std::runtime_error("Could not create temporary file beside '" +
-                               display_path(destination) +
-                               "': " + error.message());
+      throw_directory_error("Could not create temporary file beside",
+                            destination, error);
     }
   }
 
@@ -827,27 +850,10 @@ void create_private_directories(const std::filesystem::path& directory) {
   while (true) {
     try {
       create_once();
-      int access_flags = 0;
-#ifdef AT_EACCESS
-      access_flags = AT_EACCESS;
-#endif
-      if (retry_on_eintr([&] {
-            return ::faccessat(AT_FDCWD, directory.c_str(), W_OK | X_OK,
-                               access_flags);
-          }) != 0) {
-        const int access_error = errno;
-        if (access_error == EACCES || access_error == ENOENT) {
-          throw DirectoryPermissionError(
-              "Directory is not ready for writing: '" +
-              display_path(directory) + "'");
-        }
-        throw_directory_error(
-            "Could not inspect directory", directory,
-            std::error_code(access_error, std::generic_category()));
-      }
       return;
-    } catch (const DirectoryPermissionError&) {
-      if (std::chrono::steady_clock::now() >= deadline) {
+    } catch (const TransientPermissionError&) {
+      if (!has_initializing_directory(directory) ||
+          std::chrono::steady_clock::now() >= deadline) {
         throw;
       }
       std::this_thread::sleep_for(retry_delay);
@@ -967,7 +973,26 @@ void write_file_atomically(const std::filesystem::path& path,
     }
   }
 
-  auto temporary_file = reserve_temporary_file(destination);
+  auto temporary_file = [&]() {
+#ifdef _WIN32
+    return reserve_temporary_file(destination);
+#else
+    const auto deadline =
+        std::chrono::steady_clock::now() + std::chrono::seconds(1);
+    while (true) {
+      try {
+        return reserve_temporary_file(destination);
+      } catch (const TransientPermissionError&) {
+        if (!create_parent_directories ||
+            !has_initializing_directory(destination.parent_path()) ||
+            std::chrono::steady_clock::now() >= deadline) {
+          throw;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      }
+    }
+#endif
+  }();
   writer(temporary_file.path());
   temporary_file.verify_identity();
   preserve_permissions(temporary_file, destination);

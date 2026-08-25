@@ -113,8 +113,8 @@ def test_serialize_concurrent_parent_creation_under_restrictive_umask(
     monkeypatch: pytest.MonkeyPatch,
 ):
     shared_parent = tmp_path / "shared"
-    first_path = shared_parent / "first" / "data.txt"
-    second_path = shared_parent / "second" / "data.txt"
+    first_path = shared_parent / "first.txt"
+    second_path = shared_parent / "second.txt"
     mkdir = file_io_module.os.mkdir
     parent_created = threading.Event()
     release_creator = threading.Event()
@@ -180,6 +180,19 @@ def test_do_not_modify_permanently_inaccessible_parent(
         with pytest.raises(PermissionError):
             ensure_parent_directory(parent / "nested" / "data.txt")
         assert stat.S_IMODE(parent.stat().st_mode) == 0
+    finally:
+        parent.chmod(0o700)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission semantics")
+def test_existing_parent_is_a_noop_without_write_permission(tmp_path: Path):
+    parent = tmp_path / "existing"
+    parent.mkdir()
+    parent.chmod(0o500)
+
+    try:
+        ensure_parent_directory(parent / "data.txt")
+        assert stat.S_IMODE(parent.stat().st_mode) == 0o500
     finally:
         parent.chmod(0o700)
 

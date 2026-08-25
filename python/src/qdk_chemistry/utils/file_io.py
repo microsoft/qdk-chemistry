@@ -200,7 +200,11 @@ def write_file_atomically(
     reservation: _TemporaryFileReservation | None = None
 
     try:
-        reservation = _reserve_temporary_file(destination)
+        reservation = (
+            _reserve_temporary_file_with_parent_retry(destination)
+            if create_parent_directories and os.name != "nt"
+            else _reserve_temporary_file(destination)
+        )
         descriptor = reservation.descriptor
         temporary_path = reservation.path
         reserved_status = reservation.status
@@ -760,9 +764,20 @@ def _create_private_directories_once(directory: Path) -> None:
             raise close_error
 
 
-def _directory_may_be_initializing(directory: Path) -> bool:
-    access_options = {"effective_ids": True} if os.access in os.supports_effective_ids else {}
-    return not os.access(directory, os.W_OK | os.X_OK, **access_options)
+def _has_initializing_directory(directory: Path) -> bool:
+    current = directory
+    while True:
+        try:
+            status = current.stat()
+        except (FileNotFoundError, PermissionError):
+            pass
+        else:
+            if stat.S_ISDIR(status.st_mode) and status.st_uid == os.geteuid() and stat.S_IMODE(status.st_mode) == 0:
+                return True
+        parent = current.parent
+        if parent == current:
+            return False
+        current = parent
 
 
 def _create_private_directories(directory: Path) -> None:
@@ -771,20 +786,27 @@ def _create_private_directories(directory: Path) -> None:
         permission_error: PermissionError | None = None
         try:
             _create_private_directories_once(directory)
-            if not _directory_may_be_initializing(directory):
-                return
-            permission_error = PermissionError(
-                errno.EACCES,
-                f"Directory is not ready for writing: '{directory}'",
-                os.fspath(directory),
-            )
+            return
         except PermissionError as error:
+            if not _has_initializing_directory(directory):
+                raise
             permission_error = error
 
         if time.monotonic() >= deadline:
             assert permission_error is not None
             raise permission_error
         time.sleep(_DIRECTORY_CREATION_RETRY_DELAY_SECONDS)
+
+
+def _reserve_temporary_file_with_parent_retry(destination: Path) -> _TemporaryFileReservation:
+    deadline = time.monotonic() + _DIRECTORY_CREATION_RETRY_TIMEOUT_SECONDS
+    while True:
+        try:
+            return _reserve_temporary_file(destination)
+        except PermissionError:
+            if not _has_initializing_directory(destination.parent) or time.monotonic() >= deadline:
+                raise
+            time.sleep(_DIRECTORY_CREATION_RETRY_DELAY_SECONDS)
 
 
 def write_text_file_atomically(
