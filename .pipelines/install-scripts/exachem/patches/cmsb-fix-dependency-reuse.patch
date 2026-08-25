@@ -1,0 +1,139 @@
+# cmsb-fix-dependency-reuse.patch
+# ----------------------------------------------------------------------------------------------------------------------
+# Make NWChemEx-Project/CMakeBuild (CMSB, TAMM/ExaChem's superbuild helper) reuse already-installed system/build
+# dependencies -- BLAS, LAPACK, spdlog, EcpInt, nlohmann_json (NJSON) -- instead of always rebuilding its own
+# copies from source, without touching the global CMSB_DEBUG_CMAKE option (an earlier, broader attempt at this
+# via -DCMSB_DEBUG_CMAKE=OFF was tried and reverted: it also changes how every *other* TAMM dependency is
+# resolved in CMSB's nested "TAMM_External"/"EXACHEM_External" build phase, which broke that phase outright with
+# a hard CMake configure error -- "could not find TARGET NJSON_External" -- since CMSB has no build-from-source
+# fallback in that nested re-resolution path). This patch is instead scoped to exactly the affected code paths,
+# leaving everything else byte-for-byte unchanged.
+#
+# Three independent root causes/fixes, all in the same two files (cmake/macros/DependencyMacros.cmake and
+# cmake/macros/BuildCMSBModule.cmake) plus cmake/build_external/BuildGlobalArrays.cmake and
+# cmake/CMSBTargetConfig.cmake.in:
+#
+# 1. BLAS/LAPACK (cmake/macros/DependencyMacros.cmake, cmake/build_external/BuildGlobalArrays.cmake):
+#    BLAS/LAPACK are DEP_ABUILD items, so cmsb_find_dependency() only looks them up via
+#    find_package(<name> CONFIG NO_DEFAULT_PATH), which apt's libopenblas-dev satisfies for neither (it ships no
+#    BLASConfig.cmake/LAPACKConfig.cmake) -- so CMSB always rebuilds its own static, generic-target OpenBLAS.
+#    Fix: add a plain find_package(BLAS/LAPACK QUIET) fallback in cmsb_find_dependency() (mirroring the existing
+#    ELPA/HDF5/numactl special cases), which uses CMake's own FindBLAS.cmake/FindLAPACK.cmake (MODULE mode) and
+#    correctly finds the system OpenBLAS. Also make BuildGlobalArrays.cmake's find_or_build_dependency(BLAS) call
+#    unconditional (previously only reachable if a "BLAS_External" target already happened to exist, which
+#    itself was only ever created as a side effect of *building* BLAS -- so once BLAS is found instead, the
+#    later unconditional add_dependencies(GlobalArrays_External BLAS_External LAPACK_External) would otherwise
+#    fail with "target 'BLAS_External' does not exist"). Safe because cmsb_find_dependency links BLAS/LAPACK via
+#    raw library file paths (FindBLAS/FindLAPACK set e.g. BLAS_LIBRARIES to absolute .so/.a paths), not an
+#    imported target, so nothing about how they get exported/consumed downstream changes.
+#
+# 2. SPDLOG / EcpInt (cmake/CMSBTargetConfig.cmake.in, cmake/macros/BuildCMSBModule.cmake): unlike BLAS/LAPACK,
+#    cmsb_find_dependency links these (like every DEP_ABUILD_MISC item) via an external IMPORTED target
+#    reference (spdlog::spdlog, ECPINT::ecpint), so TAMM's generated tamm-config.cmake must be able to
+#    RE-RESOLVE that target when consumed by a LATER, SEPARATE cmake invocation (e.g. ExaChem's own
+#    outer/nested configure). CMSBTargetConfig.cmake.in's per-dependency find_path(... NO_DEFAULT_PATH)
+#    re-resolution loop only ever bakes a reliable, build-independent *_ROOT hint (via a literal
+#    `set(<name>_ROOT @<name>_ROOT@)`, substituted once at TAMM's own build time via configure_file) for
+#    LibInt2/HDF5/HPTT -- SPDLOG/EcpInt never got the same treatment, so their re-resolution relied entirely on
+#    CMAKE_PREFIX_PATH being correctly forwarded through CMSB's nested ExternalProject_Add machinery, which is
+#    unreliable in practice (confirmed via a live CI run: EcpInt happened to resolve, SPDLOG did not, with an
+#    identical forwarding path -- eventually hard-erroring on tamm::tamm's own set_target_properties(),
+#    "the target spdlog::spdlog was not found"). Fix: extend the exact same baked-@ROOT@ mechanism CMSB already
+#    uses for LibInt2/HDF5/HPTT to SPDLOG/EcpInt too, and forward -DSPDLOG_ROOT/-DEcpInt_ROOT into CMSB's nested
+#    *_External sub-builds the same way -DHDF5_ROOT/-DHPTT_ROOT/-DLibInt2_ROOT already are.
+#
+# 3. NJSON (nlohmann_json): same gap and same fix as SPDLOG/EcpInt above -- NJSON's elseif branch in
+#    CMSBTargetConfig.cmake.in never set `_dep_pp` either. Callers wanting NJSON reused should point NJSON_ROOT
+#    at an install providing the exact nlohmann_json version their own code needs (this is an API/ABI-sensitive
+#    dependency: nlohmann_json's public API is stable, but code reaching into its detail:: namespace, as
+#    ExaChem's own source does, is not -- verify version compatibility before pointing NJSON_ROOT at a system
+#    package).
+#
+# Callers wanting BLAS/LAPACK/SPDLOG/EcpInt/NJSON reused (not rebuilt) should pass -DSPDLOG_ROOT=<prefix>
+# -DEcpInt_ROOT=<prefix> -DNJSON_ROOT=<prefix> on BOTH the outer TAMM and outer ExaChem (or any other
+# CMSB_PROJECTS consumer) cmake invocations, alongside the pre-existing -DLibInt2_ROOT/-DGauXC_ROOT pattern (see
+# install-exachem.sh). BLAS/LAPACK reuse itself needs no extra flag beyond LINALG_VENDOR=OpenBLAS/BLIS/IBMESSL.
+#
+# Applied to a local FetchContent_MakeAvailable(CMakeBuild) source checkout via -DFETCHCONTENT_SOURCE_DIR_CMAKEBUILD
+# (see install-exachem.sh) rather than to a vendored copy in this repo, since CMSB isn't a qdk-chemistry dependency
+# in its own right -- it's fetched fresh (from NWChemEx-Project/CMakeBuild@main) as part of TAMM/ExaChem's own build.
+# Candidate for upstreaming to NWChemEx-Project/CMakeBuild: these are genuine gaps (not qdk-chemistry-specific
+# behavior), following the exact pattern CMSB already uses for LibInt2/HDF5/HPTT/ELPA/numactl.
+#
+# Apply: git -C <cmsb-src> apply cmsb-fix-dependency-reuse.patch
+# ----------------------------------------------------------------------------------------------------------------------
+diff --git a/cmake/CMSBTargetConfig.cmake.in b/cmake/CMSBTargetConfig.cmake.in
+index a6437aa..d3f3235 100644
+--- a/cmake/CMSBTargetConfig.cmake.in
++++ b/cmake/CMSBTargetConfig.cmake.in
+@@ -165,6 +165,9 @@ set(__tip_stage_${__cmsb_libname} @STAGE_DIR@/@CMAKE_INSTALL_PREFIX@)
+ set(LibInt2_ROOT @LibInt2_ROOT@)
+ set(HDF5_ROOT @HDF5_ROOT@)
+ set(HPTT_ROOT @HPTT_ROOT@)
++set(SPDLOG_ROOT @SPDLOG_ROOT@)
++set(EcpInt_ROOT @EcpInt_ROOT@)
++set(NJSON_ROOT @NJSON_ROOT@)
+ 
+ #list(PREPEND CMAKE_MODULE_PATH @STAGE_DIR@/@CMAKE_INSTALL_PREFIX@)
+ #list(PREPEND CMAKE_MODULE_PATH @CMAKE_INSTALL_PREFIX@)
+@@ -183,6 +186,7 @@ foreach(__depend_i ${__depends_${__cmsb_libname}})
+       set(__depend_cfg "Microsoft.GSLConfig.cmake")
+       list(APPEND ${__CMSB_LIBNAME}_LIBRARIES Microsoft.GSL::GSL)
+     elseif(${__depend_i} STREQUAL "NJSON")
++      set(_dep_pp ${${__depend_i}_ROOT})
+       set(__cur_dep "nlohmann_json")
+       set(__depend_cfg "nlohmann_jsonConfig.cmake")
+       set(CMAKE_FIND_PACKAGE_NAME nlohmann_json)
+@@ -209,9 +213,11 @@ foreach(__depend_i ${__depends_${__cmsb_libname}})
+       set(__depend_cfg macis-config.cmake)
+       list(APPEND ${__CMSB_LIBNAME}_LIBRARIES macis::macis)
+     elseif(${__depend_i} STREQUAL "SPDLOG")
++      set(_dep_pp ${${__depend_i}_ROOT})
+       set(__depend_cfg ${__depend_lc}Config.cmake)
+       list(APPEND ${__CMSB_LIBNAME}_LIBRARIES spdlog::spdlog)
+     elseif(${__depend_i} STREQUAL "EcpInt")
++      set(_dep_pp ${${__depend_i}_ROOT})
+       set(__depend_cfg ecpint-config.cmake)
+       list(APPEND ${__CMSB_LIBNAME}_LIBRARIES ECPINT::ecpint)
+     elseif(${__depend_i} STREQUAL "pybind11")
+diff --git a/cmake/build_external/BuildGlobalArrays.cmake b/cmake/build_external/BuildGlobalArrays.cmake
+index 2221ddc..ae4ea2a 100644
+--- a/cmake/build_external/BuildGlobalArrays.cmake
++++ b/cmake/build_external/BuildGlobalArrays.cmake
+@@ -90,9 +90,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/dep_versions.cmake)
+             list(APPEND  GA_LINALG_ROOT "-DScaLAPACK_PREFIX=${CMAKE_INSTALL_PREFIX}")
+         else()
+             find_or_build_dependency(LAPACK)
+-            if(TARGET BLAS_External)
+-                find_or_build_dependency(BLAS)
+-            endif()
++            find_or_build_dependency(BLAS)
+             #include(BuildBLAS)
+         endif()
+ 
+diff --git a/cmake/macros/BuildCMSBModule.cmake b/cmake/macros/BuildCMSBModule.cmake
+index 9d689b6..9b0d24d 100644
+--- a/cmake/macros/BuildCMSBModule.cmake
++++ b/cmake/macros/BuildCMSBModule.cmake
+@@ -249,7 +249,7 @@ function(build_cmsb_module SUPER_PROJECT_ROOT)
+     bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS ${CMSB_CORE_OPTIONS})
+ 
+     bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS BLAS_INT4 LINALG_VENDOR LINALG_PREFIX ENABLE_COVERAGE USE_SCALAPACK USE_HDF5 USE_LIBNUMA USE_ONEMATH ONEMATH_PREFIX USE_NWQSIM)
+-    bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS BLAS_ARCH GCCROOT HDF5_ROOT HPTT_ROOT LibInt2_ROOT)
++    bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS BLAS_ARCH GCCROOT HDF5_ROOT HPTT_ROOT LibInt2_ROOT SPDLOG_ROOT EcpInt_ROOT NJSON_ROOT)
+ 
+     bundle_cmake_strings(CORE_CMAKE_STRINGS CMSB_PROJECTS ENABLE_DEV_MODE GPU_ARCH MARCH_FLAGS USE_TAMM_DEV CMSB_TAG)
+     bundle_cmake_strings(CORE_CMAKE_STRINGS USE_UPCXX BLAS_INT4 LINALG_PREFIX USE_SCALAPACK USE_HDF5 USE_LIBNUMA USE_NWQSIM LINK_STATIC_GPU_LIBS)
+diff --git a/cmake/macros/DependencyMacros.cmake b/cmake/macros/DependencyMacros.cmake
+index d70d56d..712dbc8 100644
+--- a/cmake/macros/DependencyMacros.cmake
++++ b/cmake/macros/DependencyMacros.cmake
+@@ -194,6 +194,8 @@ function(cmsb_find_dependency __name)
+                     endif()
+                   elseif(${__name} STREQUAL "numactl")
+                     find_package(numactl)
++                  elseif(${__name} STREQUAL "BLAS" OR ${__name} STREQUAL "LAPACK")
++                    find_package(${__name} QUIET)
+                   endif()
+                 endif()
+             else()

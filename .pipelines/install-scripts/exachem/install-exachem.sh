@@ -5,9 +5,8 @@
 # CPP_DEPS_PREFIX by install-cpp-deps.sh (TAMM finds BLAS++/LAPACK++ via its default find_package on
 # CMAKE_PREFIX_PATH; LibInt2/GauXC/spdlog/EcpInt/nlohmann_json via explicit -D*_ROOT below), and the system MPI
 # (e.g. apt-installed openmpi-bin/libopenmpi-dev on Ubuntu). GPU is not supported here. TAMM's own CMSB
-# superbuild (NWChemEx-Project/CMakeBuild) is patched (see patches/cmsb-fix-blas-lapack-reuse.patch,
-# patches/cmsb-fix-spdlog-ecpint-reuse.patch, and patches/cmsb-fix-njson-reuse.patch) so it also reuses the
-# system OpenBLAS/LAPACK/spdlog/EcpInt/nlohmann_json instead of building its own redundant copies.
+# superbuild (NWChemEx-Project/CMakeBuild) is patched (see patches/cmsb-fix-dependency-reuse.patch) so it also
+# reuses the system OpenBLAS/LAPACK/spdlog/EcpInt/nlohmann_json instead of building its own redundant copies.
 #
 # Usage: install-exachem.sh <cgmanifest_path>
 #   cgmanifest_path - Full path to cpp/manifest/qdk-chemistry/cgmanifest.json (source of TAMM/ExaChem commits).
@@ -162,59 +161,37 @@ echo "==> HDF5: cflags='${HDF5_CFLAGS}' libs='${HDF5_LIBS}'"
 # (the base HDF5 here, like qdk-chemistry's own, is serial-only); USE_SERIAL_IO selects ExaChem's serial-I/O SCF
 # path instead. These MUST be identical on both configure lines, or ExaChem's CMSB reconfigures/rebuilds TAMM.
 #
-# NOTE: TAMM's CMSB always rebuilds its own static, generic-target BLAS/LAPACK from source here, even with
-# LINALG_VENDOR=OpenBLAS (apt's libopenblas-dev ships no BLASConfig.cmake/LAPACKConfig.cmake for CMSB's
-# find_package(... CONFIG) to find). First attempt at making CMSB reuse the system OpenBLAS instead --
-# -DCMSB_DEBUG_CMAKE=OFF (the global option controlling CMSB's dependency search strategy for *every*
-# dependency, per cmake/macros/DependencyMacros.cmake in NWChemEx-Project/CMakeBuild) -- was abandoned: it did
-# make BLAS/LAPACK resolve via the system OpenBLAS (confirmed via CI log: "Found OpenBLAS"/"Found BLAS:
-# TRUE"/"Found LAPACK: TRUE"), but TAMM's superbuild is two-phase (an outer configure resolves/builds every
-# TAMM_DEPENDENCIES item once, then re-invokes cmake on the same source tree as a nested "TAMM_External"
-# ExternalProject to actually compile the tamm library, re-resolving every dependency itself via
-# cmsb_set_up_target's own loop in cmake/macros/TargetMacros.cmake, which has NO build-from-source fallback).
-# With CMSB_DEBUG_CMAKE=OFF that nested pass failed to (re-)find NJSON/MSGSL/DOCTEST/SPDLOG/GlobalArrays at all
-# ("could not find TARGET NJSON_External"), failing all 3 Linux jobs deterministically.
+# NOTE: TAMM's CMSB always rebuilds its own copies of several dependencies that are already available (system
+# BLAS/LAPACK, spdlog, EcpInt, nlohmann_json), because its dependency-resolution loop either uses an overly
+# strict find_package(... CONFIG NO_DEFAULT_PATH) search (BLAS/LAPACK) or never bakes a reliable *_ROOT hint for
+# re-resolution when consumed by ExaChem's own separate configure (SPDLOG/EcpInt/NJSON). A first, broader attempt
+# to fix this via the global -DCMSB_DEBUG_CMAKE=OFF option was abandoned: it also changes how every *other* TAMM
+# dependency is resolved in CMSB's nested "TAMM_External"/"EXACHEM_External" build phase, which has no
+# build-from-source fallback there and broke outright ("could not find TARGET NJSON_External").
 #
-# Fixed instead with a narrower, two-part patch (see patches/cmsb-fix-blas-lapack-reuse.patch for the full
-# writeup) that leaves CMSB_DEBUG_CMAKE at its default (TRUE) -- so every other dependency's resolution in both
-# the outer and nested phases is completely unaffected -- and only changes how BLAS/LAPACK specifically are
-# resolved: cmsb_find_dependency() gets a plain find_package(BLAS/LAPACK QUIET) fallback (mirroring the
-# ELPA/HDF5/numactl special cases already there) for when its strict CONFIG-only search fails, and
-# BuildGlobalArrays.cmake's find_or_build_dependency(BLAS) call (only reachable, before this patch, if a
-# BLAS_External target already happened to exist) is made unconditional to match the LAPACK call above it.
-# BLAS/LAPACK are safe to fix this way because cmsb_find_dependency links them via raw library file paths
-# (CMake's FindBLAS/FindLAPACK modules set e.g. BLAS_LIBRARIES to absolute .so/.a paths, not an imported
-# target), so nothing about how they get exported/consumed changes.
+# Fixed instead with patches/cmsb-fix-dependency-reuse.patch (candidate for upstreaming; see that file for the
+# full per-dependency root-cause writeup) -- a narrowly-scoped patch that leaves CMSB_DEBUG_CMAKE at its default
+# and only changes how BLAS/LAPACK/SPDLOG/EcpInt/NJSON specifically are resolved:
+#   - BLAS/LAPACK: cmsb_find_dependency() gets a plain find_package(BLAS/LAPACK QUIET) fallback (mirroring the
+#     ELPA/HDF5/numactl special cases already there), and BuildGlobalArrays.cmake's
+#     find_or_build_dependency(BLAS) call is made unconditional (previously only reachable if a BLAS_External
+#     target already happened to exist).
+#   - SPDLOG/EcpInt/NJSON: CMSBTargetConfig.cmake.in gets the same baked-@ROOT@ mechanism CMSB already uses for
+#     LibInt2/HDF5/HPTT (a literal, build-time-substituted set(<name>_ROOT @<name>_ROOT@), independent of the
+#     consuming build's own CMAKE_PREFIX_PATH state), forwarded into CMSB's nested *_External sub-builds the
+#     same way -DHDF5_ROOT/-DHPTT_ROOT/-DLibInt2_ROOT already are.
 #
-# SPDLOG/EcpInt: unlike BLAS/LAPACK, cmsb_find_dependency links these (like every DEP_ABUILD_MISC item) via an
-# external IMPORTED target reference (spdlog::spdlog, ECPINT::ecpint) rather than a raw library path, so TAMM's
-# generated tamm-config.cmake (from cmake/CMSBTargetConfig.cmake.in) must be able to RE-RESOLVE that target when
-# consumed by a LATER, SEPARATE cmake invocation (ExaChem's own outer/nested configure). CMSB's template only
-# bakes a reliable *_ROOT hint (independent of the consuming build's own CMAKE_PREFIX_PATH state) for
-# LibInt2/HDF5/HPTT -- SPDLOG/EcpInt never got the same treatment, an upstream gap rather than something
-# fundamentally unfixable (confirmed via a live CI run: reusing SPDLOG_ROOT/EcpInt_ROOT alone, without CMSB's own
-# ROOT-baking, made ExaChem's nested EXACHEM_External build fail to re-resolve spdlog::spdlog specifically --
-# "the target was not found"). Fixed with patches/cmsb-fix-spdlog-ecpint-reuse.patch (candidate for
-# upstreaming): extends the exact same baked-@ROOT@ mechanism CMSB already uses for LibInt2/HDF5/HPTT to
-# SPDLOG/EcpInt too, and forwards -DSPDLOG_ROOT/-DEcpInt_ROOT into CMSB's nested *_External sub-builds the same
-# way -DHDF5_ROOT/-DHPTT_ROOT/-DLibInt2_ROOT already are.
-#
-# NJSON (nlohmann_json): same gap in CMSB, fixed the same way (patches/cmsb-fix-njson-reuse.patch, applied
-# after the spdlog/ecpint patch since both touch the same lines in the same two CMSB files). First tried
-# pointing NJSON_ROOT at apt's nlohmann-json3-dev (/usr) -- CMSB genuinely discovered it (patch confirmed
-# correct via a live CI run), but that broke the ExaChem build outright: apt's nlohmann-json3-dev on these
-# runners was v3.11.3, while ExaChem's own source (exachem/common/options/parser_utils.hpp) reaches into
-# nlohmann's *private* detail:: namespace (string_input_adapter_type), which only exists from v3.12.0 onward --
-# exactly the version both CMSB (dep_versions.cmake) and qdk-chemistry's own cpp/cmake/third_party.cmake pin.
-# Fixed properly by building nlohmann_json v3.12.0 (matching cgmanifest.json's pin exactly) into CPP_DEPS_PREFIX
-# ourselves (install-cpp-deps.sh, header-only, no apt package needed/installed anymore) and pointing NJSON_ROOT
-# there instead -- exactly matching CMSB's own pin, so both qdk-chemistry's own build and ExaChem/TAMM reuse the
-# identical, compatible nlohmann_json install.
+# NJSON (nlohmann_json) needs special care: apt's nlohmann-json3-dev is v3.11.3, while ExaChem's own source
+# (exachem/common/options/parser_utils.hpp) reaches into nlohmann's *private* detail:: namespace
+# (string_input_adapter_type), which only exists from v3.12.0 onward -- exactly the version both CMSB
+# (dep_versions.cmake) and qdk-chemistry's own cpp/cmake/third_party.cmake pin. Reusing apt's older package broke
+# the ExaChem build outright (confirmed via a live CI run). Fixed by building nlohmann_json v3.12.0 (matching
+# cgmanifest.json's pin exactly) into CPP_DEPS_PREFIX ourselves (install-cpp-deps.sh, header-only, no apt
+# package needed/installed anymore) and pointing NJSON_ROOT there instead -- exactly matching CMSB's own pin, so
+# both qdk-chemistry's own build and ExaChem/TAMM reuse the identical, compatible nlohmann_json install.
 CMSB_SRC_DIR="${BUILD_ROOT}/CMakeBuild-patched"
 git clone --depth 1 https://github.com/NWChemEx-Project/CMakeBuild.git "${CMSB_SRC_DIR}"
-git -C "${CMSB_SRC_DIR}" apply --verbose "${SCRIPT_DIR}/patches/cmsb-fix-blas-lapack-reuse.patch"
-git -C "${CMSB_SRC_DIR}" apply --verbose "${SCRIPT_DIR}/patches/cmsb-fix-spdlog-ecpint-reuse.patch"
-git -C "${CMSB_SRC_DIR}" apply --verbose "${SCRIPT_DIR}/patches/cmsb-fix-njson-reuse.patch"
+git -C "${CMSB_SRC_DIR}" apply --verbose "${SCRIPT_DIR}/patches/cmsb-fix-dependency-reuse.patch"
 
 COMMON_CMAKE_ARGS=(
   -DCMAKE_BUILD_TYPE=Release
