@@ -28,7 +28,7 @@ The table below summarizes which [optional extras](https://github.com/microsoft/
 | `time_evolve_and_measure.ipynb` | `pip install 'qdk-chemistry[jupyter]'` |
 | `estimation_ising_2d.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
 | `extended_hubbard.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
-| `factory_list.ipynb` | `pip install 'qdk-chemistry[plugins]'` |
+| `factory_list.ipynb` | `pip install 'qdk-chemistry[jupyter,plugins]'` |
 | `interoperability/pennylane/` | `pip install pennylane` |
 | `interoperability/qiskit/` | `pip install 'qdk-chemistry[qiskit-extras]'` |
 | `interoperability/openFermion/` | `pip install 'qdk-chemistry[openfermion-extras]'` |
