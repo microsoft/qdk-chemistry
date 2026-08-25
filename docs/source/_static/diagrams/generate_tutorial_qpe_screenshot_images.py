@@ -25,14 +25,14 @@ CIRCUIT_SCREENSHOTS = (
     "tutorial_qpe_power_one_circuit_overview.png",
 )
 
-CIRCUIT_BACKGROUND = 248
+CIRCUIT_BACKGROUND = 255
 MIN_NEUTRAL_VALUE = 200
 MAX_NEUTRAL_SPREAD = 5
 MIN_BACKGROUND_COMPONENT_AREA = 1000
 
 
 def replace_circuit_background(image: Image.Image) -> Image.Image:
-    """Replace large white screenshot regions with a light-gray background."""
+    """Normalize large neutral screenshot regions to the circuit background."""
     rgb = np.asarray(image.convert("RGB")).copy()
     neutral = (rgb.min(axis=2) >= MIN_NEUTRAL_VALUE) & (
         (rgb.max(axis=2) - rgb.min(axis=2)) <= MAX_NEUTRAL_SPREAD

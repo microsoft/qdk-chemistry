@@ -3,7 +3,7 @@ digraph TutorialQpeOrbitalPartition {
     nodesep=0.45;
     overlap=false;
     pad=0.2;
-    bgcolor="#FAFAFA";
+    bgcolor="#FFFFFF";
 
     node [shape=box, style="rounded,filled", fontname="Arial", width=3.1, height=1.2, margin=0.2];
 

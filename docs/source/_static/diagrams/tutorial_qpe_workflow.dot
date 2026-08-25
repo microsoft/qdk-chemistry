@@ -7,7 +7,7 @@ digraph TutorialQpeWorkflow {
     overlap=false;
     splines=spline;
     pad=0.2;
-    bgcolor="#FAFAFA";
+    bgcolor="#FFFFFF";
 
     node [shape=box, style="rounded,filled", fontname="Arial", width=2.8, height=0.9, margin="0.20,0.16"];
     edge [penwidth=2.5, arrowsize=1.0];

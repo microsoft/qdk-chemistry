@@ -5,12 +5,12 @@
  -->
 <!-- Title: TutorialQpeWorkflow Pages: 1 -->
 <svg width="1002pt" height="539pt"
- viewBox="0.00 0.00 1002.00 539.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" role="img" aria-labelledby="tutorial-qpe-workflow-title tutorial-qpe-workflow-desc" data-source-sha256="71c34eaed477fc6a4ad17950e545f5cf6413dd862d06b2fa24cbc88f638d718e">
+ viewBox="0.00 0.00 1002.00 539.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" role="img" aria-labelledby="tutorial-qpe-workflow-title tutorial-qpe-workflow-desc" data-source-sha256="dd4c1655730b5cac40c481f79e3208fe852759b2713141d00983f9f9da344201">
 <title id="tutorial-qpe-workflow-title">Molecular QPE tutorial workflow</title>
 <desc id="tutorial-qpe-workflow-desc">Six-stage workflow. Define the energy target and matching classical reference; describe stretched nitrogen and select its correlated active space; map that model to qubits and prepare a trial state; estimate the active energy with IQPE; then add the core energy and compare the reconstructed total with the matching CASCI reference.</desc>
 <g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(14.4 524.35)">
 <title>TutorialQpeWorkflow</title>
-<polygon fill="#fafafa" stroke="none" points="-14.4,14.4 -14.4,-524.35 987.4,-524.35 987.4,14.4 -14.4,14.4"/>
+<polygon fill="#ffffff" stroke="none" points="-14.4,14.4 -14.4,-524.35 987.4,-524.35 987.4,14.4 -14.4,14.4"/>
 <g id="clust1" class="cluster">
 <title>cluster_goal</title>
 <path fill="#e8eaf6" stroke="#5c6bc0" stroke-width="2.5" d="M20,-397.4C20,-397.4 234,-397.4 234,-397.4 240,-397.4 246,-403.4 246,-409.4 246,-409.4 246,-489.95 246,-489.95 246,-495.95 240,-501.95 234,-501.95 234,-501.95 20,-501.95 20,-501.95 14,-501.95 8,-495.95 8,-489.95 8,-489.95 8,-409.4 8,-409.4 8,-403.4 14,-397.4 20,-397.4"/>

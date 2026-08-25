@@ -5,12 +5,12 @@
  -->
 <!-- Title: TutorialQpeWavefunctionHierarchy Pages: 1 -->
 <svg width="1145pt" height="386pt"
- viewBox="0.00 0.00 1145.00 386.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" role="img" aria-labelledby="tutorial-qpe-wavefunction-hierarchy-title tutorial-qpe-wavefunction-hierarchy-desc" data-source-sha256="0917455d27c36966318fcc0864b4020a5179ba8dd479ccb798a1d164cde80aa0">
+ viewBox="0.00 0.00 1145.00 386.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" role="img" aria-labelledby="tutorial-qpe-wavefunction-hierarchy-title tutorial-qpe-wavefunction-hierarchy-desc" data-source-sha256="9415a0f3ec64bf26409eddac2242d2ac1d7539d01b66793c213c0ad1f21cae87">
 <title id="tutorial-qpe-wavefunction-hierarchy-title">Wavefunction representation hierarchy</title>
 <desc id="tutorial-qpe-wavefunction-hierarchy-desc">Flow from one-electron functions to many-electron wavefunctions. Nucleus-centered basis functions combine into spatial molecular orbitals; pairing a spatial orbital with alpha or beta spin gives a spin orbital. Choosing occupied spin orbitals defines an electron configuration, and its antisymmetric state is a Slater determinant. Hartree--Fock uses one optimized determinant, while a multiconfigurational wavefunction combines several determinants with coefficients.</desc>
 <g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(14.4 371.3)">
 <title>TutorialQpeWavefunctionHierarchy</title>
-<polygon fill="#fafafa" stroke="none" points="-14.4,14.4 -14.4,-371.3 1130.4,-371.3 1130.4,14.4 -14.4,14.4"/>
+<polygon fill="#ffffff" stroke="none" points="-14.4,14.4 -14.4,-371.3 1130.4,-371.3 1130.4,14.4 -14.4,14.4"/>
 <g id="clust1" class="cluster">
 <title>cluster_one_electron</title>
 <path fill="#e8eaf6" stroke="#5c6bc0" stroke-width="2.5" d="M20,-244.35C20,-244.35 543,-244.35 543,-244.35 549,-244.35 555,-250.35 555,-256.35 555,-256.35 555,-336.9 555,-336.9 555,-342.9 549,-348.9 543,-348.9 543,-348.9 20,-348.9 20,-348.9 14,-348.9 8,-342.9 8,-336.9 8,-336.9 8,-256.35 8,-256.35 8,-250.35 14,-244.35 20,-244.35"/>

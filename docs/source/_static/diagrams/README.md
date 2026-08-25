@@ -16,13 +16,13 @@ python docs/source/_static/diagrams/generate_tutorial_qpe_orbital_entropy.py
 python docs/source/_static/diagrams/generate_tutorial_qpe_graphviz.py
 ```
 
-The two plot scripts save their figures as PNGs on light-gray canvases so fixed dark
-labels remain readable in light and dark documentation themes. The phase-grid
-script also regenerates `tutorial_qpe_phase_grid_table.rst`. The Graphviz script
-creates committed SVGs from the tutorial DOT sources, adds accessible titles and
+The two plot scripts save their figures as SVGs on white canvases. Their
+`PLOT_BACKGROUND` constants control that shared color. The phase-grid script also
+regenerates `tutorial_qpe_phase_grid_table.rst`. The Graphviz script creates
+committed SVGs from the tutorial DOT sources, adds accessible titles and
 descriptions from the authored figure text, and records each source hash so stale
-outputs are detected by tests. The SVGs use opaque light canvases for predictable
-contrast in light and dark documentation themes.
+outputs are detected by tests. Each DOT file controls its opaque canvas with its
+top-level `bgcolor` attribute, currently `#FFFFFF`.
 
 ## Orbital renders
 
@@ -42,10 +42,10 @@ antialiased edges and dark surface contours are preserved.
 ## Logical circuits
 
 The original widget screenshots are retained under
-`docs/figure_sources/ground_state_qpe`. The screenshot generator replaces large
-neutral background regions with light gray while preserving white labels and
-small gate details. The resulting opaque PNGs remain readable against light and
-dark documentation themes.
+`docs/figure_sources/ground_state_qpe`. The screenshot generator normalizes large
+neutral background regions to the white `CIRCUIT_BACKGROUND` value while
+preserving white labels and small gate details. The resulting PNGs retain the
+original opaque presentation.
 
 QDK/Chemistry obtains circuit data from QDK and displays it interactively with
 `qdk.widgets.Circuit`. The widget does not currently provide a supported Python

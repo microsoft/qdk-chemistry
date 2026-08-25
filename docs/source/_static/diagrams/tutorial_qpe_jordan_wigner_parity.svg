@@ -5,12 +5,12 @@
  -->
 <!-- Title: TutorialQpeJordanWignerParity Pages: 1 -->
 <svg width="533pt" height="480pt"
- viewBox="0.00 0.00 533.00 480.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" role="img" aria-labelledby="tutorial-qpe-jordan-wigner-parity-title tutorial-qpe-jordan-wigner-parity-desc" data-source-sha256="c4ef7b73232505af929dc71118adb8559988124b0a1abb23862e489101e9896b">
+ viewBox="0.00 0.00 533.00 480.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" role="img" aria-labelledby="tutorial-qpe-jordan-wigner-parity-title tutorial-qpe-jordan-wigner-parity-desc" data-source-sha256="dd0dee281ff5ad79f58dc18532e16305f591c272cd723d99c552e7fb39751018">
 <title id="tutorial-qpe-jordan-wigner-parity-title">Jordan-Wigner parity mapping</title>
 <desc id="tutorial-qpe-jordan-wigner-parity-desc">Worked Jordan--Wigner mapping for target active spin orbital p equals 3, also called fermionic mode 3. Modes 0, 1, and 2 map to qubits ell 0, ell 1, and ell 2 and contribute the parity string Z ell 0 times Z ell 1 times Z ell 2. Its eigenvalue is negative when an odd number of those lower modes is occupied. Target qubit ell 3 carries the X minus iY creation action or X plus iY annihilation action. Multiplying target action by parity string preserves the fermionic ordering sign.</desc>
 <g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(14.4 465.35)">
 <title>TutorialQpeJordanWignerParity</title>
-<polygon fill="#fafafa" stroke="none" points="-14.4,14.4 -14.4,-465.35 518.4,-465.35 518.4,14.4 -14.4,14.4"/>
+<polygon fill="#ffffff" stroke="none" points="-14.4,14.4 -14.4,-465.35 518.4,-465.35 518.4,14.4 -14.4,14.4"/>
 <!-- Ordering -->
 <g id="node1" class="node">
 <title>Ordering</title>

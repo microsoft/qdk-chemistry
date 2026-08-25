@@ -5,12 +5,12 @@
  -->
 <!-- Title: TutorialQpeOrbitalPartition Pages: 1 -->
 <svg width="802pt" height="171pt"
- viewBox="0.00 0.00 802.00 171.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" role="img" aria-labelledby="tutorial-qpe-orbital-partition-title tutorial-qpe-orbital-partition-desc" data-source-sha256="044d8c37c081dcc8794300158aa322d519e8bcb2b6d638208c0390f276e7374e">
+ viewBox="0.00 0.00 802.00 171.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" role="img" aria-labelledby="tutorial-qpe-orbital-partition-title tutorial-qpe-orbital-partition-desc" data-source-sha256="6123ab17799c1dad56d79fc7e8221e90dfd60651222c6892c843a8819031ddb7">
 <title id="tutorial-qpe-orbital-partition-title">Active-space orbital partition</title>
 <desc id="tutorial-qpe-orbital-partition-desc">The spatial molecular orbitals are partitioned into inactive orbitals that remain doubly occupied and contribute to the core energy, active orbitals whose occupations vary among determinants and whose correlation is treated explicitly, and virtual orbitals that remain empty and are excluded from the correlated calculation.</desc>
 <g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(14.4 156.4)">
 <title>TutorialQpeOrbitalPartition</title>
-<polygon fill="#fafafa" stroke="none" points="-14.4,14.4 -14.4,-156.4 788,-156.4 788,14.4 -14.4,14.4"/>
+<polygon fill="#ffffff" stroke="none" points="-14.4,14.4 -14.4,-156.4 788,-156.4 788,14.4 -14.4,14.4"/>
 <g id="clust1" class="cluster">
 <title>cluster_orbitals</title>
 <path fill="#e8eaf6" stroke="#5c6bc0" stroke-width="2.5" d="M20,-8C20,-8 753.6,-8 753.6,-8 759.6,-8 765.6,-14 765.6,-20 765.6,-20 765.6,-122 765.6,-122 765.6,-128 759.6,-134 753.6,-134 753.6,-134 20,-134 20,-134 14,-134 8,-128 8,-122 8,-122 8,-20 8,-20 8,-14 14,-8 20,-8"/>

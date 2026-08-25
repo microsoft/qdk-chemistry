@@ -7,14 +7,22 @@
 
 from pathlib import Path
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+
+from tutorial_qpe_svg import (
+    add_accessibility_metadata,
+    figure_descriptions,
+    source_sha256,
+)
 
 REFERENCE_ENERGY_HARTREE = -9.653276065987
 TARGET_OFFSET_HARTREE = 1e-3
 NUM_PHASE_BITS = 6
 SELECTED_GRID_INDEX = 16
-PLOT_BACKGROUND = "#F2F2F2"
+PLOT_BACKGROUND = "#FFFFFF"
+SVG_FILENAME = "tutorial_qpe_phase_wrapping.svg"
 
 
 def phase_to_energy(phase_fraction: float, evolution_time: float) -> float:
@@ -165,15 +173,35 @@ def main() -> None:
     assert [index for index, _, _ in rows] == [17, None, 16, 15]
     assert np.isclose(rows[2][2] - rows[1][2], TARGET_OFFSET_HARTREE, atol=1e-12)
 
-    figures = {
-        "tutorial_qpe_phase_wrapping.png": generate_phase_wrapping_figure(
-            evolution_time
-        )
-    }
-    for filename, figure in figures.items():
-        output_path = Path(__file__).with_name(filename)
+    with mpl.rc_context(
+        {
+            "svg.fonttype": "path",
+            "svg.hashsalt": "qdk-chemistry-phase-wrapping",
+        }
+    ):
+        figure = generate_phase_wrapping_figure(evolution_time)
+        output_path = Path(__file__).with_name(SVG_FILENAME)
         figure.savefig(
-            output_path, dpi=200, bbox_inches="tight", facecolor=PLOT_BACKGROUND
+            output_path,
+            format="svg",
+            bbox_inches="tight",
+            facecolor=PLOT_BACKGROUND,
+            metadata={"Date": None},
+        )
+        plt.close(figure)
+        descriptions = figure_descriptions()
+        output_path.write_text(
+            add_accessibility_metadata(
+                output_path.read_text(encoding="utf-8"),
+                identifier="tutorial-qpe-phase-wrapping",
+                title="Signed phase-to-energy wrapping",
+                description=descriptions[SVG_FILENAME],
+                source_hash=source_sha256(
+                    Path(__file__),
+                    Path(__file__).with_name("tutorial_qpe_svg.py"),
+                ),
+            ),
+            encoding="utf-8",
         )
         print(f"Wrote {output_path}")
 

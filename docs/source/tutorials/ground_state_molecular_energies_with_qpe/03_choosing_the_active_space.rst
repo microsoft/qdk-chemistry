@@ -225,7 +225,7 @@ The selector then repartitions the orbitals according to the selected group:
    observed-result question. Showing the entropy gap is necessary to teach how
    autoCAS makes the selection, which outweighs preserving the answer as a surprise.
 
-.. figure:: /_static/diagrams/tutorial_qpe_orbital_entropy.png
+.. figure:: /_static/diagrams/tutorial_qpe_orbital_entropy.svg
    :alt: Entropy-ranked candidate orbitals. Selected orbitals 8, 7, 5, 6, 9, and 4 have entropies of approximately 0.966, 0.966, 0.964, 0.964, 0.554, and 0.548. Excluded orbitals 3 and 2 have entropies of approximately 0.030 and 0.022. A dashed vertical cut separates the sixth and seventh entropy ranks.
    :align: center
    :width: 90%

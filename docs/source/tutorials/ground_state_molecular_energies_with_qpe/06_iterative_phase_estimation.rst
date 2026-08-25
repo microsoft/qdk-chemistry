@@ -102,7 +102,7 @@ From zero through one half, the signed angle is nonnegative, so :math:`E=-\alpha
 Immediately above one half, the signed angle wraps from :math:`+\pi` to just above :math:`-\pi`; the corresponding energy jumps to just below :math:`+\pi/t` and then returns toward zero along the purple branch.
 At :math:`\varphi=1/2`, the lower filled point includes :math:`-\pi/t`, while the upper open point excludes the equivalent :math:`+\pi/t` representation.
 
-.. figure:: /_static/diagrams/tutorial_qpe_phase_wrapping.png
+.. figure:: /_static/diagrams/tutorial_qpe_phase_wrapping.svg
    :alt: Signed reconstructed energy plotted against phase fraction from zero to one. Phase fractions from zero through one half map from zero down to minus pi over t. Immediately above one half, the signed branch wraps to just below plus pi over t and returns toward zero as the phase approaches one. A neutral dashed guide connects the included minus pi over t point and excluded plus pi over t point at phase one half. A red bracket beside the plot spans their energy difference of two pi over t. Phase one wraps to phase zero.
    :align: center
    :width: 100%

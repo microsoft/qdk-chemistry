@@ -5,12 +5,12 @@
  -->
 <!-- Title: TutorialQpeIqpeIteration Pages: 1 -->
 <svg width="587pt" height="891pt"
- viewBox="0.00 0.00 587.00 891.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" role="img" aria-labelledby="tutorial-qpe-iqpe-iteration-title tutorial-qpe-iqpe-iteration-desc" data-source-sha256="3085d5959ff92ce56fc907a93b4786548799e62ec6108c6995ea36784ca69e4f">
+ viewBox="0.00 0.00 587.00 891.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" role="img" aria-labelledby="tutorial-qpe-iqpe-iteration-title tutorial-qpe-iqpe-iteration-desc" data-source-sha256="3865f64861f7e60b87e1a662561297a86b0c8ac923b1f85d1017d4966fb6af55">
 <title id="tutorial-qpe-iqpe-iteration-title">Iterative phase-estimation iteration</title>
 <desc id="tutorial-qpe-iqpe-iteration-desc">Flow through one IQPE iteration. In parallel, freshly prepare the molecular trial state on the compute register and a Hadamard superposition on a new readout ancilla. Rotate the ancilla using feedback from earlier measured bits, then use it to control this iteration's time-evolution power on the compute register. Apply a final Hadamard gate and measure the ancilla for one shot. Repeat with fresh registers for an odd number of shots; their majority selects phase bit b sub k. Use that bit to update the classical feedback angle and continue to iteration k plus 1.</desc>
 <g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(14.4 876.6)">
 <title>TutorialQpeIqpeIteration</title>
-<polygon fill="#fafafa" stroke="none" points="-14.4,14.4 -14.4,-876.6 572.6,-876.6 572.6,14.4 -14.4,14.4"/>
+<polygon fill="#ffffff" stroke="none" points="-14.4,14.4 -14.4,-876.6 572.6,-876.6 572.6,14.4 -14.4,14.4"/>
 <!-- Compute -->
 <g id="node1" class="node">
 <title>Compute</title>
