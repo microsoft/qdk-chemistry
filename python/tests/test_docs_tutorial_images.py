@@ -111,7 +111,13 @@ def test_graphviz_sources_generate_accessible_svg_figures():
         dot_path = DIAGRAMS_DIR / dot_name
         dot_source = dot_path.read_text(encoding="utf-8")
         assert 'bgcolor="#FFFFFF"' in dot_source
-        if dot_name != "tutorial_qpe_wavefunction_hierarchy.dot":
+        if dot_name == "tutorial_qpe_wavefunction_hierarchy.dot":
+            assert "χ[μ]" not in dot_source
+            assert "Φ(HF)" not in dot_source
+            assert 'χ&#160;<SUB><FONT POINT-SIZE="9">μ</FONT></SUB>' in dot_source
+            assert 'Φ&#160;<SUB><FONT POINT-SIZE="9">HF</FONT></SUB>' in dot_source
+            assert dot_source.count("<SUB>") == 2
+        else:
             assert "<SUB>" not in dot_source
         alt_match = ALT_PATTERN.search(match.group("options"))
         assert alt_match is not None, f"{rst_path}: {svg_name}"
