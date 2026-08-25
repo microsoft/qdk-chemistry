@@ -94,12 +94,15 @@ def _make_wavefunction(amplitudes: list[float]) -> Wavefunction:
 def _alias_atol(num_coefficients: int, bits_precision: int) -> float:
     """Tolerance on a marginal probability for an L-term, mu-bit alias table.
 
-    The keep values quantize each bar of the alias table to a multiple of 2^-mu, and every
-    index draws from one bar of height 1/L, so the error on a single probability is bounded
-    by roughly 1.5 / (L 2^mu); the constant is rounded up to 2 so that a tie-breaking
-    difference when the classical table is rounded cannot flake the suite. Using the flat
-    2^-mu that the setting's description quotes would leave the assertion a factor of L too
-    loose to notice a wrong ``bits_precision``.
+    Babbush et al. (arXiv:1805.03662) Eq. (35) bounds the per-coefficient error on the
+    normalized probability by 1 / (L 2^mu), and their Eq. (39) makes each prepared
+    probability an exact multiple of that same quantum, so one differently-resolved tie in
+    the classical table's rounding moves a coefficient by a full step. This implementation
+    also pads the index register to a power of two, which the reference construction does
+    not, and measurement shows up to 1.24x the reference bound at the worst padding ratio.
+    The constant is therefore 2 rather than 1, which still rejects a wrong
+    ``bits_precision``; the flat 2^-mu that the setting's description quotes would be a
+    factor of L too loose to do so.
     """
     return 2.0 / (num_coefficients * 2**bits_precision)
 
