@@ -10,6 +10,7 @@
 
 #include "factory_bindings.hpp"
 #include "qdk/chemistry/algorithms/microsoft/localization/active_space_qio.hpp"
+#include "qdk/chemistry/algorithms/microsoft/localization/gauge_fixing.hpp"
 #include "qdk/chemistry/algorithms/microsoft/localization/mp2_natural_orbitals.hpp"
 #include "qdk/chemistry/algorithms/microsoft/localization/natural_orbitals.hpp"
 #include "qdk/chemistry/algorithms/microsoft/localization/pipek_mezey.hpp"
@@ -336,6 +337,37 @@ See Also:
 Default constructor.
 
 Initializes a natural orbital transformer with default settings.
+
+)");
+
+  // Bind concrete microsoft::GaugeFixingLocalizer implementation
+  py::class_<microsoft::GaugeFixingLocalizer, Localizer, py::smart_holder>(
+      m, "QdkGaugeFixingLocalizer", R"(
+QDK gauge-fixing orbital localizer.
+
+Orbitals with equal occupation numbers span a well-defined subspace without
+being uniquely determined within it. This class resolves that freedom
+deterministically, using bounded coordinate-descent sweeps to reduce the mapped
+Hamiltonian coefficient 1-norm ``lambda = sum_l |h_l|``, which sets the evolution
+time in phase estimation and the normalization of a linear-combination-of-unitaries
+block encoding.
+
+.. note::
+    Requires restricted orbitals, an active space, an overlap matrix, and a
+    spin-traced active 1-RDM that is diagonal in the input orbital basis, which
+    is what :class:`QdkNaturalOrbitalLocalizer` produces. Requires
+    ``loc_indices_a == loc_indices_b``, and those indices must be a subset of
+    the active-space indices that does not split a degenerate block.
+
+See Also:
+    :class:`OrbitalLocalizer`
+    :class:`QdkNaturalOrbitalLocalizer`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes a gauge-fixing localizer with default settings.
 
 )");
 
