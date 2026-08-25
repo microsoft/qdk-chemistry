@@ -1781,21 +1781,19 @@ TEST_F(HamiltonianTest,
     Eigen::MatrixXd target_overlap = source_overlap;
     target_overlap(2, 2) = 5.0e-11;
     auto source_orbitals = std::make_shared<Orbitals>(
-        source_coefficients, std::nullopt,
-        std::make_optional(source_overlap), basis_set, active_space,
-        inactive_space);
+        source_coefficients, std::nullopt, std::make_optional(source_overlap),
+        basis_set, active_space, inactive_space);
     auto target_orbitals = std::make_shared<Orbitals>(
-        target_coefficients, std::nullopt,
-        std::make_optional(target_overlap), basis_set, active_space,
-        inactive_space);
+        target_coefficients, std::nullopt, std::make_optional(target_overlap),
+        basis_set, active_space, inactive_space);
     auto source = std::make_shared<Hamiltonian>(
         std::make_unique<CholeskyHamiltonianContainer>(
             Eigen::Matrix2d::Identity(), Eigen::MatrixXd::Ones(4, 1),
             source_orbitals, 0.0, Eigen::MatrixXd{}));
 
     try {
-      HamiltonianBasisTransformerFactory::create("qdk")->run(
-          source, target_orbitals);
+      HamiltonianBasisTransformerFactory::create("qdk")->run(source,
+                                                             target_orbitals);
       FAIL() << "Expected target-metric null-mode amplification to be rejected";
     } catch (const std::invalid_argument& error) {
       EXPECT_NE(std::string(error.what()).find("target AO metric"),
