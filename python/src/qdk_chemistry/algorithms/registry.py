@@ -720,7 +720,6 @@ def _register_cpp_factories():
         EffectiveHamiltonianConstructorFactory,
         GeometryOptimizerFactory,
         HamiltonianConstructorFactory,
-        HamiltonianRegularizerFactory,
         LocalizerFactory,
         MultiConfigurationCalculatorFactory,
         MultiConfigurationScfFactory,
@@ -729,6 +728,7 @@ def _register_cpp_factories():
         ProjectedMultiConfigurationCalculatorFactory,
         ScfSolverFactory,
         StabilityCheckerFactory,
+        SymmetryShifterFactory,
     )
 
     register_factory(ActiveSpaceSelectorFactory)
@@ -736,7 +736,6 @@ def _register_cpp_factories():
     register_factory(EffectiveHamiltonianConstructorFactory)
     register_factory(GeometryOptimizerFactory)
     register_factory(HamiltonianConstructorFactory)
-    register_factory(HamiltonianRegularizerFactory)
     register_factory(LocalizerFactory)
     register_factory(MultiConfigurationCalculatorFactory)
     register_factory(MultiConfigurationScfFactory)
@@ -745,6 +744,7 @@ def _register_cpp_factories():
     register_factory(ProjectedMultiConfigurationCalculatorFactory)
     register_factory(ScfSolverFactory)
     register_factory(StabilityCheckerFactory)
+    register_factory(SymmetryShifterFactory)
 
 
 def _register_python_factories():

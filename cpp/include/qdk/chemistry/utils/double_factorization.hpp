@@ -41,7 +41,7 @@ struct TwoBodyFragment {
 /// This is a standalone diagnostic/analysis utility: it does not require an
 /// Algorithm/Settings/Factory instance and can be called directly (e.g. by
 /// qdk::chemistry::utils::hamiltonian_one_norm(), or by algorithms such as
-/// qdk::chemistry::algorithms::HamiltonianRegularizer implementations that
+/// qdk::chemistry::algorithms::SymmetryShifter implementations that
 /// need low-rank two-electron fragments).
 ///
 /// @param two_body_integrals Flattened g_ijkl tensor, size norb^4.

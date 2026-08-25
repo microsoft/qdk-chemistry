@@ -7,7 +7,6 @@
 #include <qdk/chemistry/algorithms/effective_hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/geometry_optimization.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
-#include <qdk/chemistry/algorithms/hamiltonian_regularizer.hpp>
 #include <qdk/chemistry/algorithms/localization.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/mcscf.hpp>
@@ -16,6 +15,7 @@
 #include <qdk/chemistry/algorithms/population_analysis.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/algorithms/stability.hpp>
+#include <qdk/chemistry/algorithms/symmetry_shift.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/lattice_graph.hpp>
 #include <qdk/chemistry/data/nuclear_gradients.hpp>

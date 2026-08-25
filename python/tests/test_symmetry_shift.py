@@ -1,4 +1,4 @@
-"""Tests for the HamiltonianRegularizer (fermionic low-rank BLISS) algorithm."""
+"""Tests for the SymmetryShifter (fermionic low-rank BLISS) algorithm."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry import algorithms
-from qdk_chemistry.algorithms import rebuild_bliss_shifted_hamiltonian
+from qdk_chemistry.algorithms import rebuild_shifted_hamiltonian
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import Structure
 from qdk_chemistry.utils import double_factorize, hamiltonian_one_norm
@@ -49,30 +49,30 @@ def water_hamiltonian():
     return ham_constructor.run(wfn_hf.get_orbitals())
 
 
-class TestHamiltonianRegularizerFactory:
+class TestSymmetryShifterFactory:
     """Test factory registration and settings hygiene."""
 
     def test_factory(self):
-        available = algorithms.available("hamiltonian_regularizer")
+        available = algorithms.available("symmetry_shifter")
         assert isinstance(available, list)
         assert "fermionic_low_rank" in available
 
-        regularizer = algorithms.create("hamiltonian_regularizer")
-        assert regularizer is not None
-        assert regularizer.name() == "fermionic_low_rank"
+        shifter = algorithms.create("symmetry_shifter")
+        assert shifter is not None
+        assert shifter.name() == "fermionic_low_rank"
 
-        regularizer_named = algorithms.create("hamiltonian_regularizer", "fermionic_low_rank")
-        assert regularizer_named.name() == "fermionic_low_rank"
+        shifter_named = algorithms.create("symmetry_shifter", "fermionic_low_rank")
+        assert shifter_named.name() == "fermionic_low_rank"
 
         with pytest.raises(KeyError):
-            algorithms.create("hamiltonian_regularizer", "nonexistent")
+            algorithms.create("symmetry_shifter", "nonexistent")
 
     def test_default_truncation_threshold_is_zero(self):
-        regularizer = algorithms.create("hamiltonian_regularizer", "fermionic_low_rank")
-        assert regularizer.settings().get("df_truncation_threshold") == 0.0
+        shifter = algorithms.create("symmetry_shifter", "fermionic_low_rank")
+        assert shifter.settings().get("df_truncation_threshold") == 0.0
 
 
-class TestHamiltonianRegularizerCorrectness:
+class TestSymmetryShifterCorrectness:
     """Physics correctness tests: energy invariance and 1-norm reduction."""
 
     def test_energy_invariant_under_shift(self, water_hamiltonian):
@@ -81,9 +81,9 @@ class TestHamiltonianRegularizerCorrectness:
         e_before, _ = mc.run(water_hamiltonian, 5, 5)
 
         for threshold in (0.0, 1e-6):
-            regularizer = algorithms.create("hamiltonian_regularizer", "fermionic_low_rank")
-            regularizer.settings().set("df_truncation_threshold", threshold)
-            shifted_ham = regularizer.run(water_hamiltonian, 5, 5)
+            shifter = algorithms.create("symmetry_shifter", "fermionic_low_rank")
+            shifter.settings().set("df_truncation_threshold", threshold)
+            shifted_ham = shifter.run(water_hamiltonian, 5, 5)
             assert shifted_ham is not None
 
             mc_after = algorithms.create("multi_configuration_calculator", "macis_cas")
@@ -99,22 +99,22 @@ class TestHamiltonianRegularizerCorrectness:
     def test_reduces_one_norm(self, water_hamiltonian):
         norm_before = hamiltonian_one_norm(water_hamiltonian, 0.0)
 
-        regularizer = algorithms.create("hamiltonian_regularizer", "fermionic_low_rank")
-        shifted_ham = regularizer.run(water_hamiltonian, 5, 5)
+        shifter = algorithms.create("symmetry_shifter", "fermionic_low_rank")
+        shifted_ham = shifter.run(water_hamiltonian, 5, 5)
 
         norm_after = hamiltonian_one_norm(shifted_ham, 0.0)
 
         assert norm_after.total <= norm_before.total + 1e-10
 
     def test_compute_shift_then_rebuild_matches_run(self, water_hamiltonian):
-        """compute_shift() + rebuild_bliss_shifted_hamiltonian() must reproduce run()."""
-        regularizer = algorithms.create("hamiltonian_regularizer", "fermionic_low_rank")
-        shifted_run = regularizer.run(water_hamiltonian, 5, 5)
+        """compute_shift() + rebuild_shifted_hamiltonian() must reproduce run()."""
+        shifter = algorithms.create("symmetry_shifter", "fermionic_low_rank")
+        shifted_run = shifter.run(water_hamiltonian, 5, 5)
         assert shifted_run is not None
 
-        regularizer2 = algorithms.create("hamiltonian_regularizer", "fermionic_low_rank")
-        shift = regularizer2.compute_shift(water_hamiltonian, 5, 5)
-        shifted_manual = rebuild_bliss_shifted_hamiltonian(water_hamiltonian, shift, 10)
+        shifter2 = algorithms.create("symmetry_shifter", "fermionic_low_rank")
+        shift = shifter2.compute_shift(water_hamiltonian, 5, 5)
+        shifted_manual = rebuild_shifted_hamiltonian(water_hamiltonian, shift, 10)
         assert shifted_manual is not None
 
         h_run = shifted_run.get_one_body_integrals()[0]

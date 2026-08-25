@@ -5,7 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
-#include <qdk/chemistry/algorithms/hamiltonian_regularizer.hpp>
+#include <qdk/chemistry/algorithms/symmetry_shift.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/utils/hamiltonian_one_norm.hpp>
@@ -14,33 +14,33 @@
 
 using namespace qdk::chemistry::algorithms;
 
-class HamiltonianRegularizerTest : public ::testing::Test {};
+class SymmetryShiftTest : public ::testing::Test {};
 
-TEST_F(HamiltonianRegularizerTest, FactoryHygiene) {
-  auto available = HamiltonianRegularizerFactory::available();
+TEST_F(SymmetryShiftTest, FactoryHygiene) {
+  auto available = SymmetryShifterFactory::available();
   EXPECT_TRUE(std::find(available.begin(), available.end(),
                         "fermionic_low_rank") != available.end());
 
-  auto regularizer = HamiltonianRegularizerFactory::create();
-  EXPECT_EQ(regularizer->name(), "fermionic_low_rank");
-  EXPECT_EQ(regularizer->type_name(), "hamiltonian_regularizer");
+  auto shifter = SymmetryShifterFactory::create();
+  EXPECT_EQ(shifter->name(), "fermionic_low_rank");
+  EXPECT_EQ(shifter->type_name(), "symmetry_shifter");
 
-  auto regularizer_named =
-      HamiltonianRegularizerFactory::create("fermionic_low_rank");
-  EXPECT_EQ(regularizer_named->name(), "fermionic_low_rank");
+  auto shifter_named =
+      SymmetryShifterFactory::create("fermionic_low_rank");
+  EXPECT_EQ(shifter_named->name(), "fermionic_low_rank");
 
-  EXPECT_THROW(HamiltonianRegularizerFactory::create("nonexistent"),
+  EXPECT_THROW(SymmetryShifterFactory::create("nonexistent"),
                std::runtime_error);
 }
 
-TEST_F(HamiltonianRegularizerTest, DefaultTruncationThresholdIsZero) {
-  auto regularizer =
-      HamiltonianRegularizerFactory::create("fermionic_low_rank");
+TEST_F(SymmetryShiftTest, DefaultTruncationThresholdIsZero) {
+  auto shifter =
+      SymmetryShifterFactory::create("fermionic_low_rank");
   EXPECT_DOUBLE_EQ(
-      regularizer->settings().get<double>("df_truncation_threshold"), 0.0);
+      shifter->settings().get<double>("df_truncation_threshold"), 0.0);
 }
 
-TEST_F(HamiltonianRegularizerTest, ThrowsOnUnrestrictedHamiltonian) {
+TEST_F(SymmetryShiftTest, ThrowsOnUnrestrictedHamiltonian) {
   auto h_atom = testing::create_hydrogen_structure();
   auto scf_solver = ScfSolverFactory::create();
   scf_solver->settings().set("scf_type", std::string("auto"));
@@ -51,9 +51,9 @@ TEST_F(HamiltonianRegularizerTest, ThrowsOnUnrestrictedHamiltonian) {
   auto ham = hamiltonian_constructor->run(wfn_HF->get_orbitals());
   ASSERT_FALSE(ham->is_restricted());
 
-  auto regularizer =
-      HamiltonianRegularizerFactory::create("fermionic_low_rank");
-  EXPECT_THROW(regularizer->run(ham, 1, 0), std::invalid_argument);
+  auto shifter =
+      SymmetryShifterFactory::create("fermionic_low_rank");
+  EXPECT_THROW(shifter->run(ham, 1, 0), std::invalid_argument);
 }
 
 /**
@@ -63,7 +63,7 @@ TEST_F(HamiltonianRegularizerTest, ThrowsOnUnrestrictedHamiltonian) {
  * energies agree to within the standard CI energy tolerance, both at the
  * default (no-truncation) setting and with an explicit truncation threshold.
  */
-TEST_F(HamiltonianRegularizerTest, Water_STO3G_EnergyInvariantUnderShift) {
+TEST_F(SymmetryShiftTest, Water_STO3G_EnergyInvariantUnderShift) {
   auto water = testing::create_water_structure();
   auto scf_solver = ScfSolverFactory::create();
   auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
@@ -75,10 +75,10 @@ TEST_F(HamiltonianRegularizerTest, Water_STO3G_EnergyInvariantUnderShift) {
   auto [E_before, wfn_before] = mc->run(ham, 5, 5);
 
   for (const double threshold : {0.0, 1e-6}) {
-    auto regularizer =
-        HamiltonianRegularizerFactory::create("fermionic_low_rank");
-    regularizer->settings().set("df_truncation_threshold", threshold);
-    auto shifted_ham = regularizer->run(ham, 5, 5);
+    auto shifter =
+        SymmetryShifterFactory::create("fermionic_low_rank");
+    shifter->settings().set("df_truncation_threshold", threshold);
+    auto shifted_ham = shifter->run(ham, 5, 5);
     ASSERT_NE(shifted_ham, nullptr);
 
     auto mc_after = MultiConfigurationCalculatorFactory::create();
@@ -94,7 +94,7 @@ TEST_F(HamiltonianRegularizerTest, Water_STO3G_EnergyInvariantUnderShift) {
  * increase) the fermionic double-factorization 1-norm relative to the unshifted
  * Hamiltonian.
  */
-TEST_F(HamiltonianRegularizerTest, Water_STO3G_ReducesOneNorm) {
+TEST_F(SymmetryShiftTest, Water_STO3G_ReducesOneNorm) {
   auto water = testing::create_water_structure();
   auto scf_solver = ScfSolverFactory::create();
   auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
@@ -102,9 +102,9 @@ TEST_F(HamiltonianRegularizerTest, Water_STO3G_ReducesOneNorm) {
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   auto ham = hamiltonian_constructor->run(wfn_HF->get_orbitals());
 
-  auto regularizer =
-      HamiltonianRegularizerFactory::create("fermionic_low_rank");
-  auto shifted_ham = regularizer->run(ham, 5, 5);
+  auto shifter =
+      SymmetryShifterFactory::create("fermionic_low_rank");
+  auto shifted_ham = shifter->run(ham, 5, 5);
 
   auto norm_after =
       qdk::chemistry::utils::hamiltonian_one_norm(*shifted_ham, 0.0);
@@ -113,11 +113,11 @@ TEST_F(HamiltonianRegularizerTest, Water_STO3G_ReducesOneNorm) {
 }
 
 /**
- * @brief compute_shift() + rebuild_bliss_shifted_hamiltonian() must reproduce
- * run() exactly. This locks the refactor that split the regularizer into a
+ * @brief compute_shift() + rebuild_shifted_hamiltonian() must reproduce
+ * run() exactly. This locks the refactor that split the shifter into a
  * public shift-computation step and a public, shift-agnostic rebuild step.
  */
-TEST_F(HamiltonianRegularizerTest, ComputeShiftThenRebuildMatchesRun) {
+TEST_F(SymmetryShiftTest, ComputeShiftThenRebuildMatchesRun) {
   auto water = testing::create_water_structure();
   auto scf_solver = ScfSolverFactory::create();
   auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
@@ -125,15 +125,15 @@ TEST_F(HamiltonianRegularizerTest, ComputeShiftThenRebuildMatchesRun) {
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   auto ham = hamiltonian_constructor->run(wfn_HF->get_orbitals());
 
-  auto regularizer =
-      HamiltonianRegularizerFactory::create("fermionic_low_rank");
-  auto shifted_run = regularizer->run(ham, 5, 5);
+  auto shifter =
+      SymmetryShifterFactory::create("fermionic_low_rank");
+  auto shifted_run = shifter->run(ham, 5, 5);
   ASSERT_NE(shifted_run, nullptr);
 
-  auto regularizer2 =
-      HamiltonianRegularizerFactory::create("fermionic_low_rank");
-  auto shift = regularizer2->compute_shift(*ham, 5, 5);
-  auto shifted_manual = rebuild_bliss_shifted_hamiltonian(*ham, shift, 10u);
+  auto shifter2 =
+      SymmetryShifterFactory::create("fermionic_low_rank");
+  auto shift = shifter2->compute_shift(*ham, 5, 5);
+  auto shifted_manual = rebuild_shifted_hamiltonian(*ham, shift, 10u);
   ASSERT_NE(shifted_manual, nullptr);
 
   auto [h_run, h_run_beta] = shifted_run->get_one_body_integrals();
@@ -152,24 +152,4 @@ TEST_F(HamiltonianRegularizerTest, ComputeShiftThenRebuildMatchesRun) {
 
   EXPECT_NEAR(shifted_run->get_core_energy(), shifted_manual->get_core_energy(),
               1e-12);
-}
-
-/**
- * @brief An unknown shift_method must be rejected by compute_shift()/run().
- */
-TEST_F(HamiltonianRegularizerTest, ThrowsOnUnknownShiftMethod) {
-  auto water = testing::create_water_structure();
-  auto scf_solver = ScfSolverFactory::create();
-  auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
-
-  auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
-  auto ham = hamiltonian_constructor->run(wfn_HF->get_orbitals());
-
-  auto regularizer =
-      HamiltonianRegularizerFactory::create("fermionic_low_rank");
-  // The "shift_method" setting is constrained to the known methods, so an
-  // unknown value is rejected at set-time rather than deferred to run().
-  EXPECT_THROW(
-      regularizer->settings().set("shift_method", std::string("nonexistent")),
-      std::invalid_argument);
 }

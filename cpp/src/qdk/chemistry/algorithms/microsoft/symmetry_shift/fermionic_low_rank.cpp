@@ -2,16 +2,19 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include "fermionic_low_rank_regularizer.hpp"
+#include "fermionic_low_rank.hpp"
 
 #include <cstddef>
 #include <cstdint>
 #include <lapack.hh>
+#include <memory>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <string>
 
-namespace qdk::chemistry::algorithms::microsoft::fermionic_low_rank {
+#include "../../symmetry_shift_detail.hpp"
+
+namespace qdk::chemistry::algorithms::microsoft {
 
 namespace {
 
@@ -56,10 +59,10 @@ GlobalTwoBodyShift accumulate_fragment_shifts(
     // the low-1-norm shifted fragment as H^(a) + K^(a) (plus a 1-electron term
     // and a constant), i.e. the per-fragment BLISS operator is *added*. The
     // global operator is *subtracted* from H (H - K, Eq. 5), so the aggregated
-    // (mu2, xi) that rebuild_bliss_shifted_hamiltonian applies are the NEGATED
+    // (mu2, xi) that rebuild_shifted_hamiltonian applies are the NEGATED
     // sum of the per-fragment K^(a) parameters. (Fragments come from
     // double-factorizing the PHYSICAL coefficient 1/2 g, so mu2/xi are already
-    // on the correct scale for rebuild_bliss_shifted_hamiltonian.)
+    // on the correct scale for rebuild_shifted_hamiltonian.)
     result.mu2 -= fragment.sign * mu2_alpha;
     result.xi -= fragment.sign * (fragment.U * theta_alpha.asDiagonal() *
                                   fragment.U.transpose());
@@ -117,12 +120,10 @@ OneElectronShiftResult solve_one_electron_shift(
   result.lambda_1e_baseline = eigenvalues_baseline.array().abs().sum();
 
   // In-place: coulomb/exchange now hold the shifted contractions coul(g~)/
-  // exch(g~). See TwoBodyBlissCorrection (hamiltonian_regularizer.hpp) for the
-  // g~ definition and why this stays consistent with
-  // rebuild_bliss_shifted_hamiltonian's full tensor.
-  const TwoBodyBlissCorrection correction{mu2, xi};
-  correction.add_coulomb_contraction(coulomb);
-  correction.add_exchange_contraction(exchange);
+  // exch(g~). See symmetry_shift_detail.hpp for the g~ definition and why this
+  // stays consistent with rebuild_shifted_hamiltonian's full tensor.
+  detail::add_coulomb_contraction(coulomb, mu2, xi);
+  detail::add_exchange_contraction(exchange, mu2, xi);
 
   // Effective one-electron operator of H - K with mu1 = 0 (see header).
   const Eigen::MatrixXd h0 = h + (num_electrons - 1.0) * xi - mu2 * identity;
@@ -146,10 +147,11 @@ OneElectronShiftResult solve_one_electron_shift(
 }
 
 // ---------------------------------------------------------------------------
-// Top-level fermionic low-rank BLISS driver: wires steps 1-3 into a BlissShift.
+// Top-level fermionic low-rank BLISS driver: wires steps 1-3 into a
+// SymmetryShift.
 // ---------------------------------------------------------------------------
 
-BlissShift compute_fermionic_low_rank_shift(
+SymmetryShift compute_fermionic_low_rank_shift(
     const qdk::chemistry::data::Hamiltonian& hamiltonian,
     unsigned int n_alpha_electrons, unsigned int n_beta_electrons,
     double df_truncation_threshold) {
@@ -202,11 +204,50 @@ BlissShift compute_fermionic_low_rank_shift(
       one_electron.lambda_1e_baseline, one_electron.lambda_1e, one_electron.mu1,
       global_shift.mu2);
 
-  BlissShift shift;
+  SymmetryShift shift;
   shift.mu1 = one_electron.mu1;
   shift.mu2 = global_shift.mu2;
   shift.xi = global_shift.xi;
   return shift;
 }
 
-}  // namespace qdk::chemistry::algorithms::microsoft::fermionic_low_rank
+// ---------------------------------------------------------------------------
+// FermionicLowRankShifter: the SymmetryShifter implementation.
+// ---------------------------------------------------------------------------
+
+SymmetryShift FermionicLowRankShifter::compute_shift(
+    const data::Hamiltonian& hamiltonian, unsigned int n_alpha_electrons,
+    unsigned int n_beta_electrons) const {
+  QDK_LOG_TRACE_ENTERING();
+
+  if (!hamiltonian.is_restricted()) {
+    throw std::invalid_argument(
+        "FermionicLowRankShifter currently only supports restricted "
+        "(spin-restricted) Hamiltonians.");
+  }
+
+  const double df_truncation_threshold =
+      _settings->get<double>("df_truncation_threshold");
+
+  return compute_fermionic_low_rank_shift(hamiltonian, n_alpha_electrons,
+                                          n_beta_electrons,
+                                          df_truncation_threshold);
+}
+
+std::shared_ptr<data::Hamiltonian> FermionicLowRankShifter::_run_impl(
+    std::shared_ptr<data::Hamiltonian> hamiltonian,
+    unsigned int n_alpha_electrons, unsigned int n_beta_electrons) const {
+  QDK_LOG_TRACE_ENTERING();
+
+  if (!hamiltonian) {
+    throw std::invalid_argument("FermionicLowRankShifter: hamiltonian is null");
+  }
+
+  const SymmetryShift shift =
+      compute_shift(*hamiltonian, n_alpha_electrons, n_beta_electrons);
+  const unsigned int num_electrons = n_alpha_electrons + n_beta_electrons;
+
+  return rebuild_shifted_hamiltonian(*hamiltonian, shift, num_electrons);
+}
+
+}  // namespace qdk::chemistry::algorithms::microsoft

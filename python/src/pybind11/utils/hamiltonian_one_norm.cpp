@@ -33,7 +33,7 @@ restricted electronic Hamiltonian.
             This is a standalone diagnostic utility: it can be called directly
             on any qdk_chemistry.data.Hamiltonian without creating or
             configuring an Algorithm (e.g.
-            qdk_chemistry.algorithms.HamiltonianRegularizer). Users who only
+            qdk_chemistry.algorithms.SymmetryShifter). Users who only
             want to inspect the fermionic 1-norm of a Hamiltonian -- without
             necessarily also computing/applying a BLISS-style shift -- should
             call this function directly.

@@ -39,7 +39,7 @@ void bind_nuclear_derivative(py::module& m);
 void bind_population_analysis(py::module& m);
 void bind_geometry_optimization(py::module& m);
 void bind_active_space(py::module& m);
-void bind_hamiltonian_regularizer(py::module& m);
+void bind_symmetry_shift(py::module& m);
 void bind_constants(py::module& m);
 void bind_pmc(py::module& m);
 void bind_configuration(py::module& m);
@@ -114,7 +114,7 @@ PYBIND11_MODULE(_core, m) {
   bind_population_analysis(algorithms);
   bind_geometry_optimization(algorithms);
   bind_active_space(algorithms);
-  bind_hamiltonian_regularizer(algorithms);
+  bind_symmetry_shift(algorithms);
   bind_dynamical_correlation_calculator(algorithms);
   bind_pmc(algorithms);
   bind_stability(algorithms);

@@ -27,7 +27,7 @@ struct HamiltonianOneNorm {
 ///
 /// This is a standalone diagnostic utility: it can be called directly on any
 /// qdk::chemistry::data::Hamiltonian without creating or configuring an
-/// Algorithm (e.g. qdk::chemistry::algorithms::HamiltonianRegularizer). Users
+/// Algorithm (e.g. qdk::chemistry::algorithms::SymmetryShifter). Users
 /// who only want to inspect the fermionic 1-norm lambda of a Hamiltonian --
 /// without necessarily also computing/applying a BLISS-style shift -- should
 /// call this function directly.
@@ -51,7 +51,7 @@ struct HamiltonianOneNorm {
 ///
 /// NOTE ON CONVENTION: this decomposes the PHYSICAL coefficient V = 1/2 * g.
 /// qdk::chemistry::utils::double_factorize is elsewhere applied to the full
-/// tensor g (e.g. by HamiltonianRegularizer implementations), so the
+/// tensor g (e.g. by SymmetryShifter implementations), so the
 /// two_body value here is exactly half of that pipeline's aggregated
 /// lambda_df; both are internally consistent, but only V = 1/2 * g reproduces
 /// the electronic Hamiltonian exactly (and matches the paper's absolute
