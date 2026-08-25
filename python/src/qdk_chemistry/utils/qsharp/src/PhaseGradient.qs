@@ -28,13 +28,17 @@ namespace QDKChemistry.Utils.PhaseGradient {
     }
 
     /// # Summary
-    /// Applies Rz(θ) to a target qubit using phase gradient addition.
+    /// Applies Rz(-4π·x/2^b) to a target qubit using phase gradient addition.
     ///
     /// # Description
-    /// Implements Rz(4π·x/2^b) where x is the integer value stored in angleQubits
-    /// and b is the number of bits. Uses the CNOT-adder-CNOT pattern with
-    /// net effect: PGR += angle when target=|0⟩, PGR -= angle when target=|1⟩.
-    /// Cost: n Toffoli (adder) + 2b CNOTs.
+    /// x is the integer value stored in angleQubits and b is the number of bits.
+    /// The CNOT-adder-CNOT pattern adds x into the phase gradient register with a sign
+    /// set by the target, realizing diag(e^{+2πi·x/2^b}, e^{-2πi·x/2^b}). The overall sign
+    /// is opposite to Sanders et al. Appendix A; `RyViaPhaseGradient` absorbs it in its
+    /// basis change, so callers of that operation get a positive rotation.
+    /// Cost: b-1 CCZ and b-1 measurements (the adder) plus 2b CNOTs. Preparing and
+    /// unpreparing the phase gradient register is extra and is amortized when the register
+    /// is reused across rotations.
     ///
     /// # Input
     /// ## targetQubit
@@ -58,7 +62,7 @@ namespace QDKChemistry.Utils.PhaseGradient {
     }
 
     /// # Summary
-    /// Applies Ry(θ) to a target qubit using phase gradient addition.
+    /// Applies Ry(4π·x/2^b) to a target qubit using phase gradient addition.
     ///
     /// # Input
     /// ## targetQubit
@@ -100,27 +104,6 @@ namespace QDKChemistry.Utils.PhaseGradient {
             RyViaPhaseGradient(target[0], angle, pg);
         }
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Ancilla preparation helpers
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    /// Build an ancillaPrep callback that prepares the phase gradient state
-    /// on the last `numPhaseGradientQubits` qubits of the beAncillas array.
-    /// Returns a no-op when numPhaseGradientQubits == 0.
-    function MakePhaseGradientAncillaPrep(numPhaseGradientQubits : Int) : Qubit[] => Unit is Adj {
-        (beAncillas) => {
-            if numPhaseGradientQubits > 0 {
-                let n = Length(beAncillas);
-                let pgReg = beAncillas[n - numPhaseGradientQubits..n - 1];
-                PreparePhaseGradientState(pgReg);
-            }
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Test wrappers
-    // ═══════════════════════════════════════════════════════════════════════════
 
     /// Test wrapper: apply Ry then Adjoint Ry (round-trip identity check).
     internal operation TestRyRoundtrip(angleValue : Int, nBits : Int) : Unit {

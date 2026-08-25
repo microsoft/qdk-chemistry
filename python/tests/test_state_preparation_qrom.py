@@ -98,6 +98,22 @@ class TestQROMStatePreparation:
         assert circuit._qsharp_op is not None
         assert circuit._qsharp_factory is not None
 
+    def test_resource_counts(self):
+        """Pin the logical resource counts so a costing regression is visible.
+
+        Unlike alias sampling, the QROM path pays for rotations: the phase gradient register
+        is prepared once with a ladder of Rz rotations and then reused across all layers.
+        """
+        prep = QROMStatePreparation(rotation_bit_precision=4)
+        circuit = prep.run(_make_wavefunction([0.5, 0.3, 0.7, 0.1]))
+
+        lc = circuit.estimate()["logicalCounts"]
+        assert lc["numQubits"] == 14
+        assert lc["cczCount"] == 6
+        assert lc["tCount"] == 18
+        assert lc["rotationCount"] == 18
+        assert lc["measurementCount"] == 10
+
     @pytest.mark.parametrize("num_coefficients", range(3, 10, 3))
     def test_fidelity_random(self, qdk_ctx, num_coefficients):
         """Verify QROM state prep fidelity with random amplitudes.
@@ -105,6 +121,10 @@ class TestQROMStatePreparation:
         The SBM decomposition should prepare:
           |ψ⟩ = Σ_j (a_j / ||a||) |j⟩
         with quantized Ry rotations via phase gradient (bRot=10), so fidelity ≈ 1.
+
+        The tolerance is tight on purpose. At bRot=10 the measured infidelity is a few times
+        1e-6, while bRot=8 already costs 4e-5, so a loose bound like 1e-3 would pass even if
+        ``rotation_bit_precision`` were silently ignored.
         """
         rng = np.random.default_rng(seed=42 + num_coefficients)
         amplitudes = rng.uniform(0.01, 1.0, size=num_coefficients).tolist()
@@ -113,16 +133,29 @@ class TestQROMStatePreparation:
         expected = _build_expected_from_amplitudes(amplitudes, num_qubits)
 
         fidelity = abs(np.dot(np.conj(actual_sv), expected))
-        assert np.isclose(fidelity, 1.0, atol=1e-3)
+        assert np.isclose(fidelity, 1.0, atol=1e-5)
+
+    def test_precision_setting_reduces_error(self):
+        """Raising the rotation precision must measurably improve the prepared state."""
+        amplitudes = np.random.default_rng(seed=7).uniform(0.01, 1.0, size=6).tolist()
+        num_qubits = 3
+        expected = _build_expected_from_amplitudes(amplitudes, num_qubits)
+
+        infidelities = {}
+        for bits in (4, 10):
+            # Each simulation needs its own context; a reused one replays the previous state.
+            sv = _run_qrom_state_prep_and_dump(create_qsharp_context(), amplitudes, num_qubits, bits=bits)
+            infidelities[bits] = 1.0 - abs(np.vdot(_reduced_state(sv, num_qubits), expected))
+
+        assert infidelities[10] < infidelities[4] / 100, f"bRot=10 did not improve on bRot=4: {infidelities}"
 
     def test_settings_expose_rotation_bit_precision(self):
         """The constructor argument is stored in settings so create() can reach it."""
         prep = QROMStatePreparation(rotation_bit_precision=6)
-        assert prep.rotation_bit_precision == 6
         assert prep.settings().get("rotation_bit_precision") == 6
 
         prep.settings().set("rotation_bit_precision", 8)
-        assert prep.rotation_bit_precision == 8
+        assert prep.settings().get("rotation_bit_precision") == 8
 
     def test_empty_coefficients_rejected(self):
         """An empty coefficient vector is rejected rather than reaching log2(0)."""

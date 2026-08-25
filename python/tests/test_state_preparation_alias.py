@@ -85,6 +85,19 @@ def _make_wavefunction(amplitudes: list[float]) -> Wavefunction:
     return Wavefunction(container)
 
 
+def _alias_atol(num_coefficients: int, bits_precision: int) -> float:
+    """Tolerance on a marginal probability for an L-term, mu-bit alias table.
+
+    The keep values quantize each bar of the alias table to a multiple of 2^-mu, and every
+    index draws from one bar of height 1/L, so the error on a single probability is bounded
+    by roughly 1.5 / (L 2^mu); the constant is rounded up to 2 so that a tie-breaking
+    difference when the classical table is rounded cannot flake the suite. Using the flat
+    2^-mu that the setting's description quotes would leave the assertion a factor of L too
+    loose to notice a wrong ``bits_precision``.
+    """
+    return 2.0 / (num_coefficients * 2**bits_precision)
+
+
 class TestAliasSamplingStatePreparation:
     """Tests for the alias sampling state preparation algorithm."""
 
@@ -97,14 +110,29 @@ class TestAliasSamplingStatePreparation:
         assert circuit._qsharp_op is not None
         assert circuit._qsharp_factory is not None
 
+    def test_resource_counts(self):
+        """Pin the logical resource counts so a costing regression is visible.
+
+        Alias sampling spends its budget entirely on the QROM lookup and the comparator, so
+        there are no rotations at all; the whole circuit is Clifford + CCZ + measurement.
+        """
+        prep = AliasSamplingStatePreparation(bits_precision=4)
+        circuit = prep.run(_make_wavefunction([0.5, 0.3, 0.7, 0.1]))
+
+        lc = circuit.estimate()["logicalCounts"]
+        assert lc["numQubits"] == 17
+        assert lc["cczCount"] == 8
+        assert lc["tCount"] == 0
+        assert lc["rotationCount"] == 0
+        assert lc["measurementCount"] == 6
+
     def test_settings_expose_bits_precision(self):
         """The constructor argument is stored in settings so create() can reach it."""
         prep = AliasSamplingStatePreparation(bits_precision=6)
-        assert prep.bits_precision == 6
         assert prep.settings().get("bits_precision") == 6
 
         prep.settings().set("bits_precision", 8)
-        assert prep.bits_precision == 8
+        assert prep.settings().get("bits_precision") == 8
 
     def test_negative_coefficients_rejected(self):
         """Alias sampling is a PREPARE oracle over magnitudes and cannot carry a sign.
@@ -140,7 +168,11 @@ class TestAliasSamplingStatePreparation:
         marginal_probs = _compute_marginal_probs(full_sv, num_index_qubits)
 
         assert marginal_probs[3] == pytest.approx(0.0, abs=1e-12)
-        np.testing.assert_allclose(marginal_probs, [0.5, 0.3, 0.2, 0.0], atol=2.0 / (2**bits_precision))
+        np.testing.assert_allclose(
+            marginal_probs,
+            [0.5, 0.3, 0.2, 0.0],
+            atol=_alias_atol(len(coefficients), bits_precision),
+        )
 
     @pytest.mark.parametrize("num_coefficients", range(3, 10, 3))
     def test_marginal_probs_random(self, qdk_ctx, num_coefficients):
@@ -163,8 +195,35 @@ class TestAliasSamplingStatePreparation:
         abs_coeffs = np.abs(coefficients)
         expected_probs = abs_coeffs / np.sum(abs_coeffs)
 
-        atol = 2.0 / (2**bits_precision)
-        np.testing.assert_allclose(marginal_probs[: len(coefficients)], expected_probs, atol=atol)
+        np.testing.assert_allclose(
+            marginal_probs[: len(coefficients)],
+            expected_probs,
+            atol=_alias_atol(num_coefficients, bits_precision),
+        )
+
+    def test_precision_setting_reduces_error(self):
+        """Raising mu must measurably improve the prepared distribution.
+
+        The tolerance in the tests above scales as 1/(L 2^mu), but it still cannot separate
+        neighbouring values of mu. This pins the setting from the other side: the discretization
+        error has to actually shrink when more keep bits are requested, which fails immediately
+        if ``bits_precision`` is ignored somewhere in the chain down to Q#.
+        """
+        coefficients = np.random.default_rng(seed=7).uniform(0.01, 1.0, size=6).tolist()
+        expected = np.abs(coefficients) / np.sum(np.abs(coefficients))
+        num_index_qubits = 3
+
+        errors = {}
+        for bits_precision in (3, 7):
+            # A context that has already run a program replays that program's state, so each
+            # precision needs its own.
+            full_sv = _run_alias_sampling_and_dump(
+                create_qsharp_context(), coefficients, num_index_qubits, bits_precision
+            )
+            probs = _compute_marginal_probs(full_sv, num_index_qubits)
+            errors[bits_precision] = np.max(np.abs(probs[: len(coefficients)] - expected))
+
+        assert errors[7] < errors[3] / 4, f"mu=7 did not improve on mu=3: {errors}"
 
 
 def _run_conditional_alias_fr_and_dump(
@@ -249,10 +308,9 @@ class TestConditionalAliasSamplingWithFreeRider:
         abs_coeffs = np.abs(coefficients[condition_value])
         expected_probs = abs_coeffs**2 / np.sum(abs_coeffs**2)
 
-        atol = 2.0 / (2**bits_precision)
         np.testing.assert_allclose(
             marginal_probs[:n_coeffs],
             expected_probs,
-            atol=atol,
+            atol=_alias_atol(n_coeffs, bits_precision),
             err_msg=f"cond={condition_value}, free_rider={free_rider_data[condition_value]}",
         )

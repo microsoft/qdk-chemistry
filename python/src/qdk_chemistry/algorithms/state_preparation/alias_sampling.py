@@ -30,7 +30,9 @@ class AliasSamplingStatePreparationSettings(Settings):
             10,
             "Number of bits mu of precision for the alias table's keep probabilities. Each "
             "prepared probability is within 2^-mu of the target, at the cost of one extra "
-            "uniform qubit and one extra QROM output qubit per bit.",
+            "uniform qubit and one extra Quantum Read-Only Memory (QROM) output qubit per bit. "
+            "The upper bound of 30 is a sanity limit rather than an algorithmic one: 2^-30 is "
+            "already far below chemical accuracy.",
             (1, 30),
         )
 
@@ -115,7 +117,7 @@ class AliasSamplingStatePreparation(StatePreparation):
 
         Raises:
             ValueError: If the wavefunction has no coefficients, has an imaginary part,
-                contains a negative coefficient, or is all zeros.
+                contains a non-finite or negative coefficient, or is all zeros.
 
         """
         coeffs = np.asarray(wavefunction.get_coefficients())
@@ -127,6 +129,8 @@ class AliasSamplingStatePreparation(StatePreparation):
             coeffs = coeffs.real
         coeffs = coeffs.astype(float, copy=False)
 
+        if not np.all(np.isfinite(coeffs)):
+            raise ValueError("Alias sampling state preparation requires finite coefficients.")
         if np.any(coeffs < 0.0):
             raise ValueError(
                 "Alias sampling state preparation requires non-negative coefficients. It is an LCU "
@@ -146,7 +150,7 @@ class AliasSamplingStatePreparation(StatePreparation):
         padded_len = 1 << num_index_qubits
         if len(coefficients) < padded_len:
             coefficients = coefficients + [0.0] * (padded_len - len(coefficients))
-        bits_precision = self.bits_precision
+        bits_precision = int(self._settings.get("bits_precision"))
         total_qubits = 2 * num_index_qubits + 2 * bits_precision + 1
 
         params = QSHARP_UTILS.AliasSampling.AliasSamplingParams(
@@ -168,12 +172,3 @@ class AliasSamplingStatePreparation(StatePreparation):
         )
 
         return Circuit(qsharp_op=qsharp_op, qsharp_factory=qsharp_factory)
-
-    @property
-    def bits_precision(self) -> int:
-        """Number of bits for keep-coefficient precision."""
-        return int(self._settings.get("bits_precision"))
-
-    @bits_precision.setter
-    def bits_precision(self, value: int) -> None:
-        self._settings.set("bits_precision", value)

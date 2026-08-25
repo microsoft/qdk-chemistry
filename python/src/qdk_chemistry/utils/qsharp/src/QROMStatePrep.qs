@@ -206,7 +206,11 @@ namespace QDKChemistry.Utils.QROMStatePrep {
                 let pLeft = tree[2 * node];
 
                 mutable angle = 0.0;
-                if pTotal > 1e-15 {
+                // Every node is the sum of its two non-negative children, so pLeft <= pTotal
+                // and the ratio is in [0, 1] whenever pTotal is non-zero. Testing against zero
+                // rather than a fixed epsilon keeps the guard independent of the overall scale
+                // of `amplitudes`, which the caller is not required to normalize.
+                if pTotal > 0.0 {
                     let cosVal = MinD(1.0, Sqrt(pLeft / pTotal));
                     set angle = ArcCos(cosVal);
                 }

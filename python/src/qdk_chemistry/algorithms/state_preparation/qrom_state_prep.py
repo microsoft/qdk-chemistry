@@ -30,7 +30,8 @@ class QROMStatePreparationSettings(Settings):
             10,
             "Number of bits of precision used for the QROM-loaded Ry rotation angles. Higher "
             "values reduce the synthesis error of each multiplexed rotation at the cost of a "
-            "wider QROM output register.",
+            "wider QROM output register. The upper bound of 30 is a sanity limit rather than an "
+            "algorithmic one: 2^-30 is already far below chemical accuracy.",
             (1, 30),
         )
 
@@ -86,7 +87,8 @@ class QROMStatePreparation(StatePreparation):
             Circuit: A Circuit wrapping the Q# QROM state prep callable and factory.
 
         Raises:
-            ValueError: If the wavefunction has no coefficients or has an imaginary part.
+            ValueError: If the wavefunction has no coefficients, has an imaginary part,
+                contains a non-finite coefficient, or is all zeros.
 
         """
         coeffs = np.asarray(wavefunction.get_coefficients())
@@ -98,9 +100,17 @@ class QROMStatePreparation(StatePreparation):
             coeffs = coeffs.real
         coeffs = coeffs.astype(float, copy=False)
 
+        if not np.all(np.isfinite(coeffs)):
+            raise ValueError("QROM state preparation requires finite coefficients.")
+        if not np.any(coeffs != 0.0):
+            raise ValueError(
+                "QROM state preparation requires at least one non-zero coefficient; an all-zero "
+                "vector has no state to prepare."
+            )
+
         amplitudes = coeffs.tolist()
         num_state_qubits = math.ceil(math.log2(len(amplitudes))) if len(amplitudes) > 1 else 1
-        rotation_bit_precision = self.rotation_bit_precision
+        rotation_bit_precision = int(self._settings.get("rotation_bit_precision"))
 
         params = QSHARP_UTILS.QROMStatePrep.QROMStatePrepParams(
             amplitudes=amplitudes,
@@ -119,12 +129,3 @@ class QROMStatePreparation(StatePreparation):
         )
 
         return Circuit(qsharp_op=qsharp_op, qsharp_factory=qsharp_factory)
-
-    @property
-    def rotation_bit_precision(self) -> int:
-        """Number of bits for rotation angle precision."""
-        return int(self._settings.get("rotation_bit_precision"))
-
-    @rotation_bit_precision.setter
-    def rotation_bit_precision(self, value: int) -> None:
-        self._settings.set("rotation_bit_precision", value)
