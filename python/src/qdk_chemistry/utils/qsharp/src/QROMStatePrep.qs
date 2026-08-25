@@ -117,13 +117,11 @@ namespace QDKChemistry.Utils.QROMStatePrep {
         // Sign correction: Ry rotations produce |α_j| (positive amplitudes).
         // For negative coefficients, flip the phase via QROM-loaded Z.
         //
-        // This uses Std.TableLookup.Select rather than SelectSwap. The address register
-        // here *is* the state register, so the uncompute must restore it exactly.
+        // This uses Std.TableLookup.Select rather than SelectSwap because the address
+        // register here *is* the state register, so the uncompute must restore it exactly.
         // Adjoint Select is Unlookup, which measures the target in the X basis and repairs
-        // the resulting phase kickback on the address. SelectSwap's swap path (which
-        // ComputeOptimalLambda1D selects for this table's shape) declares an adjoint that
-        // is not the inverse of its body, so it leaves an uncorrected phase and scrambles
-        // the signs.
+        // the resulting phase kickback on the address. SelectSwap would also spend
+        // swap-network ancilla to no purpose on a table only one bit wide.
         let signData = ComputeSignBits(params.amplitudes, n);
         if Any(row -> row[0], signData) {
             use signBit = Qubit[1];

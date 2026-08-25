@@ -123,9 +123,11 @@ class TestQROMStatePreparation:
           |ψ⟩ = Σ_j (a_j / ||a||) |j⟩
         with quantized Ry rotations via phase gradient (bRot=10), so fidelity ≈ 1.
 
-        The tolerance is tight on purpose. At bRot=10 the measured infidelity is a few times
-        1e-6, while bRot=8 already costs 4e-5, so a loose bound like 1e-3 would pass even if
-        ``rotation_bit_precision`` were silently ignored.
+        The tolerance is tight on purpose. Low et al. (arXiv:1812.00954) Eq. (10) bounds the
+        state-vector error by O(2^-b log N), so infidelity scales as O(2^-2b log^2 N): a few
+        times 1e-6 at bRot=10 against 4e-5 to 9e-5 at bRot=8, both of which the measurements
+        match. A loose bound like 1e-3 would pass even if ``rotation_bit_precision`` were
+        silently ignored.
         """
         rng = np.random.default_rng(seed=42 + num_coefficients)
         amplitudes = rng.uniform(0.01, 1.0, size=num_coefficients).tolist()
