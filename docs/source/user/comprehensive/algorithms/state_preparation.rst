@@ -259,6 +259,9 @@ This method prepares an :math:`n`-qubit state with :math:`n` layers of multiplex
    * - ``rotation_bit_precision``
      - int
      - Number of bits of precision used for the QROM-loaded :math:`R_y` rotation angles. Higher values reduce the synthesis error of each multiplexed rotation at the cost of a wider QROM output register. The upper bound of 30 is a sanity limit rather than an algorithmic one: :math:`2^{-30}` is already far below chemical accuracy. Default is 10.
+   * - ``external_phase_gradient``
+     - bool
+     - Whether the PREPARE oracle reads a phase gradient register supplied by the caller instead of allocating and preparing its own. Sharing one gradient across a whole circuit removes the arbitrary-angle rotations that preparing it per call would cost. Only affects the oracle a block encoding embeds; a standalone run always allocates its own. Default is True.
 
 Related classes
 ---------------

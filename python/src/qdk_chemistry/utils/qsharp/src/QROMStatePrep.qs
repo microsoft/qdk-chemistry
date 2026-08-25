@@ -133,6 +133,52 @@ namespace QDKChemistry.Utils.QROMStatePrep {
         QROMStatePrepare(params, _)
     }
 
+    /// QROM state preparation in the bit order a block encoding's SELECT expects.
+    ///
+    /// # Description
+    /// The state register is reversed relative to `QROMStatePrepare`, which writes
+    /// `amplitudes[l]` to the basis state that reads as `l` with `qs[0]` most significant.
+    /// SELECT indexes its terms through `ApplyControlledOnInt`, which is least significant
+    /// first, so without the reversal the block encoding pairs each coefficient with the
+    /// wrong term and encodes a permuted Hamiltonian, with no error to show for it.
+    ///
+    /// When `externalPhaseGradient` is true the gradient is taken from the caller so one
+    /// copy can serve an entire circuit, and `qs` is `[state | phaseGradient]`. Otherwise
+    /// `qs` is the state register alone and the gradient is allocated here. `angleReg`
+    /// stays internal either way because it is returned to |0⟩ after every layer.
+    internal operation QROMStatePrepareIndexed(
+        params : QROMStatePrepParams,
+        qs : Qubit[],
+        externalPhaseGradient : Bool,
+    ) : Unit is Adj + Ctl {
+        let n = params.numStateQubits;
+        let bRot = params.rotationBitPrecision;
+        let stateReg = Reversed(qs[0..n - 1]);
+        use angleReg = Qubit[bRot];
+        if externalPhaseGradient {
+            QROMStatePrepareCore(params, stateReg, qs[n..n + bRot - 1], angleReg);
+        } else {
+            use phaseGradient = Qubit[bRot];
+            within {
+                PreparePhaseGradientState(phaseGradient);
+            } apply {
+                QROMStatePrepareCore(params, stateReg, phaseGradient, angleReg);
+            }
+        }
+    }
+
+    /// Create a QROM state preparation callable to embed in a block encoding.
+    ///
+    /// The returned callable expects `numStateQubits + rotationBitPrecision` qubits when
+    /// `externalPhaseGradient` is true, with the gradient already in |φ⟩, and
+    /// `numStateQubits` qubits otherwise.
+    function MakeQROMStatePrepOracle(
+        params : QROMStatePrepParams,
+        externalPhaseGradient : Bool,
+    ) : Qubit[] => Unit is Adj + Ctl {
+        QROMStatePrepareIndexed(params, _, externalPhaseGradient)
+    }
+
     /// Circuit entry point for QROM state preparation (allocates qubits).
     operation MakeQROMStatePrepCircuit(
         amplitudes : Double[],

@@ -137,9 +137,9 @@ namespace QDKChemistry.Utils.AliasSampling {
     /// (LCU or qubitization), where PREPARE† is applied to uncompute the garbage
     /// and project onto the correct subspace.
     ///
-    /// The index register carries amplitude √(|c_ℓ| / Σ_k |c_k|). 
+    /// The index register carries amplitude √(|c_ℓ| / Σ_k |c_k|).
     /// Signs are not represented; the accompanying SELECT oracle should carry them.
-
+    ///
     /// Register layout:
     ///   indexRegister[numIndexQubits] — output: sampled index ℓ
     ///   uniformRegister[bitsPrecision] — ancilla for comparison σ

@@ -105,7 +105,7 @@ class TestBlockEncodingAgnosticSchedule:
         """A PREPARE-SELECT-PREPARE walk must obey the same ``W^(p - 2t)`` contract."""
         psp = QSHARP_UTILS.PrepSelPrep
         op = QSHARP_UTILS.UnaryPhaseEstimation.MakeTestSignedPowerScheduleAgainstWalkOp(
-            psp.MakeTestBlockEncodingOp(0.7), psp.MakeAncillaReflectionOp(1), num_queries, address_value, 0.9
+            psp.MakeTestBlockEncodingOp(0.7), psp.MakeAncillaReflectionOp(1, 1), num_queries, address_value, 0.9
         )
         num_address_qubits = _address_qubits(num_queries + 1)
         state = _dump_op(op, num_address_qubits + 2)
@@ -120,7 +120,7 @@ class TestBlockEncodingAgnosticSchedule:
         """The contract must not depend on what the block encoding encodes."""
         psp = QSHARP_UTILS.PrepSelPrep
         op = QSHARP_UTILS.UnaryPhaseEstimation.MakeTestSignedPowerScheduleAgainstWalkOp(
-            psp.MakeTestBlockEncodingOp(theta), psp.MakeAncillaReflectionOp(1), 3, 1, 0.9
+            psp.MakeTestBlockEncodingOp(theta), psp.MakeAncillaReflectionOp(1, 1), 3, 1, 0.9
         )
         state = _dump_op(op, 4)
 
