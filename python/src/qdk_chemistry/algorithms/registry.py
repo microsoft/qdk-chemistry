@@ -868,7 +868,7 @@ def _register_python_algorithms():
         QdkFullStateSimulator,
         QdkSparseStateSimulator,
     )
-    from qdk_chemistry.algorithms.circuit_mapper import PauliSequenceMapper  # noqa: PLC0415
+    from qdk_chemistry.algorithms.circuit_mapper import PauliSequenceMapper, PSPMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
         ControlledPauliSequenceMapper,
         ControlledPSPMapper,
@@ -898,6 +898,9 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder import (  # noqa: PLC0415
         QdkStandardQpeCircuitBuilder,
     )
+    from qdk_chemistry.algorithms.phase_estimation.circuit_builder.unary_phase_estimation_builder import (  # noqa: PLC0415
+        QdkUnaryQpeCircuitBuilder,
+    )
     from qdk_chemistry.algorithms.phase_estimation.experiment_scheduler import (  # noqa: PLC0415
         QdkRobustPhaseEstimationExperimentScheduler,
     )
@@ -909,6 +912,9 @@ def _register_python_algorithms():
     )
     from qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation import (  # noqa: PLC0415
         StandardPhaseEstimation,
+    )
+    from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import (  # noqa: PLC0415
+        UnaryPhaseEstimation,
     )
     from qdk_chemistry.algorithms.propagator import MagnusPropagator  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import DenseMatrixSolver, SparseMatrixSolver  # noqa: PLC0415
@@ -941,6 +947,7 @@ def _register_python_algorithms():
     register(lambda: PartiallyRandomized())
     register(lambda: LCUBuilder())
     register(lambda: PauliSequenceMapper())
+    register(lambda: PSPMapper())
     register(lambda: ControlledPSPMapper())
     register(lambda: ControlledPauliSequenceMapper())
     register(lambda: EulerIntegrator())
@@ -950,6 +957,7 @@ def _register_python_algorithms():
     register(lambda: QdkSparseStateSimulator())
     register(lambda: QdkIterativeQpeCircuitBuilder())
     register(lambda: QdkStandardQpeCircuitBuilder())
+    register(lambda: QdkUnaryQpeCircuitBuilder())
     register(lambda: IterativePhaseEstimation())
     register(lambda: HadamardTest())
     register(lambda: QdkHadamardTestCircuitBuilder())
@@ -957,6 +965,7 @@ def _register_python_algorithms():
     register(lambda: QdkRobustPhaseEstimationCircuitBuilder())
     register(lambda: StandardPhaseEstimation())
     register(lambda: RobustPhaseEstimation())
+    register(lambda: UnaryPhaseEstimation())
     register(lambda: AmplitudeAmplification())
     register(lambda: QPESubspaceMarking())
 

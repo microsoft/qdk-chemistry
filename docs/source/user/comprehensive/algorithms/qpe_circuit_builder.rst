@@ -160,14 +160,41 @@ Use ``schedule`` followed by ``iter_build`` when workload metadata or bounded-me
    :header-rows: 1
    :widths: 25 20 55
 
+    * - Setting
+       - Type
+       - Description
+    * - ``experiment_scheduler``
+       - :class:`~qdk_chemistry.data.AlgorithmRef`
+       - Reference to the ``"rpe_experiment_scheduler"`` that resolves rounds, error budgets, randomized draws, and nested construction settings.
+
+See :doc:`robust_phase_estimation_circuit_builder` for the scheduler settings and workload APIs.
+
+Unary-iteration Phase Estimation Circuit Builder
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. rubric:: Class: ``QdkUnaryQpeCircuitBuilder`` (QDK native)
+
+.. rubric:: Factory name: ``"qdk_unary"``
+
+Constructs one flat chain of :math:`p` qubitized walk queries, using unary iteration over the phase register to select which interleaved reflection is omitted and so realize :math:`W^{2a-p}` from a single chain :cite:`Babbush2018` :cite:`Lee2021`.
+The phase register is sized to :math:`\lceil \log_2(p+1) \rceil` and ``num_bits`` is ignored.
+Requires a qubitized walk, so ``unitary_builder`` must be an LCU builder with ``quantum_walk=True`` (its default here).
+
+**Additional settings:**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 15 65
+
    * - Setting
      - Type
      - Description
-   * - ``experiment_scheduler``
-     - :class:`~qdk_chemistry.data.AlgorithmRef`
-     - Reference to the ``"rpe_experiment_scheduler"`` that resolves rounds, error budgets, randomized draws, and nested construction settings.
-
-See :doc:`robust_phase_estimation_circuit_builder` for the scheduler settings and workload APIs.
+   * - ``num_queries``
+     - int
+     - Number of walk queries :math:`p`. For a target energy error :math:`\epsilon`, the Heisenberg-limited setting is :math:`p = \lceil \pi \lambda / (2\epsilon) \rceil` with :math:`\lambda` the block-encoding 1-norm. Need not be a power of two.
+   * - ``circuit_mapper``
+     - AlgorithmRef
+     - Mapper producing the uncontrolled block encoding. It must lay the register out as ``[system | ancilla]``. Default: ``"prepare_select_prepare"``.
 
 Circuit Composition Details
 ----------------------------

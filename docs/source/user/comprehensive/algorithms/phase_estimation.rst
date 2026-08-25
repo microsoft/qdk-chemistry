@@ -17,7 +17,7 @@ QDK/Chemistry supports two types of unitaries for QPE:
 
 The QPE algorithm itself is agnostic to how the unitary is constructed — the choice of unitary builder determines the phase-to-energy mapping used in post-processing.
 
-QDK/Chemistry provides three :term:`QPE` approaches, each suited to different execution constraints:
+QDK/Chemistry provides four :term:`QPE` approaches, each suited to different execution constraints:
 
 Iterative Quantum Phase Estimation (:term:`IQPE`)
    Kitaev's single-ancilla algorithm :cite:`Kitaev1995` that extracts phase bits one at a time, from least significant to most significant, using adaptive feedback corrections between iterations.
@@ -31,7 +31,10 @@ Robust Phase Estimation
    A Hadamard-test approach that samples a geometric ladder of evolution times and unwraps the measured phases round by round.
    Its experiment scheduler represents deterministic execution counts and independent randomized draws, while its circuit builder supports eager lists and streamed X/Y pairs.
 
-All implementations share the same execution interface and produce :class:`~qdk_chemistry.data.QpeResult` objects with full :doc:`serialization <../data/serialization>` support.
+Unary-iteration Quantum Phase Estimation
+   A qubitization-only approach :cite:`Lee2021` that allows any positive number of queries instead of rounding up to the next power of two.
+
+All four implementations share the same interface and produce :class:`~qdk_chemistry.data.QpeResult` objects with automatic phase-wrapping, energy alias detection, and full :doc:`serialization <../data/serialization>` support.
 See :doc:`../data/qpe_result` for details on the result data class.
 
 .. _qpe-workflow:
@@ -265,6 +268,57 @@ See :doc:`qpe_circuit_builder` for configuring:
 - ``unitary_builder`` → ``quantum_walk`` — Enable walk operator for qubitization (LCU)
 - ``qft_do_swaps`` — Whether to include swap gates in the inverse QFT (Qiskit only)
 - ``controlled_circuit_mapper`` — Circuit synthesis strategy
+
+
+.. _unary-qpe-algorithm:
+
+Unary-iteration phase estimation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"qdk_unary"``
+
+Standard QPE spends :math:`2^n - 1` queries.
+The circuit structure consists of :cite:`Babbush2018` :cite:`Lee2021`:
+
+1. Prepare the phase register in a cosine window :math:`\sin\!\left(\frac{\pi (a+1)}{p+2}\right)`, which suppresses the spectral leakage a uniform superposition would incur :cite:`Babbush2018`
+2. Apply the :math:`p`-query chain, omitting the reflection the phase register selects
+3. Apply an inverse Quantum Fourier Transform (iQFT) to the phase register
+4. Measure all phase qubits
+
+The walk's spectrum is :math:`e^{\pm i \arccos(E/\lambda)}`, so a measured bin cannot distinguish the two signs: ``resolve_positive_branch`` picks which one is reported, and both are always returned in the result's ``branching`` tuple.
+
+.. rubric:: Settings
+
+Direct settings on :class:`~qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation.UnaryPhaseEstimation`:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``shots``
+     - int
+     - Total measurement shots for the full circuit. Default is 3.
+   * - ``resolve_positive_branch``
+     - bool
+     - Which branch of the walk's conjugate eigenphase pair to report as the resolved energy. Default is ``False``.
+
+Nested algorithm configuration (via ``qpe_circuit_builder``):
+
+See :doc:`qpe_circuit_builder` for configuring:
+
+- ``num_queries`` — Number of walk queries :math:`p`; need not be a power of two
+- ``unitary_builder`` → ``quantum_walk`` — Required; the unary path has no Trotter equivalent
+- ``circuit_mapper`` — Circuit synthesis strategy, which must expose the block encoding's ancilla reflection
+
+.. tab:: Python API (Unary-iteration configuration)
+
+   .. literalinclude:: ../../../_static/examples/python/phase_estimation.py
+      :language: python
+      :start-after: # start-cell-configure-unary
+      :end-before: # end-cell-configure-unary
 
 
 Phase-to-energy extraction

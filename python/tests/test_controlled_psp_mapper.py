@@ -96,6 +96,15 @@ class TestPrepareSelectMapper:
         with pytest.raises(ValueError, match="single control qubit"):
             mapper.run(unitary_rep)
 
+    def test_rejects_a_control_qubit_at_a_nondefault_index(self):
+        """Verify ControlledPSPMapper raises ValueError when the control qubit is not at index 0."""
+        unitary_rep = _build_unitary_rep(["XX", "ZZ"], np.array([0.25, 0.5]))
+
+        mapper = ControlledPSPMapper()
+        mapper.settings().set("control_indices", [2])
+        with pytest.raises(ValueError, match="single control qubit at index 0"):
+            mapper.run(unitary_rep)
+
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
     @pytest.mark.parametrize(
         ("pauli_strings", "coefficients", "description"),
