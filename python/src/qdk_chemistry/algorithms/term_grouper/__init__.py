@@ -18,12 +18,16 @@ Example:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.algorithms.term_grouper.base import TermGrouper, TermGrouperFactory
+from qdk_chemistry.algorithms.term_grouper.base import TermGrouper, TermGrouperFactory, TermGrouperSettings
 from qdk_chemistry.algorithms.term_grouper.commuting import (
     FullCommutingTermGrouper,
     QubitWiseCommutingTermGrouper,
 )
 from qdk_chemistry.algorithms.term_grouper.identity import IdentityTermGrouper
+from qdk_chemistry.algorithms.term_grouper.vacuum_annihilating import (
+    VacuumAnnihilatingTermGrouper,
+    VacuumAnnihilatingTermGrouperSettings,
+)
 
 __all__ = [
     "FullCommutingTermGrouper",
@@ -31,4 +35,7 @@ __all__ = [
     "QubitWiseCommutingTermGrouper",
     "TermGrouper",
     "TermGrouperFactory",
+    "TermGrouperSettings",
+    "VacuumAnnihilatingTermGrouper",
+    "VacuumAnnihilatingTermGrouperSettings",
 ]
