@@ -85,9 +85,14 @@ If you chose the minimal `pip install qdk-chemistry` above, you can add specific
 | `qiskit-extras` | Qiskit ecosystem packages | qiskit, qiskit-aer, qiskit-nature |
 | `openfermion-extras` | OpenFermion ecosystem packages | openfermion |
 | `networkx-extras` | NetworkX ecosystem packages | networkx |
+| `docs` | [Sphinx documentation build tools](docs/README.md) | sphinx, sphinx-rtd-theme, myst-parser, breathe, sphinx-autodoc-typehints, sphinx-inline-tabs, sphinxcontrib-napoleon, sphinxcontrib-bibtex, sphinx_copybutton |
+| `qre` | Quantum Resource Estimator support | qdk[qre,jupyter]>=1.30.0 |
 | `dev` | Development and testing tools | pytest, ruff, mypy, and related tooling |
-| `test` | Testing tools and optional dependencies | pytest, ipykernel, networkx, openfermion, pennylane, pyscf, qiskit, rdkit |
+| `test` | Testing tools and optional runtime dependencies; does not include `docs` | qdk-chemistry[coverage,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre], nbclient, nbformat, pennylane, rdkit, requests>=2.33.0 |
 | `all` | **All of the above** | All optional dependencies |
+
+Building the documentation also requires the system packages Doxygen and
+Graphviz. See the [documentation build instructions](docs/README.md).
 
 Install one or more extras with:
 
@@ -124,6 +129,31 @@ Alternatively, click the green button in the bottom-left corner of VS Code and s
 ### Step 3: Restart VS Code
 
 After the initial build, restart VS Code and reopen in the container to ensure the Python virtual environment is properly loaded.
+
+### Step 4: Develop
+
+The dev container installs the Python package in editable mode, so changes to pure Python files are available immediately. After changing pybind11 sources, rebuild the Python package:
+
+```bash
+python -m pip install --no-build-isolation --check-build-dependencies --no-deps \
+  -C build-dir="build/{wheel_tag}" -e ./python
+```
+
+After changing the C++ library, build and install it before rebuilding the Python bindings:
+
+```bash
+cmake --build cpp/build --target chemistry
+cmake --install cpp/build
+python -m pip install --no-build-isolation --check-build-dependencies --no-deps \
+  -C build-dir="build/{wheel_tag}" -e ./python
+```
+
+Build only the relevant C++ test target during development, then run its tests from the directory where CTest registers them. For example:
+
+```bash
+cmake --build cpp/build --target test_algorithm_hash
+ctest --test-dir cpp/build/tests --output-on-failure -R AlgorithmHash
+```
 
 **NOTE:**
 

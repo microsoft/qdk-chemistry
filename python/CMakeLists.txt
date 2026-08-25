@@ -177,10 +177,12 @@ pybind11_add_module(_core
     src/pybind11/algorithms/hamiltonian.cpp
     src/pybind11/algorithms/scf.cpp
     src/pybind11/algorithms/nuclear_derivative.cpp
+    src/pybind11/algorithms/population_analysis.cpp
     src/pybind11/algorithms/geometry_optimization.cpp
     src/pybind11/algorithms/active_space.cpp
     src/pybind11/algorithms/hamiltonian_regularizer.cpp
     src/pybind11/algorithms/dynamical_correlation_calculator.cpp
+    src/pybind11/algorithms/effective_hamiltonian.cpp
     src/pybind11/algorithms/davidson_solver.cpp
     src/pybind11/algorithms/syev_solver.cpp
     src/pybind11/utils/logger.cpp
@@ -189,6 +191,7 @@ pybind11_add_module(_core
     src/pybind11/utils/model_hamiltonians.cpp
     src/pybind11/utils/double_factorization.cpp
     src/pybind11/utils/hamiltonian_one_norm.cpp
+    src/pybind11/utils/cube_generator.cpp
     src/pybind11/constants.cpp
     src/pybind11/qdk_scf_config.cpp
     src/pybind11/module.cpp

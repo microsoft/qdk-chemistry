@@ -50,8 +50,15 @@ class PauliProductFormulaContainer(UnitaryContainer):
     where ``step_reps = r`` is the number of repeated steps.
     """
 
-    # Class attribute for filename validation
-    _data_type_name = "pauli_product_formula_container"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for product-formula containers.
+
+        Returns:
+            ``"pauli_product_formula_container"``.
+
+        """
+        return "pauli_product_formula_container"
 
     # Serialization version for this class
     _serialization_version = "0.2.0"
@@ -71,9 +78,19 @@ class PauliProductFormulaContainer(UnitaryContainer):
             num_qubits: The number of qubits the unitary acts on.
             scale: The evolution time used for eigenvalue-phase conversion.
 
+        Raises:
+            TypeError: If ``step_reps`` is not an integer.
+            ValueError: If ``step_reps`` is not positive.
+
         """
+        # bool is an int subclass, but True as a repetition count is always a mistake.
+        if isinstance(step_reps, bool) or not isinstance(step_reps, int | np.integer):
+            raise TypeError(f"step_reps must be an integer, got {type(step_reps).__name__}.")
+        if step_reps <= 0:
+            raise ValueError(f"step_reps must be a positive integer, got {step_reps}.")
+
         self.step_terms = step_terms
-        self.step_reps = step_reps
+        self.step_reps = int(step_reps)
         self._num_qubits = num_qubits
         self.scale = scale
         super().__init__()
