@@ -179,22 +179,6 @@ class TestLCUBuilder:
         assert circuit._qsharp_factory.parameter["numSelectQubits"] == 2
         assert circuit._qsharp_factory.parameter["numBlockAncillaQubits"] == 13
 
-    def test_prepare_select_prepare_rejects_qrom(self):
-        """Verify PSP rejects QROM because it requires a phase-gradient register."""
-        hamiltonian = QubitOperator(
-            pauli_strings=["XX", "ZZ", "XZ"],
-            coefficients=np.array([0.25, 0.5, 0.1]),
-        )
-        unitary = LCUBuilder().run(hamiltonian)
-        mapper = registry.create(
-            "circuit_mapper",
-            "prepare_select_prepare",
-            prepare=AlgorithmRef("state_prep", "qrom"),
-        )
-
-        with pytest.raises(AssertionError, match="QROM state preparation is not supported"):
-            mapper.run(unitary)
-
 
 class TestLCUContainer:
     """Tests for the LCUContainer data class."""

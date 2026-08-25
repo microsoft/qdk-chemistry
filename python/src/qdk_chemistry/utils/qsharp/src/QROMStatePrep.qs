@@ -44,19 +44,16 @@ namespace QDKChemistry.Utils.QROMStatePrep {
     ///
     /// Prepares: |0⟩^n → Σ_j c_j |j⟩ using n layers of multiplexed Ry rotations.
     ///
-    /// Allocates phase gradient and angle ancilla registers internally.
+    /// The phase gradient register must be initialized by the caller. The angle
+    /// ancilla register is allocated internally and returned to |0⟩.
     operation QROMStatePrepare(
         params : QROMStatePrepParams,
         target : Qubit[],
+        phaseGradient : Qubit[],
     ) : Unit is Adj + Ctl {
         let bRot = params.rotationBitPrecision;
-        use phaseGradient = Qubit[bRot];
         use angleReg = Qubit[bRot];
-        within {
-            PreparePhaseGradientState(phaseGradient);
-        } apply {
-            QROMStatePrepareCore(params, target, phaseGradient, angleReg);
-        }
+        QROMStatePrepareCore(params, target, phaseGradient, angleReg);
     }
 
     /// Core QROM state preparation.
@@ -130,53 +127,13 @@ namespace QDKChemistry.Utils.QROMStatePrep {
 
     /// Create a QROM state preparation callable.
     function MakeQROMStatePrepOp(params : QROMStatePrepParams) : Qubit[] => Unit is Adj + Ctl {
-        QROMStatePrepare(params, _)
-    }
-
-    /// QROM state preparation in the bit order a block encoding's SELECT expects.
-    ///
-    /// # Description
-    /// The state register is reversed relative to `QROMStatePrepare`, which writes
-    /// `amplitudes[l]` to the basis state that reads as `l` with `qs[0]` most significant.
-    /// SELECT indexes its terms through `ApplyControlledOnInt`, which is least significant
-    /// first, so without the reversal the block encoding pairs each coefficient with the
-    /// wrong term and encodes a permuted Hamiltonian, with no error to show for it.
-    ///
-    /// When `externalPhaseGradient` is true the gradient is taken from the caller so one
-    /// copy can serve an entire circuit, and `qs` is `[state | phaseGradient]`. Otherwise
-    /// `qs` is the state register alone and the gradient is allocated here. `angleReg`
-    /// stays internal either way because it is returned to |0⟩ after every layer.
-    internal operation QROMStatePrepareIndexed(
-        params : QROMStatePrepParams,
-        qs : Qubit[],
-        externalPhaseGradient : Bool,
-    ) : Unit is Adj + Ctl {
         let n = params.numStateQubits;
         let bRot = params.rotationBitPrecision;
-        let stateReg = Reversed(qs[0..n - 1]);
-        use angleReg = Qubit[bRot];
-        if externalPhaseGradient {
-            QROMStatePrepareCore(params, stateReg, qs[n..n + bRot - 1], angleReg);
-        } else {
-            use phaseGradient = Qubit[bRot];
-            within {
-                PreparePhaseGradientState(phaseGradient);
-            } apply {
-                QROMStatePrepareCore(params, stateReg, phaseGradient, angleReg);
-            }
-        }
-    }
-
-    /// Create a QROM state preparation callable to embed in a block encoding.
-    ///
-    /// The returned callable expects `numStateQubits + rotationBitPrecision` qubits when
-    /// `externalPhaseGradient` is true, with the gradient already in |φ⟩, and
-    /// `numStateQubits` qubits otherwise.
-    function MakeQROMStatePrepOracle(
-        params : QROMStatePrepParams,
-        externalPhaseGradient : Bool,
-    ) : Qubit[] => Unit is Adj + Ctl {
-        QROMStatePrepareIndexed(params, _, externalPhaseGradient)
+        (qs) => QROMStatePrepare(
+            params,
+            qs[0..n - 1],
+            qs[n..n + bRot - 1]
+        )
     }
 
     /// Circuit entry point for QROM state preparation (allocates qubits).
@@ -190,8 +147,13 @@ namespace QDKChemistry.Utils.QROMStatePrep {
             rotationBitPrecision = rotationBitPrecision,
             numStateQubits = numStateQubits,
         };
-        use qs = Qubit[numStateQubits];
-        QROMStatePrepare(params, qs);
+        use state = Qubit[numStateQubits];
+        use phaseGradient = Qubit[rotationBitPrecision];
+        within {
+            PreparePhaseGradientState(phaseGradient);
+        } apply {
+            QROMStatePrepare(params, state, phaseGradient);
+        }
     }
 
     /// Compute the SBM rotation angles as quantized integers in a binary heap.
@@ -305,6 +267,11 @@ namespace QDKChemistry.Utils.QROMStatePrep {
             rotationBitPrecision = rotationBitPrecision,
             numStateQubits = numStateQubits,
         };
-        QROMStatePrepare(params, qs);
+        use phaseGradient = Qubit[rotationBitPrecision];
+        within {
+            PreparePhaseGradientState(phaseGradient);
+        } apply {
+            QROMStatePrepare(params, qs, phaseGradient);
+        }
     }
 }

@@ -98,6 +98,7 @@ class TestQROMStatePreparation:
         assert circuit is not None
         assert circuit._qsharp_op is not None
         assert circuit._qsharp_factory is not None
+        assert circuit.num_qubits == 6
 
     def test_resource_counts(self):
         """Pin the logical resource counts so a costing regression is visible.

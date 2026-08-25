@@ -21,7 +21,7 @@ from .base import UnitaryContainer
 if TYPE_CHECKING:
     from qdk_chemistry.data import Wavefunction
 
-__all__ = ["BlockEncodingContainer", "ControlledOperation", "LCUContainer", "PrepareRegisters", "Select"]
+__all__ = ["BlockEncodingContainer", "ControlledOperation", "LCUContainer", "Select"]
 
 
 class BlockEncodingContainer(UnitaryContainer):
@@ -44,27 +44,6 @@ class BlockEncodingContainer(UnitaryContainer):
     @abstractmethod
     def power(self) -> int:
         """Number of times to apply the block encoding."""
-
-
-@dataclass(frozen=True)
-class PrepareRegisters:
-    r"""Register layout for a PREPARE oracle embedded in a unitary representation.
-
-    Attributes:
-        num_system_qubits: Width of the register SELECT applies its operations to.
-        num_select_qubits: Width of the index register SELECT controls on.
-        num_block_ancillas: Total width PREPARE owns, including entangled scratch.
-
-    """
-
-    num_system_qubits: int
-    num_select_qubits: int
-    num_block_ancillas: int
-
-    @property
-    def num_qubits(self) -> int:
-        """Return the total width of the unitary's flat register."""
-        return self.num_system_qubits + self.num_block_ancillas
 
 
 @dataclass(frozen=True)

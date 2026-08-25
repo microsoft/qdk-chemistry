@@ -141,7 +141,7 @@ class AliasSamplingStatePreparation(StatePreparation):
             },
         )
 
-        return Circuit(qsharp_op=qsharp_op, qsharp_factory=qsharp_factory)
+        return Circuit(qsharp_op=qsharp_op, qsharp_factory=qsharp_factory, num_qubits=total_qubits)
 
     @staticmethod
     def _num_index_qubits(num_coefficients: int) -> int:
@@ -183,32 +183,3 @@ class AliasSamplingStatePreparation(StatePreparation):
                 "all-zero vector has no distribution to sample."
             )
         return (coeffs**2).tolist()
-
-    def num_system_qubits(self, wavefunction: Wavefunction) -> int:
-        r"""Return the width of the index register SELECT controls on.
-
-        Args:
-            wavefunction: The wavefunction that will be prepared.
-
-        Returns:
-            The index register width :math:`n = \lceil\log_2 L\rceil`.
-
-        """
-        return self._num_index_qubits(len(self._sampling_weights(wavefunction)))
-
-    def num_entangled_ancillas(self, wavefunction: Wavefunction) -> int:
-        r"""Return the scratch width left entangled with the index register.
-
-        Alias sampling leaves :math:`\mu` uniform qubits, one flag qubit and
-        :math:`\mu + n` QROM output qubits entangled with the :math:`n`-qubit index, so
-        the register it owns is much wider than the index SELECT controls on.
-
-        Args:
-            wavefunction: The wavefunction that will be prepared.
-
-        Returns:
-            :math:`n + 2\mu + 1` qubits of scratch.
-
-        """
-        bits_precision = int(self._settings.get("bits_precision"))
-        return self.num_system_qubits(wavefunction) + 2 * bits_precision + 1
