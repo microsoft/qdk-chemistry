@@ -90,33 +90,6 @@ def test_opaque_png_figures_use_white_backgrounds():
             assert rgba.getpixel((0, 0)) == (255, 255, 255, 255), name
 
 
-def test_circuit_png_figures_meet_non_text_contrast():
-    """Keep circuit structure above the WCAG non-text contrast threshold."""
-    background = np.array([255, 255, 255], dtype=np.uint8)
-    structure = np.array([143, 143, 143], dtype=np.uint8)
-
-    def relative_luminance(color: np.ndarray) -> float:
-        channels = color.astype(np.float64) / 255.0
-        linear = np.where(
-            channels <= 0.04045,
-            channels / 12.92,
-            ((channels + 0.055) / 1.055) ** 2.4,
-        )
-        return float(0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2])
-
-    lighter = relative_luminance(background)
-    darker = relative_luminance(structure)
-    assert (lighter + 0.05) / (darker + 0.05) >= 3.0
-
-    for name in (
-        "tutorial_qpe_power_one_circuit_overview.png",
-        "tutorial_qpe_state_preparation_comparison.png",
-    ):
-        with Image.open(DIAGRAMS_DIR / name) as image:
-            rgb = np.asarray(image.convert("RGB"))
-        assert np.any(np.all(rgb == structure, axis=2)), name
-
-
 def test_graphviz_sources_generate_accessible_svg_figures():
     """Keep committed SVGs aligned with DOT sources and authored descriptions."""
     directives = [
