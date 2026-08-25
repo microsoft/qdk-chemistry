@@ -4,23 +4,6 @@
 
 /// Alias sampling state preparation.
 /// Reference: Babbush et al. arXiv:1805.03662, Fig. 11.
-///
-/// This file contains two families of operations with *different* probability
-/// conventions. They are both intentional; do not "unify" them.
-///
-///   * `AliasSamplingPrepare` / `RunAliasSamplingPrep` — the LCU PREPARE oracle of
-///     Babbush et al. Fig. 11. It samples p_ℓ ∝ |c_ℓ| (magnitudes, normalized by the
-///     1-norm), so the index register carries amplitude √(|c_ℓ| / Σ_k |c_k|). Signs are
-///     not represented at all; the accompanying SELECT oracle is expected to carry them.
-///
-///   * `ConditionalAliasSamplingPrepare*` — a genuine state preparation. It squares the
-///     coefficients before building the alias table, so it samples p_{c,ℓ} ∝ c_{c,ℓ}²
-///     (normalized by the 2-norm) and the index register carries amplitude
-///     |c_{c,ℓ}| / ‖c_c‖₂. A QROM-loaded sign bit then applies a Z phase, recovering the
-///     signed amplitude c_{c,ℓ} / ‖c_c‖₂ (Von Burg arXiv:2011.03494, Def. 1).
-///
-/// In short: the plain variant is 1-norm PREPARE over magnitudes, the conditional variant
-/// is 2-norm state preparation over signed coefficients.
 namespace QDKChemistry.Utils.AliasSampling {
 
     import Std.Arithmetic.ApplyIfGreaterLE;
@@ -45,7 +28,7 @@ namespace QDKChemistry.Utils.AliasSampling {
 
     /// Parameters for alias sampling state preparation.
     struct AliasSamplingParams {
-        /// Unnormalized probability weights, length L.
+        /// Coefficients of the quantum state to prepare, length L.
         coefficients : Double[],
         /// Number of bits μ for keep-coefficient precision.
         bitsPrecision : Int,
@@ -65,11 +48,6 @@ namespace QDKChemistry.Utils.AliasSampling {
         coefficients : Double[],
     ) : (Int[], Int[]) {
         let nCoeffs = Length(coefficients);
-        // The full bar height is 2^μ, so a stored keep value k means "keep index ℓ
-        // with probability k / 2^μ" under the σ < keep_ℓ comparison in
-        // AliasSamplingPrepare. Keep values occupy μ bits, so the largest storable
-        // value is 2^μ - 1; entries that must always be kept use that value together
-        // with alt_ℓ = ℓ, which makes the residual 1/2^μ "swap" a no-op.
         let barHeight = 1 <<< bitsPrecision;
         let maxKeep = barHeight - 1;
 
@@ -79,12 +57,9 @@ namespace QDKChemistry.Utils.AliasSampling {
             set total += AbsD(coefficients[i]);
         }
 
-        // An all-zero vector has no distribution to sample; without this the division
-        // below would silently seed the alias table with NaN.
         Fact(total > 0.0, "alias sampling requires at least one non-zero coefficient");
 
         // Scale to bar height × nCoeffs, rounding to nearest.
-
         let targetTotal = barHeight * nCoeffs;
         mutable scaledProbs : Int[] = [];
         mutable scaledTotal = 0;
@@ -94,12 +69,6 @@ namespace QDKChemistry.Utils.AliasSampling {
             set scaledTotal += scaled;
         }
 
-        // Walker's construction assumes the bars sum to exactly 2^μ · L. Rounding
-        // breaks that, so redistribute the residual one unit at a time instead of
-        // accumulating it and discarding it. Only indices with a non-zero coefficient
-        // are eligible: handing a unit to a zero coefficient would give it a spurious
-        // 2^-μ of probability, and it also keeps the loop from spinning forever when
-        // there is nothing left to take a unit from.
         mutable adjustable : Int[] = [];
         for i in 0..nCoeffs - 1 {
             if AbsD(coefficients[i]) > 0.0 {
@@ -168,6 +137,9 @@ namespace QDKChemistry.Utils.AliasSampling {
     /// (LCU or qubitization), where PREPARE† is applied to uncompute the garbage
     /// and project onto the correct subspace.
     ///
+    /// The index register carries amplitude √(|c_ℓ| / Σ_k |c_k|). 
+    /// Signs are not represented; the accompanying SELECT oracle should carry them.
+
     /// Register layout:
     ///   indexRegister[numIndexQubits] — output: sampled index ℓ
     ///   uniformRegister[bitsPrecision] — ancilla for comparison σ
@@ -189,9 +161,6 @@ namespace QDKChemistry.Utils.AliasSampling {
         let (keepCoeff, altIndex) = DiscretizedProbabilityDistribution(mu, params.coefficients);
 
         let nPadded = 1 <<< nIndexQubits;
-        // Largest storable keep value: "always keep". Padded rows are unreachable
-        // because PrepareUniformSuperposition only populates the first nCoeffs
-        // indices, but alt_ℓ = ℓ keeps them harmless if they ever were reached.
         let maxKeep = (1 <<< mu) - 1;
 
         // Build QROM data table: (keep_ℓ, alt_ℓ) for each index
@@ -214,11 +183,6 @@ namespace QDKChemistry.Utils.AliasSampling {
         SelectSwap(-1, selectData, indexRegister, qromOutput);
 
         // Step 4: Compare σ < keep_ℓ → keep, otherwise swap to alt_ℓ.
-        // ApplyIfGreaterLE(X, a, b, t) flips t when a > b, so passing keep as the
-        // first operand gives "keep_ℓ > σ", i.e. the keep condition; inverting it
-        // yields the swap condition σ ≥ keep_ℓ. Ordering the operands the other way
-        // round would test σ > keep_ℓ, which keeps the index when σ == keep_ℓ and
-        // therefore gives a zero-weight coefficient a residual 1/2^μ probability.
         let keepLoaded = qromOutput[0..mu - 1];
         let altLoaded = qromOutput[mu..mu + nIndexQubits - 1];
         ApplyIfGreaterLE(X, keepLoaded, uniformRegister, flagQubit);
@@ -252,10 +216,6 @@ namespace QDKChemistry.Utils.AliasSampling {
         AliasSamplingPrepare(params, qs);
     }
 
-    // ════════════════════════════════════════════════════════════════════════════
-    //  Conditional alias sampling (2D)
-    // ════════════════════════════════════════════════════════════════════════════
-
     /// Build 3D QROM table for conditional alias sampling with sign bits and
     /// optional free-rider data.
     ///
@@ -273,15 +233,10 @@ namespace QDKChemistry.Utils.AliasSampling {
         let nCoeffs = Length(coefficients[0]);
         let nPaddedIdx = 1 <<< nIndexBits;
         let nFreeRiderBits = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
-        // Largest storable keep value; see DiscretizedProbabilityDistribution. Padded rows
-        // use it together with alt_ℓ = ℓ so the residual 1/2^μ "swap" is a no-op.
         let maxKeep = (1 <<< bitsPrecision) - 1;
 
         mutable result : Bool[][][] = [];
         for c in 0..nCond - 1 {
-            // Squared, unlike the plain PREPARE variant: this operation is a 2-norm state
-            // preparation, so amplitude ∝ |c| requires probability ∝ c². See the namespace
-            // documentation comment.
             let squaredCoeffs = Mapped(x -> x * x, coefficients[c]);
             let (keepCoeff, altIndex) = DiscretizedProbabilityDistribution(bitsPrecision, squaredCoeffs);
             mutable innerData : Bool[][] = [];
@@ -416,15 +371,7 @@ namespace QDKChemistry.Utils.AliasSampling {
         Z(signOrigQubit);
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Test wrappers — apply the preparation to a caller-supplied register so the
-    // resulting state can be captured via dump_operation_on_state.
-    // ═══════════════════════════════════════════════════════════════════════════
-
     /// Test wrapper: run alias sampling on a freshly allocated register.
-    ///
-    /// The register is intentionally leaked (``AllocateQubitArray`` rather than ``use``)
-    /// so the prepared state survives the call and can be read with ``dump_machine``.
     internal operation RunAliasSamplingPrep(
         coefficients : Double[],
         bitsPrecision : Int,

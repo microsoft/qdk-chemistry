@@ -131,9 +131,9 @@ class AliasSamplingStatePreparation(StatePreparation):
         if not np.all(np.isfinite(coeffs)):
             raise ValueError("Alias sampling state preparation requires finite coefficients.")
         if np.any(coeffs < 0.0):
-            raise ValueError(
-                "Alias sampling state preparation requires non-negative coefficients."
-            )
+            raise ValueError("Alias sampling state preparation requires non-negative coefficients.")
+        if not np.any(coeffs > 0.0):
+            raise ValueError("Alias sampling state preparation requires at least one non-zero coefficient.")
 
         coefficients = coeffs.tolist()
         num_index_qubits = math.ceil(math.log2(len(coefficients))) if len(coefficients) > 1 else 1

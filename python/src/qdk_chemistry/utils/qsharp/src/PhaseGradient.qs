@@ -18,8 +18,7 @@ namespace QDKChemistry.Utils.PhaseGradient {
 
     /// Prepares the phase gradient state |φ⟩ = (1/√2^n) Σ_k exp(-2πi·k/2^n) |k⟩_LE.
     ///
-    /// Prepared via QFT†|1⟩. The QFT output (without bit-reversal swaps)
-    /// aligns with the LE adder (RippleCarryCGIncByLE).
+    /// The QFT output (without bit-reversal swaps) aligns with the LE adder (RippleCarryCGIncByLE).
     /// Ideally this is prepared at the beginning of a circuit and reused throughout.
     operation PreparePhaseGradientState(phaseGradient : Qubit[]) : Unit is Adj + Ctl {
         let n = Length(phaseGradient);
@@ -89,10 +88,6 @@ namespace QDKChemistry.Utils.PhaseGradient {
             RzViaPhaseGradient(targetQubit, angleQubits, phaseGradient);
         }
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Test wrappers — Qubit layout: target[0], angle[0..n-1], pg[0..n-1].
-    // ═══════════════════════════════════════════════════════════════════════════
 
     /// Test wrapper: apply Ry via phase gradient on |0⟩ and leave state.
     internal operation TestRy(angleValue : Int, nBits : Int) : Unit {
