@@ -270,10 +270,10 @@ The selected alpha and beta indices must be identical and match the active-space
 The localizer optimizes against the fixed input density matrices and returns a single orbital rotation.
 It does not recompute the correlated wavefunction after rotating the orbitals.
 It minimizes the quantum-information-orbital objective restricted to rotations within a fixed active space.
-It does not implement full-window QIO or QICAS.
-The :doc:`orbital optimizer contract <orbital_optimizer>` permits
-cross-boundary rotations, but no built-in implementation is currently
-registered.
+It does not implement full-window QIO or QICAS. Use the
+:ref:`QDK QICAS active-space selector <qdk-qicas-active-space>` when the
+correlated candidate window should be rotated and reduced to a smaller target
+active space.
 
 .. rubric:: Settings
 

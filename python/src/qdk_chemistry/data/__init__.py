@@ -68,7 +68,6 @@ import warnings
 from contextlib import suppress
 
 from qdk_chemistry._core.data import (
-    ActiveSpaceOptimizationResult,
     AlgorithmRef,
     AmplitudeContainer,
     AmplitudeType,
@@ -89,7 +88,6 @@ from qdk_chemistry._core.data import (
     ModelOrbitals,
     NuclearGradients,
     NuclearHessian,
-    OrbitalOptimizationResult,
     Orbitals,
     OrbitalType,
     PauliOperator,
@@ -140,7 +138,6 @@ SettingsAreLockedError = SettingsAreLocked
 
 __all__ = [
     "AOType",
-    "ActiveSpaceOptimizationResult",
     "AlgorithmRef",
     "AmplitudeContainer",
     "AmplitudeType",
@@ -170,7 +167,6 @@ __all__ = [
     "ModelOrbitals",
     "NuclearGradients",
     "NuclearHessian",
-    "OrbitalOptimizationResult",
     "OrbitalType",
     "Orbitals",
     "PauliOperator",

@@ -127,9 +127,7 @@ class _AlgorithmWrapper:
 
         # Cache miss — execute locally and store
         result = self._algo.run(*args, **kwargs)
-        stored = _store_result(resolved_cache, run_hash, self._algo, result, args, kwargs)
-        if force_rerun and not stored:
-            _invalidate_cached_job(resolved_cache, run_hash, self._algo)
+        _store_result(resolved_cache, run_hash, self._algo, result, args, kwargs)
         return result
 
     def __getattr__(self, name: str) -> Any:
@@ -167,21 +165,12 @@ def _store_result(
     result: Any,
     args: tuple,
     kwargs: dict,
-) -> bool:
-    """Store a computation result in the cache and report success."""
+) -> None:
+    """Store a computation result in the cache."""
     from qdk_chemistry.data._hashing import _item_content_hash, collect_content_hashes  # noqa: PLC0415
     from qdk_chemistry.remote.job import Job  # noqa: PLC0415
 
-    try:
-        output_hashes = collect_content_hashes(result)
-    except (AttributeError, TypeError, ValueError) as exc:
-        warnings.warn(
-            f"Caching skipped for {algorithm.type_name()}/{algorithm.name()} because its output "
-            f"could not be hashed: {exc}",
-            UserWarning,
-            stacklevel=2,
-        )
-        return False
+    output_hashes = collect_content_hashes(result)
 
     input_hashes: dict[str, str] = {}
     for i, arg in enumerate(args):
@@ -218,23 +207,9 @@ def _store_result(
                     UserWarning,
                     stacklevel=2,
                 )
-                return False
+                return
 
     cache.put_job(run_hash, job)
-    return True
-
-
-def _invalidate_cached_job(cache: Any, run_hash: str, algorithm: Any) -> None:
-    """Best-effort removal of stale metadata after a forced rerun."""
-    try:
-        cache.delete_job(run_hash)
-    except (AttributeError, OSError, TypeError, ValueError) as exc:
-        warnings.warn(
-            f"Caching skipped for {algorithm.type_name()}/{algorithm.name()}, and the previous "
-            f"cached result could not be invalidated: {exc}",
-            UserWarning,
-            stacklevel=2,
-        )
 
 
 __all__ = [
@@ -740,7 +715,6 @@ def _register_cpp_factories():
     be called by users.
     """
     from qdk_chemistry._core._algorithms import (  # noqa: PLC0415
-        ActiveSpaceOptimizerFactory,
         ActiveSpaceSelectorFactory,
         DynamicalCorrelationCalculatorFactory,
         EffectiveHamiltonianConstructorFactory,
@@ -750,7 +724,6 @@ def _register_cpp_factories():
         MultiConfigurationCalculatorFactory,
         MultiConfigurationScfFactory,
         NuclearDerivativeCalculatorFactory,
-        OrbitalOptimizerFactory,
         PopulationAnalyzerFactory,
         ProjectedMultiConfigurationCalculatorFactory,
         ScfSolverFactory,
@@ -758,7 +731,6 @@ def _register_cpp_factories():
     )
 
     register_factory(ActiveSpaceSelectorFactory)
-    register_factory(ActiveSpaceOptimizerFactory)
     register_factory(DynamicalCorrelationCalculatorFactory)
     register_factory(EffectiveHamiltonianConstructorFactory)
     register_factory(GeometryOptimizerFactory)
@@ -767,7 +739,6 @@ def _register_cpp_factories():
     register_factory(MultiConfigurationCalculatorFactory)
     register_factory(MultiConfigurationScfFactory)
     register_factory(NuclearDerivativeCalculatorFactory)
-    register_factory(OrbitalOptimizerFactory)
     register_factory(PopulationAnalyzerFactory)
     register_factory(ProjectedMultiConfigurationCalculatorFactory)
     register_factory(ScfSolverFactory)

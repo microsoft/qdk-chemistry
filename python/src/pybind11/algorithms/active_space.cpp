@@ -11,6 +11,7 @@
 #include "qdk/chemistry/algorithms/microsoft/active_space/autocas_active_space.hpp"
 #include "qdk/chemistry/algorithms/microsoft/active_space/entropy_active_space.hpp"
 #include "qdk/chemistry/algorithms/microsoft/active_space/occupation_active_space.hpp"
+#include "qdk/chemistry/algorithms/microsoft/active_space/qicas_active_space.hpp"
 #include "qdk/chemistry/algorithms/microsoft/active_space/valence_active_space.hpp"
 
 namespace py = pybind11;
@@ -215,6 +216,19 @@ Default constructor.
 Initializes an occupation-based active space selector with default settings.
 
 )");
+
+  py::class_<microsoft::QICASActiveSpaceSelector, ActiveSpaceSelector,
+             py::smart_holder>(m, "QdkQICASActiveSpaceSelector", R"(
+Quantum information-assisted complete active space (QICAS) selector.
+
+The input wavefunction's active space defines a correlated candidate window.
+QICAS rotates that window to minimize the single-orbital entropy outside the
+requested target active space, then assigns inactive, active, and virtual
+orbitals by occupation. The returned wavefunction is an orbital and partition
+carrier for a subsequent CASCI or CASSCF calculation; it is not a correlated
+solution in the selected target space.
+)")
+      .def(py::init<>());
 
   // Bind concrete microsoft::ValenceActiveSpaceSelector implementation
   py::class_<microsoft::ValenceActiveSpaceSelector, ActiveSpaceSelector,

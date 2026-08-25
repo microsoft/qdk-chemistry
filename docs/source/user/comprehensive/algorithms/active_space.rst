@@ -167,6 +167,72 @@ Automatic selection based on orbital occupation numbers, identifying orbitals wi
      - ``0.1``
      - Orbitals with occupations deviating from 0 or 2 by more than this threshold are selected
 
+.. _qdk-qicas-active-space:
+
+QDK QICAS
+~~~~~~~~~
+
+.. rubric:: Factory name: ``"qdk_qicas"``
+
+Quantum information-assisted complete active space optimization (QICAS)
+:cite:`Ding2023` optimizes the orbital basis and active-space partition by
+minimizing the single-orbital entropy discarded outside a target active space.
+It is an active-space preparation method: the returned wavefunction carries the
+optimized orbitals and target partition for a subsequent CASCI or CASSCF solve,
+not a correlated solution in the new target space.
+
+The input wavefunction's existing active space defines the correlated candidate
+window. The wavefunction must provide real, spin-dependent active-space one- and
+two-particle RDMs spanning that complete window. QICAS does not synthesize
+cross-boundary correlation from frozen inactive or empty virtual orbitals.
+
+The current implementation supports restricted, closed-shell candidate
+windows without spatial point-group blocks. Candidate-window slots must
+initially be ordered as prospective closed orbitals, target active orbitals, and
+prospective virtual orbitals. QICAS rotates every candidate pair touching a
+non-target slot, reorders the optimized window by occupation, assigns the most
+occupied excluded slots as inactive, and leaves the least occupied excluded
+slots virtual.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 15 45
+
+   * - Setting
+     - Type
+     - Default
+     - Description
+   * - ``num_active_electrons``
+     - int
+     - ``-1``
+     - Required even number of electrons in the target active space
+   * - ``num_active_orbitals``
+     - int
+     - ``-1``
+     - Required number of orbitals in the target active space
+   * - ``max_cycles``
+     - int
+     - ``200``
+     - Maximum number of Jacobi sweeps
+   * - ``convergence_tolerance``
+     - float
+     - ``1e-10``
+     - Sweep-to-sweep objective change used for convergence
+   * - ``coarse_angle_step``
+     - float
+     - ``0.02``
+     - Coarse pair-rotation angle spacing in radians
+   * - ``fine_samples``
+     - int
+     - ``201``
+     - Number of samples used to refine the best coarse angle
+   * - ``improvement_tolerance``
+     - float
+     - ``1e-12``
+     - Minimum entropy decrease required to accept a pair rotation
+
 .. _autocas-algorithm:
 
 QDK autoCAS

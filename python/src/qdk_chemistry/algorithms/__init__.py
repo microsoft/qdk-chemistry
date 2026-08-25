@@ -14,12 +14,12 @@ import importlib
 from types import ModuleType
 from typing import TYPE_CHECKING, Any
 
-from qdk_chemistry.algorithms.active_space_optimizer import ActiveSpaceOptimizer
 from qdk_chemistry.algorithms.active_space_selector import (
     ActiveSpaceSelector,
     QdkAutocasActiveSpaceSelector,
     QdkAutocasEosActiveSpaceSelector,
     QdkOccupationActiveSpaceSelector,
+    QdkQICASActiveSpaceSelector,
     QdkValenceActiveSpaceSelector,
 )
 from qdk_chemistry.algorithms.amplitude_amplification.amplitude_amplification import AmplitudeAmplification
@@ -57,7 +57,6 @@ from qdk_chemistry.algorithms.orbital_localizer import (
     QdkPipekMezeyLocalizer,
     QdkVVHVLocalizer,
 )
-from qdk_chemistry.algorithms.orbital_optimizer import OrbitalOptimizer
 from qdk_chemistry.algorithms.phase_estimation.base import PhaseEstimation
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import QpeCircuitBuilder
 from qdk_chemistry.algorithms.population_analysis import PopulationAnalyzer, QdkPopulationAnalyzer
@@ -75,7 +74,6 @@ from qdk_chemistry.utils.telemetry_events import telemetry_tracker
 
 __all__ = [
     # Classes
-    "ActiveSpaceOptimizer",
     "ActiveSpaceSelector",
     "AmplitudeAmplification",
     "CircuitExecutor",
@@ -93,7 +91,6 @@ __all__ = [
     "MultiConfigurationScf",
     "NuclearDerivativeCalculator",
     "OrbitalLocalizer",
-    "OrbitalOptimizer",
     "PhaseEstimation",
     "PopulationAnalyzer",
     "ProjectedMultiConfigurationCalculator",
@@ -114,6 +111,7 @@ __all__ = [
     "QdkOccupationActiveSpaceSelector",
     "QdkPipekMezeyLocalizer",
     "QdkPopulationAnalyzer",
+    "QdkQICASActiveSpaceSelector",
     "QdkQubitMapper",
     "QdkScfSolver",
     "QdkStabilityChecker",

@@ -154,7 +154,6 @@ pybind11_add_module(_core
     src/pybind11/data/symmetry/symmetry_blocked_sparse_map.cpp
     src/pybind11/data/element_data.cpp
     src/pybind11/data/orbitals.cpp
-    src/pybind11/data/orbital_optimization.cpp
     src/pybind11/data/wavefunction.cpp
     src/pybind11/data/hamiltonian.cpp
     src/pybind11/data/settings.cpp
@@ -175,8 +174,6 @@ pybind11_add_module(_core
     src/pybind11/algorithms/mc.cpp
     src/pybind11/algorithms/pmc.cpp
     src/pybind11/algorithms/mcscf.cpp
-    src/pybind11/algorithms/orbital_optimizer.cpp
-    src/pybind11/algorithms/active_space_optimizer.cpp
     src/pybind11/algorithms/hamiltonian.cpp
     src/pybind11/algorithms/scf.cpp
     src/pybind11/algorithms/nuclear_derivative.cpp
