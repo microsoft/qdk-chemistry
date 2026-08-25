@@ -112,14 +112,20 @@ namespace QDKChemistry.Utils.QROMStatePrep {
     }
 
     /// Create a QROM state preparation callable.
+    ///
+    /// Self-contained on an all-zero register: it prepares the phase gradient it needs and
+    /// uncomputes it, so callers that hand over a freshly allocated `[state | gradient]`
+    /// register get the requested state rather than a silently unrotated one.
     function MakeQROMStatePrepOp(params : QROMStatePrepParams) : Qubit[] => Unit is Adj + Ctl {
         let n = params.numStateQubits;
         let bRot = params.rotationBitPrecision;
-        (qs) => QROMStatePrepare(
-            params,
-            qs[0..n - 1],
-            qs[n..n + bRot - 1]
-        )
+        (qs) => {
+            within {
+                PreparePhaseGradientState(qs[n..n + bRot - 1]);
+            } apply {
+                QROMStatePrepare(params, qs[0..n - 1], qs[n..n + bRot - 1]);
+            }
+        }
     }
 
     /// Circuit entry point for QROM state preparation (allocates qubits).

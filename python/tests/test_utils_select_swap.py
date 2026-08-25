@@ -57,4 +57,4 @@ class TestSelectSwapPreservesAddressPhases:
 
     @pytest.mark.parametrize("num_swap_bits", [1, 2])
     def test_2d_swap_path_matches_plain_select(self, qdk_ctx, num_swap_bits):
-        assert qdk_ctx.code.QDKChemistry.Utils.SelectSwap.TestSelectSwap2DPhaseAgreement(_DATA_2D, num_swap_bits)
+        assert qdk_ctx.code.QDKChemistry.Utils.SelectSwap.TestSelect2DLoadPhaseAgreement(_DATA_2D, num_swap_bits)
