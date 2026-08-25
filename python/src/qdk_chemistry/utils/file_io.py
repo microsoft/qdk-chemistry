@@ -764,63 +764,74 @@ def _create_private_directories_once(directory: Path) -> None:
             raise close_error
 
 
-def _has_initializing_directory(directory: Path) -> bool:
+def _directory_initialization_state(
+    directory: Path,
+) -> tuple[bool, tuple[tuple[str, int, int, int], ...]]:
+    initializing = False
+    state: list[tuple[str, int, int, int]] = []
     current = directory
     while True:
         try:
             status = current.stat()
-        except (FileNotFoundError, PermissionError):
-            pass
+        except FileNotFoundError:
+            state.append((os.fspath(current), -1, -1, errno.ENOENT))
+        except PermissionError:
+            state.append((os.fspath(current), -1, -1, errno.EACCES))
         else:
-            if stat.S_ISDIR(status.st_mode) and status.st_uid == os.geteuid() and status.st_mode & 0o777 == 0:
-                return True
+            permissions = status.st_mode & 0o777
+            state.append((os.fspath(current), status.st_dev, status.st_ino, permissions))
+            initializing = initializing or (
+                stat.S_ISDIR(status.st_mode) and status.st_uid == os.geteuid() and permissions == 0
+            )
         parent = current.parent
         if parent == current:
-            return False
+            return initializing, tuple(state)
         current = parent
 
 
 def _create_private_directories(directory: Path) -> None:
     deadline = time.monotonic() + _DIRECTORY_CREATION_RETRY_TIMEOUT_SECONDS
-    retry_without_marker = True
+    _, previous_state = _directory_initialization_state(directory)
     while True:
         permission_error: PermissionError | None = None
         try:
             _create_private_directories_once(directory)
             return
         except PermissionError as error:
-            if _has_initializing_directory(directory):
-                retry_without_marker = True
-            elif retry_without_marker:
-                retry_without_marker = False
-                continue
-            else:
-                raise
             permission_error = error
 
         if time.monotonic() >= deadline:
             assert permission_error is not None
             raise permission_error
-        time.sleep(_DIRECTORY_CREATION_RETRY_DELAY_SECONDS)
+        initializing, current_state = _directory_initialization_state(directory)
+        if initializing:
+            previous_state = current_state
+            time.sleep(_DIRECTORY_CREATION_RETRY_DELAY_SECONDS)
+            continue
+        if current_state != previous_state:
+            previous_state = current_state
+            continue
+        raise permission_error
 
 
 def _reserve_temporary_file_with_parent_retry(destination: Path) -> _TemporaryFileReservation:
     deadline = time.monotonic() + _DIRECTORY_CREATION_RETRY_TIMEOUT_SECONDS
-    retry_without_marker = True
+    _, previous_state = _directory_initialization_state(destination.parent)
     while True:
         try:
             return _reserve_temporary_file(destination)
-        except PermissionError:
-            if _has_initializing_directory(destination.parent):
-                retry_without_marker = True
-            elif retry_without_marker:
-                retry_without_marker = False
-                continue
-            else:
-                raise
+        except PermissionError as error:
             if time.monotonic() >= deadline:
                 raise
-            time.sleep(_DIRECTORY_CREATION_RETRY_DELAY_SECONDS)
+            initializing, current_state = _directory_initialization_state(destination.parent)
+            if initializing:
+                previous_state = current_state
+                time.sleep(_DIRECTORY_CREATION_RETRY_DELAY_SECONDS)
+                continue
+            if current_state != previous_state:
+                previous_state = current_state
+                continue
+            raise error
 
 
 def write_text_file_atomically(

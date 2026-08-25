@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <system_error>
 #include <thread>
+#include <tuple>
 #include <vector>
 
 #ifdef _WIN32
@@ -101,25 +102,33 @@ class TransientPermissionError : public std::runtime_error {
 }
 
 #ifndef _WIN32
-bool has_initializing_directory(const std::filesystem::path& directory) {
+using DirectoryStateEntry = std::tuple<dev_t, ino_t, mode_t, int>;
+
+std::pair<bool, std::vector<DirectoryStateEntry>>
+directory_initialization_state(const std::filesystem::path& directory) {
+  bool initializing = false;
+  std::vector<DirectoryStateEntry> state;
   auto current = directory;
   while (!current.empty()) {
     struct stat status{};
     if (retry_on_eintr([&] { return ::stat(current.c_str(), &status); }) == 0) {
+      const mode_t permissions = status.st_mode & 0777;
+      state.emplace_back(status.st_dev, status.st_ino, permissions, 0);
       if (S_ISDIR(status.st_mode) && status.st_uid == geteuid() &&
-          (status.st_mode & 0777) == 0) {
-        return true;
+          permissions == 0) {
+        initializing = true;
       }
-    } else if (errno != EACCES && errno != ENOENT) {
-      return false;
+    } else {
+      const int status_error = errno;
+      state.emplace_back(0, 0, 0, status_error);
     }
     const auto parent = current.parent_path();
     if (parent == current) {
-      return false;
+      return {initializing, std::move(state)};
     }
     current = parent;
   }
-  return false;
+  return {initializing, std::move(state)};
 }
 #endif
 
@@ -847,24 +856,29 @@ void create_private_directories(const std::filesystem::path& directory) {
     }
   };
 
-  bool retry_without_marker = true;
+  auto [ignored_initializing, previous_state] =
+      directory_initialization_state(directory);
+  static_cast<void>(ignored_initializing);
   while (true) {
     try {
       create_once();
       return;
     } catch (const TransientPermissionError&) {
-      if (has_initializing_directory(directory)) {
-        retry_without_marker = true;
-      } else if (retry_without_marker) {
-        retry_without_marker = false;
-        continue;
-      } else {
-        throw;
-      }
       if (std::chrono::steady_clock::now() >= deadline) {
         throw;
       }
-      std::this_thread::sleep_for(retry_delay);
+      auto [initializing, current_state] =
+          directory_initialization_state(directory);
+      if (initializing) {
+        previous_state = std::move(current_state);
+        std::this_thread::sleep_for(retry_delay);
+        continue;
+      }
+      if (current_state != previous_state) {
+        previous_state = std::move(current_state);
+        continue;
+      }
+      throw;
     }
   }
 #endif
@@ -987,7 +1001,9 @@ void write_file_atomically(const std::filesystem::path& path,
 #else
     const auto deadline =
         std::chrono::steady_clock::now() + std::chrono::seconds(1);
-    bool retry_without_marker = true;
+    auto [ignored_initializing, previous_state] =
+        directory_initialization_state(destination.parent_path());
+    static_cast<void>(ignored_initializing);
     while (true) {
       try {
         return reserve_temporary_file(destination);
@@ -995,18 +1011,21 @@ void write_file_atomically(const std::filesystem::path& path,
         if (!create_parent_directories) {
           throw;
         }
-        if (has_initializing_directory(destination.parent_path())) {
-          retry_without_marker = true;
-        } else if (retry_without_marker) {
-          retry_without_marker = false;
-          continue;
-        } else {
-          throw;
-        }
         if (std::chrono::steady_clock::now() >= deadline) {
           throw;
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        auto [initializing, current_state] =
+            directory_initialization_state(destination.parent_path());
+        if (initializing) {
+          previous_state = std::move(current_state);
+          std::this_thread::sleep_for(std::chrono::milliseconds(1));
+          continue;
+        }
+        if (current_state != previous_state) {
+          previous_state = std::move(current_state);
+          continue;
+        }
+        throw;
       }
     }
 #endif

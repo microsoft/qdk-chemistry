@@ -242,6 +242,79 @@ def test_retry_reservation_after_directory_initialization_completes(
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX permission semantics")
+def test_retry_after_multiple_directory_state_changes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    directory = tmp_path / "nested" / "parent"
+    states = iter(
+        [
+            (False, (("root", 1, 1, 0o700),)),
+            (False, (("root", 1, 1, 0o700), ("nested", 1, 2, 0o700))),
+            (
+                False,
+                (
+                    ("root", 1, 1, 0o700),
+                    ("nested", 1, 2, 0o700),
+                    ("parent", 1, 3, 0o700),
+                ),
+            ),
+        ]
+    )
+    calls = 0
+
+    def fail_twice(_: Path) -> None:
+        nonlocal calls
+        calls += 1
+        if calls < 3:
+            raise PermissionError(errno.EACCES, "initializing")
+
+    monkeypatch.setattr(file_io_module, "_directory_initialization_state", lambda _: next(states))
+    monkeypatch.setattr(file_io_module, "_create_private_directories_once", fail_twice)
+
+    file_io_module._create_private_directories(directory)
+
+    assert calls == 3
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission semantics")
+def test_retry_reservation_after_multiple_directory_state_changes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    destination = tmp_path / "nested" / "parent" / "data.txt"
+    reservation = object()
+    states = iter(
+        [
+            (False, (("root", 1, 1, 0o700),)),
+            (False, (("root", 1, 1, 0o700), ("nested", 1, 2, 0o700))),
+            (
+                False,
+                (
+                    ("root", 1, 1, 0o700),
+                    ("nested", 1, 2, 0o700),
+                    ("parent", 1, 3, 0o700),
+                ),
+            ),
+        ]
+    )
+    calls = 0
+
+    def fail_twice(_: Path) -> object:
+        nonlocal calls
+        calls += 1
+        if calls < 3:
+            raise PermissionError(errno.EACCES, "initializing")
+        return reservation
+
+    monkeypatch.setattr(file_io_module, "_directory_initialization_state", lambda _: next(states))
+    monkeypatch.setattr(file_io_module, "_reserve_temporary_file", fail_twice)
+
+    assert file_io_module._reserve_temporary_file_with_parent_retry(destination) is reservation
+    assert calls == 3
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission semantics")
 def test_do_not_modify_permanently_inaccessible_parent(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
