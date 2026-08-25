@@ -239,7 +239,10 @@ class LocalBackend(RemoteBackend):
         """
         local_path = Path(local_path)
         local_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(remote_path, local_path)
+        source_path = Path(remote_path)
+        if not source_path.is_absolute():
+            source_path = Path(self.remote_workdir) / source_path
+        shutil.copy2(source_path, local_path)
 
     # ── Async job primitives ─────────────────────────────────────────────
 
