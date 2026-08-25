@@ -15,7 +15,6 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu imp
 from qdk_chemistry.algorithms.state_preparation.alias_sampling import AliasSamplingStatePreparation
 from qdk_chemistry.algorithms.state_preparation.dense_pure_state import DensePureStatePreparation
 from qdk_chemistry.algorithms.state_preparation.qrom_state_prep import QROMStatePreparation
-from qdk_chemistry.algorithms.state_preparation.state_preparation import PrepareLayout
 from qdk_chemistry.data import (
     AlgorithmRef,
     Configuration,
@@ -76,42 +75,51 @@ def _expected_block(paulis: list[np.ndarray], coefficients: list[float], theta: 
     return hamiltonian @ np.array([np.cos(theta / 2), np.sin(theta / 2)]) / sum(coefficients)
 
 
-class TestPrepareLayout:
+class TestRegisterWidths:
     """Each oracle has to describe the register it needs before it can be embedded."""
 
-    def test_default_layout_matches_the_lcu_ancilla_count(self):
+    def test_default_widths_match_the_lcu_ancilla_count(self):
         """A pure state preparation indexes exactly the register the LCU sized for it.
 
         This is the invariant that keeps every pre-existing block encoding byte-identical:
-        the default layout has to reproduce ``LCUContainer.num_prepare_ancillas`` exactly.
+        the default widths have to reproduce ``LCUContainer.num_prepare_ancillas`` exactly,
+        with nothing else asked for.
         """
         lcu, _ = _psp_mapper("dense_pure_state").resolve_lcu(_lcu(["XX", "ZZ", "XZ"], [0.25, 0.5, 0.1]).get_container())
-        layout = DensePureStatePreparation().prepare_layout(lcu.prepare)
+        dense = DensePureStatePreparation()
 
-        assert layout == PrepareLayout(num_select_qubits=2, num_block_ancillas=2, num_shared_ancillas=0)
-        assert layout.num_select_qubits == lcu.num_prepare_ancillas
+        assert dense.num_system_qubits(lcu.prepare) == lcu.num_prepare_ancillas == 2
+        assert dense.num_entangled_ancillas(lcu.prepare) == 0
+        assert dense.num_phase_gradient_ancillas(lcu.prepare) == 0
 
-    def test_alias_layout_widens_the_block_ancilla_register(self):
-        """Alias sampling indexes n qubits but leaves 2n + 2mu + 1 of them entangled.
+    def test_alias_reports_the_garbage_it_leaves_entangled(self):
+        """Alias sampling indexes n qubits but leaves n + 2mu + 1 more entangled with them.
 
         SELECT must still see only the n index qubits; the rest is garbage that
         ``PREPARE``:sup:`dagger` uncomputes.
         """
-        layout = AliasSamplingStatePreparation(bits_precision=4).prepare_layout(
-            _make_wavefunction([0.5, 0.3, 0.7, 0.1])
-        )
+        alias = AliasSamplingStatePreparation(bits_precision=4)
+        wavefunction = _make_wavefunction([0.5, 0.3, 0.7, 0.1])
 
-        assert layout == PrepareLayout(num_select_qubits=2, num_block_ancillas=2 * 2 + 2 * 4 + 1)
+        assert alias.num_system_qubits(wavefunction) == 2
+        assert alias.num_entangled_ancillas(wavefunction) == 2 + 2 * 4 + 1
+        assert alias.num_phase_gradient_ancillas(wavefunction) == 0
 
-    def test_qrom_layout_requests_a_shared_gradient(self):
-        """QROM's phase gradient is shared ancilla, not block ancilla.
+    def test_qrom_requests_a_phase_gradient_only_when_it_is_external(self):
+        """QROM's gradient is the caller's to supply, and only when it asks for it.
 
         It is left in |phi> between uses rather than |0>, so a qubitization walk must not
-        reflect about it.
+        reflect about it. Turning the setting off makes the oracle allocate its own and the
+        caller owes it nothing.
         """
-        layout = QROMStatePreparation(rotation_bit_precision=6).prepare_layout(_make_wavefunction([0.5, 0.3, 0.7, 0.1]))
+        wavefunction = _make_wavefunction([0.5, 0.3, 0.7, 0.1])
+        shared = QROMStatePreparation(rotation_bit_precision=6)
+        owned = QROMStatePreparation(rotation_bit_precision=6, external_phase_gradient=False)
 
-        assert layout == PrepareLayout(num_select_qubits=2, num_block_ancillas=2, num_shared_ancillas=6)
+        assert shared.num_system_qubits(wavefunction) == 2
+        assert shared.num_entangled_ancillas(wavefunction) == 0
+        assert shared.num_phase_gradient_ancillas(wavefunction) == 6
+        assert owned.num_phase_gradient_ancillas(wavefunction) == 0
 
 
 class TestAliasSamplingConvention:
@@ -185,11 +193,7 @@ class TestPSPMapperWithPrepareOracles:
         would raise: SELECT would just pair coefficients with the wrong terms.
         """
         unitary = _lcu(["XX", "ZZ", "XZ"], [0.25, 0.5, 0.1])
-        monkeypatch.setattr(
-            DensePureStatePreparation,
-            "prepare_layout",
-            lambda *_: PrepareLayout(num_select_qubits=5, num_block_ancillas=5),
-        )
+        monkeypatch.setattr(DensePureStatePreparation, "num_system_qubits", lambda *_: 5)
 
         with pytest.raises(ValueError, match="indexes 5 qubits"):
             _psp_mapper("dense_pure_state").run(unitary)
@@ -246,9 +250,9 @@ class TestBlockEncodingIdentity:
         context.eval(f"QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState({gradient});")
         context.eval(
             "QDKChemistry.Utils.PrepSelPrep.PrepSelPrep("
-            "QDKChemistry.Utils.QROMStatePrep.MakeQROMStatePrepOpShared("
+            "QDKChemistry.Utils.QROMStatePrep.MakeQROMStatePrepOracle("
             "new QDKChemistry.Utils.QROMStatePrep.QROMStatePrepParams {"
-            f"amplitudes = {amplitudes}, rotationBitPrecision = {b_rot}, numStateQubits = 2 }}), "
+            f"amplitudes = {amplitudes}, rotationBitPrecision = {b_rot}, numStateQubits = 2 }}, true), "
             "QDKChemistry.Utils.Select.MakeSelectOp("
             "new QDKChemistry.Utils.Select.PauliSelectParams {"
             "pauliTerms = [[PauliX], [PauliZ], [PauliY]], signs = [1, 1, 1], "

@@ -13,7 +13,7 @@ from qdk_chemistry.data import Settings, Wavefunction
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .state_preparation import PrepareLayout, StatePreparation
+from .state_preparation import StatePreparation
 
 __all__: list[str] = ["AliasSamplingStatePreparation", "AliasSamplingStatePreparationSettings"]
 
@@ -187,24 +187,31 @@ class AliasSamplingStatePreparation(StatePreparation):
             )
         return (coeffs**2).tolist()
 
-    def prepare_layout(self, wavefunction: Wavefunction) -> PrepareLayout:
-        r"""Return the register widths this oracle needs inside a block encoding.
-
-        Alias sampling leaves :math:`\mu` uniform qubits, one flag qubit and
-        :math:`\mu + n` QROM output qubits entangled with the :math:`n`-qubit index, so
-        the block ancilla register is much wider than the index SELECT controls on.
+    def num_system_qubits(self, wavefunction: Wavefunction) -> int:
+        r"""Return the width of the index register SELECT controls on.
 
         Args:
             wavefunction: The wavefunction that will be prepared.
 
         Returns:
-            PrepareLayout: An :math:`n`-qubit index inside a
-            :math:`2n + 2\mu + 1` qubit block ancilla register, with no shared ancilla.
+            The index register width :math:`n = \lceil\log_2 L\rceil`.
 
         """
-        num_index_qubits = self._num_index_qubits(len(self._sampling_weights(wavefunction)))
+        return self._num_index_qubits(len(self._sampling_weights(wavefunction)))
+
+    def num_entangled_ancillas(self, wavefunction: Wavefunction) -> int:
+        r"""Return the scratch width left entangled with the index register.
+
+        Alias sampling leaves :math:`\mu` uniform qubits, one flag qubit and
+        :math:`\mu + n` QROM output qubits entangled with the :math:`n`-qubit index, so
+        the register it owns is much wider than the index SELECT controls on.
+
+        Args:
+            wavefunction: The wavefunction that will be prepared.
+
+        Returns:
+            :math:`n + 2\mu + 1` qubits of scratch.
+
+        """
         bits_precision = int(self._settings.get("bits_precision"))
-        return PrepareLayout(
-            num_select_qubits=num_index_qubits,
-            num_block_ancillas=2 * num_index_qubits + 2 * bits_precision + 1,
-        )
+        return self.num_system_qubits(wavefunction) + 2 * bits_precision + 1

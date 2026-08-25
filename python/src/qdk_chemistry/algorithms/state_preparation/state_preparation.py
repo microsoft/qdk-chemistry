@@ -6,41 +6,10 @@
 # --------------------------------------------------------------------------------------------
 
 import warnings
-from dataclasses import dataclass
 from typing import Any
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import Circuit, Settings, Wavefunction
-
-__all__: list[str] = ["PrepareLayout"]
-
-
-@dataclass(frozen=True)
-class PrepareLayout:
-    r"""Register widths a PREPARE oracle needs inside a block encoding.
-
-    A block encoding hands PREPARE one register and SELECT another, and for simple
-    state preparations those are the same qubits. They are not always: an oracle may
-    need scratch beyond the index it produces, and it may want to share a resource
-    across the whole circuit rather than re-create it per call. This splits the three
-    cases apart.
-
-    Attributes:
-        num_select_qubits: Width of the index SELECT controls on. Only these qubits
-            carry index information.
-        num_block_ancillas: Total width PREPARE owns, index plus any garbage left
-            entangled with it. ``PREPARE``\ :sup:`†` returns all of it to
-            :math:`|0\rangle`, and a qubitization walk reflects about exactly this
-            register.
-        num_shared_ancillas: Width of ancilla prepared once for the whole circuit and
-            left in a non-zero state between uses, such as a phase gradient. These are
-            deliberately excluded from the walk reflection.
-
-    """
-
-    num_select_qubits: int
-    num_block_ancillas: int
-    num_shared_ancillas: int = 0
 
 
 class StatePreparationSettings(Settings):
@@ -108,42 +77,72 @@ class StatePreparation(Algorithm):
         """
         return super().run(wavefunction)
 
-    def prepare_layout(self, wavefunction: Wavefunction) -> PrepareLayout:
-        """Return the register widths this oracle needs inside a block encoding.
-
-        The default assumes the oracle produces a pure state on the index register and
-        needs nothing else, which is true of every state preparation that is not
-        explicitly a PREPARE oracle.
+    def num_system_qubits(self, wavefunction: Wavefunction) -> int:
+        """Return the width of the index register a block encoding's SELECT controls on.
 
         Args:
             wavefunction: The wavefunction that will be prepared.
 
         Returns:
-            PrepareLayout: The index width, repeated as the block ancilla width, with no
-            shared ancilla.
+            The number of qubits carrying index information.
 
         """
-        num_index_qubits = wavefunction.get_orbitals().num_modes()
-        return PrepareLayout(
-            num_select_qubits=num_index_qubits,
-            num_block_ancillas=num_index_qubits,
-        )
+        return wavefunction.get_orbitals().num_modes()
 
-    def prepare_oracle(self, wavefunction: Wavefunction) -> tuple[Any, PrepareLayout]:
-        """Return the Q# PREPARE callable to embed in a block encoding, and its layout.
+    def num_entangled_ancillas(self, wavefunction: Wavefunction) -> int:
+        r"""Return the scratch width this oracle leaves entangled with the index.
+
+        Zero for any state preparation that produces a pure state on the index register,
+        which is every one that is not explicitly a PREPARE oracle. When it is non-zero
+        the block ancilla register is wider than the index, and a qubitization walk
+        reflects about all of it because ``PREPARE``\ :sup:`†` returns all of it to
+        :math:`|0\rangle`.
+
+        Args:
+            wavefunction: The wavefunction that will be prepared.
+
+        Returns:
+            The number of scratch qubits beyond the index register.
+
+        """
+        del wavefunction
+        return 0
+
+    def num_phase_gradient_ancillas(self, wavefunction: Wavefunction) -> int:
+        r"""Return the width of the phase gradient register this oracle reads.
+
+        The gradient is an eigenstate of the addition it drives, so it comes back
+        unchanged and one register can serve the whole circuit. It is left in
+        :math:`|\phi\rangle` rather than :math:`|0\rangle` between uses, so the caller
+        allocates and prepares it outside the block encoding and a qubitization walk
+        must not reflect about it.
+
+        Args:
+            wavefunction: The wavefunction that will be prepared.
+
+        Returns:
+            The number of phase gradient qubits the caller must supply, zero if the
+            oracle does not use one.
+
+        """
+        del wavefunction
+        return 0
+
+    def prepare_oracle(self, wavefunction: Wavefunction) -> Any:
+        """Return the Q# PREPARE callable to embed in a block encoding.
 
         Separate from :meth:`run` because an oracle may want a different implementation
         when it is embedded than when it is a standalone circuit — QROM state preparation
-        takes its phase gradient from the caller here rather than allocating one.
+        reads a caller-supplied phase gradient here rather than allocating its own.
 
         Args:
             wavefunction: The wavefunction that will be prepared.
 
         Returns:
-            The Q# callable and the register layout it expects.
+            The Q# callable acting on the register described by this oracle's widths.
 
         """
-        return self.run(wavefunction)._qsharp_op, self.prepare_layout(wavefunction)  # noqa: SLF001
+        return self.run(wavefunction)._qsharp_op  # noqa: SLF001
 
 
 class StatePreparationFactory(AlgorithmFactory):

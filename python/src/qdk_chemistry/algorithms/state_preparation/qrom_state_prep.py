@@ -14,7 +14,7 @@ from qdk_chemistry.data import Settings, Wavefunction
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .state_preparation import PrepareLayout, StatePreparation
+from .state_preparation import StatePreparation
 
 __all__: list[str] = ["QROMStatePreparation", "QROMStatePreparationSettings"]
 
@@ -35,6 +35,16 @@ class QROMStatePreparationSettings(Settings):
             "below chemical accuracy.",
             (1, 30),
         )
+        self._set_default(
+            "external_phase_gradient",
+            "bool",
+            True,
+            "Whether the PREPARE oracle reads a phase gradient register supplied by the "
+            "caller instead of allocating and preparing its own. Sharing one gradient across "
+            "a whole circuit removes the arbitrary-angle rotations that preparing it per call "
+            "would cost. Only affects prepare_oracle(); a standalone run() always allocates "
+            "its own.",
+        )
 
 
 class QROMStatePreparation(StatePreparation):
@@ -44,7 +54,7 @@ class QROMStatePreparation(StatePreparation):
     where each layer's angles are loaded from a QROM table.
     """
 
-    def __init__(self, rotation_bit_precision: int = 10):
+    def __init__(self, rotation_bit_precision: int = 10, external_phase_gradient: bool = True):
         """Initialize QROMStatePreparation.
 
         Args:
@@ -52,11 +62,15 @@ class QROMStatePreparation(StatePreparation):
                 angle precision. Higher values give more accurate rotations.
                 Defaults to 10. Equivalent to setting the ``rotation_bit_precision``
                 entry of ``settings()``.
+            external_phase_gradient: Whether :meth:`prepare_oracle` reads a caller-supplied
+                phase gradient register rather than allocating its own. Defaults to True.
+                Equivalent to setting the ``external_phase_gradient`` entry of ``settings()``.
 
         """
         super().__init__()
         self._settings = QROMStatePreparationSettings()
         self._settings.set("rotation_bit_precision", rotation_bit_precision)
+        self._settings.set("external_phase_gradient", external_phase_gradient)
 
     def name(self) -> str:
         """Return the algorithm name."""
@@ -130,46 +144,50 @@ class QROMStatePreparation(StatePreparation):
         """Width of the state register for a given coefficient count."""
         return math.ceil(math.log2(num_coefficients)) if num_coefficients > 1 else 1
 
-    def prepare_layout(self, wavefunction: Wavefunction) -> PrepareLayout:
-        """Return the register widths this oracle needs inside a block encoding.
-
-        The prepared state is pure on the index register, so index and block ancilla
-        widths coincide. The phase gradient is requested as shared ancilla: it is an
-        eigenstate of every addition that consumes it, so one copy prepared for the whole
-        circuit serves every rotation, and preparing it per call is where all of this
-        oracle's arbitrary-angle rotations come from.
+    def num_system_qubits(self, wavefunction: Wavefunction) -> int:
+        r"""Return the width of the index register SELECT controls on.
 
         Args:
             wavefunction: The wavefunction that will be prepared.
 
         Returns:
-            PrepareLayout: An :math:`n`-qubit index with no garbage, plus a
-            ``rotation_bit_precision``-wide shared phase gradient.
+            The state register width :math:`n = \lceil\log_2 L\rceil`.
 
         """
-        params = self._build_params(wavefunction)
-        return PrepareLayout(
-            num_select_qubits=params.numStateQubits,
-            num_block_ancillas=params.numStateQubits,
-            num_shared_ancillas=params.rotationBitPrecision,
-        )
+        return self._num_state_qubits(len(self._build_params(wavefunction).amplitudes))
 
-    def prepare_oracle(self, wavefunction: Wavefunction) -> tuple[Any, PrepareLayout]:
-        """Return the shared-phase-gradient PREPARE callable and its layout.
+    def num_phase_gradient_ancillas(self, wavefunction: Wavefunction) -> int:
+        """Return the width of the phase gradient register the caller must supply.
+
+        Zero unless ``external_phase_gradient`` is set, in which case every rotation this
+        oracle applies reads the caller's gradient. Preparing that gradient is where all of
+        this oracle's arbitrary-angle rotations come from, so hoisting it out of a repeated
+        block encoding removes a cost that would otherwise scale with the repetition count.
 
         Args:
             wavefunction: The wavefunction that will be prepared.
 
         Returns:
-            A Q# callable expecting ``[state | phaseGradient]``, and its layout.
+            ``rotation_bit_precision`` qubits, or zero when the oracle allocates its own.
 
         """
-        params = self._build_params(wavefunction)
-        return (
-            QSHARP_UTILS.QROMStatePrep.MakeQROMStatePrepOpShared(params),
-            PrepareLayout(
-                num_select_qubits=params.numStateQubits,
-                num_block_ancillas=params.numStateQubits,
-                num_shared_ancillas=params.rotationBitPrecision,
-            ),
+        del wavefunction
+        if not bool(self._settings.get("external_phase_gradient")):
+            return 0
+        return int(self._settings.get("rotation_bit_precision"))
+
+    def prepare_oracle(self, wavefunction: Wavefunction) -> Any:
+        """Return the PREPARE callable to embed in a block encoding.
+
+        Args:
+            wavefunction: The wavefunction that will be prepared.
+
+        Returns:
+            A Q# callable expecting ``[state | phaseGradient]`` when
+            ``external_phase_gradient`` is set, and the state register alone otherwise.
+
+        """
+        return QSHARP_UTILS.QROMStatePrep.MakeQROMStatePrepOracle(
+            self._build_params(wavefunction),
+            bool(self._settings.get("external_phase_gradient")),
         )

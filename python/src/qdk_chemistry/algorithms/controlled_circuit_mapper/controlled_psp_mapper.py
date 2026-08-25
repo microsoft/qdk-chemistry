@@ -111,13 +111,13 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         block_mapper = self._block_mapper()
         container = unitary.get_container()
         _, use_quantum_walk = block_mapper.resolve_lcu(container)
-        prepare_op, select_op, num_system, layout = block_mapper.build_prepare_select_ops(container)
+        prepare_op, select_op, num_system, registers = block_mapper.build_prepare_select_ops(container)
 
         step_op = QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepOp(
-            prepare_op, select_op, num_system, layout.num_select_qubits
+            prepare_op, select_op, num_system, registers.num_select_qubits
         )
         if use_quantum_walk:
-            reflection_op = QSHARP_UTILS.PrepSelPrep.MakeAncillaReflectionOp(num_system, layout.num_block_ancillas)
+            reflection_op = QSHARP_UTILS.PrepSelPrep.MakeAncillaReflectionOp(num_system, registers.num_block_ancillas)
             step_op = QSHARP_UTILS.PrepSelPrep.MakeWalkOp(step_op, reflection_op)
 
         controlled_op = QSHARP_UTILS.CircuitComposition.MakeControlledOp(step_op)
@@ -128,9 +128,9 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         )
 
         # Outermost, so the one gradient preparation amortizes over every repetition.
-        if layout.num_shared_ancillas > 0:
+        if registers.num_shared_ancillas > 0:
             repeated_op = QSHARP_UTILS.PrepSelPrep.MakeWithSharedPhaseGradientControlledOp(
-                repeated_op, num_system + layout.num_block_ancillas
+                repeated_op, num_system + registers.num_block_ancillas
             )
 
         qsharp_factory = QsharpFactoryData(
@@ -139,9 +139,9 @@ class ControlledPSPMapper(ControlledCircuitMapper):
                 "prepareOp": prepare_op,
                 "selectOp": select_op,
                 "numSystemQubits": num_system,
-                "numSelectQubits": layout.num_select_qubits,
-                "numBlockAncillaQubits": layout.num_block_ancillas,
-                "numSharedQubits": layout.num_shared_ancillas,
+                "numSelectQubits": registers.num_select_qubits,
+                "numBlockAncillaQubits": registers.num_block_ancillas,
+                "numSharedQubits": registers.num_shared_ancillas,
                 "power": container.power,
                 "useWalk": use_quantum_walk,
             },
