@@ -1,7 +1,7 @@
 # cmsb-fix-dependency-reuse.patch
 # ----------------------------------------------------------------------------------------------------------------------
 # Make NWChemEx-Project/CMakeBuild (CMSB, TAMM/ExaChem's superbuild helper) reuse already-installed system/build
-# dependencies -- BLAS, LAPACK, spdlog, EcpInt, nlohmann_json (NJSON) -- instead of always rebuilding its own
+# dependencies -- BLAS, LAPACK, spdlog, EcpInt, nlohmann_json (NJSON), numactl -- instead of always rebuilding its own
 # copies from source, without touching the global CMSB_DEBUG_CMAKE option (an earlier, broader attempt at this
 # via -DCMSB_DEBUG_CMAKE=OFF was tried and reverted: it also changes how every *other* TAMM dependency is
 # resolved in CMSB's nested "TAMM_External"/"EXACHEM_External" build phase, which broke that phase outright with
@@ -9,7 +9,7 @@
 # fallback in that nested re-resolution path). This patch is instead scoped to exactly the affected code paths,
 # leaving everything else byte-for-byte unchanged.
 #
-# Three independent root causes/fixes, all in the same two files (cmake/macros/DependencyMacros.cmake and
+# Four independent root causes/fixes, all in the same two files (cmake/macros/DependencyMacros.cmake and
 # cmake/macros/BuildCMSBModule.cmake) plus cmake/build_external/BuildGlobalArrays.cmake and
 # cmake/CMSBTargetConfig.cmake.in:
 #
@@ -49,9 +49,31 @@
 #    ExaChem's own source does, is not -- verify version compatibility before pointing NJSON_ROOT at a system
 #    package).
 #
-# Callers wanting BLAS/LAPACK/SPDLOG/EcpInt/NJSON reused (not rebuilt) should pass -DSPDLOG_ROOT=<prefix>
-# -DEcpInt_ROOT=<prefix> -DNJSON_ROOT=<prefix> on BOTH the outer TAMM and outer ExaChem (or any other
-# CMSB_PROJECTS consumer) cmake invocations, alongside the pre-existing -DLibInt2_ROOT/-DGauXC_ROOT pattern (see
+# 4. numactl (cmake/CMSBTargetConfig.cmake.in, cmake/macros/BuildCMSBModule.cmake): numactl is a DEP_ABUILD item
+#    (not DEP_ABUILD_MISC) with its own module finder (cmake/find_external/Findnumactl.cmake) that searches
+#    numa.h / libnuma with NO_DEFAULT_PATH, hinting ONLY the CMSB install/stage prefix and ${NUMACTL_ROOT} -- so
+#    an OS-packaged numactl is never found on the CONSUMER side (ExaChem's later reconfigure) unless the exact
+#    same NUMACTL_ROOT value TAMM was built with is also baked in for re-resolution, mirroring the SPDLOG/EcpInt
+#    gap above. This repo's install-exachem.sh doesn't hit the bug in practice today (it seeds numa.h/libnuma.so
+#    directly into ${INSTALL_PREFIX} -- exactly where the *unpatched* consumer re-resolution already looks via
+#    ${__tip} -- rather than pointing NUMACTL_ROOT at the OS package location), but the fix is included here too
+#    for the same reason as everything else in this patch: to keep one canonical patch shared with qaml's
+#    container pipeline, where it *is* actively required (tdnf's numactl there has no CMSB-visible config file
+#    either). NOTE: on Ubuntu, apt's libnuma-dev installs libnuma.so under the multiarch triplet directory
+#    (/usr/lib/x86_64-linux-gnu/), which Findnumactl.cmake's hardcoded PATH_SUFFIXES (lib/lib32/lib64) does NOT
+#    match -- so passing -DNUMACTL_ROOT=/usr directly here (unlike qaml's Azure Linux, flat /usr/lib64) would
+#    likely fail to find it. install-exachem.sh instead points NUMACTL_ROOT at the same flat ${INSTALL_PREFIX}
+#    the seeding step already populates, sidestepping the multiarch mismatch entirely. Fix, mirroring the
+#    LibInt2/HDF5/HPTT precedent: (a) bake @NUMACTL_ROOT@ as the first search path in the consumer's
+#    `set(NUMACTL_ROOT ...)` (previously unconditionally overwritten to only the TAMM install/stage prefix,
+#    discarding any hint); (b) forward -DNUMACTL_ROOT into CMSB's nested *_External sub-builds the same way
+#    -DHDF5_ROOT/-DHPTT_ROOT/-DLibInt2_ROOT/-DSPDLOG_ROOT/... already are (the OUTER find in
+#    DependencyMacros.cmake needs no change -- Findnumactl already honors ${NUMACTL_ROOT}, it just has to be
+#    forwarded).
+#
+# Callers wanting BLAS/LAPACK/SPDLOG/EcpInt/NJSON/numactl reused (not rebuilt) should pass -DSPDLOG_ROOT=<prefix>
+# -DEcpInt_ROOT=<prefix> -DNJSON_ROOT=<prefix> -DNUMACTL_ROOT=<prefix> on BOTH the outer TAMM and outer ExaChem (or
+# any other CMSB_PROJECTS consumer) cmake invocations, alongside the pre-existing -DLibInt2_ROOT/-DGauXC_ROOT pattern (see
 # install-exachem.sh). BLAS/LAPACK reuse itself needs no extra flag beyond LINALG_VENDOR=OpenBLAS/BLIS/IBMESSL.
 #
 # Applied to a local FetchContent_MakeAvailable(CMakeBuild) source checkout via -DFETCHCONTENT_SOURCE_DIR_CMAKEBUILD
@@ -97,6 +119,15 @@ index a6437aa..d3f3235 100644
        set(__depend_cfg ecpint-config.cmake)
        list(APPEND ${__CMSB_LIBNAME}_LIBRARIES ECPINT::ecpint)
      elseif(${__depend_i} STREQUAL "pybind11")
+@@ -275,7 +281,7 @@ foreach(__depend_i ${__depends_${__cmsb_libname}})
+             message(FATAL_ERROR "HDF5 not found!")
+           endif()
+         elseif(${__depend_i} STREQUAL "numactl")
+-          set(NUMACTL_ROOT ${__tip} ${__tip_stage_${__cmsb_libname}})
++          set(NUMACTL_ROOT @NUMACTL_ROOT@ ${__tip} ${__tip_stage_${__cmsb_libname}})
+           find_package(numactl)
+         endif()
+     endif()
 diff --git a/cmake/build_external/BuildGlobalArrays.cmake b/cmake/build_external/BuildGlobalArrays.cmake
 index 2221ddc..ae4ea2a 100644
 --- a/cmake/build_external/BuildGlobalArrays.cmake
@@ -121,7 +152,7 @@ index 9d689b6..9b0d24d 100644
  
      bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS BLAS_INT4 LINALG_VENDOR LINALG_PREFIX ENABLE_COVERAGE USE_SCALAPACK USE_HDF5 USE_LIBNUMA USE_ONEMATH ONEMATH_PREFIX USE_NWQSIM)
 -    bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS BLAS_ARCH GCCROOT HDF5_ROOT HPTT_ROOT LibInt2_ROOT)
-+    bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS BLAS_ARCH GCCROOT HDF5_ROOT HPTT_ROOT LibInt2_ROOT SPDLOG_ROOT EcpInt_ROOT NJSON_ROOT)
++    bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS BLAS_ARCH GCCROOT HDF5_ROOT HPTT_ROOT LibInt2_ROOT SPDLOG_ROOT EcpInt_ROOT NJSON_ROOT NUMACTL_ROOT)
  
      bundle_cmake_strings(CORE_CMAKE_STRINGS CMSB_PROJECTS ENABLE_DEV_MODE GPU_ARCH MARCH_FLAGS USE_TAMM_DEV CMSB_TAG)
      bundle_cmake_strings(CORE_CMAKE_STRINGS USE_UPCXX BLAS_INT4 LINALG_PREFIX USE_SCALAPACK USE_HDF5 USE_LIBNUMA USE_NWQSIM LINK_STATIC_GPU_LIBS)

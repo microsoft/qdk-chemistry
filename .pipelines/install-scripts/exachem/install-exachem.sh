@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 #
 # install-exachem.sh — build and install ExaChem (+ its TAMM tensor backend) for CI, to run as an external MPI
-# process. Reuses OpenBLAS/BLAS++/LAPACK++/LibInt2/GauXC/spdlog/EcpInt/nlohmann_json already built into
+# process. Reuses OpenBLAS/BLAS++/LAPACK++/LibInt2/GauXC/spdlog/EcpInt/nlohmann_json/numactl already built into
 # CPP_DEPS_PREFIX by install-cpp-deps.sh (TAMM finds BLAS++/LAPACK++ via its default find_package on
-# CMAKE_PREFIX_PATH; LibInt2/GauXC/spdlog/EcpInt/nlohmann_json via explicit -D*_ROOT below), and the system MPI
-# (e.g. apt-installed openmpi-bin/libopenmpi-dev on Ubuntu). GPU is not supported here. TAMM's own CMSB
-# superbuild (NWChemEx-Project/CMakeBuild) is patched (see patches/cmsb-fix-dependency-reuse.patch) so it also
-# reuses the system OpenBLAS/LAPACK/spdlog/EcpInt/nlohmann_json instead of building its own redundant copies.
+# CMAKE_PREFIX_PATH; LibInt2/GauXC/spdlog/EcpInt/nlohmann_json via explicit -D*_ROOT below; numactl via a seeded
+# flat copy in INSTALL_PREFIX -- see the seeding step below for why apt's libnuma-dev can't be pointed at
+# directly), and the system MPI (e.g. apt-installed openmpi-bin/libopenmpi-dev on Ubuntu). GPU is not supported
+# here. TAMM's own CMSB superbuild (NWChemEx-Project/CMakeBuild) is patched (see
+# patches/cmsb-fix-dependency-reuse.patch) so it also reuses the system OpenBLAS/LAPACK/spdlog/EcpInt/
+# nlohmann_json/numactl instead of building its own redundant copies.
 #
 # TAMM/ExaChem's commits are hardcoded below (TAMM_COMMIT/EXACHEM_COMMIT), not read from
 # cpp/manifest/qdk-chemistry/cgmanifest.json: unlike the deps install-cpp-deps.sh builds, TAMM/ExaChem are never
@@ -91,7 +93,10 @@ echo "==> Seeded Eigen3 from ${EIGEN3_PREFIX} into ${INSTALL_PREFIX}"
 
 # TAMM's CMSB Findnumactl.cmake module (cmake/find_external/Findnumactl.cmake) hardcodes NO_DEFAULT_PATH on both
 # its find_path/find_library calls and only searches CMAKE_INSTALL_PREFIX -- so apt's libnuma-dev (system-wide,
-# under /usr) is invisible to it too, exactly like Eigen3 above. Seed numa.h + libnuma.so into INSTALL_PREFIX.
+# under /usr) is invisible to it too, exactly like Eigen3 above. Seed numa.h + libnuma.so into INSTALL_PREFIX
+# (NOTE: pointing -DNUMACTL_ROOT at /usr directly instead, as qaml's container pipeline does, would NOT work here
+# -- Ubuntu's libnuma-dev installs libnuma.so under the multiarch triplet dir /usr/lib/x86_64-linux-gnu/, which
+# Findnumactl.cmake's hardcoded PATH_SUFFIXES lib/lib32/lib64 never match; seeding a flat copy sidesteps that).
 NUMA_HEADER="$(find /usr -maxdepth 6 -name 'numa.h' -print -quit 2>/dev/null || true)"
 NUMA_LIB="$(find /usr -maxdepth 6 -name 'libnuma.so' -print -quit 2>/dev/null || true)"
 if [ -z "${NUMA_HEADER}" ] || [ -z "${NUMA_LIB}" ]; then
@@ -176,11 +181,12 @@ COMMON_CMAKE_ARGS=(
   -DSPDLOG_ROOT="${CPP_DEPS_PREFIX}"
   -DEcpInt_ROOT="${CPP_DEPS_PREFIX}"
   -DNJSON_ROOT="${CPP_DEPS_PREFIX}"
+  -DNUMACTL_ROOT="${INSTALL_PREFIX}"
   -DFETCHCONTENT_SOURCE_DIR_CMAKEBUILD="${CMSB_SRC_DIR}"
   # Enforce reuse instead of leaving it best-effort: CMSB's find_or_build_dependency() only hard-errors
   # ("Could not locate <dep> and user has requested we do not build one") when BUILD_<dep> is explicitly set to
   # OFF; if left unset, a failed find silently falls through to include(Build<dep>) and rebuilds from source
-  # (cmake/macros/DependencyMacros.cmake). Passing -DBUILD_<dep>=OFF for all five reused deps -- not just
+  # (cmake/macros/DependencyMacros.cmake). Passing -DBUILD_<dep>=OFF for all six reused deps -- not just
   # LibInt2/GauXC as before -- makes a broken *_ROOT/reuse patch fail loudly at configure time instead of
   # silently degrading into a redundant rebuild that's only visible by eyeballing the configure log.
   -DBUILD_LibInt2=OFF
@@ -188,6 +194,7 @@ COMMON_CMAKE_ARGS=(
   -DBUILD_SPDLOG=OFF
   -DBUILD_EcpInt=OFF
   -DBUILD_NJSON=OFF
+  -DBUILD_numactl=OFF
 )
 
 # --------------------------------------------------------------------------------------------------------------------
