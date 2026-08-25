@@ -104,9 +104,10 @@ class TransientPermissionError : public std::runtime_error {
 #ifndef _WIN32
 using DirectoryStateEntry = std::tuple<dev_t, ino_t, mode_t, int>;
 
-std::pair<bool, std::vector<DirectoryStateEntry>>
+std::tuple<bool, bool, std::vector<DirectoryStateEntry>>
 directory_initialization_state(const std::filesystem::path& directory) {
   bool initializing = false;
+  bool unresolved = false;
   std::vector<DirectoryStateEntry> state;
   auto current = directory;
   while (!current.empty()) {
@@ -121,15 +122,16 @@ directory_initialization_state(const std::filesystem::path& directory) {
       }
     } else {
       const int status_error = errno;
+      unresolved = true;
       state.emplace_back(0, 0, 0, status_error);
     }
     const auto parent = current.parent_path();
     if (parent == current) {
-      return {initializing, std::move(state)};
+      return {initializing, unresolved, std::move(state)};
     }
     current = parent;
   }
-  return {initializing, std::move(state)};
+  return {initializing, unresolved, std::move(state)};
 }
 #endif
 
@@ -867,15 +869,17 @@ void create_private_directories(const std::filesystem::path& directory) {
       if (std::chrono::steady_clock::now() >= deadline) {
         throw;
       }
-      auto [initializing, current_state] =
+      auto [initializing, unresolved, current_state] =
           directory_initialization_state(directory);
-      if (!has_previous_state || current_state != previous_state) {
+      if (unresolved || initializing) {
         previous_state = std::move(current_state);
         has_previous_state = true;
         std::this_thread::sleep_for(retry_delay);
         continue;
       }
-      if (initializing) {
+      if (!has_previous_state || current_state != previous_state) {
+        previous_state = std::move(current_state);
+        has_previous_state = true;
         std::this_thread::sleep_for(retry_delay);
         continue;
       }
@@ -1014,15 +1018,17 @@ void write_file_atomically(const std::filesystem::path& path,
         if (std::chrono::steady_clock::now() >= deadline) {
           throw;
         }
-        auto [initializing, current_state] =
+        auto [initializing, unresolved, current_state] =
             directory_initialization_state(destination.parent_path());
-        if (!has_previous_state || current_state != previous_state) {
+        if (unresolved || initializing) {
           previous_state = std::move(current_state);
           has_previous_state = true;
           std::this_thread::sleep_for(std::chrono::milliseconds(1));
           continue;
         }
-        if (initializing) {
+        if (!has_previous_state || current_state != previous_state) {
+          previous_state = std::move(current_state);
+          has_previous_state = true;
           std::this_thread::sleep_for(std::chrono::milliseconds(1));
           continue;
         }

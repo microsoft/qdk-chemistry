@@ -249,9 +249,10 @@ def test_retry_after_multiple_directory_state_changes(
     directory = tmp_path / "nested" / "parent"
     states = iter(
         [
-            (False, (("root", 1, 1, 0o700),)),
-            (False, (("root", 1, 1, 0o700), ("nested", 1, 2, 0o700))),
+            (False, False, (("root", 1, 1, 0o700),)),
+            (False, False, (("root", 1, 1, 0o700), ("nested", 1, 2, 0o700))),
             (
+                False,
                 False,
                 (
                     ("root", 1, 1, 0o700),
@@ -286,9 +287,10 @@ def test_retry_reservation_after_multiple_directory_state_changes(
     reservation = object()
     states = iter(
         [
-            (False, (("root", 1, 1, 0o700),)),
-            (False, (("root", 1, 1, 0o700), ("nested", 1, 2, 0o700))),
+            (False, False, (("root", 1, 1, 0o700),)),
+            (False, False, (("root", 1, 1, 0o700), ("nested", 1, 2, 0o700))),
             (
+                False,
                 False,
                 (
                     ("root", 1, 1, 0o700),
@@ -319,7 +321,7 @@ def test_skip_directory_state_snapshot_without_permission_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    def fail_if_called(_: Path) -> tuple[bool, tuple[tuple[str, int, int, int], ...]]:
+    def fail_if_called(_: Path) -> tuple[bool, bool, tuple[tuple[str, int, int, int], ...]]:
         raise AssertionError("directory state should be collected only after a permission failure")
 
     monkeypatch.setattr(file_io_module, "_directory_initialization_state", fail_if_called)
@@ -328,6 +330,53 @@ def test_skip_directory_state_snapshot_without_permission_failure(
     write_text_file_atomically(path, "contents", create_parent_directories=True)
 
     assert read_text_file(path) == "contents"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission semantics")
+def test_retry_while_directory_state_is_unresolved(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    directory = tmp_path / "nested"
+    unresolved_state = (False, True, (("nested", -1, -1, errno.EACCES),))
+    calls = 0
+
+    def fail_twice(_: Path) -> None:
+        nonlocal calls
+        calls += 1
+        if calls < 3:
+            raise PermissionError(errno.EACCES, "initializing")
+
+    monkeypatch.setattr(file_io_module, "_directory_initialization_state", lambda _: unresolved_state)
+    monkeypatch.setattr(file_io_module, "_create_private_directories_once", fail_twice)
+
+    file_io_module._create_private_directories(directory)
+
+    assert calls == 3
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission semantics")
+def test_retry_reservation_while_directory_state_is_unresolved(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    destination = tmp_path / "nested" / "data.txt"
+    reservation = object()
+    unresolved_state = (False, True, (("nested", -1, -1, errno.EACCES),))
+    calls = 0
+
+    def fail_twice(_: Path) -> object:
+        nonlocal calls
+        calls += 1
+        if calls < 3:
+            raise PermissionError(errno.EACCES, "initializing")
+        return reservation
+
+    monkeypatch.setattr(file_io_module, "_directory_initialization_state", lambda _: unresolved_state)
+    monkeypatch.setattr(file_io_module, "_reserve_temporary_file", fail_twice)
+
+    assert file_io_module._reserve_temporary_file_with_parent_retry(destination) is reservation
+    assert calls == 3
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX permission semantics")

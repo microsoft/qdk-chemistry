@@ -766,16 +766,19 @@ def _create_private_directories_once(directory: Path) -> None:
 
 def _directory_initialization_state(
     directory: Path,
-) -> tuple[bool, tuple[tuple[str, int, int, int], ...]]:
+) -> tuple[bool, bool, tuple[tuple[str, int, int, int], ...]]:
     initializing = False
+    unresolved = False
     state: list[tuple[str, int, int, int]] = []
     current = directory
     while True:
         try:
             status = current.stat()
         except FileNotFoundError:
+            unresolved = True
             state.append((os.fspath(current), -1, -1, errno.ENOENT))
         except PermissionError:
+            unresolved = True
             state.append((os.fspath(current), -1, -1, errno.EACCES))
         else:
             permissions = status.st_mode & 0o777
@@ -787,7 +790,7 @@ def _directory_initialization_state(
             )
         parent = current.parent
         if parent == current:
-            return initializing, tuple(state)
+            return initializing, unresolved, tuple(state)
         current = parent
 
 
@@ -805,12 +808,13 @@ def _create_private_directories(directory: Path) -> None:
         if time.monotonic() >= deadline:
             assert permission_error is not None
             raise permission_error
-        initializing, current_state = _directory_initialization_state(directory)
-        if previous_state is None or current_state != previous_state:
+        initializing, unresolved, current_state = _directory_initialization_state(directory)
+        if unresolved or initializing:
             previous_state = current_state
             time.sleep(_DIRECTORY_CREATION_RETRY_DELAY_SECONDS)
             continue
-        if initializing:
+        if previous_state is None or current_state != previous_state:
+            previous_state = current_state
             time.sleep(_DIRECTORY_CREATION_RETRY_DELAY_SECONDS)
             continue
         raise permission_error
@@ -825,12 +829,13 @@ def _reserve_temporary_file_with_parent_retry(destination: Path) -> _TemporaryFi
         except PermissionError as error:
             if time.monotonic() >= deadline:
                 raise
-            initializing, current_state = _directory_initialization_state(destination.parent)
-            if previous_state is None or current_state != previous_state:
+            initializing, unresolved, current_state = _directory_initialization_state(destination.parent)
+            if unresolved or initializing:
                 previous_state = current_state
                 time.sleep(_DIRECTORY_CREATION_RETRY_DELAY_SECONDS)
                 continue
-            if initializing:
+            if previous_state is None or current_state != previous_state:
+                previous_state = current_state
                 time.sleep(_DIRECTORY_CREATION_RETRY_DELAY_SECONDS)
                 continue
             raise error
