@@ -114,8 +114,9 @@ directory_initialization_state(const std::filesystem::path& directory) {
     if (retry_on_eintr([&] { return ::stat(current.c_str(), &status); }) == 0) {
       const mode_t permissions = status.st_mode & 0777;
       state.emplace_back(status.st_dev, status.st_ino, permissions, 0);
+      constexpr mode_t required_permissions = S_IWUSR | S_IXUSR;
       if (S_ISDIR(status.st_mode) && status.st_uid == geteuid() &&
-          permissions == 0) {
+          (permissions & required_permissions) != required_permissions) {
         initializing = true;
       }
     } else {
@@ -776,7 +777,7 @@ void create_private_directories(const std::filesystem::path& directory) {
   }
 #else
   constexpr auto retry_delay = std::chrono::milliseconds(1);
-  constexpr auto retry_timeout = std::chrono::seconds(1);
+  constexpr auto retry_timeout = std::chrono::milliseconds(100);
   const auto deadline = std::chrono::steady_clock::now() + retry_timeout;
 
   auto create_once = [&]() {
@@ -856,9 +857,8 @@ void create_private_directories(const std::filesystem::path& directory) {
     }
   };
 
-  auto [ignored_initializing, previous_state] =
-      directory_initialization_state(directory);
-  static_cast<void>(ignored_initializing);
+  std::vector<DirectoryStateEntry> previous_state;
+  bool has_previous_state = false;
   while (true) {
     try {
       create_once();
@@ -869,13 +869,14 @@ void create_private_directories(const std::filesystem::path& directory) {
       }
       auto [initializing, current_state] =
           directory_initialization_state(directory);
-      if (initializing) {
+      if (!has_previous_state || current_state != previous_state) {
         previous_state = std::move(current_state);
+        has_previous_state = true;
         std::this_thread::sleep_for(retry_delay);
         continue;
       }
-      if (current_state != previous_state) {
-        previous_state = std::move(current_state);
+      if (initializing) {
+        std::this_thread::sleep_for(retry_delay);
         continue;
       }
       throw;
@@ -1000,10 +1001,9 @@ void write_file_atomically(const std::filesystem::path& path,
     return reserve_temporary_file(destination);
 #else
     const auto deadline =
-        std::chrono::steady_clock::now() + std::chrono::seconds(1);
-    auto [ignored_initializing, previous_state] =
-        directory_initialization_state(destination.parent_path());
-    static_cast<void>(ignored_initializing);
+        std::chrono::steady_clock::now() + std::chrono::milliseconds(100);
+    std::vector<DirectoryStateEntry> previous_state;
+    bool has_previous_state = false;
     while (true) {
       try {
         return reserve_temporary_file(destination);
@@ -1016,13 +1016,14 @@ void write_file_atomically(const std::filesystem::path& path,
         }
         auto [initializing, current_state] =
             directory_initialization_state(destination.parent_path());
-        if (initializing) {
+        if (!has_previous_state || current_state != previous_state) {
           previous_state = std::move(current_state);
+          has_previous_state = true;
           std::this_thread::sleep_for(std::chrono::milliseconds(1));
           continue;
         }
-        if (current_state != previous_state) {
-          previous_state = std::move(current_state);
+        if (initializing) {
+          std::this_thread::sleep_for(std::chrono::milliseconds(1));
           continue;
         }
         throw;

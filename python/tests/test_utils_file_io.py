@@ -315,6 +315,22 @@ def test_retry_reservation_after_multiple_directory_state_changes(
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX permission semantics")
+def test_skip_directory_state_snapshot_without_permission_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    def fail_if_called(_: Path) -> tuple[bool, tuple[tuple[str, int, int, int], ...]]:
+        raise AssertionError("directory state should be collected only after a permission failure")
+
+    monkeypatch.setattr(file_io_module, "_directory_initialization_state", fail_if_called)
+
+    path = tmp_path / "nested" / "data.txt"
+    write_text_file_atomically(path, "contents", create_parent_directories=True)
+
+    assert read_text_file(path) == "contents"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission semantics")
 def test_do_not_modify_permanently_inaccessible_parent(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -24,7 +24,7 @@ PathLike: TypeAlias = str | os.PathLike[str]
 AtomicFileWriter: TypeAlias = Callable[[Path], None]
 
 _DIRECTORY_CREATION_RETRY_DELAY_SECONDS = 0.001
-_DIRECTORY_CREATION_RETRY_TIMEOUT_SECONDS = 1.0
+_DIRECTORY_CREATION_RETRY_TIMEOUT_SECONDS = 0.1
 
 __all__ = [
     "AtomicFileWriter",
@@ -781,7 +781,9 @@ def _directory_initialization_state(
             permissions = status.st_mode & 0o777
             state.append((os.fspath(current), status.st_dev, status.st_ino, permissions))
             initializing = initializing or (
-                stat.S_ISDIR(status.st_mode) and status.st_uid == os.geteuid() and permissions == 0
+                stat.S_ISDIR(status.st_mode)
+                and status.st_uid == os.geteuid()
+                and permissions & (stat.S_IWUSR | stat.S_IXUSR) != (stat.S_IWUSR | stat.S_IXUSR)
             )
         parent = current.parent
         if parent == current:
@@ -791,7 +793,7 @@ def _directory_initialization_state(
 
 def _create_private_directories(directory: Path) -> None:
     deadline = time.monotonic() + _DIRECTORY_CREATION_RETRY_TIMEOUT_SECONDS
-    _, previous_state = _directory_initialization_state(directory)
+    previous_state: tuple[tuple[str, int, int, int], ...] | None = None
     while True:
         permission_error: PermissionError | None = None
         try:
@@ -804,19 +806,19 @@ def _create_private_directories(directory: Path) -> None:
             assert permission_error is not None
             raise permission_error
         initializing, current_state = _directory_initialization_state(directory)
-        if initializing:
+        if previous_state is None or current_state != previous_state:
             previous_state = current_state
             time.sleep(_DIRECTORY_CREATION_RETRY_DELAY_SECONDS)
             continue
-        if current_state != previous_state:
-            previous_state = current_state
+        if initializing:
+            time.sleep(_DIRECTORY_CREATION_RETRY_DELAY_SECONDS)
             continue
         raise permission_error
 
 
 def _reserve_temporary_file_with_parent_retry(destination: Path) -> _TemporaryFileReservation:
     deadline = time.monotonic() + _DIRECTORY_CREATION_RETRY_TIMEOUT_SECONDS
-    _, previous_state = _directory_initialization_state(destination.parent)
+    previous_state: tuple[tuple[str, int, int, int], ...] | None = None
     while True:
         try:
             return _reserve_temporary_file(destination)
@@ -824,12 +826,12 @@ def _reserve_temporary_file_with_parent_retry(destination: Path) -> _TemporaryFi
             if time.monotonic() >= deadline:
                 raise
             initializing, current_state = _directory_initialization_state(destination.parent)
-            if initializing:
+            if previous_state is None or current_state != previous_state:
                 previous_state = current_state
                 time.sleep(_DIRECTORY_CREATION_RETRY_DELAY_SECONDS)
                 continue
-            if current_state != previous_state:
-                previous_state = current_state
+            if initializing:
+                time.sleep(_DIRECTORY_CREATION_RETRY_DELAY_SECONDS)
                 continue
             raise error
 
