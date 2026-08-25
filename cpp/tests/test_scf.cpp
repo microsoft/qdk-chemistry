@@ -992,7 +992,7 @@ TEST_F(ScfTest, AgHBasisSetEcpConversion) {
   // H (atom 1) should have 0 core electrons (no ECP)
   EXPECT_EQ(ecp_electrons[1], 0);
 
-  // Verify the element_ecp_electrons mapping was correctly applied
+  // Verify the total ECP electron count
   // Total electrons: Ag=47, H=1 -> 48 total
   // With ECP: Ag has 28 core electrons removed -> 19 valence
   // So total valence electrons = 19 (Ag) + 1 (H) = 20
@@ -1012,10 +1012,7 @@ TEST_F(ScfTest, AgHBasisSetEcpConversion) {
   EXPECT_EQ(coeff_alpha.rows(), basis_set->get_num_atomic_orbitals());
 }
 
-TEST_F(ScfTest, AgHBasisSetEcpJsonMapping) {
-  // Test element_ecp_electrons mapping in convert_to_json
-  // This validates that the element_ecp_electrons map is correctly built
-  // from per-atom ECP electrons and serialized as a flat list in JSON
+TEST_F(ScfTest, AgHBasisSetEcpJsonRoundTrip) {
   auto agh = testing::create_agh_structure();
   auto scf_solver = ScfSolverFactory::create();
 
@@ -1042,62 +1039,9 @@ TEST_F(ScfTest, AgHBasisSetEcpJsonMapping) {
     EXPECT_TRUE(shell_json.contains("coeff"));
   }
 
-  // Verify element_ecp_electrons mapping
-  EXPECT_TRUE(json.contains("element_ecp_electrons"));
   EXPECT_TRUE(json.contains("atom_ecp_electrons"));
   EXPECT_EQ(json["atom_ecp_electrons"], std::vector<size_t>({28, 0}));
-  auto element_ecp_electrons_json = json["element_ecp_electrons"];
-
-  // element_ecp_electrons should be a flat list: [atomic_num1, ecp_elec1,
-  // atomic_num2, ecp_elec2, ...] For AgH: Ag (Z=47) has 28 ECP electrons, H
-  // (Z=1) has 0 (not in map) So the flat list should be: [47, 28]
-  EXPECT_TRUE(element_ecp_electrons_json.is_array());
-  EXPECT_EQ(element_ecp_electrons_json.size(),
-            2);  // One element (Ag) with non-zero ECP
-
-  // Parse the flat list
-  std::map<int, int> element_ecp_map;
-  for (size_t i = 0; i + 1 < element_ecp_electrons_json.size(); i += 2) {
-    int atomic_num = element_ecp_electrons_json[i];
-    int ecp_elec = element_ecp_electrons_json[i + 1];
-    element_ecp_map[atomic_num] = ecp_elec;
-  }
-
-  // Verify Ag (Z=47) has 28 ECP electrons
-  EXPECT_EQ(element_ecp_map.size(), 1);
-  EXPECT_TRUE(element_ecp_map.find(47) != element_ecp_map.end());
-  EXPECT_EQ(element_ecp_map[47], 28);
-
-  // Verify H (Z=1) is NOT in the map (has 0 ECP electrons)
-  EXPECT_TRUE(element_ecp_map.find(1) == element_ecp_map.end());
-
-  // Verify the logic that builds element_ecp_electrons from per-atom vector
-  // Iterating through atoms and filtering non-zero ECP
-  auto ecp_electrons = basis_set->get_ecp_electrons();
-  auto structure = basis_set->get_structure();
-  auto nuclear_charges = structure->get_nuclear_charges();
-
-  // Build the map manually to verify the algorithm
-  std::map<int, int> expected_map;
-  for (size_t i = 0; i < ecp_electrons.size(); ++i) {
-    if (ecp_electrons[i] > 0) {
-      int atomic_num = static_cast<int>(nuclear_charges[i]);
-      expected_map[atomic_num] = static_cast<int>(ecp_electrons[i]);
-    }
-  }
-
-  EXPECT_EQ(expected_map.size(), element_ecp_map.size());
-  EXPECT_EQ(expected_map, element_ecp_map);
-
-  // Verify the flat list serialization
-  std::vector<int> expected_flat_list;
-  for (const auto& [k, v] : expected_map) {
-    expected_flat_list.push_back(k);
-    expected_flat_list.push_back(v);
-  }
-
-  std::vector<int> actual_flat_list = element_ecp_electrons_json;
-  EXPECT_EQ(actual_flat_list, expected_flat_list);
+  EXPECT_FALSE(json.contains("element_ecp_electrons"));
 
   // Verify nuclear_charges transformation
   EXPECT_TRUE(json.contains("atoms"));
@@ -1129,6 +1073,7 @@ TEST_F(ScfTest, AgHBasisSetEcpJsonMapping) {
       qdk::chemistry::utils::microsoft::convert_basis_set_from_qdk(*basis_set);
   auto legacy_json = internal_basis->to_json();
   legacy_json.erase("atom_ecp_electrons");
+  legacy_json["element_ecp_electrons"] = std::vector<int>({47, 28});
   auto legacy_basis = qdk::chemistry::scf::BasisSet::from_serialized_json(
       internal_basis->mol, legacy_json);
   EXPECT_EQ(legacy_basis->atom_ecp_electrons, std::vector<int>({28, 0}));
@@ -1149,16 +1094,16 @@ TEST_F(ScfTest, SameElementAtomsPreserveDistinctEcpTreatment) {
 
   auto json = qdk::chemistry::utils::microsoft::convert_to_json(*basis_set);
   EXPECT_EQ(json["atom_ecp_electrons"], std::vector<size_t>({28, 0}));
-  EXPECT_TRUE(json["element_ecp_electrons"].empty());
+  EXPECT_FALSE(json.contains("element_ecp_electrons"));
 
   auto internal_basis =
       qdk::chemistry::utils::microsoft::convert_basis_set_from_qdk(*basis_set);
   EXPECT_EQ(internal_basis->atom_ecp_electrons, std::vector<int>({28, 0}));
   EXPECT_EQ(internal_basis->mol->atomic_charges,
             std::vector<uint64_t>({19, 47}));
-  EXPECT_EQ(internal_basis->n_ecp_electrons, 28);
+  EXPECT_EQ(internal_basis->get_n_ecp_electrons(), 28);
   EXPECT_EQ(internal_basis->mol->n_electrons, 66);
-  EXPECT_TRUE(internal_basis->to_json()["element_ecp_electrons"].empty());
+  EXPECT_FALSE(internal_basis->to_json().contains("element_ecp_electrons"));
 
   auto round_tripped =
       qdk::chemistry::utils::microsoft::convert_basis_set_to_qdk(

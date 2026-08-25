@@ -70,8 +70,22 @@ class BasisSet {
 
   std::vector<Shell> ecp_shells;  ///< Effective core potential shells
   std::vector<int>
-      atom_ecp_electrons;   ///< Number of ECP electrons for each atom
-  int n_ecp_electrons = 0;  ///< Total number of core electrons replaced by ECPs
+      atom_ecp_electrons;  ///< Number of ECP electrons for each atom
+
+  /**
+   * @brief Get the total number of core electrons replaced by ECPs
+   * @return Sum of the per-atom ECP electron counts
+   */
+  int get_n_ecp_electrons() const noexcept {
+    return std::accumulate(atom_ecp_electrons.begin(), atom_ecp_electrons.end(),
+                           0);
+  }
+
+  /**
+   * @brief Validate the per-atom ECP electron counts
+   * @throws std::runtime_error if the vector size or any count is invalid
+   */
+  void validate_atom_ecp_electrons() const;
 
   /**
    * @brief Load basis set from database (QCSchema) JSON file

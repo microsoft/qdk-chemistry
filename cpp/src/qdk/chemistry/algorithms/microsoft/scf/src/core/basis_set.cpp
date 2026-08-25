@@ -15,11 +15,9 @@
 #include <fstream>
 #include <iostream>
 #include <libint2.hpp>
-#include <map>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <regex>
-#include <set>
 #include <unordered_map>
 
 #include "util/macros.h"
@@ -29,7 +27,7 @@ namespace qdk::chemistry::scf {
 
 void norm_psi4_mode(std::vector<Shell>& shells);
 
-size_t load_from_database_json(std::filesystem::path bs_path, BasisSet& basis) {
+void load_from_database_json(std::filesystem::path bs_path, BasisSet& basis) {
   QDK_LOG_TRACE_ENTERING();
 
   if (!std::filesystem::exists(bs_path)) {
@@ -45,7 +43,6 @@ size_t load_from_database_json(std::filesystem::path bs_path, BasisSet& basis) {
   auto& atom_ecp_electrons = basis.atom_ecp_electrons;
 
   atom_ecp_electrons.assign(mol.n_atoms, 0);
-  size_t n_ecp_electrons = 0;
   for (uint64_t i = 0; i < mol.n_atoms; ++i) {
     auto atomic_num = std::to_string(mol.atomic_nums[i]);
     VERIFY_INPUT(data["elements"].contains(atomic_num),
@@ -89,7 +86,6 @@ size_t load_from_database_json(std::filesystem::path bs_path, BasisSet& basis) {
     auto n_core_electrons = elem["ecp_electrons"].get<int>();
     atom_ecp_electrons[i] = n_core_electrons;
     mol.atomic_charges[i] = mol.atomic_nums[i] - n_core_electrons;
-    n_ecp_electrons += n_core_electrons;
     auto ecp = elem["ecp_potentials"];
     for (const auto& entry : ecp) {
       if (entry["ecp_type"].get<std::string>() != "scalar_ecp") {
@@ -117,8 +113,6 @@ size_t load_from_database_json(std::filesystem::path bs_path, BasisSet& basis) {
       ecp_shells.push_back(sh);
     }
   }
-
-  return n_ecp_electrons;
 }
 
 std::shared_ptr<BasisSet> BasisSet::from_database_json(
@@ -127,6 +121,24 @@ std::shared_ptr<BasisSet> BasisSet::from_database_json(
   QDK_LOG_TRACE_ENTERING();
 
   return std::shared_ptr<BasisSet>(new BasisSet(mol, path, mode, pure, sort));
+}
+
+void BasisSet::validate_atom_ecp_electrons() const {
+  if (atom_ecp_electrons.size() != mol->n_atoms) {
+    throw std::runtime_error(
+        "atom_ecp_electrons must contain one entry per atom.");
+  }
+  for (size_t i = 0; i < mol->n_atoms; ++i) {
+    int ecp_electrons = atom_ecp_electrons[i];
+    auto atomic_num = mol->atomic_nums[i];
+    if (ecp_electrons < 0 ||
+        static_cast<uint64_t>(ecp_electrons) > atomic_num) {
+      throw std::runtime_error(fmt::format(
+          "atom_ecp_electrons[{}] must be between 0 and the atomic number "
+          "({}), got {}.",
+          i, atomic_num, ecp_electrons));
+    }
+  }
 }
 
 BasisSet::BasisSet(std::shared_ptr<Molecule> mol,
@@ -140,21 +152,7 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol,
       pure(pure),
       ecp_shells(input_ecp_shells),
       atom_ecp_electrons(atom_ecp_electrons) {
-  if (atom_ecp_electrons.size() != mol->n_atoms) {
-    throw std::runtime_error(
-        "atom_ecp_electrons must contain one entry per atom.");
-  }
-  for (size_t i = 0; i < mol->n_atoms; ++i) {
-    int atomic_num = mol->atomic_nums[i];
-    int ecp_electrons = atom_ecp_electrons[i];
-    if (ecp_electrons < 0 || ecp_electrons > atomic_num) {
-      throw std::runtime_error(fmt::format(
-          "atom_ecp_electrons[{}] must be between 0 and the atomic number "
-          "({}), got {}.",
-          i, atomic_num, ecp_electrons));
-    }
-    n_ecp_electrons += ecp_electrons;
-  }
+  validate_atom_ecp_electrons();
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
   if (mpi::get_world_size() > 1) {
     MPI_Barrier(MPI_COMM_WORLD);
@@ -308,7 +306,8 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol, const std::string& path,
 #endif
 
   // Load basis from JSON
-  n_ecp_electrons = load_from_database_json(bs_path, *this);
+  load_from_database_json(bs_path, *this);
+  validate_atom_ecp_electrons();
 
   if (mode == BasisMode::PSI4) {
     norm_psi4_mode(shells);
@@ -423,6 +422,7 @@ void norm_psi4_mode(std::vector<Shell>& shells) {
 
 nlohmann::ordered_json BasisSet::to_json() const {
   QDK_LOG_TRACE_ENTERING();
+  validate_atom_ecp_electrons();
 
   std::vector<nlohmann::ordered_json> json_shells;
   for (const auto& sh : shells) {
@@ -432,29 +432,6 @@ nlohmann::ordered_json BasisSet::to_json() const {
   std::vector<nlohmann::ordered_json> json_ecp_shells;
   for (const auto& sh : ecp_shells) {
     json_ecp_shells.push_back(sh.to_json(true /*is_ecp*/));
-  }
-
-  std::map<int, int> element_ecp_electrons;
-  std::set<int> nonuniform_elements;
-  for (size_t i = 0; i < atom_ecp_electrons.size(); ++i) {
-    int atomic_num = mol->atomic_nums[i];
-    int ncore = atom_ecp_electrons[i];
-    if (nonuniform_elements.contains(atomic_num)) {
-      continue;
-    }
-    auto [it, inserted] = element_ecp_electrons.emplace(atomic_num, ncore);
-    if (!inserted && it->second != ncore) {
-      element_ecp_electrons.erase(it);
-      nonuniform_elements.insert(atomic_num);
-    }
-  }
-
-  std::vector<int> json_element_ecp_electrons;
-  for (const auto& [atomic_num, ncore] : element_ecp_electrons) {
-    if (ncore > 0) {
-      json_element_ecp_electrons.push_back(atomic_num);
-      json_element_ecp_electrons.push_back(ncore);
-    }
   }
 
   auto basis_set_json = nlohmann::ordered_json(
@@ -467,8 +444,7 @@ nlohmann::ordered_json BasisSet::to_json() const {
        {"num_atomic_orbitals", num_atomic_orbitals},
        {"electron_shells", json_shells},
        {"ecp_shells", json_ecp_shells},
-       {"atom_ecp_electrons", atom_ecp_electrons},
-       {"element_ecp_electrons", json_element_ecp_electrons}});
+       {"atom_ecp_electrons", atom_ecp_electrons}});
   return basis_set_json;
 }
 
@@ -586,17 +562,23 @@ std::shared_ptr<BasisSet> BasisSet::from_serialized_json(
 
   if (json.contains("atom_ecp_electrons")) {
     bs->atom_ecp_electrons = json["atom_ecp_electrons"].get<std::vector<int>>();
-    if (bs->atom_ecp_electrons.size() != bs->mol->n_atoms) {
-      throw std::runtime_error(
-          "atom_ecp_electrons must contain one entry per atom.");
-    }
   } else {
+    // Legacy serialized basis sets stored ECP counts by element.
     std::vector<int> element_ecp_electrons_json;
+    std::string legacy_key;
     if (json.contains("element_ecp_electrons")) {
+      legacy_key = "element_ecp_electrons";
       element_ecp_electrons_json =
           json["element_ecp_electrons"].get<std::vector<int>>();
     } else if (json.contains("elem2ecpcore")) {
+      legacy_key = "elem2ecpcore";
       element_ecp_electrons_json = json["elem2ecpcore"].get<std::vector<int>>();
+    }
+    if (!legacy_key.empty()) {
+      QDK_LOGGER().warn(
+          "Reading legacy '{}' ECP electron data. Re-serialize the basis set "
+          "to use atom_ecp_electrons.",
+          legacy_key);
     }
     if (element_ecp_electrons_json.size() % 2 != 0) {
       throw std::runtime_error(
@@ -618,22 +600,18 @@ std::shared_ptr<BasisSet> BasisSet::from_serialized_json(
     }
   }
 
+  bs->validate_atom_ecp_electrons();
+
   // Update atomic charges, total nuclear charge, and n_electrons based on ECPs
-  bs->n_ecp_electrons = 0;
+  std::vector<uint64_t> atomic_charges(bs->mol->n_atoms);
   for (size_t i = 0; i < bs->mol->n_atoms; ++i) {
-    int atomic_num = bs->mol->atomic_nums[i];
     int ecp_electrons = bs->atom_ecp_electrons[i];
-    if (ecp_electrons < 0 || ecp_electrons > atomic_num) {
-      throw std::runtime_error(fmt::format(
-          "atom_ecp_electrons[{}] must be between 0 and the atomic number "
-          "({}), got {}.",
-          i, atomic_num, ecp_electrons));
-    }
-    bs->mol->atomic_charges[i] = atomic_num - ecp_electrons;
-    bs->n_ecp_electrons += ecp_electrons;
+    atomic_charges[i] = bs->mol->atomic_nums[i] - ecp_electrons;
   }
-  bs->mol->total_nuclear_charge = std::accumulate(
-      bs->mol->atomic_charges.begin(), bs->mol->atomic_charges.end(), 0);
+  auto total_nuclear_charge = std::accumulate(
+      atomic_charges.begin(), atomic_charges.end(), uint64_t{0});
+  bs->mol->atomic_charges = std::move(atomic_charges);
+  bs->mol->total_nuclear_charge = total_nuclear_charge;
   bs->mol->n_electrons = bs->mol->total_nuclear_charge - bs->mol->charge;
 
   // Compute derived quantities

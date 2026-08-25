@@ -29,7 +29,7 @@ namespace detail {
  */
 std::array<size_t, 4> get_core_config_from_ecp_shells(
     const BasisSet& basis_set) {
-  size_t ecp_electrons = basis_set.n_ecp_electrons;
+  size_t ecp_electrons = basis_set.get_n_ecp_electrons();
   // ecp map
   std::unordered_map<int, std::array<size_t, 4>> ecp_map = {
       {0, {0, 0, 0, 0}},   // []
@@ -113,7 +113,6 @@ std::shared_ptr<BasisSet> make_atom_basis_set(size_t index,
                                               std::shared_ptr<Molecule> mol) {
   std::vector<Shell> shells;
   std::vector<Shell> ecp_shells;
-  int total_ecp_electrons = 0;
 
   // Filter shells belonging to the specified atomic number
   std::copy_if(basis_set.shells.begin(), basis_set.shells.end(),
@@ -140,18 +139,16 @@ std::shared_ptr<BasisSet> make_atom_basis_set(size_t index,
   }
 
   auto atomic_number = mol->atomic_nums[0];
-  if (index < basis_set.atom_ecp_electrons.size()) {
-    total_ecp_electrons = basis_set.atom_ecp_electrons[index];
-  }
+  int atom_ecp_electrons = basis_set.atom_ecp_electrons.at(index);
 
   // Create a new BasisSet for the atom
   auto atom_basis = std::shared_ptr<BasisSet>(new BasisSet(
-      mol, shells, ecp_shells, std::vector<int>{total_ecp_electrons},
+      mol, shells, ecp_shells, std::vector<int>{atom_ecp_electrons},
       BasisMode::RAW, basis_set.pure, false));
 
   // Update atomic charges, total nuclear charge, and n_electrons based on ECPs
-  if (total_ecp_electrons > 0) {
-    mol->atomic_charges[0] = atomic_number - total_ecp_electrons;
+  if (atom_ecp_electrons > 0) {
+    mol->atomic_charges[0] = atomic_number - atom_ecp_electrons;
     mol->total_nuclear_charge = mol->atomic_charges[0];
     mol->n_electrons = mol->total_nuclear_charge - mol->charge;
   }
@@ -165,7 +162,6 @@ bool BasisEqChecker::operator()(const BasisSet& a,
   if (a.mol->atomic_nums[0] != b.mol->atomic_nums[0]) return false;
 
   // check basis set
-  if (a.n_ecp_electrons != b.n_ecp_electrons) return false;
   if (a.pure != b.pure) return false;
   if (a.num_atomic_orbitals != b.num_atomic_orbitals) return false;
   if (a.shells.size() != b.shells.size()) return false;
@@ -211,7 +207,6 @@ size_t BasisHasher::operator()(const BasisSet& basis) const noexcept {
   hash_value(ctx, static_cast<int64_t>(basis.mol->atomic_nums[0]));
 
   // hash basis set
-  hash_value(ctx, static_cast<uint64_t>(basis.n_ecp_electrons));
   hash_value(ctx, basis.pure);
   hash_value(ctx, static_cast<uint64_t>(basis.num_atomic_orbitals));
   hash_value(ctx, static_cast<uint64_t>(basis.shells.size()));
@@ -448,6 +443,13 @@ void AtomicSphericallyAveragedHartreeFock::solve_fock_eigenproblem(
         n_double_occ = 0;
         frac_occ = 0;
       }
+    }
+
+    size_t required_shells = n_double_occ + (frac_occ > 0 ? 1 : 0);
+    if (required_shells > n_shells) {
+      throw std::runtime_error(
+          "Atomic basis does not contain enough shells for the requested "
+          "electron configuration.");
     }
 
     std::vector<double> occ_l(n_shells, 0);
