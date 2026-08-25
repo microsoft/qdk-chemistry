@@ -86,8 +86,8 @@ class QROMStatePreparation(StatePreparation):
                 raise ValueError("QROM state preparation requires real coefficients.")
             coeffs = coeffs.real
         coeffs = coeffs.astype(float, copy=False)
-        if not np.all(np.isfinite(coeffs)):
-            raise ValueError("QROM state preparation requires finite coefficients.")
+        if not np.all(np.isfinite(coeffs)) or not np.any(coeffs != 0.0):
+            raise ValueError("QROM state preparation requires finite, non-zero coefficients.")
 
         amplitudes = coeffs.tolist()
         num_state_qubits = math.ceil(math.log2(len(amplitudes))) if len(amplitudes) > 1 else 1

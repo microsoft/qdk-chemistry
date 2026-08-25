@@ -29,11 +29,8 @@ class AliasSamplingStatePreparationSettings(Settings):
             "int",
             10,
             "Number of bits mu of precision for the alias table's keep probabilities. Each "
-            "prepared probability is within 1/(L 2^mu) of the target for L coefficients, at "
-            "the cost of one extra "
-            "uniform qubit and one extra Quantum Read-Only Memory (QROM) output qubit per bit. "
-            "The upper bound of 30 is a sanity limit rather than an algorithmic one: 2^-30 is "
-            "already far below chemical accuracy.",
+            "prepared probability is within 1/(L 2^mu) of the target for L coefficients. "
+            "The upper bound of 30 is a sanity limit as 2^-30 is far below chemical accuracy.",
             (1, 30),
         )
 
@@ -129,8 +126,8 @@ class AliasSamplingStatePreparation(StatePreparation):
                 raise ValueError("Alias sampling state preparation requires real coefficients.")
             coeffs = coeffs.real
         coeffs = coeffs.astype(float, copy=False)
-        if not np.all(np.isfinite(coeffs)):
-            raise ValueError("Alias sampling state preparation requires finite coefficients.")
+        if not np.all(np.isfinite(coeffs)) or not np.any(coeffs != 0.0):
+            raise ValueError("Alias sampling state preparation requires finite, non-zero coefficients.")
         if np.any(coeffs < 0.0):
             raise ValueError("Alias sampling state preparation requires non-negative coefficients.")
 

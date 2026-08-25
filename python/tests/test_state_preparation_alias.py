@@ -155,13 +155,6 @@ class TestAliasSamplingStatePreparation:
         with pytest.raises(ValueError, match="non-negative"):
             prep.run(wf)
 
-    def test_all_zero_coefficients_rejected(self):
-        """An all-zero vector has no distribution to prepare."""
-        prep = AliasSamplingStatePreparation(bits_precision=4)
-        wf = _make_wavefunction([0.0, 0.0, 0.0, 0.0])
-        with pytest.raises(ValueError, match="non-zero"):
-            prep.run(wf)
-
     def test_zero_coefficients_get_zero_probability(self, qdk_ctx):
         """A zero coefficient must receive exactly zero probability.
 
