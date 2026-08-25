@@ -56,7 +56,8 @@
 #
 # Applied to a local FetchContent_MakeAvailable(CMakeBuild) source checkout via -DFETCHCONTENT_SOURCE_DIR_CMAKEBUILD
 # (see install-exachem.sh) rather than to a vendored copy in this repo, since CMSB isn't a qdk-chemistry dependency
-# in its own right -- it's fetched fresh (from NWChemEx-Project/CMakeBuild@main) as part of TAMM/ExaChem's own build.
+# in its own right -- it's fetched at a pinned commit (CMSB_COMMIT in install-exachem.sh; upstream TAMM itself does
+# not pin CMSB, defaulting CMSB_TAG to "main") as part of TAMM/ExaChem's own build.
 # Candidate for upstreaming to NWChemEx-Project/CMakeBuild: these are genuine gaps (not qdk-chemistry-specific
 # behavior), following the exact pattern CMSB already uses for LibInt2/HDF5/HPTT/ELPA/numactl.
 #

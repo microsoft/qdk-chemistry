@@ -47,8 +47,17 @@ TAMM_COMMIT="63c274e37c102a316e844f954bb2387988b0256c"
 EXACHEM_REPO="https://github.com/ExaChem/exachem.git"
 EXACHEM_COMMIT="45c192e840fd1e0417871d926e9ab87748111e53"
 
+# CMSB (NWChemEx-Project/CMakeBuild, TAMM/ExaChem's superbuild helper) is pinned too, for the same reproducibility
+# reason as TAMM/ExaChem above: upstream TAMM's own CMakeLists.txt does not pin it either (it defaults CMSB_TAG to
+# "main" if unset), so without a pin here we'd be building against whatever CMSB main happens to be on the day CI
+# runs -- and our cmsb-fix-dependency-reuse.patch (below) could silently stop applying if those exact files change
+# upstream. Pinned to CMSB main's HEAD as of the CI run that validated this patch end-to-end (see
+# patches/cmsb-fix-dependency-reuse.patch for the patch itself).
+CMSB_REPO="https://github.com/NWChemEx-Project/CMakeBuild.git"
+CMSB_COMMIT="f5be7e2472e8ebb9bc51163d424da7c25716ce9a"
+
 echo "==> ExaChem CI build: march=${MARCH} jobs=${JOBS} modules=${MODULES} ga_runtime=${GA_RUNTIME}"
-echo "==> TAMM: ${TAMM_COMMIT} / ExaChem: ${EXACHEM_COMMIT}"
+echo "==> TAMM: ${TAMM_COMMIT} / ExaChem: ${EXACHEM_COMMIT} / CMSB: ${CMSB_COMMIT}"
 echo "==> Reusing LibInt2/GauXC/BLAS++/LAPACK++ from CPP_DEPS_PREFIX=${CPP_DEPS_PREFIX}"
 echo "==> INSTALL_PREFIX=${INSTALL_PREFIX}"
 
@@ -148,7 +157,11 @@ echo "==> HDF5: cflags='${HDF5_CFLAGS}' libs='${HDF5_LIBS}'"
 # package needed/installed anymore) and pointing NJSON_ROOT there instead -- exactly matching CMSB's own pin, so
 # both qdk-chemistry's own build and ExaChem/TAMM reuse the identical, compatible nlohmann_json install.
 CMSB_SRC_DIR="${BUILD_ROOT}/CMakeBuild-patched"
-git clone --depth 1 https://github.com/NWChemEx-Project/CMakeBuild.git "${CMSB_SRC_DIR}"
+mkdir -p "${CMSB_SRC_DIR}"
+git -C "${CMSB_SRC_DIR}" init -q
+git -C "${CMSB_SRC_DIR}" remote add origin "${CMSB_REPO}"
+git -C "${CMSB_SRC_DIR}" fetch -q --depth 1 origin "${CMSB_COMMIT}"
+git -C "${CMSB_SRC_DIR}" checkout -q FETCH_HEAD
 git -C "${CMSB_SRC_DIR}" apply --verbose "${SCRIPT_DIR}/patches/cmsb-fix-dependency-reuse.patch"
 
 COMMON_CMAKE_ARGS=(
@@ -164,6 +177,17 @@ COMMON_CMAKE_ARGS=(
   -DEcpInt_ROOT="${CPP_DEPS_PREFIX}"
   -DNJSON_ROOT="${CPP_DEPS_PREFIX}"
   -DFETCHCONTENT_SOURCE_DIR_CMAKEBUILD="${CMSB_SRC_DIR}"
+  # Enforce reuse instead of leaving it best-effort: CMSB's find_or_build_dependency() only hard-errors
+  # ("Could not locate <dep> and user has requested we do not build one") when BUILD_<dep> is explicitly set to
+  # OFF; if left unset, a failed find silently falls through to include(Build<dep>) and rebuilds from source
+  # (cmake/macros/DependencyMacros.cmake). Passing -DBUILD_<dep>=OFF for all five reused deps -- not just
+  # LibInt2/GauXC as before -- makes a broken *_ROOT/reuse patch fail loudly at configure time instead of
+  # silently degrading into a redundant rebuild that's only visible by eyeballing the configure log.
+  -DBUILD_LibInt2=OFF
+  -DBUILD_GauXC=OFF
+  -DBUILD_SPDLOG=OFF
+  -DBUILD_EcpInt=OFF
+  -DBUILD_NJSON=OFF
 )
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -177,8 +201,6 @@ git -C "${BUILD_ROOT}/TAMM" checkout "${TAMM_COMMIT}"
 CC=gcc CXX=g++ FC=gfortran cmake -S "${BUILD_ROOT}/TAMM" -B "${BUILD_ROOT}/TAMM/build" \
   -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" \
   "${COMMON_CMAKE_ARGS[@]}" \
-  -DBUILD_LibInt2=OFF \
-  -DBUILD_GauXC=OFF \
   -DBUILD_TESTS=OFF \
   -DBUILD_METHODS=OFF
 cmake --build "${BUILD_ROOT}/TAMM/build" -j "${JOBS}"
