@@ -236,16 +236,11 @@ where :math:`\tilde{p}` is the target distribution discretized to :math:`\mu` bi
      - Description
    * - ``bits_precision``
      - int
-     - Number of bits :math:`\mu` of precision for the alias table's keep probabilities. Each prepared probability lands within :math:`2^{-\mu}` of the target, at the cost of one extra uniform qubit and one extra Quantum Read-Only Memory (QROM) output qubit per bit. The upper bound of 30 is a sanity limit rather than an algorithmic one: :math:`2^{-30}` is already far below chemical accuracy. Default is 10.
+     - Number of bits :math:`\mu` of precision for the alias table's keep probabilities. Each prepared probability is within :math:`1/(L 2^{\mu})` of the target for :math:`L` coefficients, at the cost of one extra uniform qubit and one extra Quantum Read-Only Memory (QROM) output qubit per bit. The upper bound of 30 is a sanity limit rather than an algorithmic one: :math:`2^{-30}` is already far below chemical accuracy. Default is 10.
 
-To use it, pass it as the ``prepare`` setting of the ``prepare_select_prepare`` circuit mapper, which maps an :term:`LCU` block encoding to a circuit:
+The prepared index register stays entangled with the ancillas, so this method is only meaningful inside a block encoding that applies :math:`\mathrm{PREPARE}^\dagger` to uncompute them. The ``prepare_select_prepare`` circuit mapper has that structure, but it currently sizes the PREPARE register from the coefficient count alone and so cannot yet supply the extra ancillas this method needs.
 
-.. literalinclude:: /_static/examples/python/hamiltonian_unitary_builder.py
-   :language: python
-   :start-after: start-cell-lcu-prepare
-   :end-before: end-cell-lcu-prepare
-
-Quantum Read-Only Memory (QROM) 
+Quantum Read-Only Memory (QROM)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. rubric:: Factory name: ``"qrom"``

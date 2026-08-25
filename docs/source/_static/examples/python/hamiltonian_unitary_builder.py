@@ -148,18 +148,3 @@ print(f"Number of qubits: {unitary.get_num_qubits()}")
 print(unitary.get_summary())
 # end-cell-run-lcu
 ################################################################################
-
-################################################################################
-# start-cell-lcu-prepare
-from qdk_chemistry.data import AlgorithmRef
-
-# Load the amplitudes with alias sampling instead of the default dense state prep
-psp_mapper = create(
-    "circuit_mapper",
-    "prepare_select_prepare",
-    prepare=AlgorithmRef("state_prep", "alias_sampling", bits_precision=6),
-)
-lcu_circuit = psp_mapper.run(unitary)
-print(lcu_circuit.estimate()["logicalCounts"])
-# end-cell-lcu-prepare
-################################################################################
