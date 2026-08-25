@@ -95,7 +95,7 @@ If you chose the minimal `pip install qdk-chemistry` above, you can add specific
 To build the documentation, install the `docs` extra (for example,
 `python3 -m pip install 'qdk-chemistry[docs]'`), install the Doxygen system
 binary and Graphviz (for example, `sudo apt install doxygen graphviz` on
-Ubuntu), then run `cd docs && make`. See the
+Ubuntu), then run `cd docs && make all`. See the
 [documentation build instructions](docs/README.md) for more details.
 
 Install one or more extras with:
