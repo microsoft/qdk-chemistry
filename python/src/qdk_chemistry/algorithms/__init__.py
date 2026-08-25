@@ -60,6 +60,9 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import QpeCi
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder import (
     RobustPhaseEstimationCircuitBuilder,
 )
+from qdk_chemistry.algorithms.phase_estimation.experiment_scheduler import (
+    RobustPhaseEstimationExperimentScheduler,
+)
 from qdk_chemistry.algorithms.population_analysis import PopulationAnalyzer, QdkPopulationAnalyzer
 from qdk_chemistry.algorithms.projected_multi_configuration_calculator import (
     ProjectedMultiConfigurationCalculator,
@@ -121,6 +124,7 @@ __all__ = [
     "QubitHamiltonianSolver",
     "QubitMapper",
     "RobustPhaseEstimationCircuitBuilder",
+    "RobustPhaseEstimationExperimentScheduler",
     "ScfSolver",
     "StabilityChecker",
     "StatePreparation",

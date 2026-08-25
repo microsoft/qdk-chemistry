@@ -60,17 +60,22 @@ qpe.settings().set("qpe_circuit_builder", qpe_circuit_builder)
 
 ################################################################################
 # start-cell-configure-robust
-# Configure robust phase estimation through its dedicated circuit builder
-robust_circuit_builder = AlgorithmRef(
-    "robust_phase_estimation_circuit_builder",
+# Configure robust phase estimation through its QPE builder and nested scheduler
+experiment_scheduler = AlgorithmRef(
+    "rpe_experiment_scheduler",
     "qdk",
     target_accuracy=1e-3,
     epsilon_unitary=0.85,  # Independent dimensionless Trotter sizing tolerance (default: 0.85).
     seed=42,
     unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", order=2),
 )
+robust_circuit_builder = AlgorithmRef(
+    "qpe_circuit_builder",
+    "qdk_robust",
+    experiment_scheduler=experiment_scheduler,
+)
 rpe = create("phase_estimation", "qdk_robust")
-rpe.settings().set("robust_phase_estimation_circuit_builder", robust_circuit_builder)
+rpe.settings().set("qpe_circuit_builder", robust_circuit_builder)
 rpe.settings().set(
     "circuit_executor",
     AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=42),
@@ -154,31 +159,35 @@ print(result.get_summary())
 
 ################################################################################
 # start-cell-robust-circuit-set
-# Build the same on-demand circuit collection used by robust phase estimation
-builder = create(
-    "robust_phase_estimation_circuit_builder",
+# Schedule the same reproducible workload used by robust phase estimation
+experiment_scheduler = AlgorithmRef(
+    "rpe_experiment_scheduler",
     "qdk",
     target_accuracy=1e-3,
     seed=42,
     unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", order=2),
 )
-circuit_set = builder.run(
+builder = create(
+    "qpe_circuit_builder",
+    "qdk_robust",
+    experiment_scheduler=experiment_scheduler,
+)
+circuit_set = builder.schedule(
     state_preparation=circuit,
     qubit_hamiltonian=qubit_ham,
 )
 
-# The lightweight schedule is serializable and contains no materialized circuits.
-print(circuit_set.schedule.get_summary())
+# The circuit set serializes the complete schedule and execution manifest.
+print(circuit_set.get_summary())
 
-# Generate only the circuit pair needed for execution or resource estimation.
-first_experiment = circuit_set.get_experiment(round_index=0)
-x_application = first_experiment.x_circuit.get_qre_application()
-y_application = first_experiment.y_circuit.get_qre_application()
-print(first_experiment.round_index, first_experiment.circuit_multiplicity)
+# Stream only the circuit pair needed for execution or resource estimation.
+first_spec, x_circuit, y_circuit = next(builder.iter_build(circuit_set))
+x_application = x_circuit.get_qre_application()
+y_application = y_circuit.get_qre_application()
+print(first_spec.round_index, first_spec.draw_index, first_spec.shots)
 print(x_application, y_application)
 
-# Full millihartree execution is expensive. Set this to True to execute the same
-# re-iterable set while preserving its schedule and random draws.
+# Full millihartree execution is expensive. Set this to True to execute the same workload.
 run_full_rpe = False
 if run_full_rpe:
     rpe_result = rpe.execute_circuit_set(circuit_set)

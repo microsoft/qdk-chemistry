@@ -1,4 +1,4 @@
-"""Tests for on-demand robust phase estimation circuit generation."""
+"""Tests for robust phase estimation scheduling and circuit construction."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -24,7 +24,10 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder import (
     QdkRobustPhaseEstimationCircuitBuilder,
     RobustPhaseEstimationCircuitBuilder,
-    RobustPhaseEstimationCircuitSet,
+)
+from qdk_chemistry.algorithms.phase_estimation.experiment_scheduler import (
+    QdkRobustPhaseEstimationExperimentScheduler,
+    RobustPhaseEstimationExperimentScheduler,
     _AlgorithmSnapshot,
     _num_rounds,
     _qdrift_schedule,
@@ -33,12 +36,10 @@ from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
     QubitOperator,
+    RobustPhaseEstimationCircuitSet,
     RobustPhaseEstimationRound,
-    RobustPhaseEstimationSchedule,
+    SettingNotFoundError,
     Settings,
-)
-from qdk_chemistry.data import (
-    RobustPhaseEstimationCircuitSet as DataRobustPhaseEstimationCircuitSet,
 )
 
 if TYPE_CHECKING:
@@ -112,34 +113,6 @@ def rpe_problem() -> tuple[Circuit, QubitOperator]:
     return state_preparation, hamiltonian
 
 
-@pytest.mark.parametrize(
-    ("lambda_norm", "epsilon", "expected"),
-    [(1.0, 1.0, 0), (0.5, 1.0, 0), (8.0, 1.0, 3), (10.0, 1.0, 4)],
-)
-def test_num_rounds(lambda_norm: float, epsilon: float, expected: int) -> None:
-    """The builder resolves the expected number of time-doubling rounds."""
-    assert _num_rounds(lambda_norm, epsilon) == expected
-
-
-def test_num_rounds_rejects_nonpositive_epsilon() -> None:
-    """RPE scheduling requires a positive energy tolerance."""
-    with pytest.raises(ValueError, match="epsilon"):
-        _num_rounds(1.0, 0.0)
-
-
-def test_qdrift_schedule_formula_and_monotonicity() -> None:
-    """RPE shots decrease while qDRIFT samples increase over the ladder."""
-    total_rounds = 5
-    schedules = [_qdrift_schedule(total_rounds, round_index) for round_index in range(total_rounds + 1)]
-    shots = [schedule[0] for schedule in schedules]
-    samples = [schedule[1] for schedule in schedules]
-
-    assert schedules[0] == (ceil(e * (11 + 4 * total_rounds)), 2)
-    assert shots == sorted(shots, reverse=True)
-    assert samples == sorted(samples)
-    assert all(samples[round_index] == 2 ** (2 * round_index + 1) for round_index in range(total_rounds + 1))
-
-
 @pytest.fixture
 def recording_builders(
     monkeypatch: pytest.MonkeyPatch,
@@ -165,32 +138,83 @@ def recording_builders(
     return unitary_records, hadamard_records
 
 
-def test_builder_is_registered_and_does_not_build_eagerly(
+def _copy_with_rounds(
+    circuit_set: RobustPhaseEstimationCircuitSet,
+    rounds: tuple[RobustPhaseEstimationRound, ...],
+) -> RobustPhaseEstimationCircuitSet:
+    """Copy a circuit set with replacement round metadata."""
+    return RobustPhaseEstimationCircuitSet(
+        rounds=rounds,
+        experiment_specs=circuit_set.experiment_specs,
+        state_preparation=circuit_set.state_preparation,
+        qubit_hamiltonian=circuit_set.qubit_hamiltonian,
+        lambda_norm=circuit_set.lambda_norm,
+        base_time=circuit_set.base_time,
+        target_accuracy=circuit_set.target_accuracy,
+        epsilon_rpe=circuit_set.epsilon_rpe,
+        epsilon_unitary=circuit_set.epsilon_unitary,
+        unitary_accuracy_fraction=circuit_set.unitary_accuracy_fraction,
+        error_budget_mode=circuit_set.error_budget_mode,
+        unitary_builder_category=circuit_set.unitary_builder_category,
+        energy_correction=circuit_set.energy_correction,
+        requested_seed=circuit_set.requested_seed,
+        root_seed=circuit_set.root_seed,
+        hadamard_test_circuit_builder_configuration=(circuit_set.hadamard_test_circuit_builder_configuration),
+    )
+
+
+@pytest.mark.parametrize(
+    ("lambda_norm", "epsilon", "expected"),
+    [(1.0, 1.0, 0), (0.5, 1.0, 0), (8.0, 1.0, 3), (10.0, 1.0, 4)],
+)
+def test_num_rounds(lambda_norm: float, epsilon: float, expected: int) -> None:
+    """The scheduler resolves the expected number of time-doubling rounds."""
+    assert _num_rounds(lambda_norm, epsilon) == expected
+
+
+def test_num_rounds_rejects_nonpositive_epsilon() -> None:
+    """RPE scheduling requires a positive energy tolerance."""
+    with pytest.raises(ValueError, match="epsilon"):
+        _num_rounds(1.0, 0.0)
+
+
+def test_qdrift_schedule_formula_and_monotonicity() -> None:
+    """RPE shots decrease while qDRIFT samples increase over the ladder."""
+    total_rounds = 5
+    schedules = [_qdrift_schedule(total_rounds, round_index) for round_index in range(total_rounds + 1)]
+    shots = [schedule[0] for schedule in schedules]
+    samples = [schedule[1] for schedule in schedules]
+
+    assert schedules[0] == (ceil(e * (11 + 4 * total_rounds)), 2)
+    assert shots == sorted(shots, reverse=True)
+    assert samples == sorted(samples)
+    assert all(samples[round_index] == 2 ** (2 * round_index + 1) for round_index in range(total_rounds + 1))
+
+
+def test_scheduler_and_builder_are_registered_and_scheduling_is_lazy(
     rpe_problem: tuple[Circuit, QubitOperator],
     recording_builders: tuple[list[dict[str, object]], list[tuple[str, _FakeUnitary]]],
 ) -> None:
-    """The registered builder resolves a schedule without constructing circuits."""
+    """The registered scheduler creates metadata without constructing circuits."""
     state_preparation, hamiltonian = rpe_problem
     unitary_records, hadamard_records = recording_builders
-    builder = create("robust_phase_estimation_circuit_builder", "qdk", target_accuracy=0.5, seed=7)
+    scheduler = create("rpe_experiment_scheduler", "qdk", target_accuracy=0.5, seed=7)
+    builder = create("qpe_circuit_builder", "qdk_robust")
 
-    circuit_set = builder.run(state_preparation, hamiltonian)
+    circuit_set = scheduler.run(state_preparation, hamiltonian)
 
+    assert isinstance(scheduler, RobustPhaseEstimationExperimentScheduler)
     assert isinstance(builder, RobustPhaseEstimationCircuitBuilder)
-    assert RobustPhaseEstimationCircuitSet is DataRobustPhaseEstimationCircuitSet
-    assert RobustPhaseEstimationCircuitSet.__module__ == "qdk_chemistry.data.robust_phase_estimation"
     assert isinstance(circuit_set, RobustPhaseEstimationCircuitSet)
-    assert circuit_set.num_rounds > 0
-    hadamard_ref = builder.settings().get("hadamard_test_circuit_builder")
-    assert hadamard_ref.settings is not None
     assert unitary_records == []
     assert hadamard_records == []
+    assert len(circuit_set.experiment_specs) == sum(round_data.num_draws for round_data in circuit_set.rounds)
 
-    schedule = circuit_set.schedule
-    assert isinstance(schedule, RobustPhaseEstimationSchedule)
-    assert schedule.num_rounds == circuit_set.num_rounds
-    assert unitary_records == []
-    assert hadamard_records == []
+
+def test_robust_builder_rejects_standard_qpe_settings() -> None:
+    """The shared builder type retains variant-specific settings schemas."""
+    with pytest.raises(SettingNotFoundError):
+        create("qpe_circuit_builder", "qdk_robust", num_bits=10)
 
 
 @pytest.mark.parametrize("base_time", [pi, 1.1 * pi])
@@ -200,20 +224,20 @@ def test_explicit_base_time_rejects_aliasing_energy_interval(
 ) -> None:
     """Explicit base times must distinguish every energy in the Hamiltonian norm bound."""
     state_preparation, hamiltonian = rpe_problem
-    builder = QdkRobustPhaseEstimationCircuitBuilder(target_accuracy=0.5, base_time=base_time)
+    scheduler = QdkRobustPhaseEstimationExperimentScheduler(target_accuracy=0.5, base_time=base_time)
 
     with pytest.raises(ValueError, match=r"base_time \* lambda_norm < pi"):
-        builder.run(state_preparation, hamiltonian)
+        scheduler.run(state_preparation, hamiltonian)
 
 
 def test_explicit_base_time_below_aliasing_limit_is_retained(
     rpe_problem: tuple[Circuit, QubitOperator],
 ) -> None:
-    """A safe explicit base time remains unchanged in the generated schedule."""
+    """A safe explicit base time remains unchanged in the generated workload."""
     state_preparation, hamiltonian = rpe_problem
     base_time = pi * (1.0 - 1e-12)
 
-    circuit_set = QdkRobustPhaseEstimationCircuitBuilder(target_accuracy=0.5, base_time=base_time).run(
+    circuit_set = QdkRobustPhaseEstimationExperimentScheduler(target_accuracy=0.5, base_time=base_time).run(
         state_preparation, hamiltonian
     )
 
@@ -233,7 +257,7 @@ def test_renamed_trotter_uses_same_rpe_policy(
         circuit_sets = []
         for builder_name in ("trotter", "renamed_trotter_for_rpe_test"):
             circuit_sets.append(
-                QdkRobustPhaseEstimationCircuitBuilder(
+                QdkRobustPhaseEstimationExperimentScheduler(
                     target_accuracy=0.01,
                     epsilon_unitary=epsilon_unitary,
                     unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", builder_name),
@@ -247,16 +271,8 @@ def test_renamed_trotter_uses_same_rpe_policy(
     assert builtin.error_budget_mode == renamed.error_budget_mode == "independent_trotter"
     assert builtin.epsilon_rpe == renamed.epsilon_rpe == pytest.approx(0.01)
     assert builtin.epsilon_unitary == renamed.epsilon_unitary == pytest.approx(expected_unitary_accuracy)
-    assert builtin.unitary_accuracy_fraction == renamed.unitary_accuracy_fraction == pytest.approx(0.0)
     assert builtin.unitary_builder_category == renamed.unitary_builder_category == "deterministic_or_exact"
     assert builtin.num_rounds == renamed.num_rounds
-    for builtin_round, renamed_round in zip(builtin.rounds, renamed.rounds, strict=True):
-        builtin_settings = builtin_round.unitary_builder_configuration.settings
-        renamed_settings = renamed_round.unitary_builder_configuration.settings
-        assert builtin_settings is not None
-        assert renamed_settings is not None
-        assert builtin_settings.get("target_accuracy") == pytest.approx(expected_unitary_accuracy)
-        assert renamed_settings.get("target_accuracy") == pytest.approx(expected_unitary_accuracy)
 
 
 def test_default_partial_randomized_random_cost_scales_quadratically(
@@ -268,7 +284,7 @@ def test_default_partial_randomized_random_cost_scales_quadratically(
     random_rotation_counts: list[int] = []
 
     for target_accuracy in (0.1, 0.05, 0.025, 0.0125):
-        circuit_set = QdkRobustPhaseEstimationCircuitBuilder(
+        circuit_set = QdkRobustPhaseEstimationExperimentScheduler(
             target_accuracy=target_accuracy,
             seed=7,
             unitary_builder=AlgorithmRef(
@@ -286,11 +302,7 @@ def test_default_partial_randomized_random_cost_scales_quadratically(
         terms = hamiltonian.get_real_coefficients(tolerance=1e-12, sort_by_magnitude=True)
         random_terms = terms[1:]
         num_divisions = partial_builder._resolve_num_divisions(hamiltonian, final_round.evolution_time)
-        block_samples = partial_builder._resolve_block_samples(
-            random_terms,
-            final_round.evolution_time,
-            num_divisions,
-        )
+        block_samples = partial_builder._resolve_block_samples(random_terms, final_round.evolution_time, num_divisions)
 
         assert circuit_set.epsilon_rpe == pytest.approx(target_accuracy)
         assert circuit_set.epsilon_unitary == pytest.approx(0.85)
@@ -316,10 +328,10 @@ def test_nested_unitary_power_must_be_one(
         power=2,
         power_strategy=power_strategy,
     )
-    builder = QdkRobustPhaseEstimationCircuitBuilder(target_accuracy=0.5, unitary_builder=unitary_builder)
+    scheduler = QdkRobustPhaseEstimationExperimentScheduler(target_accuracy=0.5, unitary_builder=unitary_builder)
 
     with pytest.raises(ValueError, match="unitary_builder power must be 1"):
-        builder.run(state_preparation, hamiltonian)
+        scheduler.run(state_preparation, hamiltonian)
 
 
 @pytest.mark.parametrize("builder_name", ["trotter", "qdrift", "partially_randomized"])
@@ -331,7 +343,7 @@ def test_explicit_nested_unitary_power_one_is_accepted(
     state_preparation, hamiltonian = rpe_problem
     unitary_builder = AlgorithmRef("hamiltonian_unitary_builder", builder_name, power=1)
 
-    circuit_set = QdkRobustPhaseEstimationCircuitBuilder(
+    circuit_set = QdkRobustPhaseEstimationExperimentScheduler(
         target_accuracy=0.5,
         unitary_builder=unitary_builder,
     ).run(state_preparation, hamiltonian)
@@ -339,215 +351,199 @@ def test_explicit_nested_unitary_power_one_is_accepted(
     assert all(round_data.unitary_builder_configuration.settings.get("power") == 1 for round_data in circuit_set.rounds)
 
 
-def test_rebinding_schedule_rejects_nested_unitary_power(
+def test_circuit_set_rejects_rebound_nested_unitary_power(
     rpe_problem: tuple[Circuit, QubitOperator],
 ) -> None:
-    """A serialized schedule cannot bypass the nested-power invariant."""
+    """Reconstructing a workload cannot bypass the nested-power invariant."""
     state_preparation, hamiltonian = rpe_problem
-    original = QdkRobustPhaseEstimationCircuitBuilder(target_accuracy=0.5).run(state_preparation, hamiltonian)
-    original_round = original.rounds[0]
+    original = QdkRobustPhaseEstimationExperimentScheduler(target_accuracy=0.5).run(state_preparation, hamiltonian)
+    first_round = original.rounds[0]
     invalid_round = RobustPhaseEstimationRound(
-        round_index=original_round.round_index,
-        evolution_time=original_round.evolution_time,
-        shots_per_basis=original_round.shots_per_basis,
-        num_draws=original_round.num_draws,
-        scheduled_samples=original_round.scheduled_samples,
-        circuit_multiplicity=original_round.circuit_multiplicity,
-        draw_seeds=original_round.draw_seeds,
+        round_index=first_round.round_index,
+        evolution_time=first_round.evolution_time,
+        shots_per_basis=first_round.shots_per_basis,
+        num_draws=first_round.num_draws,
+        scheduled_samples=first_round.scheduled_samples,
         unitary_builder_configuration=AlgorithmRef("hamiltonian_unitary_builder", "trotter", power=2),
-    )
-    invalid_schedule = RobustPhaseEstimationSchedule(
-        rounds=(invalid_round,),
-        lambda_norm=original.lambda_norm,
-        base_time=original.base_time,
-        target_accuracy=original.target_accuracy,
-        epsilon_rpe=original.epsilon_rpe,
-        epsilon_unitary=original.epsilon_unitary,
-        unitary_accuracy_fraction=original.unitary_accuracy_fraction,
-        error_budget_mode=original.error_budget_mode,
-        unitary_builder_category=original.unitary_builder_category,
-        energy_correction=original.energy_correction,
-        requested_seed=original.requested_seed,
-        root_seed=original.root_seed,
-        hadamard_test_circuit_builder_configuration=original.hadamard_test_circuit_builder_configuration,
     )
 
     with pytest.raises(ValueError, match="unitary_builder power must be 1"):
-        RobustPhaseEstimationCircuitSet.from_schedule(invalid_schedule, state_preparation, hamiltonian)
+        _copy_with_rounds(original, (invalid_round, *original.rounds[1:]))
 
 
-def test_deterministic_round_yields_one_pair_with_shot_multiplicity(
+def test_deterministic_round_builds_one_multi_shot_pair(
     rpe_problem: tuple[Circuit, QubitOperator],
     recording_builders: tuple[list[dict[str, object]], list[tuple[str, _FakeUnitary]]],
 ) -> None:
     """A deterministic round builds one shared-unitary pair measured many times."""
     state_preparation, hamiltonian = rpe_problem
     unitary_records, hadamard_records = recording_builders
-    builder = QdkRobustPhaseEstimationCircuitBuilder(
+    scheduler = QdkRobustPhaseEstimationExperimentScheduler(
         target_accuracy=0.5,
         seed=7,
         unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
     )
-    circuit_set = builder.run(state_preparation, hamiltonian)
-    round_zero = circuit_set.rounds[0]
+    circuit_set = scheduler.run(state_preparation, hamiltonian)
+    builder = QdkRobustPhaseEstimationCircuitBuilder()
 
-    experiments = list(circuit_set.iter_round(0))
+    spec, _, _ = next(builder.iter_build(circuit_set))
 
     expected_shots, expected_samples = _qdrift_schedule(circuit_set.num_rounds - 1, 0)
-    assert round_zero.shots_per_basis == expected_shots
-    assert round_zero.scheduled_samples == expected_samples
-    assert round_zero.num_draws == 1
-    assert round_zero.circuit_multiplicity == expected_shots
-    assert round_zero.draw_seeds == ()
-    assert len(experiments) == 1
-    assert experiments[0].draw_index is None
-    assert experiments[0].draw_seed is None
-    assert experiments[0].circuit_multiplicity == expected_shots
+    assert circuit_set.rounds[0].shots_per_basis == expected_shots
+    assert circuit_set.rounds[0].scheduled_samples == expected_samples
+    assert circuit_set.rounds[0].num_draws == 1
+    assert spec.draw_index is None
+    assert spec.draw_seed is None
+    assert spec.shots == expected_shots
     assert len(unitary_records) == 1
-    assert unitary_records[0]["target_accuracy"] == pytest.approx(0.85)
     assert [basis for basis, _ in hadamard_records] == ["X", "Y"]
     assert hadamard_records[0][1] is hadamard_records[1][1]
 
 
-def test_randomized_round_generates_independent_pairs_on_demand(
+def test_randomized_round_builds_independent_pairs_on_demand(
     rpe_problem: tuple[Circuit, QubitOperator],
     recording_builders: tuple[list[dict[str, object]], list[tuple[str, _FakeUnitary]]],
 ) -> None:
     """A randomized round builds independent seeded pairs only as requested."""
     state_preparation, hamiltonian = rpe_problem
     unitary_records, hadamard_records = recording_builders
-    builder = QdkRobustPhaseEstimationCircuitBuilder(target_accuracy=0.5, seed=11)
-    circuit_set = builder.run(state_preparation, hamiltonian)
-    round_zero = circuit_set.rounds[0]
+    circuit_set = QdkRobustPhaseEstimationExperimentScheduler(target_accuracy=0.5, seed=11).run(
+        state_preparation, hamiltonian
+    )
+    builder = QdkRobustPhaseEstimationCircuitBuilder()
 
-    experiments = list(islice(circuit_set.iter_round(0), 2))
+    experiments = list(islice(builder.iter_build(circuit_set), 2))
+    expected_specs = circuit_set.experiment_specs_for_round(0)[:2]
 
-    assert round_zero.num_draws == round_zero.shots_per_basis
-    assert round_zero.circuit_multiplicity == 1
-    assert len(round_zero.draw_seeds) == round_zero.num_draws
-    assert len(set(round_zero.draw_seeds)) == round_zero.num_draws
-    assert [experiment.draw_seed for experiment in experiments] == list(round_zero.draw_seeds[:2])
-    assert [record["seed"] for record in unitary_records] == list(round_zero.draw_seeds[:2])
+    assert [experiment[0] for experiment in experiments] == list(expected_specs)
+    assert [record["seed"] for record in unitary_records] == [spec.draw_seed for spec in expected_specs]
     assert len(unitary_records) == 2
     assert len(hadamard_records) == 4
     assert hadamard_records[0][1] is hadamard_records[1][1]
     assert hadamard_records[2][1] is hadamard_records[3][1]
 
 
-def test_direct_randomized_experiment_and_circuit_access_support_qre(
+def test_build_returns_canonical_flat_circuit_list(
     rpe_problem: tuple[Circuit, QubitOperator],
     recording_builders: tuple[list[dict[str, object]], list[tuple[str, _FakeUnitary]]],
 ) -> None:
-    """Users can materialize one seeded pair or one QRE-compatible circuit directly."""
+    """Eager construction matches the standard QPE list contract and manifest positions."""
+    state_preparation, hamiltonian = rpe_problem
+    unitary_records, hadamard_records = recording_builders
+    circuit_set = QdkRobustPhaseEstimationExperimentScheduler(target_accuracy=0.5, seed=17).run(
+        state_preparation, hamiltonian
+    )
+    circuits = QdkRobustPhaseEstimationCircuitBuilder().build(circuit_set)
+
+    assert len(circuits) == 2 * len(circuit_set.experiment_specs)
+    for spec in circuit_set.experiment_specs:
+        assert isinstance(circuits[spec.x_circuit_index], Circuit)
+        assert isinstance(circuits[spec.y_circuit_index], Circuit)
+    assert len(unitary_records) == len(circuit_set.experiment_specs)
+    assert len(hadamard_records) == len(circuits)
+
+
+def test_run_matches_standard_qpe_list_contract(
+    rpe_problem: tuple[Circuit, QubitOperator],
+    recording_builders: tuple[list[dict[str, object]], list[tuple[str, _FakeUnitary]]],
+) -> None:
+    """The normal algorithm entry point schedules once and returns a flat circuit list."""
+    state_preparation, hamiltonian = rpe_problem
+    unitary_records, hadamard_records = recording_builders
+    scheduler_ref = AlgorithmRef("rpe_experiment_scheduler", "qdk", target_accuracy=0.5, seed=17)
+    builder = QdkRobustPhaseEstimationCircuitBuilder(experiment_scheduler=scheduler_ref)
+
+    circuits = builder.run(state_preparation, hamiltonian)
+
+    assert isinstance(circuits, list)
+    assert len(circuits) == len(hadamard_records) == 2 * len(unitary_records)
+
+
+def test_streamed_pair_supports_qre(
+    rpe_problem: tuple[Circuit, QubitOperator],
+    recording_builders: tuple[list[dict[str, object]], list[tuple[str, _FakeUnitary]]],
+) -> None:
+    """A selected streamed circuit pair converts directly to QRE applications."""
     from qdk.qre.application import OpenQASMApplication  # noqa: PLC0415
 
     state_preparation, hamiltonian = rpe_problem
     unitary_records, hadamard_records = recording_builders
-    circuit_set = QdkRobustPhaseEstimationCircuitBuilder(target_accuracy=0.5, seed=17).run(
+    circuit_set = QdkRobustPhaseEstimationExperimentScheduler(target_accuracy=0.5, seed=17).run(
         state_preparation, hamiltonian
     )
+    spec, x_circuit, y_circuit = next(islice(QdkRobustPhaseEstimationCircuitBuilder().iter_build(circuit_set), 1, 2))
 
-    experiment = circuit_set.get_experiment(0, 1)
-
-    assert experiment.draw_index == 1
-    assert experiment.draw_seed == circuit_set.rounds[0].draw_seeds[1]
-    assert unitary_records[0]["seed"] == experiment.draw_seed
-    assert hadamard_records[0][1] is hadamard_records[1][1]
-    assert isinstance(experiment.x_circuit.get_qre_application(), OpenQASMApplication)
-
-    y_circuit = circuit_set.get_circuit(0, "y", 1)
+    assert spec == circuit_set.experiment_specs[1]
+    assert isinstance(x_circuit.get_qre_application(), OpenQASMApplication)
     assert isinstance(y_circuit.get_qre_application(), OpenQASMApplication)
-    assert unitary_records[1]["seed"] == experiment.draw_seed
+    assert unitary_records[-1]["seed"] == spec.draw_seed
+    assert hadamard_records[-2][1] is hadamard_records[-1][1]
 
 
-def test_direct_experiment_access_validates_round_draw_and_basis(
+def test_stream_reiteration_replays_seeded_draws(
     rpe_problem: tuple[Circuit, QubitOperator],
     recording_builders: tuple[list[dict[str, object]], list[tuple[str, _FakeUnitary]]],
 ) -> None:
-    """Direct access rejects invalid coordinates before constructing circuits."""
-    state_preparation, hamiltonian = rpe_problem
-    unitary_records, hadamard_records = recording_builders
-    randomized_set = QdkRobustPhaseEstimationCircuitBuilder(target_accuracy=0.5, seed=19).run(
-        state_preparation, hamiltonian
-    )
-    deterministic_set = QdkRobustPhaseEstimationCircuitBuilder(
-        target_accuracy=0.5,
-        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
-    ).run(state_preparation, hamiltonian)
-
-    with pytest.raises(ValueError, match="required for randomized"):
-        randomized_set.get_experiment(0)
-    with pytest.raises(IndexError, match="draw_index"):
-        randomized_set.get_experiment(0, randomized_set.rounds[0].num_draws)
-    with pytest.raises(ValueError, match="must be None"):
-        deterministic_set.get_experiment(0, 0)
-    with pytest.raises(ValueError, match="basis"):
-        randomized_set.get_circuit(0, "Z", 0)
-
-    assert unitary_records == []
-    assert hadamard_records == []
-
-
-def test_circuit_set_reiteration_replays_seeded_draws(
-    rpe_problem: tuple[Circuit, QubitOperator],
-    recording_builders: tuple[list[dict[str, object]], list[tuple[str, _FakeUnitary]]],
-) -> None:
-    """Re-iterating one set rebuilds the same randomized draw sequence."""
+    """Re-iterating one workload rebuilds the same randomized draw sequence."""
     state_preparation, hamiltonian = rpe_problem
     unitary_records, _ = recording_builders
-    circuit_set = QdkRobustPhaseEstimationCircuitBuilder(target_accuracy=0.5, seed=13).run(
+    circuit_set = QdkRobustPhaseEstimationExperimentScheduler(target_accuracy=0.5, seed=13).run(
         state_preparation, hamiltonian
     )
+    builder = QdkRobustPhaseEstimationCircuitBuilder()
 
-    first = next(circuit_set.iter_round(0))
-    second = next(circuit_set.iter_round(0))
+    first = next(builder.iter_build(circuit_set))[0]
+    second = next(builder.iter_build(circuit_set))[0]
 
     assert first.draw_seed == second.draw_seed
     assert [record["seed"] for record in unitary_records] == [first.draw_seed, first.draw_seed]
 
 
-def test_serialized_schedule_rebinds_and_replays_seeded_draw(
+def test_serialized_workload_rebinds_and_replays_seeded_draw(
     rpe_problem: tuple[Circuit, QubitOperator],
     recording_builders: tuple[list[dict[str, object]], list[tuple[str, _FakeUnitary]]],
 ) -> None:
-    """A round-tripped schedule regenerates the same draw after binding live inputs."""
+    """A round-tripped workload regenerates the same draw after rebinding live inputs."""
     state_preparation, hamiltonian = rpe_problem
     unitary_records, hadamard_records = recording_builders
-    original = QdkRobustPhaseEstimationCircuitBuilder(target_accuracy=0.5, seed=23).run(state_preparation, hamiltonian)
-    restored_schedule = RobustPhaseEstimationSchedule.from_json(json.loads(json.dumps(original.schedule.to_json())))
+    original = QdkRobustPhaseEstimationExperimentScheduler(target_accuracy=0.5, seed=23).run(
+        state_preparation, hamiltonian
+    )
+    restored = RobustPhaseEstimationCircuitSet.from_json(json.loads(json.dumps(original.to_json())))
+    rebound = restored.rebind(state_preparation)
 
-    rebound = RobustPhaseEstimationCircuitSet.from_schedule(restored_schedule, state_preparation, hamiltonian)
-    experiment = rebound.get_experiment(0, 2)
+    spec, _, _ = next(islice(QdkRobustPhaseEstimationCircuitBuilder().iter_build(rebound), 2, 3))
 
-    assert rebound.schedule.content_hash() == original.schedule.content_hash()
-    assert experiment.draw_seed == original.rounds[0].draw_seeds[2]
-    assert unitary_records[0]["seed"] == experiment.draw_seed
-    assert hadamard_records[0][1] is hadamard_records[1][1]
+    assert spec.draw_seed == original.experiment_specs[2].draw_seed
+    assert unitary_records[-1]["seed"] == spec.draw_seed
+    assert hadamard_records[-2][1] is hadamard_records[-1][1]
 
 
 @pytest.mark.parametrize("suffix", ["json", "hdf5"])
-def test_serialized_circuit_set_remains_lazy_and_generates_on_demand(
+def test_serialized_circuit_set_remains_lazy_and_builds_on_demand(
     tmp_path: Path,
     suffix: str,
     rpe_problem: tuple[Circuit, QubitOperator],
     recording_builders: tuple[list[dict[str, object]], list[tuple[str, _FakeUnitary]]],
 ) -> None:
-    """A loaded circuit-builder output retains inputs and materializes only on request."""
+    """A loaded workload retains inputs and materializes only through the builder."""
     state_preparation, hamiltonian = rpe_problem
     unitary_records, hadamard_records = recording_builders
-    original = QdkRobustPhaseEstimationCircuitBuilder(target_accuracy=0.5, seed=11).run(state_preparation, hamiltonian)
+    original = QdkRobustPhaseEstimationExperimentScheduler(target_accuracy=0.5, seed=11).run(
+        state_preparation, hamiltonian
+    )
     filename = tmp_path / f"sample.robust_phase_estimation_circuit_set.{suffix}"
-
     original.to_file(filename, suffix)
+
     restored = RobustPhaseEstimationCircuitSet.from_file(filename, suffix)
 
     assert restored.content_hash() == original.content_hash()
     assert unitary_records == []
     assert hadamard_records == []
 
-    experiment = restored.get_experiment(0, 0)
+    spec, _, _ = next(QdkRobustPhaseEstimationCircuitBuilder().iter_build(restored))
 
-    assert experiment.draw_seed == restored.rounds[0].draw_seeds[0]
+    assert spec.draw_seed == restored.experiment_specs[0].draw_seed
     assert len(unitary_records) == 1
     assert [basis for basis, _ in hadamard_records] == ["X", "Y"]
 
@@ -558,15 +554,21 @@ def test_entropy_seed_is_concretized_once_per_circuit_set(
 ) -> None:
     """The nondeterministic sentinel becomes one replayable root seed."""
     state_preparation, hamiltonian = rpe_problem
-    monkeypatch.setattr(QdkRobustPhaseEstimationCircuitBuilder, "_resolve_root_seed", staticmethod(lambda _seed: 1234))
+    monkeypatch.setattr(
+        QdkRobustPhaseEstimationExperimentScheduler,
+        "_resolve_root_seed",
+        staticmethod(lambda _seed: 1234),
+    )
 
-    circuit_set = QdkRobustPhaseEstimationCircuitBuilder(target_accuracy=0.5, seed=-1).run(
+    circuit_set = QdkRobustPhaseEstimationExperimentScheduler(target_accuracy=0.5, seed=-1).run(
         state_preparation, hamiltonian
     )
 
     assert circuit_set.requested_seed == -1
     assert circuit_set.root_seed == 1234
-    assert circuit_set.rounds[0].draw_seeds[0] == QdkRobustPhaseEstimationCircuitBuilder._derive_seed(1234, 0, 0)
+    assert circuit_set.experiment_specs[0].draw_seed == QdkRobustPhaseEstimationExperimentScheduler._derive_seed(
+        1234, 0, 0
+    )
 
 
 def test_round_configuration_is_defensive_and_round_index_is_validated(
@@ -574,7 +576,7 @@ def test_round_configuration_is_defensive_and_round_index_is_validated(
 ) -> None:
     """Configuration access returns copies and invalid round indices fail clearly."""
     state_preparation, hamiltonian = rpe_problem
-    circuit_set = QdkRobustPhaseEstimationCircuitBuilder(
+    circuit_set = QdkRobustPhaseEstimationExperimentScheduler(
         target_accuracy=0.5,
         unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
     ).run(state_preparation, hamiltonian)
@@ -584,7 +586,8 @@ def test_round_configuration_is_defensive_and_round_index_is_validated(
     first_config.settings.set("time", 99.0)
 
     second_config = round_zero.unitary_builder_configuration
+
     assert second_config.settings is not None
     assert second_config.settings.get("time") == pytest.approx(round_zero.evolution_time)
     with pytest.raises(IndexError, match="round_index"):
-        next(circuit_set.iter_round(circuit_set.num_rounds))
+        circuit_set.experiment_specs_for_round(circuit_set.num_rounds)

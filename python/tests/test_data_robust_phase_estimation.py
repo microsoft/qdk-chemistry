@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 import numpy as np
@@ -16,9 +17,8 @@ from qdk_chemistry.data import (
     DataClass,
     QubitOperator,
     RobustPhaseEstimationCircuitSet,
-    RobustPhaseEstimationExperiment,
+    RobustPhaseEstimationExperimentSpec,
     RobustPhaseEstimationRound,
-    RobustPhaseEstimationSchedule,
     Settings,
 )
 
@@ -42,23 +42,42 @@ def _algorithm_ref(algorithm_type: str, algorithm_name: str, **values: object) -
 def _round() -> RobustPhaseEstimationRound:
     """Create representative randomized round metadata."""
     return RobustPhaseEstimationRound(
-        round_index=2,
+        round_index=0,
         evolution_time=1.25,
         shots_per_basis=7,
         num_draws=7,
         scheduled_samples=32,
-        circuit_multiplicity=1,
-        draw_seeds=(101, 102, 103, 104, 105, 106, 107),
         unitary_builder_configuration=_algorithm_ref(
             "hamiltonian_unitary_builder", "partially_randomized", time=1.25, seed=101
         ),
     )
 
 
-def _schedule() -> RobustPhaseEstimationSchedule:
-    """Create a representative schedule."""
-    return RobustPhaseEstimationSchedule(
-        rounds=(_round(),),
+def _experiment_specs() -> tuple[RobustPhaseEstimationExperimentSpec, ...]:
+    """Create representative randomized experiment metadata."""
+    return tuple(
+        RobustPhaseEstimationExperimentSpec(
+            experiment_index=draw_index,
+            round_index=0,
+            draw_index=draw_index,
+            draw_seed=101 + draw_index,
+            shots=1,
+        )
+        for draw_index in range(7)
+    )
+
+
+def _circuit_set(
+    *,
+    rounds: tuple[RobustPhaseEstimationRound, ...] | None = None,
+    experiment_specs: tuple[RobustPhaseEstimationExperimentSpec, ...] | None = None,
+) -> RobustPhaseEstimationCircuitSet:
+    """Create a representative serializable RPE workload."""
+    return RobustPhaseEstimationCircuitSet(
+        rounds=(_round(),) if rounds is None else rounds,
+        experiment_specs=_experiment_specs() if experiment_specs is None else experiment_specs,
+        state_preparation=Circuit(qasm="OPENQASM 3.0;\nqubit[1] q;\n"),
+        qubit_hamiltonian=QubitOperator(pauli_strings=["Z"], coefficients=np.asarray([2.5])),
         lambda_norm=2.5,
         base_time=0.2,
         target_accuracy=0.01,
@@ -76,28 +95,31 @@ def _schedule() -> RobustPhaseEstimationSchedule:
     )
 
 
-def _circuit_set() -> RobustPhaseEstimationCircuitSet:
-    """Create a representative serializable lazy circuit set."""
-    return RobustPhaseEstimationCircuitSet.from_schedule(
-        _schedule(),
-        Circuit(qasm="OPENQASM 3.0;\nqubit[1] q;\n"),
-        QubitOperator(pauli_strings=["Z"], coefficients=np.asarray([2.5])),
-    )
+def test_experiment_spec_defines_canonical_pair_indices() -> None:
+    """An experiment identity determines its canonical X/Y circuit positions."""
+    spec = _experiment_specs()[3]
+
+    assert spec.x_circuit_index == 6
+    assert spec.y_circuit_index == 7
 
 
-def test_circuit_set_is_immutable_data_class() -> None:
-    """The circuit-builder output is immutable data with a guarded wire type."""
+def test_circuit_set_is_only_independent_rpe_data_class() -> None:
+    """Nested RPE metadata is immutable without defining additional wire types."""
     circuit_set = _circuit_set()
 
     assert isinstance(circuit_set, DataClass)
+    assert not isinstance(circuit_set.rounds[0], DataClass)
+    assert not isinstance(circuit_set.experiment_specs[0], DataClass)
     assert circuit_set.data_type_name() == "robust_phase_estimation_circuit_set"
     with pytest.raises(AttributeError, match="Cannot modify immutable"):
         circuit_set.state_preparation = Circuit(qasm="OPENQASM 3.0;\nqubit[1] q;\n")
+    with pytest.raises(FrozenInstanceError):
+        circuit_set.rounds[0].shots_per_basis = 9
 
 
 @pytest.mark.parametrize("suffix", ["json", "hdf5"])
 def test_circuit_set_file_roundtrip(tmp_path: Path, suffix: str) -> None:
-    """The lazy algorithm output preserves its schedule and source inputs across files."""
+    """The workload, manifest, inputs, and nested settings survive file round trips."""
     circuit_set = _circuit_set()
     filename = tmp_path / f"sample.robust_phase_estimation_circuit_set.{suffix}"
 
@@ -105,79 +127,78 @@ def test_circuit_set_file_roundtrip(tmp_path: Path, suffix: str) -> None:
     restored = RobustPhaseEstimationCircuitSet.from_file(filename, suffix)
 
     assert restored.content_hash() == circuit_set.content_hash()
-    assert restored.schedule.content_hash() == circuit_set.schedule.content_hash()
+    assert restored.rounds == circuit_set.rounds
+    assert restored.experiment_specs == circuit_set.experiment_specs
     assert restored.state_preparation.get_qasm() == circuit_set.state_preparation.get_qasm()
     assert restored.qubit_hamiltonian.content_hash() == circuit_set.qubit_hamiltonian.content_hash()
+    assert restored.hadamard_test_circuit_builder_configuration.settings.get("test_basis") == "X"
 
 
-def test_circuit_set_serialization_guards_type_and_version(tmp_path: Path) -> None:
-    """Circuit-set files reject the wrong data type and incompatible versions."""
-    circuit_set = _circuit_set()
-    filename = tmp_path / "sample.robust_phase_estimation_circuit_set.json"
-    circuit_set.to_json_file(filename)
-
-    with pytest.raises(ValueError, match="robust_phase_estimation_schedule"):
-        RobustPhaseEstimationSchedule.from_json_file(filename)
-
-    payload = circuit_set.to_json()
+def test_circuit_set_serialization_guards_version() -> None:
+    """Circuit-set deserialization rejects incompatible wire versions."""
+    payload = _circuit_set().to_json()
     payload["version"] = "999.0.0"
+
     with pytest.raises(RuntimeError, match="version"):
         RobustPhaseEstimationCircuitSet.from_json(payload)
 
 
-def test_schedule_is_immutable_data_class_without_circuits() -> None:
-    """The schedule is lightweight immutable metadata rather than a circuit collection."""
-    schedule = _schedule()
+def test_round_configuration_is_defensive() -> None:
+    """A caller cannot mutate the algorithm settings stored by round metadata."""
+    round_data = _round()
+    first = round_data.unitary_builder_configuration
+    first.settings.set("time", 99.0)
 
-    assert isinstance(schedule, DataClass)
-    assert "x_circuit" not in str(schedule.to_json())
-    assert "y_circuit" not in str(schedule.to_json())
-    with pytest.raises(AttributeError, match="Cannot modify immutable"):
-        schedule.target_accuracy = 0.1
+    second = round_data.unitary_builder_configuration
 
-
-@pytest.mark.parametrize("suffix", ["json", "hdf5"])
-def test_schedule_file_roundtrip(tmp_path: Path, suffix: str) -> None:
-    """Schedule metadata and nested builder settings survive JSON and HDF5 files."""
-    schedule = _schedule()
-    filename = tmp_path / f"sample.robust_phase_estimation_schedule.{suffix}"
-
-    schedule.to_file(filename, suffix)
-    restored = RobustPhaseEstimationSchedule.from_file(filename, suffix)
-
-    assert restored.content_hash() == schedule.content_hash()
-    assert restored.rounds[0].draw_seeds == schedule.rounds[0].draw_seeds
-    assert restored.rounds[0].unitary_builder_configuration.settings is not None
-    assert restored.rounds[0].unitary_builder_configuration.settings.get("seed") == 101
-    assert restored.hadamard_test_circuit_builder_configuration.settings is not None
-    assert restored.hadamard_test_circuit_builder_configuration.settings.get("test_basis") == "X"
+    assert second.settings.get("time") == pytest.approx(round_data.evolution_time)
 
 
-@pytest.mark.parametrize("suffix", ["json", "hdf5"])
-def test_materialized_experiment_file_roundtrip_supports_qre(tmp_path: Path, suffix: str) -> None:
-    """A selected circuit pair retains metadata and remains QRE-compatible after loading."""
-    from qdk.qre.application import OpenQASMApplication  # noqa: PLC0415
+def test_manifest_rejects_inconsistent_shot_total() -> None:
+    """Per-experiment shots must reconstruct each round's declared basis workload."""
+    specs = list(_experiment_specs())
+    specs[-1] = RobustPhaseEstimationExperimentSpec(
+        experiment_index=6,
+        round_index=0,
+        draw_index=6,
+        draw_seed=107,
+        shots=2,
+    )
 
-    qasm = "OPENQASM 3.0;\nqubit[1] q;\n"
-    experiment = RobustPhaseEstimationExperiment(
-        round_index=2,
+    with pytest.raises(ValueError, match="do not sum"):
+        _circuit_set(experiment_specs=tuple(specs))
+
+
+def test_deterministic_manifest_uses_one_multi_shot_pair() -> None:
+    """A deterministic round maps its complete basis workload to one circuit pair."""
+    round_data = RobustPhaseEstimationRound(
+        round_index=0,
         evolution_time=1.25,
         shots_per_basis=7,
-        draw_index=3,
-        draw_seed=104,
-        circuit_multiplicity=1,
-        x_circuit=Circuit(qasm=qasm),
-        y_circuit=Circuit(qasm=qasm),
-        unitary_builder_configuration=_round().unitary_builder_configuration,
+        num_draws=1,
+        scheduled_samples=32,
+        unitary_builder_configuration=_algorithm_ref("hamiltonian_unitary_builder", "trotter", time=1.25),
     )
-    filename = tmp_path / f"sample.robust_phase_estimation_experiment.{suffix}"
+    spec = RobustPhaseEstimationExperimentSpec(
+        experiment_index=0,
+        round_index=0,
+        draw_index=None,
+        draw_seed=None,
+        shots=7,
+    )
 
-    experiment.to_file(filename, suffix)
-    restored = RobustPhaseEstimationExperiment.from_file(filename, suffix)
+    circuit_set = _circuit_set(rounds=(round_data,), experiment_specs=(spec,))
 
-    assert restored.content_hash() == experiment.content_hash()
-    assert restored.draw_seed == experiment.draw_seed
-    assert restored.unitary_builder_configuration.settings is not None
-    assert restored.unitary_builder_configuration.settings.get("seed") == 101
-    assert isinstance(restored.x_circuit.get_qre_application(), OpenQASMApplication)
-    assert isinstance(restored.y_circuit.get_qre_application(), OpenQASMApplication)
+    assert circuit_set.experiment_specs_for_round(0) == (spec,)
+
+
+def test_rebind_replaces_live_inputs_without_rescheduling() -> None:
+    """Rebinding preserves the manifest and concrete randomized seeds."""
+    circuit_set = _circuit_set()
+    state_preparation = Circuit(qasm="OPENQASM 3.0;\nqubit[1] q;\nx q[0];\n")
+
+    rebound = circuit_set.rebind(state_preparation)
+
+    assert rebound.experiment_specs == circuit_set.experiment_specs
+    assert rebound.rounds == circuit_set.rounds
+    assert rebound.state_preparation.get_qasm() == state_preparation.get_qasm()

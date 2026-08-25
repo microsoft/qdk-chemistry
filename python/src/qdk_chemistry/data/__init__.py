@@ -37,8 +37,9 @@ Exposed classes are:
 - :class:`QpeResult`: Result of quantum phase estimation workflows, including phase, energy, and metadata.
 - :class:`QuantumErrorProfile`: Information about quantum gates and error properties.
 - :class:`QubitOperator`: Molecular electronic Hamiltonians mapped to qubits.
-- :class:`RobustPhaseEstimationSchedule`: Serializable robust phase estimation workload metadata.
-- :class:`RobustPhaseEstimationExperiment`: Materialized X/Y circuit pair with execution metadata.
+- :class:`RobustPhaseEstimationCircuitSet`: Serializable robust phase estimation workload and execution manifest.
+- :class:`RobustPhaseEstimationExperimentSpec`: Execution metadata for one planned X/Y circuit pair.
+- :class:`RobustPhaseEstimationRound`: Read-only metadata for one robust phase estimation round.
 - :class:`Settings`: Configuration settings for quantum chemistry calculations.
 - :class:`SettingValue`: Type-safe variant for storing different setting value types.
 - :class:`Shell`: Individual shell within a basis set.
@@ -124,9 +125,8 @@ from qdk_chemistry.data.qubit_operator import QubitHamiltonian, QubitOperator
 from qdk_chemistry.data.registry import available_dataclasses, get_dataclass_type, register_dataclass
 from qdk_chemistry.data.robust_phase_estimation import (
     RobustPhaseEstimationCircuitSet,
-    RobustPhaseEstimationExperiment,
+    RobustPhaseEstimationExperimentSpec,
     RobustPhaseEstimationRound,
-    RobustPhaseEstimationSchedule,
 )
 from qdk_chemistry.data.symmetries import Symmetries
 from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
@@ -185,9 +185,8 @@ __all__ = [
     "QubitHamiltonian",
     "QubitOperator",
     "RobustPhaseEstimationCircuitSet",
-    "RobustPhaseEstimationExperiment",
+    "RobustPhaseEstimationExperimentSpec",
     "RobustPhaseEstimationRound",
-    "RobustPhaseEstimationSchedule",
     "SettingNotFound",
     "SettingNotFoundError",
     "SettingTypeMismatch",

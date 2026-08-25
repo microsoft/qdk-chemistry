@@ -10,6 +10,5 @@ for resource estimation.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 from .base import QpeCircuitBuilderFactory
-from .robust_builder import RobustPhaseEstimationCircuitBuilderFactory
 
-__all__: list[str] = ["QpeCircuitBuilderFactory", "RobustPhaseEstimationCircuitBuilderFactory"]
+__all__: list[str] = ["QpeCircuitBuilderFactory"]
