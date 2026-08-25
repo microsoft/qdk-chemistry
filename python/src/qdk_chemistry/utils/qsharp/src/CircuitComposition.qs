@@ -5,6 +5,45 @@
 namespace QDKChemistry.Utils.CircuitComposition {
 
     import Std.Arrays.Subarray;
+    import Std.ResourceEstimation.BeginEstimateCaching;
+    import Std.ResourceEstimation.EndEstimateCaching;
+    import Std.ResourceEstimation.SingleVariant;
+
+    /// Returns the controlled version of `op`, taking the control register as its first argument.
+    function MakeControlledOp<'T>(op : 'T => Unit is Adj + Ctl) : ((Qubit[], 'T) => Unit is Adj + Ctl) {
+        Controlled op
+    }
+
+    /// Applies `op` to `target` `power` times.
+    operation ApplyRepeated<'T>(
+        cacheName : String,
+        op : 'T => Unit is Adj + Ctl,
+        power : Int,
+        target : 'T
+    ) : Unit is Adj + Ctl {
+        for _ in 1..power {
+            if BeginEstimateCaching(cacheName, SingleVariant()) {
+                op(target);
+                EndEstimateCaching();
+            }
+        }
+    }
+
+    /// Returns an operation applying `op` `power` times.
+    /// Parameters:
+    /// - `cacheName`: A string used for caching the resource estimation
+    function MakeRepeatedOp<'T>(
+        cacheName : String,
+        op : 'T => Unit is Adj + Ctl,
+        power : Int
+    ) : ('T => Unit is Adj + Ctl) {
+        ApplyRepeated(cacheName, op, power, _)
+    }
+
+    /// Adapts a control-register operation to the single-control-qubit shape phase estimation takes.
+    function MakeSingleControlOp<'T>(op : (Qubit[], 'T) => Unit is Adj + Ctl) : ((Qubit, 'T) => Unit is Adj + Ctl) {
+        (control, target) => op([control], target)
+    }
 
     /// Applies two operations sequentially on the same system register.
     operation ApplySequential(
