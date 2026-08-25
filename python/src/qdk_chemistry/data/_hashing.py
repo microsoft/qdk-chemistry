@@ -12,6 +12,7 @@ from typing import Any
 
 import numpy as np
 
+from qdk_chemistry._core.data import AlgorithmRef
 from qdk_chemistry._core.data import DataClass as CoreDataClass
 from qdk_chemistry.data._type_name import instance_data_type_name
 
@@ -107,11 +108,31 @@ def _hash_optional(h: "hashlib._Hash", val: Any, hash_fn) -> None:
         hash_fn(h, val)
 
 
+def _hash_algorithm_ref(h: "hashlib._Hash", reference: AlgorithmRef) -> None:
+    """Hash an algorithm reference and its recursively configured settings."""
+    _hash_str(h, reference.algorithm_type)
+    _hash_str(h, reference.algorithm_name)
+    settings = reference.settings
+    if settings is None:
+        h.update(b"\x00")
+        return
+
+    h.update(b"\x01")
+    keys = sorted(settings.keys())
+    _hash_uint(h, len(keys))
+    for key in keys:
+        _hash_str(h, key)
+        _hash_arg(h, settings.get(key))
+
+
 def _hash_arg(h: "hashlib._Hash", arg: Any) -> None:
     """Hash an arbitrary argument, dispatching by type."""
     if arg is None:
         h.update(b"N")
         h.update(b"\x00")
+    elif isinstance(arg, AlgorithmRef):
+        h.update(b"R")
+        _hash_algorithm_ref(h, arg)
     elif hasattr(arg, "content_hash"):
         h.update(b"H")
         _hash_str(h, arg.content_hash())

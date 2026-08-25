@@ -60,6 +60,31 @@ def h2_structure():
 
 
 class TestFileSerializerPrimitives:
+    def test_build_payload_hashes_algorithm_ref_argument(self):
+        """A serializable algorithm reference can be submitted as an input."""
+
+        class FakeSettings:
+            def to_dict(self):
+                return {}
+
+        class FakeAlgorithm:
+            def type_name(self):
+                return "test_algorithm"
+
+            def name(self):
+                return "test"
+
+            def settings(self):
+                return FakeSettings()
+
+            def hash(self, *_args, **_kwargs):
+                return "run_hash"
+
+        reference = AlgorithmRef()
+        payload = _build_payload_for(FakeAlgorithm(), (reference,), {})
+
+        assert payload["input_hashes"] == {"args.arg_0": _item_content_hash(reference)}
+
     @pytest.mark.parametrize(
         ("value", "type_tag"),
         [
