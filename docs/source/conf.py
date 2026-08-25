@@ -264,10 +264,11 @@ def autodoc_skip_imports(app, what, name, obj, skip, options):
     Prevent Sphinx from documenting standard library and third-party modules.
     This stops pathlib, pydantic_settings, etc. from being included in docs.
     """
+    member_name = name.rsplit(".", 1)[-1]
     if (
-        what == "module"
-        and (getattr(obj, "__module__", ""), name) in _AUTODOC_EXCLUDED_ALIASES
-    ):
+        getattr(obj, "__module__", ""),
+        member_name,
+    ) in _AUTODOC_EXCLUDED_ALIASES:
         return True
 
     # Get the module where the object is defined

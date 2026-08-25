@@ -31,11 +31,20 @@
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
 
+#if defined(__clang__) || defined(__GNUC__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#elif defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
 static_assert(std::is_same_v<OrbitalLocalizer, Localizer>);
 static_assert(std::is_same_v<OrbitalLocalizerFactory, LocalizerFactory>);
+#if defined(__clang__) || defined(__GNUC__)
 #pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 namespace {
 constexpr double kHalfPi = 1.57079632679489661923;
