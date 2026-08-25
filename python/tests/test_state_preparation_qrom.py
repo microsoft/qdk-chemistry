@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import cmath
 import math
 from typing import ClassVar
 
@@ -289,15 +290,22 @@ class TestRyViaPhaseGradient:
             (7, 4),  # θ = 7π/4
         ],
     )
-    def test_rotation_probabilities(self, qdk_ctx, x, n):
-        """P(|0⟩) = cos²(θ/2), P(|1⟩) = sin²(θ/2) with θ = 4πx/2^n."""
+    def test_rotation_amplitudes(self, qdk_ctx, x, n):
+        """Ry(θ)|0⟩ = cos(θ/2)|0⟩ + sin(θ/2)|1⟩ with θ = 4πx/2^n.
+
+        Asserting the signed amplitudes rather than the probabilities is what pins the
+        rotation direction: |a|² is even in θ, so a probability-only check passes just as
+        happily for Ry(-θ).
+        """
         qdk_ctx.code.QDKChemistry.Utils.PhaseGradient.TestRy(x, n)
         sv = np.array(qdk_ctx.dump_machine().as_dense_state())
         a0, a1 = _target_amps(sv, x, n)
 
         theta = 4.0 * math.pi * x / (1 << n)
-        np.testing.assert_allclose(abs(a0) ** 2, math.cos(theta / 2) ** 2, atol=1e-6)
-        np.testing.assert_allclose(abs(a1) ** 2, math.sin(theta / 2) ** 2, atol=1e-6)
+        np.testing.assert_allclose(a0.real, math.cos(theta / 2), atol=1e-6)
+        np.testing.assert_allclose(a1.real, math.sin(theta / 2), atol=1e-6)
+        np.testing.assert_allclose(a0.imag, 0.0, atol=1e-6)
+        np.testing.assert_allclose(a1.imag, 0.0, atol=1e-6)
 
     @pytest.mark.parametrize(("x", "n"), [(1, 4), (5, 5), (3, 4)])
     def test_adjoint_roundtrip(self, qdk_ctx, x, n):
@@ -309,3 +317,25 @@ class TestRyViaPhaseGradient:
         np.testing.assert_allclose(abs(a0), 1 / math.sqrt(2), atol=1e-8)
         np.testing.assert_allclose(abs(a1), 1 / math.sqrt(2), atol=1e-8)
         np.testing.assert_allclose(a0 / a1, 1.0, atol=1e-8)
+
+
+class TestRzViaPhaseGradient:
+    """Tests for the RzViaPhaseGradient operation."""
+
+    @pytest.mark.parametrize(("x", "n"), [(1, 4), (2, 4), (3, 4), (1, 5), (5, 5)])
+    def test_polarity(self, qdk_ctx, x, n):
+        """Rz(θ) = diag(e^{-iθ/2}, e^{+iθ/2}) with θ = +4πx/2^n.
+
+        Applied to |+⟩ this leaves a relative phase of exactly θ between the two target
+        amplitudes, so the sign of the convention is directly observable. The positive
+        sign is the one used by Sanders et al. (arXiv:2007.07391) Appendix A and by
+        Qualtran's ``RzViaPhaseGradient``; a caller reading the docblock gets that
+        convention rather than its negation.
+        """
+        qdk_ctx.code.QDKChemistry.Utils.PhaseGradient.TestRzOnPlus(x, n)
+        sv = np.array(qdk_ctx.dump_machine().as_dense_state())
+        a0, a1 = _target_amps(sv, x, n)
+
+        theta = 4.0 * math.pi * x / (1 << n)
+        expected = (theta + math.pi) % (2 * math.pi) - math.pi
+        np.testing.assert_allclose(cmath.phase(a1 / a0), expected, atol=1e-6)

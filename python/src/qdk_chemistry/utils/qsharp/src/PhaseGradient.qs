@@ -28,14 +28,15 @@ namespace QDKChemistry.Utils.PhaseGradient {
     }
 
     /// # Summary
-    /// Applies Rz(-4π·x/2^b) to a target qubit using phase gradient addition.
+    /// Applies Rz(4π·x/2^b) to a target qubit using phase gradient addition.
     ///
     /// # Description
     /// x is the integer value stored in angleQubits and b is the number of bits.
-    /// The CNOT-adder-CNOT pattern adds x into the phase gradient register with a sign
-    /// set by the target, realizing diag(e^{+2πi·x/2^b}, e^{-2πi·x/2^b}). The overall sign
-    /// is opposite to Sanders et al. Appendix A; `RyViaPhaseGradient` absorbs it in its
-    /// basis change, so callers of that operation get a positive rotation.
+    /// Adding c into the phase gradient register kicks back a phase e^{2πi·c/2^b}, so
+    /// negating the register conditionally turns the adder into a subtractor on one branch
+    /// of the target. Conditioning that negation on the target being |0⟩ realizes
+    /// diag(e^{-2πi·x/2^b}, e^{+2πi·x/2^b}) = Rz(4π·x/2^b), matching Sanders et al.
+    /// Appendix A and Qualtran's `RzViaPhaseGradient`.
     /// Cost: b-1 CCZ and b-1 measurements (the adder) plus 2b CNOTs. Preparing and
     /// unpreparing the phase gradient register is extra and is amortized when the register
     /// is reused across rotations.
@@ -53,6 +54,7 @@ namespace QDKChemistry.Utils.PhaseGradient {
         phaseGradient : Qubit[]
     ) : Unit is Adj + Ctl {
         within {
+            X(targetQubit);
             for k in 0..Length(phaseGradient) - 1 {
                 CNOT(targetQubit, phaseGradient[k]);
             }
@@ -63,6 +65,10 @@ namespace QDKChemistry.Utils.PhaseGradient {
 
     /// # Summary
     /// Applies Ry(4π·x/2^b) to a target qubit using phase gradient addition.
+    ///
+    /// # Description
+    /// Conjugating by `Adjoint S` and `H` maps the Z axis onto +Y, so the positive
+    /// Rz above yields a positive Ry.
     ///
     /// # Input
     /// ## targetQubit
@@ -77,7 +83,7 @@ namespace QDKChemistry.Utils.PhaseGradient {
         phaseGradient : Qubit[]
     ) : Unit is Adj + Ctl {
         within {
-            S(targetQubit);
+            Adjoint S(targetQubit);
             H(targetQubit);
         } apply {
             RzViaPhaseGradient(targetQubit, angleQubits, phaseGradient);
@@ -102,6 +108,26 @@ namespace QDKChemistry.Utils.PhaseGradient {
             PreparePhaseGradientState(pg);
         } apply {
             RyViaPhaseGradient(target[0], angle, pg);
+        }
+    }
+
+    /// Test wrapper: apply Rz via phase gradient to |+⟩ so the relative phase, and
+    /// therefore the sign convention, is observable in the dumped state.
+    internal operation TestRzOnPlus(angleValue : Int, nBits : Int) : Unit {
+        let target = QIR.Runtime.AllocateQubitArray(1);
+        let angle = QIR.Runtime.AllocateQubitArray(nBits);
+        let pg = QIR.Runtime.AllocateQubitArray(nBits);
+
+        H(target[0]);
+
+        for k in 0..nBits - 1 {
+            if (angleValue >>> k) &&& 1 == 1 { X(angle[k]); }
+        }
+
+        within {
+            PreparePhaseGradientState(pg);
+        } apply {
+            RzViaPhaseGradient(target[0], angle, pg);
         }
     }
 
