@@ -238,7 +238,7 @@ where :math:`\tilde{p}` is the target distribution discretized to :math:`\mu` bi
      - int
      - Number of bits :math:`\mu` of precision for the alias table's keep probabilities. Each prepared probability is within :math:`1/(L 2^{\mu})` of the target for :math:`L` coefficients, at the cost of one extra uniform qubit and one extra Quantum Read-Only Memory (QROM) output qubit per bit. The upper bound of 30 is a sanity limit rather than an algorithmic one: :math:`2^{-30}` is already far below chemical accuracy. Default is 10.
 
-The prepared index register stays entangled with the ancillas, so this method is only meaningful inside a block encoding that applies :math:`\mathrm{PREPARE}^\dagger` to uncompute them. The ``prepare_select_prepare`` circuit mapper has that structure, but it currently sizes the PREPARE register from the coefficient count alone and so cannot yet supply the extra ancillas this method needs.
+The prepared index register stays entangled with the ancillas, so this method is only meaningful inside a block encoding that applies :math:`\mathrm{PREPARE}^\dagger` to uncompute them. The ``prepare_select_prepare`` circuit mapper supplies those ancillas and uncomputes them after SELECT.
 
 Quantum Read-Only Memory (QROM)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -246,6 +246,9 @@ Quantum Read-Only Memory (QROM)
 .. rubric:: Factory name: ``"qrom"``
 
 This method prepares an :math:`n`-qubit state with :math:`n` layers of multiplexed :math:`R_y` rotations, where each layer's rotation angles are loaded from a QROM table and applied through a phase gradient register. It uses only :math:`n = \lceil \log_2 L \rceil` state qubits, plus scratch ancilla per lookup, in exchange for :math:`n` QROM lookups. :math:`R_y` rotations only generate non-negative amplitudes, so the coefficient signs are applied afterwards by a QROM-loaded ``Z`` phase kickback.
+
+.. warning::
+   QROM state preparation is not supported by the :term:`LCU` ``prepare_select_prepare`` circuit mapper because its phase gradient register needs to be pre-initialized.
 
 .. rubric:: Settings
 

@@ -49,18 +49,7 @@ class TestSelectSwapLoadsCorrectValues:
 
 
 class TestSelectSwapPreservesAddressPhases:
-    """The swap path must agree with the plain-select path as a *phase* oracle.
-
-    A lookup whose uncompute is wrong still loads the right bits, so the value tests above
-    pass while the phase of the address register is silently corrupted. That is invisible
-    to a probability-based check and fatal to a state-preparation caller, whose address
-    register *is* the prepared state. Both operations under test are diagonal +/-1 oracles
-    and therefore self-inverse, so composing the two paths is the identity exactly when
-    they agree.
-
-    The optimizer picks ``num_swap_bits = 0`` for every table small enough to simulate
-    end to end, so without these tests the swap branch is never executed.
-    """
+    """The swap path must agree with the plain-select path as a *phase* oracle."""
 
     @pytest.mark.parametrize("num_swap_bits", [1, 2, 3])
     def test_1d_swap_path_matches_plain_select(self, qdk_ctx, num_swap_bits):
@@ -68,4 +57,4 @@ class TestSelectSwapPreservesAddressPhases:
 
     @pytest.mark.parametrize("num_swap_bits", [1, 2])
     def test_2d_swap_path_matches_plain_select(self, qdk_ctx, num_swap_bits):
-        assert qdk_ctx.code.QDKChemistry.Utils.SelectSwap.TestSelect2DLoadPhaseAgreement(_DATA_2D, num_swap_bits)
+        assert qdk_ctx.code.QDKChemistry.Utils.SelectSwap.TestSelectSwap2DPhaseAgreement(_DATA_2D, num_swap_bits)

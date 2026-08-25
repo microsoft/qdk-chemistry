@@ -14,7 +14,7 @@ import pytest
 
 from qdk_chemistry.algorithms import registry
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
-from qdk_chemistry.data import QubitOperator
+from qdk_chemistry.data import AlgorithmRef, QubitOperator
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import BlockEncodingContainer, LCUContainer
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
@@ -159,6 +159,41 @@ class TestLCUBuilder:
         builder = LCUBuilder()
         with pytest.raises(ValueError, match="L1 norm is too small"):
             builder.run(hamiltonian)
+
+    def test_prepare_select_prepare_with_alias_sampling(self):
+        """Verify alias sampling supplies its entangled scratch register to PREPARE."""
+        hamiltonian = QubitOperator(
+            pauli_strings=["XX", "ZZ", "XZ"],
+            coefficients=np.array([0.25, 0.5, 0.1]),
+        )
+        unitary = LCUBuilder().run(hamiltonian)
+        mapper = registry.create(
+            "circuit_mapper",
+            "prepare_select_prepare",
+            prepare=AlgorithmRef("state_prep", "alias_sampling", bits_precision=4),
+        )
+
+        circuit = mapper.run(unitary)
+
+        assert circuit.num_qubits == 15
+        assert circuit._qsharp_factory.parameter["numSelectQubits"] == 2
+        assert circuit._qsharp_factory.parameter["numBlockAncillaQubits"] == 13
+
+    def test_prepare_select_prepare_rejects_qrom(self):
+        """Verify PSP rejects QROM because it requires a phase-gradient register."""
+        hamiltonian = QubitOperator(
+            pauli_strings=["XX", "ZZ", "XZ"],
+            coefficients=np.array([0.25, 0.5, 0.1]),
+        )
+        unitary = LCUBuilder().run(hamiltonian)
+        mapper = registry.create(
+            "circuit_mapper",
+            "prepare_select_prepare",
+            prepare=AlgorithmRef("state_prep", "qrom"),
+        )
+
+        with pytest.raises(AssertionError, match="QROM state preparation is not supported"):
+            mapper.run(unitary)
 
 
 class TestLCUContainer:

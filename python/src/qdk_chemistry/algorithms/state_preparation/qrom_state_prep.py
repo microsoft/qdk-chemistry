@@ -39,11 +39,8 @@ class QROMStatePreparationSettings(Settings):
             "external_phase_gradient",
             "bool",
             True,
-            "Whether the PREPARE oracle reads a phase gradient register supplied by the "
-            "caller instead of allocating and preparing its own. Sharing one gradient across "
-            "a whole circuit removes the arbitrary-angle rotations that preparing it per call "
-            "would cost. Only affects prepare_oracle(); a standalone run() always allocates "
-            "its own.",
+            "Whether the oracle reads a phase gradient register supplied by the caller instead of "
+            "allocating and preparing its own."
         )
 
 
@@ -64,8 +61,6 @@ class QROMStatePreparation(StatePreparation):
                 entry of ``settings()``.
             external_phase_gradient: Whether :meth:`prepare_oracle` reads a caller-supplied
                 phase gradient register rather than allocating its own. Defaults to True.
-                Equivalent to setting the ``external_phase_gradient`` entry of ``settings()``.
-
         """
         super().__init__()
         self._settings = QROMStatePreparationSettings()

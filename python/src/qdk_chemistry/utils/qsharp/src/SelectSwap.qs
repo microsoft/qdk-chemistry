@@ -44,10 +44,7 @@ namespace QDKChemistry.Utils.SelectSwap {
     import Std.TableLookup.Select;
     import QDKChemistry.Utils.UnaryIteration.UnaryIteration;
 
-    // ═══════════════════════════════════════════════════════════════════════════
     //  1D SELECT-SWAP
-    // ═══════════════════════════════════════════════════════════════════════════
-
     operation SelectSwap(numSwapBits : Int, data : Bool[][], address : Qubit[], output : Qubit[]) : Unit is Adj + Ctl {
         let (n, nRequired) = DimensionsForSelect(data, address);
         let addressFitted = address[...nRequired - 1];
@@ -63,10 +60,7 @@ namespace QDKChemistry.Utils.SelectSwap {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
     //  2D SELECT-SWAP (unary iteration over outer × SELECT-SWAP over inner)
-    // ═══════════════════════════════════════════════════════════════════════════
-
     /// Loads `data[outer][inner]` into `target` by unary iteration over the outer index and
     /// a select-swap lookup over the inner one. The adjoint is compiler-generated: it has to
     /// undo the swap network as well as the lookup, which is easy to get wrong by hand.
@@ -110,10 +104,6 @@ namespace QDKChemistry.Utils.SelectSwap {
 
         return bestLambda;
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    //  1D helper functions
-    // ═══════════════════════════════════════════════════════════════════════════
 
     /// Runs `action` on the data word addressed by `address`, then uncomputes the lookup.
     ///
@@ -186,10 +176,6 @@ namespace QDKChemistry.Utils.SelectSwap {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    //  2D helper functions
-    // ═══════════════════════════════════════════════════════════════════════════
-
     internal function SelectSwapCost2D(lambda : Int, numOuterData : Int, numInnerData : Int, numBits : Int) : Int {
         let outerAddressBits = Ceiling(Lg(IntAsDouble(numOuterData)));
         let innerAddressBits = Ceiling(Lg(IntAsDouble(numInnerData)));
@@ -206,10 +192,6 @@ namespace QDKChemistry.Utils.SelectSwap {
             return numOuterData * select_cost + swap_cost + unselect_cost;
         }
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    //  shared helpers
-    // ═══════════════════════════════════════════════════════════════════════════
 
     internal function DimensionsForSelect(data : Bool[][], address : Qubit[]) : (Int, Int) {
         let N = Length(data);
@@ -240,10 +222,6 @@ namespace QDKChemistry.Utils.SelectSwap {
             }
         }
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    //  Test & estimation wrappers
-    // ═══════════════════════════════════════════════════════════════════════════
 
     /// 1D SelectSwap correctness: set address to |addr⟩, apply SelectSwap in within/apply,
     /// CNOT result to persistent copy register, then verify copy matches expected data.

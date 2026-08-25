@@ -19,7 +19,6 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     import Std.ResourceEstimation.BeginEstimateCaching;
     import Std.ResourceEstimation.EndEstimateCaching;
     import Std.ResourceEstimation.SingleVariant;
-    import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
 
     /// No-op PREPARE callable for single-term Hamiltonians (0-ancilla case).
     operation NoOpPrepare(ancillaRegister : Qubit[]) : Unit is Adj + Ctl {}
@@ -136,12 +135,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
 
     /// # Summary
     /// Reflection about the all-zero state of the block-encoding ancillas of a flat
-    /// `[systemReg | blockAncilla | sharedAncilla]` register.
-    ///
-    /// # Description
-    /// Only `blockAncilla` is reflected. Shared ancilla such as a phase gradient register
-    /// sit in |φ⟩ rather than |0⟩ between uses, so including them would reflect about the
-    /// wrong subspace and silently corrupt the walk.
+    /// `[systemReg | blockAncilla]` register.
     function MakeAncillaReflectionOp(
         numSystemQubits : Int,
         numBlockAncillaQubits : Int,
@@ -165,30 +159,6 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         )
     }
 
-    /// # Summary
-    /// Wraps an operation so a shared phase gradient register is prepared once around it.
-    ///
-    /// # Description
-    /// The gradient state is an eigenstate of the additions that consume it, so it returns
-    /// unchanged after every rotation and can be shared across an entire circuit. Preparing
-    /// it inside the rotation instead costs a QFT per use, which is where every
-    /// arbitrary-angle rotation in QROM state preparation comes from.
-    ///
-    /// Q# controls only the `apply` block of a conjugation, so `Controlled` of the result
-    /// leaves the gradient preparation uncontrolled, as intended.
-    function MakeWithSharedPhaseGradientOp(
-        inner : Qubit[] => Unit is Adj + Ctl,
-        gradientOffset : Int,
-    ) : (Qubit[] => Unit is Adj + Ctl) {
-        (allQubits) => {
-            within {
-                PreparePhaseGradientState(allQubits[gradientOffset...]);
-            } apply {
-                inner(allQubits);
-            }
-        }
-    }
-
     /// Qubitization walk `W = REFLECT · B` on the flat `[systemReg | ancillaReg]` register.
     function MakeWalkOp(
         blockEncoding : Qubit[] => Unit is Adj + Ctl,
@@ -200,52 +170,27 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         }
     }
 
-    /// Controlled-shape counterpart of `MakeWithSharedPhaseGradientOp`.
-    function MakeWithSharedPhaseGradientControlledOp(
-        inner : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
-        gradientOffset : Int,
-    ) : ((Qubit[], Qubit[]) => Unit is Adj + Ctl) {
-        (ctls, allQubits) => {
-            within {
-                PreparePhaseGradientState(allQubits[gradientOffset...]);
-            } apply {
-                inner(ctls, allQubits);
-            }
-        }
-    }
-
     /// Circuit entry point: allocates the register and applies the block encoding `power` times.
-    ///
-    /// Register layout: `[system | blockAncilla | sharedAncilla]`. The shared ancilla, when
-    /// present, is a phase gradient prepared once around the whole power loop rather than
-    /// once per block encoding.
     operation MakePrepSelPrepCircuit(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
         numSystemQubits : Int,
         numSelectQubits : Int,
         numBlockAncillaQubits : Int,
-        numSharedQubits : Int,
         power : Int,
         useWalk : Bool,
     ) : Unit {
-        use register = Qubit[numSystemQubits + numBlockAncillaQubits + numSharedQubits];
+        use register = Qubit[numSystemQubits + numBlockAncillaQubits];
         let systems = register[0..numSystemQubits - 1];
         let prepareRegister = register[numSystemQubits...];
         let blockAncilla = register[numSystemQubits..numSystemQubits + numBlockAncillaQubits - 1];
-        within {
-            if numSharedQubits > 0 {
-                PreparePhaseGradientState(register[numSystemQubits + numBlockAncillaQubits...]);
-            }
-        } apply {
-            for _ in 1..power {
-                if BeginEstimateCaching(useWalk ? "PSPWalk" | "PrepSelPrep", SingleVariant()) {
-                    PrepSelPrep(prepareOp, selectOp, systems, prepareRegister, numSelectQubits);
-                    if useWalk {
-                        Reflect(blockAncilla);
-                    }
-                    EndEstimateCaching();
+        for _ in 1..power {
+            if BeginEstimateCaching(useWalk ? "PSPWalk" | "PrepSelPrep", SingleVariant()) {
+                PrepSelPrep(prepareOp, selectOp, systems, prepareRegister, numSelectQubits);
+                if useWalk {
+                    Reflect(blockAncilla);
                 }
+                EndEstimateCaching();
             }
         }
     }
@@ -257,31 +202,24 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         numSystemQubits : Int,
         numSelectQubits : Int,
         numBlockAncillaQubits : Int,
-        numSharedQubits : Int,
         power : Int,
         useWalk : Bool,
     ) : Unit {
         use control = Qubit();
-        use register = Qubit[numSystemQubits + numBlockAncillaQubits + numSharedQubits];
+        use register = Qubit[numSystemQubits + numBlockAncillaQubits];
         let systems = register[0..numSystemQubits - 1];
         let prepareRegister = register[numSystemQubits...];
         let blockAncilla = register[numSystemQubits..numSystemQubits + numBlockAncillaQubits - 1];
-        within {
-            if numSharedQubits > 0 {
-                PreparePhaseGradientState(register[numSystemQubits + numBlockAncillaQubits...]);
-            }
-        } apply {
-            for _ in 1..power {
-                if BeginEstimateCaching(useWalk ? "ControlledPSPWalk" | "ControlledPrepSelPrep", SingleVariant()) {
-                    Controlled PrepSelPrep(
-                        [control],
-                        (prepareOp, selectOp, systems, prepareRegister, numSelectQubits)
-                    );
-                    if useWalk {
-                        Controlled Reflect([control], blockAncilla);
-                    }
-                    EndEstimateCaching();
+        for _ in 1..power {
+            if BeginEstimateCaching(useWalk ? "ControlledPSPWalk" | "ControlledPrepSelPrep", SingleVariant()) {
+                Controlled PrepSelPrep(
+                    [control],
+                    (prepareOp, selectOp, systems, prepareRegister, numSelectQubits)
+                );
+                if useWalk {
+                    Controlled Reflect([control], blockAncilla);
                 }
+                EndEstimateCaching();
             }
         }
     }

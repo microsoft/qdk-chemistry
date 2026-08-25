@@ -129,12 +129,6 @@ class ControlledPSPMapper(ControlledCircuitMapper):
             container.power,
         )
 
-        # Outermost, so the one gradient preparation amortizes over every repetition.
-        if registers.num_shared_ancillas > 0:
-            repeated_op = QSHARP_UTILS.PrepSelPrep.MakeWithSharedPhaseGradientControlledOp(
-                repeated_op, registers.num_system_qubits + registers.num_block_ancillas
-            )
-
         qsharp_factory = QsharpFactoryData(
             program=QSHARP_UTILS.PrepSelPrep.MakeControlledPrepSelPrepCircuit,
             parameter={
@@ -143,7 +137,6 @@ class ControlledPSPMapper(ControlledCircuitMapper):
                 "numSystemQubits": registers.num_system_qubits,
                 "numSelectQubits": registers.num_select_qubits,
                 "numBlockAncillaQubits": registers.num_block_ancillas,
-                "numSharedQubits": registers.num_shared_ancillas,
                 "power": container.power,
                 "useWalk": use_quantum_walk,
             },
