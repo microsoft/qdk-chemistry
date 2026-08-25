@@ -21,7 +21,10 @@ if TYPE_CHECKING:
 
     from qdk_chemistry.algorithms.base import Algorithm
     from qdk_chemistry.remote.backends import RemoteBackend
+    from qdk_chemistry.remote.backends.base import JobStatus
     from qdk_chemistry.remote.job import Job
+
+_CACHE_MISS = object()
 
 
 class RemoteAlgorithmProxy:
@@ -145,7 +148,12 @@ class RemoteAlgorithmProxy:
         return self._algorithm.settings()
 
     def __getattr__(self, name: str) -> Any:
-        """Forward all other attribute access to the wrapped algorithm."""
+        """Forward all other attribute access to the wrapped algorithm.
+
+        Args:
+            name: Attribute name to retrieve from the wrapped algorithm.
+
+        """
         return getattr(self._algorithm, name)
 
     def __repr__(self) -> str:
@@ -165,7 +173,14 @@ class RemoteAlgorithmProxy:
 
 
 def _build_payload_for(algorithm: Any, args: tuple, kwargs: dict) -> dict:
-    """Build an execution payload from any algorithm-like object."""
+    """Build an execution payload from any algorithm-like object.
+
+    Args:
+        algorithm: Algorithm-like object providing execution metadata.
+        args: Positional arguments for the algorithm.
+        kwargs: Keyword arguments for the algorithm.
+
+    """
     import contextlib  # noqa: PLC0415
 
     from qdk_chemistry.data._hashing import _item_content_hash  # noqa: PLC0415
@@ -193,10 +208,19 @@ def _build_payload_for(algorithm: Any, args: tuple, kwargs: dict) -> dict:
 
 
 def _store_result(cache: Any, run_hash: str, job: Any, result: Any) -> None:
-    """Hash result items, persist DataClass blobs, update job in cache."""
+    """Hash result items, persist DataClass blobs, update job in cache.
+
+    Args:
+        cache: Cache backend receiving result data and job metadata.
+        run_hash: Deterministic cache key for the execution.
+        job: Job record to update with output hashes.
+        result: Algorithm result to persist.
+
+    """
     from qdk_chemistry.data._hashing import collect_content_hashes  # noqa: PLC0415
 
     job.output_hashes = collect_content_hashes(result)
+    job.output_is_tuple = isinstance(result, tuple)
     job.status = "retrieved"
 
     items = result if isinstance(result, tuple) else (result,)
@@ -207,8 +231,17 @@ def _store_result(cache: Any, run_hash: str, job: Any, result: Any) -> None:
     cache.put_job(run_hash, job)
 
 
-def _reconstruct_from_cache(cache: Any, job: Any) -> Any | None:
-    """Reconstruct the full result from cached data, or None on partial miss."""
+def _reconstruct_from_cache(cache: Any, job: Any) -> Any:
+    """Reconstruct the full result from cached data, or return the cache-miss sentinel.
+
+    Args:
+        cache: Cache backend containing result data.
+        job: Job record containing output-hash descriptors.
+
+    """
+    if job.output_hashes is None or job.output_is_tuple is None:
+        return _CACHE_MISS
+
     items: list[Any] = []
     for entry in job.output_hashes:
         if "value" in entry:
@@ -216,22 +249,37 @@ def _reconstruct_from_cache(cache: Any, job: Any) -> Any | None:
         else:
             data = cache.get_data(entry["hash"])
             if data is None:
-                return None
+                return _CACHE_MISS
             items.append(data)
-    return items[0] if len(items) == 1 else tuple(items)
+    if job.output_is_tuple:
+        return tuple(items)
+    return items[0] if len(items) == 1 else _CACHE_MISS
 
 
-def _poll_until_done(job: Any) -> None:
-    """Block until the job reaches a terminal state."""
-    from qdk_chemistry.remote.backends.base import DEFAULT_POLL_INTERVAL, DEFAULT_TIMEOUT  # noqa: PLC0415
+def _poll_until_done(job: Any) -> JobStatus:
+    """Block until the job reaches a terminal state.
+
+    Args:
+        job: Submitted job to poll.
+
+    Returns:
+        The final status reported by the backend.
+
+    """
+    from qdk_chemistry.remote.backends.base import (  # noqa: PLC0415
+        DEFAULT_POLL_INTERVAL,
+        DEFAULT_TIMEOUT,
+        JobStatus,
+    )
 
     poll_interval = job.backend_config.get("poll_interval", DEFAULT_POLL_INTERVAL)
     timeout = job.backend_config.get("timeout", DEFAULT_TIMEOUT)
     deadline = time.monotonic() + timeout
+    status = JobStatus(job_id=job.job_id, status=job.status)
     while not job.is_terminal:
         status = job.check()
         if status.is_terminal:
-            return
+            return status
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise TimeoutError(
@@ -240,10 +288,19 @@ def _poll_until_done(job: Any) -> None:
                 f"Error: {status.error or 'unknown'}\nLogs:\n{status.logs}"
             )
         time.sleep(min(poll_interval, remaining))
+    return status
 
 
 def _run_uncached(algorithm: Any, remote: Any, args: tuple, kwargs: dict) -> Any:
-    """Execute without caching — locally or via a remote proxy."""
+    """Execute without caching — locally or via a remote proxy.
+
+    Args:
+        algorithm: Algorithm-like object to execute.
+        remote: Remote backend name or instance, or ``None`` for local execution.
+        args: Positional arguments for the algorithm.
+        kwargs: Keyword arguments for the algorithm.
+
+    """
     if remote is not None:
         proxy = RemoteAlgorithmProxy(algorithm, remote)
         return proxy.run(*args, **kwargs)
@@ -321,9 +378,9 @@ def run(
 
         if job is not None:
             # 1a) Completed with outputs → reconstruct
-            if job.is_terminal and job.output_hashes:
+            if job.output_hashes is not None:
                 result = _reconstruct_from_cache(resolved_cache, job)
-                if result is not None:
+                if result is not _CACHE_MISS:
                     return result
 
             # 1b) Still in-flight → resume polling
@@ -331,12 +388,14 @@ def run(
                 if _on_job_submitted is not None:
                     _on_job_submitted(job)
                 _poll_until_done(job)
-                if job.is_successful:
-                    result = job.fetch()
-                    _store_result(resolved_cache, run_hash, job, result)
-                    return result
 
-            # 1c) Failed → fall through and re-submit
+            # 1c) Execution finished but cached outputs are unavailable → fetch again
+            if job.is_successful:
+                result = job.fetch()
+                _store_result(resolved_cache, run_hash, job, result)
+                return result
+
+            # 1d) Failed → fall through and re-submit
 
     # 2) Cache miss — execute
     if remote is not None:
@@ -372,24 +431,28 @@ def run(
             if _on_job_submitted is not None:
                 _on_job_submitted(job)
 
-            _poll_until_done(job)
+            final_status = _poll_until_done(job)
 
             if not job.is_successful:
                 resolved_cache.put_job(run_hash, job)
-                raise RuntimeError(f"Remote job {job.job_id} ended with status: {job.status}")
+                raise RuntimeError(
+                    f"Remote job {job.job_id} ended with status: {final_status.status}\n"
+                    f"Error: {final_status.error or 'unknown'}\nLogs:\n{final_status.logs}"
+                )
 
             # If the remote wrote results to a shared cache, reconstruct
             # from there directly — avoiding an expensive fetch/download.
-            result = None
+            result = _CACHE_MISS
             if resolved_remote_cache is not None and resolved_remote_cache.is_shared:
                 remote_job = resolved_remote_cache.get_job(run_hash)
-                if remote_job is not None and remote_job.output_hashes:
+                if remote_job is not None and remote_job.output_hashes is not None:
                     result = _reconstruct_from_cache(resolved_remote_cache, remote_job)
-                    if result is not None:
+                    if result is not _CACHE_MISS:
                         job.output_hashes = remote_job.output_hashes
+                        job.output_is_tuple = remote_job.output_is_tuple
                         job.status = "retrieved"
 
-            if result is None:
+            if result is _CACHE_MISS:
                 result = job.fetch()
         finally:
             if owns_backend:

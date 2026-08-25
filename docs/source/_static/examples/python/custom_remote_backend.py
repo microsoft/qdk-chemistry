@@ -29,7 +29,12 @@ from qdk_chemistry.remote.backends import (
 
 
 def _parse_remote_pid(output: str) -> str | None:
-    """Return a normalized positive PID from remote command output."""
+    """Return a normalized positive PID from remote command output.
+
+    Args:
+        output: Standard output containing the remote process identifier.
+
+    """
     pid = output.strip()
     if not pid.isascii() or not pid.isdecimal():
         return None
@@ -62,7 +67,18 @@ class SSHBackend(RemoteBackend):
         ssh_options: list[str] | None = None,
         python_path: str = "python3",
     ) -> None:
-        """Initialize the backend with a required SSH host."""
+        """Initialize the backend with a required SSH host.
+
+        Args:
+            host: SSH destination, such as ``"user@hostname"``.
+            poll_interval: Seconds between job status checks.
+            timeout: Maximum duration for one SSH or SCP operation.
+            remote_workdir: Remote directory containing job artifacts.
+            identity_file: Optional private-key path passed to SSH and SCP.
+            ssh_options: Additional SSH and SCP command-line options.
+            python_path: Remote Python executable used to start the worker.
+
+        """
         if not host:
             raise ValueError("SSHBackend requires a host (e.g., 'user@hostname')")
         super().__init__(
@@ -103,7 +119,13 @@ class SSHBackend(RemoteBackend):
         """Implement the abstract disconnection hook as a no-op for one-shot commands."""
 
     def upload(self, local_path: str | Path, remote_path: str) -> None:
-        """Implement the abstract upload hook with SCP."""
+        """Implement the abstract upload hook with SCP.
+
+        Args:
+            local_path: Source file on the local machine.
+            remote_path: Destination file path on the remote machine.
+
+        """
         local_path = Path(local_path)
         command = [
             "scp",
@@ -122,7 +144,13 @@ class SSHBackend(RemoteBackend):
             raise RuntimeError(f"SCP upload failed: {result.stderr}")
 
     def download(self, remote_path: str, local_path: str | Path) -> None:
-        """Implement the abstract download hook with SCP."""
+        """Implement the abstract download hook with SCP.
+
+        Args:
+            remote_path: Source file path on the remote machine.
+            local_path: Destination file on the local machine.
+
+        """
         local_path = Path(local_path)
         local_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -155,7 +183,12 @@ class SSHBackend(RemoteBackend):
         return options
 
     def _ssh_cmd(self, remote_command: list[str]) -> list[str]:
-        """Build an SSH command."""
+        """Build an SSH command.
+
+        Args:
+            remote_command: Command and arguments to execute on the remote machine.
+
+        """
         command = ["ssh", *self._ssh_options(), self._ssh_target()]
         command.append(shlex.join(remote_command))
         return command
@@ -163,7 +196,13 @@ class SSHBackend(RemoteBackend):
     def _run_remote(
         self, command: str, *, timeout: int | None = None
     ) -> subprocess.CompletedProcess:
-        """Run a shell command on the remote machine."""
+        """Run a shell command on the remote machine.
+
+        Args:
+            command: Shell command to execute remotely.
+            timeout: Optional command timeout in seconds.
+
+        """
         ssh_command = ["ssh", *self._ssh_options(), self._ssh_target(), command]
         return subprocess.run(
             ssh_command,
@@ -174,7 +213,12 @@ class SSHBackend(RemoteBackend):
         )
 
     def _submit(self, payload: dict) -> tuple[str, dict]:
-        """Override the optional async submission hook to launch an SSH worker."""
+        """Override the optional async submission hook to launch an SSH worker.
+
+        Args:
+            payload: Serialized algorithm execution request.
+
+        """
         import shutil
         import tempfile
 
@@ -240,6 +284,10 @@ class SSHBackend(RemoteBackend):
         ``JobState`` defines the canonical case-insensitive lifecycle states.
         Backend-specific status strings are also supported and remain
         nonterminal until mapped to a terminal state.
+
+        Args:
+            backend_state: Persisted state for the submitted remote job.
+
         """
         remote_job_dir = backend_state["remote_job_dir"]
 
@@ -287,7 +335,12 @@ class SSHBackend(RemoteBackend):
         )
 
     def cancel(self, backend_state: dict) -> None:
-        """Override the optional async cancellation hook by signaling the worker PID."""
+        """Override the optional async cancellation hook by signaling the worker PID.
+
+        Args:
+            backend_state: Persisted state for the submitted remote job.
+
+        """
         remote_job_dir = backend_state["remote_job_dir"]
         pid_path = shlex.quote(f"{remote_job_dir}/pid")
         pid_result = self._run_remote(f"cat {pid_path}", timeout=10)
@@ -301,7 +354,13 @@ class SSHBackend(RemoteBackend):
         backend_state: dict,
         local_dir: str | Path | None = None,
     ) -> dict:
-        """Override the optional async fetch hook to download and deserialize results."""
+        """Override the optional async fetch hook to download and deserialize results.
+
+        Args:
+            backend_state: Persisted state for the completed remote job.
+            local_dir: Optional directory for downloaded result files.
+
+        """
         import json
         import shutil
         import tempfile
@@ -341,7 +400,12 @@ class SSHBackend(RemoteBackend):
                 shutil.rmtree(local_dir, ignore_errors=True)
 
     def cleanup_job(self, backend_state: dict) -> None:
-        """Remove artifacts owned by one completed SSH job."""
+        """Remove artifacts owned by one completed SSH job.
+
+        Args:
+            backend_state: Persisted state for the terminal remote job.
+
+        """
         remote_workdir = PurePosixPath(self.remote_workdir)
         remote_job_dir = PurePosixPath(backend_state["remote_job_dir"])
         remote_output_dir = PurePosixPath(backend_state["remote_output_dir"])
@@ -372,7 +436,12 @@ class SSHRemoteBackendPlugin(QdkChemistryPlugin):
     """Register the illustrative SSH remote backend."""
 
     def register(self, registrar: PluginRegistrar) -> None:
-        """Register the backend with QDK/Chemistry."""
+        """Register the backend with QDK/Chemistry.
+
+        Args:
+            registrar: Plugin registrar receiving the SSH backend.
+
+        """
         registrar.register_remote_backend("ssh", SSHBackend)
 
 

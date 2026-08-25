@@ -44,7 +44,12 @@ __all__ = [
 
 
 def __getattr__(name: str):
-    """Load re-exported remote types on first access."""
+    """Load re-exported remote types on first access.
+
+    Args:
+        name: Name of the re-exported remote type to load.
+
+    """
     if name == "Job":
         from qdk_chemistry.remote.job import Job  # noqa: PLC0415
 

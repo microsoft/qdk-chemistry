@@ -117,27 +117,11 @@ class TestFileSerializerPrimitives:
         assert result == value
         assert isinstance(result, tuple)
 
-    def test_dict_round_trip(self, tmp_path):
-        value = {"a": 1, "b": 2.0, "c": "three"}
-        entry = FileSerializer.serialize_value(tmp_path, "dct", value)
-        assert entry["type"] == "dict"
-        assert FileSerializer.deserialize_value(tmp_path, entry) == value
-
-    def test_dict_round_trip_preserves_key_types(self, tmp_path):
-        """Dictionary keys retain their values, types, and insertion order."""
-        value = {1: "integer", "1": "string", (2, "two"): "tuple"}
-        entry = FileSerializer.serialize_value(tmp_path, "dct", value)
-
-        result = FileSerializer.deserialize_value(tmp_path, entry)
-
-        assert list(result) == [1, "1", (2, "two")]
-        assert result == value
-
     def test_nested_structures(self, tmp_path):
-        value = [{"x": [1, 2]}, (True, None)]
+        value = [[1, 2], (True, None)]
         entry = FileSerializer.serialize_value(tmp_path, "nested", value)
         result = FileSerializer.deserialize_value(tmp_path, entry)
-        assert result[0] == {"x": [1, 2]}
+        assert result[0] == [1, 2]
         assert result[1] == (True, None)
 
     def test_unsupported_type_raises(self, tmp_path):
@@ -165,18 +149,18 @@ class TestFileSerializerDataClass:
         assert isinstance(loaded, Structure)
         np.testing.assert_array_almost_equal(loaded.get_coordinates(), h2_structure.get_coordinates())
 
-    def test_dict_blob_filenames_do_not_depend_on_keys(self, tmp_path, h2_structure):
-        """Distinct dictionary entries cannot resolve to the same blob file."""
+    def test_nested_blob_filenames_are_unique(self, tmp_path, h2_structure):
+        """Distinct nested values cannot resolve to the same blob file."""
         helium = Structure(["He"], np.array([[1.0, 0.0, 0.0]]))
-        entry = FileSerializer.serialize_value(tmp_path, "structures", {"/": h2_structure, "_": helium})
+        entry = FileSerializer.serialize_value(tmp_path, "structures", [h2_structure, helium])
 
-        filenames = [item["value"]["file"] for item in entry["entries"]]
+        filenames = [item["file"] for item in entry["items"]]
         assert len(set(filenames)) == 2
         assert all((tmp_path / filename).exists() for filename in filenames)
 
         result = FileSerializer.deserialize_value(tmp_path, entry)
-        np.testing.assert_array_equal(result["/"].get_coordinates(), h2_structure.get_coordinates())
-        np.testing.assert_array_equal(result["_"].get_coordinates(), helium.get_coordinates())
+        np.testing.assert_array_equal(result[0].get_coordinates(), h2_structure.get_coordinates())
+        np.testing.assert_array_equal(result[1].get_coordinates(), helium.get_coordinates())
 
     def test_is_dataclass(self, sample_orbitals):
         assert FileSerializer.is_dataclass(sample_orbitals)
@@ -569,6 +553,31 @@ def test_worker_logs_cache_read_failure(caplog):
     assert "Failed to read cached result for run testhash" in record.message
 
 
+@pytest.mark.parametrize(
+    ("result", "output_is_tuple"),
+    [
+        pytest.param(None, False, id="none"),
+        pytest.param((42,), True, id="singleton-tuple"),
+        pytest.param((), True, id="empty-tuple"),
+        pytest.param((None,), True, id="singleton-none-tuple"),
+    ],
+)
+def test_worker_cache_preserves_result_shape(tmp_path, result, output_is_tuple):
+    cache = FolderCache(path=tmp_path / "cache")
+    inputs = {
+        "algorithm_type": "test_algorithm",
+        "algorithm_name": "plugin",
+        "settings": {},
+    }
+
+    remote_worker._store_cached_result(cache, "testhash", inputs, result)
+
+    assert remote_worker._get_cached_result(cache, "testhash") == result
+    job = cache.get_job("testhash")
+    assert job is not None
+    assert job.output_is_tuple is output_is_tuple
+
+
 def test_worker_logs_cache_write_failure(caplog):
     cache = MagicMock()
     cache.put_job.side_effect = RuntimeError("cache write failed")
@@ -639,6 +648,13 @@ class TestJob:
         assert loaded.backend_state == {"pid": 1234}
         assert loaded.run_hash == "aaaa"
         assert loaded.input_hashes == {"args.arg_0": "hash0"}
+
+    def test_load_requires_status(self, tmp_path):
+        path = tmp_path / "job_j1.json"
+        path.write_text(json.dumps({"job_id": "j1", "backend": "local"}))
+
+        with pytest.raises(ValueError, match="missing required field 'status'"):
+            Job.load(path)
 
     def test_to_dict_normalizes_paths_and_algorithm_refs(self, tmp_path):
         """Job metadata uses the same durable representation as remote settings."""
@@ -837,6 +853,7 @@ class TestJob:
             persisted = Job.load(tmp_path / "job_x.json")
             assert persisted.status == "retrieved"
             assert persisted.output_hashes is not None
+            assert persisted.output_is_tuple is True
 
         backend.cleanup_job.side_effect = assert_persisted_before_cleanup
 
@@ -853,6 +870,7 @@ class TestJob:
         persisted = Job.load(tmp_path / "job_x.json")
         assert persisted.status == "retrieved"
         assert persisted.output_hashes is not None
+        assert persisted.output_is_tuple is True
 
     def test_fetch_failure_preserves_backend_artifacts(self, monkeypatch):
         backend = MagicMock()
@@ -901,8 +919,17 @@ class TestJob:
 
     def test_output_hashes_round_trip(self, tmp_path):
         hashes = [{"hash": "h1", "type": "float", "value": -75.5}, {"hash": "h2", "type": "wavefunction"}]
-        job = Job(job_id="x", backend="local", backend_config={}, backend_state={}, output_hashes=hashes)
-        assert Job.load(job.save(tmp_path / "job_x.json")).output_hashes == hashes
+        job = Job(
+            job_id="x",
+            backend="local",
+            backend_config={},
+            backend_state={},
+            output_hashes=hashes,
+            output_is_tuple=True,
+        )
+        loaded = Job.load(job.save(tmp_path / "job_x.json"))
+        assert loaded.output_hashes == hashes
+        assert loaded.output_is_tuple is True
 
 
 class TestBackendRegistry:
@@ -1398,6 +1425,37 @@ class TestRunWithCache:
         assert "remote_cache" not in payload
         assert "remote_cache_backend" not in payload
 
+    def test_remote_failure_includes_backend_diagnostics(self, tmp_path):
+        """A terminal remote failure reports backend error details and logs."""
+        cache = FolderCache(path=tmp_path / "cache")
+        algo = self._mock_algorithm()
+        backend = MagicMock()
+        job = Job(
+            job_id="remote-job",
+            backend="test",
+            backend_config={"poll_interval": 0},
+            backend_state={},
+        )
+
+        def fail_job():
+            job.status = "failed"
+            return JobStatus(
+                job_id=job.job_id,
+                status="failed",
+                error="Remote worker exited with code 1",
+                logs="Traceback (most recent call last): ...",
+            )
+
+        job.check = MagicMock(side_effect=fail_job)
+        backend.submit.return_value = job
+
+        with pytest.raises(RuntimeError) as error:
+            run(algo, "arg1", cache=cache, remote=backend)
+
+        assert "failed" in str(error.value)
+        assert "Remote worker exited with code 1" in str(error.value)
+        assert "Traceback (most recent call last): ..." in str(error.value)
+
     def test_cached_poll_accepts_lowercase_success(self, tmp_path, monkeypatch):
         cache = FolderCache(path=tmp_path / "cache")
         algo = self._mock_algorithm()
@@ -1426,6 +1484,28 @@ class TestRunWithCache:
         backend.submit.assert_not_called()
         sleep.assert_not_called()
 
+    def test_cached_success_without_outputs_retries_fetch(self, tmp_path, monkeypatch):
+        """A persisted success is fetched again instead of being resubmitted."""
+        cache = FolderCache(path=tmp_path / "cache")
+        algo = self._mock_algorithm()
+        backend = MagicMock()
+        job = Job(
+            job_id="remote-job",
+            backend="test",
+            backend_config={},
+            backend_state={},
+            status="succeeded",
+            run_hash="testhash1234abcd",
+        )
+        cache.put_job("testhash1234abcd", job)
+        fetch = MagicMock(return_value=-75.5)
+        monkeypatch.setattr(Job, "fetch", fetch)
+
+        assert run(algo, "arg1", cache=cache, remote=backend) == -75.5
+
+        fetch.assert_called_once_with()
+        backend.submit.assert_not_called()
+
     def test_remote_uses_shared_tier_from_cache(self, tmp_path):
         local_cache = FolderCache(path=tmp_path / "local")
         shared_cache = FolderCache(path=tmp_path / "shared", is_shared=True)
@@ -1452,6 +1532,49 @@ class TestRunWithCache:
         }
         assert payload["remote_cache_backend"] is shared_cache
 
+    @pytest.mark.parametrize(
+        "result",
+        [
+            pytest.param(None, id="none"),
+            pytest.param((42,), id="singleton-tuple"),
+            pytest.param((), id="empty-tuple"),
+        ],
+    )
+    def test_remote_reconstructs_result_from_shared_cache(self, tmp_path, result):
+        local_cache = FolderCache(path=tmp_path / "local")
+        shared_cache = FolderCache(path=tmp_path / "shared", is_shared=True)
+        cache = TieredCache([local_cache, shared_cache])
+        algo = self._mock_algorithm(result=result)
+        backend = MagicMock()
+        submitted_job = Job(
+            job_id="remote-job",
+            backend="test",
+            backend_config={"poll_interval": 0},
+            backend_state={},
+            status="running",
+        )
+        submitted_job.fetch = MagicMock(return_value="fetched")
+        remote_job = Job(
+            job_id="remote-job",
+            backend="remote",
+            backend_config={},
+            backend_state={},
+            status="retrieved",
+            output_hashes=collect_content_hashes(result),
+            output_is_tuple=isinstance(result, tuple),
+        )
+
+        def complete_job():
+            shared_cache.put_job("testhash1234abcd", remote_job)
+            submitted_job.status = "succeeded"
+            return JobStatus(job_id=submitted_job.job_id, status="succeeded")
+
+        submitted_job.check = MagicMock(side_effect=complete_job)
+        backend.submit.return_value = submitted_job
+
+        assert run(algo, cache=cache, remote=backend) == result
+        submitted_job.fetch.assert_not_called()
+
     def test_run_stores_in_cache(self, tmp_path):
         cache = FolderCache(path=tmp_path / "cache")
         algo = self._mock_algorithm()
@@ -1470,6 +1593,28 @@ class TestRunWithCache:
 
         assert run(algo, "arg1", cache=cache, remote=None) == -75.5
         algo.run.assert_not_called()
+
+    @pytest.mark.parametrize(
+        ("result", "output_is_tuple"),
+        [
+            pytest.param(None, False, id="none"),
+            pytest.param((42,), True, id="singleton-tuple"),
+            pytest.param((), True, id="empty-tuple"),
+            pytest.param((None,), True, id="singleton-none-tuple"),
+        ],
+    )
+    def test_cache_hit_preserves_result_shape(self, tmp_path, result, output_is_tuple):
+        cache = FolderCache(path=tmp_path / "cache")
+        algo = self._mock_algorithm(result=result)
+
+        assert run(algo, cache=cache, remote=None) == result
+        algo.run.reset_mock()
+
+        assert run(algo, cache=cache, remote=None) == result
+        algo.run.assert_not_called()
+        job = cache.get_job("testhash1234abcd")
+        assert job is not None
+        assert job.output_is_tuple is output_is_tuple
 
     def test_force_rerun(self, tmp_path):
         cache = FolderCache(path=tmp_path / "cache")

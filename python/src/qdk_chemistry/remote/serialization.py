@@ -209,11 +209,15 @@ def _jsonable_settings(settings: Settings) -> dict[str, Any]:
 class FileSerializer:
     """Handles file-based serialization of QDK Chemistry objects for remote transport.
 
-    Each DataClass object is serialized to its own .{type_name}.h5 file, and
-    each NumPy array to its own .ndarray.npy file. Primitives and simple types
-    are stored in a JSON manifest file. Algorithm references embed plain tagged
-    settings dictionaries, recursively preserving further nested algorithm
-    references.
+    Supported values are QDK Chemistry data classes, ``AlgorithmRef`` objects,
+    NumPy arrays and scalars, Python primitives, and lists or tuples recursively
+    containing supported values. Dictionaries are protocol structure rather than
+    serializable values. Nested algorithm references remain supported through
+    their tagged settings representation.
+
+    Each data class is serialized to its own .{type_name}.h5 file, and each
+    NumPy array to its own .ndarray.npy file. Primitives and simple types are
+    stored in a JSON manifest file.
 
     Directory structure for inputs::
 
@@ -411,31 +415,11 @@ class FileSerializer:
                 )
             return {"type": "tuple", "items": items}
 
-        # Handle dicts
         if isinstance(value, dict):
-            entries = []
-            for index, (key, item) in enumerate(value.items()):
-                entries.append(
-                    {
-                        "key": cls.serialize_value(
-                            directory,
-                            f"{name}_entry_{index}_key",
-                            key,
-                            cache=cache,
-                            content_hash=_item_content_hash(key) if cls.is_cacheable(key) else None,
-                            seed_cache=seed_cache,
-                        ),
-                        "value": cls.serialize_value(
-                            directory,
-                            f"{name}_entry_{index}_value",
-                            item,
-                            cache=cache,
-                            content_hash=_item_content_hash(item) if cls.is_cacheable(item) else None,
-                            seed_cache=seed_cache,
-                        ),
-                    }
-                )
-            return {"type": "dict", "entries": entries}
+            raise TypeError(
+                "Dictionary values are not supported by remote serialization; "
+                "use keyword arguments, algorithm settings, or a QDK Chemistry data class"
+            )
 
         raise TypeError(f"Cannot serialize object of type {type(value).__name__}")
 
@@ -520,14 +504,6 @@ class FileSerializer:
         if type_tag == "tuple":
             return tuple(cls.deserialize_value(directory, item, cache=cache) for item in entry["items"])
 
-        if type_tag == "dict":
-            return {
-                cls.deserialize_value(directory, item["key"], cache=cache): cls.deserialize_value(
-                    directory, item["value"], cache=cache
-                )
-                for item in entry["entries"]
-            }
-
         raise TypeError(f"Unknown type tag: {type_tag}")
 
 
@@ -548,14 +524,6 @@ def get_serialized_file_names(entry: dict[str, Any]) -> list[str]:
 
     if type_tag in ("list", "tuple"):
         return [filename for item in entry["items"] for filename in get_serialized_file_names(item)]
-
-    if type_tag == "dict":
-        return [
-            filename
-            for item in entry["entries"]
-            for value in (item["key"], item["value"])
-            for filename in get_serialized_file_names(value)
-        ]
 
     if type_tag in ("none", "algorithm_ref", "cached", "bool", "int", "float", "str"):
         return []

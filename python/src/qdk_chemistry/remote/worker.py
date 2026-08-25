@@ -22,7 +22,12 @@ _CACHE_MISS = object()
 
 
 def _load_remote_cache(input_dir: Path) -> tuple[Any, str | None]:
-    """Create the cache described by an input manifest, when available."""
+    """Create the cache described by an input manifest, when available.
+
+    Args:
+        input_dir: Directory containing the serialized input manifest.
+
+    """
     run_hash = None
     try:
         from qdk_chemistry.remote.serialization import _load_manifest  # noqa: PLC0415
@@ -44,13 +49,27 @@ def _load_remote_cache(input_dir: Path) -> tuple[Any, str | None]:
 
 
 def _get_cached_result(cache: Any, run_hash: str | None) -> Any:
-    """Return a complete cached result or the cache-miss sentinel."""
+    """Return a complete cached result or the cache-miss sentinel.
+
+    Args:
+        cache: Cache backend to query.
+        run_hash: Deterministic execution hash to look up.
+
+    """
     if cache is None or run_hash is None:
         return _CACHE_MISS
 
     try:
+        from qdk_chemistry.remote.backends.base import JobState, JobStatus  # noqa: PLC0415
+
         job = cache.get_job(run_hash)
-        if job is None or not job.output_hashes or (job.status or "").lower() not in ("retrieved", "succeeded"):
+        status = JobStatus.normalize_status(job.status) if job is not None else None
+        if (
+            job is None
+            or job.output_hashes is None
+            or job.output_is_tuple is None
+            or status not in (JobState.RETRIEVED, JobState.SUCCEEDED)
+        ):
             return _CACHE_MISS
 
         items: list[Any] = []
@@ -62,14 +81,24 @@ def _get_cached_result(cache: Any, run_hash: str | None) -> Any:
             if data is None:
                 return _CACHE_MISS
             items.append(data)
-        return items[0] if len(items) == 1 else tuple(items)
+        if job.output_is_tuple:
+            return tuple(items)
+        return items[0] if len(items) == 1 else _CACHE_MISS
     except Exception:  # noqa: BLE001
         logger.warning("Failed to read cached result for run %s", run_hash, exc_info=True)
         return _CACHE_MISS
 
 
 def _store_cached_result(cache: Any, run_hash: str | None, inputs: dict[str, Any], result: Any) -> None:
-    """Persist a completed result to the compute node's cache when configured."""
+    """Persist a completed result to the compute node's cache when configured.
+
+    Args:
+        cache: Cache backend receiving the completed result.
+        run_hash: Deterministic execution hash for the result.
+        inputs: Deserialized algorithm metadata and arguments.
+        result: Completed algorithm result to persist.
+
+    """
     if cache is None or run_hash is None:
         return
 
@@ -78,6 +107,7 @@ def _store_cached_result(cache: Any, run_hash: str | None, inputs: dict[str, Any
         from qdk_chemistry.remote.job import Job  # noqa: PLC0415
 
         output_hashes = collect_content_hashes(result)
+        output_is_tuple = isinstance(result, tuple)
         result_items = result if isinstance(result, tuple) else (result,)
         for entry, item in zip(output_hashes, result_items, strict=False):
             if "value" not in entry:
@@ -99,6 +129,7 @@ def _store_cached_result(cache: Any, run_hash: str | None, inputs: dict[str, Any
                 run_hash=run_hash,
                 input_hashes=inputs.get("input_hashes"),
                 output_hashes=output_hashes,
+                output_is_tuple=output_is_tuple,
             ),
         )
     except Exception:  # noqa: BLE001
@@ -106,7 +137,13 @@ def _store_cached_result(cache: Any, run_hash: str | None, inputs: dict[str, Any
 
 
 def execute_job(input_dir: str | Path, output_dir: str | Path) -> Any:
-    """Execute one serialized algorithm job and write its serialized result."""
+    """Execute one serialized algorithm job and write its serialized result.
+
+    Args:
+        input_dir: Directory containing serialized algorithm inputs.
+        output_dir: Directory to receive serialized results.
+
+    """
     from qdk_chemistry.algorithms import create as create_algorithm  # noqa: PLC0415
     from qdk_chemistry.remote.serialization import (  # noqa: PLC0415
         deserialize_inputs,
@@ -131,7 +168,12 @@ def execute_job(input_dir: str | Path, output_dir: str | Path) -> Any:
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    """Run the compute-node worker command."""
+    """Run the compute-node worker command.
+
+    Args:
+        argv: Command-line arguments, or ``None`` to read process arguments.
+
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input-dir", required=True, help="Directory containing serialized inputs")
     parser.add_argument("--output-dir", required=True, help="Directory for serialized outputs")

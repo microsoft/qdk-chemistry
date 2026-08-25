@@ -109,7 +109,13 @@ def _hash_optional(h: "hashlib._Hash", val: Any, hash_fn) -> None:
 
 
 def _hash_algorithm_ref(h: "hashlib._Hash", reference: AlgorithmRef) -> None:
-    """Hash an algorithm reference and its recursively configured settings."""
+    """Hash an algorithm reference and its recursively configured settings.
+
+    Args:
+        h: Hash object receiving the reference representation.
+        reference: Algorithm reference to hash.
+
+    """
     _hash_str(h, reference.algorithm_type)
     _hash_str(h, reference.algorithm_name)
     settings = reference.settings

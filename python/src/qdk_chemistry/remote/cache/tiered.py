@@ -57,7 +57,13 @@ class TieredCache(CacheBackend):
     name = "tiered"
 
     def __init__(self, tiers: list[CacheBackend | dict[str, Any]], **_kwargs: Any):
-        """Initialise with an ordered list of cache tiers."""
+        """Initialise with an ordered list of cache tiers.
+
+        Args:
+            tiers: Cache instances or serialized cache configurations, fastest first.
+            **_kwargs: Ignored compatibility configuration.
+
+        """
         super().__init__()
         if not tiers:
             raise ValueError("TieredCache requires at least one tier")
@@ -65,7 +71,12 @@ class TieredCache(CacheBackend):
 
     @staticmethod
     def _resolve_tier(tier: CacheBackend | dict[str, Any]) -> CacheBackend:
-        """Resolve a cache instance or serialized cache configuration."""
+        """Resolve a cache instance or serialized cache configuration.
+
+        Args:
+            tier: Cache instance or configuration containing its registry name.
+
+        """
         if isinstance(tier, CacheBackend):
             return tier
         if not isinstance(tier, dict) or "name" not in tier:

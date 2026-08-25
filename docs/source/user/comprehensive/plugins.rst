@@ -306,6 +306,8 @@ Algorithms created through :func:`qdk_chemistry.algorithms.create` accept ``remo
    :start-after: # start-cell-custom-remote-run
    :end-before: # end-cell-custom-remote-run
 
+Remote argument and result values support QDK Chemistry data classes, NumPy arrays with non-object and non-structured data types, ``None``, booleans, integers, floats, strings, NumPy scalar equivalents, and lists or tuples recursively containing supported values. :class:`~qdk_chemistry.data.AlgorithmRef` values are also supported in arguments and settings, including nested algorithm-reference settings. Generic dictionaries are not supported as argument or result values. Keyword arguments and algorithm settings remain mappings because the protocol serializes their entries separately; use a QDK Chemistry data class for other structured values.
+
 Disconnecting closes connection-scoped resources but does not remove artifacts belonging to submitted jobs. For an asynchronous :class:`~qdk_chemistry.remote.job.Job`, pass ``cleanup=True`` to :meth:`~qdk_chemistry.remote.job.Job.fetch` to remove backend artifacts after the result is successfully retrieved and persisted. Call :meth:`~qdk_chemistry.remote.job.Job.cleanup` to remove artifacts separately for any terminal job. Cleanup is idempotent; failed retrieval leaves artifacts available for inspection or retry.
 
 Passing a path as ``cache`` creates a local :class:`~qdk_chemistry.remote.cache.folder.FolderCache`. On a completed cache hit, ``run`` reconstructs and returns the result without submitting another remote job. If the cache contains an in-flight job for the same algorithm, settings, and inputs, polling resumes instead of creating a duplicate. Pass ``force_rerun=True`` to bypass the lookup and execute again.

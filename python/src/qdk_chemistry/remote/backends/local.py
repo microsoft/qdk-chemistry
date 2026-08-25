@@ -26,7 +26,12 @@ __all__ = ["LocalBackend"]
 
 
 def _windows_process_is_running(pid: int) -> bool:
-    """Check process liveness through the Windows process API."""
+    """Check process liveness through the Windows process API.
+
+    Args:
+        pid: Process identifier to check.
+
+    """
     import ctypes  # noqa: PLC0415
     from ctypes import wintypes  # noqa: PLC0415
 
@@ -56,7 +61,12 @@ def _windows_process_is_running(pid: int) -> bool:
 
 
 def _process_is_running(pid: int) -> bool:
-    """Check a process by PID when its original handle is unavailable."""
+    """Check a process by PID when its original handle is unavailable.
+
+    Args:
+        pid: Process identifier to check.
+
+    """
     if sys.platform == "win32":
         return _windows_process_is_running(pid)
 
@@ -77,7 +87,12 @@ def _process_is_running(pid: int) -> bool:
 
 
 def _windows_process_identity(pid: int) -> str | None:
-    """Return the immutable creation time for a Windows process."""
+    """Return the immutable creation time for a Windows process.
+
+    Args:
+        pid: Process identifier to inspect.
+
+    """
     import ctypes  # noqa: PLC0415
     from ctypes import wintypes  # noqa: PLC0415
 
@@ -113,7 +128,12 @@ def _windows_process_identity(pid: int) -> str | None:
 
 
 def _process_identity(pid: int) -> str | None:
-    """Return an immutable OS identity for a process, when supported."""
+    """Return an immutable OS identity for a process, when supported.
+
+    Args:
+        pid: Process identifier to inspect.
+
+    """
     if sys.platform == "win32":
         return _windows_process_identity(pid)
 
@@ -224,7 +244,12 @@ class LocalBackend(RemoteBackend):
     # ── Async job primitives ─────────────────────────────────────────────
 
     def _submit(self, payload: dict) -> tuple[str, dict]:
-        """Launch a background subprocess and return ``(job_id, backend_state)``."""
+        """Launch a background subprocess and return ``(job_id, backend_state)``.
+
+        Args:
+            payload: Serialized execution request.
+
+        """
         from qdk_chemistry.remote.serialization import serialize_inputs  # noqa: PLC0415
 
         job_id = uuid.uuid4().hex[:12]
@@ -276,7 +301,12 @@ class LocalBackend(RemoteBackend):
         return job_id, backend_state
 
     def check(self, backend_state: dict) -> JobStatus:
-        """Check whether the background subprocess has finished."""
+        """Check whether the background subprocess has finished.
+
+        Args:
+            backend_state: Persisted state for the submitted local job.
+
+        """
         pid = backend_state["pid"]
         output_dir = backend_state["output_dir"]
         job_workdir = backend_state.get("job_workdir", str(Path(output_dir).parent))
@@ -309,7 +339,12 @@ class LocalBackend(RemoteBackend):
         )
 
     def cancel(self, backend_state: dict) -> None:
-        """Kill the background subprocess."""
+        """Kill the background subprocess.
+
+        Args:
+            backend_state: Persisted state for the submitted local job.
+
+        """
         import os  # noqa: PLC0415
         import signal  # noqa: PLC0415
 
@@ -330,7 +365,13 @@ class LocalBackend(RemoteBackend):
         backend_state: dict,
         local_dir: str | Path | None = None,
     ) -> Any:
-        """Deserialize results from a completed local job."""
+        """Deserialize results from a completed local job.
+
+        Args:
+            backend_state: Persisted state for the completed local job.
+            local_dir: Optional directory for downloaded result files.
+
+        """
         from qdk_chemistry.remote.serialization import (  # noqa: PLC0415
             deserialize_outputs,
         )
@@ -352,7 +393,12 @@ class LocalBackend(RemoteBackend):
         return result
 
     def cleanup_job(self, backend_state: dict) -> None:
-        """Remove one local job directory and its parent when empty."""
+        """Remove one local job directory and its parent when empty.
+
+        Args:
+            backend_state: Persisted state for the terminal local job.
+
+        """
         workdir = Path(backend_state["workdir"]).resolve()
         job_workdir = Path(backend_state["job_workdir"]).resolve()
         output_dir = Path(backend_state["output_dir"]).resolve()

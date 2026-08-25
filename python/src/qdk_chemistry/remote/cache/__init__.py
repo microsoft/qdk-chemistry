@@ -32,7 +32,13 @@ _CACHES: dict[str, type[CacheBackend]] = {}
 
 
 def _register_cache(name: str, cls: type[CacheBackend]) -> type[CacheBackend]:
-    """Register one cache class after validating registry ownership."""
+    """Register one cache class after validating registry ownership.
+
+    Args:
+        name: Registry name for the cache backend.
+        cls: Cache backend class to register.
+
+    """
     if name in _CACHES:
         raise _DuplicateRegistrationError(f"Cache backend name '{name}' is already registered")
     for registered_name, registered_cls in _CACHES.items():
@@ -73,7 +79,7 @@ def get_cache(name: str, **config: Any) -> CacheBackend:
 
     Args:
         name: Backend name (e.g. ``"folder"``).
-        config: Backend-specific configuration.
+        **config: Backend-specific configuration.
 
     Raises:
         ValueError: If no cache is registered with that name.
@@ -95,6 +101,10 @@ def resolve_cache(cache: str | pathlib.Path | CacheBackend | None, **kwargs: Any
     - A ``Path`` or path-like string → ``FolderCache(path=...)``
     - A registered name string → looked up in the registry; extra
       ``kwargs`` are forwarded to the backend constructor.
+
+    Args:
+        cache: Cache instance, registered backend name, filesystem path, or ``None``.
+        **kwargs: Backend-specific configuration for a name or filesystem path.
 
     """
     if cache is None:

@@ -449,7 +449,13 @@ _BACKENDS: dict[str, type[RemoteBackend]] = {}
 
 
 def _register_backend(name: str, cls: Type[RemoteBackend]) -> Type[RemoteBackend]:  # noqa: UP006
-    """Register one backend class after validating registry ownership."""
+    """Register one backend class after validating registry ownership.
+
+    Args:
+        name: Registry name for the backend.
+        cls: Backend class to register.
+
+    """
     if name in _BACKENDS:
         raise _DuplicateRegistrationError(f"Remote backend name '{name}' is already registered")
     for registered_name, registered_cls in _BACKENDS.items():
@@ -493,7 +499,7 @@ def get_backend(name: str, **config) -> RemoteBackend:
 
     Args:
         name: Backend name (e.g., "custom" or "local")
-        **config: Backend-specific configuration
+        **config: Backend-specific configuration.
 
     Returns:
         Configured RemoteBackend instance
@@ -514,7 +520,7 @@ def create_remote(name: str, **config) -> RemoteBackend:
 
     Args:
         name: Backend name (e.g., "custom" or "local")
-        **config: Backend-specific configuration options
+        **config: Backend-specific configuration options.
 
     Returns:
         Configured RemoteBackend instance ready for use

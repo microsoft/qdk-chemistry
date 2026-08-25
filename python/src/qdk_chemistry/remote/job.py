@@ -28,7 +28,13 @@ _JOB_FILE_VERSION = 2
 
 
 def _prepare_persisted_value(value: Any, field: str) -> Any:
-    """Normalize supported values and verify that job metadata is JSON-safe."""
+    """Normalize supported values and verify that job metadata is JSON-safe.
+
+    Args:
+        value: Metadata value to normalize and validate.
+        field: Metadata field name used in validation errors.
+
+    """
     from qdk_chemistry.remote.serialization import _jsonable_settings_value  # noqa: PLC0415
 
     try:
@@ -73,6 +79,8 @@ class Job:
                         reconstructed without a cache backend.  Populated
                         when results are fetched.  ``None`` until results
                         are retrieved.
+        output_is_tuple: Whether the retrieved result is a tuple.  ``None``
+                 until results are retrieved.
 
     """
 
@@ -90,8 +98,25 @@ class Job:
         run_hash: str | None = None,
         input_hashes: dict[str, str] | None = None,
         output_hashes: list[dict[str, Any]] | None = None,
+        output_is_tuple: bool | None = None,
     ):
-        """Initialise a Job from its constituent parts."""
+        """Initialise a Job from its constituent parts.
+
+        Args:
+            job_id: Unique identifier assigned by the backend.
+            backend: Registered backend name.
+            backend_config: Configuration used to reconstruct the backend.
+            backend_state: Persisted backend-specific job state.
+            algorithm_info: Submitted algorithm type, name, and settings.
+            status: Initial job status.
+            submitted_at: ISO-8601 submission timestamp.
+            file_path: Optional path for the persisted job record.
+            run_hash: Deterministic hash used for cache lookup.
+            input_hashes: Content hashes for submitted inputs.
+            output_hashes: Content-hash descriptors for retrieved outputs.
+            output_is_tuple: Whether the retrieved result is a tuple.
+
+        """
         self.job_id = job_id
         self.backend = backend
         self.backend_config = backend_config
@@ -103,6 +128,7 @@ class Job:
         self.run_hash: str | None = run_hash
         self.input_hashes: dict[str, str] | None = input_hashes
         self.output_hashes: list[dict[str, Any]] | None = output_hashes
+        self.output_is_tuple: bool | None = output_is_tuple
 
     # ── Serialisation ────────────────────────────────────────────────────
 
@@ -124,6 +150,8 @@ class Job:
             d["input_hashes"] = self.input_hashes
         if self.output_hashes is not None:
             d["output_hashes"] = self.output_hashes
+        if self.output_is_tuple is not None:
+            d["output_is_tuple"] = self.output_is_tuple
         return _prepare_persisted_value(d, "metadata")
 
     def save(self, path: str | pathlib.Path | None = None) -> pathlib.Path:
@@ -181,18 +209,21 @@ class Job:
         version = data.get("version", 1)
         if version > _JOB_FILE_VERSION:
             raise ValueError(f"Unsupported job file version {version} (max supported {_JOB_FILE_VERSION})")
+        if "status" not in data:
+            raise ValueError("Job file is missing required field 'status'")
         return cls(
             job_id=data["job_id"],
             backend=data["backend"],
             backend_config=data.get("backend_config", {}),
             backend_state=data.get("backend_state", {}),
             algorithm_info=data.get("algorithm_info", {}),
-            status=data.get("status", "unknown"),
+            status=data["status"],
             submitted_at=data.get("submitted_at"),
             file_path=path,
             run_hash=data.get("run_hash"),
             input_hashes=data.get("input_hashes"),
             output_hashes=data.get("output_hashes"),
+            output_is_tuple=data.get("output_is_tuple"),
         )
 
     @classmethod
@@ -230,15 +261,17 @@ class Job:
 
     def check(self) -> JobStatus:
         """Query the backend, persist the latest status, and return it."""
+        from qdk_chemistry.remote.backends.base import JobState, JobStatus  # noqa: PLC0415
+
         backend = self._get_backend()
         try:
             job_status = backend.check(self.backend_state)
         finally:
             backend.disconnect()
 
-        if (self.status or "").lower() == "retrieved" or self.output_hashes is not None:
-            self.status = "retrieved"
-            job_status.status = "retrieved"
+        if JobStatus.normalize_status(self.status) == JobState.RETRIEVED or self.output_hashes is not None:
+            self.status = JobState.RETRIEVED
+            job_status.status = JobState.RETRIEVED
         else:
             self.status = job_status.status
         if self.file_path is not None:
@@ -283,6 +316,7 @@ class Job:
                 from qdk_chemistry.data._hashing import collect_content_hashes  # noqa: PLC0415
 
                 self.output_hashes = collect_content_hashes(result)
+                self.output_is_tuple = isinstance(result, tuple)
             except Exception:  # noqa: BLE001
                 pass
             if self.file_path is not None:
