@@ -20,35 +20,21 @@ from qdk_chemistry.utils.qsharp import create_qsharp_context
 
 @pytest.fixture
 def qdk_ctx() -> qdk.Context:
-    """Fresh Q# context for a single test.
-
-    Every test here simulates a program and reads the result off ``dump_machine``. A
-    context that has already run one program reports that program's state on the next
-    read, so sharing one across tests silently compares a vector against the previous
-    test's output.
-    """
+    """Fresh Q# context for a single test."""
     return create_qsharp_context()
 
 
 def _run_qrom_state_prep_and_dump(
     ctx: qdk.Context, amplitudes: list[float], num_qubits: int, bits: int = 10
 ) -> np.ndarray:
-    """Run the QROM state preparation via qdk.Context and return the statevector.
-
-    Loads the QROMStatePrep Q# sources and a thin wrapper that allocates
-    qubits internally, then captures the statevector via ``ctx.dump_machine()``.
-    """
+    """Run the QROM state preparation and return the statevector."""
     ctx.code.QDKChemistry.Utils.QROMStatePrep.RunQROMStatePrep(amplitudes, bits, num_qubits)
     state = ctx.dump_machine()
     return np.array(state.as_dense_state())
 
 
 def _build_expected_from_amplitudes(amplitudes: list[float], num_qubits: int) -> np.ndarray:
-    """Build the expected normalized statevector from input amplitudes.
-
-    The QROM SBM decomposition prepares Σ_j (a_j/||a||) |j⟩ where j indexes
-    the computational basis in Q# little-endian order (qubit k = bit k).
-    """
+    """Build the expected normalized statevector from input amplitudes."""
     n_states = 2**num_qubits
     expected = np.zeros(n_states, dtype=complex)
     for j, amp in enumerate(amplitudes):
@@ -61,11 +47,7 @@ def _build_expected_from_amplitudes(amplitudes: list[float], num_qubits: int) ->
 
 
 def _make_wavefunction(amplitudes: list[float]) -> Wavefunction:
-    """Create a Wavefunction from a list of amplitudes.
-
-    Zero amplitudes are kept so that determinant ``idx`` stays aligned with position ``idx``
-    in the coefficient vector, which is the index the QROM circuit addresses.
-    """
+    """Create a Wavefunction from a list of amplitudes."""
     num_qubits = math.ceil(math.log2(len(amplitudes))) if len(amplitudes) > 1 else 1
     dets = [Configuration.from_bitstring(format(idx, f"0{num_qubits}b")) for idx in range(len(amplitudes))]
     orbitals = ModelOrbitals(num_qubits)
@@ -74,11 +56,7 @@ def _make_wavefunction(amplitudes: list[float]) -> Wavefunction:
 
 
 def _reduced_state(sv: np.ndarray, num_qubits: int) -> np.ndarray:
-    """Project the full statevector onto the ``num_qubits`` state qubits.
-
-    ``dump_machine`` is big-endian (qubit 0 = MSB) and the state register is allocated
-    first, so it occupies the top ``num_qubits`` bits of the dense index.
-    """
+    """Project the full statevector onto the ``num_qubits`` state qubits."""
     reduced = np.zeros(2**num_qubits, dtype=complex)
     stride = len(sv) // (2**num_qubits)
     for i, amp in enumerate(sv):
@@ -101,11 +79,7 @@ class TestQROMStatePreparation:
         assert circuit.num_qubits == 6
 
     def test_resource_counts(self):
-        """Pin the logical resource counts so a costing regression is visible.
-
-        Unlike alias sampling, the QROM path pays for rotations: the phase gradient register
-        is prepared once with a ladder of Rz rotations and then reused across all layers.
-        """
+        """Pin the logical resource counts so a costing regression is visible."""
         prep = QROMStatePreparation(rotation_bit_precision=4)
         circuit = prep.run(_make_wavefunction([0.5, 0.3, 0.7, 0.1]))
 
@@ -118,18 +92,7 @@ class TestQROMStatePreparation:
 
     @pytest.mark.parametrize("num_coefficients", range(3, 10, 3))
     def test_fidelity_random(self, qdk_ctx, num_coefficients):
-        """Verify QROM state prep fidelity with random amplitudes.
-
-        The SBM decomposition should prepare:
-          |ψ⟩ = Σ_j (a_j / ||a||) |j⟩
-        with quantized Ry rotations via phase gradient (bRot=10), so fidelity ≈ 1.
-
-        The tolerance is tight on purpose. Low et al. (arXiv:1812.00954) Eq. (10) bounds the
-        state-vector error by O(2^-b log N), so infidelity scales as O(2^-2b log^2 N): a few
-        times 1e-6 at bRot=10 against 4e-5 to 9e-5 at bRot=8, both of which the measurements
-        match. A loose bound like 1e-3 would pass even if ``rotation_bit_precision`` were
-        silently ignored.
-        """
+        """Verify QROM state prep fidelity with random amplitudes."""
         rng = np.random.default_rng(seed=42 + num_coefficients)
         amplitudes = rng.uniform(0.01, 1.0, size=num_coefficients).tolist()
         num_qubits = math.ceil(math.log2(num_coefficients))
@@ -147,7 +110,6 @@ class TestQROMStatePreparation:
 
         infidelities = {}
         for bits in (4, 10):
-            # Each simulation needs its own context; a reused one replays the previous state.
             sv = _run_qrom_state_prep_and_dump(create_qsharp_context(), amplitudes, num_qubits, bits=bits)
             infidelities[bits] = 1.0 - abs(np.vdot(_reduced_state(sv, num_qubits), expected))
 
@@ -175,11 +137,7 @@ class TestQROMStatePreparation:
 
 
 class _EmptyCoefficientWavefunction:
-    """Stand-in wavefunction whose coefficient vector is empty.
-
-    ``StateVectorContainer`` will not build a determinant-free wavefunction, so the empty
-    input guard is exercised through the minimal interface ``_run_impl`` actually uses.
-    """
+    """Stand-in wavefunction whose coefficient vector is empty."""
 
     def get_coefficients(self) -> np.ndarray:
         """Return an empty coefficient vector."""
@@ -187,18 +145,7 @@ class _EmptyCoefficientWavefunction:
 
 
 class TestQROMSignedAmplitudes:
-    """The QROM loader's handling of signed amplitudes.
-
-    :math:`R_y` rotations only produce non-negative amplitudes, so the coefficient signs are
-    applied afterwards by a QROM-loaded ``Z`` phase kickback. Uncomputing that lookup is the
-    delicate part: its address register *is* the state register, so an adjoint that is not a
-    faithful inverse leaves an uncorrected phase and scrambles the signs. Routing the lookup
-    through ``Std.TableLookup.Select`` makes the adjoint ``Unlookup``, which repairs the phase
-    kickback its X-basis measurement leaves behind.
-
-    Every case is swept over several simulator seeds. The historical defect reproduced on
-    roughly seven seeds in eight, so a single-seed test would have passed straight through it.
-    """
+    """The QROM loader's handling of signed amplitudes."""
 
     SIGNED_AMPLITUDES: ClassVar[list[float]] = [0.5, -0.5, 0.5, 0.5]
     SEEDS: ClassVar[list[int]] = [1, 2, 3, 4, 5, 6, 7, 8]
@@ -217,12 +164,7 @@ class TestQROMSignedAmplitudes:
 
     @pytest.mark.parametrize("seed", SEEDS)
     def test_signs_are_preserved(self, qdk_ctx, seed):
-        r"""The prepared state matches the signed target on every seed.
-
-        Compared with :math:`|\langle \psi | \phi \rangle|`: the uncompute measures an
-        ancilla in the X basis, so the overall sign of the result depends on the seed even
-        when the relative signs are right.
-        """
+        """The prepared state matches the signed target on every seed."""
         qdk_ctx.set_quantum_seed(seed)
         num_qubits = 2
         sv = _run_qrom_state_prep_and_dump(qdk_ctx, self.SIGNED_AMPLITUDES, num_qubits, bits=4)
@@ -266,16 +208,10 @@ def _reverse_bits(x: int, n: int) -> int:
 
 
 def _target_amps(sv: np.ndarray, x: int, n_bits: int) -> tuple[complex, complex]:
-    """Extract target qubit amplitudes from the full statevector.
-
-    Qubit layout (BE in dump_machine): qubit 0 = MSB.
-    Allocation order: target[0] (bit 2n), angle[0..n-1] (bits 2n-1..n), pg[0..n-1] (bits n-1..0).
-    After uncomputing pg → |0⟩ and angle = |x⟩ (LE), the angle's LE bits
-    map to descending bit positions, requiring bit-reversal of x.
-    """
+    """Extract target qubit amplitudes from the full statevector."""
     angle_idx = _reverse_bits(x, n_bits) << n_bits
-    idx_0 = angle_idx  # target = |0⟩
-    idx_1 = angle_idx | (1 << (2 * n_bits))  # target = |1⟩
+    idx_0 = angle_idx
+    idx_1 = angle_idx | (1 << (2 * n_bits))
     return sv[idx_0], sv[idx_1]
 
 
@@ -285,21 +221,16 @@ class TestRyViaPhaseGradient:
     @pytest.mark.parametrize(
         ("x", "n"),
         [
-            (0, 4),  # θ = 0 → Ry = I
-            (1, 4),  # θ = π/4
-            (2, 4),  # θ = π/2
-            (4, 4),  # θ = π → Ry|0⟩ = |1⟩
-            (3, 5),  # θ = 3π/8
-            (7, 4),  # θ = 7π/4
+            (0, 4),
+            (1, 4),
+            (2, 4),
+            (4, 4),
+            (3, 5),
+            (7, 4),
         ],
     )
     def test_rotation_amplitudes(self, qdk_ctx, x, n):
-        """Ry(θ)|0⟩ = cos(θ/2)|0⟩ + sin(θ/2)|1⟩ with θ = 4πx/2^n.
-
-        Asserting the signed amplitudes rather than the probabilities is what pins the
-        rotation direction: |a|² is even in θ, so a probability-only check passes just as
-        happily for Ry(-θ).
-        """
+        """Ry(θ)|0⟩ = cos(θ/2)|0⟩ + sin(θ/2)|1⟩ with θ = 4πx/2^n."""
         qdk_ctx.code.QDKChemistry.Utils.PhaseGradient.TestRy(x, n)
         sv = np.array(qdk_ctx.dump_machine().as_dense_state())
         a0, a1 = _target_amps(sv, x, n)
@@ -327,14 +258,7 @@ class TestRzViaPhaseGradient:
 
     @pytest.mark.parametrize(("x", "n"), [(1, 4), (2, 4), (3, 4), (1, 5), (5, 5)])
     def test_polarity(self, qdk_ctx, x, n):
-        """Rz(θ) = diag(e^{-iθ/2}, e^{+iθ/2}) with θ = +4πx/2^n.
-
-        Applied to |+⟩ this leaves a relative phase of exactly θ between the two target
-        amplitudes, so the sign of the convention is directly observable. The positive
-        sign is the one used by Sanders et al. (arXiv:2007.07391) Appendix A and by
-        Qualtran's ``RzViaPhaseGradient``; a caller reading the docblock gets that
-        convention rather than its negation.
-        """
+        """Rz(θ) = diag(e^{-iθ/2}, e^{+iθ/2}) with θ = +4πx/2^n."""
         qdk_ctx.code.QDKChemistry.Utils.PhaseGradient.TestRzOnPlus(x, n)
         sv = np.array(qdk_ctx.dump_machine().as_dense_state())
         a0, a1 = _target_amps(sv, x, n)

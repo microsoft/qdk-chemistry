@@ -17,8 +17,6 @@ def qdk_ctx() -> qdk.Context:
     return create_qsharp_context()
 
 
-#: Eight three-bit words, so the address register is three qubits and ``num_swap_bits``
-#: can range over the whole select/swap split.
 _DATA_1D = [
     [True, False, True],
     [False, True, True],
