@@ -107,16 +107,17 @@ install(
 # down; blas_threads.cpp names the functions. Any other vendor -- Accelerate on
 # macOS, reference BLAS, or none reported at all -- exposes no such API, and
 # ScopedBlasThreads then compiles to a no-op.
-set(QDK_CHEMISTRY_BLAS_VENDOR "${BLAS_VENDOR}" CACHE STRING
-    "BLAS vendor whose thread-control API to bind: OpenBLAS, IntelMKL, BLIS, or empty to disable")
-set_property(CACHE QDK_CHEMISTRY_BLAS_VENDOR PROPERTY STRINGS
-    "" OpenBLAS IntelMKL BLIS)
+#
+# BLAS_VENDOR is the knob for the one case the search cannot answer -- passing
+# BLAS_LIBRARIES directly skips the vendor search (FindBLAS.cmake), leaving
+# BLAS_VENDOR empty, and -DBLAS_VENDOR=<vendor> supplies the missing label.
+set(_qdk_blas_vendor "${BLAS_VENDOR}")
 
-if(QDK_CHEMISTRY_BLAS_VENDOR STREQUAL "OpenBLAS")
+if(_qdk_blas_vendor STREQUAL "OpenBLAS")
   set(QDK_CHEMISTRY_BLAS_VENDOR_OPENBLAS ON)
-elseif(QDK_CHEMISTRY_BLAS_VENDOR STREQUAL "IntelMKL")
+elseif(_qdk_blas_vendor STREQUAL "IntelMKL")
   set(QDK_CHEMISTRY_BLAS_VENDOR_INTELMKL ON)
-elseif(QDK_CHEMISTRY_BLAS_VENDOR STREQUAL "BLIS")
+elseif(_qdk_blas_vendor STREQUAL "BLIS")
   set(QDK_CHEMISTRY_BLAS_VENDOR_BLIS ON)
 endif()
 
@@ -135,7 +136,7 @@ if(QDK_CHEMISTRY_BLAS_VENDOR_OPENBLAS OR QDK_CHEMISTRY_BLAS_VENDOR_INTELMKL OR
   # dependency is the vendor-agnostic BLAS::BLAS, so cmake/qdkConfig.cmake.in
   # steers the consumer's BLAS search to the same provider. A cache variable
   # because this is a subdirectory scope.
-  set(QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR "${QDK_CHEMISTRY_BLAS_VENDOR}"
+  set(QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR "${_qdk_blas_vendor}"
       CACHE INTERNAL
       "BLAS vendor whose thread-control symbols are bound into the library")
 else()

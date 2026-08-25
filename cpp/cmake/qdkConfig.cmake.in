@@ -78,10 +78,12 @@ if(QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR AND BLAS_VENDOR AND
     "'${QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR}' and calls its thread-control API, "
     "but the BLAS resolved here is '${BLAS_VENDOR}' (${BLAS_LIBRARIES}); "
     "linking would fail with an unresolved symbol. Point this project at the "
-    "same BLAS (e.g. "
-    "-DBLAS_PREFERENCE_LIST=${QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR}), or rebuild "
-    "qdk-chemistry with -DQDK_CHEMISTRY_BLAS_VENDOR= to make the library "
-    "independent of a particular BLAS provider.")
+    "same BLAS: -DBLAS_PREFERENCE_LIST=${QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR} "
+    "(in an existing build directory add -UBLAS_LIBRARIES -UBLAS_VENDOR, or "
+    "the cached result is reused and the search never re-runs), or "
+    "-DBLAS_LIBRARIES=<path> together with "
+    "-DBLAS_VENDOR=${QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR}. BLAS_VENDOR alone "
+    "only labels the BLAS already resolved; it does not select one.")
 endif()
 
 if(NOT TARGET qdk::chemistry)

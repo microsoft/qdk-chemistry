@@ -87,7 +87,9 @@ const BlasThreadApi& blas_thread_api() {
         "oversubscription or wrong results, restrict your BLAS to a single "
         "thread via its environment variable (e.g. OPENBLAS_NUM_THREADS, "
         "MKL_NUM_THREADS, BLIS_NUM_THREADS or VECLIB_MAXIMUM_THREADS), or "
-        "configure with -DQDK_CHEMISTRY_BLAS_VENDOR=<OpenBLAS|IntelMKL|BLIS>.");
+        "reconfigure with -DBLAS_VENDOR=<OpenBLAS|IntelMKL|BLIS>: supplying "
+        "BLAS_LIBRARIES skips the search that would otherwise detect the "
+        "vendor, so name the vendor of the BLAS this build already links.");
     return BlasThreadApi{};
   }();
   return api;
