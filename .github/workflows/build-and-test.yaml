@@ -150,10 +150,8 @@ jobs:
           hdf5 \
           graphviz \
           gcovr \
-          nlohmann-json \
           bison \
-          flex \
-          googletest
+          flex
 
     - name: Cache Doxygen (macOS)
       if: matrix.os-name == 'macOS'

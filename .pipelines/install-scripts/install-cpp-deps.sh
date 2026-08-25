@@ -3,17 +3,19 @@ set -e
 
 # install-cpp-deps.sh — build and install qdk-chemistry's C++ dependencies for CI pipelines.
 #
-# Builds from source (into install_prefix): nlohmann_json, spdlog, BLAS++, LAPACK++, LibInt2, ECPint (libecpint),
-# GauXC.
+# Builds from source (into install_prefix): nlohmann_json, googletest, Catch2, spdlog, BLAS++, LAPACK++, LibInt2,
+# ECPint (libecpint), GauXC.
 # Reused from the OS instead of built here: the actual BLAS/LAPACK implementation that BLAS++/LAPACK++ link
 # against (e.g. OpenBLAS via apt on Linux, Apple's Accelerate framework via macOS's "auto" vendor -- see
 # blas_vendor below).
 #
 # For context, qdk-chemistry's own C++ build (cpp/cmake/third_party.cmake, external/macis) also requires several
 # dependencies to already be installed on the system, independently of this script: Eigen3, HDF5, Boost, OpenMP,
-# Threads, MPI (only when built with ExaChem support), and GoogleTest (used if found, otherwise fetched). These
-# are installed via apt/brew by the pipeline before this script runs (see build-and-test.yaml), not by
-# install-cpp-deps.sh itself.
+# Threads, and MPI (only when built with ExaChem support). These are installed via apt/brew by the pipeline
+# before this script runs (see build-and-test.yaml), not by install-cpp-deps.sh itself. GoogleTest and Catch2
+# are each resolved via a find_package(...) call that falls back to fetching+building from source if not found
+# (cpp/tests/CMakeLists.txt and external/macis/cmake/macis-catch2.cmake, respectively); installing both here
+# lets that find_package() succeed and avoids the redundant per-job fetch+rebuild.
 #
 # Usage: install-cpp-deps.sh <cpp_cgmanifest_path> <macis_cgmanifest_path> [blas_vendor]
 #
@@ -158,6 +160,16 @@ if [[ -z "$GAUXC_COMMIT" ]]; then
     echo "Error: Could not find gauxc commit hash in $CGMANIFEST"
     exit 1
 fi
+GTEST_COMMIT=$(get_commit_hash "$CGMANIFEST" "google/googletest")
+if [[ -z "$GTEST_COMMIT" ]]; then
+    echo "Error: Could not find googletest commit hash in $CGMANIFEST"
+    exit 1
+fi
+GTEST_TAG=$(get_tag "$CGMANIFEST" "google/googletest")
+if [[ -z "$GTEST_TAG" ]]; then
+    echo "Error: Could not find googletest tag in $CGMANIFEST"
+    exit 1
+fi
 
 # Read versions from macis cgmanifest
 BLASPP_COMMIT=$(get_commit_hash "$MACIS_CGMANIFEST" "icl-utk-edu/blaspp")
@@ -170,6 +182,16 @@ if [[ -z "$LAPACKPP_COMMIT" ]]; then
     echo "Error: Could not find lapackpp commit hash in $MACIS_CGMANIFEST"
     exit 1
 fi
+CATCH2_COMMIT=$(get_commit_hash "$MACIS_CGMANIFEST" "catchorg/Catch2")
+if [[ -z "$CATCH2_COMMIT" ]]; then
+    echo "Error: Could not find Catch2 commit hash in $MACIS_CGMANIFEST"
+    exit 1
+fi
+CATCH2_TAG=$(get_tag "$MACIS_CGMANIFEST" "catchorg/Catch2")
+if [[ -z "$CATCH2_TAG" ]]; then
+    echo "Error: Could not find Catch2 tag in $MACIS_CGMANIFEST"
+    exit 1
+fi
 
 echo "Using versions from cgmanifest.json:"
 echo "  spdlog: ${SPDLOG_TAG:-$SPDLOG_COMMIT}"
@@ -179,6 +201,8 @@ echo "  libecpint: ${LIBECPINT_TAG:-$LIBECPINT_COMMIT}"
 echo "  libint: $LIBINT_URL"
 echo "  gauxc: $GAUXC_COMMIT"
 echo "  nlohmann_json: ${NJSON_TAG:-$NJSON_COMMIT}"
+echo "  googletest: ${GTEST_TAG:-$GTEST_COMMIT}"
+echo "  Catch2: ${CATCH2_TAG:-$CATCH2_COMMIT}"
 
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
@@ -196,6 +220,45 @@ cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
 make install
 cd "$BUILD_DIR"
 rm -rf nlohmann_json
+
+# Install googletest (qdk-chemistry's own cpp/tests/CMakeLists.txt finds this via find_package(GTest QUIET),
+# falling back to fetching+building v1.14.0 itself if not found -- installing it here once, cached alongside
+# the other C++ deps, avoids that redundant per-job rebuild).
+echo "=== Installing googletest ==="
+git clone https://github.com/google/googletest.git googletest
+cd googletest
+git checkout "$GTEST_COMMIT"
+mkdir -p build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
+         -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
+         -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+         -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS" \
+         -DINSTALL_GTEST=ON
+make -j"$JOBS"
+make install
+cd "$BUILD_DIR"
+rm -rf googletest
+
+# Install Catch2 (external/macis's own cmake/macis-catch2.cmake finds this via
+# find_package(Catch2 3.0.1 CONFIG QUIET), falling back to fetching+building v3.3.2 itself if not found -- same
+# rationale as googletest above).
+echo "=== Installing Catch2 ==="
+git clone https://github.com/catchorg/Catch2.git catch2
+cd catch2
+git checkout "$CATCH2_COMMIT"
+mkdir -p build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
+         -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
+         -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+         -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS" \
+         -DCATCH_BUILD_TESTING=OFF \
+         -DCATCH_INSTALL_DOCS=OFF
+make -j"$JOBS"
+make install
+cd "$BUILD_DIR"
+rm -rf catch2
 
 # Install spdlog
 echo "=== Installing spdlog ==="
