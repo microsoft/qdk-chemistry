@@ -44,20 +44,6 @@ namespace QDKChemistry.Utils.QROMStatePrep {
     ///
     /// Prepares: |0⟩^n → Σ_j c_j |j⟩ using n layers of multiplexed Ry rotations.
     ///
-    /// The phase gradient register must be initialized by the caller. The angle
-    /// ancilla register is allocated internally and returned to |0⟩.
-    operation QROMStatePrepare(
-        params : QROMStatePrepParams,
-        target : Qubit[],
-        phaseGradient : Qubit[],
-    ) : Unit is Adj + Ctl {
-        let bRot = params.rotationBitPrecision;
-        use angleReg = Qubit[bRot];
-        QROMStatePrepareCore(params, target, phaseGradient, angleReg);
-    }
-
-    /// Core QROM state preparation.
-    ///
     /// Each layer l targets qubit target[l] and uses Reversed(target[0..l-1])
     /// as the LE address register for SelectSwap QROM lookup.
     ///
@@ -69,18 +55,18 @@ namespace QDKChemistry.Utils.QROMStatePrep {
     /// ## target
     /// State register (n qubits), initialized to |0...0⟩.
     /// ## phaseGradient
-    /// Phase gradient ancilla (bRot qubits), pre-initialized.
-    /// ## angleReg
-    /// Angle scratch register (bRot qubits), initialized to |0...0⟩.
-    internal operation QROMStatePrepareCore(
+    /// Phase gradient ancilla (bRot qubits), pre-initialized by the caller.
+    operation QROMStatePrepare(
         params : QROMStatePrepParams,
         target : Qubit[],
         phaseGradient : Qubit[],
-        angleReg : Qubit[],
     ) : Unit is Adj + Ctl {
         let n = params.numStateQubits;
         let bRot = params.rotationBitPrecision;
         let angleTree = ComputeSBMAngles(params.amplitudes, n, bRot);
+
+        // Angle scratch register; each layer uncomputes it back to |0...0⟩.
+        use angleReg = Qubit[bRot];
 
         // Iterate MSB-first: layer l targets target[l].
         for level in 0..n - 1 {
