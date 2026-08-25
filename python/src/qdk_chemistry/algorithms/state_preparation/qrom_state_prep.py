@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import math
+from typing import Any
 
 import numpy as np
 
@@ -13,7 +14,7 @@ from qdk_chemistry.data import Settings, Wavefunction
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .state_preparation import StatePreparation
+from .state_preparation import PrepareLayout, StatePreparation
 
 __all__: list[str] = ["QROMStatePreparation", "QROMStatePreparationSettings"]
 
@@ -74,8 +75,36 @@ class QROMStatePreparation(StatePreparation):
             Circuit: A Circuit wrapping the Q# QROM state prep callable and factory.
 
         Raises:
-            ValueError: If the wavefunction has no coefficients, has an imaginary part,
-                contains a non-finite coefficient, or is all zeros.
+            ValueError: If the wavefunction has no coefficients, has an imaginary part, or
+                contains a non-finite coefficient.
+
+        """
+        params = self._build_params(wavefunction)
+
+        qsharp_op = QSHARP_UTILS.QROMStatePrep.MakeQROMStatePrepOp(params)
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.QROMStatePrep.MakeQROMStatePrepCircuit,
+            parameter={
+                "amplitudes": params.amplitudes,
+                "rotationBitPrecision": params.rotationBitPrecision,
+                "numStateQubits": params.numStateQubits,
+            },
+        )
+
+        return Circuit(qsharp_op=qsharp_op, qsharp_factory=qsharp_factory)
+
+    def _build_params(self, wavefunction: Wavefunction):
+        """Validate a wavefunction and build the Q# parameter record for it.
+
+        Args:
+            wavefunction: The target wavefunction.
+
+        Returns:
+            The Q# ``QROMStatePrepParams`` record.
+
+        Raises:
+            ValueError: If the wavefunction has no coefficients, has an imaginary part, or
+                contains a non-finite coefficient.
 
         """
         coeffs = np.asarray(wavefunction.get_coefficients())
@@ -90,23 +119,57 @@ class QROMStatePreparation(StatePreparation):
             raise ValueError("QROM state preparation requires finite coefficients.")
 
         amplitudes = coeffs.tolist()
-        num_state_qubits = math.ceil(math.log2(len(amplitudes))) if len(amplitudes) > 1 else 1
-        rotation_bit_precision = int(self._settings.get("rotation_bit_precision"))
-
-        params = QSHARP_UTILS.QROMStatePrep.QROMStatePrepParams(
+        return QSHARP_UTILS.QROMStatePrep.QROMStatePrepParams(
             amplitudes=amplitudes,
-            rotationBitPrecision=rotation_bit_precision,
-            numStateQubits=num_state_qubits,
+            rotationBitPrecision=int(self._settings.get("rotation_bit_precision")),
+            numStateQubits=self._num_state_qubits(len(amplitudes)),
         )
 
-        qsharp_op = QSHARP_UTILS.QROMStatePrep.MakeQROMStatePrepOp(params)
-        qsharp_factory = QsharpFactoryData(
-            program=QSHARP_UTILS.QROMStatePrep.MakeQROMStatePrepCircuit,
-            parameter={
-                "amplitudes": amplitudes,
-                "rotationBitPrecision": rotation_bit_precision,
-                "numStateQubits": num_state_qubits,
-            },
+    @staticmethod
+    def _num_state_qubits(num_coefficients: int) -> int:
+        """Width of the state register for a given coefficient count."""
+        return math.ceil(math.log2(num_coefficients)) if num_coefficients > 1 else 1
+
+    def prepare_layout(self, wavefunction: Wavefunction) -> PrepareLayout:
+        """Return the register widths this oracle needs inside a block encoding.
+
+        The prepared state is pure on the index register, so index and block ancilla
+        widths coincide. The phase gradient is requested as shared ancilla: it is an
+        eigenstate of every addition that consumes it, so one copy prepared for the whole
+        circuit serves every rotation, and preparing it per call is where all of this
+        oracle's arbitrary-angle rotations come from.
+
+        Args:
+            wavefunction: The wavefunction that will be prepared.
+
+        Returns:
+            PrepareLayout: An :math:`n`-qubit index with no garbage, plus a
+            ``rotation_bit_precision``-wide shared phase gradient.
+
+        """
+        params = self._build_params(wavefunction)
+        return PrepareLayout(
+            num_select_qubits=params.numStateQubits,
+            num_block_ancillas=params.numStateQubits,
+            num_shared_ancillas=params.rotationBitPrecision,
         )
 
-        return Circuit(qsharp_op=qsharp_op, qsharp_factory=qsharp_factory)
+    def prepare_oracle(self, wavefunction: Wavefunction) -> tuple[Any, PrepareLayout]:
+        """Return the shared-phase-gradient PREPARE callable and its layout.
+
+        Args:
+            wavefunction: The wavefunction that will be prepared.
+
+        Returns:
+            A Q# callable expecting ``[state | phaseGradient]``, and its layout.
+
+        """
+        params = self._build_params(wavefunction)
+        return (
+            QSHARP_UTILS.QROMStatePrep.MakeQROMStatePrepOpShared(params),
+            PrepareLayout(
+                num_select_qubits=params.numStateQubits,
+                num_block_ancillas=params.numStateQubits,
+                num_shared_ancillas=params.rotationBitPrecision,
+            ),
+        )

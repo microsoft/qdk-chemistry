@@ -139,6 +139,39 @@ namespace QDKChemistry.Utils.QROMStatePrep {
         QROMStatePrepare(params, _)
     }
 
+    /// QROM state preparation over a `[state | phaseGradient]` register, in the bit order a
+    /// block encoding's SELECT expects.
+    ///
+    /// # Description
+    /// Two things differ from `QROMStatePrepare`:
+    ///
+    /// The gradient is taken from the caller instead of being allocated and prepared here,
+    /// so one gradient can serve an entire circuit. `angleReg` stays internal because it is
+    /// returned to |0⟩ after every layer.
+    ///
+    /// The state register is reversed. `QROMStatePrepare` writes `amplitudes[l]` to the
+    /// basis state that reads as `l` with `qs[0]` most significant, but SELECT indexes its
+    /// terms through `ApplyControlledOnInt`, which is least significant first. Without the
+    /// reversal the block encoding pairs each coefficient with the wrong term and encodes a
+    /// permuted Hamiltonian, with no error to show for it.
+    internal operation QROMStatePrepareShared(
+        params : QROMStatePrepParams,
+        qs : Qubit[],
+    ) : Unit is Adj + Ctl {
+        let n = params.numStateQubits;
+        let bRot = params.rotationBitPrecision;
+        use angleReg = Qubit[bRot];
+        QROMStatePrepareCore(params, Reversed(qs[0..n - 1]), qs[n..n + bRot - 1], angleReg);
+    }
+
+    /// Create a QROM state preparation callable that shares a caller-supplied phase gradient.
+    ///
+    /// The returned callable expects `numStateQubits + rotationBitPrecision` qubits, with the
+    /// gradient already in |φ⟩.
+    function MakeQROMStatePrepOpShared(params : QROMStatePrepParams) : Qubit[] => Unit is Adj + Ctl {
+        QROMStatePrepareShared(params, _)
+    }
+
     /// Circuit entry point for QROM state preparation (allocates qubits).
     operation MakeQROMStatePrepCircuit(
         amplitudes : Double[],

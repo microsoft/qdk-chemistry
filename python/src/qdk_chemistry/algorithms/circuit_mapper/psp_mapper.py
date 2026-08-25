@@ -9,6 +9,7 @@ from typing import Any
 
 from qdk import qsharp
 
+from qdk_chemistry.algorithms.state_preparation.state_preparation import PrepareLayout
 from qdk_chemistry.data import AlgorithmRef, Settings
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
@@ -142,22 +143,45 @@ class PSPMapper(CircuitMapper):
             "PSPMapper requires LCUContainer or LCUWalkContainer."
         )
 
-    def build_prepare_select_ops(self, container: UnitaryContainer) -> tuple[Any, Any, int]:
-        """Return the PREPARE and SELECT Q# oracles and the system register size.
+    def build_prepare_select_ops(self, container: UnitaryContainer) -> tuple[Any, Any, int, PrepareLayout]:
+        """Return the PREPARE and SELECT Q# oracles, the system register size, and the layout.
 
         Args:
             container: The container held by the unitary representation.
 
         Returns:
-            The PREPARE Q# callable, the SELECT Q# callable, and the system register size.
+            The PREPARE Q# callable, the SELECT Q# callable, the system register size, and
+            the register layout PREPARE expects.
+
+        Raises:
+            ValueError: If the PREPARE oracle's index width disagrees with the number of
+                ancilla the LCU decomposition sized itself for.
 
         """
         lcu, _ = self.resolve_lcu(container)
-        if lcu.prepare is not None:
-            prepare_op = self._create_nested("prepare").run(lcu.prepare)._qsharp_op  # noqa: SLF001
-        else:
-            prepare_op = QSHARP_UTILS.PrepSelPrep.NoOpPrepare
-        return prepare_op, self._build_pauli_select_op(lcu.select), lcu.select.num_target_qubits
+        if lcu.prepare is None:
+            return (
+                QSHARP_UTILS.PrepSelPrep.NoOpPrepare,
+                self._build_pauli_select_op(lcu.select),
+                lcu.select.num_target_qubits,
+                PrepareLayout(num_select_qubits=0, num_block_ancillas=0),
+            )
+
+        prepare_op, layout = self._create_nested("prepare").prepare_oracle(lcu.prepare)
+        if layout.num_select_qubits != lcu.num_prepare_ancillas:
+            raise ValueError(
+                f"PREPARE oracle indexes {layout.num_select_qubits} qubits but the LCU "
+                f"decomposition has {lcu.num_prepare_ancillas} prepare ancilla. SELECT would "
+                "control on the wrong register. This happens when the state preparation "
+                "indexes coefficients by list position while the decomposition indexes them "
+                "by determinant bit pattern."
+            )
+        return (
+            prepare_op,
+            self._build_pauli_select_op(lcu.select),
+            lcu.select.num_target_qubits,
+            layout,
+        )
 
     def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
         r"""Construct the block-encoding circuit on the flat ``[system | ancilla]`` register.
@@ -172,12 +196,14 @@ class PSPMapper(CircuitMapper):
 
         """
         container = unitary.get_container()
-        lcu, use_quantum_walk = self.resolve_lcu(container)
-        prepare_op, select_op, num_system = self.build_prepare_select_ops(container)
+        _, use_quantum_walk = self.resolve_lcu(container)
+        prepare_op, select_op, num_system, layout = self.build_prepare_select_ops(container)
 
-        qsharp_op = QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepOp(prepare_op, select_op, num_system)
+        qsharp_op = QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepOp(
+            prepare_op, select_op, num_system, layout.num_select_qubits
+        )
         if use_quantum_walk:
-            reflection_op = QSHARP_UTILS.PrepSelPrep.MakeAncillaReflectionOp(num_system)
+            reflection_op = QSHARP_UTILS.PrepSelPrep.MakeAncillaReflectionOp(num_system, layout.num_block_ancillas)
             qsharp_op = QSHARP_UTILS.PrepSelPrep.MakeWalkOp(qsharp_op, reflection_op)
 
         if container.power != 1:
@@ -187,13 +213,21 @@ class PSPMapper(CircuitMapper):
                 container.power,
             )
 
+        # Outermost, so the one gradient preparation amortizes over every repetition.
+        if layout.num_shared_ancillas > 0:
+            qsharp_op = QSHARP_UTILS.PrepSelPrep.MakeWithSharedPhaseGradientOp(
+                qsharp_op, num_system + layout.num_block_ancillas
+            )
+
         qsharp_factory = QsharpFactoryData(
             program=QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepCircuit,
             parameter={
                 "prepareOp": prepare_op,
                 "selectOp": select_op,
                 "numSystemQubits": num_system,
-                "numAncillaQubits": lcu.num_prepare_ancillas,
+                "numSelectQubits": layout.num_select_qubits,
+                "numBlockAncillaQubits": layout.num_block_ancillas,
+                "numSharedQubits": layout.num_shared_ancillas,
                 "power": container.power,
                 "useWalk": use_quantum_walk,
             },
@@ -202,5 +236,5 @@ class PSPMapper(CircuitMapper):
         return Circuit(
             qsharp_factory=qsharp_factory,
             qsharp_op=qsharp_op,
-            num_qubits=num_system + lcu.num_prepare_ancillas,
+            num_qubits=num_system + layout.num_block_ancillas + layout.num_shared_ancillas,
         )

@@ -110,12 +110,14 @@ class ControlledPSPMapper(ControlledCircuitMapper):
 
         block_mapper = self._block_mapper()
         container = unitary.get_container()
-        lcu, use_quantum_walk = block_mapper.resolve_lcu(container)
-        prepare_op, select_op, num_system = block_mapper.build_prepare_select_ops(container)
+        _, use_quantum_walk = block_mapper.resolve_lcu(container)
+        prepare_op, select_op, num_system, layout = block_mapper.build_prepare_select_ops(container)
 
-        step_op = QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepOp(prepare_op, select_op, num_system)
+        step_op = QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepOp(
+            prepare_op, select_op, num_system, layout.num_select_qubits
+        )
         if use_quantum_walk:
-            reflection_op = QSHARP_UTILS.PrepSelPrep.MakeAncillaReflectionOp(num_system)
+            reflection_op = QSHARP_UTILS.PrepSelPrep.MakeAncillaReflectionOp(num_system, layout.num_block_ancillas)
             step_op = QSHARP_UTILS.PrepSelPrep.MakeWalkOp(step_op, reflection_op)
 
         controlled_op = QSHARP_UTILS.CircuitComposition.MakeControlledOp(step_op)
@@ -125,13 +127,21 @@ class ControlledPSPMapper(ControlledCircuitMapper):
             container.power,
         )
 
+        # Outermost, so the one gradient preparation amortizes over every repetition.
+        if layout.num_shared_ancillas > 0:
+            repeated_op = QSHARP_UTILS.PrepSelPrep.MakeWithSharedPhaseGradientControlledOp(
+                repeated_op, num_system + layout.num_block_ancillas
+            )
+
         qsharp_factory = QsharpFactoryData(
             program=QSHARP_UTILS.PrepSelPrep.MakeControlledPrepSelPrepCircuit,
             parameter={
                 "prepareOp": prepare_op,
                 "selectOp": select_op,
                 "numSystemQubits": num_system,
-                "numAncillaQubits": lcu.num_prepare_ancillas,
+                "numSelectQubits": layout.num_select_qubits,
+                "numBlockAncillaQubits": layout.num_block_ancillas,
+                "numSharedQubits": layout.num_shared_ancillas,
                 "power": container.power,
                 "useWalk": use_quantum_walk,
             },
