@@ -155,10 +155,11 @@ It measures how much the Hartree--Fock energy changes with basis size while the 
 
 .. _tutorial-wavefunction-hierarchy:
 
-.. graphviz:: /_static/diagrams/tutorial_qpe_wavefunction_hierarchy.dot
+.. figure:: /_static/diagrams/tutorial_qpe_wavefunction_hierarchy.svg
    :alt: Flow from one-electron functions to many-electron wavefunctions. Nucleus-centered basis functions combine into spatial molecular orbitals; pairing a spatial orbital with alpha or beta spin gives a spin orbital. Choosing occupied spin orbitals defines an electron configuration, and its antisymmetric state is a Slater determinant. Hartree--Fock uses one optimized determinant, while a multiconfigurational wavefunction combines several determinants with coefficients.
    :align: center
-   :caption: Basis functions build molecular orbitals with spin; occupied orbitals define determinants, which form one-determinant or multiconfigurational many-electron wavefunctions.
+
+   Basis functions build molecular orbitals with spin; occupied orbitals define determinants, which form one-determinant or multiconfigurational many-electron wavefunctions.
 
 .. admonition:: Which basis set gives a lower energy and why?
    :class: quiz-question
