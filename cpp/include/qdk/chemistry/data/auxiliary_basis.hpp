@@ -201,10 +201,13 @@ class AuxiliaryBasis : public DataClass,
       std::shared_ptr<Structure> structure,
       AOType atomic_orbital_type = AOType::Spherical);
 
-  /** @brief Get the stable data-class type name. @return @c auxiliary_basis. */
-  std::string get_data_type_name() const override {
-    return DATACLASS_TO_SNAKE_CASE(AuxiliaryBasis);
-  }
+    /** @brief Get the stable data-class type name. @return @c auxiliary_basis. */
+    static std::string data_type_name() {
+        return DATACLASS_TO_SNAKE_CASE(AuxiliaryBasis);
+    }
+
+    /** @brief Get the data-class type name for this instance. */
+    std::string get_data_type_name() const override { return data_type_name(); }
 
   /** @brief Get a human-readable summary. @return Summary string. */
   std::string get_summary() const override;

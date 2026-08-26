@@ -752,7 +752,7 @@ TEST_F(BasisSetTest, ECPShellConstruction) {
   rpow_p << 1;
   ecp_shells.emplace_back(0, OrbitalType::P, exp_p, coeff_p, rpow_p);
 
-  BasisSet basis("test-basis", shells, ecp_shells, {2, 2}, structure);
+  BasisSet basis("test-basis", shells, ecp_shells, {2, 0}, structure);
 
   // Check ECP shell data
   EXPECT_TRUE(basis.has_ecp_shells());
@@ -1930,7 +1930,7 @@ TEST_F(BasisSetTest, DataTypeName) {
 TEST_F(BasisSetTest, SharedPtrStructureConstructors) {
   auto structure = std::make_shared<Structure>(
       std::vector<Eigen::Vector3d>{{0.0, 0.0, 0.0}, {1.4, 0.0, 0.0}},
-      std::vector<std::string>{"H", "H"});
+      std::vector<std::string>{"Ag", "H"});
 
   std::vector<Shell> shells;
   shells.emplace_back(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
@@ -1949,7 +1949,7 @@ TEST_F(BasisSetTest, SharedPtrStructureConstructors) {
   rpow << 0;
   std::vector<Shell> ecp_shells;
   ecp_shells.emplace_back(0, OrbitalType::S, exp, coeff, rpow);
-  std::vector<size_t> ecp_electrons = {0, 2};
+  std::vector<size_t> ecp_electrons = {28, 0};
 
   BasisSet b2("sp2", shells, ecp_shells, ecp_electrons, structure);
   EXPECT_TRUE(b2.has_ecp_shells());

@@ -220,9 +220,9 @@ TEST_F(WavefunctionCoreTest,
       primary_basis->get_structure());
   auto reference = std::make_shared<Wavefunction>(*wf);
   std::optional<ContainerTypes::VectorVariant> t1{
-      ContainerTypes::VectorVariant{Eigen::VectorXd::Zero(8)}};
+      ContainerTypes::VectorVariant{Eigen::VectorXd::Zero(8).eval()}};
   std::optional<ContainerTypes::VectorVariant> t2{
-      ContainerTypes::VectorVariant{Eigen::VectorXd::Zero(64)}};
+      ContainerTypes::VectorVariant{Eigen::VectorXd::Zero(64).eval()}};
   Wavefunction amplitude_wavefunction(std::make_unique<AmplitudeContainer>(
       orbitals, reference, AmplitudeType::CoupledCluster, t1, t2));
 

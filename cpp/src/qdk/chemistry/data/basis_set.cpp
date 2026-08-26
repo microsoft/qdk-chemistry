@@ -196,6 +196,10 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
       _structure(structure),
       _ecp_name("none") {
   QDK_LOG_TRACE_ENTERING();
+  if (_name.empty()) {
+    throw std::invalid_argument("BasisSet name cannot be empty");
+  }
+
   if (!structure) {
     throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
   }
@@ -1463,7 +1467,7 @@ void BasisSet::to_hdf5(H5::Group& group) const {
     }
 
     // Save ECP name and electrons if present
-    if (!_ecp_name.empty()) {
+    if (has_ecp_shells() || has_ecp_electrons()) {
       // Save ECP name as attribute
       H5::Attribute ecp_name_attr =
           group.createAttribute("ecp_name", string_type, scalar_space);
@@ -1759,7 +1763,10 @@ std::shared_ptr<BasisSet> BasisSet::from_hdf5(H5::Group& group) {
       const bool has_real_ecp_electrons =
           std::any_of(ecp_electrons.begin(), ecp_electrons.end(),
                       [](size_t n) { return n != 0; });
-      if (!ecp_shells.empty() || !ecp_name.empty() || has_real_ecp_electrons) {
+        const bool has_real_ecp_name =
+          !ecp_name.empty() && ecp_name != "none";
+        if (!ecp_shells.empty() || has_real_ecp_name ||
+          has_real_ecp_electrons) {
         throw std::runtime_error(
             "HDF5 BasisSet contains ECP data but no structure; "
             "cannot reconstruct without losing information");
@@ -1865,7 +1872,7 @@ nlohmann::json BasisSet::to_json() const {
     }
   }
 
-  if (has_ecp_electrons() || !_ecp_name.empty()) {
+  if (has_ecp_shells() || has_ecp_electrons()) {
     j["ecp_name"] = _ecp_name;
     j["ecp_electrons"] = _ecp_electrons;
   }
@@ -2073,7 +2080,10 @@ std::shared_ptr<BasisSet> BasisSet::from_json(const nlohmann::json& j) {
       const bool has_real_ecp_electrons =
           std::any_of(ecp_electrons.begin(), ecp_electrons.end(),
                       [](size_t n) { return n != 0; });
-      if (!ecp_shells.empty() || !ecp_name.empty() || has_real_ecp_electrons) {
+        const bool has_real_ecp_name =
+          !ecp_name.empty() && ecp_name != "none";
+        if (!ecp_shells.empty() || has_real_ecp_name ||
+          has_real_ecp_electrons) {
         throw std::runtime_error(
             "Cannot create BasisSet with ECP data but without structure");
       }
