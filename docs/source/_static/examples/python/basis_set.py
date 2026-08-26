@@ -8,9 +8,21 @@
 ################################################################################
 # docs:xyz ../data/water.structure.xyz
 # start-cell-loading
-import numpy as np
 from pathlib import Path
-from qdk_chemistry.data import AOType, BasisSet, OrbitalType, Shell, Structure
+
+import numpy as np
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import (
+    AOType,
+    AuxiliaryBasis,
+    AuxiliaryBasisRole,
+    BasisSet,
+    EffectiveCorePotential,
+    OrbitalType,
+    Shell,
+    Structure,
+    with_auxiliary_basis,
+)
 
 # Load a water molecule structure from inline XYZ file
 structure = Structure.from_xyz("""\
@@ -36,11 +48,37 @@ basis_from_index = BasisSet.from_index_map(index_basis_map, structure)
 
 ################################################################################
 # start-cell-loading-with-aux
-# Load a primary basis set with an auxiliary basis set for density fitting
-basis_with_aux = BasisSet.from_basis_name("def2-svp", "def2-universal-jfit", structure)
-print(f"Primary shells: {basis_with_aux.get_num_shells()}")
-print(f"Auxiliary shells: {basis_with_aux.get_num_aux_shells()}")
-print(f"Auxiliary name: {basis_with_aux.get_aux_name()}")
+# Obtain a wavefunction without knowing its later auxiliary-basis requirements
+primary_basis = BasisSet.from_basis_name("def2-svp", structure)
+_, wavefunction = create("scf_solver").run(
+    structure,
+    charge=0,
+    spin_multiplicity=1,
+    basis_or_guess=primary_basis,
+)
+
+# Later, derive the structure from that wavefunction and attach the required basis
+wavefunction_structure = wavefunction.get_orbitals().get_basis_set().get_structure()
+aux_basis = AuxiliaryBasis.from_basis_name(
+    "def2-universal-jfit", wavefunction_structure
+)
+wavefunction_with_jfit = with_auxiliary_basis(
+    wavefunction, AuxiliaryBasisRole.JFIT, aux_basis
+)
+
+assert (
+    not wavefunction.get_orbitals()
+    .get_basis_set()
+    .has_auxiliary_basis(AuxiliaryBasisRole.JFIT)
+)
+assert (
+    wavefunction_with_jfit.get_orbitals()
+    .get_basis_set()
+    .has_auxiliary_basis(AuxiliaryBasisRole.JFIT)
+)
+print(f"Primary shells: {primary_basis.get_num_shells()}")
+print(f"Auxiliary shells: {aux_basis.get_num_shells()}")
+print(f"Auxiliary name: {aux_basis.get_name()}")
 # end-cell-loading-with-aux
 ################################################################################
 
@@ -147,7 +185,10 @@ ecp_shell = Shell(0, OrbitalType.S, ecp_exponents, ecp_coefficients, ecp_rpowers
 ecp_shells = [ecp_shell]
 ecp_electrons = [28, 0, 0]  # 28 core electrons replaced on the first atom
 basis_with_ecp = BasisSet(
-    "my-basis", [shell1, shell2], "my-ecp", ecp_shells, ecp_electrons, structure
+    "my-basis",
+    [shell1, shell2],
+    EffectiveCorePotential("my-ecp", ecp_shells, ecp_electrons),
+    structure,
 )
 
 # Query ECP data
@@ -160,25 +201,26 @@ print(f"Num ECP shells: {basis_with_ecp.get_num_ecp_shells()}")
 
 ################################################################################
 # start-cell-auxiliary
-# Create auxiliary shells for density fitting
+# Create custom auxiliary shells
 aux_shells = [
     Shell(0, OrbitalType.S, np.array([5.0]), np.array([2.0])),
     Shell(1, OrbitalType.S, np.array([4.0]), np.array([1.5])),
 ]
 
-# Construct a basis set with a named auxiliary basis
-basis_with_aux_manual = BasisSet(
-    "my-basis", [shell1, shell2], "my-aux-fit", aux_shells, structure
+# Construct a named auxiliary basis for this molecular structure
+auxiliary_basis = AuxiliaryBasis("my-aux-fit", aux_shells, structure)
+basis_with_rifit = with_auxiliary_basis(
+    basis_set, AuxiliaryBasisRole.RIFIT, auxiliary_basis
 )
+stored_auxiliary = basis_with_rifit.get_auxiliary_basis(AuxiliaryBasisRole.RIFIT)
 
 # Query auxiliary data
-print(f"Has auxiliary: {basis_with_aux_manual.has_aux_basis()}")
-print(f"Auxiliary name: {basis_with_aux_manual.get_aux_name()}")
-print(f"Num aux shells: {basis_with_aux_manual.get_num_aux_shells()}")
+print(f"Auxiliary name: {stored_auxiliary.get_name()}")
+print(f"Num aux shells: {stored_auxiliary.get_num_shells()}")
 
 # Retrieve auxiliary shell data
-for i in range(basis_with_aux_manual.get_num_aux_shells()):
-    s = basis_with_aux_manual.get_aux_shell(i)
+for i in range(stored_auxiliary.get_num_shells()):
+    s = stored_auxiliary.get_shell(i)
     print(f"  Aux shell {i}: atom={s.atom_index}, type={s.orbital_type}")
 # end-cell-auxiliary
 ################################################################################

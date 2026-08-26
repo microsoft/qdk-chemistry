@@ -10,6 +10,8 @@ Exposed classes are:
 - :class:`AmplitudeType`: Enumeration of amplitude expansion types (MP2, CCSD, Unspecified).
 - :class:`Ansatz`: Quantum chemical ansatz combining a Hamiltonian and wavefunction for energy calculations.
 - :class:`AOType`: Enumeration of basis set types (STO-3G, 6-31G, etc.).
+- :class:`AuxiliaryBasis`: Secondary basis supplied to algorithms that require one, such as density fitting.
+- :class:`AuxiliaryBasisRole`: Algorithm-facing purpose served by an auxiliary basis.
 - :class:`BasisSet`: Gaussian basis set definitions for quantum calculations.
 - :class:`CanonicalFourCenterHamiltonianContainer`: Container for four-center two-electron integrals in canonical form.
 - :class:`CholeskyHamiltonianContainer`: Container for Hamiltonians represented using Cholesky-decomposed integrals.
@@ -18,6 +20,7 @@ Exposed classes are:
 - :class:`ConfigurationSet`: Collection of electronic configurations with associated orbital information.
 - :class:`DataClass`: Base data class.
 - :class:`ElectronicStructureSettings`: Specialized settings for electronic structure calculations.
+- :class:`EffectiveCorePotential`: Effective core potential data associated with a basis set.
 - :class:`Element`: Represents a chemical element with its properties.
 - :class:`EnergyExpectationResult`: Result for Hamiltonian energy expectation value and variance.
 - :class:`Hamiltonian`: Quantum mechanical Hamiltonian operator representation.
@@ -73,11 +76,14 @@ from qdk_chemistry._core.data import (
     AmplitudeType,
     Ansatz,
     AOType,
+    AuxiliaryBasis,
+    AuxiliaryBasisRole,
     BasisSet,
     CanonicalFourCenterHamiltonianContainer,
     CholeskyHamiltonianContainer,
     Configuration,
     ConfigurationSet,
+    EffectiveCorePotential,
     ElectronicStructureSettings,
     Element,
     Hamiltonian,
@@ -108,6 +114,7 @@ from qdk_chemistry._core.data import (
     WavefunctionContainer,
     WavefunctionType,
     get_current_ciaaw_version,
+    with_auxiliary_basis,
 )
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.circuit import Circuit
@@ -141,6 +148,8 @@ __all__ = [
     "AmplitudeContainer",
     "AmplitudeType",
     "Ansatz",
+    "AuxiliaryBasis",
+    "AuxiliaryBasisRole",
     "BasisSet",
     "CanonicalFourCenterHamiltonianContainer",
     "CholeskyHamiltonianContainer",
@@ -151,6 +160,7 @@ __all__ = [
     "DataClass",
     "DrivenContainer",
     "DrivenQubitHamiltonian",
+    "EffectiveCorePotential",
     "ElectronicStructureSettings",
     "Element",
     "EnergyExpectationResult",
@@ -200,6 +210,7 @@ __all__ = [
     "WavefunctionContainer",
     "WavefunctionType",
     "get_current_ciaaw_version",
+    "with_auxiliary_basis",
 ]
 
 

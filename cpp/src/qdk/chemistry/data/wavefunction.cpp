@@ -220,7 +220,7 @@ WavefunctionContainer::WavefunctionContainer(
       _two_rdm_spin_traced(std::move(two_rdm_spin_traced)),
       _active_one_rdm(std::move(active_one_rdm)),
       _active_two_rdm(std::move(active_two_rdm)),
-      _entropies(entropies) {
+      _entropies(std::make_shared<OrbitalEntropies>(entropies)) {
   QDK_LOG_TRACE_ENTERING();
 }
 
@@ -557,8 +557,8 @@ bool WavefunctionContainer::has_active_two_rdm() const {
 Eigen::VectorXd WavefunctionContainer::get_single_orbital_entropies() const {
   QDK_LOG_TRACE_ENTERING();
   // Return pre-computed / cached entropies if available
-  if (_entropies.single_orbital) {
-    return *_entropies.single_orbital;
+  if (_entropies->single_orbital) {
+    return *_entropies->single_orbital;
   }
   if (!has_one_rdm_spin_dependent() || !has_two_rdm_spin_dependent()) {
     throw std::runtime_error(
@@ -628,40 +628,41 @@ Eigen::VectorXd WavefunctionContainer::get_single_orbital_entropies() const {
     }
   }
   // Cache the result
-  _entropies.single_orbital = s1_entropies;
+  _entropies->single_orbital = s1_entropies;
   return s1_entropies;
 }
 
 bool WavefunctionContainer::has_single_orbital_entropies() const {
   QDK_LOG_TRACE_ENTERING();
-  return _entropies.single_orbital.has_value() ||
+  return _entropies->single_orbital.has_value() ||
          (has_one_rdm_spin_dependent() && has_two_rdm_spin_dependent());
 }
 
 bool WavefunctionContainer::has_mutual_information() const {
   QDK_LOG_TRACE_ENTERING();
   // Available directly, or derivable from s1 + s2
-  return _entropies.mutual_information.has_value() ||
-         (_entropies.two_orbital.has_value() && has_single_orbital_entropies());
+  return _entropies->mutual_information.has_value() ||
+         (_entropies->two_orbital.has_value() &&
+          has_single_orbital_entropies());
 }
 
 bool WavefunctionContainer::has_two_orbital_entropies() const {
   QDK_LOG_TRACE_ENTERING();
   // Available directly, or derivable from s1 + mut inf
-  return _entropies.two_orbital.has_value() ||
-         (_entropies.mutual_information.has_value() &&
+  return _entropies->two_orbital.has_value() ||
+         (_entropies->mutual_information.has_value() &&
           has_single_orbital_entropies());
 }
 
 Eigen::MatrixXd WavefunctionContainer::get_two_orbital_entropies() const {
   QDK_LOG_TRACE_ENTERING();
-  if (_entropies.two_orbital) {
-    return *_entropies.two_orbital;
+  if (_entropies->two_orbital) {
+    return *_entropies->two_orbital;
   }
   // Derive from s1 and mutual information: s2_{ij} = s1_i + s1_j - I_{ij}
-  if (_entropies.mutual_information && has_single_orbital_entropies()) {
+  if (_entropies->mutual_information && has_single_orbital_entropies()) {
     Eigen::VectorXd s1 = get_single_orbital_entropies();
-    const Eigen::MatrixXd& mi = *_entropies.mutual_information;
+    const Eigen::MatrixXd& mi = *_entropies->mutual_information;
     Eigen::Index norbs = s1.size();
     Eigen::MatrixXd s2 = Eigen::MatrixXd::Zero(norbs, norbs);
     for (Eigen::Index i = 0; i < norbs; ++i) {
@@ -670,7 +671,7 @@ Eigen::MatrixXd WavefunctionContainer::get_two_orbital_entropies() const {
         s2(j, i) = s2(i, j);
       }
     }
-    _entropies.two_orbital = s2;
+    _entropies->two_orbital = s2;
     return s2;
   }
   throw std::runtime_error(
@@ -681,13 +682,13 @@ Eigen::MatrixXd WavefunctionContainer::get_two_orbital_entropies() const {
 
 Eigen::MatrixXd WavefunctionContainer::get_mutual_information() const {
   QDK_LOG_TRACE_ENTERING();
-  if (_entropies.mutual_information) {
-    return *_entropies.mutual_information;
+  if (_entropies->mutual_information) {
+    return *_entropies->mutual_information;
   }
   // Derive from s1 and s2: I_{ij} = s1_i + s1_j - s2_{ij}
-  if (_entropies.two_orbital && has_single_orbital_entropies()) {
+  if (_entropies->two_orbital && has_single_orbital_entropies()) {
     Eigen::VectorXd s1 = get_single_orbital_entropies();
-    const Eigen::MatrixXd& s2 = *_entropies.two_orbital;
+    const Eigen::MatrixXd& s2 = *_entropies->two_orbital;
     Eigen::Index norbs = s1.size();
     Eigen::MatrixXd mi = Eigen::MatrixXd::Zero(norbs, norbs);
     for (Eigen::Index i = 0; i < norbs; ++i) {
@@ -696,7 +697,7 @@ Eigen::MatrixXd WavefunctionContainer::get_mutual_information() const {
         mi(j, i) = mi(i, j);
       }
     }
-    _entropies.mutual_information = mi;
+    _entropies->mutual_information = mi;
     return mi;
   }
   throw std::runtime_error(
@@ -717,13 +718,14 @@ void WavefunctionContainer::_serialize_entropies_to_json(
     nlohmann::json& j) const {
   QDK_LOG_TRACE_ENTERING();
 
-  if (_entropies.single_orbital) {
-    j["single_orbital_entropies"] = std::vector<double>(
-        _entropies.single_orbital->data(),
-        _entropies.single_orbital->data() + _entropies.single_orbital->size());
+  if (_entropies->single_orbital) {
+    j["single_orbital_entropies"] =
+        std::vector<double>(_entropies->single_orbital->data(),
+                            _entropies->single_orbital->data() +
+                                _entropies->single_orbital->size());
   }
-  if (_entropies.mutual_information) {
-    const auto& mi = *_entropies.mutual_information;
+  if (_entropies->mutual_information) {
+    const auto& mi = *_entropies->mutual_information;
     j["mutual_information_rows"] = mi.rows();
     j["mutual_information_cols"] = mi.cols();
     std::vector<double> mi_data(mi.rows() * mi.cols());
@@ -951,6 +953,23 @@ size_t WavefunctionContainer::size() const {
   throw std::runtime_error(detail::kNotDeterminantExpansionMessage);
 }
 
+std::unique_ptr<WavefunctionContainer>
+WavefunctionContainer::_clone_for_basis_enrichment(
+    std::shared_ptr<BasisSet>) const {
+  QDK_LOG_TRACE_ENTERING();
+  throw std::runtime_error("Wavefunction container type '" +
+                           get_container_type() +
+                           "' does not support auxiliary-basis enrichment");
+}
+
+std::unique_ptr<WavefunctionContainer>
+detail::BasisEnrichmentAccess::enrich_container(
+    const WavefunctionContainer& container,
+    std::shared_ptr<BasisSet> enriched_basis) {
+  QDK_LOG_TRACE_ENTERING();
+  return container._clone_for_basis_enrichment(std::move(enriched_basis));
+}
+
 // Wavefunction implementations
 Wavefunction::Wavefunction(std::unique_ptr<WavefunctionContainer> container)
     : _container(std::move(container)) {
@@ -970,6 +989,32 @@ Wavefunction& Wavefunction::operator=(const Wavefunction& other) {
     _container = other._container->clone();
   }
   return *this;
+}
+
+std::shared_ptr<Wavefunction>
+detail::BasisEnrichmentAccess::enrich_wavefunction(
+    const Wavefunction& wavefunction, const AuxiliaryBasisRole role,
+    std::shared_ptr<AuxiliaryBasis> auxiliary_basis) {
+  QDK_LOG_TRACE_ENTERING();
+  auto orbitals = wavefunction.get_orbitals();
+  if (!orbitals || !orbitals->has_basis_set()) {
+    throw std::invalid_argument(
+        "Wavefunction orbitals must carry a primary BasisSet before an "
+        "auxiliary basis can be associated");
+  }
+
+  auto enriched_basis = enrich_basis(*orbitals->get_basis_set(), role,
+                                     std::move(auxiliary_basis));
+  return std::make_shared<Wavefunction>(
+      enrich_container(*wavefunction._container, std::move(enriched_basis)));
+}
+
+std::shared_ptr<Wavefunction> with_auxiliary_basis(
+    const Wavefunction& wavefunction, const AuxiliaryBasisRole role,
+    std::shared_ptr<AuxiliaryBasis> auxiliary_basis) {
+  QDK_LOG_TRACE_ENTERING();
+  return detail::BasisEnrichmentAccess::enrich_wavefunction(
+      wavefunction, role, std::move(auxiliary_basis));
 }
 
 std::vector<std::string> Wavefunction::sectors() const {
@@ -1696,16 +1741,16 @@ void WavefunctionContainer::to_hdf5(H5::Group& group) const {
     }
 
     // Serialize entropies if available
-    if (_entropies.single_orbital) {
-      hsize_t soe_dims = _entropies.single_orbital->size();
+    if (_entropies->single_orbital) {
+      hsize_t soe_dims = _entropies->single_orbital->size();
       H5::DataSpace soe_space(1, &soe_dims);
       H5::DataSet soe_dataset = group.createDataSet(
           "single_orbital_entropies", H5::PredType::NATIVE_DOUBLE, soe_space);
-      soe_dataset.write(_entropies.single_orbital->data(),
+      soe_dataset.write(_entropies->single_orbital->data(),
                         H5::PredType::NATIVE_DOUBLE);
     }
-    if (_entropies.mutual_information) {
-      const auto& mi = *_entropies.mutual_information;
+    if (_entropies->mutual_information) {
+      const auto& mi = *_entropies->mutual_information;
       hsize_t mi_dims[2] = {static_cast<hsize_t>(mi.rows()),
                             static_cast<hsize_t>(mi.cols())};
       H5::DataSpace mi_space(2, mi_dims);

@@ -14,12 +14,21 @@
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
+#include "shell_binding_utils.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::data;
 
 // Wrapper functions that accept both strings and pathlib.Path objects
 namespace {
+
+using qdk::chemistry::python::utils::to_shell_vec;
+
+void warn_deprecated(const char* message) {
+  if (PyErr_WarnEx(PyExc_DeprecationWarning, message, 1) < 0) {
+    throw py::error_already_set();
+  }
+}
 
 void basis_set_to_file_wrapper(BasisSet& self, const py::object& filename,
                                const std::string& format_type) {
@@ -55,44 +64,63 @@ std::shared_ptr<BasisSet> basis_set_from_json_file_wrapper(
       qdk::chemistry::python::utils::to_string_path(filename));
 }
 
-//TODO: Check why both functions exist here
-
-// Convert a Python iterable of Shell objects to std::vector<Shell>.
-// Used by lambda-based init overloads to bypass pybind11's list_caster, which
-// can create a list_iterator that crashes under py::smart_holder during
-// overload probing of constructors with multiple std::vector<Shell> params.
-//
-// Materialize the iterable to a list first, then use index-based access so
-// that no Python list_iterator object is ever created while extracting items
-// (list_iterator does not support weak references, which smart_holder tries
-// to install).
-std::vector<Shell> to_shell_vec(const py::iterable& items) {
-  py::list lst(items);
-  const ssize_t n = py::len(lst);
-  std::vector<Shell> result;
-  result.reserve(static_cast<size_t>(n));
-  for (ssize_t i = 0; i < n; ++i) {
-    result.push_back(
-        py::reinterpret_borrow<py::object>(PyList_GET_ITEM(lst.ptr(), i))
-            .cast<Shell>());
-  }
-  return result;
+std::shared_ptr<BasisSet> basis_set_with_ao_symmetries(
+    const std::string& name, const py::iterable& shells,
+    std::shared_ptr<Structure> structure,
+    std::shared_ptr<const SymmetryProduct> ao_symmetries,
+    std::unordered_map<SymmetryLabel, std::size_t> ao_extents, AOType ao_type) {
+  return std::make_shared<BasisSet>(
+      name, to_shell_vec(shells), std::move(structure),
+      std::move(ao_symmetries), std::move(ao_extents), ao_type);
 }
 
-// Converts a Python list of Shell objects to std::vector<Shell> via index
-// access. Using PyList_GET_ITEM avoids constructing a list_iterator, which
-// cannot be weak-referenced under py::smart_holder and otherwise crashes
-// during constructor overload probing.
-std::vector<Shell> shells_from_py_list(const py::list& shells) {
-  std::vector<Shell> result;
-  const Py_ssize_t size = PyList_GET_SIZE(shells.ptr());
-  result.reserve(static_cast<std::size_t>(size));
-  for (Py_ssize_t i = 0; i < size; ++i) {
-    PyObject* item = PyList_GET_ITEM(shells.ptr(), i);
-    result.push_back(py::reinterpret_borrow<py::object>(item).cast<Shell>());
-  }
-  return result;
+std::shared_ptr<BasisSet> basis_set_with_ecp(
+    const std::string& name, const py::iterable& shells,
+    const EffectiveCorePotential& ecp, std::shared_ptr<Structure> structure,
+    AOType ao_type) {
+  return std::make_shared<BasisSet>(name, to_shell_vec(shells), ecp,
+                                    std::move(structure), ao_type);
 }
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#elif defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
+
+std::shared_ptr<BasisSet> basis_set_with_legacy_ecp(
+    const std::string& name, const py::iterable& shells,
+    const py::iterable& ecp_shells, const std::vector<size_t>& ecp_electrons,
+    std::shared_ptr<Structure> structure, AOType ao_type) {
+  warn_deprecated(
+      "Passing ECP shells and electrons directly is deprecated in vTODO; "
+      "construct EffectiveCorePotential and pass it to BasisSet instead.");
+  return std::shared_ptr<BasisSet>(
+      new BasisSet(name, to_shell_vec(shells), to_shell_vec(ecp_shells),
+                   ecp_electrons, std::move(structure), ao_type));
+}
+
+std::shared_ptr<BasisSet> basis_set_with_named_legacy_ecp(
+    const std::string& name, const py::iterable& shells,
+    const std::string& ecp_name, const py::iterable& ecp_shells,
+    const std::vector<size_t>& ecp_electrons,
+    std::shared_ptr<Structure> structure, AOType ao_type) {
+  warn_deprecated(
+      "Passing named ECP shells and electrons directly is deprecated in "
+      "vTODO; construct EffectiveCorePotential and pass it to BasisSet "
+      "instead.");
+  return std::shared_ptr<BasisSet>(new BasisSet(
+      name, to_shell_vec(shells), ecp_name, to_shell_vec(ecp_shells),
+      ecp_electrons, std::move(structure), ao_type));
+}
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 }  // namespace
 
@@ -100,8 +128,18 @@ void bind_basis_set(py::module& m) {
   using namespace qdk::chemistry::data;
   using qdk::chemistry::python::utils::bind_getter_as_property;
 
+  py::enum_<AuxiliaryBasisRole>(
+      m, "AuxiliaryBasisRole",
+      "Algorithm-facing purpose served by an auxiliary basis")
+      .value("JFIT", AuxiliaryBasisRole::JFit, "Coulomb density-fitting basis")
+      .value("JKFIT", AuxiliaryBasisRole::JKFit,
+             "Coulomb and exchange density-fitting basis")
+      .value("RIFIT", AuxiliaryBasisRole::RIFit, "Correlation-fitting basis")
+      .value("CABS", AuxiliaryBasisRole::CABS, "Complementary auxiliary basis");
+
   // Bind OrbitalType enum
   py::enum_<OrbitalType>(m, "OrbitalType", "Enumeration of orbital types")
+      .value("UL", OrbitalType::UL, "ECP local potential (l=-1)")
       .value("S", OrbitalType::S, "s orbital (l=0)")
       .value("P", OrbitalType::P, "p orbital (l=1)")
       .value("D", OrbitalType::D, "d orbital (l=2)")
@@ -229,7 +267,71 @@ Returns:
 Examples:
     >>> if shell.has_radial_powers():
     ...     print("This is an ECP shell")
+)")
+      .def(
+          "to_json", [](const Shell& self) { return self.to_json().dump(); },
+          R"(
+Serialize this shell to a JSON string.
+
+The owning atom index is supplied by the parent basis and is therefore not
+included in the shell JSON.
+
+Returns:
+    str: Serialized orbital type and primitive arrays
+)")
+      .def_static(
+          "from_json",
+          [](const std::string& json, size_t atom_index,
+             bool allow_radial_powers) {
+            return Shell::from_json(nlohmann::json::parse(json), atom_index,
+                                    allow_radial_powers);
+          },
+          py::arg("json"), py::arg("atom_index"),
+          py::arg("allow_radial_powers") = false,
+          R"(
+Deserialize a shell from a JSON string.
+
+Args:
+    json (str): JSON produced by :meth:`to_json`
+    atom_index (int): Atom on which the reconstructed shell is centered
+    allow_radial_powers (bool, optional): Whether ECP radial powers are accepted
+
+Returns:
+    Shell: Reconstructed shell
+
+Raises:
+    ValueError: If radial powers are present but not allowed
 )");
+
+  py::class_<EffectiveCorePotential>(m, "EffectiveCorePotential",
+                                     "Effective core potential data")
+      .def(py::init([](const py::iterable& shells,
+                       const std::vector<size_t>& electrons) {
+             return EffectiveCorePotential(to_shell_vec(shells), electrons);
+           }),
+           py::arg("shells"), py::arg("electrons"), R"(
+Create custom effective core potential data.
+
+Args:
+    shells (Iterable[Shell]): ECP shells with radial powers
+    electrons (list[int]): Replaced electrons for each atom
+)")
+      .def(py::init([](const std::string& name, const py::iterable& shells,
+                       const std::vector<size_t>& electrons) {
+             return EffectiveCorePotential(name, to_shell_vec(shells),
+                                           electrons);
+           }),
+           py::arg("name"), py::arg("shells"), py::arg("electrons"), R"(
+Create named effective core potential data.
+)")
+      .def("get_name", &EffectiveCorePotential::get_name, "Get the ECP name.")
+      .def("get_shells", &EffectiveCorePotential::get_shells,
+           py::return_value_policy::reference_internal, "Get ECP shells.")
+      .def("get_electrons", &EffectiveCorePotential::get_electrons,
+           py::return_value_policy::reference_internal,
+           "Get replaced electrons for each atom.")
+      .def_readonly_static("custom_name", &EffectiveCorePotential::custom_name,
+                           "Name assigned to custom ECP data.");
 
   py::class_<BasisSet, DataClass, py::smart_holder> basis_set(m, "BasisSet",
                                                               R"(
@@ -246,8 +348,6 @@ Examples:
     >>> basis = BasisSet("STO-3G", [shell])
     >>> print(f"Number of atomic orbitals: {basis.get_num_atomic_orbitals()}")
 )");
-
-  // TODO: Check also these here 
 
   // Copy constructor
   basis_set.def(py::init<const BasisSet&>(), py::arg("other"),
@@ -270,16 +370,7 @@ Args:
 )");
 
   basis_set.def(
-      py::init([](const std::string& name, const py::list& shells,
-                  std::shared_ptr<Structure> structure,
-                  std::shared_ptr<const SymmetryProduct> ao_symmetries,
-                  std::unordered_map<SymmetryLabel, std::size_t> ao_extents,
-                  AOType atomic_orbital_type) {
-        return std::make_shared<BasisSet>(
-            name, shells_from_py_list(shells), std::move(structure),
-            std::move(ao_symmetries), std::move(ao_extents),
-            atomic_orbital_type);
-      }),
+      py::init(&basis_set_with_ao_symmetries),
       R"(
 Constructor with explicit AO symmetries.
 
@@ -304,20 +395,11 @@ Examples:
       py::arg("ao_extents") = std::unordered_map<SymmetryLabel, std::size_t>{},
       py::arg("atomic_orbital_type") = AOType::Spherical);
 
-  basis_set.def(py::init<const std::string&, const Structure&, AOType>(),
-                R"(
-Create a basis set from a name and shells.
-
-Args:
-    name (str): Name of the basis set (e.g., "6-31G", "cc-pVDZ")
-        shells (Iterable[Shell]): Iterable of Shell objects
-    atomic_orbital_type (AOType): Spherical or Cartesian (default Spherical)
-)");
-
   // BasisSet(name, shells, structure [, atomic_orbital_type])
   basis_set.def(py::init([](const std::string& name, const py::iterable& shells,
-                            const Structure& structure, AOType ao) {
-                  return BasisSet(name, to_shell_vec(shells), structure, ao);
+                            std::shared_ptr<Structure> structure, AOType ao) {
+                  return std::make_shared<BasisSet>(name, to_shell_vec(shells),
+                                                    std::move(structure), ao);
                 }),
                 py::arg("name"), py::arg("shells"), py::arg("structure"),
                 py::arg("atomic_orbital_type") = AOType::Spherical,
@@ -331,62 +413,10 @@ Args:
     atomic_orbital_type (AOType): Spherical or Cartesian (default Spherical)
 )");
 
-  // BasisSet(name, shells, aux_shells, structure [, atomic_orbital_type])
-  basis_set.def(py::init([](const std::string& name, const py::iterable& shells,
-                            const py::iterable& aux_shells,
-                            const Structure& structure, AOType ao) {
-                  return BasisSet(name, to_shell_vec(shells),
-                                  to_shell_vec(aux_shells), structure, ao);
-                }),
-                py::arg("name"), py::arg("shells"), py::arg("aux_shells"),
-                py::arg("structure"),
-                py::arg("atomic_orbital_type") = AOType::Spherical,
-                R"(
-Create a basis set with auxiliary shells.
-
-Args:
-    name (str): Name of the basis set
-    shells (Iterable[Shell]): Iterable of Shell objects
-    aux_shells (Iterable[Shell]): Iterable of auxiliary Shell objects (e.g., for density fitting)
-    structure (Structure): Molecular structure
-    atomic_orbital_type (AOType): Spherical or Cartesian (default Spherical)
-)");
-
-  // BasisSet(name, shells, aux_name, aux_shells, structure
-  //          [, atomic_orbital_type])
-  basis_set.def(
-      py::init([](const std::string& name, const py::iterable& shells,
-                  const std::string& aux_name, const py::iterable& aux_shells,
-                  const Structure& structure, AOType ao) {
-        return BasisSet(name, to_shell_vec(shells), aux_name,
-                        to_shell_vec(aux_shells), structure, ao);
-      }),
-      py::arg("name"), py::arg("shells"), py::arg("aux_name"),
-      py::arg("aux_shells"), py::arg("structure"),
-      py::arg("atomic_orbital_type") = AOType::Spherical,
-      R"(
-Create a basis set with a named auxiliary basis.
-
-Args:
-    name (str): Name of the basis set
-    shells (Iterable[Shell]): Iterable of Shell objects
-    aux_name (str): Name of the auxiliary basis set
-    aux_shells (Iterable[Shell]): Iterable of auxiliary Shell objects
-    structure (Structure): Molecular structure
-    atomic_orbital_type (AOType): Spherical or Cartesian (default Spherical)
-)");
-
   // BasisSet(name, shells, ecp_shells, ecp_electrons, structure
   //          [, atomic_orbital_type])
-  basis_set.def(py::init([](const std::string& name, const py::iterable& shells,
-                            const py::iterable& ecp_shells,
-                            const std::vector<size_t>& ecp_electrons,
-                            const Structure& structure, AOType ao) {
-                  return BasisSet(name, to_shell_vec(shells),
-                                  to_shell_vec(ecp_shells), ecp_electrons,
-                                  structure, ao);
-                }),
-                py::arg("name"), py::arg("shells"), py::arg("ecp_shells"),
+  basis_set.def(py::init(&basis_set_with_legacy_ecp), py::arg("name"),
+                py::arg("shells"), py::arg("ecp_shells"),
                 py::arg("ecp_electrons"), py::arg("structure"),
                 py::arg("atomic_orbital_type") = AOType::Spherical,
                 R"(
@@ -403,18 +433,11 @@ Args:
 
   // BasisSet(name, shells, ecp_name, ecp_shells, ecp_electrons, structure
   //          [, atomic_orbital_type])
-  basis_set.def(
-      py::init([](const std::string& name, const py::iterable& shells,
-                  const std::string& ecp_name, const py::iterable& ecp_shells,
-                  const std::vector<size_t>& ecp_electrons,
-                  const Structure& structure, AOType ao) {
-        return BasisSet(name, to_shell_vec(shells), ecp_name,
-                        to_shell_vec(ecp_shells), ecp_electrons, structure, ao);
-      }),
-      py::arg("name"), py::arg("shells"), py::arg("ecp_name"),
-      py::arg("ecp_shells"), py::arg("ecp_electrons"), py::arg("structure"),
-      py::arg("atomic_orbital_type") = AOType::Spherical,
-      R"(
+  basis_set.def(py::init(&basis_set_with_named_legacy_ecp), py::arg("name"),
+                py::arg("shells"), py::arg("ecp_name"), py::arg("ecp_shells"),
+                py::arg("ecp_electrons"), py::arg("structure"),
+                py::arg("atomic_orbital_type") = AOType::Spherical,
+                R"(
 Create a basis set with a named ECP.
 
 Args:
@@ -427,35 +450,11 @@ Args:
     atomic_orbital_type (AOType): Spherical or Cartesian (default Spherical)
 )");
 
-  // BasisSet(name, shells, ecp_name, ecp_shells, ecp_electrons,
-  //          aux_name, aux_shells, structure [, atomic_orbital_type])
-  basis_set.def(
-      py::init([](const std::string& name, const py::iterable& shells,
-                  const std::string& ecp_name, const py::iterable& ecp_shells,
-                  const std::vector<size_t>& ecp_electrons,
-                  const std::string& aux_name, const py::iterable& aux_shells,
-                  const Structure& structure, AOType ao) {
-        return BasisSet(name, to_shell_vec(shells), ecp_name,
-                        to_shell_vec(ecp_shells), ecp_electrons, aux_name,
-                        to_shell_vec(aux_shells), structure, ao);
-      }),
-      py::arg("name"), py::arg("shells"), py::arg("ecp_name"),
-      py::arg("ecp_shells"), py::arg("ecp_electrons"), py::arg("aux_name"),
-      py::arg("aux_shells"), py::arg("structure"),
-      py::arg("atomic_orbital_type") = AOType::Spherical,
-      R"(
-Create a basis set with ECP and auxiliary basis.
-
-Args:
-    name (str): Name of the basis set
-    shells (Iterable[Shell]): Iterable of Shell objects
-    ecp_name (str): Name of the ECP basis set
-    ecp_shells (Iterable[Shell]): Iterable of ECP Shell objects
-    ecp_electrons (list[int]): Number of ECP electrons per atom
-    aux_name (str): Name of the auxiliary basis set
-    aux_shells (Iterable[Shell]): Iterable of auxiliary Shell objects
-    structure (Structure): Molecular structure
-    atomic_orbital_type (AOType): Spherical or Cartesian (default Spherical)
+  basis_set.def(py::init(&basis_set_with_ecp), py::arg("name"),
+                py::arg("shells"), py::arg("ecp"), py::arg("structure"),
+                py::arg("atomic_orbital_type") = AOType::Spherical,
+                R"(
+Create a basis set with typed effective core potential data.
 )");
 
   // Basis type management
@@ -501,8 +500,12 @@ Examples:
                 py::arg("atom_index"),
                 py::return_value_policy::reference_internal);
 
-  basis_set.def("get_shell", &BasisSet::get_shell,
-                R"(
+  basis_set.def(
+      "get_shell",
+      [](const BasisSet& self, size_t shell_index) {
+        return self.get_shell(shell_index);
+      },
+      R"(
 Get a specific shell by global index.
 
 Args:
@@ -518,8 +521,7 @@ Examples:
     >>> shell = basis_set.get_shell(0)
     >>> print(f"First shell type: {shell.orbital_type}")
 )",
-                py::arg("shell_index"),
-                py::return_value_policy::reference_internal);
+      py::arg("shell_index"));
 
   basis_set.def("get_num_shells", &BasisSet::get_num_shells,
                 R"(
@@ -575,8 +577,12 @@ Examples:
                 py::arg("atom_index"),
                 py::return_value_policy::reference_internal);
 
-  basis_set.def("get_ecp_shell", &BasisSet::get_ecp_shell,
-                R"(
+  basis_set.def(
+      "get_ecp_shell",
+      [](const BasisSet& self, size_t shell_index) {
+        return self.get_ecp_shell(shell_index);
+      },
+      R"(
 Get a specific ECP shell by global index.
 
 Args:
@@ -592,8 +598,7 @@ Examples:
     >>> ecp_shell = basis_set.get_ecp_shell(0)
     >>> print(f"First ECP shell has {ecp_shell.get_num_primitives()} primitives")
 )",
-                py::arg("shell_index"),
-                py::return_value_policy::reference_internal);
+      py::arg("shell_index"));
 
   basis_set.def("get_num_ecp_shells", &BasisSet::get_num_ecp_shells,
                 R"(
@@ -617,92 +622,6 @@ Returns:
 Examples:
     >>> if basis_set.has_ecp_shells():
     ...     print("This basis set includes ECP shells")
-)");
-
-  // Auxiliary shell access
-  basis_set.def("get_aux_shells", &BasisSet::get_aux_shells,
-                R"(
-Get all auxiliary shells (flattened from per-atom storage).
-
-Returns:
-    list[Shell]: Vector of all auxiliary shells in the basis set
-
-Examples:
-    >>> aux_shells = basis_set.get_aux_shells()
-    >>> print(f"Total auxiliary shells: {len(aux_shells)}")
-)");
-
-  basis_set.def("get_aux_shells_for_atom", &BasisSet::get_aux_shells_for_atom,
-                R"(
-Get auxiliary shells for a specific atom.
-
-Args:
-    atom_index (int): Index of the atom
-
-Returns:
-    list[Shell]: Vector of auxiliary shells for the specified atom
-
-Examples:
-    >>> aux_atom_shells = basis_set.get_aux_shells_for_atom(0)
-    >>> print(f"Atom 0 has {len(aux_atom_shells)} auxiliary shells")
-)",
-                py::arg("atom_index"),
-                py::return_value_policy::reference_internal);
-
-  basis_set.def("get_aux_shell", &BasisSet::get_aux_shell,
-                R"(
-Get a specific auxiliary shell by global index.
-
-Args:
-    shell_index (int): Global index of the auxiliary shell
-
-Returns:
-    Shell: Reference to the specified auxiliary shell
-
-Raises:
-    IndexError: If auxiliary shell index is out of range
-
-Examples:
-    >>> aux_shell = basis_set.get_aux_shell(0)
-    >>> print(f"First aux shell type: {aux_shell.orbital_type}")
-)",
-                py::arg("shell_index"),
-                py::return_value_policy::reference_internal);
-
-  basis_set.def("get_num_aux_shells", &BasisSet::get_num_aux_shells,
-                R"(
-Get total number of auxiliary shells across all atoms.
-
-Returns:
-    int: Total number of auxiliary shells
-
-Examples:
-    >>> n_aux_shells = basis_set.get_num_aux_shells()
-    >>> print(f"Total auxiliary shells: {n_aux_shells}")
-)");
-
-  basis_set.def("has_aux_basis", &BasisSet::has_aux_basis,
-                R"(
-Check if this basis set has an auxiliary basis.
-
-Returns:
-    bool: True if there are any auxiliary shells
-
-Examples:
-    >>> if basis_set.has_aux_basis():
-    ...     print("This basis set includes an auxiliary basis")
-)");
-
-  basis_set.def("get_aux_name", &BasisSet::get_aux_name,
-                R"(
-Get the auxiliary basis set name.
-
-Returns:
-    str: Name of the auxiliary basis set
-
-Examples:
-    >>> aux_name = basis_set.get_aux_name()
-    >>> print(f"Auxiliary basis: {aux_name}")
 )");
 
   // atomic orbital management
@@ -731,19 +650,6 @@ Returns:
 Examples:
     >>> n_basis = basis_set.get_num_atomic_orbitals()
     >>> print(f"Total atomic orbitals: {n_basis}")
-)");
-
-  basis_set.def("get_num_auxiliary_orbitals",
-                &BasisSet::get_num_auxiliary_orbitals,
-                R"(
-Get total number of auxiliary orbitals in the basis set.
-
-Returns:
-    int: Total number of auxiliary orbitals from all auxiliary shells
-
-Examples:
-    >>> n_aux = basis_set.get_num_auxiliary_orbitals()
-    >>> print(f"Total auxiliary orbitals: {n_aux}")
 )");
 
   basis_set.def("ao_symmetries", &BasisSet::ao_symmetries,
@@ -984,6 +890,59 @@ Examples:
     ...     structure = basis_set.get_structure()
     ... else:
     ...     print("No structure associated with basis set")
+)");
+
+  basis_set.def("has_auxiliary_basis", &BasisSet::has_auxiliary_basis,
+                py::arg("role"),
+                R"(
+Check whether an auxiliary basis is associated with an exact role.
+
+Args:
+    role (AuxiliaryBasisRole): Exact role to inspect
+
+Returns:
+    bool: Whether that role has an associated basis
+)");
+
+  basis_set.def("get_auxiliary_basis", &BasisSet::get_auxiliary_basis,
+                py::arg("role"),
+                R"(
+Get the auxiliary basis associated with an exact role.
+
+Args:
+    role (AuxiliaryBasisRole): Exact role to retrieve
+
+Returns:
+    AuxiliaryBasis: Associated auxiliary basis
+
+Raises:
+    IndexError: If the role has no association
+)");
+
+  basis_set.def("resolve_auxiliary_basis", &BasisSet::resolve_auxiliary_basis,
+                py::arg("role"),
+                R"(
+Resolve an auxiliary basis compatible with a required role.
+
+Exact associations take precedence. A JKFIT basis may satisfy a JFIT
+requirement, but JFIT cannot satisfy JKFIT.
+
+Args:
+    role (AuxiliaryBasisRole): Required role
+
+Returns:
+    AuxiliaryBasis: Exact or compatible auxiliary basis
+
+Raises:
+    IndexError: If no compatible basis is available
+)");
+
+  basis_set.def("get_auxiliary_bases", &BasisSet::get_auxiliary_bases,
+                R"(
+Get all exact auxiliary-basis associations.
+
+Returns:
+    dict[AuxiliaryBasisRole, AuxiliaryBasis]: Role-keyed associations
 )");
 
   basis_set.def("get_ecp_name", &BasisSet::get_ecp_name,
@@ -1247,8 +1206,11 @@ Examples:
                        py::arg("basis_name"));
   basis_set.def_static(
       "from_basis_name",
-      py::overload_cast<const std::string&, const Structure&, AOType>(
-          &BasisSet::from_basis_name),
+      [](std::string basis_name, std::shared_ptr<Structure> structure,
+         AOType ao_type) {
+        return BasisSet::from_basis_name(std::move(basis_name),
+                                         std::move(structure), ao_type);
+      },
       R"(
 Create a basis set by name for a molecular structure.
 
@@ -1275,34 +1237,12 @@ Examples:
       py::arg("basis_name"), py::arg("structure"),
       py::arg("atomic_orbital_type") = AOType::Spherical);
   basis_set.def_static(
-      "from_basis_name",
-      py::overload_cast<const std::string&, const std::string&,
-                        const Structure&, AOType>(&BasisSet::from_basis_name),
-      R"(
-Create a basis set by name with an auxiliary basis for a molecular structure.
-
-Loads a standard basis set and auxiliary basis set for all atoms in the structure.
-
-Args:
-    basis_name (str): Name of the basis set (e.g., "def2-svp")
-    aux_basis_name (str): Name of the auxiliary basis set (e.g., "def2-universal-jfit")
-    structure (Structure): Molecular structure
-    atomic_orbital_type (AOType, optional): Whether to use spherical or Cartesian atomic orbitals.
-        Default is Spherical
-
-Returns:
-    BasisSet: New basis set instance with auxiliary basis
-
-Examples:
-    >>> basis = BasisSet.from_basis_name("def2-svp", "def2-universal-jfit", structure)
-    >>> print(f"Aux shells: {basis.get_num_aux_shells()}")
-)",
-      py::arg("basis_name"), py::arg("aux_basis_name"), py::arg("structure"),
-      py::arg("atomic_orbital_type") = AOType::Spherical);
-  basis_set.def_static(
       "from_element_map",
-      py::overload_cast<const std::map<std::string, std::string>&,
-                        const Structure&, AOType>(&BasisSet::from_element_map),
+      [](const std::map<std::string, std::string>& element_to_basis_map,
+         std::shared_ptr<Structure> structure, AOType ao_type) {
+        return BasisSet::from_element_map(element_to_basis_map,
+                                          std::move(structure), ao_type);
+      },
       R"(
 Create a basis set with different basis sets per element.
 
@@ -1331,34 +1271,12 @@ Examples:
       py::arg("element_to_basis_map"), py::arg("structure"),
       py::arg("atomic_orbital_type") = AOType::Spherical);
   basis_set.def_static(
-      "from_element_map",
-      py::overload_cast<const std::map<std::string, std::string>&,
-                        const std::map<std::string, std::string>&,
-                        const Structure&, AOType>(&BasisSet::from_element_map),
-      R"(
-Create a basis set with different basis sets and auxiliary basis sets per element.
-
-Args:
-    element_to_basis_map (dict[str, str]): Dictionary mapping element symbols to basis set names
-    element_to_aux_basis_map (dict[str, str]): Dictionary mapping element symbols to auxiliary basis set names
-    structure (Structure): Molecular structure
-    atomic_orbital_type (AOType, optional): Whether to use spherical or Cartesian atomic orbitals.
-        Default is Spherical
-
-Returns:
-    BasisSet: New basis set instance with auxiliary basis
-
-Examples:
-    >>> basis_map = {"H": "def2-svp", "O": "def2-svp"}
-    >>> aux_map = {"H": "def2-universal-jfit", "O": "def2-universal-jfit"}
-    >>> basis = BasisSet.from_element_map(basis_map, aux_map, structure)
-)",
-      py::arg("element_to_basis_map"), py::arg("element_to_aux_basis_map"),
-      py::arg("structure"), py::arg("atomic_orbital_type") = AOType::Spherical);
-  basis_set.def_static(
       "from_index_map",
-      py::overload_cast<const std::map<size_t, std::string>&, const Structure&,
-                        AOType>(&BasisSet::from_index_map),
+      [](const std::map<size_t, std::string>& index_to_basis_map,
+         std::shared_ptr<Structure> structure, AOType ao_type) {
+        return BasisSet::from_index_map(index_to_basis_map,
+                                        std::move(structure), ao_type);
+      },
       R"(
 Create a basis set with different basis sets per atom index.
 
@@ -1386,32 +1304,6 @@ Examples:
 )",
       py::arg("index_to_basis_map"), py::arg("structure"),
       py::arg("atomic_orbital_type") = AOType::Spherical);
-  basis_set.def_static(
-      "from_index_map",
-      py::overload_cast<const std::map<size_t, std::string>&,
-                        const std::map<size_t, std::string>&, const Structure&,
-                        AOType>(&BasisSet::from_index_map),
-      R"(
-Create a basis set with different basis sets and auxiliary basis sets per atom index.
-
-Args:
-    index_to_basis_map (dict[int, str]): Dictionary mapping atom indices to basis set names
-    index_to_aux_basis_map (dict[int, str]): Dictionary mapping atom indices to auxiliary basis set names
-    structure (Structure): Molecular structure
-    atomic_orbital_type (AOType, optional): Whether to use spherical or Cartesian atomic orbitals.
-        Default is Spherical
-
-Returns:
-    BasisSet: New basis set instance with auxiliary basis
-
-Examples:
-    >>> basis_map = {0: "def2-svp", 1: "def2-svp", 2: "def2-svp"}
-    >>> aux_map = {0: "def2-universal-jfit", 1: "def2-universal-jfit", 2: "def2-universal-jfit"}
-    >>> basis = BasisSet.from_index_map(basis_map, aux_map, structure)
-)",
-      py::arg("index_to_basis_map"), py::arg("index_to_aux_basis_map"),
-      py::arg("structure"), py::arg("atomic_orbital_type") = AOType::Spherical);
-
   // Utility functions (static methods);
   basis_set.def_static("orbital_type_to_string",
                        &BasisSet::orbital_type_to_string,
@@ -1585,14 +1477,6 @@ Name used for custom ECP basis sets.
 Type:
     str
 )");
-  basis_set.def_readonly_static("custom_aux_name", &BasisSet::custom_aux_name,
-                                R"(
-Name used for custom auxiliary basis sets.
-
-Type:
-        str
-)");
-
   // Data type name class attribute
   basis_set.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(BasisSet);
 }

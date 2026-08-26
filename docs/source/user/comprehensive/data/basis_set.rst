@@ -20,7 +20,6 @@ Key features of the :class:`~qdk_chemistry.data.BasisSet` class include:
 - Integration with molecular structure information
 - On-demand expansion of shells to individual basis functions
 - Effective Core Potentials (ECP) with radial powers
-- Auxiliary basis sets for density fitting
 
 Usage
 -----
@@ -100,7 +99,7 @@ The library supports three methods for loading basis sets:
 .. seealso::
    For a complete list of available basis sets, see the :doc:`Supported Basis Sets <../basis_functionals>` documentation.
 
-The library also supports loading an auxiliary basis set alongside the primary basis set in a single call:
+Primary and auxiliary bases are independent values constructed against the same molecular structure. If an algorithm later needs an auxiliary basis, derive the structure through the existing wavefunction and associate the new basis by role. :func:`~qdk_chemistry.data.with_auxiliary_basis` returns an enriched wavefunction and leaves its input unchanged:
 
 .. tab:: C++ API
 
@@ -179,7 +178,7 @@ Working with ECP shells
 Effective Core Potentials (ECPs) replace inner-core electrons with a pseudopotential, reducing computational cost for heavy atoms.
 ECP shells are stored alongside primary shells but include an additional **radial powers** vector (:math:`r^n` terms).
 
-ECP data is specified at construction time via dedicated constructors that accept ``ecp_shells``, ``ecp_electrons``, and an optional ``ecp_name``.
+ECP data can be grouped in an ``EffectiveCorePotential`` value and passed to a convenience constructor. Existing constructors that accept ``ecp_shells``, ``ecp_electrons``, and an optional ``ecp_name`` remain available but are deprecated.
 The ``ecp_electrons`` vector records how many core electrons each atom has replaced.
 
 .. tab:: C++ API
@@ -203,10 +202,14 @@ The ``ecp_electrons`` vector records how many core electrons each atom has repla
 Auxiliary basis sets
 --------------------
 
-Auxiliary basis sets are used in density-fitting (DF) and resolution-of-the-identity (RI) approximations to speed up two-electron integral evaluation.
-The auxiliary shells are stored inside the same :class:`~qdk_chemistry.data.BasisSet` object as supplementary data alongside the primary shells.
+An auxiliary basis is a secondary basis supplied to algorithms that require one. Density fitting (DF/RI) is the most common consumer, but the class carries no algorithm-specific role.
+The auxiliary name, shells, orbital representation, and molecular structure form an independent :class:`~qdk_chemistry.data.AuxiliaryBasis` value.
 
-Auxiliary basis data can be attached at construction time or loaded from the library using ``from_basis_name`` with an auxiliary name.
+Construct an :class:`~qdk_chemistry.data.AuxiliaryBasis` explicitly for custom data, or load it from the library with :meth:`~qdk_chemistry.data.AuxiliaryBasis.from_basis_name`. The role belongs to its association with a primary basis, not to the auxiliary value itself. :class:`~qdk_chemistry.data.AuxiliaryBasisRole` provides ``JFIT``, ``JKFIT``, ``RIFIT``, and ``CABS`` associations. Basis-family names remain ordinary auxiliary-basis names: for example, explicitly associate an MP2FIT-named basis with ``RIFIT`` or an OptRI/OptRI+ basis with ``CABS``.
+
+An enriched :class:`~qdk_chemistry.data.BasisSet` may carry several roles simultaneously. Exact lookup is available through :meth:`~qdk_chemistry.data.BasisSet.get_auxiliary_basis`. :meth:`~qdk_chemistry.data.BasisSet.resolve_auxiliary_basis` additionally permits a ``JKFIT`` association to satisfy a ``JFIT`` requirement, but never the inverse. The free :func:`~qdk_chemistry.data.with_auxiliary_basis` function is also overloaded for wavefunctions, preserving their payload while returning a new wavefunction with an enriched primary basis.
+
+Wavefunction enrichment copies the comparatively small primary basis value because its role map changes. Large immutable wavefunction payloads, including CI coefficients and configurations, amplitudes, RDMs, entropy data, and orbital tensors, are structurally shared with the input wavefunction.
 
 .. tab:: C++ API
 
@@ -225,12 +228,14 @@ Auxiliary basis data can be attached at construction time or loaded from the lib
 Serialization
 -------------
 
-The :class:`~qdk_chemistry.data.BasisSet` class supports serialization to and from JSON and HDF5 formats.
+The :class:`~qdk_chemistry.data.BasisSet` class supports serialization to and from JSON and HDF5 formats, including all role-keyed auxiliary-basis associations.
 For detailed information about serialization in QDK/Chemistry, see the :doc:`Serialization <../data/serialization>` documentation.
 
 .. note::
    All basis set-related files require the ``.basis_set`` suffix before the file type extension, for example ``molecule.basis_set.json`` and ``h2.basis_set.h5`` for JSON and HDF5 files respectively.
    This naming convention is enforced to maintain consistency across the QDK/Chemistry ecosystem.
+
+   Standalone auxiliary basis files use the ``.auxiliary_basis`` suffix, for example ``water.auxiliary_basis.json``.
 
 File formats
 ~~~~~~~~~~~~
@@ -245,7 +250,7 @@ JSON representation of a :class:`~qdk_chemistry.data.BasisSet` has the following
 .. code-block:: json
 
    {
-     "version": "0.1.0",
+       "version": "0.2.0",
      "name": "6-31G",
      "atomic_orbital_type": "spherical",
      "num_atomic_orbitals": 9,
@@ -268,19 +273,17 @@ JSON representation of a :class:`~qdk_chemistry.data.BasisSet` has the following
              "coefficients": [50.0, 20.0],
              "rpowers": [2, 2]
            }
-         ],
-         "aux_shells": [
-           {
-             "orbital_type": "s",
-             "exponents": [5.0],
-             "coefficients": [2.0]
-           }
          ]
        }
      ],
-     "ecp_name": "my-ecp",
-     "ecp_electrons": [28, 0],
-     "aux_name": "my-aux-fit"
+       "ecp_name": "my-ecp",
+       "ecp_electrons": [28, 0],
+       "auxiliary_bases": {
+          "jfit": {
+             "name": "def2-universal-jfit",
+             "atomic_orbital_type": "spherical"
+          }
+       }
    }
 
 HDF5 format
@@ -291,9 +294,8 @@ HDF5 representation of a :class:`~qdk_chemistry.data.BasisSet` has the following
 .. code-block:: text
 
    /basis_set                                     (Group - top-level)
-   ├── @version = "0.1.0"                         (Attribute, variable-length string)
+   ├── @version = "0.2.0"                         (Attribute, variable-length string)
    ├── @ecp_name = "lanl2dz"                      (Attribute, variable-length string, optional)
-   ├── @aux_name = "cc-pVDZ-RI"                   (Attribute, variable-length string, optional)
    │
    ├── metadata/                                  (Group)
    │   ├── @name = "cc-pVDZ"                      (Attribute, variable-length string)
@@ -316,12 +318,9 @@ HDF5 representation of a :class:`~qdk_chemistry.data.BasisSet` has the following
    │
    ├── ecp_electrons                              (Dataset: uint64, 1D per atom, optional)
    │
-   ├── aux_shells/                                (Group, optional - present if auxiliary basis exists)
-   │   ├── atom_indices                           (Dataset: uint32, 1D, one per shell)
-   │   ├── orbital_types                          (Dataset: int32, 1D, one per shell)
-   │   ├── num_primitives                         (Dataset: uint32, 1D, one per shell)
-   │   ├── exponents                              (Dataset: float64, 1D, flattened across shells)
-   │   └── coefficients                           (Dataset: float64, 1D, flattened across shells)
+   ├── auxiliary_bases/                           (Group, optional)
+   │   └── jfit/                                  (Group, keyed by role)
+   │       └── @json                              (Attribute, serialized AuxiliaryBasis)
    │
    └── structure/                                 (Group, optional - nested Structure object)
 

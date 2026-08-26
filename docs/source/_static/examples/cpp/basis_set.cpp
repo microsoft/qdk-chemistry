@@ -3,6 +3,7 @@
 // license information.
 
 // Basis Set usage examples.
+#include <cassert>
 #include <qdk/chemistry.hpp>
 using namespace qdk::chemistry::data;
 
@@ -13,7 +14,7 @@ int main() {
   std::vector<Eigen::Vector3d> coords = {
       {0.0, 0.0, 0.0}, {0.757, 0.586, 0.0}, {-0.757, 0.586, 0.0}};
   std::vector<std::string> symbols = {"O", "H", "H"};
-  Structure structure(coords, symbols);
+  auto structure = std::make_shared<Structure>(coords, symbols);
 
   // Create basis sets from the library using basis set name
   auto basis_from_name = BasisSet::from_basis_name("sto-3g", structure);
@@ -32,9 +33,25 @@ int main() {
 
   // --------------------------------------------------------------------------------------------
   // start-cell-loading-with-aux
-  // Load a primary basis set with an auxiliary basis set for density fitting
-  auto basis_with_aux =
-      BasisSet::from_basis_name("def2-svp", "def2-universal-jfit", structure);
+  // Obtain a wavefunction without knowing its later auxiliary-basis needs
+  auto primary_basis = BasisSet::from_basis_name("def2-svp", structure);
+  auto scf_solver = qdk::chemistry::algorithms::ScfSolverFactory::create();
+  auto scf_result = scf_solver->run(structure, 0, 1, primary_basis);
+  auto wavefunction = scf_result.second;
+
+  // Later, derive the structure from that wavefunction and attach the basis
+  auto wavefunction_structure =
+      wavefunction->get_orbitals()->get_basis_set()->get_structure();
+  auto aux_basis = AuxiliaryBasis::from_basis_name("def2-universal-jfit",
+                                                   wavefunction_structure);
+  auto wavefunction_with_jfit =
+      with_auxiliary_basis(*wavefunction, AuxiliaryBasisRole::JFit, aux_basis);
+
+  assert(!wavefunction->get_orbitals()->get_basis_set()->has_auxiliary_basis(
+      AuxiliaryBasisRole::JFit));
+  assert(wavefunction_with_jfit->get_orbitals()
+             ->get_basis_set()
+             ->has_auxiliary_basis(AuxiliaryBasisRole::JFit));
   // end-cell-loading-with-aux
   // --------------------------------------------------------------------------------------------
 
@@ -184,8 +201,9 @@ int main() {
   // Create a basis set with ECP data
   std::vector<Shell> ecp_shells = {ecp_shell};
   std::vector<size_t> ecp_electrons = {28, 0, 0};
-  BasisSet basis_with_ecp("my-basis", shells, "my-ecp", ecp_shells,
-                          ecp_electrons, structure);
+  BasisSet basis_with_ecp(
+      "my-basis", shells,
+      EffectiveCorePotential("my-ecp", ecp_shells, ecp_electrons), structure);
 
   // Query ECP data
   bool has_ecp = basis_with_ecp.has_ecp_shells();
@@ -196,26 +214,27 @@ int main() {
 
   // --------------------------------------------------------------------------------------------
   // start-cell-auxiliary
-  // Create auxiliary shells for density fitting
+  // Create custom auxiliary shells
   std::vector<Shell> aux_shells;
   aux_shells.emplace_back(0, OrbitalType::S, std::vector{5.0},
                           std::vector{2.0});
   aux_shells.emplace_back(1, OrbitalType::S, std::vector{4.0},
                           std::vector{1.5});
 
-  // Construct a basis set with a named auxiliary basis
-  BasisSet basis_with_aux_manual("my-basis", shells, "my-aux-fit", aux_shells,
-                                 structure);
+  // Construct a named auxiliary basis for this molecular structure
+  auto auxiliary_basis =
+      std::make_shared<AuxiliaryBasis>("my-aux-fit", aux_shells, structure);
+  auto basis_with_rifit = with_auxiliary_basis(
+      basis_set, AuxiliaryBasisRole::RIFit, auxiliary_basis);
 
   // Query auxiliary data
-  bool has_aux = basis_with_aux_manual.has_aux_basis();
-  std::string aux_name = basis_with_aux_manual.get_aux_name();
-  size_t num_aux = basis_with_aux_manual.get_num_aux_shells();
+  auto stored_aux =
+      basis_with_rifit->get_auxiliary_basis(AuxiliaryBasisRole::RIFit);
+  std::string aux_name = stored_aux->get_name();
+  size_t num_aux = stored_aux->get_num_shells();
 
   // Retrieve auxiliary shell data
-  auto all_aux_shells = basis_with_aux_manual.get_aux_shells();
-  const Shell& aux_s = basis_with_aux_manual.get_aux_shell(0);
-  const auto& atom0_aux = basis_with_aux_manual.get_aux_shells_for_atom(0);
+  auto all_aux_shells = stored_aux->get_shells();
   // end-cell-auxiliary
   // --------------------------------------------------------------------------------------------
 

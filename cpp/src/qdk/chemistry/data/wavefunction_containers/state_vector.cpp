@@ -47,7 +47,8 @@ StateVectorContainer::StateVectorContainer(const Configuration& det,
                                            const std::string& sector,
                                            WavefunctionType type)
     : WavefunctionContainer(type),
-      _coefficients(Eigen::VectorXd(Eigen::VectorXd::Ones(1))),
+      _coefficients(std::make_shared<const CoeffContainer>(
+          Eigen::VectorXd(Eigen::VectorXd::Ones(1)))),
       _configuration_set(DeterminantVector{det}, orbitals, sector) {
   QDK_LOG_TRACE_ENTERING();
 
@@ -114,7 +115,7 @@ StateVectorContainer::StateVectorContainer(
     : WavefunctionContainer(one_rdm_spin_traced, one_rdm_aa, one_rdm_bb,
                             two_rdm_spin_traced, two_rdm_aaaa, two_rdm_aabb,
                             two_rdm_bbbb, entropies, type),
-      _coefficients(coeffs),
+      _coefficients(std::make_shared<const CoeffContainer>(coeffs)),
       _configuration_set(dets, orbitals, sector) {
   QDK_LOG_TRACE_ENTERING();
   auto n_coeffs =
@@ -143,7 +144,7 @@ StateVectorContainer::StateVectorContainer(
                             std::move(two_rdm_spin_traced),
                             std::move(active_one_rdm),
                             std::move(active_two_rdm), entropies, type),
-      _coefficients(coeffs),
+      _coefficients(std::make_shared<const CoeffContainer>(coeffs)),
       _configuration_set(dets, orbitals, sector) {
   QDK_LOG_TRACE_ENTERING();
   auto n_coeffs =
@@ -159,6 +160,21 @@ StateVectorContainer::StateVectorContainer(
   }
 }
 
+StateVectorContainer::StateVectorContainer(
+    const StateVectorContainer& source,
+    std::shared_ptr<Orbitals> enriched_orbitals)
+    : WavefunctionContainer(source.get_type()),
+      _coefficients(source._coefficients),
+      _configuration_set(detail::BasisEnrichmentAccess::rebind_orbitals(
+          source._configuration_set, std::move(enriched_orbitals))) {
+  QDK_LOG_TRACE_ENTERING();
+  _one_rdm_spin_traced = source._one_rdm_spin_traced;
+  _two_rdm_spin_traced = source._two_rdm_spin_traced;
+  _active_one_rdm = source._active_one_rdm;
+  _active_two_rdm = source._active_two_rdm;
+  _entropies = source._entropies;
+}
+
 // ---------------------------------------------------------------------------
 // Basic accessors
 // ---------------------------------------------------------------------------
@@ -171,11 +187,34 @@ std::unique_ptr<WavefunctionContainer> StateVectorContainer::clone() const {
   QDK_LOG_TRACE_ENTERING();
 
   return std::make_unique<StateVectorContainer>(
-      _coefficients, _configuration_set.get_configurations(),
+      *_coefficients, _configuration_set.get_configurations(),
       this->get_orbitals(), _one_rdm_spin_traced, _two_rdm_spin_traced,
       _active_one_rdm, _active_two_rdm,
-      _configuration_set.sector_layout().front().first, _entropies,
+      _configuration_set.sector_layout().front().first, *_entropies,
       this->get_type());
+}
+
+std::unique_ptr<WavefunctionContainer>
+StateVectorContainer::_clone_for_basis_enrichment(
+    std::shared_ptr<BasisSet> enriched_basis) const {
+  QDK_LOG_TRACE_ENTERING();
+
+  auto enriched =
+      std::unique_ptr<StateVectorContainer>(new StateVectorContainer(
+          *this, detail::BasisEnrichmentAccess::rebind_basis(
+                     *get_orbitals(), std::move(enriched_basis))));
+  if (enriched->_coefficients != _coefficients ||
+      &enriched->_configuration_set.get_configurations() !=
+          &_configuration_set.get_configurations() ||
+      enriched->_one_rdm_spin_traced != _one_rdm_spin_traced ||
+      enriched->_two_rdm_spin_traced != _two_rdm_spin_traced ||
+      enriched->_active_one_rdm != _active_one_rdm ||
+      enriched->_active_two_rdm != _active_two_rdm ||
+      enriched->_entropies != _entropies) {
+    throw std::logic_error(
+        "Basis enrichment copied or changed state-vector payload data");
+  }
+  return enriched;
 }
 
 std::shared_ptr<Orbitals> StateVectorContainer::get_orbitals() const {
@@ -211,14 +250,14 @@ ScalarVariant StateVectorContainer::get_coefficient(
     throw std::runtime_error("No determinants available");
   }
 
-  bool complex = detail::is_vector_variant_complex(_coefficients);
+  bool complex = detail::is_vector_variant_complex(*_coefficients);
   auto it = std::find(determinants.begin(), determinants.end(), det);
   if (it != determinants.end()) {
     size_t index = std::distance(determinants.begin(), it);
     if (complex) {
-      return std::get<Eigen::VectorXcd>(_coefficients)(index);
+      return std::get<Eigen::VectorXcd>(*_coefficients)(index);
     }
-    return std::get<Eigen::VectorXd>(_coefficients)(index);
+    return std::get<Eigen::VectorXd>(*_coefficients)(index);
   }
   // A determinant absent from the expansion has zero amplitude.
   if (complex) {
@@ -230,7 +269,7 @@ ScalarVariant StateVectorContainer::get_coefficient(
 const StateVectorContainer::VectorVariant&
 StateVectorContainer::get_coefficients() const {
   QDK_LOG_TRACE_ENTERING();
-  return _coefficients;
+  return *_coefficients;
 }
 
 const StateVectorContainer::DeterminantVector&
@@ -250,10 +289,10 @@ size_t StateVectorContainer::size() const {
   if (determinants.empty()) {
     return 0;  // Empty wavefunction has size 0
   }
-  if (detail::is_vector_variant_complex(_coefficients)) {
-    return std::get<Eigen::VectorXcd>(_coefficients).size();
+  if (detail::is_vector_variant_complex(*_coefficients)) {
+    return std::get<Eigen::VectorXcd>(*_coefficients).size();
   }
-  return std::get<Eigen::VectorXd>(_coefficients).size();
+  return std::get<Eigen::VectorXd>(*_coefficients).size();
 }
 
 ScalarVariant StateVectorContainer::overlap(
@@ -320,7 +359,7 @@ ScalarVariant StateVectorContainer::overlap(
 double StateVectorContainer::norm() const {
   QDK_LOG_TRACE_ENTERING();
   return std::visit([](const auto& vec) -> double { return vec.norm(); },
-                    _coefficients);
+                    *_coefficients);
 }
 
 bool StateVectorContainer::contains_determinant(
@@ -377,7 +416,7 @@ StateVectorContainer::active_num_particles() const {
 
 bool StateVectorContainer::has_coefficients() const {
   QDK_LOG_TRACE_ENTERING();
-  return !_coefficients.valueless_by_exception();
+  return _coefficients && !_coefficients->valueless_by_exception();
 }
 
 bool StateVectorContainer::has_configuration_set() const {
@@ -392,7 +431,7 @@ std::string StateVectorContainer::get_container_type() const {
 
 bool StateVectorContainer::is_complex() const {
   QDK_LOG_TRACE_ENTERING();
-  return detail::is_vector_variant_complex(_coefficients);
+  return detail::is_vector_variant_complex(*_coefficients);
 }
 
 // ---------------------------------------------------------------------------
@@ -665,7 +704,7 @@ const VectorVariant& StateVectorContainer::get_active_two_rdm_spin_traced()
 
 Eigen::VectorXd StateVectorContainer::get_single_orbital_entropies() const {
   QDK_LOG_TRACE_ENTERING();
-  if (_is_single_determinant() && !_entropies.single_orbital) {
+  if (_is_single_determinant() && !_entropies->single_orbital) {
     // For a single Slater determinant with no provided entropies, all orbitals
     // are either fully occupied or unoccupied, giving zero entropy each.
     const auto active_ai = get_orbitals()->active_indices();
@@ -901,10 +940,10 @@ nlohmann::json StateVectorContainer::to_json() const {
   j["wavefunction_type"] =
       (_type == WavefunctionType::SelfDual) ? "self_dual" : "not_self_dual";
 
-  bool is_complex = detail::is_vector_variant_complex(_coefficients);
+  bool is_complex = detail::is_vector_variant_complex(*_coefficients);
   j["is_complex"] = is_complex;
   if (is_complex) {
-    const auto& coeffs_complex = std::get<Eigen::VectorXcd>(_coefficients);
+    const auto& coeffs_complex = std::get<Eigen::VectorXcd>(*_coefficients);
     nlohmann::json coeffs_array = nlohmann::json::array();
     for (int i = 0; i < coeffs_complex.size(); ++i) {
       coeffs_array.push_back(
@@ -912,7 +951,7 @@ nlohmann::json StateVectorContainer::to_json() const {
     }
     j["coefficients"] = coeffs_array;
   } else {
-    const auto& coeffs_real = std::get<Eigen::VectorXd>(_coefficients);
+    const auto& coeffs_real = std::get<Eigen::VectorXd>(*_coefficients);
     j["coefficients"] = std::vector<double>(
         coeffs_real.data(), coeffs_real.data() + coeffs_real.size());
   }
@@ -996,7 +1035,7 @@ void StateVectorContainer::hash_update(
     qdk::chemistry::utils::HashContext& ctx) const {
   WavefunctionContainer::hash_update(ctx);
   hash_value(ctx, get_container_type());
-  hash_value(ctx, _coefficients);
+  hash_value(ctx, *_coefficients);
   hash_value(ctx, _configuration_set.content_hash());
 }
 

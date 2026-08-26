@@ -37,7 +37,15 @@ from collections import Counter
 import numpy as np
 import pyscf
 
-from qdk_chemistry.data import AOType, BasisSet, Hamiltonian, Orbitals, Shell, Structure
+from qdk_chemistry.data import (
+    AOType,
+    BasisSet,
+    EffectiveCorePotential,
+    Hamiltonian,
+    Orbitals,
+    Shell,
+    Structure,
+)
 from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix, spin_channel_vector
 from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.utils import Logger
@@ -389,9 +397,9 @@ def pyscf_mol_to_qdk_basis(
         else:
             raise ValueError(f"PySCF ECP data must be a string or dict, got {type(pyscf_mol.ecp)}.")
 
-        # Create BasisSet with name, shells, ecp_name, ecp_shells, ecp_electrons, structure, and basis type
         if any(n > 0 for n in ecp_electrons):
-            return BasisSet(basis_name, shells, ecp_name, ecp_shells, ecp_electrons, structure, AOType.Spherical)
+            ecp = EffectiveCorePotential(ecp_name, ecp_shells, ecp_electrons)
+            return BasisSet(basis_name, shells, ecp, structure, AOType.Spherical)
 
     # Fallback: include ECP shells (with zero electrons) only if present
     if ecp_shells:
