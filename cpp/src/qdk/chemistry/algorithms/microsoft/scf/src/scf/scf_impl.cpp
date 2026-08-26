@@ -948,9 +948,11 @@ void SCFImpl::build_one_electron_integrals_() {
       break;
     case IntegralDressing::X2C1e:
     case IntegralDressing::X2C1eContracted:
-      TIMEIT(one_body_ao = build_x2c_one_body_ao(
-                 ctx_.basis_set, ctx_.cfg->mpi,
-                 ctx_.cfg->integral_dressing == IntegralDressing::X2C1e),
+      const bool decontract =
+          ctx_.cfg->integral_dressing == IntegralDressing::X2C1e;
+      TIMEIT(one_body_ao =
+                 build_x2c_one_body_ao(ctx_.basis_set, ctx_.cfg->mpi,
+                                       decontract, decontract ? nullptr : &S_),
              "SCFImpl::build_one_electron_integrals->x2c");
       break;
   }

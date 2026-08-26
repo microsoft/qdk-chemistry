@@ -40,10 +40,13 @@ RowMajorMatrix build_nonrelativistic_one_body_ao(const BasisSet& basis_set,
  * @param internal_basis_set Internal spherical all-electron basis.
  * @param mpi Parallel configuration used for integral evaluation.
  * @param decontract Whether to decontract before X2C and recontract afterward.
+ * @param contracted_overlap Optional overlap already evaluated in the supplied
+ *        contracted basis; ignored when @p decontract is true.
  * @return X2C-1e one-electron matrix in the supplied basis.
  */
 RowMajorMatrix build_x2c_one_body_ao(
     const std::shared_ptr<BasisSet>& internal_basis_set,
-    const ParallelConfig& mpi, bool decontract);
+    const ParallelConfig& mpi, bool decontract,
+    const RowMajorMatrix* contracted_overlap = nullptr);
 
 }  // namespace qdk::chemistry::scf
