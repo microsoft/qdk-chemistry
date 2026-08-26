@@ -5,13 +5,11 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import numpy as np
-
 from qdk_chemistry.data import Wavefunction
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .state_preparation import StatePreparation
+from .state_preparation import StatePreparation, dense_coefficients
 
 __all__: list[str] = ["DensePureStatePreparation"]
 
@@ -52,25 +50,7 @@ class DensePureStatePreparation(StatePreparation):
             Circuit: A Circuit object implementing the state preparation.
 
         """
-        config_set = wavefunction.get_configuration_set()
-        dets = wavefunction.get_active_determinants()
-        coeffs = np.asarray(wavefunction.get_coefficients())
-        if np.iscomplexobj(coeffs):
-            if not np.allclose(coeffs.imag, 0.0):
-                raise ValueError("Dense state preparation requires real coefficients (imaginary part must be zero).")
-            coeffs = coeffs.real
-        n_bits = config_set.num_modes() * dets[0].bits_per_mode()
-        n_qubits = n_bits
-        if n_qubits > 32:
-            raise ValueError("Dense state preparation is only supported for up to 32 qubits.")
-        statevector = np.zeros(2**n_qubits, dtype=float)
-        for coeff, det in zip(coeffs, dets, strict=True):
-            bits = det.to_bits(n_bits)
-            idx = 0
-            for i, b in enumerate(bits):
-                idx |= b << i
-            statevector[idx] += coeff
-
+        statevector, n_qubits = dense_coefficients(wavefunction, "Dense state preparation")
         row_map = list(range(n_qubits - 1, -1, -1))
         state_prep_params = QSHARP_UTILS.StatePreparation.StatePreparationParams(
             rowMap=row_map,

@@ -142,28 +142,41 @@ class PSPMapper(CircuitMapper):
             "PSPMapper requires LCUContainer or LCUWalkContainer."
         )
 
-    def build_prepare_select_ops(self, container: UnitaryContainer) -> tuple[Any, Any, int, int, int]:
-        """Return the PREPARE and SELECT Q# oracles and the widths of the registers they act on.
+    def build_select_ops(self, container: UnitaryContainer) -> tuple[Any, int]:
+        """Return the SELECT oracle and the width of the system register it targets.
 
         Args:
             container: The container held by the unitary representation.
 
         Returns:
-            The PREPARE Q# callable, the SELECT Q# callable, the system register width, the index
-            width SELECT controls on, and the total width PREPARE owns.
-
-        Raises:
-            ValueError: If the PREPARE circuit carries no Q# operation, does not declare the
-                width it acts on, or declares one too narrow for the index SELECT controls on.
+            The Q# SELECT callable and the number of system qubits.
 
         """
         lcu, _ = self.resolve_lcu(container)
-        select_op = self._build_pauli_select_op(lcu.select)
-        num_system_qubits = lcu.select.num_target_qubits
-        if lcu.prepare is None:
-            return QSHARP_UTILS.PrepSelPrep.NoOpPrepare, select_op, num_system_qubits, 0, 0
+        return self._build_pauli_select_op(lcu.select), lcu.select.num_target_qubits
 
-        prepare_circuit = self._create_nested("prepare").run(lcu.prepare)
+    def build_prep_ops(self, container: UnitaryContainer) -> tuple[Any, int, int]:
+        """Return the PREPARE oracle and the widths of the ancilla it acts on.
+
+        Args:
+            container: The container held by the unitary representation.
+
+        Returns:
+            The Q# PREPARE callable, the index width SELECT controls on, and the block
+            ancilla width.
+
+        Raises:
+            ValueError: If the PREPARE circuit carries no Q# operation, does not declare the
+                width it acts on, declares one too narrow for the index SELECT controls on, or
+                expects shared ancilla this mapper does not supply.
+
+        """
+        lcu, _ = self.resolve_lcu(container)
+        if lcu.prepare is None:
+            return QSHARP_UTILS.PrepSelPrep.NoOpPrepare, 0, 0
+
+        prepare_algorithm = self._create_nested("prepare")
+        prepare_circuit = prepare_algorithm.run(lcu.prepare)
         prepare_op = prepare_circuit._qsharp_op  # noqa: SLF001
         if prepare_op is None:
             raise ValueError("The PREPARE circuit has no Q# operation to embed in the block encoding.")
@@ -174,15 +187,25 @@ class PSPMapper(CircuitMapper):
         num_select_qubits = lcu.num_prepare_ancillas
         if num_block_ancillas is None:
             raise ValueError(
-                "The PREPARE circuit does not declare num_qubits, so the block ancilla register cannot "
-                "be sized. A state preparation used as a PREPARE oracle must report the width it acts on."
+                f"State preparation '{prepare_algorithm.name()}' does not declare num_qubits, so the "
+                "block ancilla register cannot be sized."
+            )
+        if num_block_ancillas <= 0:
+            raise ValueError(
+                f"State preparation '{prepare_algorithm.name()}' declares num_qubits={num_block_ancillas}, "
+                "but a PREPARE oracle must act on at least one qubit."
+            )
+        if prepare_circuit.num_shared_ancillas:
+            raise ValueError(
+                f"State preparation '{prepare_algorithm.name()}' expects {prepare_circuit.num_shared_ancillas} "
+                "shared ancilla, which PSPMapper does not supply."
             )
         if num_block_ancillas < num_select_qubits:
             raise ValueError(
-                f"The PREPARE circuit acts on {num_block_ancillas} qubits but the LCU decomposition "
-                f"indexes {num_select_qubits} of them. SELECT would control on qubits PREPARE does not own."
+                f"The PREPARE circuit acts on {num_block_ancillas} qubits, but the LCU decomposition indexes "
+                f"{num_select_qubits} of them. SELECT would control on qubits PREPARE does not own."
             )
-        return prepare_op, select_op, num_system_qubits, num_select_qubits, num_block_ancillas
+        return prepare_op, num_select_qubits, num_block_ancillas
 
     def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
         r"""Construct the block-encoding circuit on the flat ``[system | ancilla]`` register.
@@ -198,9 +221,8 @@ class PSPMapper(CircuitMapper):
         """
         container = unitary.get_container()
         _, use_quantum_walk = self.resolve_lcu(container)
-        prepare_op, select_op, num_system_qubits, num_select_qubits, num_block_ancillas = self.build_prepare_select_ops(
-            container
-        )
+        select_op, num_system_qubits = self.build_select_ops(container)
+        prepare_op, num_select_qubits, num_block_ancillas = self.build_prep_ops(container)
 
         qsharp_op = QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepOp(
             prepare_op, select_op, num_system_qubits, num_select_qubits
