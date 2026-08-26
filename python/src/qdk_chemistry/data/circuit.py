@@ -77,6 +77,8 @@ class Circuit(DataClass):
         qsharp_factory: QsharpFactoryData | None = None,
         encoding: str | None = None,
         num_qubits: int | None = None,
+        num_shared_ancillas: int = 0,
+        shared_prep_op: Callable[..., Any] | None = None,
     ) -> None:
         """Initialize a Circuit.
 
@@ -92,6 +94,12 @@ class Circuit(DataClass):
             num_qubits: The width of the register ``qsharp_op`` acts on, when the producer
                 knows it. Scratch qubits a circuit allocates internally are not counted.
                 Defaults to None.
+            num_shared_ancillas: How many trailing qubits ``qsharp_op`` expects to already hold a
+                particular state and leaves in it, rather than returning them to zero. The caller
+                prepares them once with ``shared_prep_op`` and must exclude them from any
+                reflection about the zero state. Defaults to 0. Not serialized.
+            shared_prep_op: The Q# callable that initializes the shared ancilla register.
+                Defaults to None, which is required when ``num_shared_ancillas`` is 0.
 
         Notes:
             At least one representation (qasm, qir, qsharp, or qsharp_factory) must be provided.
@@ -102,7 +110,8 @@ class Circuit(DataClass):
             - get_qiskit_circuit(): Converts from qir if available, otherwise converts from qasm
 
         Raises:
-            ValueError: If ``num_qubits`` is negative.
+            ValueError: If ``num_qubits`` is negative, or if the shared ancilla declaration is
+                inconsistent with ``num_qubits`` or with ``shared_prep_op``.
 
         """
         Logger.trace_entering()
@@ -114,7 +123,22 @@ class Circuit(DataClass):
         self.encoding = encoding
         if num_qubits is not None and num_qubits < 0:
             raise ValueError(f"num_qubits must be non-negative. Got {num_qubits}.")
+        if num_shared_ancillas < 0:
+            raise ValueError(f"num_shared_ancillas must be non-negative. Got {num_shared_ancillas}.")
+        if num_shared_ancillas > 0:
+            if num_qubits is None:
+                raise ValueError("num_qubits must be declared when num_shared_ancillas is non-zero.")
+            if num_shared_ancillas > num_qubits:
+                raise ValueError(
+                    f"num_shared_ancillas ({num_shared_ancillas}) cannot exceed num_qubits ({num_qubits})."
+                )
+            if shared_prep_op is None:
+                raise ValueError("shared_prep_op must be provided when num_shared_ancillas is non-zero.")
+        elif shared_prep_op is not None:
+            raise ValueError("shared_prep_op was provided but num_shared_ancillas is 0.")
         self.num_qubits = num_qubits
+        self.num_shared_ancillas = num_shared_ancillas
+        self._shared_prep_op = shared_prep_op
 
         # Check that a representation of the quantum circuit is given by the keyword arguments
         if not any([self.qasm, self.qsharp, self.qir, self._qsharp_factory]):

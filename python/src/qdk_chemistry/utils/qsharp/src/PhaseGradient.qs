@@ -14,6 +14,7 @@ namespace QDKChemistry.Utils.PhaseGradient {
 
     import Std.Arithmetic.RippleCarryCGIncByLE;
     import Std.Canon.ApplyQFT;
+    import Std.Canon.ApplyXorInPlace;
     import Std.Core.Length;
 
     /// Prepares the phase gradient state |φ⟩ = (1/√2^n) Σ_k exp(-2πi·k/2^n) |k⟩_LE.
@@ -89,57 +90,46 @@ namespace QDKChemistry.Utils.PhaseGradient {
         }
     }
 
-    /// Test wrapper: apply Ry via phase gradient on |0⟩ and leave state.
-    internal operation TestRy(angleValue : Int, nBits : Int) : Unit {
-        let target = QIR.Runtime.AllocateQubitArray(1);
-        let angle = QIR.Runtime.AllocateQubitArray(nBits);
-        let pg = QIR.Runtime.AllocateQubitArray(nBits);
-
-        for k in 0..nBits - 1 {
-            if (angleValue >>> k) &&& 1 == 1 { X(angle[k]); }
-        }
-
-        within {
-            PreparePhaseGradientState(pg);
-        } apply {
-            RyViaPhaseGradient(target[0], angle, pg);
+    /// Test wrapper: Ry via phase gradient on `[target | angle | gradient]`.
+    internal function MakeTestRyOp(angleValue : Int, nBits : Int) : Qubit[] => Unit {
+        (qs) => {
+            let angle = qs[1..nBits];
+            let pg = qs[nBits + 1..2 * nBits];
+            ApplyXorInPlace(angleValue, angle);
+            within {
+                PreparePhaseGradientState(pg);
+            } apply {
+                RyViaPhaseGradient(qs[0], angle, pg);
+            }
         }
     }
 
-    /// Test wrapper: apply Rz via phase gradient to |+⟩ so the relative phase, and
-    /// therefore the sign convention, is observable in the dumped state.
-    internal operation TestRzOnPlus(angleValue : Int, nBits : Int) : Unit {
-        let target = QIR.Runtime.AllocateQubitArray(1);
-        let angle = QIR.Runtime.AllocateQubitArray(nBits);
-        let pg = QIR.Runtime.AllocateQubitArray(nBits);
-
-        H(target[0]);
-
-        for k in 0..nBits - 1 {
-            if (angleValue >>> k) &&& 1 == 1 { X(angle[k]); }
-        }
-
-        within {
-            PreparePhaseGradientState(pg);
-        } apply {
-            RzViaPhaseGradient(target[0], angle, pg);
+    /// Test wrapper: Rz via phase gradient on `[target | angle | gradient]`.
+    internal function MakeTestRzOnPlusOp(angleValue : Int, nBits : Int) : Qubit[] => Unit {
+        (qs) => {
+            let angle = qs[1..nBits];
+            let pg = qs[nBits + 1..2 * nBits];
+            H(qs[0]);
+            ApplyXorInPlace(angleValue, angle);
+            within {
+                PreparePhaseGradientState(pg);
+            } apply {
+                RzViaPhaseGradient(qs[0], angle, pg);
+            }
         }
     }
 
-    /// Test wrapper: apply Ry then Adjoint Ry (round-trip identity check).
-    internal operation TestRyRoundtrip(angleValue : Int, nBits : Int) : Unit {
-        let target = QIR.Runtime.AllocateQubitArray(1);
-        let angle = QIR.Runtime.AllocateQubitArray(nBits);
-        let pg = QIR.Runtime.AllocateQubitArray(nBits);
-
-        H(target[0]);
-
-        for k in 0..nBits - 1 {
-            if (angleValue >>> k) &&& 1 == 1 { X(angle[k]); }
+    /// Test wrapper: Ry round-trip on `[target | angle | gradient]`.
+    internal function MakeTestRyRoundtripOp(angleValue : Int, nBits : Int) : Qubit[] => Unit {
+        (qs) => {
+            let angle = qs[1..nBits];
+            let pg = qs[nBits + 1..2 * nBits];
+            H(qs[0]);
+            ApplyXorInPlace(angleValue, angle);
+            within {
+                PreparePhaseGradientState(pg);
+                RyViaPhaseGradient(qs[0], angle, pg);
+            } apply {}
         }
-        within {
-            PreparePhaseGradientState(pg);
-            RyViaPhaseGradient(target[0], angle, pg);
-        } apply {}
     }
 }
