@@ -89,9 +89,14 @@
 #    and a static libFLAME.a end up on the same final executable's link line, and since both are full,
 #    conforming implementations of the same netlib LAPACK Fortran API (libFLAME is built with
 #    --enable-legacy-lapack), every routine collides: "multiple definition of `dsytrd_'" etc. Fix: forward
-#    LAPACK_PREFERENCE_LIST (not previously in any of BuildCMSBModule.cmake's CORE_CMAKE_STRINGS/CORE_CMAKE_LISTS/
-#    CORE_CMAKE_OPTIONS/DEPENDENCY_CMAKE_OPTIONS bundling lists) to every consumer sub-build, so a caller can pin
-#    it explicitly (e.g. -DLAPACK_PREFERENCE_LIST="FLAME;ReferenceLAPACK" for the BLIS+libFLAME stack -- see
+#    LAPACK_PREFERENCE_LIST (not previously in any of BuildCMSBModule.cmake's bundling lists) to every consumer
+#    sub-build via bundle_cmake_list()/CORE_CMAKE_LISTS -- NOT bundle_cmake_strings()/CORE_CMAKE_STRINGS, which
+#    embeds each -D<var>:STRING=<value> as one element of an outer CMake list: since our own value itself
+#    contains a semicolon ("FLAME;ReferenceLAPACK"), that collides with the outer list's own element separator
+#    and gets silently split/truncated, so LAPACK_PREFERENCE_LIST never actually reaches the sub-build and
+#    ReferenceLAPACK keeps winning. bundle_cmake_list()'s :LIST= typed cache args are what ExternalProject_Add's
+#    CMAKE_CACHE_ARGS escapes correctly for exactly this multi-value case. So a caller can pin it explicitly
+#    (e.g. -DLAPACK_PREFERENCE_LIST="FLAME;ReferenceLAPACK" for the BLIS+libFLAME stack -- see
 #    install-exachem.sh) and have libFLAME resolved consistently everywhere instead of ReferenceLAPACK winning by
 #    default ordering. Deliberately NOT using -DBLA_VENDOR=<vendor> for this (the codebase's own
 #    emulate_kitware_linalg_modules() helper would honor it, but only if BLA_VENDOR is ALSO forwarded, which it
@@ -201,6 +206,15 @@ diff --git a/cmake/macros/BuildCMSBModule.cmake b/cmake/macros/BuildCMSBModule.c
 index 9d689b6..9b0d24d 100644
 --- a/cmake/macros/BuildCMSBModule.cmake
 +++ b/cmake/macros/BuildCMSBModule.cmake
+@@ -242,7 +242,7 @@ function(build_cmsb_module SUPER_PROJECT_ROOT)
+     bundle_cmake_args(CORE_CMAKE_OPTIONS ${CMSB_CORE_OPTIONS})
+ 
+     bundle_cmake_list(CORE_CMAKE_LISTS CMAKE_PREFIX_PATH CMAKE_MODULE_PATH 
+-                      CMSB_LAM_PATH CMAKE_INSTALL_RPATH CMAKE_BUILD_WITH_INSTALL_RPATH)
++                      CMSB_LAM_PATH CMAKE_INSTALL_RPATH CMAKE_BUILD_WITH_INSTALL_RPATH LAPACK_PREFERENCE_LIST)
+ 
+     bundle_cmake_strings(CORE_CMAKE_STRINGS ${CMSB_C_FLAGS} ${CMSB_CXX_FLAGS} ${CMSB_Fortran_FLAGS})
+     # Some deps may need this even if overall build type is Release/Debug
 @@ -249,5 +249,5 @@ function(build_cmsb_module SUPER_PROJECT_ROOT)
      bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS ${CMSB_CORE_OPTIONS})
  
@@ -208,11 +222,6 @@ index 9d689b6..9b0d24d 100644
 -    bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS BLAS_ARCH GCCROOT HDF5_ROOT HPTT_ROOT LibInt2_ROOT)
 +    bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS BLAS_ARCH GCCROOT HDF5_ROOT HPTT_ROOT LibInt2_ROOT SPDLOG_ROOT EcpInt_ROOT NJSON_ROOT)
  
-@@ -254,3 +254,3 @@ function(build_cmsb_module SUPER_PROJECT_ROOT)
-     bundle_cmake_strings(CORE_CMAKE_STRINGS CMSB_PROJECTS ENABLE_DEV_MODE GPU_ARCH MARCH_FLAGS USE_TAMM_DEV CMSB_TAG)
--    bundle_cmake_strings(CORE_CMAKE_STRINGS USE_UPCXX BLAS_INT4 LINALG_PREFIX USE_SCALAPACK USE_HDF5 USE_LIBNUMA USE_NWQSIM LINK_STATIC_GPU_LIBS)
-+    bundle_cmake_strings(CORE_CMAKE_STRINGS USE_UPCXX BLAS_INT4 LINALG_PREFIX LAPACK_PREFERENCE_LIST USE_SCALAPACK USE_HDF5 USE_LIBNUMA USE_NWQSIM LINK_STATIC_GPU_LIBS)
-     bundle_cmake_strings(CORE_CMAKE_STRINGS ${PROJECT_NAME}_HAS_HIP CMSB_HAS_HIP ROCM_ROOT)
 diff --git a/cmake/macros/DependencyMacros.cmake b/cmake/macros/DependencyMacros.cmake
 index d70d56d..712dbc8 100644
 --- a/cmake/macros/DependencyMacros.cmake
