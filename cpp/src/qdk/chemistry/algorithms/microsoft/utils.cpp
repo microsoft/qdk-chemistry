@@ -255,19 +255,15 @@ qdk::chemistry::data::BasisSet convert_basis_set_to_qdk(
   }
 
   // Handle ECP (Effective Core Potential) information if present
-  if (basis_set.n_ecp_electrons != 0 || !basis_set.ecp_shells.empty() ||
-      !basis_set.element_ecp_electrons.empty()) {
+  basis_set.validate_atom_ecp_electrons();
+  if (basis_set.get_n_ecp_electrons() != 0 || !basis_set.ecp_shells.empty()) {
     // Use basis set name as ECP name
     std::string qdk_ecp_name = basis_set.name;
 
-    // Build ECP electrons per atom vector
-    std::vector<size_t> qdk_ecp_electrons(basis_set.mol->n_atoms, 0);
-    for (size_t i = 0; i < basis_set.mol->n_atoms; ++i) {
-      int atomic_num = basis_set.mol->atomic_nums[i];
-      auto it = basis_set.element_ecp_electrons.find(atomic_num);
-      if (it != basis_set.element_ecp_electrons.end()) {
-        qdk_ecp_electrons[i] = static_cast<size_t>(it->second);
-      }
+    std::vector<size_t> qdk_ecp_electrons;
+    qdk_ecp_electrons.reserve(basis_set.atom_ecp_electrons.size());
+    for (int ecp_electrons : basis_set.atom_ecp_electrons) {
+      qdk_ecp_electrons.push_back(static_cast<size_t>(ecp_electrons));
     }
 
     // Create the BasisSet with shells, ECP shells, ECP name, ECP electrons, and
@@ -361,25 +357,9 @@ nlohmann::ordered_json convert_to_json(
     }
   }
 
-  // Build element_ecp_electrons map from ecp_electrons vector
   auto& structure = basis_set.get_structure();
   auto nuclear_charges = structure->get_nuclear_charges();
   auto ecp_electrons = basis_set.get_ecp_electrons();
-
-  std::map<int, int> element_ecp_electrons;
-  for (size_t i = 0; i < ecp_electrons.size(); ++i) {
-    if (ecp_electrons[i] > 0) {
-      int atomic_num = static_cast<int>(nuclear_charges[i]);
-      element_ecp_electrons[atomic_num] = static_cast<int>(ecp_electrons[i]);
-    }
-  }
-
-  // Serialize element_ecp_electrons as flat list
-  std::vector<int> json_element_ecp_electrons;
-  for (const auto& [k, v] : element_ecp_electrons) {
-    json_element_ecp_electrons.push_back(k);
-    json_element_ecp_electrons.push_back(v);
-  }
 
   std::vector<unsigned> nuclear_charges_unsigned(nuclear_charges.size());
   std::transform(nuclear_charges.begin(), nuclear_charges.end(),
@@ -394,7 +374,7 @@ nlohmann::ordered_json convert_to_json(
        {"num_atomic_orbitals", basis_set.get_num_atomic_orbitals()},
        {"electron_shells", json_shells},
        {"ecp_shells", json_ecp_shells},
-       {"element_ecp_electrons", json_element_ecp_electrons}});
+       {"atom_ecp_electrons", ecp_electrons}});
 
   return j;
 }
