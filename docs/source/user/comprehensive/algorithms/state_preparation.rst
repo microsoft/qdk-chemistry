@@ -223,7 +223,7 @@ This method implements the coherent alias sampling oracle of Babbush et al. :cit
 where :math:`\tilde{p}` is the target distribution discretized to :math:`\mu` bits.
 
 .. warning::
-   This is a **block-encoding subroutine, not a general-purpose state preparation**. The index register is left entangled with ancilla, so the output is only meaningful inside an :term:`LCU` or qubitization circuit where :math:`\mathrm{PREPARE}^\dagger` later uncomputes the garbage. It has no way to represent a coefficient's sign, so negative coefficients are rejected.
+   This is a **block-encoding subroutine, not a general state preparation for algorithms like QPE**. The index register is left entangled with ancilla, so the output is only meaningful inside an :term:`LCU` or qubitization circuit where :math:`\mathrm{PREPARE}^\dagger` later uncomputes the garbage. Negative coefficients are not supported.
 
 .. rubric:: Settings
 
@@ -237,8 +237,6 @@ where :math:`\tilde{p}` is the target distribution discretized to :math:`\mu` bi
    * - ``bits_precision``
      - int
      - Number of bits :math:`\mu` of precision for the alias table's keep probabilities. Each prepared probability is within :math:`1/(L 2^{\mu})` of the target for :math:`L` coefficients. The upper bound of 30 is a sanity limit as :math:`2^{-30}` is far below chemical accuracy. Default is 10.
-
-The prepared index register stays entangled with the ancillas, so this method is only meaningful inside a block encoding that applies :math:`\mathrm{PREPARE}^\dagger` to uncompute them. The ``prepare_select_prepare`` circuit mapper supplies those ancillas and uncomputes them after SELECT.
 
 Related classes
 ---------------
