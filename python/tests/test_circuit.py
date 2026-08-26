@@ -102,25 +102,26 @@ class TestCircuitConstruction:
         assert Circuit(qasm="OPENQASM 3.0;", num_qubits=5).num_qubits == 5
         assert Circuit(qasm="OPENQASM 3.0;", num_qubits=0).num_qubits == 0
 
-    def test_shared_ancillas_are_recorded_with_their_prep_op(self):
-        """A shared tail is declared alongside the callable that initializes it."""
-        prep = object()
-        circuit = Circuit(qasm="OPENQASM 3.0;", num_qubits=5, num_shared_ancillas=2, shared_prep_op=prep)
-        assert circuit.num_shared_ancillas == 2
-        assert circuit._shared_prep_op is prep
+    def test_phase_gradient_ancillas_are_recorded(self):
+        """A trailing phase gradient register is declared on the circuit."""
+        circuit = Circuit(qasm="OPENQASM 3.0;", num_qubits=5, num_phase_gradient_ancillas=2)
+        assert circuit.num_phase_gradient_ancillas == 2
+
+    def test_phase_gradient_ancillas_survive_a_json_round_trip(self):
+        """The declaration is a plain count, so it serializes with the rest of the circuit."""
+        circuit = Circuit(qasm="OPENQASM 3.0;", num_qubits=5, num_phase_gradient_ancillas=2)
+        assert Circuit.from_json(circuit.to_json()).num_phase_gradient_ancillas == 2
 
     @pytest.mark.parametrize(
         ("kwargs", "match"),
         [
-            ({"num_qubits": 5, "num_shared_ancillas": -1}, "must be non-negative"),
-            ({"num_qubits": 5, "num_shared_ancillas": 2}, "shared_prep_op must be provided"),
-            ({"num_qubits": 2, "num_shared_ancillas": 3, "shared_prep_op": object()}, "cannot exceed num_qubits"),
-            ({"num_shared_ancillas": 1, "shared_prep_op": object()}, "num_qubits must be declared"),
-            ({"num_qubits": 5, "shared_prep_op": object()}, "num_shared_ancillas is 0"),
+            ({"num_qubits": 5, "num_phase_gradient_ancillas": -1}, "must be non-negative"),
+            ({"num_qubits": 2, "num_phase_gradient_ancillas": 3}, "cannot exceed num_qubits"),
+            ({"num_phase_gradient_ancillas": 1}, "num_qubits must be declared"),
         ],
     )
-    def test_inconsistent_shared_ancilla_declarations_are_rejected(self, kwargs, match):
-        """An unusable shared ancilla declaration fails at construction, not inside Q#."""
+    def test_inconsistent_phase_gradient_declarations_are_rejected(self, kwargs, match):
+        """An unusable phase gradient declaration fails at construction, not inside Q#."""
         with pytest.raises(ValueError, match=match):
             Circuit(qasm="OPENQASM 3.0;", **kwargs)
 
