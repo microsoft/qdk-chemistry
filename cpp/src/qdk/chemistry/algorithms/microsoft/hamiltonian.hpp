@@ -28,8 +28,10 @@ namespace detail {
  * @return True when the sequence is empty or contiguous.
  */
 inline bool indices_are_contiguous(const std::vector<std::size_t>& indices) {
-  return indices.empty() ||
-         indices.back() - indices.front() + 1 == indices.size();
+  for (std::size_t index = 1; index < indices.size(); ++index) {
+    if (indices[index] != indices[index - 1] + 1) return false;
+  }
+  return true;
 }
 
 std::pair<std::shared_ptr<qdk::chemistry::scf::BasisSet>, Eigen::MatrixXd>

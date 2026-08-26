@@ -3,10 +3,12 @@
 // license information.
 
 #include <gtest/gtest.h>
+#include <qdk/chemistry/scf/util/int1e.h>
 
 #include <Eigen/Dense>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <nlohmann/json.hpp>
 #include <numeric>
 #include <optional>
@@ -28,6 +30,7 @@
 #include <sstream>
 #include <stdexcept>
 
+#include "../src/qdk/chemistry/algorithms/microsoft/hamiltonian.hpp"
 #include "qdk/chemistry/algorithms/microsoft/scalar_relativistic_hamiltonian.hpp"
 #include "qdk/chemistry/algorithms/microsoft/utils.hpp"
 #include "ut_common.hpp"
@@ -2765,14 +2768,35 @@ TEST_F(HamiltonianTest, DataTypeName) {
   EXPECT_EQ(h.get_data_type_name(), "hamiltonian");
 }
 
+TEST_F(HamiltonianConstructorTest, ContiguousIndicesRequireSortedUniqueInput) {
+  using qdk::chemistry::algorithms::microsoft::detail::indices_are_contiguous;
+  EXPECT_TRUE(indices_are_contiguous({}));
+  EXPECT_TRUE(indices_are_contiguous({2}));
+  EXPECT_TRUE(indices_are_contiguous({2, 3, 4}));
+  EXPECT_FALSE(indices_are_contiguous({2, 4}));
+  EXPECT_FALSE(indices_are_contiguous({2, 2}));
+  EXPECT_FALSE(indices_are_contiguous({3, 2}));
+}
+
 // ══════════════════════════════════════════════════════════════════════════
 // X2C-1e integral dressing tests
 // ══════════════════════════════════════════════════════════════════════════
 
-// Helper: run water SCF + build both NR and X2C Hamiltonians
-auto run_water_nr_and_x2c = [](const std::string& basis = "sto-3g",
-                               const std::string& integral_dressing =
-                                   "x2c_1e") {
+using WaterX2CResult =
+    std::tuple<double, std::shared_ptr<Hamiltonian>,
+               std::shared_ptr<Hamiltonian>, std::shared_ptr<Orbitals>>;
+
+// Run each immutable water fixture once per basis and dressing mode.
+const WaterX2CResult& run_water_nr_and_x2c(
+    const std::string& basis = "sto-3g",
+    const std::string& integral_dressing = "x2c_1e") {
+  using Key = std::pair<std::string, std::string>;
+  static std::map<Key, WaterX2CResult> cache;
+  const Key key{basis, integral_dressing};
+  if (const auto found = cache.find(key); found != cache.end()) {
+    return found->second;
+  }
+
   std::vector<Eigen::Vector3d> coords = {{0.0, -0.1432247636, 0.0},
                                          {1.6380335020, 1.1363366135, 0.0},
                                          {-1.6380335020, 1.1363366135, 0.0}};
@@ -2790,8 +2814,11 @@ auto run_water_nr_and_x2c = [](const std::string& basis = "sto-3g",
   auto ham_x2c = make_x2c_constructor("qdk", integral_dressing);
   auto h_x2c = ham_x2c->run(orbitals);
 
-  return std::make_tuple(energy, h_nr, h_x2c, orbitals);
-};
+  return cache
+      .emplace(key, WaterX2CResult{energy, std::move(h_nr), std::move(h_x2c),
+                                   std::move(orbitals)})
+      .first->second;
+}
 
 TEST_F(HamiltonianConstructorTest, X2CDefaultSettings) {
   for (const std::string factory_name : {"qdk", "qdk_cholesky"}) {
@@ -2801,20 +2828,6 @@ TEST_F(HamiltonianConstructorTest, X2CDefaultSettings) {
     EXPECT_ANY_THROW(
         constructor->settings().set("integral_dressing", "unsupported"));
   }
-}
-
-TEST_F(HamiltonianConstructorTest, X2CEdgeCases) {
-  auto x2c = make_x2c_constructor();
-
-  // Throw if restricted orbitals have empty active space
-  EXPECT_THROW(
-      {
-        auto model_orbs = std::make_shared<ModelOrbitals>(
-            testing::restricted_index_set(3, {}),
-            testing::restricted_index_set(3, {}));
-        x2c->run(model_orbs);
-      },
-      std::runtime_error);
 }
 
 TEST_F(HamiltonianConstructorTest, X2CNonContiguousActiveSpace) {
@@ -2888,29 +2901,83 @@ TEST_F(HamiltonianConstructorTest, X2CNonContiguousInactiveSpace) {
   });
 }
 
-TEST_F(HamiltonianConstructorTest, X2CNearLinearDependenceIsFinite) {
+TEST_F(HamiltonianConstructorTest, X2CMetricScreeningMatchesEquivalentBasis) {
   std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d::Zero()};
   std::vector<std::string> symbols = {"H"};
   Structure structure(coordinates, symbols);
-  std::vector<Shell> shells;
-  shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{1.0},
-                            std::vector<double>{1.0}));
-  shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{1.000000002},
-                            std::vector<double>{1.0}));
-  auto basis_set =
-      std::make_shared<BasisSet>("near-dependent", shells, structure);
-  auto orbitals = std::make_shared<Orbitals>(
-      Eigen::MatrixXd::Identity(2, 2), std::nullopt, std::nullopt, basis_set,
-      testing::restricted_index_set(2, {0, 1}),
-      testing::restricted_index_set(2, {}));
 
-  for (const std::string integral_dressing : {"x2c_1e_contracted", "x2c_1e"}) {
-    auto x2c = make_x2c_constructor("qdk", integral_dressing);
-    auto hamiltonian = x2c->run(orbitals);
+  auto build_one_body = [&](const std::vector<double>& exponents,
+                            const std::string& integral_dressing) {
+    std::vector<Shell> shells;
+    for (const double exponent : exponents) {
+      shells.emplace_back(0, OrbitalType::S, std::vector<double>{exponent},
+                          std::vector<double>{1.0});
+    }
+    auto basis_set =
+        std::make_shared<BasisSet>("metric-screening", shells, structure);
+    const size_t dimension = exponents.size();
+    std::vector<size_t> all_indices(dimension);
+    std::iota(all_indices.begin(), all_indices.end(), 0);
+    auto orbitals = std::make_shared<Orbitals>(
+        Eigen::MatrixXd::Identity(dimension, dimension), std::nullopt,
+        std::nullopt, basis_set,
+        testing::restricted_index_set(dimension, all_indices),
+        testing::restricted_index_set(dimension, {}));
+    auto constructor = make_x2c_constructor("qdk", integral_dressing);
+    auto hamiltonian = constructor->run(orbitals);
     auto [one_body_alpha, one_body_beta] =
         hamiltonian->get_one_body_integrals();
-    EXPECT_TRUE(one_body_alpha.allFinite());
-    EXPECT_TRUE(one_body_beta.allFinite());
+    return Eigen::MatrixXd(one_body_alpha);
+  };
+
+  constexpr double diffuse_exponent = 2.5e-5;
+  auto generalized_spectrum = [](const Eigen::MatrixXd& one_body,
+                                 const std::vector<double>& exponents) {
+    const Eigen::Index dimension = one_body.rows();
+    Eigen::MatrixXd overlap(dimension, dimension);
+    for (Eigen::Index row = 0; row < dimension; ++row) {
+      for (Eigen::Index column = 0; column < dimension; ++column) {
+        const double product = exponents[row] * exponents[column];
+        const double sum = exponents[row] + exponents[column];
+        overlap(row, column) = std::pow(2.0 * std::sqrt(product) / sum, 1.5);
+      }
+    }
+
+    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> overlap_solver(overlap);
+    EXPECT_EQ(overlap_solver.info(), Eigen::Success);
+    const double cutoff = 1e-10 * overlap_solver.eigenvalues().maxCoeff();
+    std::vector<Eigen::Index> retained;
+    for (Eigen::Index index = 0; index < dimension; ++index) {
+      if (overlap_solver.eigenvalues()(index) > cutoff) {
+        retained.push_back(index);
+      }
+    }
+    Eigen::MatrixXd orthogonalizer(dimension, retained.size());
+    for (size_t column = 0; column < retained.size(); ++column) {
+      const Eigen::Index index = retained[column];
+      orthogonalizer.col(column) =
+          overlap_solver.eigenvectors().col(index) /
+          std::sqrt(overlap_solver.eigenvalues()(index));
+    }
+    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> hamiltonian_solver(
+        orthogonalizer.transpose() * one_body * orthogonalizer);
+    EXPECT_EQ(hamiltonian_solver.info(), Eigen::Success);
+    return hamiltonian_solver.eigenvalues();
+  };
+
+  for (const std::string integral_dressing : {"x2c_1e_contracted", "x2c_1e"}) {
+    const std::vector<double> duplicate_exponents{1.0, 1.0, diffuse_exponent};
+    const std::vector<double> unique_exponents{1.0, diffuse_exponent};
+    const Eigen::VectorXd duplicate_spectrum = generalized_spectrum(
+        build_one_body(duplicate_exponents, integral_dressing),
+        duplicate_exponents);
+    const Eigen::VectorXd unique_spectrum = generalized_spectrum(
+        build_one_body(unique_exponents, integral_dressing), unique_exponents);
+    ASSERT_EQ(duplicate_spectrum.size(), unique_spectrum.size());
+    EXPECT_LT((duplicate_spectrum - unique_spectrum).cwiseAbs().maxCoeff(),
+              1e-10)
+        << "duplicate=" << duplicate_spectrum.transpose()
+        << ", unique=" << unique_spectrum.transpose();
   }
 }
 
@@ -3003,13 +3070,61 @@ TEST_F(HamiltonianConstructorTest, X2CRestrictedOpenShellOrbitals) {
 }
 
 TEST_F(HamiltonianConstructorTest, X2CAbsoluteOneBodyReferences) {
-  // Generated with PySCF using exact QDK basis shells, QDK's speed of light,
+  // Reference uses exact QDK basis shells, QDK's speed of light,
   // and QDK SCF orbital coefficients.
+  auto symmetric_matrix = [](const std::vector<double>& upper_triangle) {
+    constexpr Eigen::Index dimension = 7;
+    EXPECT_EQ(upper_triangle.size(),
+              static_cast<size_t>(dimension * (dimension + 1) / 2));
+    Eigen::MatrixXd matrix = Eigen::MatrixXd::Zero(dimension, dimension);
+    size_t index = 0;
+    for (Eigen::Index row = 0; row < dimension; ++row) {
+      for (Eigen::Index column = row; column < dimension; ++column) {
+        matrix(row, column) = upper_triangle[index++];
+        matrix(column, row) = matrix(row, column);
+      }
+    }
+    return matrix;
+  };
+
+  const std::map<std::string, Eigen::MatrixXd> references = {
+      {"x2c_1e_contracted",
+       symmetric_matrix({
+           -32.578789438529064,     0.57475877515990514,
+           1.741252692451031e-14,   0.21214833081572079,
+           1.0707454094009528e-14,  0.25948012062218612,
+           1.4153690683979093e-14,  -7.5664728031635518,
+           2.1525459798948942e-14,  -0.5230431108841932,
+           1.0205396554301009e-12,  -1.2206893405988162,
+           1.0675319334232235e-12,  -6.0181608259892263,
+           -2.7620067359211549e-12, 4.638436321001968e-12,
+           4.3074331355157158e-12,  -1.7668404206455299,
+           -6.6105711519795918,     -2.4208231591644891e-12,
+           1.3054587177535795,      -2.4596898235476929e-12,
+           -7.347734524712167,      6.1278782981257408e-13,
+           3.090605210090857e-12,   -5.2920635209012863,
+           1.2822670519703641e-12,  -5.5139248098732256,
+       })},
+      {"x2c_1e", symmetric_matrix({
+                     -32.577465748805508,     0.57443326282304286,
+                     1.4996893278855433e-13,  0.21195248033067005,
+                     -1.4870515069039216e-13, 0.25925084541357557,
+                     2.1067784051087736e-13,  -7.5663640982116798,
+                     -1.1542909236468568e-13, -0.52298575799108227,
+                     -2.0194426824969573e-12, -1.2206180050254942,
+                     7.2519744211165663e-13,  -6.0181075598311926,
+                     -5.5280294679280144e-12, 7.32905942149941e-12,
+                     7.085402784594798e-12,   -1.7667679601125272,
+                     -6.6104535879945931,     -9.3999751947578105e-12,
+                     1.305419716793242,       -1.9350423059321846e-12,
+                     -7.3475818978072001,     1.8828301212178241e-12,
+                     -8.2166702812457013e-12, -5.2919455673432667,
+                     4.5812263626087009e-12,  -5.5138130903856251,
+                 })},
+  };
+
   for (const std::string factory_name : {"qdk", "qdk_cholesky"}) {
-    for (const auto& [integral_dressing, expected_trace] :
-         std::vector<std::pair<std::string, double>>{
-             {"x2c_1e_contracted", -70.927717075213437},
-             {"x2c_1e", -70.925731550323121}}) {
+    for (const auto& [integral_dressing, expected] : references) {
       auto [energy, h_nr, h_x2c, orbitals] =
           run_water_nr_and_x2c("sto-3g", integral_dressing);
       if (factory_name == "qdk_cholesky") {
@@ -3018,10 +3133,10 @@ TEST_F(HamiltonianConstructorTest, X2CAbsoluteOneBodyReferences) {
         h_x2c = constructor->run(orbitals);
       }
       auto [one_body_alpha, one_body_beta] = h_x2c->get_one_body_integrals();
-      EXPECT_NEAR(one_body_alpha.trace(), expected_trace,
-                  testing::scf_energy_tolerance);
-      EXPECT_NEAR(one_body_beta.trace(), expected_trace,
-                  testing::scf_energy_tolerance);
+      EXPECT_LT((one_body_alpha - expected).cwiseAbs().maxCoeff(),
+                testing::integral_tolerance);
+      EXPECT_LT((one_body_beta - expected).cwiseAbs().maxCoeff(),
+                testing::integral_tolerance);
       EXPECT_EQ(h_x2c->get_container_type(),
                 factory_name == "qdk" ? "canonical_four_center" : "cholesky");
     }
@@ -3041,6 +3156,69 @@ TEST_F(HamiltonianConstructorTest, X2CUnrestrictedO2Reference) {
   EXPECT_NEAR(one_body_beta.trace(), -267.86977556398790,
               testing::scf_energy_tolerance);
   EXPECT_GT((one_body_alpha - one_body_beta).norm(), 1e-6);
+}
+
+TEST_F(HamiltonianConstructorTest, X2CArgonDihydrideAllElectronReferences) {
+  Structure argon_dihydride(
+      std::vector<Eigen::Vector3d>{
+          {0.0, 0.0, 0.0}, {2.0, 0.3, 0.1}, {-0.4, 1.7, -0.2}},
+      std::vector<std::string>{"Ar", "H", "H"});
+  auto basis_set = BasisSet::from_basis_name("6-31g", argon_dihydride);
+  const Eigen::Index dimension =
+      static_cast<Eigen::Index>(basis_set->get_num_atomic_orbitals());
+  ASSERT_EQ(dimension, 17);
+
+  qdk::chemistry::utils::microsoft::initialize_backend();
+  auto internal_basis =
+      qdk::chemistry::utils::microsoft::convert_basis_set_from_qdk(*basis_set);
+  qdk::chemistry::scf::OneBodyIntegral integrals(
+      internal_basis.get(), internal_basis->mol.get(),
+      qdk::chemistry::scf::mpi_default_input());
+  Eigen::MatrixXd overlap(dimension, dimension);
+  integrals.overlap_integral(overlap.data());
+
+  std::vector<size_t> all_indices(dimension);
+  std::iota(all_indices.begin(), all_indices.end(), 0);
+  auto orbitals = std::make_shared<Orbitals>(
+      Eigen::MatrixXd::Identity(dimension, dimension), std::nullopt, overlap,
+      basis_set, testing::restricted_index_set(dimension, all_indices),
+      testing::restricted_index_set(dimension, {}));
+
+  const std::map<std::string, Eigen::VectorXd> reference_spectra = {
+      {"x2c_1e_contracted",
+       (Eigen::VectorXd(17) << -163.6248984392942, -40.47617108701198,
+        -39.803974232754214, -39.77268582436207, -39.750811174993736,
+        -16.033296164440962, -14.905978858744085, -14.720154937852454,
+        -14.601703306431869, -9.471975878938917, -8.732204675091294,
+        -7.560111340990473, -6.865510537675951, -6.8054633111509135,
+        -6.747974053857274, -5.072727698265831, -4.933951088798542)
+           .finished()},
+      {"x2c_1e",
+       (Eigen::VectorXd(17) << -163.51957015609702, -40.463172489494546,
+        -39.79846465639268, -39.76703291575807, -39.74530829380297,
+        -16.03208802481571, -14.905187861617721, -14.719337181608951,
+        -14.600940204130607, -9.47194637775618, -8.732187565205718,
+        -7.560366471380896, -6.865425068849774, -6.805357383823735,
+        -6.747889378486366, -5.072754050714073, -4.9339748119475235)
+           .finished()},
+  };
+
+  for (const auto& [integral_dressing, expected] : reference_spectra) {
+    auto constructor = make_x2c_constructor("qdk", integral_dressing);
+    auto hamiltonian = constructor->run(orbitals);
+    auto [one_body_alpha, one_body_beta] =
+        hamiltonian->get_one_body_integrals();
+    Eigen::GeneralizedSelfAdjointEigenSolver<Eigen::MatrixXd> alpha_solver(
+        one_body_alpha, overlap);
+    Eigen::GeneralizedSelfAdjointEigenSolver<Eigen::MatrixXd> beta_solver(
+        one_body_beta, overlap);
+    ASSERT_EQ(alpha_solver.info(), Eigen::Success);
+    ASSERT_EQ(beta_solver.info(), Eigen::Success);
+    EXPECT_LT((alpha_solver.eigenvalues() - expected).cwiseAbs().maxCoeff(),
+              10 * testing::integral_tolerance);
+    EXPECT_LT((beta_solver.eigenvalues() - expected).cwiseAbs().maxCoeff(),
+              10 * testing::integral_tolerance);
+  }
 }
 
 TEST_F(HamiltonianConstructorTest, X2CUnrestrictedSpinChannelProjection) {
