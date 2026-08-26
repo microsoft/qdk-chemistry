@@ -14,52 +14,6 @@ from qdk_chemistry.data import Circuit, Settings, Wavefunction
 
 __all__: list[str] = []
 
-MAX_DENSE_QUBITS = 32
-
-
-def dense_coefficients(wavefunction: Wavefunction, label: str) -> tuple[np.ndarray, int]:
-    """Scatter a wavefunction's coefficients onto their determinant-derived indices.
-
-    A ``Wavefunction`` stores only occupied determinants, so the coefficient list is not
-    positionally aligned with the basis index. Each coefficient is placed at the index its
-    determinant's bits encode (little-endian, matching ``dense_pure_state``), and the register
-    width comes from the configuration set rather than the coefficient count.
-
-    Args:
-        wavefunction: The target wavefunction.
-        label: Algorithm name, used to prefix error messages.
-
-    Returns:
-        The dense real coefficient vector and the width of the state register in qubits.
-
-    Raises:
-        ValueError: If the wavefunction has no coefficients, has a non-zero imaginary
-            part, or is too wide to densify.
-
-    """
-    coefficients = np.asarray(wavefunction.get_coefficients())
-    if coefficients.size == 0:
-        raise ValueError(f"{label} requires at least one coefficient.")
-    if np.iscomplexobj(coefficients):
-        if not np.allclose(coefficients.imag, 0.0):
-            raise ValueError(f"{label} requires real coefficients.")
-        coefficients = coefficients.real
-    coefficients = coefficients.astype(float, copy=False)
-
-    determinants = wavefunction.get_active_determinants()
-    num_bits = wavefunction.get_configuration_set().num_modes() * determinants[0].bits_per_mode()
-    num_qubits = max(num_bits, 1)
-    if num_qubits > MAX_DENSE_QUBITS:
-        raise ValueError(f"{label} is only supported for up to {MAX_DENSE_QUBITS} qubits.")
-
-    dense = np.zeros(1 << num_qubits, dtype=float)
-    for coefficient, determinant in zip(coefficients, determinants, strict=True):
-        index = 0
-        for position, bit in enumerate(determinant.to_bits(num_bits)):
-            index |= bit << position
-        dense[index] += coefficient
-    return dense, num_qubits
-
 
 class StatePreparationSettings(Settings):
     """Deprecated settings container for state preparation algorithms.
@@ -125,6 +79,50 @@ class StatePreparation(Algorithm):
 
         """
         return super().run(wavefunction)
+
+    @staticmethod
+    def dense_state_vector(wavefunction: Wavefunction, label: str) -> tuple[np.ndarray, int]:
+        """Scatter a wavefunction's coefficients onto their determinant-derived indices.
+
+        A ``Wavefunction`` stores only occupied determinants, so the coefficient list is not
+        positionally aligned with the basis index. Each coefficient is placed at the index its
+        determinant's bits encode (little-endian), and the register width comes from the
+        configuration set rather than the coefficient count.
+
+        Args:
+            wavefunction: The target wavefunction.
+            label: Algorithm name, used to prefix error messages.
+
+        Returns:
+            The dense real coefficient vector and the width of the state register in qubits.
+
+        Raises:
+            ValueError: If the wavefunction has no coefficients, has a non-zero imaginary
+                part, or is too wide to densify.
+
+        """
+        coefficients = np.asarray(wavefunction.get_coefficients())
+        if coefficients.size == 0:
+            raise ValueError(f"{label} requires at least one coefficient.")
+        if np.iscomplexobj(coefficients):
+            if not np.allclose(coefficients.imag, 0.0):
+                raise ValueError(f"{label} requires real coefficients.")
+            coefficients = coefficients.real
+        coefficients = coefficients.astype(float, copy=False)
+
+        determinants = wavefunction.get_active_determinants()
+        num_bits = wavefunction.get_configuration_set().num_modes() * determinants[0].bits_per_mode()
+        num_qubits = max(num_bits, 1)
+        if num_qubits > 32:
+            raise ValueError(f"{label} is only supported for up to 32 qubits.")
+
+        dense = np.zeros(1 << num_qubits, dtype=float)
+        for coefficient, determinant in zip(coefficients, determinants, strict=True):
+            index = 0
+            for position, bit in enumerate(determinant.to_bits(num_bits)):
+                index |= bit << position
+            dense[index] += coefficient
+        return dense, num_qubits
 
 
 class StatePreparationFactory(AlgorithmFactory):
