@@ -190,8 +190,8 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
             raise ValueError(f"Circuit mapper '{type(mapper).__name__}' did not report num_qubits.")
         num_system_qubits = qubit_hamiltonian.num_qubits
 
-        block_encoding_shared = block_encoding.num_phase_gradient_ancillas
-        state_prep_shared = state_preparation.num_phase_gradient_ancillas
+        block_encoding_shared = block_encoding.metadata.num_phase_gradient_ancillas
+        state_prep_shared = state_preparation.metadata.num_phase_gradient_ancillas
         if block_encoding_shared and state_prep_shared and block_encoding_shared != state_prep_shared:
             raise ValueError(
                 f"State preparation expects {state_prep_shared} phase gradient ancilla but the "
