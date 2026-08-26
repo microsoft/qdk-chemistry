@@ -193,10 +193,10 @@ class PSPMapper(CircuitMapper):
                 f"State preparation '{prepare_algorithm.name()}' declares num_qubits={num_block_ancillas}, "
                 "but a PREPARE oracle must act on at least one qubit."
             )
-        if prepare_circuit.num_phase_gradient_ancillas:
+        if prepare_circuit.metadata.num_phase_gradient_ancillas:
             raise ValueError(
                 f"State preparation '{prepare_algorithm.name()}' expects "
-                f"{prepare_circuit.num_phase_gradient_ancillas} phase gradient ancilla, "
+                f"{prepare_circuit.metadata.num_phase_gradient_ancillas} phase gradient ancilla, "
                 "which PSPMapper does not supply."
             )
         if num_block_ancillas < num_select_qubits:
