@@ -231,8 +231,9 @@ must be given the full dense ``norb**4`` block; one that reads only the canonica
 
 The active regularization, minimum denominator, maximum raw intruder amplitude,
 and semicanonicalization status are logged when construction completes. A
-warning is also logged when the raw amplitude exceeds one, where the
-perturbation series stops contracting.
+warning is also logged when the raw amplitude exceeds one. This is a heuristic
+flag for a large individual amplitude, not a convergence boundary; SW
+convergence depends on the perturbation norm and spectral gap.
 
 The kept space ``P`` is a required ``run()`` argument (``p_indices``): a
 :class:`~qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet` of window

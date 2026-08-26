@@ -36,7 +36,7 @@ namespace {
 Eigen::MatrixXd reference_active_density(const data::Wavefunction& reference,
                                          std::size_t n_ref_active) {
   const auto size = static_cast<Eigen::Index>(n_ref_active);
-  if (reference.has_active_one_rdm()) {
+  if (reference.has_one_rdm_spin_traced()) {
     const auto& rdm_variant = reference.get_active_one_rdm_spin_traced();
     const auto* rdm = std::get_if<Eigen::MatrixXd>(&rdm_variant);
     if (!rdm)
@@ -202,9 +202,10 @@ void warn_on_intruders(const sw::ActiveDownfoldResult& down, bool regularized) {
 
   // Warn on the RAW amplitude: the regularizer damps the operator, so a
   // regularized amplitude would hide the very channels it compensates for.
-  // 1.0 is where the perturbation series stops contracting, and it sits in a
-  // wide empirical gap -- benign folds measured here top out near 0.51, a
-  // mismatched kept space reaches 1.6-3.0.
+  // 1.0 is a heuristic flag for a large individual amplitude, not a
+  // convergence boundary; SW convergence depends on the perturbation norm and
+  // spectral gap. It sits in a wide empirical gap -- benign folds measured
+  // here top out near 0.51, while a mismatched kept space reaches 1.6-3.0.
   constexpr double intruder_warn_amplitude = 1.0;
   if (down.max_amplitude <= intruder_warn_amplitude) return;
   if (!regularized)

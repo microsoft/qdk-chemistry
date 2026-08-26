@@ -23,6 +23,7 @@
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <set>
 #include <vector>
 
@@ -317,6 +318,23 @@ TEST(SchriefferWolffPT2Test, AcceptsMeanFieldHfReference) {
   auto [E_sw, wfn_sw] = cas_sw->run(H_eff, static_cast<unsigned int>(na),
                                     static_cast<unsigned int>(nb));
   EXPECT_TRUE(std::isfinite(E_sw));
+
+  Eigen::MatrixXd legacy_density(2, 2);
+  legacy_density << 1.0, 0.2, 0.2, 1.0;
+  Eigen::VectorXd coefficients = Eigen::VectorXd::Ones(1);
+  qcd::Wavefunction::DeterminantVector determinants{
+      qcd::Configuration::from_spin_half_string("20")};
+  auto legacy_reference = std::make_shared<qcd::Wavefunction>(
+      std::make_unique<qcd::StateVectorContainer>(
+          coefficients, determinants, ref_orbs,
+          std::optional<qcd::StateVectorContainer::MatrixVariant>{
+              legacy_density},
+          std::nullopt));
+  ASSERT_TRUE(legacy_reference->has_one_rdm_spin_traced());
+  ASSERT_FALSE(legacy_reference->has_active_one_rdm());
+  EXPECT_NE(swpt2->run(legacy_reference, H_window,
+                       testing::restricted_index_set(norb, P)),
+            nullptr);
 }
 
 // The kept space P can be given explicitly via the `active_indices` setting,

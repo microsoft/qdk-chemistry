@@ -152,8 +152,8 @@ general. With ``semicanonicalize``, :math:`F` is diagonalized within each orbita
 before the denominators are formed and the emitted operator is rotated back to the caller's
 basis, making the setting a no-op for canonical orbitals.
 
-Near-degenerate channels give a small :math:`\Delta_T` and a large amplitude, where the
-perturbative expansion stops converging. ``regularizer_sigma2`` damps them by replacing the
+Near-degenerate channels give a small :math:`\Delta_T` and a large amplitude, which can make the
+perturbative expansion unreliable. ``regularizer_sigma2`` damps them by replacing the
 bare inverse denominator with
 
 .. math::
@@ -215,7 +215,9 @@ different states.
 The constructor logs the active regularization, the derived active electron count, the largest
 folded occupation deviation, the minimum denominator and the maximum raw amplitude
 :math:`|c_T/\Delta_T|`. It warns when a folded deviation or the folded core's excess charge is
-large, and when the amplitude exceeds one, where the perturbation series stops contracting.
+large, and when the amplitude exceeds one. The latter is a heuristic flag for a large individual
+amplitude, not a convergence boundary; SW convergence depends on the perturbation norm and
+spectral gap.
 
 Cost is dominated by the projected commutator, and it grows steeply with the kept space;
 building the window's dense integral block is negligible beside it. Widening the window is
