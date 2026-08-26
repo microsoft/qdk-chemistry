@@ -540,7 +540,9 @@ class SparseIsometryStatePreparation(StatePreparation):
                 "numQubits": n_qubits,
             },
         )
-        return Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op, encoding="jordan-wigner")
+        return Circuit(
+            qsharp_factory=qsharp_factory, qsharp_op=qsharp_op, encoding="jordan-wigner", num_qubits=n_qubits
+        )
 
     def _compose_qiskit(
         self,
@@ -568,7 +570,7 @@ class SparseIsometryStatePreparation(StatePreparation):
             opt_level = dense_settings.get("transpile_optimization_level")
             full_qc = transpile(full_qc, basis_gates=basis_gates, optimization_level=opt_level)
 
-        return Circuit(qasm=qasm3.dumps(full_qc), encoding="jordan-wigner")
+        return Circuit(qasm=qasm3.dumps(full_qc), encoding="jordan-wigner", num_qubits=full_qc.num_qubits)
 
     def _compose_binary_encoding(
         self,
@@ -620,7 +622,9 @@ class SparseIsometryStatePreparation(StatePreparation):
                     "ancillaPool": ancilla_pool,
                 },
             )
-            return Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op, encoding="jordan-wigner")
+            return Circuit(
+                qsharp_factory=qsharp_factory, qsharp_op=qsharp_op, encoding="jordan-wigner", num_qubits=n_qubits
+            )
 
         # Qiskit path
         _require_composable_dense_circuit(dense_circuit, dense_algo)
@@ -644,7 +648,7 @@ class SparseIsometryStatePreparation(StatePreparation):
             opt_level = dense_settings.get("transpile_optimization_level")
             full_qc = transpile(full_qc, basis_gates=basis_gates, optimization_level=opt_level)
 
-        return Circuit(qasm=qasm3.dumps(full_qc), encoding="jordan-wigner")
+        return Circuit(qasm=qasm3.dumps(full_qc), encoding="jordan-wigner", num_qubits=full_qc.num_qubits)
 
     def _perform_gf2x(
         self, bitstrings: list[list[int]], coeffs: np.ndarray
@@ -820,6 +824,7 @@ class SparseIsometryStatePreparation(StatePreparation):
             qsharp_factory=qsharp_factory,
             qsharp_op=qsharp_op,
             encoding="jordan-wigner",
+            num_qubits=num_qubits,
         )
 
     def name(self) -> str:
