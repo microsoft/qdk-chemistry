@@ -132,6 +132,16 @@
 #    (see install-exachem.sh) pointing at that script; harmless/no-op for GHA's OpenBLAS (LAPACK_PREFERENCE_LIST
 #    is left unset there, so the now-conditional default still resolves to ReferenceLAPACK exactly as before).
 #
+#    Fix #6 also patches a second, independent GlobalArrays packaging gap in the same PATCH_COMMAND step (same
+#    script): GA's cmake/linalg-modules/LinAlgModulesMacros.cmake's install_linalg_modules() copies a fixed
+#    subset of Find<Vendor>.cmake modules next to its exported globalarrays-config.cmake, for downstream
+#    consumers (e.g. TAMM/ExaChem re-importing GlobalArrays::ga) to re-resolve BLAS/LAPACK from that installed
+#    config alone. That subset never included FindFLAME.cmake, even though GA's own build supports FLAME as a
+#    LAPACK vendor -- so re-resolving GlobalArrays::ga downstream, `find_package(FLAME)` couldn't even find the
+#    finder module, fell through to CONFIG mode, failed, and LAPACK_PREFERENCE_LIST moved on to ReferenceLAPACK,
+#    reintroducing the exact same conflict a third time despite (a)/(b)/(c) above working correctly. The script
+#    now also adds FindFLAME.cmake to that installed list.
+#
 # Callers wanting BLAS/LAPACK/SPDLOG/EcpInt/NJSON reused (not rebuilt) should pass -DSPDLOG_ROOT=<prefix>
 # -DEcpInt_ROOT=<prefix> -DNJSON_ROOT=<prefix> on BOTH the outer TAMM and outer ExaChem (or any other
 # CMSB_PROJECTS consumer) cmake invocations, alongside the pre-existing -DLibInt2_ROOT/-DGauXC_ROOT pattern (see
