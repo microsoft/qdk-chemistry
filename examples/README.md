@@ -5,13 +5,13 @@ This directory contains example scripts demonstrating how to use QDK/Chemistry f
 ## Version compatibility
 
 > **Important:** The `main` branch is the active development branch and may contain changes that are incompatible with the version of `qdk-chemistry` installed via pip.
-> If you installed `qdk-chemistry` from PyPI (e.g., `pip install qdk-chemistry`), checkout the `stable/major.minor` branch corresponding to your installed version to ensure the examples work correctly.
-> For example, if you have `qdk-chemistry` 1.0.x installed:
+> If you installed `qdk-chemistry` from PyPI (e.g., `pip install qdk-chemistry`), check out the `stable/major.minor` branch corresponding to your installed version to ensure the examples work correctly.
+> For example, if you have `qdk-chemistry` `<major>.<minor>.x` installed:
 >
 > ```bash
 > git clone https://github.com/microsoft/qdk-chemistry.git
 > cd qdk-chemistry
-> git checkout stable/1.0
+> git checkout stable/<major>.<minor>
 > ```
 >
 > You can check your installed version with `pip show qdk-chemistry`.
