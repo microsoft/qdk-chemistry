@@ -379,7 +379,8 @@ namespace {
 /** @brief Compute X2C-1e integrals, optionally in a decontracted basis. */
 Eigen::MatrixXd compute_x2c_one_electron(
     const std::shared_ptr<qcs::BasisSet>& internal_basis_set,
-    const qcs::ParallelConfig& mpi, bool decontract) {
+  const qcs::ParallelConfig& mpi, bool decontract,
+  const qcs::RowMajorMatrix* contracted_overlap) {
   if (!internal_basis_set->pure) {
     throw std::invalid_argument("X2C-1e currently supports spherical AOs only");
   }
@@ -405,7 +406,16 @@ Eigen::MatrixXd compute_x2c_one_electron(
   Eigen::MatrixXd kinetic(dimension, dimension);
   Eigen::MatrixXd potential(dimension, dimension);
   Eigen::MatrixXd pvp(dimension, dimension);
-  int1e->overlap_integral(overlap.data());
+  if (!decontract && contracted_overlap != nullptr) {
+    if (contracted_overlap->rows() != static_cast<Eigen::Index>(dimension) ||
+        contracted_overlap->cols() != static_cast<Eigen::Index>(dimension)) {
+      throw std::invalid_argument(
+          "Precomputed X2C overlap dimension does not match the basis");
+    }
+    overlap = *contracted_overlap;
+  } else {
+    int1e->overlap_integral(overlap.data());
+  }
   int1e->kinetic_integral(kinetic.data());
   int1e->nuclear_integral(potential.data());
   int1e->pvp_integral(pvp.data());
@@ -469,15 +479,18 @@ RowMajorMatrix build_nonrelativistic_one_body_ao(const BasisSet& basis_set,
 
 RowMajorMatrix build_x2c_one_body_ao(
     const std::shared_ptr<qcs::BasisSet>& internal_basis_set,
-    const qcs::ParallelConfig& mpi, bool decontract) {
+  const qcs::ParallelConfig& mpi, bool decontract,
+  const qcs::RowMajorMatrix* contracted_overlap) {
   Eigen::MatrixXd hamiltonian;
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
   if (mpi.world_size == 1) {
-    return compute_x2c_one_electron(internal_basis_set, mpi, decontract);
+    return compute_x2c_one_electron(internal_basis_set, mpi, decontract,
+                                    contracted_overlap);
   }
   std::string local_error;
   try {
-    hamiltonian = compute_x2c_one_electron(internal_basis_set, mpi, decontract);
+    hamiltonian = compute_x2c_one_electron(internal_basis_set, mpi, decontract,
+                                           contracted_overlap);
   } catch (const std::exception& error) {
     local_error = error.what();
   } catch (...) {
@@ -508,7 +521,8 @@ RowMajorMatrix build_x2c_one_body_ao(
   MPI_Bcast(hamiltonian.data(), static_cast<int>(hamiltonian.size()),
             MPI_DOUBLE, 0, MPI_COMM_WORLD);
 #else
-  hamiltonian = compute_x2c_one_electron(internal_basis_set, mpi, decontract);
+  hamiltonian = compute_x2c_one_electron(internal_basis_set, mpi, decontract,
+                                         contracted_overlap);
 #endif
   return hamiltonian;
 }
