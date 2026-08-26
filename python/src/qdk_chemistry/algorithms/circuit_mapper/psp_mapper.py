@@ -181,8 +181,6 @@ class PSPMapper(CircuitMapper):
         if prepare_op is None:
             raise ValueError("The PREPARE circuit has no Q# operation to embed in the block encoding.")
 
-        # The declared width is the whole register PREPARE owns; anything past the index is
-        # scratch that PREPARE-dagger uncomputes.
         num_block_ancillas = prepare_circuit.num_qubits
         num_select_qubits = lcu.num_prepare_ancillas
         if num_block_ancillas is None:
