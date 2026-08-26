@@ -5,15 +5,13 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import math
-
 import numpy as np
 
 from qdk_chemistry.data import Settings, Wavefunction
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .state_preparation import StatePreparation
+from .state_preparation import StatePreparation, dense_coefficients
 
 __all__: list[str] = ["QROMStatePreparation", "QROMStatePreparationSettings"]
 
@@ -80,7 +78,7 @@ class QROMStatePreparation(StatePreparation):
         """
         params = self._build_params(wavefunction)
 
-        qsharp_op = QSHARP_UTILS.QROMStatePrep.MakeQROMStatePrepOp(params)
+        qsharp_op = QSHARP_UTILS.QROMStatePrep.MakeQROMStatePrepOpWithSharedGradient(params)
         qsharp_factory = QsharpFactoryData(
             program=QSHARP_UTILS.QROMStatePrep.MakeQROMStatePrepCircuit,
             parameter={
@@ -94,6 +92,8 @@ class QROMStatePreparation(StatePreparation):
             qsharp_op=qsharp_op,
             qsharp_factory=qsharp_factory,
             num_qubits=params.numStateQubits + params.rotationBitPrecision,
+            num_shared_ancillas=params.rotationBitPrecision,
+            shared_prep_op=QSHARP_UTILS.PhaseGradient.PreparePhaseGradientState,
         )
 
     def _build_params(self, wavefunction: Wavefunction):
@@ -110,25 +110,12 @@ class QROMStatePreparation(StatePreparation):
                 contains a non-finite coefficient, or is all zeros.
 
         """
-        coeffs = np.asarray(wavefunction.get_coefficients())
-        if coeffs.size == 0:
-            raise ValueError("QROM state preparation requires at least one coefficient.")
-        if np.iscomplexobj(coeffs):
-            if np.any(coeffs.imag != 0.0):
-                raise ValueError("QROM state preparation requires real coefficients.")
-            coeffs = coeffs.real
-        coeffs = coeffs.astype(float, copy=False)
+        coeffs, num_state_qubits = dense_coefficients(wavefunction, "QROM state preparation")
         if not np.all(np.isfinite(coeffs)) or not np.any(coeffs != 0.0):
             raise ValueError("QROM state preparation requires finite, non-zero coefficients.")
 
-        amplitudes = coeffs.tolist()
         return QSHARP_UTILS.QROMStatePrep.QROMStatePrepParams(
-            amplitudes=amplitudes,
+            amplitudes=coeffs.tolist(),
             rotationBitPrecision=int(self._settings.get("rotation_bit_precision")),
-            numStateQubits=self._num_state_qubits(len(amplitudes)),
+            numStateQubits=num_state_qubits,
         )
-
-    @staticmethod
-    def _num_state_qubits(num_coefficients: int) -> int:
-        """Width of the state register for a given coefficient count."""
-        return math.ceil(math.log2(num_coefficients)) if num_coefficients > 1 else 1
