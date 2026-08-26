@@ -14,8 +14,10 @@ set -ex
 # Unlike GHA's build-and-test.yaml (which uses apt's OpenBLAS), this pipeline uses BLIS+LibFLAME as its BLAS/
 # LAPACK vendor -- see build-pip-wheels.sh's own comment: this avoids symbol collisions with qiskit's shared
 # OpenBLAS. LINALG_VENDOR=BLIS / LINALG_PREFIX are passed to install-exachem.sh accordingly (see that script's
-# own comments for the caveat: CMSB's stock find_package(BLAS/LAPACK) fallback needs -DBLA_VENDOR=FLAME to look
-# for BLIS/libFLAME specifically -- this combination is new/unverified in CI).
+# own comments: with BLIS, every CMSB/TAMM/ExaChem consumer sub-build needs an explicit LAPACK_PREFERENCE_LIST
+# hint -- forwarded via patches/cmsb-fix-dependency-reuse.patch fix #5 -- to prefer libFLAME over CMSB's own
+# bundled Netlib ReferenceLAPACK; without it, both end up statically linked into the same executable and
+# collide on every LAPACK symbol).
 #
 # Only the final exachem_install directory is written under the bind-mounted repo checkout (so it survives to be
 # published as a pipeline artifact / cached across pipeline runs -- see .pipelines/templates/build-exachem-linux.yml);

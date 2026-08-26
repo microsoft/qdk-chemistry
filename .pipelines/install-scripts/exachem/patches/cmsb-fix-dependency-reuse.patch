@@ -75,10 +75,42 @@
 #    (lib/lib32/lib64) never match directly, but CMake's own *default* find_library search is multiarch-aware
 #    (via CMAKE_LIBRARY_ARCHITECTURE) and covers it automatically, no extra suffix/hint needed.
 #
+# 5. LAPACK_PREFERENCE_LIST not forwarded to consumer sub-builds (cmake/macros/BuildCMSBModule.cmake): with
+#    LINALG_VENDOR=BLIS, BLAS resolves fine (BLIS provides it), but LAPACK does not: BLIS ships no LAPACK
+#    routines, so the shared icl-utk-edu/linalg-cmake-modules ecosystem (vendored into every CMSB/TAMM/ExaChem
+#    consumer's CMAKE_MODULE_PATH as CMSB_LAM_PATH) falls back to its own bundled Netlib "ReferenceLAPACK"
+#    (cmake/linalg-modules/FindLAPACK.cmake's default LAPACK_PREFERENCE_LIST is "ReferenceLAPACK;FLAME" --
+#    ReferenceLAPACK is tried, and found/reused first, since CMSB already built one earlier in the same
+#    superbuild for GlobalArrays -- so FLAME, i.e. libFLAME, our actual intended LAPACK provider alongside BLIS,
+#    is never reached). This ReferenceLAPACK is independently re-resolved by EVERY CMSB consumer sub-build that
+#    lists LAPACK in its CMSB_DEPENDENCIES (e.g. "<project>_Methods_External", a fresh nested cmake process with
+#    no access to the outer process's already-resolved CMake targets) -- and ExaChem's own consumer resolution
+#    picks up libFLAME too (via BLAS++/LAPACK++, reused from install-cpp-deps.sh, whose own -Dblas=blis vendor
+#    logic always pairs BLIS with libFLAME for LAPACK -- see install-blaspp.sh). Both a static ReferenceLAPACK.a
+#    and a static libFLAME.a end up on the same final executable's link line, and since both are full,
+#    conforming implementations of the same netlib LAPACK Fortran API (libFLAME is built with
+#    --enable-legacy-lapack), every routine collides: "multiple definition of `dsytrd_'" etc. Fix: forward
+#    LAPACK_PREFERENCE_LIST (not previously in any of BuildCMSBModule.cmake's CORE_CMAKE_STRINGS/CORE_CMAKE_LISTS/
+#    CORE_CMAKE_OPTIONS/DEPENDENCY_CMAKE_OPTIONS bundling lists) to every consumer sub-build, so a caller can pin
+#    it explicitly (e.g. -DLAPACK_PREFERENCE_LIST="FLAME;ReferenceLAPACK" for the BLIS+libFLAME stack -- see
+#    install-exachem.sh) and have libFLAME resolved consistently everywhere instead of ReferenceLAPACK winning by
+#    default ordering. Deliberately NOT using -DBLA_VENDOR=<vendor> for this (the codebase's own
+#    emulate_kitware_linalg_modules() helper would honor it, but only if BLA_VENDOR is ALSO forwarded, which it
+#    isn't either) because BLA_VENDOR feeds BOTH BLAS_PREFERENCE_LIST and LAPACK_PREFERENCE_LIST identically --
+#    forcing BLAS_PREFERENCE_LIST to "FLAME" too would risk silently swapping away our fast, already-working BLIS
+#    BLAS resolution for whatever (slower, reference) BLAS routines libFLAME may or may not itself bundle.
+#    LAPACK_PREFERENCE_LIST is scoped to LAPACK alone, leaving BLAS_PREFERENCE_LIST's existing (working) default
+#    untouched. No matching *_PREFIX hint is needed: libFLAME is installed to the same prefix as BLIS
+#    (LINALG_PREFIX, already forwarded), which the Find*.cmake modules fall through to via
+#    CMAKE_C_IMPLICIT_LINK_DIRECTORIES when no explicit *_PREFIX is given -- exactly how BLIS itself is already
+#    found today without any BLIS_PREFIX hint.
+#
 # Callers wanting BLAS/LAPACK/SPDLOG/EcpInt/NJSON reused (not rebuilt) should pass -DSPDLOG_ROOT=<prefix>
 # -DEcpInt_ROOT=<prefix> -DNJSON_ROOT=<prefix> on BOTH the outer TAMM and outer ExaChem (or any other
 # CMSB_PROJECTS consumer) cmake invocations, alongside the pre-existing -DLibInt2_ROOT/-DGauXC_ROOT pattern (see
-# install-exachem.sh). BLAS/LAPACK reuse itself needs no extra flag beyond LINALG_VENDOR=OpenBLAS/BLIS/IBMESSL.
+# install-exachem.sh). BLAS/LAPACK reuse itself needs no extra flag beyond LINALG_VENDOR=OpenBLAS/BLIS/IBMESSL --
+# except when LINALG_VENDOR=BLIS, which additionally needs -DLAPACK_PREFERENCE_LIST="FLAME;ReferenceLAPACK" (fix
+# #5) to make LAPACK resolve to libFLAME instead of CMSB's own bundled ReferenceLAPACK.
 # numactl reuse (fix #4) needs no per-consumer flag thanks to the finder fallback, but -DBUILD_numactl=OFF is
 # recommended to turn a failed reuse into a loud error, and -DNUMACTL_ROOT=<prefix> may still be passed to hint
 # the primary search.
@@ -170,15 +202,18 @@ diff --git a/cmake/macros/BuildCMSBModule.cmake b/cmake/macros/BuildCMSBModule.c
 index 9d689b6..9b0d24d 100644
 --- a/cmake/macros/BuildCMSBModule.cmake
 +++ b/cmake/macros/BuildCMSBModule.cmake
-@@ -249,7 +249,7 @@ function(build_cmsb_module SUPER_PROJECT_ROOT)
+@@ -249,5 +249,5 @@ function(build_cmsb_module SUPER_PROJECT_ROOT)
      bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS ${CMSB_CORE_OPTIONS})
  
      bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS BLAS_INT4 LINALG_VENDOR LINALG_PREFIX ENABLE_COVERAGE USE_SCALAPACK USE_HDF5 USE_LIBNUMA USE_ONEMATH ONEMATH_PREFIX USE_NWQSIM)
 -    bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS BLAS_ARCH GCCROOT HDF5_ROOT HPTT_ROOT LibInt2_ROOT)
 +    bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS BLAS_ARCH GCCROOT HDF5_ROOT HPTT_ROOT LibInt2_ROOT SPDLOG_ROOT EcpInt_ROOT NJSON_ROOT)
  
+@@ -254,3 +254,3 @@ function(build_cmsb_module SUPER_PROJECT_ROOT)
      bundle_cmake_strings(CORE_CMAKE_STRINGS CMSB_PROJECTS ENABLE_DEV_MODE GPU_ARCH MARCH_FLAGS USE_TAMM_DEV CMSB_TAG)
-     bundle_cmake_strings(CORE_CMAKE_STRINGS USE_UPCXX BLAS_INT4 LINALG_PREFIX USE_SCALAPACK USE_HDF5 USE_LIBNUMA USE_NWQSIM LINK_STATIC_GPU_LIBS)
+-    bundle_cmake_strings(CORE_CMAKE_STRINGS USE_UPCXX BLAS_INT4 LINALG_PREFIX USE_SCALAPACK USE_HDF5 USE_LIBNUMA USE_NWQSIM LINK_STATIC_GPU_LIBS)
++    bundle_cmake_strings(CORE_CMAKE_STRINGS USE_UPCXX BLAS_INT4 LINALG_PREFIX LAPACK_PREFERENCE_LIST USE_SCALAPACK USE_HDF5 USE_LIBNUMA USE_NWQSIM LINK_STATIC_GPU_LIBS)
+     bundle_cmake_strings(CORE_CMAKE_STRINGS ${PROJECT_NAME}_HAS_HIP CMSB_HAS_HIP ROCM_ROOT)
 diff --git a/cmake/macros/DependencyMacros.cmake b/cmake/macros/DependencyMacros.cmake
 index d70d56d..712dbc8 100644
 --- a/cmake/macros/DependencyMacros.cmake

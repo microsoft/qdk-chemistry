@@ -20,12 +20,11 @@
 # Optional env vars: INSTALL_PREFIX, BUILD_ROOT, MARCH, JOBS, KEEP_BUILD_DIR, LINALG_VENDOR, LINALG_PREFIX
 #
 #   LINALG_VENDOR  - CMSB's -DLINALG_VENDOR= value (default: OpenBLAS, matching GHA's apt-installed OpenBLAS).
-#                    Pass "BLIS" for the ADO wheel pipeline's BLIS+LibFLAME stack. NOTE: unlike BLAS++'s own
-#                    -Dblas= vendor selection (which has first-class BLIS support), the CMSB reuse patch's
-#                    BLAS/LAPACK fallback (patches/cmsb-fix-dependency-reuse.patch, fix #1) uses CMake's stock
-#                    find_package(BLAS/LAPACK), which needs an explicit BLA_VENDOR hint to look for BLIS/libFLAME
-#                    specifically (see BLA_VENDOR=FLAME below) -- this combination is unverified against BLIS and
-#                    may need iteration.
+#                    Pass "BLIS" for the ADO wheel pipeline's BLIS+LibFLAME stack. With LINALG_VENDOR=BLIS, every
+#                    CMSB/TAMM/ExaChem consumer sub-build resolves LAPACK via the shared icl-utk-edu/
+#                    linalg-cmake-modules ecosystem's own bundled Netlib "ReferenceLAPACK" by default (BLIS alone
+#                    provides no LAPACK routines) -- see LAPACK_PREFERENCE_LIST below for why that collides with
+#                    libFLAME and how it's fixed.
 #   LINALG_PREFIX  - CMSB's -DLINALG_PREFIX= value (default: empty, i.e. rely on the system default search path
 #                    for OpenBLAS). Pass the BLIS+LibFLAME install prefix (e.g. /usr/local) when LINALG_VENDOR=BLIS.
 #
@@ -213,22 +212,36 @@ COMMON_CMAKE_ARGS=(
   -DBUILD_numactl=OFF
 )
 
-# LINALG_PREFIX/BLA_VENDOR are appended conditionally rather than baked into the array literal above, since they
-# only apply for a non-default LINALG_VENDOR (e.g. the ADO wheel pipeline's BLIS+LibFLAME stack; GHA's default
-# OpenBLAS needs neither -- apt's OpenBLAS is found by CMake's stock find_package(BLAS/LAPACK) fallback, added by
-# patches/cmsb-fix-dependency-reuse.patch fix #1, without any vendor hint).
+# LINALG_PREFIX/LAPACK_PREFERENCE_LIST are appended conditionally rather than baked into the array literal above,
+# since they only apply for a non-default LINALG_VENDOR (e.g. the ADO wheel pipeline's BLIS+LibFLAME stack; GHA's
+# default OpenBLAS needs neither -- apt's OpenBLAS is a single combined library providing both BLAS and LAPACK,
+# so CMSB's own stock find_package(BLAS/LAPACK) fallback (patches/cmsb-fix-dependency-reuse.patch fix #1) finds
+# it directly, without any vendor/preference hint).
 if [ -n "${LINALG_PREFIX}" ]; then
   COMMON_CMAKE_ARGS+=(-DLINALG_PREFIX="${LINALG_PREFIX}")
 fi
 if [ "${LINALG_VENDOR}" = "BLIS" ]; then
-  # CMSB's own BLAS++/LAPACK++-independent BLAS/LAPACK reuse (fix #1 of the CMSB patch) goes through CMake's
-  # stock find_package(BLAS/LAPACK QUIET) -- a genuinely different discovery mechanism from BLAS++'s own
-  # -Dblas=blis vendor selection (install-blaspp.sh), which is NOT used here. Stock CMake's FindBLAS/FindLAPACK
-  # need an explicit BLA_VENDOR hint to search for BLIS+libFLAME specifically (BLA_VENDOR=FLAME, per CMake's own
-  # documented vendor list) -- without it, the search may not try BLIS/libFLAME library names at all. This
-  # combination is unverified in CI; if BLAS/LAPACK end up "Will build" instead of "Found" in the TAMM/ExaChem
-  # configure log, this is the first place to check.
-  COMMON_CMAKE_ARGS+=(-DBLA_VENDOR=FLAME)
+  # BLIS provides BLAS only, so every CMSB/TAMM/ExaChem consumer sub-build that needs LAPACK falls back to the
+  # shared icl-utk-edu/linalg-cmake-modules ecosystem's own default LAPACK_PREFERENCE_LIST ("ReferenceLAPACK;
+  # FLAME") -- and since a ReferenceLAPACK (CMSB's own bundled, statically-built Netlib LAPACK) gets built once
+  # early in the superbuild (for GlobalArrays) and is then found/reused everywhere else, it always wins over
+  # FLAME (libFLAME, our actual intended LAPACK provider alongside BLIS) by simple list order. That leaves BOTH
+  # a static ReferenceLAPACK.a (from the above) AND a static libFLAME.a (pulled in separately via BLAS++/
+  # LAPACK++, reused from install-cpp-deps.sh's -Dblas=blis build -- see install-blaspp.sh) on the final
+  # executable's link line -- two full, conflicting implementations of the same netlib LAPACK Fortran API,
+  # causing "multiple definition of `dsytrd_'" and similar link errors (confirmed via a live ADO CI failure).
+  # Fix: explicitly prefer FLAME over ReferenceLAPACK via LAPACK_PREFERENCE_LIST (forwarded to every consumer
+  # sub-build by patches/cmsb-fix-dependency-reuse.patch fix #5), so LAPACK resolves to libFLAME consistently
+  # everywhere and ReferenceLAPACK is never built/linked at all. ReferenceLAPACK is kept as a fallback in case
+  # libFLAME somehow isn't found (louder rebuild instead of a silent, hard-to-diagnose link failure). Deliberately
+  # not using -DBLA_VENDOR=FLAME for this: it would ALSO force BLAS_PREFERENCE_LIST to FLAME-only (BLA_VENDOR
+  # feeds both BLAS_ and LAPACK_PREFERENCE_LIST identically), which would risk silently dropping our fast,
+  # already-working BLIS BLAS resolution in favor of whatever BLAS routines libFLAME itself may or may not
+  # bundle. No matching *_PREFIX hint is needed for FLAME: libFLAME lives in the same prefix as BLIS
+  # (LINALG_PREFIX, already forwarded), which the Find*.cmake modules fall through to via
+  # CMAKE_C_IMPLICIT_LINK_DIRECTORIES when no explicit *_PREFIX is given -- exactly how BLIS itself is already
+  # found today without a BLIS_PREFIX hint.
+  COMMON_CMAKE_ARGS+=(-DLAPACK_PREFERENCE_LIST="FLAME;ReferenceLAPACK")
 fi
 
 # --------------------------------------------------------------------------------------------------------------------
