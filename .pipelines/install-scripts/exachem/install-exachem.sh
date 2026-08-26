@@ -17,7 +17,17 @@
 #
 # Usage: install-exachem.sh
 # Required env vars: CPP_DEPS_PREFIX
-# Optional env vars: INSTALL_PREFIX, BUILD_ROOT, MARCH, JOBS, KEEP_BUILD_DIR
+# Optional env vars: INSTALL_PREFIX, BUILD_ROOT, MARCH, JOBS, KEEP_BUILD_DIR, LINALG_VENDOR, LINALG_PREFIX
+#
+#   LINALG_VENDOR  - CMSB's -DLINALG_VENDOR= value (default: OpenBLAS, matching GHA's apt-installed OpenBLAS).
+#                    Pass "BLIS" for the ADO wheel pipeline's BLIS+LibFLAME stack. NOTE: unlike BLAS++'s own
+#                    -Dblas= vendor selection (which has first-class BLIS support), the CMSB reuse patch's
+#                    BLAS/LAPACK fallback (patches/cmsb-fix-dependency-reuse.patch, fix #1) uses CMake's stock
+#                    find_package(BLAS/LAPACK), which needs an explicit BLA_VENDOR hint to look for BLIS/libFLAME
+#                    specifically (see BLA_VENDOR=FLAME below) -- this combination is unverified against BLIS and
+#                    may need iteration.
+#   LINALG_PREFIX  - CMSB's -DLINALG_PREFIX= value (default: empty, i.e. rely on the system default search path
+#                    for OpenBLAS). Pass the BLIS+LibFLAME install prefix (e.g. /usr/local) when LINALG_VENDOR=BLIS.
 #
 set -euo pipefail
 
@@ -38,6 +48,8 @@ KEEP_BUILD_DIR="${KEEP_BUILD_DIR:-0}"
 MARCH="${MARCH:-x86-64-v3}"
 JOBS="${JOBS:-$(nproc)}"
 MODULES="${MODULES:-CC}"
+LINALG_VENDOR="${LINALG_VENDOR:-OpenBLAS}"
+LINALG_PREFIX="${LINALG_PREFIX:-}"
 # MPI_PROGRESS_RANK is the only Global Arrays runtime that makes progress on a plain shm/TCP transport (no RDMA
 # NIC on these runners); it requires >= 2 MPI ranks (1 data-server rank + >= 1 compute rank).
 GA_RUNTIME="${GA_RUNTIME:-MPI_PROGRESS_RANK}"
@@ -58,7 +70,7 @@ EXACHEM_COMMIT="45c192e840fd1e0417871d926e9ab87748111e53"
 CMSB_REPO="https://github.com/NWChemEx-Project/CMakeBuild.git"
 CMSB_COMMIT="f5be7e2472e8ebb9bc51163d424da7c25716ce9a"
 
-echo "==> ExaChem CI build: march=${MARCH} jobs=${JOBS} modules=${MODULES} ga_runtime=${GA_RUNTIME}"
+echo "==> ExaChem CI build: march=${MARCH} jobs=${JOBS} modules=${MODULES} ga_runtime=${GA_RUNTIME} linalg_vendor=${LINALG_VENDOR}"
 echo "==> TAMM: ${TAMM_COMMIT} / ExaChem: ${EXACHEM_COMMIT} / CMSB: ${CMSB_COMMIT}"
 echo "==> Reusing LibInt2/GauXC/BLAS++/LAPACK++ from CPP_DEPS_PREFIX=${CPP_DEPS_PREFIX}"
 echo "==> INSTALL_PREFIX=${INSTALL_PREFIX}"
@@ -176,7 +188,7 @@ git -C "${CMSB_SRC_DIR}" apply --verbose "${SCRIPT_DIR}/patches/cmsb-fix-depende
 COMMON_CMAKE_ARGS=(
   -DCMAKE_BUILD_TYPE=Release
   -DMODULES="${MODULES}"
-  -DLINALG_VENDOR=OpenBLAS
+  -DLINALG_VENDOR="${LINALG_VENDOR}"
   -DMARCH_FLAGS="-march=${MARCH}"
   -DUSE_HDF5=OFF
   -DTAMM_CXX_FLAGS="-DUSE_SERIAL_IO ${HDF5_CFLAGS}"
@@ -200,6 +212,24 @@ COMMON_CMAKE_ARGS=(
   -DBUILD_NJSON=OFF
   -DBUILD_numactl=OFF
 )
+
+# LINALG_PREFIX/BLA_VENDOR are appended conditionally rather than baked into the array literal above, since they
+# only apply for a non-default LINALG_VENDOR (e.g. the ADO wheel pipeline's BLIS+LibFLAME stack; GHA's default
+# OpenBLAS needs neither -- apt's OpenBLAS is found by CMake's stock find_package(BLAS/LAPACK) fallback, added by
+# patches/cmsb-fix-dependency-reuse.patch fix #1, without any vendor hint).
+if [ -n "${LINALG_PREFIX}" ]; then
+  COMMON_CMAKE_ARGS+=(-DLINALG_PREFIX="${LINALG_PREFIX}")
+fi
+if [ "${LINALG_VENDOR}" = "BLIS" ]; then
+  # CMSB's own BLAS++/LAPACK++-independent BLAS/LAPACK reuse (fix #1 of the CMSB patch) goes through CMake's
+  # stock find_package(BLAS/LAPACK QUIET) -- a genuinely different discovery mechanism from BLAS++'s own
+  # -Dblas=blis vendor selection (install-blaspp.sh), which is NOT used here. Stock CMake's FindBLAS/FindLAPACK
+  # need an explicit BLA_VENDOR hint to search for BLIS+libFLAME specifically (BLA_VENDOR=FLAME, per CMake's own
+  # documented vendor list) -- without it, the search may not try BLIS/libFLAME library names at all. This
+  # combination is unverified in CI; if BLAS/LAPACK end up "Will build" instead of "Found" in the TAMM/ExaChem
+  # configure log, this is the first place to check.
+  COMMON_CMAKE_ARGS+=(-DBLA_VENDOR=FLAME)
+fi
 
 # --------------------------------------------------------------------------------------------------------------------
 # Step 1: build TAMM (CMSB superbuild: GlobalArrays, HPTT, Librett, EcpInt, Eigen3, doctest, ... + TAMM itself).

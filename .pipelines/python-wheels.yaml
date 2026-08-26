@@ -129,6 +129,32 @@ extends:
           parameters:
             march: x86-64-v3
 
+      # ExaChem (+ TAMM) build for the Linux x86_64 test environment, built once here (in a container, matching
+      # its own runtime environment -- see build-exachem-linux.yml for why) rather than per-Python-version, and
+      # published as a pipeline artifact for the linux_x86_64 matrix job's test step to consume. Does not touch
+      # qdk-chemistry's own wheel build (build-pip-wheels.yml/.sh) at all -- ExaChem/TAMM and their dependencies
+      # (BLIS+LibFLAME, spdlog, libint2, ecpint, gauxc, nlohmann_json, ...) are built and installed into an
+      # entirely separate prefix, never touching qdk-chemistry's own (independent, uncached) MACIS/BLAS++
+      # FetchContent build.
+      - job: Build_linux_x86_64_exachem
+        pool:
+          name: $(CPU_POOL_X86)
+          demands:
+          - ImageOverride -equals Ubuntu24.04Nightly
+          os: linux
+        timeoutInMinutes: 480
+        displayName: Build Linux x86_64 ExaChem (BLIS+LibFLAME)
+        templateContext:
+          outputs:
+          - output: pipelineArtifact
+            displayName: Upload ExaChem install (Linux x86_64)
+            targetPath: $(System.DefaultWorkingDirectory)/exachem_install
+            artifactName: linux-x86_64-exachem-install
+        steps:
+        - template: .pipelines/templates/build-exachem-linux.yml@self
+          parameters:
+            march: x86-64-v3
+
       - ${{ each target in parameters.matrix }}:
         - job: Build_${{ target.name }}
           ${{ if eq(target.os, 'macOS') }}:
@@ -153,6 +179,7 @@ extends:
               - ImageOverride -equals ${{ target.imageName }}
               os: windows
           ${{ else }}:
+            dependsOn: Build_linux_x86_64_exachem
             pool:
               name: $(CPU_POOL_X86)
               demands:
@@ -170,6 +197,11 @@ extends:
           variables:
             LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
           templateContext:
+            ${{ if eq(target.name, 'linux_x86_64') }}:
+              inputs:
+              - input: pipelineArtifact
+                artifactName: linux-x86_64-exachem-install
+                targetPath: $(System.DefaultWorkingDirectory)/exachem_install
             outputs:
             - output: pipelineArtifact
               displayName: Upload Python $(pythonVersion) Wheels for ${{ target.os }} ${{ target.march }}

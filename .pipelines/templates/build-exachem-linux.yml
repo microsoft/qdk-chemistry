@@ -1,0 +1,67 @@
+parameters:
+- name: march
+  type: string
+  default: x86-64-v3
+- name: blisVersion
+  type: string
+  default: '2.0'
+- name: libflameVersion
+  type: string
+  default: '5.2.0'
+- name: agentBuildDirectory
+  type: string
+  default: $(Agent.BuildDirectory)
+- name: dockerImage
+  type: string
+  default: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
+
+steps:
+- checkout: self
+  persistCredentials: true
+  path: qdk-chemistry
+  fetchDepth: 1
+  retryCountOnTaskFailure: 3
+
+# Cached across pipeline runs (not just across jobs within one run, which the pipeline-artifact publish below
+# already covers): keyed on everything that can change ExaChem's build output, so a cache hit skips the (slow)
+# BLIS/LibFLAME + C++ deps + ExaChem/TAMM build entirely on unrelated pipeline runs.
+- task: Cache@2
+  displayName: Restore/save ExaChem install cache
+  inputs:
+    key: >-
+      "linux-exachem-${{ parameters.march }}-blis${{ parameters.blisVersion }}-libflame${{ parameters.libflameVersion }}-v1" |
+      cpp/manifest/qdk-chemistry/cgmanifest.json |
+      external/macis/manifest/cgmanifest.json |
+      .pipelines/install-scripts/build-exachem-linux.sh |
+      .pipelines/install-scripts/install-blis.sh |
+      .pipelines/install-scripts/install-libflame.sh |
+      .pipelines/install-scripts/install-cpp-deps.sh |
+      .pipelines/install-scripts/install-blaspp.sh |
+      .pipelines/install-scripts/install-lapackpp.sh |
+      .pipelines/install-scripts/exachem/**/*
+    path: $(System.DefaultWorkingDirectory)/exachem_install
+    cacheHitVar: EXACHEM_INSTALL_CACHE_RESTORED
+
+- script: |
+    echo "Building ExaChem (Linux ${{ parameters.march }}, BLIS+LibFLAME)..."
+    docker run --rm \
+      --platform linux/amd64 \
+      -v ${{ parameters.agentBuildDirectory }}:/workspace:rshared \
+      -w /workspace/qdk-chemistry \
+      ${{ parameters.dockerImage }} \
+    bash .pipelines/install-scripts/build-exachem-linux.sh ${{ parameters.march }} \
+                                                           ${{ parameters.blisVersion }} \
+                                                           ${{ parameters.libflameVersion }}
+  displayName: Build ExaChem (Linux ${{ parameters.march }})
+  condition: ne(variables['EXACHEM_INSTALL_CACHE_RESTORED'], 'true')
+  retryCountOnTaskFailure: 2
+
+# The docker container above runs as root, so exachem_install (bind-mounted from the host) is root-owned once
+# the container exits -- the same issue and fix already used after every other Docker-based step in this
+# pipeline (see the "Fix wheel directory ownership" step in python-wheels.yaml). Only needed after a fresh
+# build: a cache hit restores files with the ownership they were saved with (already fixed up the last time
+# this step ran), so there is nothing to fix on that path.
+- script: |
+    sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/exachem_install
+  displayName: Fix ExaChem install directory ownership
+  condition: and(succeeded(), ne(variables['EXACHEM_INSTALL_CACHE_RESTORED'], 'true'))
