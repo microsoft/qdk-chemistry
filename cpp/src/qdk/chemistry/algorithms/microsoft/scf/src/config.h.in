@@ -10,12 +10,6 @@
 #cmakedefine QDK_CHEMISTRY_ENABLE_PCM
 #cmakedefine QDK_CHEMISTRY_ENABLE_DFTD3
 
-// BLAS vendor whose thread-control API is bound into this build; at most one is
-// defined, and none means ScopedBlasThreads is a no-op. See util/blas_threads.h.
-#cmakedefine QDK_CHEMISTRY_BLAS_VENDOR_OPENBLAS
-#cmakedefine QDK_CHEMISTRY_BLAS_VENDOR_INTELMKL
-#cmakedefine QDK_CHEMISTRY_BLAS_VENDOR_BLIS
-
 namespace qdk::chemistry::scf {
 
 class QDKChemistryConfig {

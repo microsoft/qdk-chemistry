@@ -2,26 +2,26 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include <qdk/chemistry/scf/config.h>
 #include <qdk/chemistry/scf/util/blas_threads.h>
 
 #include <functional>
 #include <mutex>
 #include <qdk/chemistry/utils/logger.hpp>
 
-// Thread-control API this build links against, selected by the BLAS vendor the
-// configure step found (see the BLAS section of ../CMakeLists.txt). Link-time
-// binding is the only way to reach the BLAS our own calls go to: a symbol found
-// in the running process may belong to a different BLAS, and a statically
-// linked one exports nothing to find. Vendors without such an API -- Accelerate
-// on macOS, reference BLAS, or whatever a Windows build resolves to -- define
-// none of these and fall through to the no-op path below.
-#if defined(QDK_CHEMISTRY_BLAS_VENDOR_OPENBLAS)
+// Thread-control API this build links against. The BLAS section of
+// ../CMakeLists.txt defines QDK_CHEMISTRY_BLAS_VENDOR_<BLAS_VENDOR> for the
+// vendors that have one. Link-time binding is the only way to reach the BLAS
+// our own calls go to: a symbol found in the running process may belong to a
+// different BLAS, and a statically linked one exports nothing to find. Vendors
+// without such an API -- Accelerate on macOS, reference BLAS, or whatever a
+// Windows build resolves to -- define none of these and fall through to the
+// no-op path below.
+#if defined(QDK_CHEMISTRY_BLAS_VENDOR_OpenBLAS)
 extern "C" {
 void openblas_set_num_threads(int);
 int openblas_get_num_threads(void);
 }
-#elif defined(QDK_CHEMISTRY_BLAS_VENDOR_INTELMKL)
+#elif defined(QDK_CHEMISTRY_BLAS_VENDOR_IntelMKL)
 extern "C" {
 void MKL_Set_Num_Threads(int);
 int MKL_Get_Max_Threads(void);
@@ -55,10 +55,10 @@ struct BlasThreadApi {
 
 /// @brief Thread-control API bound at link time, if this build has one.
 BlasThreadApi linked_blas_thread_api() {
-#if defined(QDK_CHEMISTRY_BLAS_VENDOR_OPENBLAS)
+#if defined(QDK_CHEMISTRY_BLAS_VENDOR_OpenBLAS)
   return {BlasVendor::OpenBLAS, [] { return openblas_get_num_threads(); },
           [](int n) { openblas_set_num_threads(n); }};
-#elif defined(QDK_CHEMISTRY_BLAS_VENDOR_INTELMKL)
+#elif defined(QDK_CHEMISTRY_BLAS_VENDOR_IntelMKL)
   // MKL reports the maximum rather than a current count; they agree except
   // while an MKL_Set_Num_Threads_Local override is in effect, which we do not
   // use. Narrowing is not a concern: thread counts are small.
