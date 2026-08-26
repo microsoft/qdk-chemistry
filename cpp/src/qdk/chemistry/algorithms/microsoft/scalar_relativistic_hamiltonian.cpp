@@ -438,7 +438,7 @@ Eigen::MatrixXd compute_x2c_one_electron(
     const std::shared_ptr<qcs::BasisSet>& internal_basis_set,
     const qcs::ParallelConfig& mpi, bool decontract) {
   if (!internal_basis_set->ecp_shells.empty() ||
-      internal_basis_set->n_ecp_electrons != 0) {
+      internal_basis_set->get_n_ecp_electrons() != 0) {
     throw std::invalid_argument(
         "The X2C-1e approximation does not support effective core potentials; "
         "use an all-electron basis set");
