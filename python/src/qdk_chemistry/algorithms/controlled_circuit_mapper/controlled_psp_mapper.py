@@ -111,9 +111,8 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         block_mapper = self._block_mapper()
         container = unitary.get_container()
         _, use_quantum_walk = block_mapper.resolve_lcu(container)
-        prepare_op, select_op, num_system_qubits, num_select_qubits, num_block_ancillas = (
-            block_mapper.build_prepare_select_ops(container)
-        )
+        select_op, num_system_qubits = block_mapper.build_select_ops(container)
+        prepare_op, num_select_qubits, num_block_ancillas = block_mapper.build_prep_ops(container)
 
         step_op = QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepOp(
             prepare_op, select_op, num_system_qubits, num_select_qubits
