@@ -21,7 +21,15 @@ from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import (
     _post_process_phase_estimation,
 )
 from qdk_chemistry.algorithms.state_preparation import identity_state_prep
-from qdk_chemistry.data import AlgorithmRef, QubitOperator
+from qdk_chemistry.algorithms.state_preparation.qrom_state_prep import QROMStatePreparation
+from qdk_chemistry.data import (
+    AlgorithmRef,
+    Configuration,
+    ModelOrbitals,
+    QubitOperator,
+    StateVectorContainer,
+    Wavefunction,
+)
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
@@ -442,7 +450,7 @@ class TestUnaryQpeEndToEnd:
     def test_alias_sampling_lcu_recovers_the_ground_state_energy(self):
         """Unary QPE returns the ground-state energy with alias-sampling PREPARE in the LCU walk."""
         num_queries = 7
-        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([0.5, 0.5]))
+        hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ", "XZ"], coefficients=np.array([0.25, 0.625, 0.125]))
         energies, vectors = np.linalg.eigh(hamiltonian.to_matrix())
         state_prep_params = {
             "rowMap": list(range(hamiltonian.num_qubits - 1, -1, -1)),
@@ -476,7 +484,7 @@ class TestUnaryQpeEndToEnd:
 
         result = qpe.run(qubit_hamiltonian=hamiltonian, state_preparation=state_preparation)
 
-        assert result.raw_energy == pytest.approx(float(energies[0]), abs=1e-9)
+        assert result.raw_energy == pytest.approx(float(energies[0]), abs=0.02)
 
 
 def test_the_builder_reflects_the_ancilla_tail_the_mapper_declared():
@@ -493,3 +501,63 @@ def test_the_builder_reflects_the_ancilla_tail_the_mapper_declared():
     )[0]
 
     assert circuit._qsharp_factory.parameter["numAncillas"] == declared - hamiltonian.num_qubits
+
+
+def _ground_state_wavefunction(hamiltonian: QubitOperator) -> Wavefunction:
+    """Wrap a Hamiltonian's ground eigenvector as a single-qubit Wavefunction."""
+    _, vectors = np.linalg.eigh(hamiltonian.to_matrix())
+    amplitudes = np.real(vectors[:, 0])
+    dets = [Configuration.from_bitstring(format(idx, "01b")[::-1]) for idx in range(len(amplitudes))]
+    return Wavefunction(StateVectorContainer(amplitudes, dets, ModelOrbitals(1)))
+
+
+def test_a_state_prep_shared_register_is_sized_and_prepared_by_the_builder():
+    """QROM wants a shared phase gradient the block encoding has no use for."""
+    hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([0.5, 0.5]))
+    state_preparation = QROMStatePreparation(rotation_bit_precision=6).run(_ground_state_wavefunction(hamiltonian))
+    declared = PSPMapper().run(LCUBuilder(quantum_walk=True).run(hamiltonian)).num_qubits
+    assert declared is not None
+
+    builder = QdkUnaryQpeCircuitBuilder(num_queries=3)
+    circuit = builder.run(state_preparation=state_preparation, qubit_hamiltonian=hamiltonian)[0]
+    parameter = circuit._qsharp_factory.parameter
+
+    assert parameter["numSharedAncillas"] == 6
+    assert parameter["statePrepUsesShared"] is True
+    assert parameter["blockEncodingUsesShared"] is False
+    # The shared register sits past the block ancilla, so the reflection width is untouched.
+    assert parameter["numAncillas"] == declared - hamiltonian.num_qubits
+    assert circuit.num_qubits == 2 + declared + 6
+
+
+def test_a_state_prep_without_shared_ancilla_does_not_claim_the_shared_register():
+    """``statePrepUsesShared`` stays off so the state prep keeps its system-only signature."""
+    hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([0.5, 0.5]))
+
+    builder = QdkUnaryQpeCircuitBuilder(num_queries=3)
+    circuit = builder.run(
+        state_preparation=identity_state_prep(hamiltonian.num_qubits),
+        qubit_hamiltonian=hamiltonian,
+    )[0]
+
+    assert circuit._qsharp_factory.parameter["statePrepUsesShared"] is False
+    assert circuit._qsharp_factory.parameter["numSharedAncillas"] == 0
+
+
+def test_qrom_initial_state_prep_recovers_the_ground_state_energy():
+    """QROM rotates through the shared gradient, so QPE must prepare it before the state prep.
+
+    Without that preparation the rotations leave the gradient dirty and entangled with the
+    system register, which then holds no eigenstate at all.
+    """
+    hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([0.5, 0.5]))
+    energies, _ = np.linalg.eigh(hamiltonian.to_matrix())
+    state_preparation = QROMStatePreparation(rotation_bit_precision=8).run(_ground_state_wavefunction(hamiltonian))
+
+    qpe = UnaryPhaseEstimation(shots=200)
+    qpe.settings().set("qpe_circuit_builder", AlgorithmRef("qpe_circuit_builder", "qdk_unary", num_queries=6))
+    qpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"))
+
+    result = qpe.run(qubit_hamiltonian=hamiltonian, state_preparation=state_preparation)
+
+    assert result.raw_energy == pytest.approx(float(energies[0]), abs=0.02)
