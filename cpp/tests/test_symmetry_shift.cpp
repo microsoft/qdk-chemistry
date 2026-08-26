@@ -4,10 +4,12 @@
 
 #include <gtest/gtest.h>
 
+#include <qdk/chemistry/algorithms/algorithm_defaults.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/symmetry_shift.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
+#include <qdk/chemistry/data/settings.hpp>
 #include <qdk/chemistry/utils/hamiltonian_one_norm.hpp>
 
 #include "ut_common.hpp"
@@ -40,6 +42,30 @@ TEST_F(SymmetryShiftTest, DefaultTruncationThresholdIsZero) {
       shifter->settings().get<double>("df_truncation_threshold"), 0.0);
 }
 
+/**
+ * @brief SymmetryShifterFactory must be listed in the
+ * REGISTER_FACTORY_SETTINGS_INIT block of algorithm_defaults.cpp.
+ *
+ * That list is maintained by hand, and an omission fails silently rather than
+ * loudly: resolve_algorithm_defaults() returns nullptr, and
+ * AlgorithmRef::_resolve_settings() stores that nullptr behind a bare
+ * catch (...). Anyone nesting an AlgorithmRef("symmetry_shifter", ...) inside
+ * another algorithm's settings then gets no defaults, no error message, and a
+ * null dereference on the first attempt to configure it.
+ */
+TEST_F(SymmetryShiftTest, ResolvesAlgorithmDefaults) {
+  const auto settings = qdk::chemistry::algorithms::detail::
+      resolve_algorithm_defaults("symmetry_shifter", "fermionic_low_rank");
+  ASSERT_NE(settings, nullptr)
+      << "symmetry_shifter is missing from the REGISTER_FACTORY_SETTINGS_INIT "
+         "block in algorithms/algorithm_defaults.cpp";
+  EXPECT_DOUBLE_EQ(settings->get<double>("df_truncation_threshold"), 0.0);
+
+  // The path that actually bites: a nested reference must self-resolve.
+  const qdk::chemistry::data::AlgorithmRef ref("symmetry_shifter",
+                                               "fermionic_low_rank");
+  EXPECT_NE(ref.get_settings(), nullptr);
+}
 TEST_F(SymmetryShiftTest, ThrowsOnUnrestrictedHamiltonian) {
   auto h_atom = testing::create_hydrogen_structure();
   auto scf_solver = ScfSolverFactory::create();
