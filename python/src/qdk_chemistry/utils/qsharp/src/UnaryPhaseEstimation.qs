@@ -83,7 +83,9 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
         phaseQubitPrep(phaseQubits);
 
         within {
-            prepareSharedOp(sharedQubits);
+            if numSharedAncillas > 0 {
+                prepareSharedOp(sharedQubits);
+            }
         } apply {
             statePrep(statePrepUsesShared ? systemQubits + sharedQubits | systemQubits);
             let blockEncoding =
