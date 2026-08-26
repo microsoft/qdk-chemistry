@@ -5,15 +5,13 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import math
-
 import numpy as np
 
 from qdk_chemistry.data import Settings, Wavefunction
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .state_preparation import StatePreparation
+from .state_preparation import StatePreparation, dense_coefficients
 
 __all__: list[str] = ["AliasSamplingStatePreparation", "AliasSamplingStatePreparationSettings"]
 
@@ -52,16 +50,14 @@ class AliasSamplingStatePreparation(StatePreparation):
 
     .. warning::
 
-        **The index register stays entangled with ancilla.** Unlike ``dense_pure_state``
-        or ``sparse_isometry``, the output is not a pure state on the index register
-        alone. This circuit is only meaningful as the PREPARE subroutine of a block
-        encoding (LCU or qubitization), where PREPARE\ :sup:`†` later uncomputes the
-        garbage and projects onto the correct subspace.
+        **The index register stays entangled with ancilla.** This is a block-encoding
+        subroutine, not a general state preparation for algorithms like QPE. It is only
+        meaningful as the PREPARE subroutine of an LCU or qubitization circuit, where
+        PREPARE\ :sup:`†` later uncomputes the garbage and projects onto the correct
+        subspace.
 
-        Coefficient signs are discarded, which is why negative coefficients are rejected
-        outright. Index :math:`\ell` is the *position* of a coefficient in the
-        wavefunction's coefficient vector, not a Jordan-Wigner determinant bit pattern, so
-        the returned circuit carries no fermionic encoding.
+        Negative coefficients are not supported. Index :math:`\ell` is the determinant's
+        bit pattern, matching ``dense_pure_state``.
 
     The circuit proceeds:
 
@@ -115,11 +111,7 @@ class AliasSamplingStatePreparation(StatePreparation):
                 contains a non-finite or negative coefficient, or is all zeros.
 
         """
-        coefficients = self._sampling_weights(wavefunction)
-        num_index_qubits = self._num_index_qubits(len(coefficients))
-        padded_len = 1 << num_index_qubits
-        if len(coefficients) < padded_len:
-            coefficients = coefficients + [0.0] * (padded_len - len(coefficients))
+        coefficients, num_index_qubits = self._sampling_weights(wavefunction)
         bits_precision = int(self._settings.get("bits_precision"))
         total_qubits = 2 * num_index_qubits + 2 * bits_precision + 1
 
@@ -144,12 +136,7 @@ class AliasSamplingStatePreparation(StatePreparation):
         return Circuit(qsharp_op=qsharp_op, qsharp_factory=qsharp_factory, num_qubits=total_qubits)
 
     @staticmethod
-    def _num_index_qubits(num_coefficients: int) -> int:
-        """Width of the index register for a given coefficient count."""
-        return math.ceil(math.log2(num_coefficients)) if num_coefficients > 1 else 1
-
-    @staticmethod
-    def _sampling_weights(wavefunction: Wavefunction) -> list[float]:
+    def _sampling_weights(wavefunction: Wavefunction) -> tuple[list[float], int]:
         """Return the sampling weights ``|c|^2`` for a wavefunction's amplitudes.
 
         The Q# layer normalizes these itself, so they are returned unnormalized.
@@ -158,28 +145,21 @@ class AliasSamplingStatePreparation(StatePreparation):
             wavefunction: The target wavefunction.
 
         Returns:
-            The squared amplitudes, one per coefficient.
+            The squared amplitudes indexed by determinant, and the index register width.
 
         Raises:
             ValueError: If the coefficients are empty, complex, non-finite, negative, or
                 all zero.
 
         """
-        coeffs = np.asarray(wavefunction.get_coefficients())
-        if coeffs.size == 0:
-            raise ValueError("Alias sampling state preparation requires at least one coefficient.")
-        if np.iscomplexobj(coeffs):
-            if np.any(coeffs.imag != 0.0):
-                raise ValueError("Alias sampling state preparation requires real coefficients.")
-            coeffs = coeffs.real
-        coeffs = coeffs.astype(float, copy=False)
+        coeffs, num_index_qubits = dense_coefficients(wavefunction, "Alias sampling state preparation")
         if not np.all(np.isfinite(coeffs)):
             raise ValueError("Alias sampling state preparation requires finite coefficients.")
         if np.any(coeffs < 0.0):
             raise ValueError("Alias sampling state preparation requires non-negative coefficients.")
-        if not np.any(coeffs != 0.0):
-            raise ValueError(
-                "Alias sampling state preparation requires at least one non-zero coefficient; an "
-                "all-zero vector has no distribution to sample."
-            )
-        return (coeffs**2).tolist()
+        weights = coeffs**2
+        if not np.all(np.isfinite(weights)):
+            raise ValueError("Alias sampling state preparation overflows to infinity when squaring; rescale first.")
+        if not np.any(weights != 0.0):
+            raise ValueError("Alias sampling state preparation requires at least one non-zero coefficient.")
+        return weights.tolist(), num_index_qubits
