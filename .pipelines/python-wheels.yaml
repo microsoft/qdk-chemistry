@@ -116,18 +116,23 @@ extends:
       # Windows C++ dependency build (vcpkg + FetchContent targets).
       # Runs once so the 5 parallel Python-version wheel jobs share a single
       # warm cache entry instead of each rebuilding deps independently.
-      - job: Build_windows_x86_64_deps
-        pool:
-          name: $(CPU_POOL_X86)
-          demands:
-          - ImageOverride -equals windows-2025-1espt
-          os: windows
-        timeoutInMinutes: 480
-        displayName: Build Windows x86_64 C++ dependencies
-        steps:
-        - template: .pipelines/templates/build-pip-wheels-windows-deps.yml@self
-          parameters:
-            march: x86-64-v3
+      # Gated on windows_x86_64 actually being present in the matrix parameter (rather than running
+      # unconditionally) so a run that overrides `matrix` to skip Windows -- e.g. to iterate quickly on the
+      # Linux-only ExaChem work below -- doesn't waste a Windows agent on a dependency build nothing consumes.
+      - ${{ each target in parameters.matrix }}:
+        - ${{ if eq(target.name, 'windows_x86_64') }}:
+          - job: Build_windows_x86_64_deps
+            pool:
+              name: $(CPU_POOL_X86)
+              demands:
+              - ImageOverride -equals windows-2025-1espt
+              os: windows
+            timeoutInMinutes: 480
+            displayName: Build Windows x86_64 C++ dependencies
+            steps:
+            - template: .pipelines/templates/build-pip-wheels-windows-deps.yml@self
+              parameters:
+                march: x86-64-v3
 
       # ExaChem (+ TAMM) build for the Linux x86_64 test environment, built once here (in a container, matching
       # its own runtime environment -- see build-exachem-linux.yml for why) rather than per-Python-version, and
@@ -135,25 +140,28 @@ extends:
       # qdk-chemistry's own wheel build (build-pip-wheels.yml/.sh) at all -- ExaChem/TAMM and their dependencies
       # (BLIS+LibFLAME, spdlog, libint2, ecpint, gauxc, nlohmann_json, ...) are built and installed into an
       # entirely separate prefix, never touching qdk-chemistry's own (independent, uncached) MACIS/BLAS++
-      # FetchContent build.
-      - job: Build_linux_x86_64_exachem
-        pool:
-          name: $(CPU_POOL_X86)
-          demands:
-          - ImageOverride -equals Ubuntu24.04Nightly
-          os: linux
-        timeoutInMinutes: 480
-        displayName: Build Linux x86_64 ExaChem (BLIS+LibFLAME)
-        templateContext:
-          outputs:
-          - output: pipelineArtifact
-            displayName: Upload ExaChem install (Linux x86_64)
-            targetPath: $(System.DefaultWorkingDirectory)/exachem_install
-            artifactName: linux-x86_64-exachem-install
-        steps:
-        - template: .pipelines/templates/build-exachem-linux.yml@self
-          parameters:
-            march: x86-64-v3
+      # FetchContent build. Gated on linux_x86_64 being present in the matrix, same reasoning as the Windows
+      # deps job above.
+      - ${{ each target in parameters.matrix }}:
+        - ${{ if eq(target.name, 'linux_x86_64') }}:
+          - job: Build_linux_x86_64_exachem
+            pool:
+              name: $(CPU_POOL_X86)
+              demands:
+              - ImageOverride -equals Ubuntu24.04Nightly
+              os: linux
+            timeoutInMinutes: 480
+            displayName: Build Linux x86_64 ExaChem (BLIS+LibFLAME)
+            templateContext:
+              outputs:
+              - output: pipelineArtifact
+                displayName: Upload ExaChem install (Linux x86_64)
+                targetPath: $(System.DefaultWorkingDirectory)/exachem_install
+                artifactName: linux-x86_64-exachem-install
+            steps:
+            - template: .pipelines/templates/build-exachem-linux.yml@self
+              parameters:
+                march: x86-64-v3
 
       - ${{ each target in parameters.matrix }}:
         - job: Build_${{ target.name }}
