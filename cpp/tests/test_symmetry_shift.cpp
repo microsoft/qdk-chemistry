@@ -44,14 +44,8 @@ TEST_F(SymmetryShiftTest, DefaultTruncationThresholdIsZero) {
 
 /**
  * @brief SymmetryShifterFactory must be listed in the
- * REGISTER_FACTORY_SETTINGS_INIT block of algorithm_defaults.cpp.
- *
- * That list is maintained by hand, and an omission fails silently rather than
- * loudly: resolve_algorithm_defaults() returns nullptr, and
- * AlgorithmRef::_resolve_settings() stores that nullptr behind a bare
- * catch (...). Anyone nesting an AlgorithmRef("symmetry_shifter", ...) inside
- * another algorithm's settings then gets no defaults, no error message, and a
- * null dereference on the first attempt to configure it.
+ * REGISTER_FACTORY_SETTINGS_INIT block of algorithm_defaults.cpp; an omission
+ * there fails silently, leaving nested AlgorithmRefs without defaults.
  */
 TEST_F(SymmetryShiftTest, ResolvesAlgorithmDefaults) {
   const auto settings = qdk::chemistry::algorithms::detail::
@@ -116,11 +110,10 @@ TEST_F(SymmetryShiftTest, Water_STO3G_EnergyInvariantUnderShift) {
 }
 
 /**
- * @brief The fermionic low-rank BLISS shift should reduce (or at least not
- * increase) the fermionic double-factorization 1-norm relative to the unshifted
- * Hamiltonian.
+ * @brief Regression test pinning the fermionic double-factorization 1-norm of
+ * the shifted water/STO-3G Hamiltonian to a value recorded from a local run.
  */
-TEST_F(SymmetryShiftTest, Water_STO3G_ReducesOneNorm) {
+TEST_F(SymmetryShiftTest, Water_STO3G_OneNormRegression) {
   auto water = testing::create_water_structure();
   auto scf_solver = ScfSolverFactory::create();
   auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");

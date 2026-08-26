@@ -124,11 +124,17 @@ OneElectronShiftResult solve_one_electron_shift(
 /// SymmetryShift ready for rebuild_shifted_hamiltonian(). The Hamiltonian
 /// must be restricted.
 ///
+/// The two 1-norms are minimized sequentially, not jointly, so the total is not
+/// guaranteed to decrease; if it would increase, a zero shift is returned with
+/// a warning, leaving the Hamiltonian unchanged.
+///
 /// @param hamiltonian The Hamiltonian to analyze (restricted).
 /// @param n_alpha_electrons Target number of alpha electrons.
 /// @param n_beta_electrons Target number of beta electrons.
 /// @param df_truncation_threshold Fragments whose eigenvalue magnitude falls
 ///        below this threshold are dropped (0.0 = no truncation).
+/// @return The computed shift, or a zero (norb x norb) shift if the computed
+///         one would not reduce the fermionic 1-norm.
 SymmetryShift compute_fermionic_low_rank_shift(
     const qdk::chemistry::data::Hamiltonian& hamiltonian,
     unsigned int n_alpha_electrons, unsigned int n_beta_electrons,

@@ -204,6 +204,22 @@ SymmetryShift compute_fermionic_low_rank_shift(
       one_electron.lambda_1e_baseline, one_electron.lambda_1e, one_electron.mu1,
       global_shift.mu2);
 
+  // The two-body and one-body 1-norms are minimized sequentially, not jointly,
+  // so the total can come out worse. Fall back to a zero shift, which leaves
+  // the Hamiltonian unchanged.
+  if (lambda_total_after > lambda_total_before) {
+    QDK_LOGGER().warn(
+        "compute_fermionic_low_rank_shift: the computed shift would increase "
+        "the fermionic 1-norm (before={}, after={}); returning a zero shift, "
+        "so the Hamiltonian is left unchanged.",
+        lambda_total_before, lambda_total_after);
+
+    SymmetryShift identity_shift;
+    identity_shift.xi = Eigen::MatrixXd::Zero(static_cast<Eigen::Index>(norb),
+                                              static_cast<Eigen::Index>(norb));
+    return identity_shift;
+  }
+
   SymmetryShift shift;
   shift.mu1 = one_electron.mu1;
   shift.mu2 = global_shift.mu2;
