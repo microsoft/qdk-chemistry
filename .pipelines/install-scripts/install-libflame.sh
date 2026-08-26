@@ -17,7 +17,7 @@ elif [[ ${MARCH} == 'x86-64-v3' ]]; then
     export LIBFLAME_ARCH=x86_64
 fi
 
-# Download libflame
+# Download libflame v5.2.0 (a stable release tag, not a floating branch -- checksum-verified below)
 echo "Downloading libflame ${LIBFLAME_VERSION}..."
 # Clean up any leftover state from a previous (possibly failed) attempt on
 # this self-hosted agent — the workspace persists across builds and retries.

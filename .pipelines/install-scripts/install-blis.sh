@@ -6,7 +6,7 @@ MARCH=${2:-x86-64-v3}
 BLIS_VERSION=${3:-2.0}
 CFLAGS=${4:-"-fPIC -O3"}
 
-# Download BLIS v2.0
+# Download BLIS v2.0 (a stable release tag, not a floating branch -- checksum-verified below)
 echo "Downloading BLIS ${BLIS_VERSION}..."
 # Clean up any leftover state from a previous (possibly failed) attempt on
 # this self-hosted agent — the workspace persists across builds and retries.

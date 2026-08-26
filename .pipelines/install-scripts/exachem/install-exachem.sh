@@ -177,6 +177,12 @@ COMMON_CMAKE_ARGS=(
   -DNJSON_ROOT="${CPP_DEPS_PREFIX}"
   -DNUMACTL_ROOT="${INSTALL_PREFIX}"
   -DFETCHCONTENT_SOURCE_DIR_CMAKEBUILD="${CMSB_SRC_DIR}"
+  # Patches GlobalArrays' own cmake/ga-linalg.cmake (fetched fresh by CMSB via git clone, so not something we can
+  # override via FETCHCONTENT_SOURCE_DIR the way CMSB itself is patched above) so its LAPACK_PREFERENCE_LIST
+  # default becomes overridable instead of an unconditional clobber -- see patches/cmsb-fix-dependency-reuse.patch
+  # fix #6. Applied unconditionally (harmless for GHA's OpenBLAS: LAPACK_PREFERENCE_LIST is left unset there, so
+  # the now-conditional default still resolves to ReferenceLAPACK exactly as before).
+  -DGA_LINALG_PATCH_SCRIPT="${SCRIPT_DIR}/patches/fix-ga-linalg-preference.cmake"
   # Enforce reuse instead of leaving it best-effort: CMSB's find_or_build_dependency() only hard-errors
   # ("Could not locate <dep> and user has requested we do not build one") when BUILD_<dep> is explicitly set to
   # OFF; if left unset, a failed find silently falls through to include(Build<dep>) and rebuilds from source

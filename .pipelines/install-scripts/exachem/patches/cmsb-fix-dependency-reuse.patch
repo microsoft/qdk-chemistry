@@ -9,8 +9,9 @@
 # fallback in that nested re-resolution path). This patch is instead scoped to exactly the affected code paths,
 # leaving everything else byte-for-byte unchanged.
 #
-# Four independent root causes/fixes, across cmake/macros/DependencyMacros.cmake, cmake/macros/BuildCMSBModule.cmake,
-# cmake/build_external/BuildGlobalArrays.cmake, cmake/CMSBTargetConfig.cmake.in and cmake/find_external/Findnumactl.cmake:
+# Six independent root causes/fixes, across cmake/macros/DependencyMacros.cmake, cmake/macros/BuildCMSBModule.cmake,
+# cmake/build_external/BuildGlobalArrays.cmake, cmake/CMSBTargetConfig.cmake.in and cmake/find_external/Findnumactl.cmake
+# (plus a companion GlobalArrays-side fix, applied via PATCH_COMMAND -- see fix #6):
 #
 # 1. BLAS/LAPACK (cmake/macros/DependencyMacros.cmake, cmake/build_external/BuildGlobalArrays.cmake):
 #    BLAS/LAPACK are DEP_ABUILD items, so cmsb_find_dependency() only looks them up via
@@ -109,12 +110,35 @@
 #    CMAKE_C_IMPLICIT_LINK_DIRECTORIES when no explicit *_PREFIX is given -- exactly how BLIS itself is already
 #    found today without any BLIS_PREFIX hint.
 #
+# 6. GlobalArrays' OWN LAPACK_PREFERENCE_LIST override (GlobalArrays' own cmake/ga-linalg.cmake, patched via
+#    PATCH_COMMAND -- see fix-ga-linalg-preference.cmake): fix #5 above only changes what TAMM/ExaChem's OWN
+#    consumer sub-builds search for. GlobalArrays (a CMSB dependency of TAMM, built as its own nested
+#    GlobalArrays_External ExternalProject_Add) has an IDENTICAL hardcoded override in its own bundled
+#    cmake/ga-linalg.cmake (unconditional `set(LAPACK_PREFERENCE_LIST ReferenceLAPACK)` for
+#    LINALG_VENDOR=BLIS/OpenBLAS/IBMESSL, with no FLAME fallback at all), and GA's own CMakeLists.txt links its
+#    resolved LAPACK PUBLICLY (`target_link_libraries(ga PUBLIC ${GA_EXTRA_LIBS})`, where GA_EXTRA_LIBS includes
+#    the LAPACK target) and exports it via `install(EXPORT globalarrays-targets ...)`. So even with fix #5,
+#    GlobalArrays::ga's own exported link interface still carries ReferenceLAPACK, and TAMM/ExaChem link against
+#    GlobalArrays::ga transitively -- reintroducing the same "multiple definition of `dsytrd_'" conflict via a
+#    different path. Fix: (a) guard BuildGlobalArrays.cmake's OWN analogous unconditional override the same way
+#    as fix #5, (b) forward LAPACK_PREFERENCE_LIST into GlobalArrays_External's own nested configure via
+#    GA_LINALG_ROOT (escaping embedded ';' with the $<SEMICOLON> generator expression, since GA_LINALG_ROOT is
+#    itself flattened into ExternalProject_Add's plain CMAKE_ARGS -- ordinary list-element semicolons don't
+#    survive that the way CMAKE_CACHE_ARGS's :LIST= typed entries do), and (c) add a PATCH_COMMAND to
+#    GlobalArrays_External's ExternalProject_Add that runs fix-ga-linalg-preference.cmake (a small, portable
+#    CMake script shipped alongside this patch) against GA's freshly-cloned cmake/ga-linalg.cmake, guarding ITS
+#    hardcoded override the same way -- since GA is a separate git repo CMSB clones fresh, not something we can
+#    override via FETCHCONTENT_SOURCE_DIR the way we patch CMSB itself. Requires -DGA_LINALG_PATCH_SCRIPT=<path>
+#    (see install-exachem.sh) pointing at that script; harmless/no-op for GHA's OpenBLAS (LAPACK_PREFERENCE_LIST
+#    is left unset there, so the now-conditional default still resolves to ReferenceLAPACK exactly as before).
+#
 # Callers wanting BLAS/LAPACK/SPDLOG/EcpInt/NJSON reused (not rebuilt) should pass -DSPDLOG_ROOT=<prefix>
 # -DEcpInt_ROOT=<prefix> -DNJSON_ROOT=<prefix> on BOTH the outer TAMM and outer ExaChem (or any other
 # CMSB_PROJECTS consumer) cmake invocations, alongside the pre-existing -DLibInt2_ROOT/-DGauXC_ROOT pattern (see
 # install-exachem.sh). BLAS/LAPACK reuse itself needs no extra flag beyond LINALG_VENDOR=OpenBLAS/BLIS/IBMESSL --
 # except when LINALG_VENDOR=BLIS, which additionally needs -DLAPACK_PREFERENCE_LIST="FLAME;ReferenceLAPACK" (fix
-# #5) to make LAPACK resolve to libFLAME instead of CMSB's own bundled ReferenceLAPACK.
+# #5) and -DGA_LINALG_PATCH_SCRIPT=<path-to-fix-ga-linalg-preference.cmake> (fix #6) to make LAPACK resolve to
+# libFLAME instead of CMSB's/GlobalArrays' own bundled ReferenceLAPACK, in both places it's independently resolved.
 # numactl reuse (fix #4) needs no per-consumer flag thanks to the finder fallback, but -DBUILD_numactl=OFF is
 # recommended to turn a failed reuse into a loud error, and -DNUMACTL_ROOT=<prefix> may still be passed to hint
 # the primary search.
@@ -163,10 +187,33 @@ index a6437aa..d3f3235 100644
        list(APPEND ${__CMSB_LIBNAME}_LIBRARIES ECPINT::ecpint)
      elseif(${__depend_i} STREQUAL "pybind11")
 diff --git a/cmake/build_external/BuildGlobalArrays.cmake b/cmake/build_external/BuildGlobalArrays.cmake
-index 2221ddc..ae4ea2a 100644
+index 2221ddc..3fe5ba7 100644
 --- a/cmake/build_external/BuildGlobalArrays.cmake
 +++ b/cmake/build_external/BuildGlobalArrays.cmake
-@@ -90,9 +90,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/dep_versions.cmake)
+@@ -64,7 +64,9 @@ include(${CMAKE_CURRENT_LIST_DIR}/dep_versions.cmake)
+ 
+     if(${LINALG_VENDOR} STREQUAL "BLIS" OR ${LINALG_VENDOR} STREQUAL "OpenBLAS" OR ${LINALG_VENDOR} STREQUAL "IBMESSL")
+         set(BLAS_PREFERENCE_LIST ${LINALG_VENDOR})
+-        set(LAPACK_PREFERENCE_LIST ReferenceLAPACK)
++        if(NOT LAPACK_PREFERENCE_LIST)
++          set(LAPACK_PREFERENCE_LIST ReferenceLAPACK)
++        endif()
+ 
+         set(LINALG_PREFER_STATIC ON)
+         if(BUILD_SHARED_LIBS)
+@@ -83,6 +85,11 @@ include(${CMAKE_CURRENT_LIST_DIR}/dep_versions.cmake)
+             set(GA_LINALG_ROOT   "-DLINALG_PREFIX=${CMAKE_INSTALL_PREFIX}")
+         endif()
+ 
++        # Forward the caller's LAPACK_PREFERENCE_LIST into GA's own nested configure too, escaping embedded ';'
++        # via $<SEMICOLON> so it survives as one GA_LINALG_ROOT list element (needed for fix #6, below).
++        string(REPLACE ";" "$<SEMICOLON>" _lapack_pref_escaped "${LAPACK_PREFERENCE_LIST}")
++        list(APPEND GA_LINALG_ROOT "-DLAPACK_PREFERENCE_LIST=${_lapack_pref_escaped}")
++
+         if(USE_SCALAPACK)
+             set(ScaLAPACK_PREFERENCE_LIST ReferenceScaLAPACK)
+             find_or_build_dependency(LAPACK)	    
+@@ -90,9 +97,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/dep_versions.cmake)
              list(APPEND  GA_LINALG_ROOT "-DScaLAPACK_PREFIX=${CMAKE_INSTALL_PREFIX}")
          else()
              find_or_build_dependency(LAPACK)
@@ -177,6 +224,14 @@ index 2221ddc..ae4ea2a 100644
              #include(BuildBLAS)
          endif()
  
+@@ -152,6 +157,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/dep_versions.cmake)
+         GIT_REPOSITORY ${GA_REPO}
+         GIT_TAG ${GA_GIT_TAG}
+         UPDATE_DISCONNECTED 1
++        PATCH_COMMAND ${CMAKE_COMMAND} -DGA_LINALG_FILE=<SOURCE_DIR>/cmake/ga-linalg.cmake -P ${GA_LINALG_PATCH_SCRIPT}
+         CMAKE_ARGS ${DEPENDENCY_CMAKE_OPTIONS} -DENABLE_BLAS=ON -DLINALG_VENDOR=${LINALG_VENDOR} ${GA_LINALG_ROOT} 
+         ${GA_DPCPP} -DGA_RUNTIME=${GA_RUNTIME} -DENABLE_SYSV=${GA_ENABLE_SYSV} -DENABLE_PROFILING=${USE_GA_PROFILER} 
+         ${GA_LINALG_THREAD_LAYER} -DLINALG_REQUIRED_COMPONENTS=${LINALG_REQUIRED_COMPONENTS} ${GA_ScaLAPACK} ${GA_DEV_MODE} 
 diff --git a/cmake/find_external/Findnumactl.cmake b/cmake/find_external/Findnumactl.cmake
 index 6bc5269..7ae17d9 100644
 --- a/cmake/find_external/Findnumactl.cmake
