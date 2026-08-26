@@ -98,7 +98,7 @@ def h2_hamiltonian() -> QubitOperator:
 # `to_gate()`/`compose()`, which reject classical bits. The Base profile emits the
 # ancilla-free form instead, so pin just these two.
 @pytest.fixture
-def base_qsharp_context() -> Iterator[qdk.Context]:
+def use_base_qdk_ctx() -> Iterator[qdk.Context]:
     """Route the library's shared context to a ``TargetProfile.Base`` build."""
     with use_qsharp_context(create_qsharp_context(TargetProfile.Base)) as context:
         yield context
@@ -157,7 +157,8 @@ class TestQPEWithQubitization:
         )
 
     @pytest.mark.parametrize("builder_name", _builder_params)
-    def test_iterative_qpe_with_qubitization_h2(self, builder_name, h2_hamiltonian, base_qsharp_context):
+    @pytest.mark.usefixtures("use_base_qdk_ctx")
+    def test_iterative_qpe_with_qubitization_h2(self, builder_name, h2_hamiltonian):
         """Verify QPE with qubitization recovers H2 ground-state energy.
 
         Uses the full H2/STO-3G qubit Hamiltonian (15 Pauli terms, 4 qubits)
@@ -168,7 +169,6 @@ class TestQPEWithQubitization:
         Reference ground-state energy: -2.2472 Ha (from exact diagonalization).
         With 4 phase bits, the discretization error is ~0.02 Ha.
         """
-        assert base_qsharp_context is not None
         # Exact ground state from qubit Hamiltonian solver (dense diagonalization)
         solver = create("qubit_hamiltonian_solver", "qdk_dense_matrix_solver")
         reference_energy, ground_state_vector = solver.run(h2_hamiltonian)
@@ -237,9 +237,9 @@ class TestQPEWithQubitization:
     @pytest.mark.skipif(
         not QDK_CHEMISTRY_HAS_QISKIT_AER or not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit Aer not available."
     )
-    def test_standard_qpe_with_qubitization_h2(self, h2_hamiltonian, base_qsharp_context):
+    @pytest.mark.usefixtures("use_base_qdk_ctx")
+    def test_standard_qpe_with_qubitization_h2(self, h2_hamiltonian):
         """Verify standard QPE with qubitization recovers H2 ground-state energy."""
-        assert base_qsharp_context is not None
         # Exact ground state from qubit Hamiltonian solver (dense diagonalization)
         solver = create("qubit_hamiltonian_solver", "qdk_dense_matrix_solver")
         reference_energy, ground_state_vector = solver.run(h2_hamiltonian)
