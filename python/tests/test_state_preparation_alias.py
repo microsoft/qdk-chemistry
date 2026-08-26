@@ -9,32 +9,28 @@ import math
 
 import numpy as np
 import pytest
-import qdk
+from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.state_preparation.alias_sampling import AliasSamplingStatePreparation
 from qdk_chemistry.data import Configuration, ModelOrbitals, StateVectorContainer, Wavefunction
-from qdk_chemistry.utils.qsharp import create_qsharp_context
-
-
-@pytest.fixture
-def qdk_ctx() -> qdk.Context:
-    """Fresh Q# context for a single test."""
-    return create_qsharp_context()
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 
 def _run_alias_sampling_and_dump(
-    ctx: qdk.Context,
     coefficients: list[float],
     num_index_qubits: int,
     bits_precision: int,
 ) -> np.ndarray:
     """Run alias sampling state prep and return the full statevector."""
     total_qubits = 2 * num_index_qubits + 2 * bits_precision + 1
-    ctx.code.QDKChemistry.Utils.AliasSampling.RunAliasSamplingPrep(
-        coefficients, bits_precision, num_index_qubits, total_qubits
+    params = QSHARP_UTILS.AliasSampling.AliasSamplingParams(
+        coefficients=coefficients,
+        bitsPrecision=bits_precision,
+        numIndexQubits=num_index_qubits,
+        numQubits=total_qubits,
     )
-    state = ctx.dump_machine()
-    return np.array(state.as_dense_state())
+    op = QSHARP_UTILS.AliasSampling.MakeAliasSamplingOp(params)
+    return np.array(dump_operation_on_state(op, total_qubits, context=get_qsharp_context()))
 
 
 def _reverse_bits(values: np.ndarray, num_bits: int) -> np.ndarray:
@@ -60,10 +56,18 @@ def _compute_marginal_probs(
     return probs
 
 
+def _make_sparse_wavefunction(num_qubits: int, indices: list[int], amplitudes: list[float]) -> Wavefunction:
+    """Create a Wavefunction that occupies only *indices* of a ``num_qubits`` register."""
+    dets = [Configuration.from_bitstring(format(idx, f"0{num_qubits}b")[::-1]) for idx in indices]
+    orbitals = ModelOrbitals(num_qubits)
+    container = StateVectorContainer(np.array([float(a) for a in amplitudes]), dets, orbitals)
+    return Wavefunction(container)
+
+
 def _make_wavefunction(amplitudes: list[float]) -> Wavefunction:
     """Create a Wavefunction from a list of amplitudes."""
     num_qubits = math.ceil(math.log2(len(amplitudes))) if len(amplitudes) > 1 else 1
-    dets = [Configuration.from_bitstring(format(idx, f"0{num_qubits}b")) for idx in range(len(amplitudes))]
+    dets = [Configuration.from_bitstring(format(idx, f"0{num_qubits}b")[::-1]) for idx in range(len(amplitudes))]
     orbitals = ModelOrbitals(num_qubits)
     container = StateVectorContainer(np.array([float(a) for a in amplitudes]), dets, orbitals)
     return Wavefunction(container)
@@ -71,7 +75,7 @@ def _make_wavefunction(amplitudes: list[float]) -> Wavefunction:
 
 def _alias_atol(num_coefficients: int, bits_precision: int) -> float:
     """Tolerance on a marginal probability for an L-term, mu-bit alias table."""
-    return 2.0 / (num_coefficients * 2**bits_precision)
+    return 1.0 / (num_coefficients * 2**bits_precision)
 
 
 class TestAliasSamplingStatePreparation:
@@ -113,13 +117,27 @@ class TestAliasSamplingStatePreparation:
         with pytest.raises(ValueError, match="non-negative"):
             prep.run(wf)
 
-    def test_zero_coefficients_get_zero_probability(self, qdk_ctx):
+    def test_sparse_wavefunction_uses_determinant_indices(self):
+        """A coefficient belongs at its determinant's index, not its position in the list."""
+        prep = AliasSamplingStatePreparation(bits_precision=4)
+        weights, num_index_qubits = prep._sampling_weights(_make_sparse_wavefunction(2, [0, 3], [0.6, 0.8]))
+
+        assert num_index_qubits == 2
+        assert weights == pytest.approx([0.36, 0.0, 0.0, 0.64])
+
+    def test_coefficients_that_overflow_when_squared_are_rejected(self):
+        """The finiteness guard has to survive the squaring, not just precede it."""
+        prep = AliasSamplingStatePreparation(bits_precision=4)
+        with pytest.raises(ValueError, match="overflows to infinity"):
+            prep.run(_make_wavefunction([1e200, 1.0]))
+
+    def test_zero_coefficients_get_zero_probability(self):
         """A zero coefficient must receive exactly zero probability."""
         bits_precision = 4
         coefficients = [0.5, 0.3, 0.2, 0.0]
         num_index_qubits = 2
 
-        full_sv = _run_alias_sampling_and_dump(qdk_ctx, coefficients, num_index_qubits, bits_precision)
+        full_sv = _run_alias_sampling_and_dump(coefficients, num_index_qubits, bits_precision)
         marginal_probs = _compute_marginal_probs(full_sv, num_index_qubits)
 
         assert marginal_probs[3] == pytest.approx(0.0, abs=1e-12)
@@ -129,15 +147,30 @@ class TestAliasSamplingStatePreparation:
             atol=_alias_atol(len(coefficients), bits_precision),
         )
 
+    def test_largest_remainder_keeps_bound(self):
+        """Reviewer counterexample: index-order residual fill-in broke 1/(L 2^mu)."""
+        bits_precision = 1
+        coefficients = [0.35, 0.30, 0.175, 0.175]
+        num_index_qubits = 2
+
+        full_sv = _run_alias_sampling_and_dump(coefficients, num_index_qubits, bits_precision)
+        marginal_probs = _compute_marginal_probs(full_sv, num_index_qubits)
+
+        np.testing.assert_allclose(
+            marginal_probs[: len(coefficients)],
+            coefficients,
+            atol=_alias_atol(len(coefficients), bits_precision),
+        )
+
     @pytest.mark.parametrize("num_coefficients", range(3, 10, 3))
-    def test_marginal_probs_random(self, qdk_ctx, num_coefficients):
+    def test_marginal_probs_random(self, num_coefficients):
         """Verify alias sampling marginal probabilities with random coefficients."""
         rng = np.random.default_rng(seed=42 + num_coefficients)
         coefficients = rng.uniform(0.01, 1.0, size=num_coefficients).tolist()
         num_index_qubits = math.ceil(math.log2(num_coefficients))
         bits_precision = 6
 
-        full_sv = _run_alias_sampling_and_dump(qdk_ctx, coefficients, num_index_qubits, bits_precision)
+        full_sv = _run_alias_sampling_and_dump(coefficients, num_index_qubits, bits_precision)
         marginal_probs = _compute_marginal_probs(full_sv, num_index_qubits)
 
         abs_coeffs = np.abs(coefficients)
@@ -157,9 +190,7 @@ class TestAliasSamplingStatePreparation:
 
         errors = {}
         for bits_precision in (3, 7):
-            full_sv = _run_alias_sampling_and_dump(
-                create_qsharp_context(), coefficients, num_index_qubits, bits_precision
-            )
+            full_sv = _run_alias_sampling_and_dump(coefficients, num_index_qubits, bits_precision)
             probs = _compute_marginal_probs(full_sv, num_index_qubits)
             errors[bits_precision] = np.max(np.abs(probs[: len(coefficients)] - expected))
 
@@ -167,18 +198,23 @@ class TestAliasSamplingStatePreparation:
 
 
 def _run_conditional_alias_fr_and_dump(
-    ctx: qdk.Context,
     coefficients: list[list[float]],
     free_rider_data: list[list[bool]],
     bits_precision: int,
     condition_value: int,
 ) -> np.ndarray:
     """Run conditional alias sampling with free-rider and return statevector."""
-    ctx.code.QDKChemistry.Utils.AliasSampling.RunConditionalAliasSamplingPrepWithFreeRider(
+    n_cond = len(coefficients)
+    n_coeffs = len(coefficients[0])
+    n_index_bits = math.ceil(math.log2(n_coeffs))
+    n_cond_bits = math.ceil(math.log2(n_cond))
+    n_free_rider_bits = len(free_rider_data[0]) if free_rider_data else 0
+    n_qrom_output = bits_precision + n_index_bits + 2
+    total_qubits = n_cond_bits + n_index_bits + bits_precision + 1 + n_qrom_output + n_free_rider_bits
+    op = QSHARP_UTILS.AliasSampling.MakeConditionalAliasSamplingPrepWithFreeRiderOp(
         coefficients, free_rider_data, bits_precision, condition_value
     )
-    state = ctx.dump_machine()
-    return np.array(state.as_dense_state())
+    return np.array(dump_operation_on_state(op, total_qubits, context=get_qsharp_context()))
 
 
 def _compute_conditional_marginal_probs(
@@ -215,7 +251,7 @@ class TestConditionalAliasSamplingWithFreeRider:
             (2, 4, 1),
         ],
     )
-    def test_marginal_probs_with_free_rider(self, qdk_ctx, n_cond, n_coeffs, condition_value):
+    def test_marginal_probs_with_free_rider(self, n_cond, n_coeffs, condition_value):
         """Verify marginal probs and free-rider data loading."""
         rng = np.random.default_rng(seed=456 + n_cond * 10 + condition_value)
         coefficients = rng.uniform(-1.0, 1.0, size=(n_cond, n_coeffs)).tolist()
@@ -225,9 +261,7 @@ class TestConditionalAliasSamplingWithFreeRider:
         n_index_bits = math.ceil(math.log2(n_coeffs))
         n_cond_bits = math.ceil(math.log2(n_cond))
 
-        full_sv = _run_conditional_alias_fr_and_dump(
-            qdk_ctx, coefficients, free_rider_data, bits_precision, condition_value
-        )
+        full_sv = _run_conditional_alias_fr_and_dump(coefficients, free_rider_data, bits_precision, condition_value)
         marginal_probs = _compute_conditional_marginal_probs(full_sv, n_cond_bits, n_index_bits, condition_value)
 
         abs_coeffs = np.abs(coefficients[condition_value])
@@ -238,4 +272,51 @@ class TestConditionalAliasSamplingWithFreeRider:
             expected_probs,
             atol=_alias_atol(n_coeffs, bits_precision),
             err_msg=f"cond={condition_value}, free_rider={free_rider_data[condition_value]}",
+        )
+
+
+def _run_conditional_alias_and_dump(
+    coefficients: list[list[float]],
+    bits_precision: int,
+    condition_value: int,
+    num_swap_bits: int,
+) -> np.ndarray:
+    """Run conditional alias sampling (no free rider) and return statevector."""
+    n_cond = len(coefficients)
+    n_coeffs = len(coefficients[0])
+    n_index_bits = math.ceil(math.log2(n_coeffs))
+    n_cond_bits = math.ceil(math.log2(n_cond))
+    n_qrom_output = bits_precision + n_index_bits + 2
+    total_qubits = n_cond_bits + n_index_bits + bits_precision + 1 + n_qrom_output
+    op = QSHARP_UTILS.AliasSampling.MakeConditionalAliasSamplingPrepOp(
+        coefficients, bits_precision, condition_value, num_swap_bits
+    )
+    return np.array(dump_operation_on_state(op, total_qubits, context=get_qsharp_context()))
+
+
+class TestConditionalAliasSampling:
+    """Tests for conditional alias sampling without free-rider data."""
+
+    @pytest.mark.parametrize("num_swap_bits", [0, -1, 1])
+    @pytest.mark.parametrize("condition_value", [0, 1])
+    def test_marginal_probs(self, condition_value, num_swap_bits):
+        """Verify conditional marginal probs for no-swap, optimal, and select-swap loads."""
+        n_cond, n_coeffs = 2, 4
+        rng = np.random.default_rng(seed=789 + condition_value)
+        coefficients = rng.uniform(-1.0, 1.0, size=(n_cond, n_coeffs)).tolist()
+        bits_precision = 6
+        n_index_bits = math.ceil(math.log2(n_coeffs))
+        n_cond_bits = math.ceil(math.log2(n_cond))
+
+        full_sv = _run_conditional_alias_and_dump(coefficients, bits_precision, condition_value, num_swap_bits)
+        marginal_probs = _compute_conditional_marginal_probs(full_sv, n_cond_bits, n_index_bits, condition_value)
+
+        abs_coeffs = np.abs(coefficients[condition_value])
+        expected_probs = abs_coeffs**2 / np.sum(abs_coeffs**2)
+
+        np.testing.assert_allclose(
+            marginal_probs[:n_coeffs],
+            expected_probs,
+            atol=_alias_atol(n_coeffs, bits_precision),
+            err_msg=f"cond={condition_value}, num_swap_bits={num_swap_bits}",
         )
