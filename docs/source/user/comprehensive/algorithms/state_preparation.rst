@@ -240,29 +240,6 @@ where :math:`\tilde{p}` is the target distribution discretized to :math:`\mu` bi
 
 The prepared index register stays entangled with the ancillas, so this method is only meaningful inside a block encoding that applies :math:`\mathrm{PREPARE}^\dagger` to uncompute them. The ``prepare_select_prepare`` circuit mapper supplies those ancillas and uncomputes them after SELECT.
 
-Quantum Read-Only Memory (QROM)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. rubric:: Factory name: ``"qrom"``
-
-This method prepares an :math:`n`-qubit state with :math:`n` layers of multiplexed :math:`R_y` rotations, where each layer's rotation angles are loaded from a QROM table and applied through a phase gradient register. It uses only :math:`n = \lceil \log_2 L \rceil` state qubits, plus scratch ancilla per lookup, in exchange for :math:`n` QROM lookups. :math:`R_y` rotations only generate non-negative amplitudes, so the coefficient signs are applied afterwards by a QROM-loaded ``Z`` phase kickback.
-
-.. warning::
-   QROM state preparation is not supported by the :term:`LCU` ``prepare_select_prepare`` circuit mapper, because its multiplexed rotations read a phase gradient register that the block encoding does not supply.
-
-.. rubric:: Settings
-
-.. list-table::
-   :header-rows: 1
-   :widths: 25 25 50
-
-   * - Setting
-     - Type
-     - Description
-   * - ``rotation_bit_precision``
-     - int
-     - Number of bits of precision used for the QROM-loaded :math:`R_y` rotation angles. Higher values reduce the synthesis error of each multiplexed rotation at the cost of a wider QROM output register. The upper bound of 30 is a sanity limit rather than an algorithmic one: :math:`2^{-30}` is already far below chemical accuracy. Default is 10.
-
 Related classes
 ---------------
 
