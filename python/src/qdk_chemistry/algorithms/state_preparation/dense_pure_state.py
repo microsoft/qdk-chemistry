@@ -9,7 +9,7 @@ from qdk_chemistry.data import Wavefunction
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .state_preparation import StatePreparation, dense_coefficients
+from .state_preparation import StatePreparation
 
 __all__: list[str] = ["DensePureStatePreparation"]
 
@@ -50,7 +50,7 @@ class DensePureStatePreparation(StatePreparation):
             Circuit: A Circuit object implementing the state preparation.
 
         """
-        statevector, n_qubits = dense_coefficients(wavefunction, "Dense state preparation")
+        statevector, n_qubits = self.dense_state_vector(wavefunction, "Dense state preparation")
         row_map = list(range(n_qubits - 1, -1, -1))
         state_prep_params = QSHARP_UTILS.StatePreparation.StatePreparationParams(
             rowMap=row_map,

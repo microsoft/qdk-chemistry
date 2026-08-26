@@ -11,7 +11,7 @@ from qdk_chemistry.data import Settings, Wavefunction
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .state_preparation import StatePreparation, dense_coefficients
+from .state_preparation import StatePreparation
 
 __all__: list[str] = ["AliasSamplingStatePreparation", "AliasSamplingStatePreparationSettings"]
 
@@ -152,7 +152,7 @@ class AliasSamplingStatePreparation(StatePreparation):
                 all zero.
 
         """
-        coeffs, num_index_qubits = dense_coefficients(wavefunction, "Alias sampling state preparation")
+        coeffs, num_index_qubits = StatePreparation.dense_state_vector(wavefunction, "Alias sampling state preparation")
         if not np.all(np.isfinite(coeffs)):
             raise ValueError("Alias sampling state preparation requires finite coefficients.")
         if np.any(coeffs < 0.0):
