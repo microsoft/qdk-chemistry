@@ -94,9 +94,13 @@ echo "==> Seeded Eigen3 from ${EIGEN3_PREFIX} into ${INSTALL_PREFIX}"
 # TAMM's CMSB Findnumactl.cmake module (cmake/find_external/Findnumactl.cmake) hardcodes NO_DEFAULT_PATH on both
 # its find_path/find_library calls and only searches CMAKE_INSTALL_PREFIX -- so apt's libnuma-dev (system-wide,
 # under /usr) is invisible to it too, exactly like Eigen3 above. Seed numa.h + libnuma.so into INSTALL_PREFIX
-# (NOTE: pointing -DNUMACTL_ROOT at /usr directly instead, as qaml's container pipeline does, would NOT work here
-# -- Ubuntu's libnuma-dev installs libnuma.so under the multiarch triplet dir /usr/lib/x86_64-linux-gnu/, which
-# Findnumactl.cmake's hardcoded PATH_SUFFIXES lib/lib32/lib64 never match; seeding a flat copy sidesteps that).
+# (NOTE: pointing -DNUMACTL_ROOT at /usr directly instead, as qaml's container pipeline does, would NOT reliably
+# work here -- Ubuntu's libnuma-dev installs libnuma.so under the multiarch triplet dir /usr/lib/x86_64-linux-gnu/,
+# which Findnumactl.cmake's hardcoded PATH_SUFFIXES lib/lib32/lib64 never match on the *primary*, NO_DEFAULT_PATH
+# search; seeding a flat copy at a path those suffixes DO match sidesteps that. patches/cmsb-fix-dependency-reuse.patch
+# also gives Findnumactl.cmake a default-path *fallback* search -- which, being a plain default find_library with
+# no explicit PATHS, IS multiarch-aware and would likely find the OS copy on its own -- but the seeding here is kept
+# as the primary, more surgical mechanism rather than relying on that broader fallback finding the right copy).
 NUMA_HEADER="$(find /usr -maxdepth 6 -name 'numa.h' -print -quit 2>/dev/null || true)"
 NUMA_LIB="$(find /usr -maxdepth 6 -name 'libnuma.so' -print -quit 2>/dev/null || true)"
 if [ -z "${NUMA_HEADER}" ] || [ -z "${NUMA_LIB}" ]; then
