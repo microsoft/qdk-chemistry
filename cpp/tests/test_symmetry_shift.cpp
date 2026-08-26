@@ -12,6 +12,7 @@
 #include <qdk/chemistry/data/settings.hpp>
 #include <qdk/chemistry/utils/hamiltonian_one_norm.hpp>
 
+#include "../src/qdk/chemistry/algorithms/microsoft/symmetry_shift/fermionic_low_rank.hpp"
 #include "ut_common.hpp"
 
 using namespace qdk::chemistry::algorithms;
@@ -107,6 +108,54 @@ TEST_F(SymmetryShiftTest, Water_STO3G_EnergyInvariantUnderShift) {
     EXPECT_NEAR(E_before, E_after, testing::ci_energy_tolerance)
         << "Energy not invariant at df_truncation_threshold=" << threshold;
   }
+}
+
+/**
+ * @brief An empty fragment list must still produce a correctly sized xi.
+ *
+ * xi used to be sized from the fragments themselves, so no fragments meant a
+ * 0x0 xi and an out-of-bounds read downstream.
+ */
+TEST_F(SymmetryShiftTest, AccumulatesEmptyFragmentListIntoZeroShift) {
+  constexpr Eigen::Index norb = 7;
+  auto shift = microsoft::accumulate_fragment_shifts({}, norb);
+
+  EXPECT_EQ(shift.xi.rows(), norb);
+  EXPECT_EQ(shift.xi.cols(), norb);
+  EXPECT_TRUE(shift.xi.isZero());
+  EXPECT_DOUBLE_EQ(shift.mu2, 0.0);
+}
+
+/**
+ * @brief A df_truncation_threshold above every fragment eigenvalue must be
+ * handled gracefully rather than crashing, and must keep the energy invariant.
+ */
+TEST_F(SymmetryShiftTest, Water_STO3G_SurvivesAllFragmentsTruncated) {
+  auto water = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
+
+  auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
+  auto ham = hamiltonian_constructor->run(wfn_HF->get_orbitals());
+
+  auto mc = MultiConfigurationCalculatorFactory::create();
+  auto [E_before, wfn_before] = mc->run(ham, 5, 5);
+
+  auto shifter = SymmetryShifterFactory::create("fermionic_low_rank");
+  shifter->settings().set("df_truncation_threshold", 1.0e6);
+
+  auto [h_alpha, h_beta] = ham->get_one_body_integrals();
+  auto shift = shifter->compute_shift(*ham, 5, 5);
+  EXPECT_EQ(shift.xi.rows(), h_alpha.rows());
+  EXPECT_TRUE(shift.xi.isZero());
+  EXPECT_DOUBLE_EQ(shift.mu2, 0.0);
+
+  auto shifted_ham = shifter->run(ham, 5, 5);
+  ASSERT_NE(shifted_ham, nullptr);
+
+  auto mc_after = MultiConfigurationCalculatorFactory::create();
+  auto [E_after, wfn_after] = mc_after->run(shifted_ham, 5, 5);
+  EXPECT_NEAR(E_before, E_after, testing::ci_energy_tolerance);
 }
 
 /**

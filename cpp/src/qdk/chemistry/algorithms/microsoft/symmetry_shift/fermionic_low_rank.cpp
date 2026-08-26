@@ -30,15 +30,9 @@ inline std::size_t two_body_index(std::size_t i, std::size_t j, std::size_t k,
 // ---------------------------------------------------------------------------
 
 GlobalTwoBodyShift accumulate_fragment_shifts(
-    const std::vector<qdk::chemistry::utils::TwoBodyFragment>& fragments) {
-  GlobalTwoBodyShift result;
-
-  if (fragments.empty()) {
-    return result;
-  }
-
-  const Eigen::Index norb = fragments.front().U.rows();
-  result.xi = Eigen::MatrixXd::Zero(norb, norb);
+    const std::vector<qdk::chemistry::utils::TwoBodyFragment>& fragments,
+    Eigen::Index norb) {
+  GlobalTwoBodyShift result(norb);
 
   for (const auto& fragment : fragments) {
     result.lambda_df_baseline += fragment.lambda_df;
@@ -182,7 +176,15 @@ SymmetryShift compute_fermionic_low_rank_shift(
   auto fragments = qdk::chemistry::utils::double_factorize(
       two_body_coefficient, norb, df_truncation_threshold);
 
-  auto global_shift = accumulate_fragment_shifts(fragments);
+  if (fragments.empty()) {
+    QDK_LOGGER().warn(
+        "compute_fermionic_low_rank_shift: df_truncation_threshold={} "
+        "discarded every fragment; only the one-electron shift mu1 remains.",
+        df_truncation_threshold);
+  }
+
+  auto global_shift = accumulate_fragment_shifts(
+      fragments, static_cast<Eigen::Index>(norb));
 
   auto one_electron = solve_one_electron_shift(
       h_alpha, g_aaaa, global_shift.mu2, global_shift.xi, num_electrons);

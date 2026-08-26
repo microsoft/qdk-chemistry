@@ -49,13 +49,13 @@ struct HamiltonianOneNorm {
 ///      Heff_ij = h_ij + sum_k g[i,j,k,k] - 1/2 sum_k g[i,k,k,j],
 ///    and take lambda_1e = sum_i |gamma_i| over its eigenvalues (Eq. 15).
 ///
-/// NOTE ON CONVENTION: this decomposes the PHYSICAL coefficient V = 1/2 * g.
-/// qdk::chemistry::utils::double_factorize is elsewhere applied to the full
-/// tensor g (e.g. by SymmetryShifter implementations), so the
-/// two_body value here is exactly half of that pipeline's aggregated
-/// lambda_df; both are internally consistent, but only V = 1/2 * g reproduces
-/// the electronic Hamiltonian exactly (and matches the paper's absolute
-/// 1-norms).
+/// NOTE ON CONVENTION: this decomposes the PHYSICAL coefficient V = 1/2 * g,
+/// as do the SymmetryShifter implementations, so the two_body value here is
+/// directly comparable to that pipeline's aggregated lambda_df. Only V = 1/2*g
+/// reproduces the electronic Hamiltonian exactly (and matches the paper's
+/// absolute 1-norms); a caller who hands the raw tensor g straight to
+/// qdk::chemistry::utils::double_factorize() gets exactly twice this value,
+/// since lambda_DF scales linearly with the tensor.
 ///
 /// @param hamiltonian Restricted Hamiltonian to analyze.
 /// @param df_truncation_threshold Fragments whose reshaped-supermatrix

@@ -44,7 +44,10 @@ struct TwoBodyFragment {
 /// qdk::chemistry::algorithms::SymmetryShifter implementations that
 /// need low-rank two-electron fragments).
 ///
-/// @param two_body_integrals Flattened g_ijkl tensor, size norb^4.
+/// @param two_body_integrals Flattened two-electron tensor, size norb^4. The
+///        caller chooses the convention: lambda_df scales linearly with this
+///        tensor, and both in-tree callers pass the physical coefficient
+///        V = 1/2 * g rather than the raw g.
 /// @param norb Number of (spatial) orbitals.
 /// @param truncation_threshold Fragments whose eigenvalue magnitude of the
 ///        reshaped supermatrix falls below this threshold are dropped.

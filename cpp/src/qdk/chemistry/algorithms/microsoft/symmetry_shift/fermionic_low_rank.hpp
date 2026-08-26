@@ -58,6 +58,11 @@ inline double median(const Eigen::VectorXd& values) {
 /// that is SUBTRACTED from H; the per-fragment operators are negated
 /// during aggregation because the DF+LRPS identity (Eq. C6) adds them.
 struct GlobalTwoBodyShift {
+  /// `norb` is required so that `xi` is always correctly sized, including
+  /// when there are no fragments to accumulate.
+  explicit GlobalTwoBodyShift(Eigen::Index norb)
+      : xi(Eigen::MatrixXd::Zero(norb, norb)) {}
+
   double mu2 = 0.0;    ///< Aggregated mu_2 (for H - K).
   Eigen::MatrixXd xi;  ///< Aggregated xi_ij (for H - K), norb x norb.
   double lambda_df_baseline = 0.0;  ///< Sum of pre-shift fragment 1-norms.
@@ -71,8 +76,13 @@ struct GlobalTwoBodyShift {
 /// double-factorizing the PHYSICAL two-electron coefficient 1/2 g, so the
 /// aggregated (mu2, xi) are directly usable by
 /// rebuild_shifted_hamiltonian().
+///
+/// `norb` is taken from the Hamiltonian rather than from `fragments`, so an
+/// empty fragment list (every fragment truncated away) yields a well-formed
+/// zero shift instead of an unsized xi.
 GlobalTwoBodyShift accumulate_fragment_shifts(
-    const std::vector<qdk::chemistry::utils::TwoBodyFragment>& fragments);
+    const std::vector<qdk::chemistry::utils::TwoBodyFragment>& fragments,
+    Eigen::Index norb);
 
 /// Result of solve_one_electron_shift(): the optimal one-electron BLISS
 /// shift mu1 and the resulting fermionic 1-norm of the shifted effective
