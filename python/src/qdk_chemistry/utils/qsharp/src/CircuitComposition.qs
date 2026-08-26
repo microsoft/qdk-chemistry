@@ -63,6 +63,7 @@ namespace QDKChemistry.Utils.CircuitComposition {
     /// Returns `op` wrapped so it prepares and restores its own trailing `numShared` ancillas.
     ///
     /// Use where `op` runs once; a caller invoking it repeatedly should hoist `prepareShared`.
+    /// `numShared` of 0 leaves `op` unwrapped, since the trailing slice would be empty.
     function MakeSharedAncillaOp(
         op : Qubit[] => Unit is Adj + Ctl,
         prepareShared : Qubit[] => Unit is Adj + Ctl,
@@ -70,7 +71,9 @@ namespace QDKChemistry.Utils.CircuitComposition {
     ) : Qubit[] => Unit is Adj + Ctl {
         (qs) => {
             within {
-                prepareShared(qs[Length(qs) - numShared...]);
+                if numShared > 0 {
+                    prepareShared(qs[Length(qs) - numShared...]);
+                }
             } apply {
                 op(qs);
             }

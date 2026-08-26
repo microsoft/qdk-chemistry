@@ -11,7 +11,7 @@ from qdk_chemistry.data import Settings, Wavefunction
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .state_preparation import StatePreparation, dense_coefficients
+from .state_preparation import StatePreparation
 
 __all__: list[str] = ["QROMStatePreparation", "QROMStatePreparationSettings"]
 
@@ -92,8 +92,7 @@ class QROMStatePreparation(StatePreparation):
             qsharp_op=qsharp_op,
             qsharp_factory=qsharp_factory,
             num_qubits=params.numStateQubits + params.rotationBitPrecision,
-            num_shared_ancillas=params.rotationBitPrecision,
-            shared_prep_op=QSHARP_UTILS.PhaseGradient.PreparePhaseGradientState,
+            num_phase_gradient_ancillas=params.rotationBitPrecision,
         )
 
     def _build_params(self, wavefunction: Wavefunction):
@@ -110,7 +109,7 @@ class QROMStatePreparation(StatePreparation):
                 contains a non-finite coefficient, or is all zeros.
 
         """
-        coeffs, num_state_qubits = dense_coefficients(wavefunction, "QROM state preparation")
+        coeffs, num_state_qubits = self.dense_state_vector(wavefunction, "QROM state preparation")
         if not np.all(np.isfinite(coeffs)) or not np.any(coeffs != 0.0):
             raise ValueError("QROM state preparation requires finite, non-zero coefficients.")
 
