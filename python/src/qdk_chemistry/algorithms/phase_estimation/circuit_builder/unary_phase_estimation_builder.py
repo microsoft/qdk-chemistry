@@ -190,20 +190,18 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
             raise ValueError(f"Circuit mapper '{type(mapper).__name__}' did not report num_qubits.")
         num_system_qubits = qubit_hamiltonian.num_qubits
 
-        # Shared ancilla sit past the block ancilla and stay in their prepared state between
-        # walk steps, so the reflection covers only the block ancilla, which return to zero.
-        block_encoding_shared = block_encoding.num_shared_ancillas
-        state_prep_shared = state_preparation.num_shared_ancillas
+        block_encoding_shared = block_encoding.num_phase_gradient_ancillas
+        state_prep_shared = state_preparation.num_phase_gradient_ancillas
         if block_encoding_shared and state_prep_shared and block_encoding_shared != state_prep_shared:
             raise ValueError(
-                f"State preparation expects {state_prep_shared} shared ancilla but the block "
-                f"encoding expects {block_encoding_shared}."
+                f"State preparation expects {state_prep_shared} phase gradient ancilla but the "
+                f"block encoding expects {block_encoding_shared}."
             )
-        num_shared_ancillas = max(block_encoding_shared, state_prep_shared)
-        shared_prep_op = (
-            block_encoding._shared_prep_op  # noqa: SLF001
-            or state_preparation._shared_prep_op  # noqa: SLF001
-            or QSHARP_UTILS.PrepSelPrep.NoOpPrepare
+        num_phase_gradient_ancillas = max(block_encoding_shared, state_prep_shared)
+        prepare_shared_op = (
+            QSHARP_UTILS.PhaseGradient.PreparePhaseGradientState
+            if num_phase_gradient_ancillas
+            else QSHARP_UTILS.PrepSelPrep.NoOpPrepare
         )
         num_ancilla_qubits = num_qubits - num_system_qubits - block_encoding_shared
         if num_ancilla_qubits <= 0:
@@ -225,11 +223,11 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
             "applyBlockEncoding": block_encoding_op,
             "applyReflection": apply_reflection,
             "phaseQubitPrep": QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(phase_prep_params),
-            "prepareSharedOp": shared_prep_op,
+            "prepareSharedOp": prepare_shared_op,
             "numQueries": num_queries,
             "numSystemQubits": num_system_qubits,
             "numAncillas": num_ancilla_qubits,
-            "numSharedAncillas": num_shared_ancillas,
+            "numSharedAncillas": num_phase_gradient_ancillas,
             "statePrepUsesShared": bool(state_prep_shared),
             "blockEncodingUsesShared": bool(block_encoding_shared),
         }
@@ -238,7 +236,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
                 program=QSHARP_UTILS.UnaryPhaseEstimation.MakeUnaryQPECircuit,
                 parameter=parameters,
             ),
-            num_qubits=num_phase_qubits + num_system_qubits + num_ancilla_qubits + num_shared_ancillas,
+            num_qubits=num_phase_qubits + num_system_qubits + num_ancilla_qubits + num_phase_gradient_ancillas,
         )
         return [circuit]
 
