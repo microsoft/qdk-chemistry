@@ -148,34 +148,13 @@ echo "==> HDF5: cflags='${HDF5_CFLAGS}' libs='${HDF5_LIBS}'"
 # (the base HDF5 here, like qdk-chemistry's own, is serial-only); USE_SERIAL_IO selects ExaChem's serial-I/O SCF
 # path instead. These MUST be identical on both configure lines, or ExaChem's CMSB reconfigures/rebuilds TAMM.
 #
-# NOTE: TAMM's CMSB always rebuilds its own copies of several dependencies that are already available (system
-# BLAS/LAPACK, spdlog, EcpInt, nlohmann_json), because its dependency-resolution loop either uses an overly
-# strict find_package(... CONFIG NO_DEFAULT_PATH) search (BLAS/LAPACK) or never bakes a reliable *_ROOT hint for
-# re-resolution when consumed by ExaChem's own separate configure (SPDLOG/EcpInt/NJSON). A first, broader attempt
-# to fix this via the global -DCMSB_DEBUG_CMAKE=OFF option was abandoned: it also changes how every *other* TAMM
-# dependency is resolved in CMSB's nested "TAMM_External"/"EXACHEM_External" build phase, which has no
-# build-from-source fallback there and broke outright ("could not find TARGET NJSON_External").
+# Without patches/cmsb-fix-dependency-reuse.patch, TAMM's CMSB would rebuild its own copies of system BLAS/LAPACK/
+# spdlog/EcpInt/nlohmann_json instead of reusing them -- see that file for the full per-dependency root-cause
+# writeup and candidate upstream fix.
 #
-# Fixed instead with patches/cmsb-fix-dependency-reuse.patch (candidate for upstreaming; see that file for the
-# full per-dependency root-cause writeup) -- a narrowly-scoped patch that leaves CMSB_DEBUG_CMAKE at its default
-# and only changes how BLAS/LAPACK/SPDLOG/EcpInt/NJSON specifically are resolved:
-#   - BLAS/LAPACK: cmsb_find_dependency() gets a plain find_package(BLAS/LAPACK QUIET) fallback (mirroring the
-#     ELPA/HDF5/numactl special cases already there), and BuildGlobalArrays.cmake's
-#     find_or_build_dependency(BLAS) call is made unconditional (previously only reachable if a BLAS_External
-#     target already happened to exist).
-#   - SPDLOG/EcpInt/NJSON: CMSBTargetConfig.cmake.in gets the same baked-@ROOT@ mechanism CMSB already uses for
-#     LibInt2/HDF5/HPTT (a literal, build-time-substituted set(<name>_ROOT @<name>_ROOT@), independent of the
-#     consuming build's own CMAKE_PREFIX_PATH state), forwarded into CMSB's nested *_External sub-builds the
-#     same way -DHDF5_ROOT/-DHPTT_ROOT/-DLibInt2_ROOT already are.
-#
-# NJSON (nlohmann_json) needs special care: apt's nlohmann-json3-dev is v3.11.3, while ExaChem's own source
-# (exachem/common/options/parser_utils.hpp) reaches into nlohmann's *private* detail:: namespace
-# (string_input_adapter_type), which only exists from v3.12.0 onward -- exactly the version both CMSB
-# (dep_versions.cmake) and qdk-chemistry's own cpp/cmake/third_party.cmake pin. Reusing apt's older package broke
-# the ExaChem build outright (confirmed via a live CI run). Fixed by building nlohmann_json v3.12.0 (matching
-# cgmanifest.json's pin exactly) into CPP_DEPS_PREFIX ourselves (install-cpp-deps.sh, header-only, no apt
-# package needed/installed anymore) and pointing NJSON_ROOT there instead -- exactly matching CMSB's own pin, so
-# both qdk-chemistry's own build and ExaChem/TAMM reuse the identical, compatible nlohmann_json install.
+# NJSON_ROOT specifically must point at a nlohmann_json >= 3.12.0 (built by install-cpp-deps.sh, matching
+# cgmanifest.json's pin): ExaChem's own source reaches into nlohmann's private detail:: namespace
+# (string_input_adapter_type), only present from 3.12.0 onward, which apt's nlohmann-json3-dev (3.11.3) predates.
 CMSB_SRC_DIR="${BUILD_ROOT}/CMakeBuild-patched"
 mkdir -p "${CMSB_SRC_DIR}"
 git -C "${CMSB_SRC_DIR}" init -q
@@ -221,26 +200,12 @@ if [ -n "${LINALG_PREFIX}" ]; then
   COMMON_CMAKE_ARGS+=(-DLINALG_PREFIX="${LINALG_PREFIX}")
 fi
 if [ "${LINALG_VENDOR}" = "BLIS" ]; then
-  # BLIS provides BLAS only, so every CMSB/TAMM/ExaChem consumer sub-build that needs LAPACK falls back to the
-  # shared icl-utk-edu/linalg-cmake-modules ecosystem's own default LAPACK_PREFERENCE_LIST ("ReferenceLAPACK;
-  # FLAME") -- and since a ReferenceLAPACK (CMSB's own bundled, statically-built Netlib LAPACK) gets built once
-  # early in the superbuild (for GlobalArrays) and is then found/reused everywhere else, it always wins over
-  # FLAME (libFLAME, our actual intended LAPACK provider alongside BLIS) by simple list order. That leaves BOTH
-  # a static ReferenceLAPACK.a (from the above) AND a static libFLAME.a (pulled in separately via BLAS++/
-  # LAPACK++, reused from install-cpp-deps.sh's -Dblas=blis build -- see install-blaspp.sh) on the final
-  # executable's link line -- two full, conflicting implementations of the same netlib LAPACK Fortran API,
-  # causing "multiple definition of `dsytrd_'" and similar link errors (confirmed via a live ADO CI failure).
-  # Fix: explicitly prefer FLAME over ReferenceLAPACK via LAPACK_PREFERENCE_LIST (forwarded to every consumer
-  # sub-build by patches/cmsb-fix-dependency-reuse.patch fix #5), so LAPACK resolves to libFLAME consistently
-  # everywhere and ReferenceLAPACK is never built/linked at all. ReferenceLAPACK is kept as a fallback in case
-  # libFLAME somehow isn't found (louder rebuild instead of a silent, hard-to-diagnose link failure). Deliberately
-  # not using -DBLA_VENDOR=FLAME for this: it would ALSO force BLAS_PREFERENCE_LIST to FLAME-only (BLA_VENDOR
-  # feeds both BLAS_ and LAPACK_PREFERENCE_LIST identically), which would risk silently dropping our fast,
-  # already-working BLIS BLAS resolution in favor of whatever BLAS routines libFLAME itself may or may not
-  # bundle. No matching *_PREFIX hint is needed for FLAME: libFLAME lives in the same prefix as BLIS
-  # (LINALG_PREFIX, already forwarded), which the Find*.cmake modules fall through to via
-  # CMAKE_C_IMPLICIT_LINK_DIRECTORIES when no explicit *_PREFIX is given -- exactly how BLIS itself is already
-  # found today without a BLIS_PREFIX hint.
+  # BLIS has no LAPACK routines, so every CMSB consumer sub-build falls back to CMSB's own bundled Netlib
+  # ReferenceLAPACK -- which wins over libFLAME (our actual LAPACK provider alongside BLIS) by default list
+  # order, and both end up statically linked into the same executable ("multiple definition of `dsytrd_'" etc).
+  # Prefer FLAME explicitly instead; see patches/cmsb-fix-dependency-reuse.patch fix #5 for the full mechanism.
+  # Not using -DBLA_VENDOR=FLAME here: it feeds BLAS_PREFERENCE_LIST too, which would risk swapping away our
+  # already-working BLIS BLAS resolution. No *_PREFIX hint needed: libFLAME shares BLIS's prefix (LINALG_PREFIX).
   COMMON_CMAKE_ARGS+=(-DLAPACK_PREFERENCE_LIST="FLAME;ReferenceLAPACK")
 fi
 

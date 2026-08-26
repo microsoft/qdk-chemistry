@@ -6,18 +6,12 @@ set -ex
 #
 # Runs inside the same ubuntu:24.04 Docker container used to build/test the qdk-chemistry wheel itself (see
 # build-pip-wheels.sh / test-pip-wheels.sh) -- NOT directly on the ADO host pool -- so the resulting ExaChem
-# binary is guaranteed to be ABI-compatible with whatever OS the wheel test container actually runs, independent
-# of the host pool's own OS. This matters because the host pool is expected to migrate from Ubuntu to Azure Linux
-# at some point; as long as the wheel build/test containers stay pinned to ubuntu:24.04 (a separate decision),
-# this script does not need to change when that migration happens.
+# binary stays ABI-compatible with the test container regardless of what OS the host pool itself runs (the pool
+# is expected to migrate from Ubuntu to Azure Linux at some point; this script doesn't need to change for that).
 #
-# Unlike GHA's build-and-test.yaml (which uses apt's OpenBLAS), this pipeline uses BLIS+LibFLAME as its BLAS/
-# LAPACK vendor -- see build-pip-wheels.sh's own comment: this avoids symbol collisions with qiskit's shared
-# OpenBLAS. LINALG_VENDOR=BLIS / LINALG_PREFIX are passed to install-exachem.sh accordingly (see that script's
-# own comments: with BLIS, every CMSB/TAMM/ExaChem consumer sub-build needs an explicit LAPACK_PREFERENCE_LIST
-# hint -- forwarded via patches/cmsb-fix-dependency-reuse.patch fix #5 -- to prefer libFLAME over CMSB's own
-# bundled Netlib ReferenceLAPACK; without it, both end up statically linked into the same executable and
-# collide on every LAPACK symbol).
+# Uses BLIS+LibFLAME as its BLAS/LAPACK vendor, unlike GHA's OpenBLAS -- see build-pip-wheels.sh's own comment
+# for why, and install-exachem.sh's LINALG_VENDOR=BLIS handling for the LAPACK_PREFERENCE_LIST fix that combo
+# needs.
 #
 # Only the final exachem_install directory is written under the bind-mounted repo checkout (so it survives to be
 # published as a pipeline artifact / cached across pipeline runs -- see .pipelines/templates/build-exachem-linux.yml);

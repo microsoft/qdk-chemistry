@@ -35,11 +35,11 @@
 #    `set(<name>_ROOT @<name>_ROOT@)`, substituted once at TAMM's own build time via configure_file) for
 #    LibInt2/HDF5/HPTT -- SPDLOG/EcpInt never got the same treatment, so their re-resolution relied entirely on
 #    CMAKE_PREFIX_PATH being correctly forwarded through CMSB's nested ExternalProject_Add machinery, which is
-#    unreliable in practice (confirmed via a live CI run: EcpInt happened to resolve, SPDLOG did not, with an
-#    identical forwarding path -- eventually hard-erroring on tamm::tamm's own set_target_properties(),
-#    "the target spdlog::spdlog was not found"). Fix: extend the exact same baked-@ROOT@ mechanism CMSB already
-#    uses for LibInt2/HDF5/HPTT to SPDLOG/EcpInt too, and forward -DSPDLOG_ROOT/-DEcpInt_ROOT into CMSB's nested
-#    *_External sub-builds the same way -DHDF5_ROOT/-DHPTT_ROOT/-DLibInt2_ROOT already are.
+#    unreliable in practice: EcpInt resolves but SPDLOG doesn't via an identical forwarding path, hard-erroring
+#    on tamm::tamm's own set_target_properties(), "the target spdlog::spdlog was not found". Fix: extend the
+#    exact same baked-@ROOT@ mechanism CMSB already uses for LibInt2/HDF5/HPTT to SPDLOG/EcpInt too, and forward
+#    -DSPDLOG_ROOT/-DEcpInt_ROOT into CMSB's nested *_External sub-builds the same way -DHDF5_ROOT/-DHPTT_ROOT/
+#    -DLibInt2_ROOT already are.
 #
 # 3. NJSON (nlohmann_json): same gap and same fix as SPDLOG/EcpInt above -- NJSON's elseif branch in
 #    CMSBTargetConfig.cmake.in never set `_dep_pp` either. Callers wanting NJSON reused should point NJSON_ROOT
@@ -58,11 +58,10 @@
 #    UPPER-case `NUMACTL_ROOT` -- a case mismatch unique to numactl (LibInt2/HDF5/HPTT/SPDLOG/EcpInt/NJSON all use
 #    the same casing for dep-name and finder-var, e.g. "SPDLOG"/SPDLOG_ROOT, so their forwarding just works).
 #    A first attempt at fixing this the same way as SPDLOG/EcpInt/NJSON above (baking @NUMACTL_ROOT@ into the
-#    CMSBTargetConfig.cmake.in consumer re-resolution, forwarding -DNUMACTL_ROOT via bundle_cmake_args) looked
-#    right but did NOT fix the actual failure: it only helps the *consumer* re-resolution path, not the nested
-#    TAMM_External build, which re-resolves TAMM_DEPENDENCIES from scratch in its own cmake process and hard-
-#    errored on the uncreated numactl_External target once -DBUILD_numactl=OFF was also set (confirmed via a live
-#    qaml-discovery CI run). Rather than plumb the case-mismatched variable through every nested layer, the fix
+#    CMSBTargetConfig.cmake.in consumer re-resolution, forwarding -DNUMACTL_ROOT via bundle_cmake_args) does not
+#    work: it only helps the *consumer* re-resolution path, not the nested TAMM_External build, which re-resolves
+#    TAMM_DEPENDENCIES from scratch in its own cmake process and hard-errors on the uncreated numactl_External
+#    target once -DBUILD_numactl=OFF is also set. Rather than plumb the case-mismatched variable through every nested layer, the fix
 #    instead makes reuse work in EVERY CMSB configure phase (outer, nested, and downstream consumer) with no
 #    forwarding at all: Findnumactl gets a default-path FALLBACK search (a second find_path/find_library WITHOUT
 #    NO_DEFAULT_PATH) after its existing NO_DEFAULT_PATH search. Since find_path/find_library are no-ops once the
