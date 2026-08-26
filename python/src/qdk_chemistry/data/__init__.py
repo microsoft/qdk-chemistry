@@ -126,6 +126,7 @@ from qdk_chemistry.data.qpe_result import QpeResult
 
 # ``QubitHamiltonian`` is re-exported as a deprecated alias of ``QubitOperator``.
 from qdk_chemistry.data.qubit_operator import QubitHamiltonian, QubitOperator
+from qdk_chemistry.data.registry import available_dataclasses, get_dataclass_type, register_dataclass
 from qdk_chemistry.data.symmetries import Symmetries
 from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
 from qdk_chemistry.data.time_dependent_qubit_hamiltonian.base import TimeDependentQubitHamiltonian
@@ -209,7 +210,10 @@ __all__ = [
     "Wavefunction",
     "WavefunctionContainer",
     "WavefunctionType",
+    "available_dataclasses",
     "get_current_ciaaw_version",
+    "get_dataclass_type",
+    "register_dataclass",
     "with_auxiliary_basis",
 ]
 

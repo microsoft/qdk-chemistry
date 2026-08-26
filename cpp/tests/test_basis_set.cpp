@@ -584,6 +584,24 @@ TEST_F(BasisSetTest, ECPDefaultInitialization) {
   EXPECT_TRUE(basis.get_ecp_shells().empty());
 }
 
+TEST_F(BasisSetTest, EffectiveNuclearPropertiesMatchStructureWithoutEcp) {
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}};
+  std::vector<std::string> symbols = {"O", "H"};
+  Structure structure(coords, symbols);
+
+  std::vector<Shell> shells;
+  shells.emplace_back(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
+  shells.emplace_back(1, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
+  BasisSet basis("test-basis", shells, structure);
+
+  const auto effective_charges = basis.get_effective_nuclear_charges();
+  EXPECT_TRUE(
+      (effective_charges.array() == structure.get_nuclear_charges().array())
+          .all());
+  EXPECT_DOUBLE_EQ(basis.calculate_effective_nuclear_repulsion_energy(),
+                   structure.calculate_nuclear_repulsion_energy());
+}
+
 TEST_F(BasisSetTest, ECPGet) {
   // Test getting ECP data
   std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}};

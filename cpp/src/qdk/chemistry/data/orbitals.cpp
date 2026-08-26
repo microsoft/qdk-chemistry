@@ -12,7 +12,6 @@
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <set>
 #include <span>
 #include <stdexcept>
@@ -1115,7 +1114,7 @@ void Orbitals::to_hdf5_file(const std::string& filename) const {
   }
   // Validate filename has correct data type suffix
   std::string validated_filename = DataTypeFilename::validate_write_suffix(
-      filename, DATACLASS_TO_SNAKE_CASE(Orbitals));
+      filename, Orbitals::data_type_name());
 
   _to_hdf5_file(validated_filename);
 }
@@ -1127,8 +1126,8 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5_file(
     throw std::invalid_argument("Filename cannot be empty");
   }
   // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_read_suffix(filename, "orbitals");
+  std::string validated_filename = DataTypeFilename::validate_read_suffix(
+      filename, Orbitals::data_type_name());
 
   return _from_hdf5_file(validated_filename);
 }
@@ -1140,7 +1139,7 @@ void Orbitals::to_json_file(const std::string& filename) const {
   }
   // Validate filename has correct data type suffix
   std::string validated_filename = DataTypeFilename::validate_write_suffix(
-      filename, DATACLASS_TO_SNAKE_CASE(Orbitals));
+      filename, Orbitals::data_type_name());
 
   _to_json_file(validated_filename);
 }
@@ -1152,8 +1151,8 @@ std::shared_ptr<Orbitals> Orbitals::from_json_file(
     throw std::invalid_argument("Filename cannot be empty");
   }
   // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_read_suffix(filename, "orbitals");
+  std::string validated_filename = DataTypeFilename::validate_read_suffix(
+      filename, Orbitals::data_type_name());
 
   return _from_json_file(validated_filename);
 }
@@ -1810,6 +1809,10 @@ ModelOrbitals::ModelOrbitals(size_t basis_size,
     : Orbitals(), _num_orbitals(basis_size) {
   QDK_LOG_TRACE_ENTERING();
   _symmetries = std::move(symmetries);
+  if (!_symmetries) {
+    _symmetries =
+        std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial());
+  }
   _is_restricted = model_restricted_from_symmetries(_symmetries);
   // Full active space over all modes by default; inactive space empty.
   std::vector<size_t> all_indices(basis_size);

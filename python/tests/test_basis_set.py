@@ -24,6 +24,7 @@ from qdk_chemistry.data import (
     Shell,
     Structure,
 )
+from qdk_chemistry.data._type_name import class_data_type_name
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
@@ -1543,9 +1544,8 @@ def test_get_supported_elements_for_basis_set():
 
 
 def test_basis_set_data_type_name():
-    """Test that BasisSet has the correct _data_type_name class attribute."""
-    assert hasattr(BasisSet, "_data_type_name")
-    assert BasisSet._data_type_name == "basis_set"
+    """Test that BasisSet exposes its static wire-format identifier."""
+    assert class_data_type_name(BasisSet) == "basis_set"
 
 
 # ---------------------------------------------------------------------------

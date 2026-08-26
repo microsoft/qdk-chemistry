@@ -9,7 +9,6 @@
 #include <nlohmann/json_fwd.hpp>
 #include <qdk/chemistry/data/configuration.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <string>
 #include <utility>
 #include <vector>
@@ -113,12 +112,18 @@ class ConfigurationSet : public DataClass {
   bool empty() const;
 
   /**
-   * @brief Get the data type name for this class
+   * @brief Get the static data type name for this class.
    * @return "configuration_set"
    */
-  std::string get_data_type_name() const override {
+  static std::string data_type_name() {
     return DATACLASS_TO_SNAKE_CASE(ConfigurationSet);
   }
+
+  /**
+   * @brief Get the data type name for this instance.
+   * @return "configuration_set"
+   */
+  std::string get_data_type_name() const override { return data_type_name(); }
 
   /**
    * @brief Access configuration by index

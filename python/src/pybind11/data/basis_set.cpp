@@ -10,7 +10,6 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -35,7 +34,6 @@ void basis_set_to_file_wrapper(BasisSet& self, const py::object& filename,
   self.to_file(qdk::chemistry::python::utils::to_string_path(filename),
                format_type);
 }
-
 std::shared_ptr<BasisSet> basis_set_from_file_wrapper(
     const py::object& filename, const std::string& format_type) {
   return BasisSet::from_file(
@@ -969,6 +967,36 @@ Examples:
     >>> print(f"ECP electrons per atom: {ecp_electrons}")
 )");
 
+  basis_set.def("get_effective_nuclear_charges",
+                &BasisSet::get_effective_nuclear_charges,
+                R"(
+Get nuclear charges adjusted for ECP core electrons.
+
+Returns:
+    numpy.ndarray: Effective nuclear charge for each atom
+
+Raises:
+    RuntimeError: If no structure is associated with this basis set
+
+Examples:
+    >>> charges = basis_set.get_effective_nuclear_charges()
+)");
+
+  basis_set.def("calculate_effective_nuclear_repulsion_energy",
+                &BasisSet::calculate_effective_nuclear_repulsion_energy,
+                R"(
+Calculate nuclear repulsion using ECP-adjusted nuclear charges.
+
+Returns:
+    float: Effective nuclear repulsion energy in atomic units (Hartree)
+
+Raises:
+    RuntimeError: If no structure is associated with this basis set
+
+Examples:
+    >>> energy = basis_set.calculate_effective_nuclear_repulsion_energy()
+)");
+
   basis_set.def("has_ecp_electrons", &BasisSet::has_ecp_electrons,
                 R"(
 Check if ECP (Effective Core Potential) electrons are present.
@@ -1478,5 +1506,11 @@ Type:
     str
 )");
   // Data type name class attribute
-  basis_set.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(BasisSet);
+  basis_set.def_static("data_type_name", &BasisSet::data_type_name, R"(
+Return the wire-format identifier for basis sets.
+
+Returns:
+        str: ``"basis_set"``
+
+)");
 }

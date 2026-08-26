@@ -13,7 +13,6 @@
 #include <qdk/chemistry/data/shell.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -305,12 +304,18 @@ class BasisSet : public DataClass,
       EffectiveCorePotential::custom_name;
 
   /**
-   * @brief Get the data type name for this class
+   * @brief Get the static data type name for this class.
    * @return "basis_set"
    */
-  std::string get_data_type_name() const override {
+  static std::string data_type_name() {
     return DATACLASS_TO_SNAKE_CASE(BasisSet);
   }
+
+  /**
+   * @brief Get the data type name for this instance.
+   * @return "basis_set"
+   */
+  std::string get_data_type_name() const override { return data_type_name(); }
   /**
    * @brief Get supported basis set names
    * @return Vector of supported basis set names
@@ -666,6 +671,22 @@ class BasisSet : public DataClass,
    * @return Vector containing numbers of ECP electrons for each atom
    */
   const std::vector<size_t>& get_ecp_electrons() const;
+
+  /**
+   * @brief Get effective nuclear charges after accounting for ECP electrons
+   * @return Vector of effective nuclear charges for each atom
+   * @throws std::runtime_error if no structure is associated with this basis
+   * set
+   */
+  Eigen::VectorXd get_effective_nuclear_charges() const;
+
+  /**
+   * @brief Calculate nuclear repulsion using ECP-adjusted nuclear charges
+   * @return Effective nuclear repulsion energy in atomic units (Hartree)
+   * @throws std::runtime_error if no structure is associated with this basis
+   * set
+   */
+  double calculate_effective_nuclear_repulsion_energy() const;
 
   /**
    * @brief Check if ECP electrons are present

@@ -183,6 +183,94 @@ bool StateVectorContainer::_is_single_determinant() const {
   return size() == 1;
 }
 
+std::pair<Eigen::VectorXd, Eigen::VectorXd>
+StateVectorContainer::_single_determinant_occupations_pair() const {
+  if (!_is_single_determinant()) {
+    throw std::runtime_error("Expected a single determinant");
+  }
+
+  const auto alpha_active_indices =
+      spin_channel_indices(get_orbitals()->active_indices(), axes::alpha());
+  const size_t num_active_orbitals =
+      alpha_active_indices.empty()
+          ? get_orbitals()->get_num_molecular_orbitals()
+          : alpha_active_indices.size();
+  Eigen::VectorXd alpha_occupations =
+      Eigen::VectorXd::Zero(num_active_orbitals);
+  Eigen::VectorXd beta_occupations = Eigen::VectorXd::Zero(num_active_orbitals);
+
+  const auto& det = get_active_determinants()[0];
+  for (size_t active_idx = 0;
+       active_idx < num_active_orbitals && active_idx < det.capacity();
+       ++active_idx) {
+    if (det.bits_per_mode() == 2) {
+      if (det.has_alpha_electron(active_idx)) {
+        alpha_occupations(active_idx) = 1.0;
+      }
+      if (det.has_beta_electron(active_idx)) {
+        beta_occupations(active_idx) = 1.0;
+      }
+    } else {
+      alpha_occupations(active_idx) =
+          det.get_mode_state(active_idx) ? 1.0 : 0.0;
+    }
+  }
+  return {alpha_occupations, beta_occupations};
+}
+
+bool StateVectorContainer::_one_rdm_matches_single_determinant() const {
+  if (!_is_single_determinant()) {
+    return false;
+  }
+  if (!_active_one_rdm && !_one_rdm_spin_traced) {
+    return true;
+  }
+
+  auto [alpha_occupations, beta_occupations] =
+      _single_determinant_occupations_pair();
+  constexpr double rdm_comparison_tolerance = 1e-12;
+
+  if (_active_one_rdm) {
+    const bool spin_dependent_matches = std::visit(
+        [&](const auto& rdm) {
+          const auto& alpha_rdm = rdm.block({axes::alpha(), axes::alpha()});
+          const auto& beta_rdm = rdm.block({axes::beta(), axes::beta()});
+          using Scalar = typename std::decay_t<decltype(alpha_rdm)>::Scalar;
+          Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> expected_alpha =
+              alpha_occupations.template cast<Scalar>().asDiagonal();
+          Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> expected_beta =
+              beta_occupations.template cast<Scalar>().asDiagonal();
+          return alpha_rdm.rows() == expected_alpha.rows() &&
+                 alpha_rdm.cols() == expected_alpha.cols() &&
+                 beta_rdm.rows() == expected_beta.rows() &&
+                 beta_rdm.cols() == expected_beta.cols() &&
+                 alpha_rdm.isApprox(expected_alpha, rdm_comparison_tolerance) &&
+                 beta_rdm.isApprox(expected_beta, rdm_comparison_tolerance);
+        },
+        *_active_one_rdm);
+    if (!spin_dependent_matches) {
+      return false;
+    }
+  }
+
+  if (!_one_rdm_spin_traced) {
+    return true;
+  }
+
+  return std::visit(
+      [&](const auto& spin_traced_rdm) {
+        using Scalar = typename std::decay_t<decltype(spin_traced_rdm)>::Scalar;
+        Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic> expected =
+            (alpha_occupations + beta_occupations)
+                .template cast<Scalar>()
+                .asDiagonal();
+        return spin_traced_rdm.rows() == expected.rows() &&
+               spin_traced_rdm.cols() == expected.cols() &&
+               spin_traced_rdm.isApprox(expected, rdm_comparison_tolerance);
+      },
+      *_one_rdm_spin_traced);
+}
+
 std::unique_ptr<WavefunctionContainer> StateVectorContainer::clone() const {
   QDK_LOG_TRACE_ENTERING();
 
@@ -447,7 +535,7 @@ bool StateVectorContainer::has_one_rdm_spin_dependent() const {
   QDK_LOG_TRACE_ENTERING();
   // A single determinant can generate its spin-dependent RDM on the fly only
   // when the basis declares a spin (S_z) axis to block it by.
-  if (_is_single_determinant()) {
+  if (_is_single_determinant() && _one_rdm_matches_single_determinant()) {
     auto sym = get_orbitals()->symmetries();
     if (sym && sym->has_axis(AxisName::Spin)) {
       return true;
@@ -458,14 +546,14 @@ bool StateVectorContainer::has_one_rdm_spin_dependent() const {
 
 bool StateVectorContainer::has_one_rdm_spin_traced() const {
   QDK_LOG_TRACE_ENTERING();
-  return _is_single_determinant() ||
+  return (_is_single_determinant() && _one_rdm_matches_single_determinant()) ||
          WavefunctionContainer::has_one_rdm_spin_traced();
 }
 
 bool StateVectorContainer::has_two_rdm_spin_dependent() const {
   QDK_LOG_TRACE_ENTERING();
   // See has_one_rdm_spin_dependent: lazy generation needs a spin axis.
-  if (_is_single_determinant()) {
+  if (_is_single_determinant() && _one_rdm_matches_single_determinant()) {
     auto sym = get_orbitals()->symmetries();
     if (sym && sym->has_axis(AxisName::Spin)) {
       return true;
@@ -476,14 +564,19 @@ bool StateVectorContainer::has_two_rdm_spin_dependent() const {
 
 bool StateVectorContainer::has_two_rdm_spin_traced() const {
   QDK_LOG_TRACE_ENTERING();
-  return _is_single_determinant() ||
+  return (_is_single_determinant() && _one_rdm_matches_single_determinant()) ||
          WavefunctionContainer::has_two_rdm_spin_traced();
 }
 
 const SymmetryBlockedTensorVariant<2>& StateVectorContainer::active_one_rdm()
     const {
   QDK_LOG_TRACE_ENTERING();
-  if (!_active_one_rdm && _is_single_determinant()) {
+  if (!_active_one_rdm && _one_rdm_spin_traced &&
+      _is_restricted_closed_shell()) {
+    return WavefunctionContainer::active_one_rdm();
+  }
+  if (!_active_one_rdm && _is_single_determinant() &&
+      _one_rdm_matches_single_determinant()) {
     auto sym = get_orbitals()->symmetries();
     if (!sym || !sym->has_axis(AxisName::Spin)) {
       throw std::runtime_error(
@@ -535,7 +628,8 @@ const SymmetryBlockedTensorVariant<2>& StateVectorContainer::active_one_rdm()
 const SymmetryBlockedTensorVariant<4>& StateVectorContainer::active_two_rdm()
     const {
   QDK_LOG_TRACE_ENTERING();
-  if (!_active_two_rdm && _is_single_determinant()) {
+  if (!_active_two_rdm && _is_single_determinant() &&
+      _one_rdm_matches_single_determinant()) {
     auto sym = get_orbitals()->symmetries();
     if (!sym || !sym->has_axis(AxisName::Spin)) {
       throw std::runtime_error(
@@ -646,7 +740,8 @@ const MatrixVariant& StateVectorContainer::get_active_one_rdm_spin_traced()
 const VectorVariant& StateVectorContainer::get_active_two_rdm_spin_traced()
     const {
   QDK_LOG_TRACE_ENTERING();
-  if (_is_single_determinant() && !_two_rdm_spin_traced && !_active_two_rdm) {
+  if (_is_single_determinant() && _one_rdm_matches_single_determinant() &&
+      !_two_rdm_spin_traced && !_active_two_rdm) {
     auto [alpha_occupations, beta_occupations] = _active_occupations_pair();
     const auto active_ai = get_orbitals()->active_indices();
     const auto active_alpha = spin_channel_indices(active_ai, axes::alpha());
@@ -704,7 +799,8 @@ const VectorVariant& StateVectorContainer::get_active_two_rdm_spin_traced()
 
 Eigen::VectorXd StateVectorContainer::get_single_orbital_entropies() const {
   QDK_LOG_TRACE_ENTERING();
-  if (_is_single_determinant() && !_entropies->single_orbital) {
+  if (_is_single_determinant() && _one_rdm_matches_single_determinant() &&
+      !_entropies->single_orbital && !_active_two_rdm && !_two_rdm_spin_traced) {
     // For a single Slater determinant with no provided entropies, all orbitals
     // are either fully occupied or unoccupied, giving zero entropy each.
     const auto active_ai = get_orbitals()->active_indices();
@@ -739,62 +835,31 @@ StateVectorContainer::_active_occupations_pair() const {
     throw std::runtime_error("No determinants available");
   }
 
+  if (_is_single_determinant() && _one_rdm_matches_single_determinant()) {
+    return _single_determinant_occupations_pair();
+  }
+
+  if (!_active_one_rdm && _one_rdm_spin_traced) {
+    if (!_is_restricted_closed_shell()) {
+      throw std::runtime_error(
+          "Spin-resolved orbital occupations cannot be derived from only a "
+          "spin-traced 1-RDM for an open-shell state.\n"
+          "Please provide a spin-resolved 1-RDM or use diagonal elements of "
+          "the spin-traced 1-RDM to compute total orbital occupations.");
+    }
+    WavefunctionContainer::active_one_rdm();
+  }
+
   const auto alpha_active_indices =
       spin_channel_indices(get_orbitals()->active_indices(), axes::alpha());
 
   if (alpha_active_indices.empty()) {
-    if (_is_single_determinant()) {
-      // No active space partition: all orbitals are active.
-      // Compute directly from the determinant to avoid mutual recursion
-      // with _total_occupations_pair().
-      const size_t num_orbitals = get_orbitals()->get_num_molecular_orbitals();
-      Eigen::VectorXd alpha_occ = Eigen::VectorXd::Zero(num_orbitals);
-      Eigen::VectorXd beta_occ = Eigen::VectorXd::Zero(num_orbitals);
-      const auto& det = determinants[0];
-      for (size_t i = 0; i < num_orbitals && i < det.capacity(); ++i) {
-        if (det.bits_per_mode() == 2) {
-          if (det.has_alpha_electron(i)) alpha_occ(i) = 1.0;
-          if (det.has_beta_electron(i)) beta_occ(i) = 1.0;
-        } else {
-          alpha_occ(i) = det.get_mode_state(i) ? 1.0 : 0.0;
-        }
-      }
-      return {alpha_occ, beta_occ};
-    }
     return {Eigen::VectorXd::Zero(0), Eigen::VectorXd::Zero(0)};
   }
 
   const size_t num_active_orbitals = alpha_active_indices.size();
 
-  if (_is_single_determinant()) {
-    // Read occupations directly from the single determinant.
-    Eigen::VectorXd alpha_occupations =
-        Eigen::VectorXd::Zero(num_active_orbitals);
-    Eigen::VectorXd beta_occupations =
-        Eigen::VectorXd::Zero(num_active_orbitals);
-
-    const auto& det = determinants[0];
-    if (det.bits_per_mode() == 2) {
-      for (size_t active_idx = 0;
-           active_idx < num_active_orbitals && active_idx < det.capacity();
-           ++active_idx) {
-        if (det.has_alpha_electron(active_idx))
-          alpha_occupations(active_idx) = 1.0;
-        if (det.has_beta_electron(active_idx))
-          beta_occupations(active_idx) = 1.0;
-      }
-    } else {
-      for (size_t active_idx = 0;
-           active_idx < num_active_orbitals && active_idx < det.capacity();
-           ++active_idx) {
-        alpha_occupations(active_idx) =
-            det.get_mode_state(active_idx) ? 1.0 : 0.0;
-      }
-    }
-    return {alpha_occupations, beta_occupations};
-  }
-
-  // Multi-determinant: occupations come from diagonalizing the 1-RDM.
+  // Occupations from RDM data come from diagonalizing the 1-RDM.
   Eigen::VectorXd alpha_occupations =
       Eigen::VectorXd::Zero(num_active_orbitals);
   Eigen::VectorXd beta_occupations = Eigen::VectorXd::Zero(num_active_orbitals);

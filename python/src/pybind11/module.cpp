@@ -5,6 +5,7 @@
 #include <pybind11/pybind11.h>
 
 #include <qdk/chemistry/data/settings.hpp>
+#include <qdk/chemistry/exceptions.hpp>
 
 namespace py = pybind11;
 
@@ -34,8 +35,10 @@ void bind_serialization(py::module& m);
 void bind_mc(py::module& m);
 void bind_mcscf(py::module& m);
 void bind_hamiltonian_constructor(py::module& m);
+void bind_effective_hamiltonian_constructor(py::module& m);
 void bind_scf(py::module& m);
 void bind_nuclear_derivative(py::module& m);
+void bind_population_analysis(py::module& m);
 void bind_geometry_optimization(py::module& m);
 void bind_active_space(py::module& m);
 void bind_constants(py::module& m);
@@ -52,9 +55,13 @@ void bind_davidson_solver(py::module& m);
 void bind_syev_solver(py::module& m);
 void bind_lattice_graph(py::module& m);
 void bind_model_hamiltonians(py::module& m);
+void bind_cube_generator(py::module& m);
 
 PYBIND11_MODULE(_core, m) {
   m.doc() = "QDK/Chemistry C++ core bindings";
+
+  py::register_exception<qdk::chemistry::DuplicateRegistrationError>(
+      m, "DuplicateRegistrationError", PyExc_ValueError);
 
   auto data = m.def_submodule("data");
   data.doc() = R"(Data submodule)";
@@ -102,8 +109,10 @@ PYBIND11_MODULE(_core, m) {
   bind_mc(algorithms);
   bind_mcscf(algorithms);
   bind_hamiltonian_constructor(algorithms);
+  bind_effective_hamiltonian_constructor(algorithms);
   bind_scf(algorithms);
   bind_nuclear_derivative(algorithms);
+  bind_population_analysis(algorithms);
   bind_geometry_optimization(algorithms);
   bind_active_space(algorithms);
   bind_dynamical_correlation_calculator(algorithms);
@@ -117,6 +126,7 @@ PYBIND11_MODULE(_core, m) {
   bind_orbital_rotation(utils);
   bind_model_hamiltonians(utils);
   bind_logger(utils);
+  bind_cube_generator(utils);
 
   // Bind constants and config at the top level
   bind_constants(m);

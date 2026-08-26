@@ -151,6 +151,28 @@ qdk::chemistry::data::Structure convert_to_structure(
   return qdk::chemistry::data::Structure(coordinates, elements);
 }
 
+std::vector<std::uint64_t> to_integral_nuclear_charges(
+    const Eigen::VectorXd& nuclear_charges) {
+  constexpr double integral_charge_tolerance = 1e-12;
+  const Eigen::VectorXd rounded_charges =
+      nuclear_charges.array().round().matrix();
+
+  if (!nuclear_charges.allFinite() || (rounded_charges.array() < 0.0).any() ||
+      ((nuclear_charges - rounded_charges).array().abs() >
+       integral_charge_tolerance)
+          .any()) {
+    throw std::invalid_argument(
+        "Nuclear charges must be finite, nonnegative, and integral.");
+  }
+
+  std::vector<std::uint64_t> integral_charges;
+  integral_charges.reserve(static_cast<std::size_t>(rounded_charges.size()));
+  for (Eigen::Index i = 0; i < rounded_charges.size(); ++i) {
+    integral_charges.push_back(static_cast<std::uint64_t>(rounded_charges(i)));
+  }
+  return integral_charges;
+}
+
 std::shared_ptr<qcs::Molecule> convert_to_molecule(
     const qdk::chemistry::data::Structure& structure, int64_t charge,
     int64_t multiplicity) {
@@ -158,13 +180,14 @@ std::shared_ptr<qcs::Molecule> convert_to_molecule(
 
   // Convert the Structure to a Molecule
   const auto& coordinates = structure.get_coordinates();
-  const auto& nuclear_charges = structure.get_nuclear_charges();
+  const auto nuclear_charges =
+      to_integral_nuclear_charges(structure.get_nuclear_charges());
 
   auto molecule_ptr = std::make_shared<qcs::Molecule>();
   auto& molecule = *molecule_ptr;
   molecule.n_atoms = static_cast<uint64_t>(coordinates.rows());
-  molecule.total_nuclear_charge =
-      std::accumulate(nuclear_charges.begin(), nuclear_charges.end(), 0u);
+  molecule.total_nuclear_charge = std::accumulate(
+      nuclear_charges.begin(), nuclear_charges.end(), std::uint64_t{0});
   molecule.charge = charge;
   molecule.multiplicity = multiplicity;
   molecule.n_electrons = molecule.total_nuclear_charge - molecule.charge;
@@ -232,19 +255,15 @@ qdk::chemistry::data::BasisSet convert_basis_set_to_qdk(
   }
 
   // Handle ECP (Effective Core Potential) information if present
-  if (basis_set.n_ecp_electrons != 0 || !basis_set.ecp_shells.empty() ||
-      !basis_set.element_ecp_electrons.empty()) {
+  basis_set.validate_atom_ecp_electrons();
+  if (basis_set.get_n_ecp_electrons() != 0 || !basis_set.ecp_shells.empty()) {
     // Use basis set name as ECP name
     std::string qdk_ecp_name = basis_set.name;
 
-    // Build ECP electrons per atom vector
-    std::vector<size_t> qdk_ecp_electrons(basis_set.mol->n_atoms, 0);
-    for (size_t i = 0; i < basis_set.mol->n_atoms; ++i) {
-      int atomic_num = basis_set.mol->atomic_nums[i];
-      auto it = basis_set.element_ecp_electrons.find(atomic_num);
-      if (it != basis_set.element_ecp_electrons.end()) {
-        qdk_ecp_electrons[i] = static_cast<size_t>(it->second);
-      }
+    std::vector<size_t> qdk_ecp_electrons;
+    qdk_ecp_electrons.reserve(basis_set.atom_ecp_electrons.size());
+    for (int ecp_electrons : basis_set.atom_ecp_electrons) {
+      qdk_ecp_electrons.push_back(static_cast<size_t>(ecp_electrons));
     }
 
     // Create the BasisSet with shells, ECP shells, ECP name, ECP electrons, and
@@ -270,11 +289,10 @@ std::shared_ptr<qcs::BasisSet> convert_basis_set_from_qdk(
   auto mol = convert_to_molecule(*structure, 0,
                                  1);  // Default charge=0, multiplicity=1
 
-  // remove number of ecp electrons from atomic charges
-  auto ecp_electrons = qdk_basis_set.get_ecp_electrons();
+  const auto effective_charges = to_integral_nuclear_charges(
+      qdk_basis_set.get_effective_nuclear_charges());
   for (size_t i = 0; i < mol->n_atoms; ++i) {
-    int n_core_electrons = static_cast<int>(ecp_electrons[i]);
-    mol->atomic_charges[i] = mol->atomic_nums[i] - n_core_electrons;
+    mol->atomic_charges[i] = effective_charges[i];
   }
 
   auto basis_json = convert_to_json(qdk_basis_set);
@@ -339,25 +357,9 @@ nlohmann::ordered_json convert_to_json(
     }
   }
 
-  // Build element_ecp_electrons map from ecp_electrons vector
   auto& structure = basis_set.get_structure();
   auto nuclear_charges = structure->get_nuclear_charges();
   auto ecp_electrons = basis_set.get_ecp_electrons();
-
-  std::map<int, int> element_ecp_electrons;
-  for (size_t i = 0; i < ecp_electrons.size(); ++i) {
-    if (ecp_electrons[i] > 0) {
-      int atomic_num = static_cast<int>(nuclear_charges[i]);
-      element_ecp_electrons[atomic_num] = static_cast<int>(ecp_electrons[i]);
-    }
-  }
-
-  // Serialize element_ecp_electrons as flat list
-  std::vector<int> json_element_ecp_electrons;
-  for (const auto& [k, v] : element_ecp_electrons) {
-    json_element_ecp_electrons.push_back(k);
-    json_element_ecp_electrons.push_back(v);
-  }
 
   std::vector<unsigned> nuclear_charges_unsigned(nuclear_charges.size());
   std::transform(nuclear_charges.begin(), nuclear_charges.end(),
@@ -372,7 +374,7 @@ nlohmann::ordered_json convert_to_json(
        {"num_atomic_orbitals", basis_set.get_num_atomic_orbitals()},
        {"electron_shells", json_shells},
        {"ecp_shells", json_ecp_shells},
-       {"element_ecp_electrons", json_element_ecp_electrons}});
+       {"atom_ecp_electrons", ecp_electrons}});
 
   return j;
 }

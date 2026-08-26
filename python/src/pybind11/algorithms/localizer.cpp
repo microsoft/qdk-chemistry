@@ -9,6 +9,8 @@
 #include <qdk/chemistry.hpp>
 
 #include "factory_bindings.hpp"
+#include "qdk/chemistry/algorithms/microsoft/localization/active_space_qio.hpp"
+#include "qdk/chemistry/algorithms/microsoft/localization/gauge_fixing.hpp"
 #include "qdk/chemistry/algorithms/microsoft/localization/mp2_natural_orbitals.hpp"
 #include "qdk/chemistry/algorithms/microsoft/localization/natural_orbitals.hpp"
 #include "qdk/chemistry/algorithms/microsoft/localization/pipek_mezey.hpp"
@@ -73,35 +75,36 @@ Returns:
   // Localizer abstract base class
   py::class_<Localizer, LocalizerBase, py::smart_holder> localizer(
       m, "OrbitalLocalizer", R"(
-Abstract base class for orbital localizers.
+Abstract base class for orbital localization and transformation algorithms.
 
-This class defines the interface for localizing molecular orbitals.
-Localization transforms canonical molecular orbitals into localized orbitals that are spatially confined to specific regions or bonds.
-Concrete implementations should inherit from this class and implement the localize method.
+This class defines the interface for selecting and transforming molecular orbitals.
+Implementations may produce spatially localized orbitals or other representations,
+such as natural orbitals. Concrete implementations should inherit from this class
+and implement the _run_impl method.
 
 Examples:
     >>> # To create a custom orbital localizer, inherit from this class.
     >>> import qdk_chemistry.algorithms as alg
     >>> import qdk_chemistry.data as data
-    >>> class MyLocalizer(alg.Localizer):
+    >>> class MyLocalizer(alg.OrbitalLocalizer):
     ...     def __init__(self):
     ...         super().__init__()  # Call the base class constructor
     ...     # Implement the _run_impl method
     ...     def _run_impl(self, wavefunction: data.Wavefunction, loc_indices_a: list, loc_indices_b: list) -> data.Wavefunction:
-    ...         # Custom localization implementation
-    ...         return localized_wavefunction
+    ...         # Custom orbital transformation implementation
+    ...         return transformed_wavefunction
 )");
 
   localizer.def(py::init<>(),
                 R"(
-Create a Localizer instance.
+Create an OrbitalLocalizer instance.
 
 Default constructor for the abstract base class.
 This should typically be called from derived class constructors.
 
 Examples:
     >>> # In a derived class:
-    >>> class MyLocalizer(alg.Localizer):
+    >>> class MyLocalizer(alg.OrbitalLocalizer):
     ...     def __init__(self):
     ...         super().__init__()  # Calls this constructor
 
@@ -109,22 +112,23 @@ Examples:
 
   localizer.def("run", &Localizer::run,
                 R"(
-Localize molecular orbitals in the given wavefunction.
+Transform selected molecular orbitals in the given wavefunction.
 
 Args:
-    wavefunction (qdk_chemistry.data.Wavefunction): The canonical molecular wavefunction to localize
-    loc_indices_a (list[int]): Indices of alpha orbitals to localize (empty for no localization)
-    loc_indices_b (list[int]): Indices of beta orbitals to localize (empty for no localization)
+    wavefunction (qdk_chemistry.data.Wavefunction): The molecular wavefunction to transform
+    loc_indices_a (list[int]): Indices of alpha orbitals to transform; empty selects none
+    loc_indices_b (list[int]): Indices of beta orbitals to transform; empty selects none
 
 Notes:
     For restricted orbitals, ``loc_indices_b`` must match ``loc_indices_a``.
+    If both index lists are empty, the orbital transformation is a no-op.
 
 Returns:
-    qdk_chemistry.data.Wavefunction: The localized molecular wavefunction
+    qdk_chemistry.data.Wavefunction: The output wavefunction with transformed orbitals
 
 Raises:
     ValueError: If orbital indices are invalid or inconsistent
-    RuntimeError: If localization fails due to numerical issues
+    RuntimeError: If the transformation fails due to numerical issues
 
 )",
                 py::arg("wavefunction"), py::arg("loc_indices_a"),
@@ -155,7 +159,7 @@ Internal settings object property.
 This property allows derived classes to replace the settings object with a specialized Settings subclass in their constructors.
 
 Examples:
-    >>> class MyLocalizer(alg.Localizer):
+    >>> class MyLocalizer(alg.OrbitalLocalizer):
     ...     def __init__(self):
     ...         super().__init__()
     ...         from qdk_chemistry.data import ElectronicStructureSettings
@@ -333,6 +337,65 @@ See Also:
 Default constructor.
 
 Initializes a natural orbital transformer with default settings.
+
+)");
+
+  // Bind concrete microsoft::GaugeFixingLocalizer implementation
+  py::class_<microsoft::GaugeFixingLocalizer, Localizer, py::smart_holder>(
+      m, "QdkGaugeFixingLocalizer", R"(
+QDK gauge-fixing orbital localizer.
+
+Orbitals with equal occupation numbers span a well-defined subspace without
+being uniquely determined within it. This class resolves that freedom
+deterministically, using bounded coordinate-descent sweeps to reduce the mapped
+Hamiltonian coefficient 1-norm ``lambda = sum_l |h_l|``, which sets the evolution
+time in phase estimation and the normalization of a linear-combination-of-unitaries
+block encoding.
+
+.. note::
+    Requires restricted orbitals, an active space, an overlap matrix, and a
+    spin-traced active 1-RDM that is diagonal in the input orbital basis, which
+    is what :class:`QdkNaturalOrbitalLocalizer` produces. Requires
+    ``loc_indices_a == loc_indices_b``, and those indices must be a subset of
+    the active-space indices that does not split a degenerate block.
+
+See Also:
+    :class:`OrbitalLocalizer`
+    :class:`QdkNaturalOrbitalLocalizer`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes a gauge-fixing localizer with default settings.
+
+)");
+
+  // Bind concrete microsoft::ActiveSpaceQIOLocalizer implementation
+  py::class_<microsoft::ActiveSpaceQIOLocalizer, Localizer, py::smart_holder>(
+      m, "QdkActiveSpaceQIOLocalizer", R"(
+QDK quantum-information orbital (QIO) active-space localizer.
+
+Rotates restricted active orbitals to minimize the total single-orbital entropy
+using gradient-free Jacobi sweeps.
+
+This class minimizes the QIO objective restricted to rotations within a fixed
+active space. It does not implement full-space QIO or QICAS, both of which mix
+orbitals across the active-space boundary.
+
+.. note::
+    Requires a restricted active orbital space, matching alpha and beta
+    localization indices, and spin-dependent active-space 1- and 2-RDMs.
+
+See Also:
+    :class:`OrbitalLocalizer`
+    :class:`qdk_chemistry.data.Wavefunction`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes a quantum-information orbital localizer with default settings.
 
 )");
 

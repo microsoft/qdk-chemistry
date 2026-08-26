@@ -142,6 +142,9 @@ Accessing basis set data
 Following the :doc:`immutable design principle <../design/index>` used throughout QDK/Chemistry, all getter methods return const references or copies of the data.
 This ensures that the basis set data remains consistent and prevents accidental modifications that could lead to inconsistent states.
 
+For basis sets containing an :term:`ECP`, ``get_effective_nuclear_charges()`` returns each nuclear charge after subtracting the core electrons represented by the ECP, and ``calculate_effective_nuclear_repulsion_energy()`` uses those charges.
+The associated :class:`~qdk_chemistry.data.Structure` retains the physical atomic charges and physical nuclear repulsion energy.
+
 .. note::
    If you need to modify a basis set after creation, you should create a new BasisSet object with the desired
    changes rather than trying to modify an existing one.
