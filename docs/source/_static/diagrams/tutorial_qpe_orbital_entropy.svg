@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
   "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="526.79952pt" height="310.794102pt" viewBox="0 0 526.79952 310.794102" xmlns="http://www.w3.org/2000/svg" version="1.1" role="img" aria-labelledby="tutorial-qpe-orbital-entropy-title tutorial-qpe-orbital-entropy-desc" data-source-sha256="87e6270eb273381fb4193304fa4e5985fdefdc3793f322db8d054022d74b408c">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="526.79952pt" height="310.794102pt" viewBox="0 0 526.79952 310.794102" xmlns="http://www.w3.org/2000/svg" version="1.1" role="img" aria-labelledby="tutorial-qpe-orbital-entropy-title tutorial-qpe-orbital-entropy-desc" data-source-sha256="8502018f366da9c5b59276b1535866cdeaa513bcd2552f737482af28ed633bc2">
 <title id="tutorial-qpe-orbital-entropy-title">Natural-orbital entropy selection</title>
 <desc id="tutorial-qpe-orbital-entropy-desc">Entropy-ranked candidate orbitals. Selected orbitals 8, 7, 5, 6, 9, and 4 have entropies of approximately 0.966, 0.966, 0.964, 0.964, 0.554, and 0.548. Excluded orbitals 3 and 2 have entropies of approximately 0.030 and 0.022. A dashed vertical cut separates the sixth and seventh entropy ranks.</desc>
  <metadata>
