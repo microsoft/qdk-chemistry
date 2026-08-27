@@ -16,6 +16,7 @@ import json
 import os
 import pathlib
 import tempfile
+import time
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
@@ -129,6 +130,7 @@ class Job:
         self.input_hashes: dict[str, str] | None = input_hashes
         self.output_hashes: list[dict[str, Any]] | None = output_hashes
         self.output_is_tuple: bool | None = output_is_tuple
+        self._active_backend: RemoteBackend | None = None
 
     # ── Serialisation ────────────────────────────────────────────────────
 
@@ -251,23 +253,35 @@ class Job:
 
     # ── Backend interaction ──────────────────────────────────────────────
 
-    def _get_backend(self) -> RemoteBackend:
-        """Create and connect a backend from the persisted configuration."""
+    def attach_backend(self, backend: RemoteBackend) -> None:
+        """Associate this in-memory job with its submitting backend."""
+        self._active_backend = backend
+
+    def detach_backend(self) -> None:
+        """Remove the non-persistent backend association."""
+        self._active_backend = None
+
+    def _get_backend(self) -> tuple[RemoteBackend, bool]:
+        """Return an active backend and whether this job must disconnect it."""
+        if self._active_backend is not None:
+            return self._active_backend, False
+
         from qdk_chemistry.remote.backends import get_backend  # noqa: PLC0415
 
         backend = get_backend(self.backend, **self.backend_config)
         backend.connect()
-        return backend
+        return backend, True
 
     def check(self) -> JobStatus:
         """Query the backend, persist the latest status, and return it."""
         from qdk_chemistry.remote.backends.base import JobState, JobStatus  # noqa: PLC0415
 
-        backend = self._get_backend()
+        backend, should_disconnect = self._get_backend()
         try:
             job_status = backend.check(self.backend_state)
         finally:
-            backend.disconnect()
+            if should_disconnect:
+                backend.disconnect()
 
         if JobStatus.normalize_status(self.status) == JobState.RETRIEVED or self.output_hashes is not None:
             self.status = JobState.RETRIEVED
@@ -280,11 +294,12 @@ class Job:
 
     def cancel(self) -> None:
         """Cancel the backend job and persist its canceled status."""
-        backend = self._get_backend()
+        backend, should_disconnect = self._get_backend()
         try:
             backend.cancel(self.backend_state)
         finally:
-            backend.disconnect()
+            if should_disconnect:
+                backend.disconnect()
 
         self.status = "canceled"
         if self.file_path is not None:
@@ -307,7 +322,7 @@ class Job:
             The deserialized algorithm results.
 
         """
-        backend = self._get_backend()
+        backend, should_disconnect = self._get_backend()
         try:
             result = backend.fetch(self.backend_state, local_dir=local_dir)
 
@@ -325,7 +340,8 @@ class Job:
                 backend.cleanup_job(self.backend_state)
             return result
         finally:
-            backend.disconnect()
+            if should_disconnect:
+                backend.disconnect()
 
     def cleanup(self) -> None:
         """Remove backend artifacts for this terminal job.
@@ -339,11 +355,46 @@ class Job:
         if not self.is_terminal:
             raise RuntimeError("Cannot clean up a job before it reaches a terminal state")
 
-        backend = self._get_backend()
+        backend, should_disconnect = self._get_backend()
         try:
             backend.cleanup_job(self.backend_state)
         finally:
-            backend.disconnect()
+            if should_disconnect:
+                backend.disconnect()
+
+    def wait(self) -> JobStatus:
+        """Block until the job reaches a terminal state.
+
+        Returns:
+            The final status reported by the backend.
+
+        Raises:
+            TimeoutError: If the configured timeout expires before completion.
+
+        """
+        from qdk_chemistry.remote.backends.base import (  # noqa: PLC0415
+            DEFAULT_POLL_INTERVAL,
+            DEFAULT_TIMEOUT,
+            JobStatus,
+        )
+
+        poll_interval = self.backend_config.get("poll_interval", DEFAULT_POLL_INTERVAL)
+        timeout = self.backend_config.get("timeout", DEFAULT_TIMEOUT)
+        deadline = time.monotonic() + timeout
+        status = JobStatus(job_id=self.job_id, status=self.status)
+        while not self.is_terminal:
+            status = self.check()
+            if status.is_terminal:
+                return status
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError(
+                    f"Remote job {self.job_id} did not reach a terminal state within {timeout} seconds\n"
+                    f"Last status: {status.status}\n"
+                    f"Error: {status.error or 'unknown'}\nLogs:\n{status.logs}"
+                )
+            time.sleep(min(poll_interval, remaining))
+        return status
 
     # ── Conveniences ─────────────────────────────────────────────────────
 

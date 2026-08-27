@@ -7,13 +7,12 @@
 
 from __future__ import annotations
 
-import time
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
 
-    from qdk_chemistry.remote.backends.base import JobStatus
     from qdk_chemistry.remote.job import Job
 
 _CACHE_MISS = object()
@@ -108,39 +107,43 @@ def _reconstruct_from_cache(cache: Any, job: Any) -> Any:
     return items[0] if len(items) == 1 else _CACHE_MISS
 
 
-def _poll_until_done(job: Any) -> JobStatus:
-    """Block until the job reaches a terminal state.
+def submit(
+    algorithm: Any,
+    *args: Any,
+    remote: Any,
+    job_dir: str | Path | None = None,
+    **kwargs: Any,
+) -> Job:
+    """Submit an algorithm for remote execution without blocking.
 
     Args:
-        job: Submitted job to poll.
+        algorithm: Algorithm-like object to execute remotely.
+        *args: Positional arguments for the algorithm.
+        remote: Remote backend name or connected backend instance.
+        job_dir: Optional directory where the job record is saved.
+        **kwargs: Keyword arguments for the algorithm.
 
     Returns:
-        The final status reported by the backend.
+        A job handle that can be checked, canceled, fetched, or waited on.
 
     """
-    from qdk_chemistry.remote.backends.base import (  # noqa: PLC0415
-        DEFAULT_POLL_INTERVAL,
-        DEFAULT_TIMEOUT,
-        JobStatus,
-    )
+    from qdk_chemistry.remote.backends import get_backend  # noqa: PLC0415
 
-    poll_interval = job.backend_config.get("poll_interval", DEFAULT_POLL_INTERVAL)
-    timeout = job.backend_config.get("timeout", DEFAULT_TIMEOUT)
-    deadline = time.monotonic() + timeout
-    status = JobStatus(job_id=job.job_id, status=job.status)
-    while not job.is_terminal:
-        status = job.check()
-        if status.is_terminal:
-            return status
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            raise TimeoutError(
-                f"Remote job {job.job_id} did not reach a terminal state within {timeout} seconds\n"
-                f"Last status: {status.status}\n"
-                f"Error: {status.error or 'unknown'}\nLogs:\n{status.logs}"
-            )
-        time.sleep(min(poll_interval, remaining))
-    return status
+    owns_backend = isinstance(remote, str)
+    if owns_backend:
+        backend = get_backend(remote)
+        backend.connect()
+    else:
+        backend = remote
+
+    try:
+        job = backend.submit(_build_payload_for(algorithm, args, kwargs), job_dir=job_dir)
+        if owns_backend:
+            job.detach_backend()
+        return job
+    finally:
+        if owns_backend:
+            backend.disconnect()
 
 
 def _run_uncached(algorithm: Any, remote: Any, args: tuple, kwargs: dict) -> Any:
@@ -156,28 +159,16 @@ def _run_uncached(algorithm: Any, remote: Any, args: tuple, kwargs: dict) -> Any
     if remote is None:
         return algorithm.run(*args, **kwargs)
 
-    from qdk_chemistry.remote.backends import get_backend  # noqa: PLC0415
-
-    owns_backend = isinstance(remote, str)
-    if owns_backend:
-        backend = get_backend(remote)
-        backend.connect()
-    else:
-        backend = remote
-
-    try:
-        payload = _build_payload_for(algorithm, args, kwargs)
-        job = backend.submit(payload)
-        final_status = _poll_until_done(job)
-        if not job.is_successful:
-            raise RuntimeError(
-                f"Remote job {job.job_id} ended with status: {final_status.status}\n"
-                f"Error: {final_status.error or 'unknown'}\nLogs:\n{final_status.logs}"
-            )
-        return job.fetch()
-    finally:
-        if owns_backend:
-            backend.disconnect()
+    job = submit(algorithm, *args, remote=remote, **kwargs)
+    final_status = job.wait()
+    if not job.is_successful:
+        raise RuntimeError(
+            f"Remote job {job.job_id} ended with status: {final_status.status}\n"
+            f"Error: {final_status.error or 'unknown'}\nLogs:\n{final_status.logs}"
+        )
+    result = job.fetch()
+    job.cleanup()
+    return result
 
 
 def run(
@@ -262,12 +253,13 @@ def run(
             if not job.is_terminal:
                 if _on_job_submitted is not None:
                     _on_job_submitted(job)
-                _poll_until_done(job)
+                job.wait()
 
             # 1c) Execution finished but cached outputs are unavailable → fetch again
             if job.is_successful:
                 result = job.fetch()
                 _store_result(resolved_cache, run_hash, job, result)
+                job.cleanup()
                 return result
 
             # 1d) Failed → fall through and re-submit
@@ -306,7 +298,7 @@ def run(
             if _on_job_submitted is not None:
                 _on_job_submitted(job)
 
-            final_status = _poll_until_done(job)
+            final_status = job.wait()
 
             if not job.is_successful:
                 resolved_cache.put_job(run_hash, job)
@@ -353,4 +345,6 @@ def run(
         )
 
     _store_result(resolved_cache, run_hash, job, result)
+    if remote is not None:
+        job.cleanup()
     return result

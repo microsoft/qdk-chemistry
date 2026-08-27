@@ -26,7 +26,7 @@ from qdk_chemistry.remote.backends import (
     get_backend,
 )
 from qdk_chemistry.remote.cache import resolve_cache
-from qdk_chemistry.remote.proxy import run
+from qdk_chemistry.remote.proxy import run, submit
 
 if TYPE_CHECKING:
     from qdk_chemistry.remote.backends.base import RemoteBackend
@@ -40,6 +40,7 @@ __all__ = [
     "get_backend",
     "resolve_cache",
     "run",
+    "submit",
 ]
 
 

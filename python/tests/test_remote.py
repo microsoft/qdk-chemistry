@@ -36,7 +36,7 @@ from qdk_chemistry.remote.backends.local import LocalBackend
 from qdk_chemistry.remote.cache.folder import FolderCache
 from qdk_chemistry.remote.cache.tiered import TieredCache
 from qdk_chemistry.remote.job import Job
-from qdk_chemistry.remote.proxy import _build_payload_for, _poll_until_done, run
+from qdk_chemistry.remote.proxy import _build_payload_for, run, submit
 from qdk_chemistry.remote.serialization import (
     FileSerializer,
     deserialize_inputs,
@@ -720,7 +720,7 @@ class TestJob:
         job = Job(job_id="x", backend="local", backend_config={}, backend_state={}, status=status)
         assert not job.is_terminal
 
-    def test_poll_until_done_times_out_with_backend_error(self, monkeypatch):
+    def test_wait_times_out_with_backend_error(self, monkeypatch):
         job = Job(
             job_id="x",
             backend="test-remote",
@@ -732,12 +732,12 @@ class TestJob:
         monkeypatch.setattr(time, "sleep", sleep)
 
         with pytest.raises(TimeoutError, match="Invalid PID file"):
-            _poll_until_done(job)
+            job.wait()
 
         job.check.assert_called_once_with()
         sleep.assert_not_called()
 
-    def test_poll_until_done_uses_backend_poll_interval(self, monkeypatch):
+    def test_wait_uses_backend_poll_interval(self, monkeypatch):
         job = Job(
             job_id="x",
             backend="test-remote",
@@ -754,7 +754,7 @@ class TestJob:
         sleep = MagicMock()
         monkeypatch.setattr(time, "sleep", sleep)
 
-        _poll_until_done(job)
+        job.wait()
 
         sleep.assert_called_once_with(0.25)
 
@@ -1069,64 +1069,6 @@ class TestBackendContract:
         backend.cancel.assert_called_once_with(backend_state)
         backend.cleanup_job.assert_called_once_with(backend_state)
 
-    def test_submit_and_wait_uses_backend_poll_interval(self, monkeypatch):
-        """Blocking submission polls at the backend's configured interval."""
-        backend = LocalBackend(poll_interval=0.25)
-        backend._submit = MagicMock(return_value=("job-id", {"backend": "state"}))
-        backend.check = MagicMock(
-            side_effect=[
-                JobStatus(job_id="job-id", status="running"),
-                JobStatus(job_id="job-id", status="succeeded"),
-            ]
-        )
-        backend.fetch = MagicMock(return_value={"result": 42})
-        sleep = MagicMock()
-        monkeypatch.setattr(time, "sleep", sleep)
-
-        assert backend.submit_and_wait({}) == {"result": 42}
-
-        assert backend._backend_args["poll_interval"] == 0.25
-        sleep.assert_called_once_with(0.25)
-
-    def test_submit_and_wait_accepts_lowercase_success(self):
-        backend = MagicMock(spec=RemoteBackend)
-        backend._backend_args = {"poll_interval": 0, "timeout": 1}
-        backend._submit.return_value = ("job-id", {"backend": "state"})
-        backend.check.return_value = JobStatus(job_id="job-id", status="succeeded")
-        backend.fetch.return_value = {"result": 42}
-
-        assert RemoteBackend.submit_and_wait(backend, {}) == {"result": 42}
-
-        backend.fetch.assert_called_once_with({"backend": "state"})
-
-    def test_submit_and_wait_optionally_cleans_job(self):
-        backend = MagicMock(spec=RemoteBackend)
-        backend._backend_args = {"poll_interval": 0, "timeout": 1}
-        backend._submit.return_value = ("job-id", {"backend": "state"})
-        backend.check.return_value = JobStatus(job_id="job-id", status="succeeded")
-        backend.fetch.return_value = {"result": 42}
-
-        assert RemoteBackend.submit_and_wait(backend, {}, cleanup=True) == {"result": 42}
-
-        backend.cleanup_job.assert_called_once_with({"backend": "state"})
-
-    def test_submit_and_wait_times_out_with_backend_error(self, monkeypatch):
-        backend = LocalBackend(timeout=0)
-        backend._submit = MagicMock(return_value=("job-id", {"backend": "state"}))
-        backend.check = MagicMock(
-            return_value=JobStatus(job_id="job-id", status="unknown", error="Could not read PID file")
-        )
-        backend.fetch = MagicMock()
-        sleep = MagicMock()
-        monkeypatch.setattr(time, "sleep", sleep)
-
-        with pytest.raises(TimeoutError, match="Could not read PID file"):
-            backend.submit_and_wait({})
-
-        backend.check.assert_called_once_with({"backend": "state"})
-        backend.fetch.assert_not_called()
-        sleep.assert_not_called()
-
     def test_upload_download_round_trip(self, backend, tmp_path):
         src = tmp_path / "input.txt"
         src.write_text("hello remote")
@@ -1439,6 +1381,7 @@ class TestRunWithCache:
             status="succeeded",
         )
         job.fetch = MagicMock(return_value=-75.5)
+        job.cleanup = MagicMock()
         backend.submit.return_value = job
         get_backend = MagicMock(return_value=backend)
         monkeypatch.setattr(remote_backends, "get_backend", get_backend)
@@ -1448,6 +1391,7 @@ class TestRunWithCache:
         get_backend.assert_called_once_with("test")
         backend.submit.assert_called_once()
         job.fetch.assert_called_once_with()
+        job.cleanup.assert_called_once_with()
         backend.connect.assert_called_once_with()
         backend.disconnect.assert_called_once_with()
 
@@ -1462,6 +1406,7 @@ class TestRunWithCache:
             status="succeeded",
         )
         job.fetch = MagicMock(return_value=-75.5)
+        job.cleanup = MagicMock()
         backend.submit.return_value = job
 
         assert run(algo, "arg1", remote=backend) == -75.5
@@ -1469,7 +1414,52 @@ class TestRunWithCache:
 
         backend.submit.assert_called_once()
         job.fetch.assert_called_once_with()
+        job.cleanup.assert_called_once_with()
         backend.disconnect.assert_not_called()
+
+    def test_injected_unregistered_backend_runs_to_completion(self):
+        class UnregisteredBackend(RemoteBackend):
+            name = "unregistered"
+
+            def __init__(self):
+                super().__init__(poll_interval=0, timeout=1)
+                self.statuses = iter(["running", "succeeded"])
+
+            def connect(self):
+                pass
+
+            def disconnect(self):
+                pass
+
+            def upload(self, local_path, remote_path):
+                pass
+
+            def download(self, remote_path, local_path):
+                pass
+
+            def _submit(self, _payload):
+                return "remote-job", {}
+
+            def check(self, _backend_state):
+                return JobStatus(job_id="remote-job", status=next(self.statuses))
+
+            def fetch(self, _backend_state, local_dir=None):
+                del local_dir
+                return -75.5
+
+            def cleanup_job(self, _backend_state):
+                pass
+
+        assert run(self._mock_algorithm(), remote=UnregisteredBackend()) == -75.5
+
+    def test_submit_returns_job_for_injected_backend(self):
+        algo = self._mock_algorithm()
+        backend = MagicMock()
+        job = MagicMock(spec=Job)
+        backend.submit.return_value = job
+
+        assert submit(algo, "arg1", remote=backend) is job
+        backend.submit.assert_called_once()
 
     def test_named_remote_with_cache_disconnects_owned_backend(self, tmp_path, monkeypatch):
         cache = FolderCache(path=tmp_path / "cache")
@@ -1483,6 +1473,13 @@ class TestRunWithCache:
             status="Succeeded",
         )
         job.fetch = MagicMock(return_value=-75.5)
+
+        def verify_result_was_stored():
+            cached_job = cache.get_job("testhash1234abcd")
+            assert cached_job is not None
+            assert cached_job.output_hashes is not None
+
+        job.cleanup = MagicMock(side_effect=verify_result_was_stored)
         backend.submit.return_value = job
         get_backend = MagicMock(return_value=backend)
         monkeypatch.setattr(remote_backends, "get_backend", get_backend)
@@ -1492,6 +1489,7 @@ class TestRunWithCache:
         get_backend.assert_called_once_with("test")
         backend.connect.assert_called_once_with()
         backend.disconnect.assert_called_once_with()
+        job.cleanup.assert_called_once_with()
         payload = backend.submit.call_args.args[0]
         assert "remote_cache" not in payload
         assert "remote_cache_backend" not in payload
@@ -1547,6 +1545,8 @@ class TestRunWithCache:
 
         monkeypatch.setattr(Job, "check", complete_job)
         monkeypatch.setattr(Job, "fetch", MagicMock(return_value=-75.5))
+        cleanup = MagicMock()
+        monkeypatch.setattr(Job, "cleanup", cleanup)
         sleep = MagicMock()
         monkeypatch.setattr(time, "sleep", sleep)
 
@@ -1554,6 +1554,7 @@ class TestRunWithCache:
 
         backend.submit.assert_not_called()
         sleep.assert_not_called()
+        cleanup.assert_called_once_with()
 
     def test_cached_success_without_outputs_retries_fetch(self, tmp_path, monkeypatch):
         """A persisted success is fetched again instead of being resubmitted."""
@@ -1571,10 +1572,13 @@ class TestRunWithCache:
         cache.put_job("testhash1234abcd", job)
         fetch = MagicMock(return_value=-75.5)
         monkeypatch.setattr(Job, "fetch", fetch)
+        cleanup = MagicMock()
+        monkeypatch.setattr(Job, "cleanup", cleanup)
 
         assert run(algo, "arg1", cache=cache, remote=backend) == -75.5
 
         fetch.assert_called_once_with()
+        cleanup.assert_called_once_with()
         backend.submit.assert_not_called()
 
     def test_remote_uses_shared_tier_from_cache(self, tmp_path):
@@ -1591,6 +1595,7 @@ class TestRunWithCache:
             status="Succeeded",
         )
         job.fetch = MagicMock(return_value=-75.5)
+        job.cleanup = MagicMock()
         backend.submit.return_value = job
 
         assert run(algo, "arg1", cache=cache, remote=backend) == -75.5
@@ -1602,6 +1607,7 @@ class TestRunWithCache:
             "is_shared": True,
         }
         assert payload["remote_cache_backend"] is shared_cache
+        job.cleanup.assert_called_once_with()
 
     @pytest.mark.parametrize(
         "result",
@@ -1625,6 +1631,7 @@ class TestRunWithCache:
             status="running",
         )
         submitted_job.fetch = MagicMock(return_value="fetched")
+        submitted_job.cleanup = MagicMock()
         remote_job = Job(
             job_id="remote-job",
             backend="remote",
@@ -1645,6 +1652,7 @@ class TestRunWithCache:
 
         assert run(algo, cache=cache, remote=backend) == result
         submitted_job.fetch.assert_not_called()
+        submitted_job.cleanup.assert_called_once_with()
 
     def test_run_stores_in_cache(self, tmp_path):
         cache = FolderCache(path=tmp_path / "cache")
@@ -1709,11 +1717,13 @@ class TestRunWithCache:
             status="Succeeded",
         )
         job.fetch = MagicMock(return_value=-75.5)
+        job.cleanup = MagicMock()
         backend.submit.return_value = job
 
         assert run(algo, "arg1", cache=cache, remote=backend, force_rerun=True) == -75.5
 
         assert backend.submit.call_args.args[0]["force_rerun"] is True
+        job.cleanup.assert_called_once_with()
 
     def test_remote_submission_callback_runs_after_handle_is_persisted(self, tmp_path):
         cache = FolderCache(path=tmp_path / "cache")
@@ -1727,6 +1737,7 @@ class TestRunWithCache:
             status="Succeeded",
         )
         job.fetch = MagicMock(return_value=-75.5)
+        job.cleanup = MagicMock()
         backend.submit.return_value = job
         persisted_jobs = []
 
@@ -1744,6 +1755,7 @@ class TestRunWithCache:
         assert result == -75.5
         assert persisted_jobs[0] is not None
         assert persisted_jobs[0].job_id == "remote-job"
+        job.cleanup.assert_called_once_with()
 
     def test_string_cache_path(self, tmp_path):
         algo = self._mock_algorithm(result=42)

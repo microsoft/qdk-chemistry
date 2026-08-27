@@ -269,53 +269,6 @@ class RemoteBackend(ABC):
 
         """
 
-    def submit_and_wait(self, payload: dict, *, cleanup: bool = False) -> Any:
-        """Submit a job and block until results are available.
-
-        Uses ``_submit()`` to launch the job asynchronously, polls via
-        :meth:`check`, and then :meth:`fetch` es the result.
-
-        Args:
-            payload: Execution request containing algorithm_type,
-                algorithm_name, settings, args, kwargs.
-            cleanup: Whether to remove backend job artifacts after successful
-                result retrieval.
-
-        Returns:
-            The deserialized result from the algorithm.
-
-        """
-        import time  # noqa: PLC0415
-
-        job_id, backend_state = self._submit(payload)
-        timeout = self._backend_args.get("timeout", DEFAULT_TIMEOUT)
-        poll_interval = self._backend_args.get("poll_interval", DEFAULT_POLL_INTERVAL)
-        deadline = time.monotonic() + timeout
-
-        while True:
-            status = self.check(backend_state)
-            if status.is_terminal:
-                break
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise TimeoutError(
-                    f"Remote job {job_id} did not reach a terminal state within {timeout} seconds\n"
-                    f"Last status: {status.status}\n"
-                    f"Error: {status.error or 'unknown'}\nLogs:\n{status.logs}"
-                )
-            time.sleep(min(poll_interval, remaining))
-
-        if not status.is_successful:
-            raise RuntimeError(
-                f"Remote job {job_id} ended with status: {status.status}\n"
-                f"Error: {status.error or 'unknown'}\nLogs:\n{status.logs}"
-            )
-
-        result = self.fetch(backend_state)
-        if cleanup:
-            self.cleanup_job(backend_state)
-        return result
-
     # ── Async job primitives ─────────────────────────────────────────────
 
     def submit(self, payload: dict, *, job_dir: str | Path | None = None) -> Job:
@@ -381,6 +334,7 @@ class RemoteBackend(ABC):
             run_hash=run_hash,
             input_hashes=input_hashes,
         )
+        job.attach_backend(self)
 
         if job_dir is not None:
             job_dir = Path(job_dir)
