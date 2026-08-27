@@ -868,6 +868,7 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
         ControlledPauliSequenceMapper,
         ControlledPSPMapper,
+        ControlledSwapPauliSequenceMapper,
         SOSSAMapper,
     )
     from qdk_chemistry.algorithms.expectation_estimator.qdk import QdkExpectationEstimator  # noqa: PLC0415
@@ -918,6 +919,7 @@ def _register_python_algorithms():
         FullCommutingTermGrouper,
         IdentityTermGrouper,
         QubitWiseCommutingTermGrouper,
+        VacuumAnnihilatingTermGrouper,
     )
     from qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder import (  # noqa: PLC0415
         EulerEvolutionCircuitBuilder,
@@ -934,6 +936,7 @@ def _register_python_algorithms():
     register(lambda: FullCommutingTermGrouper())
     register(lambda: QubitWiseCommutingTermGrouper())
     register(lambda: IdentityTermGrouper())
+    register(lambda: VacuumAnnihilatingTermGrouper())
     register(lambda: Trotter())
     register(lambda: Zassenhaus())
     register(lambda: QDrift())
@@ -945,6 +948,7 @@ def _register_python_algorithms():
     register(lambda: AliasSamplingStatePreparation())
     register(lambda: QROMStatePreparation())
     register(lambda: ControlledPauliSequenceMapper())
+    register(lambda: ControlledSwapPauliSequenceMapper())
     register(lambda: SOSSAMapper())
     register(lambda: SOSSABuilder())
     register(lambda: EulerIntegrator())

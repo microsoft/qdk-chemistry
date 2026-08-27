@@ -213,17 +213,17 @@ Alias Sampling
 
 .. rubric:: Factory name: ``"alias_sampling"``
 
-This method implements the coherent alias sampling PREPARE oracle of Babbush et al. :cite:`Babbush2018` (section III.D). Given :math:`L` non-negative coefficients :math:`c_\ell`, it prepares
+This method implements the coherent alias sampling oracle of Babbush et al. :cite:`Babbush2018` (section III.D). Given :math:`L` non-negative coefficients :math:`c_\ell`, it prepares
 
 .. math::
 
    \sum_{\ell} \sqrt{\tilde{p}_\ell} \left| \ell \right\rangle \left| \mathrm{garbage}_\ell \right\rangle ,
-   \qquad \tilde{p}_\ell \approx \frac{|c_\ell|}{\sum_k |c_k|} ,
+   \qquad \tilde{p}_\ell \approx \frac{c_\ell^2}{\sum_k c_k^2} ,
 
 where :math:`\tilde{p}` is the target distribution discretized to :math:`\mu` bits.
 
 .. warning::
-   This is a **block-encoding subroutine, not a general-purpose state preparation**. The index register is left entangled with ancilla, so the output is only meaningful inside an :term:`LCU` or qubitization circuit where :math:`\mathrm{PREPARE}^\dagger` later uncomputes the garbage. It realizes :math:`\sqrt{|c_\ell| / \sum_k |c_k|}` rather than :math:`c_\ell / \lVert c \rVert_2`, and has no way to represent a coefficient's sign, so negative coefficients are rejected.
+   This is a **block-encoding subroutine, not a general state preparation for algorithms like QPE**. The index register is left entangled with ancilla, so the output is only meaningful inside an :term:`LCU` or qubitization circuit where :math:`\mathrm{PREPARE}^\dagger` later uncomputes the garbage. Negative coefficients are not supported.
 
 .. rubric:: Settings
 
@@ -236,30 +236,7 @@ where :math:`\tilde{p}` is the target distribution discretized to :math:`\mu` bi
      - Description
    * - ``bits_precision``
      - int
-     - Number of bits :math:`\mu` of precision for the alias table's keep probabilities. Each prepared probability lands within :math:`2^{-\mu}` of the target, at the cost of one extra uniform qubit and one extra QROM output qubit per bit. Default is 10.
-
-QROM
-~~~~
-
-.. rubric:: Factory name: ``"qrom"``
-
-This method prepares an :math:`n`-qubit state with :math:`n` layers of multiplexed :math:`R_y` rotations, where each layer's rotation angles are loaded from a QROM table and applied through a phase gradient register. It uses only :math:`n = \lceil \log_2 L \rceil` state qubits, plus scratch ancilla per lookup, in exchange for :math:`n` QROM lookups.
-
-.. note::
-   :math:`R_y` rotations only generate non-negative amplitudes, so the coefficient signs are applied afterwards by a QROM-loaded ``Z`` phase kickback. That lookup is uncomputed through ``Std.TableLookup``, whose adjoint repairs the phase kickback its measurement-based uncompute leaves on the address register. The prepared state is therefore correct up to a global phase that depends on those measurement outcomes.
-
-.. rubric:: Settings
-
-.. list-table::
-   :header-rows: 1
-   :widths: 25 25 50
-
-   * - Setting
-     - Type
-     - Description
-   * - ``rotation_bit_precision``
-     - int
-     - Number of bits of precision used for the QROM-loaded :math:`R_y` rotation angles. Higher values reduce the synthesis error of each multiplexed rotation at the cost of a wider QROM output register. Default is 10.
+     - Number of bits :math:`\mu` of precision for the alias table's keep probabilities. Each prepared probability is within :math:`1/(L 2^{\mu})` of the target for :math:`L` coefficients. The upper bound of 30 is a sanity limit as :math:`2^{-30}` is far below chemical accuracy. Default is 10.
 
 Related classes
 ---------------

@@ -4,38 +4,24 @@
 
 /// Alias sampling state preparation.
 /// Reference: Babbush et al. arXiv:1805.03662, Fig. 11.
-///
-/// This file contains two families of operations with *different* probability
-/// conventions. They are both intentional; do not "unify" them.
-///
-///   * `AliasSamplingPrepare` / `RunAliasSamplingPrep` — the LCU PREPARE oracle of
-///     Babbush et al. Fig. 11. It samples p_ℓ ∝ |c_ℓ| (magnitudes, normalized by the
-///     1-norm), so the index register carries amplitude √(|c_ℓ| / Σ_k |c_k|). Signs are
-///     not represented at all; the accompanying SELECT oracle is expected to carry them.
-///
-///   * `ConditionalAliasSamplingPrepare*` — a genuine state preparation. It squares the
-///     coefficients before building the alias table, so it samples p_{c,ℓ} ∝ c_{c,ℓ}²
-///     (normalized by the 2-norm) and the index register carries amplitude
-///     |c_{c,ℓ}| / ‖c_c‖₂. A QROM-loaded sign bit then applies a Z phase, recovering the
-///     signed amplitude c_{c,ℓ} / ‖c_c‖₂ (Von Burg arXiv:2011.03494, Def. 1).
-///
-/// In short: the plain variant is 1-norm PREPARE over magnitudes, the conditional variant
-/// is 2-norm state preparation over signed coefficients.
 namespace QDKChemistry.Utils.AliasSampling {
 
     import Std.Arithmetic.ApplyIfGreaterLE;
     import Std.Arrays.MappedOverRange;
     import Std.Canon.ApplyToEachCA;
+    import Std.Canon.ApplyXorInPlace;
     import Std.Convert.IntAsBoolArray;
     import Std.Convert.IntAsDouble;
     import Std.Core.Length;
+    import Std.Diagnostics.Fact;
     import Std.Math.AbsD;
     import Std.Math.Ceiling;
+    import Std.Math.Floor;
     import Std.Math.Lg;
-    import Std.Math.Round;
     import Std.StatePreparation.PrepareUniformSuperposition;
     import Std.Arrays.Mapped;
     import Std.Arrays.Padded;
+    import Std.Arrays.Zipped;
     import Std.TableLookup.Select;
     import QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D;
     import QDKChemistry.Utils.SelectSwap.Select2DLoad;
@@ -43,7 +29,7 @@ namespace QDKChemistry.Utils.AliasSampling {
 
     /// Parameters for alias sampling state preparation.
     struct AliasSamplingParams {
-        /// Unnormalized probability weights, length L.
+        /// Coefficients of the quantum state to prepare, length L.
         coefficients : Double[],
         /// Number of bits μ for keep-coefficient precision.
         bitsPrecision : Int,
@@ -63,11 +49,6 @@ namespace QDKChemistry.Utils.AliasSampling {
         coefficients : Double[],
     ) : (Int[], Int[]) {
         let nCoeffs = Length(coefficients);
-        // The full bar height is 2^μ, so a stored keep value k means "keep index ℓ
-        // with probability k / 2^μ" under the σ < keep_ℓ comparison in
-        // AliasSamplingPrepare. Keep values occupy μ bits, so the largest storable
-        // value is 2^μ - 1; entries that must always be kept use that value together
-        // with alt_ℓ = ℓ, which makes the residual 1/2^μ "swap" a no-op.
         let barHeight = 1 <<< bitsPrecision;
         let maxKeep = barHeight - 1;
 
@@ -77,39 +58,40 @@ namespace QDKChemistry.Utils.AliasSampling {
             set total += AbsD(coefficients[i]);
         }
 
-        // Scale to bar height × nCoeffs, rounding to nearest.
+        Fact(total > 0.0, "alias sampling requires at least one non-zero coefficient");
+
+        // Scale to bar height × nCoeffs by flooring, keeping the fractional
+        // remainder per index for largest-remainder (Hamilton) apportionment.
         let targetTotal = barHeight * nCoeffs;
         mutable scaledProbs : Int[] = [];
         mutable scaledTotal = 0;
+        mutable remainders : Double[] = [];
         for i in 0..nCoeffs - 1 {
-            let scaled = Round(AbsD(coefficients[i]) / total * IntAsDouble(targetTotal));
-            set scaledProbs += [scaled];
-            set scaledTotal += scaled;
+            let exact = AbsD(coefficients[i]) / total * IntAsDouble(targetTotal);
+            let base = Floor(exact);
+            set scaledProbs += [base];
+            set scaledTotal += base;
+            // Zero coefficients must never receive weight, so mark them with a
+            // sentinel remainder below any real one so they are never chosen.
+            set remainders += [AbsD(coefficients[i]) > 0.0 ? exact - IntAsDouble(base) | -1.0];
         }
 
-        // Walker's construction assumes the bars sum to exactly 2^μ · L. Rounding
-        // breaks that, so redistribute the residual one unit at a time instead of
-        // accumulating it and discarding it. Only indices with a non-zero coefficient
-        // are eligible: handing a unit to a zero coefficient would give it a spurious
-        // 2^-μ of probability, and it also keeps the loop from spinning forever when
-        // there is nothing left to take a unit from.
-        mutable adjustable : Int[] = [];
-        for i in 0..nCoeffs - 1 {
-            if AbsD(coefficients[i]) > 0.0 {
-                set adjustable += [i];
-            }
-        }
-
+        // Distribute leftover units to the largest remainders first, ties by ascending index.
+        // Flooring keeps the residual non-negative, so bar heights only increase.
         mutable residual = targetTotal - scaledTotal;
-        mutable cursor = 0;
-        while residual != 0 and Length(adjustable) > 0 {
-            let index = adjustable[cursor];
-            let delta = residual > 0 ? 1 | -1;
-            if scaledProbs[index] + delta >= 0 {
-                set scaledProbs w/= index <- scaledProbs[index] + delta;
-                set residual -= delta;
+        for _ in 1..residual {
+            mutable bestIdx = -1;
+            mutable bestRem = -1.0;
+            for i in 0..nCoeffs - 1 {
+                if remainders[i] > bestRem {
+                    set bestRem = remainders[i];
+                    set bestIdx = i;
+                }
             }
-            set cursor = (cursor + 1) % Length(adjustable);
+            if bestIdx >= 0 {
+                set scaledProbs w/= bestIdx <- scaledProbs[bestIdx] + 1;
+                set remainders w/= bestIdx <- -1.0;
+            }
         }
 
         // Initialize keep and alt arrays
@@ -161,6 +143,9 @@ namespace QDKChemistry.Utils.AliasSampling {
     /// (LCU or qubitization), where PREPARE† is applied to uncompute the garbage
     /// and project onto the correct subspace.
     ///
+    /// The index register carries amplitude √(|c_ℓ| / Σ_k |c_k|).
+    /// Signs are not represented; the accompanying SELECT oracle should carry them.
+    ///
     /// Register layout:
     ///   indexRegister[numIndexQubits] — output: sampled index ℓ
     ///   uniformRegister[bitsPrecision] — ancilla for comparison σ
@@ -182,9 +167,6 @@ namespace QDKChemistry.Utils.AliasSampling {
         let (keepCoeff, altIndex) = DiscretizedProbabilityDistribution(mu, params.coefficients);
 
         let nPadded = 1 <<< nIndexQubits;
-        // Largest storable keep value: "always keep". Padded rows are unreachable
-        // because PrepareUniformSuperposition only populates the first nCoeffs
-        // indices, but alt_ℓ = ℓ keeps them harmless if they ever were reached.
         let maxKeep = (1 <<< mu) - 1;
 
         // Build QROM data table: (keep_ℓ, alt_ℓ) for each index
@@ -207,11 +189,6 @@ namespace QDKChemistry.Utils.AliasSampling {
         SelectSwap(-1, selectData, indexRegister, qromOutput);
 
         // Step 4: Compare σ < keep_ℓ → keep, otherwise swap to alt_ℓ.
-        // ApplyIfGreaterLE(X, a, b, t) flips t when a > b, so passing keep as the
-        // first operand gives "keep_ℓ > σ", i.e. the keep condition; inverting it
-        // yields the swap condition σ ≥ keep_ℓ. Ordering the operands the other way
-        // round would test σ > keep_ℓ, which keeps the index when σ == keep_ℓ and
-        // therefore gives a zero-weight coefficient a residual 1/2^μ probability.
         let keepLoaded = qromOutput[0..mu - 1];
         let altLoaded = qromOutput[mu..mu + nIndexQubits - 1];
         ApplyIfGreaterLE(X, keepLoaded, uniformRegister, flagQubit);
@@ -245,18 +222,6 @@ namespace QDKChemistry.Utils.AliasSampling {
         AliasSamplingPrepare(params, qs);
     }
 
-    /// Helper to compute the total number of qubits needed for alias sampling.
-    /// Returns: numIndexQubits + bitsPrecision + 1 (flag) + bitsPrecision + numIndexQubits (qrom output)
-    function ComputeAliasSamplingQubits(numCoefficients : Int, bitsPrecision : Int) : (Int, Int) {
-        let numIndexQubits = Ceiling(Lg(IntAsDouble(numCoefficients)));
-        let numQubits = 2 * numIndexQubits + 2 * bitsPrecision + 1;
-        return (numIndexQubits, numQubits);
-    }
-
-    // ════════════════════════════════════════════════════════════════════════════
-    //  Conditional alias sampling (2D)
-    // ════════════════════════════════════════════════════════════════════════════
-
     /// Build 3D QROM table for conditional alias sampling with sign bits and
     /// optional free-rider data.
     ///
@@ -274,15 +239,10 @@ namespace QDKChemistry.Utils.AliasSampling {
         let nCoeffs = Length(coefficients[0]);
         let nPaddedIdx = 1 <<< nIndexBits;
         let nFreeRiderBits = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
-        // Largest storable keep value; see DiscretizedProbabilityDistribution. Padded rows
-        // use it together with alt_ℓ = ℓ so the residual 1/2^μ "swap" is a no-op.
         let maxKeep = (1 <<< bitsPrecision) - 1;
 
         mutable result : Bool[][][] = [];
         for c in 0..nCond - 1 {
-            // Squared, unlike the plain PREPARE variant: this operation is a 2-norm state
-            // preparation, so amplitude ∝ |c| requires probability ∝ c². See the namespace
-            // documentation comment.
             let squaredCoeffs = Mapped(x -> x * x, coefficients[c]);
             let (keepCoeff, altIndex) = DiscretizedProbabilityDistribution(bitsPrecision, squaredCoeffs);
             mutable innerData : Bool[][] = [];
@@ -395,8 +355,14 @@ namespace QDKChemistry.Utils.AliasSampling {
         if lambda == 0 {
             Select2DLoad(table3D, conditionalRegister, indexRegister, 0, qromOutput + freeRiderRegister);
         } else {
-            use swapAnc = Qubit[m * ((1 <<< lambda) - 1)];
-            Select2DLoad(table3D, conditionalRegister, indexRegister, lambda, qromOutput + freeRiderRegister + swapAnc);
+            // SelectSwap leaves the non-addressed chunks dirty, so copy the addressed
+            // word out and let the within/apply uncompute and free the swap ancilla.
+            use swapTarget = Qubit[m * (1 <<< lambda)];
+            within {
+                Select2DLoad(table3D, conditionalRegister, indexRegister, lambda, swapTarget);
+            } apply {
+                ApplyToEachCA(CNOT, Zipped(swapTarget[0..m - 1], qromOutput + freeRiderRegister));
+            }
         }
 
         let keepCoeffLoaded = qromOutput[0..bitsPrecision - 1];
@@ -417,105 +383,78 @@ namespace QDKChemistry.Utils.AliasSampling {
         Z(signOrigQubit);
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Test wrappers — apply the preparation to a caller-supplied register so the
-    // resulting state can be captured via dump_operation_on_state.
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    /// Test wrapper: run alias sampling on a freshly allocated register.
-    ///
-    /// The register is intentionally leaked (``AllocateQubitArray`` rather than ``use``)
-    /// so the prepared state survives the call and can be read with ``dump_machine``.
-    internal operation RunAliasSamplingPrep(
-        coefficients : Double[],
-        bitsPrecision : Int,
-        numIndexQubits : Int,
-        numQubits : Int,
-    ) : Unit {
-        let params = new AliasSamplingParams {
-            coefficients = coefficients,
-            bitsPrecision = bitsPrecision,
-            numIndexQubits = numIndexQubits,
-            numQubits = numQubits,
-        };
-        let qs = QIR.Runtime.AllocateQubitArray(numQubits);
-        AliasSamplingPrepare(params, qs);
-    }
-
-    /// Test wrapper: run conditional alias sampling and leave state for dump_machine.
-    internal operation RunConditionalAliasSamplingPrep(
+    /// Test wrapper: conditional alias sampling on `[condition | index | uniform | flag | qrom]`.
+    internal function MakeConditionalAliasSamplingPrepOp(
         coefficients : Double[][],
         bitsPrecision : Int,
         conditionValue : Int,
-    ) : Unit {
-        let nCond = Length(coefficients);
-        let nCoeffs = Length(coefficients[0]);
-        let nIndexBits = Ceiling(Lg(IntAsDouble(nCoeffs)));
-        let nCondBits = Ceiling(Lg(IntAsDouble(nCond)));
-        let nQromOutput = bitsPrecision + nIndexBits + 2;
-        let totalQubits = nCondBits + nIndexBits + bitsPrecision + 1 + nQromOutput;
+        numSwapBits : Int,
+    ) : Qubit[] => Unit {
+        (qs) => {
+            let nCond = Length(coefficients);
+            let nCoeffs = Length(coefficients[0]);
+            let nIndexBits = Ceiling(Lg(IntAsDouble(nCoeffs)));
+            let nCondBits = Ceiling(Lg(IntAsDouble(nCond)));
+            let nQromOutput = bitsPrecision + nIndexBits + 2;
 
-        let qs = QIR.Runtime.AllocateQubitArray(totalQubits);
+            let conditionalReg = qs[0..nCondBits - 1];
+            let indexReg = qs[nCondBits..nCondBits + nIndexBits - 1];
+            let uniformReg = qs[nCondBits + nIndexBits..nCondBits + nIndexBits + bitsPrecision - 1];
+            let flagQubit = qs[nCondBits + nIndexBits + bitsPrecision];
+            let qromOut = qs[nCondBits + nIndexBits + bitsPrecision + 1..nCondBits + nIndexBits + bitsPrecision + nQromOutput];
 
-        let conditionalReg = qs[0..nCondBits - 1];
-        let indexReg = qs[nCondBits..nCondBits + nIndexBits - 1];
-        let uniformReg = qs[nCondBits + nIndexBits..nCondBits + nIndexBits + bitsPrecision - 1];
-        let flagQubit = qs[nCondBits + nIndexBits + bitsPrecision];
-        let qromOut = qs[nCondBits + nIndexBits + bitsPrecision + 1..nCondBits + nIndexBits + bitsPrecision + nQromOutput];
+            ApplyXorInPlace(conditionValue, conditionalReg);
 
-        // Set conditional register to |conditionValue⟩
-        ApplyXorInPlace(conditionValue, conditionalReg);
-
-        ConditionalAliasSamplingPrepare(
-            coefficients,
-            bitsPrecision,
-            conditionalReg,
-            indexReg,
-            uniformReg,
-            flagQubit,
-            qromOut,
-            0
-        );
+            ConditionalAliasSamplingPrepare(
+                coefficients,
+                bitsPrecision,
+                conditionalReg,
+                indexReg,
+                uniformReg,
+                flagQubit,
+                qromOut,
+                numSwapBits
+            );
+        }
     }
 
-    /// Test wrapper: run conditional alias sampling with free-rider data.
-    internal operation RunConditionalAliasSamplingPrepWithFreeRider(
+    /// Test wrapper: conditional alias sampling with free-rider data.
+    internal function MakeConditionalAliasSamplingPrepWithFreeRiderOp(
         coefficients : Double[][],
         freeRiderData : Bool[][],
         bitsPrecision : Int,
         conditionValue : Int,
-    ) : Unit {
-        let nCond = Length(coefficients);
-        let nCoeffs = Length(coefficients[0]);
-        let nIndexBits = Ceiling(Lg(IntAsDouble(nCoeffs)));
-        let nCondBits = Ceiling(Lg(IntAsDouble(nCond)));
-        let nFreeRiderBits = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
-        let nQromOutput = bitsPrecision + nIndexBits + 2;
-        let totalQubits = nCondBits + nIndexBits + bitsPrecision + 1 + nQromOutput + nFreeRiderBits;
+    ) : Qubit[] => Unit {
+        (qs) => {
+            let nCond = Length(coefficients);
+            let nCoeffs = Length(coefficients[0]);
+            let nIndexBits = Ceiling(Lg(IntAsDouble(nCoeffs)));
+            let nCondBits = Ceiling(Lg(IntAsDouble(nCond)));
+            let nFreeRiderBits = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
+            let nQromOutput = bitsPrecision + nIndexBits + 2;
 
-        let qs = QIR.Runtime.AllocateQubitArray(totalQubits);
+            let conditionalReg = qs[0..nCondBits - 1];
+            let indexReg = qs[nCondBits..nCondBits + nIndexBits - 1];
+            let uniformReg = qs[nCondBits + nIndexBits..nCondBits + nIndexBits + bitsPrecision - 1];
+            let flagQubit = qs[nCondBits + nIndexBits + bitsPrecision];
+            let qromOut = qs[nCondBits + nIndexBits + bitsPrecision + 1..nCondBits + nIndexBits + bitsPrecision + nQromOutput];
+            let freeRiderReg = qs[nCondBits + nIndexBits + bitsPrecision + 1 + nQromOutput..nCondBits + nIndexBits + bitsPrecision + nQromOutput + nFreeRiderBits];
 
-        let conditionalReg = qs[0..nCondBits - 1];
-        let indexReg = qs[nCondBits..nCondBits + nIndexBits - 1];
-        let uniformReg = qs[nCondBits + nIndexBits..nCondBits + nIndexBits + bitsPrecision - 1];
-        let flagQubit = qs[nCondBits + nIndexBits + bitsPrecision];
-        let qromOut = qs[nCondBits + nIndexBits + bitsPrecision + 1..nCondBits + nIndexBits + bitsPrecision + nQromOutput];
-        let freeRiderReg = qs[nCondBits + nIndexBits + bitsPrecision + 1 + nQromOutput..nCondBits + nIndexBits + bitsPrecision + nQromOutput + nFreeRiderBits];
+            ApplyXorInPlace(conditionValue, conditionalReg);
 
-        ApplyXorInPlace(conditionValue, conditionalReg);
-
-        ConditionalAliasSamplingPrepareWithFreeRider(
-            coefficients,
-            freeRiderData,
-            bitsPrecision,
-            conditionalReg,
-            indexReg,
-            uniformReg,
-            flagQubit,
-            qromOut,
-            freeRiderReg,
-            0
-        );
+            ConditionalAliasSamplingPrepareWithFreeRider(
+                coefficients,
+                freeRiderData,
+                bitsPrecision,
+                conditionalReg,
+                indexReg,
+                uniformReg,
+                flagQubit,
+                qromOut,
+                freeRiderReg,
+                0
+            );
+        }
     }
 
 }

@@ -8,6 +8,10 @@
 from .base import ControlledCircuitMapperFactory, ControlledCircuitMapperSettings
 from .controlled_pauli_sequence_mapper import ControlledPauliSequenceMapper
 from .controlled_psp_mapper import ControlledPSPMapper, ControlledPSPMapperSettings
+from .controlled_swap_pauli_sequence_mapper import (
+    ControlledSwapPauliSequenceMapper,
+    ControlledSwapPauliSequenceMapperSettings,
+)
 from .sossa_mapper import (
     SOSSAMapper,
     SOSSAMapperSettings,
@@ -19,6 +23,8 @@ __all__ = [
     "ControlledPSPMapper",
     "ControlledPSPMapperSettings",
     "ControlledPauliSequenceMapper",
+    "ControlledSwapPauliSequenceMapper",
+    "ControlledSwapPauliSequenceMapperSettings",
     "SOSSAMapper",
     "SOSSAMapperSettings",
 ]

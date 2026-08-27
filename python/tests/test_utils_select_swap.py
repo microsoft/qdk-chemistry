@@ -6,19 +6,9 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
-import qdk
 
-from qdk_chemistry.utils.qsharp import create_qsharp_context
+from qdk_chemistry.utils.qsharp import get_qsharp_context
 
-
-@pytest.fixture
-def qdk_ctx() -> qdk.Context:
-    """Fresh Q# context for a single test."""
-    return create_qsharp_context()
-
-
-#: Eight three-bit words, so the address register is three qubits and ``num_swap_bits``
-#: can range over the whole select/swap split.
 _DATA_1D = [
     [True, False, True],
     [False, True, True],
@@ -40,32 +30,29 @@ class TestSelectSwapLoadsCorrectValues:
     """The loaded word is the addressed word, for every select/swap split."""
 
     @pytest.mark.parametrize("num_swap_bits", [0, 1, 2, 3])
-    def test_1d_loads_every_address(self, qdk_ctx, num_swap_bits):
-        assert qdk_ctx.code.QDKChemistry.Utils.SelectSwap.TestSelectSwap1DCorrectness(_DATA_1D, num_swap_bits)
+    def test_1d_loads_every_address(self, num_swap_bits):
+        assert get_qsharp_context().code.QDKChemistry.Utils.SelectSwap.TestSelectSwap1DCorrectness(
+            _DATA_1D, num_swap_bits
+        )
 
     @pytest.mark.parametrize("num_swap_bits", [0, 1, 2])
-    def test_2d_loads_every_address(self, qdk_ctx, num_swap_bits):
-        assert qdk_ctx.code.QDKChemistry.Utils.SelectSwap.TestSelect2DLoadCorrectness(_DATA_2D, num_swap_bits)
+    def test_2d_loads_every_address(self, num_swap_bits):
+        assert get_qsharp_context().code.QDKChemistry.Utils.SelectSwap.TestSelect2DLoadCorrectness(
+            _DATA_2D, num_swap_bits
+        )
 
 
 class TestSelectSwapPreservesAddressPhases:
-    """The swap path must agree with the plain-select path as a *phase* oracle.
-
-    A lookup whose uncompute is wrong still loads the right bits, so the value tests above
-    pass while the phase of the address register is silently corrupted. That is invisible
-    to a probability-based check and fatal to a state-preparation caller, whose address
-    register *is* the prepared state. Both operations under test are diagonal +/-1 oracles
-    and therefore self-inverse, so composing the two paths is the identity exactly when
-    they agree.
-
-    The optimizer picks ``num_swap_bits = 0`` for every table small enough to simulate
-    end to end, so without these tests the swap branch is never executed.
-    """
+    """The swap path must agree with the plain-select path as a *phase* oracle."""
 
     @pytest.mark.parametrize("num_swap_bits", [1, 2, 3])
-    def test_1d_swap_path_matches_plain_select(self, qdk_ctx, num_swap_bits):
-        assert qdk_ctx.code.QDKChemistry.Utils.SelectSwap.TestSelectSwap1DPhaseAgreement(_DATA_1D, num_swap_bits)
+    def test_1d_swap_path_matches_plain_select(self, num_swap_bits):
+        assert get_qsharp_context().code.QDKChemistry.Utils.SelectSwap.TestSelectSwap1DPhaseAgreement(
+            _DATA_1D, num_swap_bits
+        )
 
     @pytest.mark.parametrize("num_swap_bits", [1, 2])
-    def test_2d_swap_path_matches_plain_select(self, qdk_ctx, num_swap_bits):
-        assert qdk_ctx.code.QDKChemistry.Utils.SelectSwap.TestSelect2DLoadPhaseAgreement(_DATA_2D, num_swap_bits)
+    def test_2d_swap_path_matches_plain_select(self, num_swap_bits):
+        assert get_qsharp_context().code.QDKChemistry.Utils.SelectSwap.TestSelect2DLoadPhaseAgreement(
+            _DATA_2D, num_swap_bits
+        )

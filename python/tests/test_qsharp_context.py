@@ -43,8 +43,6 @@ _PORTABLE_MODULES = tuple(Path(name).stem for name in _BASE_PROFILE_FILES)
 
 #: Modules withheld from ``TargetProfile.Base``. Most uncompute through measurement, which
 #: Base cannot express, so they are made to fail as missing rather than compile and mislead.
-#: ``PhaseGradient`` is pure unitary but is only reachable from ``QROMStatePrep``, so it is
-#: withheld with it rather than carried into the Base build unused.
 _ADAPTIVE_ONLY_MODULES = (
     "UnaryIteration",
     "UnaryPhaseEstimation",

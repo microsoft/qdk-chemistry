@@ -27,7 +27,7 @@ except ImportError:
 from qdk_chemistry.algorithms.state_preparation._binary_encoding_utils import MatrixCompressionType
 from qdk_chemistry.data import Circuit
 from qdk_chemistry.data import circuit as circuit_module
-from qdk_chemistry.data.circuit import QsharpFactoryData
+from qdk_chemistry.data.circuit import CircuitMetadata, QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -101,6 +101,33 @@ class TestCircuitConstruction:
         """Callers read the register width off the circuit rather than its producer."""
         assert Circuit(qasm="OPENQASM 3.0;", num_qubits=5).num_qubits == 5
         assert Circuit(qasm="OPENQASM 3.0;", num_qubits=0).num_qubits == 0
+
+    def test_phase_gradient_ancillas_are_recorded(self):
+        """A trailing phase gradient register is declared on the circuit."""
+        circuit = Circuit(qasm="OPENQASM 3.0;", num_qubits=5, metadata=CircuitMetadata(num_phase_gradient_ancillas=2))
+        assert circuit.metadata.num_phase_gradient_ancillas == 2
+
+    def test_phase_gradient_ancillas_survive_a_json_round_trip(self):
+        """The declaration is plain data, so it serializes with the rest of the circuit."""
+        circuit = Circuit(qasm="OPENQASM 3.0;", num_qubits=5, metadata=CircuitMetadata(num_phase_gradient_ancillas=2))
+        assert Circuit.from_json(circuit.to_json()).metadata.num_phase_gradient_ancillas == 2
+
+    @pytest.mark.parametrize(
+        ("num_qubits", "num_gradient", "match"),
+        [
+            (5, -1, "must be non-negative"),
+            (2, 3, "cannot exceed num_qubits"),
+            (None, 1, "num_qubits must be declared"),
+        ],
+    )
+    def test_inconsistent_phase_gradient_declarations_are_rejected(self, num_qubits, num_gradient, match):
+        """An unusable phase gradient declaration fails at construction, not inside Q#."""
+        with pytest.raises(ValueError, match=match):
+            Circuit(
+                qasm="OPENQASM 3.0;",
+                num_qubits=num_qubits,
+                metadata=CircuitMetadata(num_phase_gradient_ancillas=num_gradient),
+            )
 
 
 class TestGetQsharpCircuit:
