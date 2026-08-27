@@ -156,7 +156,10 @@ extends:
               outputs:
               - output: pipelineArtifact
                 displayName: Upload ExaChem install (Linux x86_64)
-                targetPath: $(System.DefaultWorkingDirectory)/exachem_install
+                # Hardcode the qdk-chemistry/ segment (matching this job's `checkout: self path: qdk-chemistry`)
+                # rather than relying on $(System.DefaultWorkingDirectory) alone -- see the matching download
+                # input below for why that variable can't be trusted here.
+                targetPath: $(Agent.BuildDirectory)/qdk-chemistry/exachem_install
                 artifactName: linux-x86_64-exachem-install
             steps:
             - template: .pipelines/templates/build-exachem-linux.yml@self
@@ -209,7 +212,14 @@ extends:
               inputs:
               - input: pipelineArtifact
                 artifactName: linux-x86_64-exachem-install
-                targetPath: $(System.DefaultWorkingDirectory)/exachem_install
+                # Hardcode $(Agent.BuildDirectory)/qdk-chemistry/... (matching the upload above and this job's
+                # own `checkout: self path: qdk-chemistry`) rather than $(System.DefaultWorkingDirectory): 1ES PT
+                # runs templateContext.inputs BEFORE this job's own `steps:` (including its checkout), so at
+                # download time $(System.DefaultWorkingDirectory) still resolves to ADO's default self-checkout
+                # alias ("s"), not "qdk-chemistry" -- landing the artifact in a directory the docker-mounted test
+                # script (test-pip-wheels.sh, which looks under /workspace/qdk-chemistry/) never sees, silently
+                # skipping the ExaChem integration test.
+                targetPath: $(Agent.BuildDirectory)/qdk-chemistry/exachem_install
             outputs:
             - output: pipelineArtifact
               displayName: Upload Python $(pythonVersion) Wheels for ${{ target.os }} ${{ target.march }}
