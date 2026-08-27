@@ -88,12 +88,12 @@ class TestOuterPrep:
         against the expected normalized state:
           |ψ⟩ = Σ_j (a_j / ||a||) |j⟩
 
-        Note: both backends leave the index register little-endian, which is the address
-        order Select expects (``MakeOuterPreparePureState`` gets there via
-        ``Reversed(register)`` over ``PreparePureStateD``; the QROM prep writes its
-        ``target`` LE directly). ``dump_machine()`` reports big-endian, so coefficient[k]
-        appears at dump index bit_reverse(k). We account for this by building expected in
-        LE-address space.
+        Note: ``dump_machine()`` reports big-endian, and the two backends differ in
+        where they leave coefficient ``k``. ``MakeOuterPreparePureState``
+        (``dense_pure_state``) wraps ``PreparePureStateD`` in ``Reversed(register)``,
+        so coefficient ``k`` lands at dump index ``bit_reverse(k)``. The QROM prep
+        writes its ``target`` in dump order, so coefficient ``k`` lands at index ``k``.
+        Expected is built to match whichever applies.
         """
         controlled_unitary = _build_controlled_unitary()
         container = controlled_unitary.get_container()
@@ -111,9 +111,12 @@ class TestOuterPrep:
         expected = np.zeros(n_states)
         for j, amp in enumerate(coefficients):
             if j < n_states:
-                # coefficient[k] → LE address k → BE dump index bit_reverse(k)
-                be_idx = int(format(j, f"0{num_qubits}b")[::-1], 2)
-                expected[be_idx] = amp
+                if algorithm == "dense_pure_state":
+                    # Reversed(register) over PreparePureStateD puts coefficient[k]
+                    # at big-endian dump index bit_reverse(k).
+                    expected[int(format(j, f"0{num_qubits}b")[::-1], 2)] = amp
+                else:
+                    expected[j] = amp
         expected /= np.linalg.norm(expected)
 
         fidelity = abs(np.dot(np.conj(actual_sv), expected))
@@ -144,14 +147,13 @@ class TestOuterPrep:
         state = qdk_ctx.dump_machine()
         full_sv = np.array(state.as_dense_state())
 
-        # Compute marginal probabilities on the index register (top bits, LE)
+        # Marginal over the index register (top bits of the big-endian dump). Alias
+        # sampling writes its index register in dump order, so no bit reversal here.
         n_index = 2**num_index_qubits
         shift = total_qubits - num_index_qubits
         probs = np.zeros(n_index)
         for i in range(len(full_sv)):
-            be_idx = (i >> shift) & (n_index - 1)
-            index_val = int("{:0{w}b}".format(be_idx, w=num_index_qubits)[::-1], 2)
-            probs[index_val] += abs(full_sv[i]) ** 2
+            probs[(i >> shift) & (n_index - 1)] += abs(full_sv[i]) ** 2
 
         squared_coeffs = np.abs(coefficients) ** 2
         expected_probs = squared_coeffs / np.sum(squared_coeffs)
