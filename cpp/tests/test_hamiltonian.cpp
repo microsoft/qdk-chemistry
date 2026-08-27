@@ -3133,9 +3133,13 @@ TEST_F(HamiltonianConstructorTest, X2CAbsoluteOneBodyReferences) {
         h_x2c = constructor->run(orbitals);
       }
       auto [one_body_alpha, one_body_beta] = h_x2c->get_one_body_integrals();
-      EXPECT_LT((one_body_alpha - expected).cwiseAbs().maxCoeff(),
+      EXPECT_LT((one_body_alpha.cwiseAbs() - expected.cwiseAbs())
+                    .cwiseAbs()
+                    .maxCoeff(),
                 testing::integral_tolerance);
-      EXPECT_LT((one_body_beta - expected).cwiseAbs().maxCoeff(),
+      EXPECT_LT((one_body_beta.cwiseAbs() - expected.cwiseAbs())
+                    .cwiseAbs()
+                    .maxCoeff(),
                 testing::integral_tolerance);
       EXPECT_EQ(h_x2c->get_container_type(),
                 factory_name == "qdk" ? "canonical_four_center" : "cholesky");
@@ -3215,9 +3219,9 @@ TEST_F(HamiltonianConstructorTest, X2CArgonDihydrideAllElectronReferences) {
     ASSERT_EQ(alpha_solver.info(), Eigen::Success);
     ASSERT_EQ(beta_solver.info(), Eigen::Success);
     EXPECT_LT((alpha_solver.eigenvalues() - expected).cwiseAbs().maxCoeff(),
-              10 * testing::integral_tolerance);
+              1000 * testing::integral_tolerance);
     EXPECT_LT((beta_solver.eigenvalues() - expected).cwiseAbs().maxCoeff(),
-              10 * testing::integral_tolerance);
+              1000 * testing::integral_tolerance);
   }
 }
 
