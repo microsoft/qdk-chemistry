@@ -17,6 +17,15 @@
 # shipped in the qdk-chemistry wheel or linked into its binary -- they're only used as an external MPI
 # subprocess in GHA CI test runs -- so they aren't Component Governance-relevant and don't belong in cgmanifest.
 #
+# All four pins below (TAMM_COMMIT/EXACHEM_COMMIT/CMSB_COMMIT/GA_COMMIT) plus the five patches under patches/ are
+# validated together, as a set, against each other -- not independently: e.g. each ExaChem patch's header states
+# the exact TAMM/ExaChem commit it was verified against, and cmsb-fix-dependency-reuse.patch/
+# globalarrays-fix-linalg-preference.patch are each verified against their own pinned commit only. Bumping any
+# one of these four pins requires re-running this script's full build in CI and re-checking (via the "Applied
+# against commit ..." note in each patch's header) that all five patches still apply -- a mismatched pin/patch
+# combination fails loudly (git apply --verbose under set -euo pipefail aborts the script), not silently, but
+# figuring out *why* still means checking all five patch headers plus this comment.
+#
 # Usage: install-exachem.sh
 # Required env vars: CPP_DEPS_PREFIX
 # Optional env vars: INSTALL_PREFIX, BUILD_ROOT, MARCH, JOBS, KEEP_BUILD_DIR, LINALG_VENDOR, LINALG_PREFIX
@@ -99,6 +108,10 @@ fi
 EIGEN3_CMAKE_DIR="$(dirname "${EIGEN3_CONFIG}")"                     # e.g. /usr/share/eigen3/cmake
 EIGEN3_SHARE_DIR="$(dirname "${EIGEN3_CMAKE_DIR}")"                  # e.g. /usr/share/eigen3
 EIGEN3_PREFIX="$(dirname "$(dirname "${EIGEN3_SHARE_DIR}")")"        # e.g. /usr
+# rm -rf the destinations first: cp -r into an already-existing directory (e.g. a stale INSTALL_PREFIX left over
+# from a previous run against the same prefix) copies INTO it as a subdirectory instead of refreshing it, which
+# would silently leave a stale Eigen3Config.cmake in place at the path CMake actually resolves.
+rm -rf "${INSTALL_PREFIX}/share/eigen3/cmake" "${INSTALL_PREFIX}/include/eigen3"
 mkdir -p "${INSTALL_PREFIX}/share/eigen3" "${INSTALL_PREFIX}/include"
 cp -r "${EIGEN3_CMAKE_DIR}" "${INSTALL_PREFIX}/share/eigen3/cmake"
 cp -r "${EIGEN3_PREFIX}/include/eigen3" "${INSTALL_PREFIX}/include/eigen3"
@@ -341,10 +354,11 @@ fi
 # OMPI_ALLOW_RUN_AS_ROOT*: this script may run inside a root Docker container (e.g. the ADO pipeline).
 SMOKE_TEST_INPUT="${BUILD_ROOT}/exachem/inputs/ci/hub_1d_6s.json"
 SMOKE_TEST_DIR="$(mktemp -d)"
+trap 'rm -rf "${SMOKE_TEST_DIR}"' EXIT
 echo "==> Running minimal ExaChem example: ${SMOKE_TEST_INPUT}"
 ( cd "${SMOKE_TEST_DIR}" && OMP_NUM_THREADS=1 OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 \
     mpirun -n 2 "${INSTALL_PREFIX}/bin/ExaChem" "${SMOKE_TEST_INPUT}" )
-rm -rf "${SMOKE_TEST_DIR}"
+# (cleanup of SMOKE_TEST_DIR is handled by the trap above, on every exit path -- including a failed mpirun run)
 
 echo "==> Smoke test OK: ${INSTALL_PREFIX}/bin/ExaChem installed, fully linked, and ran a minimal example."
 
