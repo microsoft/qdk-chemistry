@@ -674,7 +674,12 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// Then applies all Givens rotations from the loaded rotTarget register.
     ///
     /// Cost: N + R*2^bBits (Select) + (N-1) × Adder(bRot) (rotations).
-    /// Matches paper cost formula (arXiv:2502.15882v1, Step 5).
+    ///
+    /// This is above the paper's N + R*B: the SF Select is addressed by the full
+    /// bReg, so its table is padded from B+1 entries up to 2^bBits =
+    /// 2^⌈log₂(B+1)⌉. At FeMoco-54 (N=54, R=10, B=27) that is 374 vs 324
+    /// entries. Collapsing the gap needs a Select that can address a
+    /// non-power-of-two range, not a change here.
     ///
     /// Reference: arXiv:2502.15882v1, Appendix B.5; Babbush et al. (arXiv:1805.03662).
     operation ApplyGivensRotationsQROM(
