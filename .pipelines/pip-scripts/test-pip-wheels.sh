@@ -13,18 +13,6 @@ else
     PYTHON_DIR="$REPO_ROOT/python"
 fi
 
-# ExaChem/TAMM (built separately, in a preliminary Linux x86_64-only pipeline job -- see
-# .pipelines/templates/build-exachem-linux.yml -- and downloaded here as a pipeline artifact) is optional: only
-# present for the Linux x86_64 leg. Auto-detected the same way PYTHON_DIR is above, rather than via a script
-# argument, so this script needs no changes for legs that never build/download it (aarch64, macOS, Windows) --
-# the ExaChem CCSD integration tests (tests/test_exachem_ccsd_integration.py) already self-skip via
-# shutil.which("ExaChem") when it is not on PATH.
-if [ -d "/workspace/qdk-chemistry/exachem_install" ]; then
-    EXACHEM_INSTALL_DIR="/workspace/qdk-chemistry/exachem_install"
-else
-    EXACHEM_INSTALL_DIR=""
-fi
-
 export DEBIAN_FRONTEND=noninteractive
 
 if [ "$MAC_BUILD" == "OFF" ]; then
@@ -144,14 +132,17 @@ python3 -m pip install --dry-run --ignore-installed --quiet \
 # Disable telemetry during testing
 export QSHARP_PYTHON_TELEMETRY=false
 
-# ExaChem's binary/libs are only needed here, for the ExaChem CCSD integration test's shutil.which("ExaChem")
-# lookup -- scoped to just this pytest invocation (matching the same scoping decision already made in GHA's
-# build-and-test.yaml) rather than exported earlier, so nothing else in this script (pip install, Component
-# Governance's pip report, ...) is affected by it.
-if [ -n "$EXACHEM_INSTALL_DIR" ]; then
+# ExaChem/TAMM (built separately, in a preliminary .pipelines/templates/build-exachem-linux.yml job and
+# downloaded here as a pipeline artifact) is optional: only present for the Linux x86_64 leg.
+if [ -d "/workspace/qdk-chemistry/exachem_install" ]; then
+    EXACHEM_INSTALL_DIR="/workspace/qdk-chemistry/exachem_install"
+
+    # ExaChem's binary/libs are only needed here, for the ExaChem CCSD integration test's shutil.which("ExaChem")
+    # lookup -- scoped to just this pytest invocation so nothing else in this script is affected by it.
     export PATH="${EXACHEM_INSTALL_DIR}/bin:${PATH}"
     export LD_LIBRARY_PATH="${EXACHEM_INSTALL_DIR}/lib:${EXACHEM_INSTALL_DIR}/lib64:${LD_LIBRARY_PATH:-}"
 fi
+
 
 # Run pytest suite
 echo '=== Running pytest suite ==='
