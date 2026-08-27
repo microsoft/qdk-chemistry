@@ -143,14 +143,24 @@ class JobStatus:
 class RemoteBackend(ABC):
     """Abstract base class for remote execution backends.
 
-    Backends must implement:
+    Backends must implement these core operations:
 
     - **connect** / **disconnect**: lifecycle management
-    - **upload** / **download**: file transfer to/from the remote system
+    - **upload** / **download**: default file transfer to/from the remote system
     - **_submit**: launch a job asynchronously (returns job_id + state)
     - **check**: poll job status
     - **fetch**: download and deserialize results
+
+    Backends may optionally implement:
+
+    - **cancel**: cancel a running or queued job
     - **cleanup_job**: remove artifacts for a terminal job
+
+    :meth:`upload` and :meth:`download` are the normal transport for serialized
+    job files. A backend with access to a cache shared by the client and compute
+    node may use it instead for cache-backed artifacts, avoiding redundant file
+    transfers. Files unavailable through that cache still use the default
+    transport.
 
     The remote node executes ``python -m qdk_chemistry.remote.worker`` which handles
     input deserialization, algorithm execution, caching, and output
@@ -236,6 +246,10 @@ class RemoteBackend(ABC):
     def upload(self, local_path: str | Path, remote_path: str) -> None:
         """Upload a file from local system to remote system.
 
+        Backend implementations normally call this while staging the files
+        produced by input serialization. Cache-backed files may be omitted
+        when the compute node can read them from a shared cache.
+
         Args:
             local_path: Path to the local file.
             remote_path: Destination path on the remote system.
@@ -245,6 +259,9 @@ class RemoteBackend(ABC):
     @abstractmethod
     def download(self, remote_path: str, local_path: str | Path) -> None:
         """Download a file from remote system to local system.
+
+        Backend implementations normally call this from :meth:`fetch` for
+        serialized outputs that were not retrieved through a shared cache.
 
         Args:
             remote_path: Path to the file on the remote system.
@@ -371,8 +388,9 @@ class RemoteBackend(ABC):
 
         return job
 
+    @abstractmethod
     def _submit(self, payload: dict) -> tuple[str, dict]:
-        """Backend-specific async submission (override in subclasses).
+        """Backend-specific async submission.
 
         Args:
             payload: Execution request.
@@ -387,6 +405,7 @@ class RemoteBackend(ABC):
         """
         raise NotImplementedError(f"Backend '{self.name}' does not support async submission")
 
+    @abstractmethod
     def check(self, backend_state: dict) -> JobStatus:
         """Query the current status of a previously submitted job.
 
@@ -402,12 +421,16 @@ class RemoteBackend(ABC):
     def cancel(self, backend_state: dict) -> None:
         """Cancel a running or queued job.
 
+        This operation is optional. The default implementation raises
+        :class:`NotImplementedError`.
+
         Args:
             backend_state: The opaque state dict produced by ``_submit()``.
 
         """
         raise NotImplementedError(f"Backend '{self.name}' does not support cancellation")
 
+    @abstractmethod
     def fetch(
         self,
         backend_state: dict,
@@ -431,9 +454,9 @@ class RemoteBackend(ABC):
     def cleanup_job(self, backend_state: dict) -> None:
         """Remove artifacts owned by a terminal job.
 
-        Implementations must make repeated calls safe and must not remove
-        shared backend work directories. Job artifacts are retained until a
-        caller invokes this method through job cleanup.
+        This operation is optional. Implementations must make repeated calls
+        safe and must not remove shared backend work directories. The default
+        implementation raises :class:`NotImplementedError`.
 
         Args:
             backend_state: The opaque state dict produced by ``_submit()``.
