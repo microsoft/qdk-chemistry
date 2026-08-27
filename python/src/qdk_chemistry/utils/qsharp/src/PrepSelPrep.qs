@@ -97,8 +97,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     /// it produces — alias sampling, for instance, leaves `2μ + 1` qubits of garbage
     /// entangled with a `numSelectQubits`-wide index. Handing that garbage to SELECT would
     /// make it control on qubits that carry no index information.
-    ///
-    /// The garbage never has to be cleared here: `within/apply` runs `Adjoint prepareOp`,
+    /// Both the garbage ancillas and select ancillas are cleared by the `Adjoint prepareOp`,
     /// which uncomputes the whole register back to |0⟩.
     operation PrepSelPrep(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
