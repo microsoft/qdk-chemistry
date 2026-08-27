@@ -178,19 +178,16 @@ struct Shell {
   int get_angular_momentum() const { return static_cast<int>(orbital_type); }
 
   /**
-   * @brief Convert this shell to its JSON representation
-   * @return JSON containing orbital type and primitive arrays
+   * @brief Serialize this shell.
+   * @param include_radial_powers Whether to include ECP radial powers
    */
-  nlohmann::json to_json() const;
+  nlohmann::json to_json(bool include_radial_powers = false) const;
 
   /**
-   * @brief Build a shell from its JSON representation
-   *
-   * @param json Shell JSON as produced by @ref to_json
-   * @param atom_index Owning atom, which the JSON itself does not carry
-   * @param allow_radial_powers Whether ECP radial powers may be present
-   * @return Deserialized shell
-   * @throws std::invalid_argument if radial powers are present but not allowed
+   * @brief Deserialize a shell.
+   * @param json Serialized shell data
+   * @param atom_index Index of the atom on which the shell is centered
+   * @param allow_radial_powers Whether ECP radial powers are permitted
    */
   static Shell from_json(const nlohmann::json& json, size_t atom_index,
                          bool allow_radial_powers = false);

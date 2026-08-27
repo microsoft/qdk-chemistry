@@ -1686,7 +1686,7 @@ nlohmann::json BasisSet::to_json() const {
         atom_json["ecp_shells"] = nlohmann::json::array();
 
         for (const auto& ecp_shell : atom_ecp_shells) {
-          atom_json["ecp_shells"].push_back(ecp_shell.to_json());
+          atom_json["ecp_shells"].push_back(ecp_shell.to_json(true));
         }
       }
 

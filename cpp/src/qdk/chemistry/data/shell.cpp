@@ -62,14 +62,14 @@ Shell::Shell(size_t atom_idx, OrbitalType orb_type,
   std::copy(rpow_list.begin(), rpow_list.end(), rpowers.data());
 }
 
-nlohmann::json Shell::to_json() const {
+nlohmann::json Shell::to_json(const bool include_radial_powers) const {
   nlohmann::json json;
   json["orbital_type"] = orbital_type_to_string(orbital_type);
   json["exponents"] = std::vector<double>(exponents.data(),
                                           exponents.data() + exponents.size());
   json["coefficients"] = std::vector<double>(
       coefficients.data(), coefficients.data() + coefficients.size());
-  if (has_radial_powers()) {
+  if (include_radial_powers && has_radial_powers()) {
     json["rpowers"] =
         std::vector<int>(rpowers.data(), rpowers.data() + rpowers.size());
   }
@@ -78,19 +78,19 @@ nlohmann::json Shell::to_json() const {
 
 Shell Shell::from_json(const nlohmann::json& json, const size_t atom_index,
                        const bool allow_radial_powers) {
-  auto exponent_list = json.at("exponents").get<std::vector<double>>();
-  auto coefficient_list = json.at("coefficients").get<std::vector<double>>();
-  auto type =
+  const auto type =
       string_to_orbital_type(json.at("orbital_type").get<std::string>());
+  const auto exponents = json.at("exponents").get<std::vector<double>>();
+  const auto coefficients = json.at("coefficients").get<std::vector<double>>();
   if (json.contains("rpowers")) {
     if (!allow_radial_powers) {
       throw std::invalid_argument(
           "Unexpected radial powers in a regular Gaussian shell");
     }
-    return Shell(atom_index, type, exponent_list, coefficient_list,
+    return Shell(atom_index, type, exponents, coefficients,
                  json.at("rpowers").get<std::vector<int>>());
   }
-  return Shell(atom_index, type, exponent_list, coefficient_list);
+  return Shell(atom_index, type, exponents, coefficients);
 }
 
 void sort_shells_inplace(std::vector<Shell>& shells) {
