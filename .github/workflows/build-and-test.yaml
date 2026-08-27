@@ -203,10 +203,6 @@ jobs:
         echo "LD_LIBRARY_PATH=${{ env.CPP_DEPS_PREFIX }}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
         echo "PATH=${{ env.CPP_DEPS_PREFIX }}/bin:${PATH}" >> $GITHUB_ENV
 
-    # TODO: ExaChem currently builds (and, after the first run, restores from cache) on every Linux job regardless
-    # of whether slow tests will actually run, to make initial CI bring-up/debugging easier. Once this is verified
-    # working end-to-end, gate it behind the same condition used for QDK_CHEMISTRY_RUN_SLOW_TESTS below (only build
-    # when slow tests are requested) to avoid the cache-miss cost on every regular PR.
     - name: Install C++ dependencies and ExaChem (Linux)
       if: steps.cache-cpp-deps.outputs.cache-hit != 'true' # Run the dependency build if we don't find the right hash in the cache
       env:
