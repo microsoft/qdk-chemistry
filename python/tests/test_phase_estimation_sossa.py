@@ -748,16 +748,14 @@ class TestSOSSAQPEIntegration:
         result = qpe.run(qubit_hamiltonian=sossa_op, state_preparation=state_prep)
 
         # (1) The register must land on the bin the exact eigenvalue predicts.
+        # The schedule applies W^(numQueries - 2t), so the register encodes *twice* the
+        # walk phase; ``phase_fraction`` is that doubled phase, folded into [0, 1/2] by the
+        # branch resolution in ``_post_process_phase_estimation``. Fold the exact value the
+        # same way so the two are on one scale.
         exact_phase = _energy_to_qpe_phase(gs_energy, lambda_sos)
-        exact_doubled_phase = (2 * exact_phase) % 1.0
-        measured_doubled_phase = result.metadata["measured_phase_fraction"]
-        bin_error = (
-            min(
-                abs(measured_doubled_phase - exact_doubled_phase),
-                1.0 - abs(measured_doubled_phase - exact_doubled_phase),
-            )
-            * num_bins
-        )
+        exact_doubled_phase = 2.0 * min(exact_phase, 0.5 - exact_phase)
+        measured_doubled_phase = result.phase_fraction
+        bin_error = abs(measured_doubled_phase - exact_doubled_phase) * num_bins
         assert bin_error <= 1.0, (
             f"Measured 2*phi={measured_doubled_phase:.6f} is {bin_error:.2f} bins away from the "
             f"exact {exact_doubled_phase:.6f} (num_bins={num_bins})."

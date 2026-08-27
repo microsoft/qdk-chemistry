@@ -264,7 +264,7 @@ class TestMisconfigurationIsSurfaced:
 
     def test_a_plain_block_encoding_is_rejected(self):
         """The schedule drops one reflection, so a bare LCU has nothing to drop."""
-        with pytest.raises(ValueError, match="Requires a LCU walk unitary representation"):
+        with pytest.raises(ValueError, match="Requires a LCU or SOSSA walk unitary representation"):
             _run_builder(_make_builder(unitary_builder=LCUBuilder(quantum_walk=False)))
 
     @pytest.mark.parametrize(

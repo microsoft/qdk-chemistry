@@ -345,8 +345,17 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
 
         """
         mapper = self._create_nested("controlled_circuit_mapper")
-        required = ("build_walk_op", "num_ancilla_qubits", "num_shared_ancilla_qubits")
-        missing = [name for name in required if not hasattr(mapper, name)]
+        # Each capability is probed as a literal so a rename of the mapper method is caught by
+        # test_mapper_capability_literals; a loop over a tuple of names hides them from that scan.
+        missing = [
+            name
+            for name, provided in (
+                ("build_walk_op", hasattr(mapper, "build_walk_op")),
+                ("num_ancilla_qubits", hasattr(mapper, "num_ancilla_qubits")),
+                ("num_shared_ancilla_qubits", hasattr(mapper, "num_shared_ancilla_qubits")),
+            )
+            if not provided
+        ]
         if missing:
             raise ValueError(
                 f"A SOSSA walk needs a controlled_circuit_mapper exposing {missing}; "
