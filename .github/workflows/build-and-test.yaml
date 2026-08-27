@@ -355,6 +355,18 @@ jobs:
         # Register the Jupyter kernel for notebook tests
         python -m ipykernel install --user --name python3 --display-name "Python 3"
 
+    # test-with-qdk-branch reuses this exact build (Linux/x86-64-v3/Python 3.13, the only leg it hardcodes)
+    # instead of independently repeating the same C++ deps + C++ + Python build itself. Gated on the same
+    # workflow_dispatch input that triggers test-with-qdk-branch, so regular push/PR runs (which never consume
+    # this artifact) don't pay for the extra upload.
+    - name: Upload install dir (for test-with-qdk-branch)
+      if: matrix.os-name == 'Linux' && matrix.python-version == '3.13' && github.event_name == 'workflow_dispatch' && inputs.test_with_qdk_branch
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: qdk-chemistry-install-linux-x86-64-v3-py3.13
+        path: ${{ github.workspace }}/install
+        retention-days: 1
+
     - name: Run Python tests
       env:
         OMP_NUM_THREADS: ${{ matrix.python-test-threads }}
@@ -747,16 +759,12 @@ jobs:
 
   test-with-qdk-branch:
     name: Full Test with QDK Branch
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_with_qdk_branch }}
+    needs: coverage
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_with_qdk_branch && needs.coverage.result == 'success' }}
     runs-on: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly]
     env:
-      BUILD_DIR: cpp/build
       QSHARP_PYTHON_TELEMETRY: 'false'
       CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
-      CPP_DEPS_PREFIX: ${{ github.workspace }}/cpp_deps_install
-      CTEST_OUTPUT_ON_FAILURE: 1
-      CMAKE_BUILD_PARALLEL_LEVEL: 32
-      QDK_UARCH: x86-64-v3
       QDK_BRANCH: main
     steps:
     - name: Checkout repository
@@ -776,7 +784,9 @@ jobs:
         python-version: '3.13'
         cache: pip
 
-    - name: Install Linux system packages
+    # This job does not build C++/Python itself -- these packages are only needed to satisfy the built
+    # qdk_chemistry extension's runtime shared-library dependencies (OpenBLAS/HDF5/libgfortran).
+    - name: Install Linux runtime packages
       run: |
         MAX_WAIT_SECONDS=300
         WAIT_INTERVAL_SECONDS=5
@@ -793,65 +803,20 @@ jobs:
 
         sudo apt-get update
         sudo apt-get install -y \
-          build-essential \
-          ninja-build \
-          cmake \
-          libeigen3-dev \
-          libboost-all-dev \
           libhdf5-dev \
           libopenblas-dev \
-          libgfortran5 \
-          pkg-config
+          libgfortran5
 
-    - name: Cache C++ dependency install
-      id: cache-cpp-deps
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+    # Reuses the coverage job's own Linux/x86-64-v3/Python-3.13 build (dependencies + C++ + Python install)
+    # Adds the "install qdk from branch" override and re-runs the Python test suite against it.
+    - name: Download coverage build (Linux x86-64-v3, Python 3.13)
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
-        path: |
-          ${{ env.CPP_DEPS_PREFIX }}
-        key: >-
-          cpp-deps-Linux-x86-64-v3-
-          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.devcontainer/scripts/install_cpp_dependencies.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh') }}
+        name: qdk-chemistry-install-linux-x86-64-v3-py3.13
+        path: ${{ github.workspace }}/install
 
-    - name: Add C++ deps prefix to CMake search path
+    - name: Test pre-installed qdk_chemistry package
       run: |
-        echo "CMAKE_PREFIX_PATH=${{ env.CPP_DEPS_PREFIX }}:${CMAKE_PREFIX_PATH}" >> $GITHUB_ENV
-        echo "LD_LIBRARY_PATH=${{ env.CPP_DEPS_PREFIX }}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
-        echo "PATH=${{ env.CPP_DEPS_PREFIX }}/bin:${PATH}" >> $GITHUB_ENV
-
-    - name: Install C++ dependencies
-      if: steps.cache-cpp-deps.outputs.cache-hit != 'true'
-      env:
-        INSTALL_PREFIX: ${{ env.CPP_DEPS_PREFIX }}
-        BUILD_DIR: ${{ github.workspace }}/cpp_deps_build
-        KEEP_BUILD_DIR: 1
-      run: |
-        bash ${{ github.workspace }}/.devcontainer/scripts/install_cpp_dependencies.sh \
-          ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json \
-          ${{ github.workspace }}/external/macis/manifest/cgmanifest.json
-
-    - name: Configure and build C++
-      run: |
-        cmake -S cpp -B "$BUILD_DIR" \
-          -GNinja \
-          -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/.pipelines/toolchains/linux.cmake" \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_INSTALL_PREFIX="$CMAKE_INSTALL_PREFIX" \
-          -DQDK_UARCH="$QDK_UARCH" \
-          -DQDK_ENABLE_OPENMP=ON \
-          -DBUILD_TESTING=OFF
-        cmake --build "$BUILD_DIR"
-
-    - name: Install C++ library
-      run: cmake --install "$BUILD_DIR" --prefix "$CMAKE_INSTALL_PREFIX"
-
-    - name: Install Python package
-      working-directory: python
-      env:
-        CMAKE_BUILD_TYPE: Release
-      run: |
-        rm -r ${{ github.workspace }}/install/lib/cmake/qdk
-        python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[test,docs]
         python -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
         python -m ipykernel install --user --name python3 --display-name "Python 3"
 
