@@ -44,6 +44,22 @@ TEST_F(SymmetryShiftTest, DefaultTruncationThresholdIsZero) {
 }
 
 /**
+ * @brief df_truncation_threshold is compared against |eigenvalue|, so a
+ * negative value can never truncate anything and is silently meaningless
+ * without a constraint. Its BoundConstraint must reject it.
+ */
+TEST_F(SymmetryShiftTest, NegativeTruncationThresholdIsRejected) {
+  auto shifter = SymmetryShifterFactory::create("fermionic_low_rank");
+
+  EXPECT_THROW(shifter->settings().set("df_truncation_threshold", -1.0e-8),
+               std::invalid_argument);
+
+  // The boundary value and ordinary positive values remain valid.
+  EXPECT_NO_THROW(shifter->settings().set("df_truncation_threshold", 0.0));
+  EXPECT_NO_THROW(shifter->settings().set("df_truncation_threshold", 1.0e-8));
+}
+
+/**
  * @brief SymmetryShifterFactory must be listed in the
  * REGISTER_FACTORY_SETTINGS_INIT block of algorithm_defaults.cpp; an omission
  * there fails silently, leaving nested AlgorithmRefs without defaults.

@@ -83,7 +83,7 @@ void add_two_body_correction(Eigen::VectorXd& g, Eigen::Index norb, double mu2,
 
 std::shared_ptr<data::Hamiltonian> rebuild_shifted_hamiltonian(
     const data::Hamiltonian& original, const SymmetryShift& shift,
-    unsigned int input_num_electrons) {
+    unsigned int num_electrons) {
   using qdk::chemistry::data::CanonicalFourCenterHamiltonianContainer;
   using qdk::chemistry::data::Hamiltonian;
 
@@ -113,10 +113,10 @@ std::shared_ptr<data::Hamiltonian> rebuild_shifted_hamiltonian(
   const double mu1 = shift.mu1;
   const double mu2 = shift.mu2;
   const Eigen::MatrixXd& xi = shift.xi;
-  const double num_electrons = static_cast<double>(input_num_electrons);
+  const double ne = static_cast<double>(num_electrons);
 
   // One-body part: h_tilde_ij = h_ij + (Ne-1)*xi_ij - (mu1+mu2)*delta_ij.
-  Eigen::MatrixXd h_tilde = h_alpha + (num_electrons - 1.0) * xi;
+  Eigen::MatrixXd h_tilde = h_alpha + (ne - 1.0) * xi;
   h_tilde.diagonal().array() -= (mu1 + mu2);
 
   // Two-body part: g_tilde = g + dg, folded in place (single source of truth
@@ -126,9 +126,8 @@ std::shared_ptr<data::Hamiltonian> rebuild_shifted_hamiltonian(
                                   xi);
 
   // Constant part of -K in the Ne-electron sector: +mu1*Ne + mu2*Ne^2.
-  const double core_energy_new = original.get_core_energy() +
-                                 mu1 * num_electrons +
-                                 mu2 * num_electrons * num_electrons;
+  const double core_energy_new =
+      original.get_core_energy() + mu1 * ne + mu2 * ne * ne;
 
   const Eigen::MatrixXd inactive_fock =
       original.has_inactive_fock_matrix()

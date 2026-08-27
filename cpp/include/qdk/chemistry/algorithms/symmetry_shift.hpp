@@ -69,7 +69,7 @@ struct SymmetryShift {
  *
  * @param original The Hamiltonian being shifted. Must be restricted.
  * @param shift The symmetry shift parameters (mu1, mu2, xi) to apply.
- * @param input_num_electrons Target number of active electrons (Ne); the
+ * @param num_electrons Target number of active electrons (Ne); the
  *        invariance guarantee only holds for an integer electron count.
  * @return The shifted Hamiltonian.
  *
@@ -78,7 +78,7 @@ struct SymmetryShift {
  */
 std::shared_ptr<data::Hamiltonian> rebuild_shifted_hamiltonian(
     const data::Hamiltonian& original, const SymmetryShift& shift,
-    unsigned int input_num_electrons);
+    unsigned int num_electrons);
 
 /**
  * @class SymmetryShifter

@@ -6,6 +6,7 @@
 
 #include <Eigen/Dense>
 #include <algorithm>
+#include <limits>
 #include <memory>
 #include <qdk/chemistry/algorithms/symmetry_shift.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
@@ -156,8 +157,9 @@ SymmetryShift compute_fermionic_low_rank_shift(
  *
  * Default settings:
  * - df_truncation_threshold: 0.0 - drop double-factorization fragments whose
- *   eigenvalue magnitude is below this threshold. The default of 0.0 performs
- *   no truncation (exact double factorization).
+ *   eigenvalue magnitude is below this threshold. Must be non-negative
+ *   (the threshold is compared against |eigenvalue|). The default of 0.0
+ *   performs no truncation (exact double factorization).
  *
  * @see qdk::chemistry::algorithms::microsoft::FermionicLowRankShifter
  */
@@ -168,7 +170,13 @@ class FermionicLowRankShifterSettings
    * @brief Constructor that initializes the default settings.
    */
   FermionicLowRankShifterSettings() {
-    set_default("df_truncation_threshold", 0.0);
+    set_default<double>(
+        "df_truncation_threshold", 0.0,
+        "Drop double-factorization fragments whose supermatrix eigenvalue "
+        "magnitude is below this threshold. Must be non-negative; 0.0 "
+        "performs no truncation (exact double factorization).",
+        qdk::chemistry::data::BoundConstraint<double>{
+            0.0, std::numeric_limits<double>::max()});
   }
 };
 
