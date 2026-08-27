@@ -302,6 +302,22 @@ class SOSSAMapper(ControlledCircuitMapper):
         num_spin_qubits = 2  # spinDQ + spinSF, matches Q# SOSSAWalk.qs
         return regs["num_outer_qubits"] + regs["num_inner_qubits"] + num_spin_qubits + regs["num_phase_gradient_qubits"]
 
+    def num_shared_ancilla_qubits(self, container: SOSSAWalkContainer) -> int:
+        """The phase gradient qubits shared across queries rather than reflected about.
+
+        These sit at the tail of the walk layout, past the ancillas the walk reflects
+        about. An external algorithm that allocates the register itself needs the split,
+        because the count from :meth:`num_ancilla_qubits` covers both parts.
+
+        Args:
+            container: The SOSSA walk container describing the block encoding.
+
+        Returns:
+            The number of persistent phase gradient qubits, zero when none are needed.
+
+        """
+        return self._compute_register_sizes(container)["num_phase_gradient_qubits"]
+
     def build_walk_op(
         self,
         unitary: UnitaryRepresentation,
