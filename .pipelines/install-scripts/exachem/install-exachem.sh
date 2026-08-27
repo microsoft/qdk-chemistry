@@ -259,16 +259,30 @@ cmake --build "${BUILD_ROOT}/exachem/build" -j "${JOBS}"
 cmake --install "${BUILD_ROOT}/exachem/build"
 
 # --------------------------------------------------------------------------------------------------------------------
-# Smoke test: binary exists and every shared library resolves.
+# Smoke test: binary exists, every shared library resolves, and it actually runs a minimal calculation.
 # --------------------------------------------------------------------------------------------------------------------
 test -x "${INSTALL_PREFIX}/bin/ExaChem"
+echo "==> ldd ${INSTALL_PREFIX}/bin/ExaChem:"
+ldd "${INSTALL_PREFIX}/bin/ExaChem"
 missing="$(ldd "${INSTALL_PREFIX}/bin/ExaChem" | grep -i 'not found' || true)"
 if [ -n "${missing}" ]; then
   echo "ERROR: unresolved shared libraries:"
   echo "${missing}"
   exit 1
 fi
-echo "==> Smoke test OK: ${INSTALL_PREFIX}/bin/ExaChem installed and fully linked."
+
+# Minimal end-to-end run: a 6-site Hubbard SCF+CCSD input (ExaChem's own CI uses the same file, from the source
+# tree already cloned above at ${BUILD_ROOT}/exachem) -- small enough to run in seconds, but exercises the real
+# GA/TAMM/CCSD path, not just linking. GA_RUNTIME=MPI_PROGRESS_RANK (the default above) needs >= 2 MPI ranks.
+# OMPI_ALLOW_RUN_AS_ROOT*: this script may run inside a root Docker container (e.g. the ADO pipeline).
+SMOKE_TEST_INPUT="${BUILD_ROOT}/exachem/inputs/ci/hub_1d_6s.json"
+SMOKE_TEST_DIR="$(mktemp -d)"
+echo "==> Running minimal ExaChem example: ${SMOKE_TEST_INPUT}"
+( cd "${SMOKE_TEST_DIR}" && OMP_NUM_THREADS=1 OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 \
+    mpirun -n 2 "${INSTALL_PREFIX}/bin/ExaChem" "${SMOKE_TEST_INPUT}" )
+rm -rf "${SMOKE_TEST_DIR}"
+
+echo "==> Smoke test OK: ${INSTALL_PREFIX}/bin/ExaChem installed, fully linked, and ran a minimal example."
 
 if [ "${KEEP_BUILD_DIR}" != "1" ]; then
   rm -rf "${BUILD_ROOT}"
