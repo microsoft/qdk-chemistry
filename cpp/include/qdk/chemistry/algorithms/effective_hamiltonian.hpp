@@ -3,11 +3,12 @@
 // license information.
 
 #pragma once
-#include <functional>
+
 #include <memory>
 #include <qdk/chemistry/algorithms/algorithm.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/settings.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <string>
 
@@ -15,82 +16,143 @@ namespace qdk::chemistry::algorithms {
 
 /**
  * @class EffectiveHamiltonianConstructor
- * @brief Abstract base class for constructing effective Hamiltonian operators
- *        from a reference wavefunction.
+ * @brief Abstract base for constructing an effective Hamiltonian.
  *
- * Unlike @ref HamiltonianConstructor, which maps @ref data::Orbitals to a bare
- * @ref data::Hamiltonian, an effective-Hamiltonian constructor maps a reference
- * @ref data::Wavefunction to a dressed @ref data::Hamiltonian. The reference
- * supplies both the orbital basis (via @ref data::Wavefunction::get_orbitals)
- * and the reduced density matrices used by density-driven similarity
- * transformations such as canonical transcorrelated F12.
+ * Given a reference wavefunction and an input Hamiltonian, a concrete
+ * implementation constructs an effective Hamiltonian in an explicitly
+ * specified target P-space.
  *
- * The output has the same shape and quartic complexity as a bare Hamiltonian,
- * so it plugs into every existing downstream solver and qubit mapper unchanged.
+ * @c p_indices holds absolute molecular-orbital indices, drawn from the same
+ * index universe as @c data::Orbitals::active_indices().
  *
- * @see data::Hamiltonian
- * @see data::Wavefunction
- * @see data::Settings
+ * The returned Hamiltonian is expressed over P and must satisfy:
+ * - its orbitals have @c active_indices() equal to @c p_indices;
+ * - its orbitals classify fully occupied orbitals of @f$Q = W \setminus P@f$
+ *   as inactive and unoccupied orbitals of Q as virtual, while preserving the
+ *   input Hamiltonian's inactive orbitals;
+ * - its inactive Fock matrix, when present, is consistent with the output
+ *   inactive orbitals and may therefore differ from the input Hamiltonian's
+ *   inactive Fock matrix;
+ * - the scalar shift from folding in Q is added to the constant (zero-body)
+ *   energy term, and the remaining Q contribution is folded into the
+ *   integrals.
+ *
+ * Input validation is opt-in. The base @ref run method does not validate its
+ * arguments; concrete implementations decide whether to call
+ * @ref _validate_inputs.
+ *
+ * Typical usage:
+ * @code
+ * auto constructor =
+ *   EffectiveHamiltonianConstructorFactory::create("algorithm_name");
+ * auto effective_hamiltonian =
+ *   constructor->run(reference, hamiltonian, p_indices);
+ * @endcode
+ *
+ * @see EffectiveHamiltonianConstructorFactory for creating instances
+ * @see data::Wavefunction for the reference wavefunction input
+ * @see data::Hamiltonian for the input and output Hamiltonians
+ * @see data::SymmetryBlockedIndexSet for the target P-space indices
  */
 class EffectiveHamiltonianConstructor
     : public Algorithm<EffectiveHamiltonianConstructor,
                        std::shared_ptr<data::Hamiltonian>,
-                       std::shared_ptr<data::Wavefunction>> {
+                       std::shared_ptr<data::Wavefunction>,
+                       std::shared_ptr<data::Hamiltonian>,
+                       std::shared_ptr<const data::SymmetryBlockedIndexSet>> {
  public:
+  /**
+   * @brief Default constructor.
+   */
   EffectiveHamiltonianConstructor() = default;
+
+  /**
+   * @brief Virtual destructor.
+   */
   virtual ~EffectiveHamiltonianConstructor() = default;
 
   /**
-   * @brief Construct an effective Hamiltonian from a reference wavefunction.
+   * @brief Construct the effective Hamiltonian acting on the target space P.
    *
    * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
-   * @param reference The reference wavefunction supplying orbitals and RDMs
+   * @param reference Reference wavefunction providing the reference state.
+   * @param hamiltonian Input Hamiltonian built over the whole window @f$W = P
+   * \cup Q@f$.
+   * @param p_indices Absolute molecular-orbital indices of the target space P,
+   *        which must lie within the input Hamiltonian's active orbital window.
    * \endcond
-   * @return The constructed effective Hamiltonian
-   *
-   * @throw std::runtime_error if construction fails
-   * @throw std::invalid_argument if the reference is incomplete or invalid
+   * @return The effective Hamiltonian acting on the target space P, following
+   *         the output contract documented on this class.
    * @throws qdk::chemistry::data::SettingsAreLocked if attempting to modify
-   * settings after run() is called
-   *
-   * @note Settings are automatically locked when this method is called.
+   *         settings after run() is called.
+   * @note Settings are automatically locked when this method is called and
+   *       cannot be modified during or after execution.
+   * @note This method performs no input validation of its own. Any argument
+   *       checking is the responsibility of the concrete implementation.
    */
   using Algorithm::run;
 
   /**
-   * @brief Access the algorithm's name
-   * @return The algorithm's name
+   * @brief Access the algorithm's name.
    */
-  virtual std::string name() const = 0;
+  virtual std::string name() const override = 0;
 
   /**
-   * @brief Access the algorithm's type name
-   * @return The algorithm's type name
+   * @brief Access the algorithm's type name.
    */
-  std::string type_name() const final {
+  std::string type_name() const override {
     return "effective_hamiltonian_constructor";
-  };
+  }
 
  protected:
   /**
-   * @brief Implementation of effective-Hamiltonian construction.
+   * @brief Validate the common input-space contract.
    *
-   * Automatically called by run() after settings have been locked.
+   * Concrete implementations may call this helper before performing
+   * method-specific validation or computation. Validation is opt-in; the base
+   * @ref run method does not call it automatically.
    *
-   * @param reference The reference wavefunction supplying orbitals and RDMs
-   * @return The constructed effective Hamiltonian
+   * @param reference Reference wavefunction whose active orbital space must be
+   *        a subset of the input Hamiltonian's active orbital window.
+   * @param hamiltonian Input Hamiltonian defining the outer orbital window.
+   * @param p_indices Target P-space as absolute molecular-orbital indices,
+   *        which must be a subset of the input Hamiltonian's active orbital
+   *        window.
+   * @throws std::invalid_argument if an input is null, the Hamiltonian and
+   *         wavefunction use incompatible orbital bases or spin restrictions,
+   *         or the spaces do not satisfy @f$P \subseteq W_H@f$ and
+   *         @f$W_{\mathrm{ref}} \subseteq W_H@f$.
+   */
+  void _validate_inputs(
+      const std::shared_ptr<data::Wavefunction>& reference,
+      const std::shared_ptr<data::Hamiltonian>& hamiltonian,
+      const std::shared_ptr<const data::SymmetryBlockedIndexSet>& p_indices)
+      const;
+
+  /**
+   * @brief Implementation of the effective-Hamiltonian construction.
+   *
+   * Contains the actual construction logic. It is automatically called by
+   * run() after settings have been locked, and must be implemented by derived
+   * classes.
+   *
+   * @param reference Reference wavefunction providing the reference state.
+   * @param hamiltonian Input Hamiltonian built over the whole window @f$W = P
+   * \cup Q@f$.
+   * @param p_indices Absolute molecular-orbital indices of the target space P,
+   *        which must lie within the input Hamiltonian's active orbital window.
+   * @return The effective Hamiltonian acting on the target space P. It must
+   *         satisfy the output contract documented on this class.
    */
   virtual std::shared_ptr<data::Hamiltonian> _run_impl(
-      std::shared_ptr<data::Wavefunction> reference) const = 0;
+      std::shared_ptr<data::Wavefunction> reference,
+      std::shared_ptr<data::Hamiltonian> hamiltonian,
+      std::shared_ptr<const data::SymmetryBlockedIndexSet> p_indices)
+      const override = 0;
 };
 
 /**
- * @brief Factory class for creating effective-Hamiltonian constructors.
- *
- * Mirrors @ref HamiltonianConstructorFactory: maintains a registry of
- * implementations identified by string keys, created via create().
- *
- * @see EffectiveHamiltonianConstructor
+ * @brief Factory for effective-Hamiltonian constructor instances.
  */
 struct EffectiveHamiltonianConstructorFactory
     : public AlgorithmFactory<EffectiveHamiltonianConstructor,
@@ -99,7 +161,7 @@ struct EffectiveHamiltonianConstructorFactory
     return "effective_hamiltonian_constructor";
   }
   static void register_default_instances();
-  static std::string default_algorithm_name() { return "qdk_ct_f12"; }
+  static std::string default_algorithm_name() { return ""; }
 };
 
 }  // namespace qdk::chemistry::algorithms

@@ -91,8 +91,15 @@ class QubitOperator(DataClass):
 
     """
 
-    # Class attribute for filename validation
-    _data_type_name = "qubit_hamiltonian"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for qubit operators.
+
+        Returns:
+            ``"qubit_hamiltonian"``.
+
+        """
+        return "qubit_hamiltonian"
 
     # Serialization version for this class
     _serialization_version = "0.1.0"

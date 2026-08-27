@@ -5,6 +5,7 @@
 #include <H5Cpp.h>
 #include <gtest/gtest.h>
 
+#include <complex>
 #include <cstddef>
 #include <filesystem>
 #include <memory>
@@ -41,6 +42,19 @@ SBS make_trivial_blocked(std::size_t value) {
 }  // namespace qdk::chemistry::tests::test_support
 
 namespace test_support = qdk::chemistry::tests::test_support;
+
+TEST(SymmetryBlockedScalarTest, DataTypeNameIncludesScalarType) {
+  EXPECT_EQ(SymmetryBlockedScalar<std::size_t>::data_type_name(),
+            "symmetry_blocked_scalar_uint");
+  EXPECT_EQ(SymmetryBlockedScalar<double>::data_type_name(),
+            "symmetry_blocked_scalar_real");
+  EXPECT_EQ(SymmetryBlockedScalar<float>::data_type_name(),
+            "symmetry_blocked_scalar_real32");
+  EXPECT_EQ(SymmetryBlockedScalar<std::complex<double>>::data_type_name(),
+            "symmetry_blocked_scalar_complex");
+  EXPECT_EQ(SymmetryBlockedScalar<std::complex<float>>::data_type_name(),
+            "symmetry_blocked_scalar_complex32");
+}
 
 TEST(SymmetryBlockedScalarTest, SpinBlockedHoldsIndependentChannels) {
   auto scalar = test_support::make_spin_blocked(5, 3);

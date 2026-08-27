@@ -1,4 +1,4 @@
-"""Public entry point for the effective Hamiltonian constructor algorithms.
+"""Public entry point for the effective-Hamiltonian construction algorithms.
 
 This module re-exports the core :class:`EffectiveHamiltonianConstructor` and
 concrete implementations so that consumers can import them directly from
@@ -11,6 +11,8 @@ concrete implementations so that consumers can import them directly from
 # --------------------------------------------------------------------------------------------
 
 from qdk_chemistry._core._algorithms import (
-    EffectiveHamiltonianConstructor,  # noqa: F401 - re-export
-    QdkCtF12HamiltonianConstructor,  # noqa: F401 - re-export
+    EffectiveHamiltonianConstructor,
+    QdkCtF12HamiltonianConstructor,
 )
+
+__all__ = ["EffectiveHamiltonianConstructor", "QdkCtF12HamiltonianConstructor"]

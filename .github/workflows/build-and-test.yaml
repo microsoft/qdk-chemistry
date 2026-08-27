@@ -37,33 +37,6 @@ permissions:
   statuses: write
 
 jobs:
-  check-up-to-date:
-    name: Check if branch is up to date with main
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v6
-      with:
-        fetch-depth: 0
-        submodules: recursive
-
-    - name: Check if branch is up to date with main (Pull Request)
-      run: |
-        # Ensure origin/main is present
-        git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
-
-        # Check if the current commit is ahead of main
-        # Kills pipeline if branch is not up to date with main
-        # For pull requests, we use github.event.pull_request.sha to get the commit SHA,
-        # as GitHub treats the current commit as one that would be produced by merging into main
-        if ! git merge-base --is-ancestor origin/main "${{ github.event.pull_request.head.sha }}"; then
-          echo "This branch is not up to date with main. Please merge the latest changes from main into your branch to continue."
-          exit 1
-        fi
-
-        echo "Branch is up to date, starting Build and Test workflow."
-
   coverage:
     name: ${{ matrix.os-name }} Build, Test, and Coverage Analysis
     runs-on: ${{ matrix.runner }}
@@ -71,8 +44,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-        # Python 3.10 temporarily disabled: stable qdk[qre] requires cirq-core>=1.6.1,
-        # which needs Python >= 3.11, so the qre extra cannot resolve on 3.10.
+        - os-name: Linux
+          runner: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly, 'JobId=qdk_chemistry-linux-py3.10-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
+          build-parallel: 32
+          uarch: x86-64-v3
+          python-version: '3.10'
+          cpp-test-threads: 2
+          python-test-threads: 2
         - os-name: Linux
           runner: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly, 'JobId=qdk_chemistry-linux-py3.13-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
           build-parallel: 32
@@ -127,7 +105,7 @@ jobs:
         df -h "${{ github.workspace }}"
 
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         submodules: recursive
 
@@ -138,7 +116,7 @@ jobs:
         echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
     - name: Set up Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
       with:
         python-version: ${{ matrix.python-version }}
         cache: pip
@@ -198,7 +176,7 @@ jobs:
     - name: Cache Doxygen (macOS)
       if: matrix.os-name == 'macOS'
       id: cache-doxygen
-      uses: actions/cache@v5
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           ${{ github.workspace }}/doxygen_install
@@ -230,7 +208,7 @@ jobs:
     - name: Cache C++ dependency install # Checks if manifest files or build script have changed to rebuild dependencies
       id: cache-cpp-deps
       if: ${{ !inputs.rebuild_dep_cache }}
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           ${{ env.CPP_DEPS_PREFIX }}
@@ -257,7 +235,7 @@ jobs:
 
     - name: Save C++ dependency cache
       if: steps.cache-cpp-deps.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v5
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           ${{ env.CPP_DEPS_PREFIX }}
@@ -583,7 +561,7 @@ jobs:
       DEPS_CACHE_VERSION: v2
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         submodules: recursive
 
@@ -597,7 +575,7 @@ jobs:
         "cxx-path=$env:CXX_PATH"   >> $env:GITHUB_OUTPUT
 
     - name: Set up Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
       with:
         python-version: '3.13'
 
@@ -617,7 +595,7 @@ jobs:
     - name: Restore vcpkg cache
       id: cache-vcpkg
       if: ${{ !inputs.rebuild_dep_cache }}
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: vcpkg_installed
         key: windows-vcpkg-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', '.pipelines/install-scripts/install-cpp-deps-windows.ps1') }}
@@ -625,7 +603,7 @@ jobs:
     - name: Restore deps-install cache
       id: cache-deps
       if: ${{ !inputs.rebuild_dep_cache }}
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: deps-install-${{ matrix.compiler }}
         key: >-
@@ -644,14 +622,14 @@ jobs:
 
     - name: Save vcpkg cache
       if: steps.cache-vcpkg.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v5
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: vcpkg_installed
         key: windows-vcpkg-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', '.pipelines/install-scripts/install-cpp-deps-windows.ps1') }}
 
     - name: Save deps-install cache
       if: steps.cache-deps.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v5
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: deps-install-${{ matrix.compiler }}
         key: >-
@@ -778,7 +756,7 @@ jobs:
         sudo apt-get clean || true
 
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         submodules: recursive
 
@@ -789,7 +767,7 @@ jobs:
         echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
     - name: Set up Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
       with:
         python-version: '3.13'
         cache: pip
@@ -823,7 +801,7 @@ jobs:
 
     - name: Cache C++ dependency install
       id: cache-cpp-deps
-      uses: actions/cache@v5
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           ${{ env.CPP_DEPS_PREFIX }}
@@ -877,8 +855,7 @@ jobs:
       run: |
         git clone --depth 1 --branch "${QDK_BRANCH}" https://github.com/microsoft/qdk.git "${{ runner.temp }}/qdk"
         echo "QDK commit: $(git -C "${{ runner.temp }}/qdk" rev-parse HEAD)"
-        pip install --force-reinstall "${{ runner.temp }}/qdk/source/widgets" "${{ runner.temp }}/qdk/source/jupyterlab"
-        pip install --force-reinstall "${{ runner.temp }}/qdk/source/qdk_package"
+        pip install --force-reinstall --no-deps "${{ runner.temp }}/qdk/source/qdk_package"
         echo "Installed qdk from branch: ${QDK_BRANCH}"
         python -m pip show qdk
 
@@ -897,7 +874,7 @@ jobs:
 
     - name: Upload test results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: qdk-branch-test-results
         path: test-results/

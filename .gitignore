@@ -1,3 +1,6 @@
+# Operating system metadata
+.DS_Store
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -235,7 +238,6 @@ python/VERSION
 
 # GHCP
 .github/copilot-instructions.md
-.github/skills/
 
 # Claude
 .claude
