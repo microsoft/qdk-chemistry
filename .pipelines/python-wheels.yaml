@@ -198,7 +198,8 @@ extends:
             maxParallel: 5
           displayName: Build ${{ target.march }} ${{ target.os }} wheels
           variables:
-            LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
+            # Must stay a literal value: ADO's variables: block doesn't expand $VAR.
+            LD_LIBRARY_PATH: /usr/local/lib
           templateContext:
             ${{ if eq(target.name, 'linux_x86_64') }}:
               inputs:

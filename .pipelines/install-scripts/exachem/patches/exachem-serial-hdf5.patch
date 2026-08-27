@@ -12,7 +12,10 @@
 #  2) scf_outputs.cpp's read/write_scf_mat call get_hdf5_dt<T>() + HDF5 H5* APIs,
 #     which tamm/tamm_io.hpp provides ONLY under `#if defined(USE_HDF5)`. With
 #     USE_HDF5=OFF they vanish, so we supply a file-local <hdf5.h> include +
-#     get_hdf5_dt<T>() under `#if defined(USE_SERIAL_IO)`.
+#     get_hdf5_dt<T>() under `#if defined(USE_SERIAL_IO)`. Only int/float/double are
+#     handled (SCFIO<T> is only ever explicitly instantiated for T=double); an
+#     unsupported T fails the build via static_assert instead of silently mapping to
+#     the wrong HDF5 type.
 #
 # Apply: git -C <exachem-src> apply exachem-serial-hdf5.patch
 # ----------------------------------------------------------------------------------------------------------------------
@@ -84,7 +87,7 @@ index ec5faa8..2dd7954 100644
 +  if constexpr(std::is_same_v<double, T>) return H5T_NATIVE_DOUBLE;
 +  else if constexpr(std::is_same_v<float, T>) return H5T_NATIVE_FLOAT;
 +  else if constexpr(std::is_same_v<int, T>) return H5T_NATIVE_INT;
-+  else return H5T_NATIVE_DOUBLE;
++  else static_assert(!sizeof(T), "get_hdf5_dt: unsupported tensor element type");
 +}
 +#endif
  

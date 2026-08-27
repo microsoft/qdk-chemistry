@@ -11,7 +11,8 @@ set -e
 # Usage: install-blaspp.sh <install_prefix> <commit> [blas_vendor] [march] [build_shared_libs]
 #   install_prefix     - CMAKE_INSTALL_PREFIX (also searched for an existing BLAS install, e.g. OpenBLAS/BLIS).
 #   commit              - blaspp commit hash, resolved from external/macis/manifest/cgmanifest.json.
-#   blas_vendor         - BLAS++'s `-Dblas=` value: "openblas" (default) or "blis" (ADO's BLIS+LibFLAME stack).
+#   blas_vendor         - BLAS++'s `-Dblas=` value: "auto" (link-tests against an already-found BLAS), "openblas"
+#                         (default), or "blis" (ADO's BLIS+LibFLAME stack).
 #   march               - -march= value for CMAKE_CXX_FLAGS (default: x86-64-v3).
 #   build_shared_libs   - ON/OFF (default: OFF, matches its callers' static default).
 
