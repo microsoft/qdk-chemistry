@@ -274,7 +274,7 @@ class RemoteBackend(ABC):
     def submit(self, payload: dict, *, job_dir: str | Path | None = None) -> Job:
         """Submit a job and return immediately with a ``Job``.
 
-        Unlike :meth:`submit_and_wait`, this method does **not** block.
+        This method does **not** block.
         The returned ``Job`` is self-contained: it can be
         saved to disk, loaded in a different process, and used to
         ``Job.check()``, ``Job.cancel()``, or
@@ -284,7 +284,7 @@ class RemoteBackend(ABC):
         backend-specific implementation.
 
         Args:
-            payload: Execution request (same format as *submit_and_wait*).
+            payload: Execution request containing algorithm metadata and inputs.
             job_dir: Optional directory where the job file is saved
                 automatically (as ``<id>.job.json``).  If *None* the job
                 is returned in-memory only.
@@ -400,7 +400,7 @@ class RemoteBackend(ABC):
 
         Returns:
             The deserialized algorithm results (same format as the return
-            value of :meth:`submit_and_wait`).
+            value of the completed algorithm run).
 
         """
         raise NotImplementedError(f"Backend '{self.name}' does not support result fetching")

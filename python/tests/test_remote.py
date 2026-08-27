@@ -489,7 +489,7 @@ def test_worker_force_rerun_bypasses_remote_cache(tmp_path, monkeypatch):
         run_hash="testhash",
         force_rerun=True,
     )
-    monkeypatch.setattr(remote_worker, "_load_remote_cache", MagicMock(return_value=(MagicMock(), "testhash")))
+    monkeypatch.setattr(remote_worker, "_load_remote_cache", MagicMock(return_value=(MagicMock(), "testhash", True)))
     get_cached_result = MagicMock(return_value=-75.5)
     monkeypatch.setattr(remote_worker, "_get_cached_result", get_cached_result)
     algorithm = MagicMock()
