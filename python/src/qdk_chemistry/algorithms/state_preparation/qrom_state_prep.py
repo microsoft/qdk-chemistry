@@ -91,6 +91,7 @@ class QROMStatePreparation(StatePreparation):
         return Circuit(
             qsharp_op=qsharp_op,
             qsharp_factory=qsharp_factory,
+            encoding="jordan-wigner",
             num_qubits=params.numStateQubits + params.rotationBitPrecision,
             metadata=CircuitMetadata(num_phase_gradient_ancillas=params.rotationBitPrecision),
         )

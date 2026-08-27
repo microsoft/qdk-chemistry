@@ -133,7 +133,12 @@ class AliasSamplingStatePreparation(StatePreparation):
             },
         )
 
-        return Circuit(qsharp_op=qsharp_op, qsharp_factory=qsharp_factory, num_qubits=total_qubits)
+        return Circuit(
+            qsharp_op=qsharp_op,
+            qsharp_factory=qsharp_factory,
+            encoding="jordan-wigner",
+            num_qubits=total_qubits,
+        )
 
     @classmethod
     def _sampling_weights(cls, wavefunction: Wavefunction) -> tuple[list[float], int]:
