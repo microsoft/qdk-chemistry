@@ -165,10 +165,16 @@ GA_CMAKE_ARGS=(
   -DGA_RUNTIME="${GA_RUNTIME}"
   -DENABLE_SYSV=OFF
   -DENABLE_PROFILING=OFF
+  # GA's own cmake/ga-linalg.cmake (check_ga_blas_options()) hard-errors ("ENABLE_BLAS=ON but the options to
+  # specify the root of the LinAlg libraries installation are not set") whenever ENABLE_BLAS=ON and
+  # LINALG_PREFIX is unset OR does not point at an existing directory -- regardless of whether the actual
+  # library search then succeeds via other means. For GHA's OpenBLAS, LINALG_PREFIX itself is intentionally
+  # left empty (apt's OpenBLAS resolves via CMake's own default system search paths, not an explicit hint), so
+  # fall back to INSTALL_PREFIX (already created above, always an existing directory) purely to satisfy this
+  # existence check -- CMSB's own BuildGlobalArrays.cmake did exactly this too (always pointing LINALG_PREFIX at
+  # its own CMAKE_INSTALL_PREFIX for BLIS/OpenBLAS, never the real BLAS location) when it used to build GA.
+  -DLINALG_PREFIX="${LINALG_PREFIX:-${INSTALL_PREFIX}}"
 )
-if [ -n "${LINALG_PREFIX}" ]; then
-  GA_CMAKE_ARGS+=(-DLINALG_PREFIX="${LINALG_PREFIX}")
-fi
 if [ "${LINALG_VENDOR}" = "BLIS" ]; then
   # Same reasoning as COMMON_CMAKE_ARGS's own LAPACK_PREFERENCE_LIST below: BLIS has no LAPACK routines, so
   # without this GA's own LAPACK resolves to its bundled ReferenceLAPACK instead of libFLAME.
