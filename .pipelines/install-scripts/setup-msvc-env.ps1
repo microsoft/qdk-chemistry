@@ -132,6 +132,7 @@ if ($env:GITHUB_ENV) {
     $newPathEntries | ForEach-Object { Write-Host "##vso[task.prependpath]$_" }
     Write-Host "##vso[task.setvariable variable=MSVC_TOOLSET]$toolset"
     Write-Host "##vso[task.setvariable variable=CL_PATH]$cxx"
+    Write-Host "##vso[task.setvariable variable=CXX_PATH]$cxx"
     Write-Host "##vso[task.setvariable variable=VCPKG_TRIPLET]$triplet"
 }
 

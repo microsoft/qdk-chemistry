@@ -781,9 +781,6 @@ jobs:
 
   coverage-windows-arm64:
     name: ${{ matrix.compiler }} - Build & test (Windows ARM64)
-    # Same 1ES arrangement as the x86_64 job, on the ARM64 pool. The JobId is
-    # distinct from that job's so the two cannot collide: both matrices index
-    # from zero within the same workflow run.
     runs-on: [self-hosted, 1ES.Pool=1es-gh-Dpsd_v6-arm-pool, 1ES.ImageOverride=windows-2025-arm64-1espt, 'JobId=qdk_chemistry-win-arm64-${{ strategy.job-index }}-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
     timeout-minutes: 480
     permissions:
@@ -805,9 +802,6 @@ jobs:
       # this unset is what lets both the C++ and the Python builds auto-detect.
       # Bump to force a rebuild of the cached dependencies.
       DEPS_CACHE_VERSION: v2
-      # CMake 4.x errors out on projects declaring cmake_minimum_required below
-      # 3.5. Several vendored dependencies still do; this is the documented
-      # escape hatch, and it is a no-op on an image that ships CMake 3.x.
       CMAKE_POLICY_VERSION_MINIMUM: '3.5'
     steps:
     - name: Checkout repository
@@ -828,15 +822,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v6
       with:
-        # CPython ships win-arm64 builds from 3.11 onwards.
         python-version: '3.13'
-        # Must be explicit. The action defaults to the runner process
-        # architecture, which is x64 under emulation on this image, and that
-        # image's tool cache holds an x64 interpreter it will happily select.
-        # The failure is silent until the very end: the extension module is
-        # built ARM64 by the toolchain configured above, pip resolves win_amd64
-        # dependencies, and the import fails with "%1 is not a valid Win32
-        # application" after the whole build has already run.
         architecture: arm64
 
     - name: Verify the interpreter is native ARM64
@@ -911,8 +897,6 @@ jobs:
             -DepsInstallDir "${{ github.workspace }}\deps-install-${{ matrix.compiler }}"
         if ($LASTEXITCODE -ne 0) { throw "Dependency install failed ($LASTEXITCODE)" }
 
-    # Saved immediately after the install so a later timeout still leaves a warm
-    # cache for the next run — dependency builds dominate the job's runtime.
     - name: Save vcpkg cache
       if: steps.cache-vcpkg.outputs.cache-hit != 'true'
       uses: actions/cache/save@v5
@@ -964,12 +948,7 @@ jobs:
         cmake --build "cpp/build-${{ matrix.compiler }}"
         if ($LASTEXITCODE -ne 0) { throw "CMake build failed ($LASTEXITCODE)" }
 
-    # Guards the OpenBLAS ARM64 build: confirms the library reports an ARMV8
-    # kernel set rather than the generic one, and that dgetrf returns above the
-    # getf2 crossover instead of looping forever. Both failure modes are silent
-    # -- the library builds, links, and computes dgemm correctly -- so without
-    # this check a regression surfaces only as the whole test suite timing out.
-    # Costs about a minute.
+    # OpenBLAS ARM64 smoke test.
     - name: Verify OpenBLAS on ARM64
       shell: pwsh
       timeout-minutes: 15
