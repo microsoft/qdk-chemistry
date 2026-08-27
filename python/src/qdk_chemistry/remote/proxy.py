@@ -159,16 +159,29 @@ def _run_uncached(algorithm: Any, remote: Any, args: tuple, kwargs: dict) -> Any
     if remote is None:
         return algorithm.run(*args, **kwargs)
 
-    job = submit(algorithm, *args, remote=remote, **kwargs)
-    final_status = job.wait()
-    if not job.is_successful:
-        raise RuntimeError(
-            f"Remote job {job.job_id} ended with status: {final_status.status}\n"
-            f"Error: {final_status.error or 'unknown'}\nLogs:\n{final_status.logs}"
-        )
-    result = job.fetch()
-    job.cleanup()
-    return result
+    from qdk_chemistry.remote.backends import get_backend  # noqa: PLC0415
+
+    owns_backend = isinstance(remote, str)
+    if owns_backend:
+        backend = get_backend(remote)
+        backend.connect()
+    else:
+        backend = remote
+
+    try:
+        job = submit(algorithm, *args, remote=backend, **kwargs)
+        final_status = job.wait()
+        if not job.is_successful:
+            raise RuntimeError(
+                f"Remote job {job.job_id} ended with status: {final_status.status}\n"
+                f"Error: {final_status.error or 'unknown'}\nLogs:\n{final_status.logs}"
+            )
+        result = job.fetch()
+        job.cleanup()
+        return result
+    finally:
+        if owns_backend:
+            backend.disconnect()
 
 
 def run(

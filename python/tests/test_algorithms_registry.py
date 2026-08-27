@@ -128,6 +128,7 @@ def test_algorithm_wrapper_remote_cache_satisfies_local_run(tmp_path, result):
         status="succeeded",
     )
     job.fetch = MagicMock(return_value=result)
+    job.attach_backend(backend)
     backend.submit.return_value = job
 
     assert algorithm.run(cache=tmp_path, remote=backend) == result

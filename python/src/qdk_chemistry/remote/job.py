@@ -382,19 +382,27 @@ class Job:
         timeout = self.backend_config.get("timeout", DEFAULT_TIMEOUT)
         deadline = time.monotonic() + timeout
         status = JobStatus(job_id=self.job_id, status=self.status)
-        while not self.is_terminal:
-            status = self.check()
-            if status.is_terminal:
-                return status
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise TimeoutError(
-                    f"Remote job {self.job_id} did not reach a terminal state within {timeout} seconds\n"
-                    f"Last status: {status.status}\n"
-                    f"Error: {status.error or 'unknown'}\nLogs:\n{status.logs}"
-                )
-            time.sleep(min(poll_interval, remaining))
-        return status
+        backend, should_disconnect = self._get_backend()
+        if should_disconnect:
+            self.attach_backend(backend)
+        try:
+            while not self.is_terminal:
+                status = self.check()
+                if status.is_terminal:
+                    return status
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError(
+                        f"Remote job {self.job_id} did not reach a terminal state within {timeout} seconds\n"
+                        f"Last status: {status.status}\n"
+                        f"Error: {status.error or 'unknown'}\nLogs:\n{status.logs}"
+                    )
+                time.sleep(min(poll_interval, remaining))
+            return status
+        finally:
+            if should_disconnect:
+                self.detach_backend()
+                backend.disconnect()
 
     # ── Conveniences ─────────────────────────────────────────────────────
 

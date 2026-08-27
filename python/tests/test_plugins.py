@@ -417,6 +417,18 @@ def test_unified_plugin_registers_remote_backend(monkeypatch):
         def download(self, remote_path, local_path):
             """Accept a download for the test backend."""
 
+        def _submit(self, payload):
+            """Reject submission because this registration test has no worker."""
+            raise NotImplementedError
+
+        def check(self, backend_state):
+            """Reject status checks because this registration test has no worker."""
+            raise NotImplementedError
+
+        def fetch(self, backend_state, local_dir=None):
+            """Reject result fetching because this registration test has no worker."""
+            raise NotImplementedError
+
     class RemotePlugin(QdkChemistryPlugin):
         """Plugin that contributes a remote backend."""
 

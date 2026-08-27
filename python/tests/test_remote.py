@@ -758,6 +758,30 @@ class TestJob:
 
         sleep.assert_called_once_with(0.25)
 
+    def test_wait_reuses_reconstructed_backend(self, monkeypatch):
+        backend = MagicMock()
+        backend.check.side_effect = [
+            JobStatus(job_id="x", status="running"),
+            JobStatus(job_id="x", status="succeeded"),
+        ]
+        get_backend = MagicMock(return_value=backend)
+        monkeypatch.setattr(remote_backends, "get_backend", get_backend)
+        job = Job(
+            job_id="x",
+            backend="test-remote",
+            backend_config={"poll_interval": 0, "timeout": 1},
+            backend_state={"operation_id": "operation"},
+        )
+
+        status = job.wait()
+
+        assert status.status == "succeeded"
+        get_backend.assert_called_once_with("test-remote", poll_interval=0, timeout=1)
+        backend.connect.assert_called_once_with()
+        assert backend.check.call_count == 2
+        backend.disconnect.assert_called_once_with()
+        assert job._active_backend is None
+
     def test_discover_finds_jobs(self, tmp_path):
         for i in range(3):
             Job(job_id=f"j{i}", backend="local", backend_config={}, backend_state={}).save(tmp_path / f"j{i}.job.json")
@@ -981,6 +1005,15 @@ class TestBackendRegistry:
 
             def download(self, remote_path, local_path):
                 pass
+
+            def _submit(self, payload):
+                raise NotImplementedError
+
+            def check(self, backend_state):
+                raise NotImplementedError
+
+            def fetch(self, backend_state, local_dir=None):
+                raise NotImplementedError
 
         register_backend("_test_stub")(StubBackend)
 
@@ -1372,17 +1405,18 @@ class TestRunWithCache:
 
     def test_named_remote_without_cache_disconnects_owned_backend(self, monkeypatch):
         algo = self._mock_algorithm()
-        backend = MagicMock()
-        job = Job(
-            job_id="remote-job",
-            backend="test",
-            backend_config={},
-            backend_state={},
-            status="succeeded",
+        backend = MagicMock(spec=RemoteBackend)
+        backend.name = "test"
+        backend._backend_args = {"poll_interval": 0, "timeout": 1}
+        backend._submit.return_value = ("remote-job", {})
+        backend.submit.side_effect = lambda payload, job_dir=None: RemoteBackend.submit(
+            backend, payload, job_dir=job_dir
         )
-        job.fetch = MagicMock(return_value=-75.5)
-        job.cleanup = MagicMock()
-        backend.submit.return_value = job
+        backend.check.side_effect = [
+            JobStatus(job_id="remote-job", status="running"),
+            JobStatus(job_id="remote-job", status="succeeded"),
+        ]
+        backend.fetch.return_value = -75.5
         get_backend = MagicMock(return_value=backend)
         monkeypatch.setattr(remote_backends, "get_backend", get_backend)
 
@@ -1390,8 +1424,9 @@ class TestRunWithCache:
 
         get_backend.assert_called_once_with("test")
         backend.submit.assert_called_once()
-        job.fetch.assert_called_once_with()
-        job.cleanup.assert_called_once_with()
+        assert backend.check.call_count == 2
+        backend.fetch.assert_called_once_with({}, local_dir=None)
+        backend.cleanup_job.assert_called_once_with({})
         backend.connect.assert_called_once_with()
         backend.disconnect.assert_called_once_with()
 
