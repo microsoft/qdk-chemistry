@@ -135,8 +135,8 @@ class AliasSamplingStatePreparation(StatePreparation):
 
         return Circuit(qsharp_op=qsharp_op, qsharp_factory=qsharp_factory, num_qubits=total_qubits)
 
-    @staticmethod
-    def _sampling_weights(wavefunction: Wavefunction) -> tuple[list[float], int]:
+    @classmethod
+    def _sampling_weights(cls, wavefunction: Wavefunction) -> tuple[list[float], int]:
         """Return the sampling weights ``|c|^2`` for a wavefunction's amplitudes.
 
         The Q# layer normalizes these itself, so they are returned unnormalized.
@@ -152,7 +152,7 @@ class AliasSamplingStatePreparation(StatePreparation):
                 all zero.
 
         """
-        coeffs, num_index_qubits = StatePreparation.dense_state_vector(wavefunction, "Alias sampling state preparation")
+        coeffs, num_index_qubits = cls._dense_state_vector(wavefunction, "Alias sampling state preparation")
         if not np.all(np.isfinite(coeffs)):
             raise ValueError("Alias sampling state preparation requires finite coefficients.")
         if np.any(coeffs < 0.0):
