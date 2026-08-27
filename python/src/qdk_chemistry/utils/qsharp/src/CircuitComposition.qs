@@ -89,6 +89,13 @@ namespace QDKChemistry.Utils.CircuitComposition {
     ///
     /// The ancillas are restored by the `within` block before release, so the wrapper stays
     /// Adj + Ctl and the visible register is safe to reflect about |0⟩.
+    ///
+    /// Cost note: `prepareOwned` runs on every invocation, so a caller that invokes the
+    /// returned callable repeatedly (a walk step calls PREPARE and PREPARE† once each,
+    /// repeated once per phase-estimation query) pays for the preparation each time. Where
+    /// the caller already owns a persistent register of the same width, hoisting the
+    /// preparation out and using `MakeSharedAncillaOp` is cheaper; this wrapper exists for
+    /// callers whose register layout has no slot for the ancillas at all.
     operation ApplyWithOwnedAncillas(
         op : Qubit[] => Unit is Adj + Ctl,
         prepareOwned : Qubit[] => Unit is Adj + Ctl,

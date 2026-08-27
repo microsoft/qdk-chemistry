@@ -123,7 +123,7 @@ class TestOuterPrep:
         r"""Verify alias sampling prepares the SOS outer distribution, not its square root.
 
         The SOS block encoding needs amplitudes proportional to the generator one-norms
-        :math:`c_l` (Eq. 88 of Low et al. 2025), because the normalization
+        :math:`c_l` (Eqs. (7) and (9) of Low et al. 2025), because the normalization
         :math:`\Lambda = \frac{1}{2}\sum_l c_l^2` and the energy decoding
         :math:`E = \Lambda(1 + \cos 2\pi\varphi)` are both read off those amplitudes.
         One-dimensional alias sampling discretizes its input as a *probability*
@@ -404,7 +404,8 @@ class TestSelectFullFidelity:
 class TestSOSSAWalkLogicalCounts:
     """Verify logical resource counts of the SOSSA walk operator match paper formulas.
 
-    The walk operator W = Ref_{a,B} . U-adj . Ref_B . U (arXiv:2502.15882v1, Eq. 77)
+    The walk operator W = Ref_{a,B} . U-adj . Ref_B . U (defined inline above Eq. (9)
+    of :cite:`Low2025`, derived in its Appendix A 2)
     has resource costs that depend on the problem parameters (N, R, B, C) and the
     chosen sub-algorithms. These tests verify that:
 
@@ -412,7 +413,7 @@ class TestSOSSAWalkLogicalCounts:
     2. Toffoli counts scale correctly with problem size
     3. Walk power multiplies the Toffoli cost linearly
 
-    Reference: arXiv:2502.15882v1, Appendix B.7 (Table 3).
+    Reference: :cite:`Low2025`, Appendix B 7 b (Table III).
     """
 
     @pytest.mark.parametrize(

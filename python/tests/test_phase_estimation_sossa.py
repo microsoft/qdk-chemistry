@@ -4,7 +4,7 @@ Tests the full pipeline:
     FactorizedHamiltonianContainer → SOSSABuilder → UnitaryRepresentation
     → SOSSAMapper → Circuit → IQPE → energy
 
-Reference: arXiv:2502.15882v1 (Low et al. 2025)
+Reference: Low et al., Phys. Rev. X 15 (2025), :cite:`Low2025`
 """
 
 # --------------------------------------------------------------------------------------------
@@ -151,7 +151,7 @@ def _dfthc_m_matrices(basis_vectors, two_body_weights):
 
 
 def _h1_majorana(h1, basis_vectors, two_body_weights, identity_weight):
-    """Replicate ``FactorizedHamiltonianContainer::get_h1_majorana`` (Eq. 38).
+    """Replicate ``FactorizedHamiltonianContainer::get_h1_majorana`` (Eq. 36).
 
     The SOS generators are built from the *normal-ordering corrected* one-body
     matrix, not from the bare ``h1``::
@@ -168,7 +168,7 @@ def _h1_majorana(h1, basis_vectors, two_body_weights, identity_weight):
 
 
 def _sos_energy_shift(h1, basis_vectors, two_body_weights, identity_weight):
-    """Replicate ``SOSSAQubitMapper`` ``energy_shift`` (Eq. 32), with zero core/BLISS.
+    """Replicate ``SOSSAQubitMapper`` ``energy_shift`` (Eq. 30), with zero core/BLISS.
 
     ``E_SOS = -2 sum_r w_-^{(r)} - 1/2 sum_rc |W^{(rc)}|^2``.
     """
@@ -182,7 +182,7 @@ def _build_dfthc_hamiltonian_matrix(h1, basis_vectors, two_body_weights, identit
     r"""Build the SOSSA gap Hamiltonian ``H_gap = sum_G G† G`` via Jordan-Wigner.
 
     The one-body generators come from diagonalizing the *Majorana-corrected*
-    one-body matrix (Eq. 38), matching ``SOSSAQubitMapper``, which reads
+    one-body matrix (Eq. 36), matching ``SOSSAQubitMapper``, which reads
     ``container.get_h1_majorana()`` rather than the bare ``h1``.
 
     For eigenvalue :math:`\lambda_k` of that matrix the mapper emits the LCU
@@ -202,7 +202,7 @@ def _build_dfthc_hamiltonian_matrix(h1, basis_vectors, two_body_weights, identit
     ``H_gap + E_SOS`` equals the physical Hamiltonian exactly; see
     ``test_sos_decomposition_reproduces_physical_hamiltonian``.
 
-    Reference: Eq. 20-21, 29, 32, 38 in :cite:`Low2025`.
+    Reference: Eqs. 20-21, 29, 30, 36 in :cite:`Low2025`.
     """
     num_orbitals = h1.shape[0]
     n_ranks, b_dim, _ = basis_vectors.shape
@@ -895,9 +895,9 @@ class TestSOSSAQPEIntegration:
 
             H_physical = Σ_G G†G + E_SOS · I
 
-        with the energy shift of :cite:`Low2025` Eq. 32,
+        with the energy shift of :cite:`Low2025` Eq. 30,
         ``E_SOS = -2 Σ_r w_-^{(r)} - ½ Σ_rc |W^{(rc)}|²``, evaluated on the
-        Majorana-corrected one-body matrix of Eq. 38.  Recovering the physical
+        Majorana-corrected one-body matrix of Eq. 36.  Recovering the physical
         energy from a phase estimate therefore requires adding ``E_SOS`` back.
 
         The whole spectrum is compared (not just the ground state) so that a
@@ -930,7 +930,7 @@ class TestSOSSAQPEIntegration:
         )
 
     def test_energy_shift_matches_qubit_mapper(self):
-        """The mapper's ``energy_shift`` must equal Eq. 32 evaluated on h1_majorana."""
+        """The mapper's ``energy_shift`` must equal Eq. 30 evaluated on h1_majorana."""
         data = _build_h2_dfthc_data()
         n_orb = data["N"]
         orbitals = create_test_orbitals(n_orb)

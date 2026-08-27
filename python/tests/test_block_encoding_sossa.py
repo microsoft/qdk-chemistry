@@ -295,7 +295,7 @@ class TestSOSSABuilder:
         r"""Verify the builder emits both conventions of the outer PREPARE distribution.
 
         The SOS block encoding needs the outer PREPARE to produce amplitudes
-        proportional to the generator one-norms :math:`c_{x_o}` (Eq. 88 of Low et
+        proportional to the generator one-norms :math:`c_{x_o}` (Eqs. (7) and (9) of Low et
         al. 2025), so ``outer_prepare`` holds :math:`c/\|c\|`. Backends that
         discretize their input as a probability distribution have to be handed
         :math:`c^2` instead, which is what ``outer_prepare_probabilities`` holds.
