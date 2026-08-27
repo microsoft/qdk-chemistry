@@ -222,7 +222,7 @@ class MassDescriptor(MolecularDescriptorCalculator):
 
 ################################################################################
 # start-cell-descriptor-registration
-import qdk_chemistry.algorithms as algorithms
+from qdk_chemistry import algorithms
 
 # Register the factory
 algorithms.registry.register_factory(MolecularDescriptorCalculatorFactory())
