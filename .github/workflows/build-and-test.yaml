@@ -800,6 +800,11 @@ jobs:
         name: qdk-chemistry-install-linux-x86-64-v3-py3.13
         path: ${{ github.workspace }}/install
 
+    # actions/download-artifact doesn't preserve the executable bit, so install/bin/* (e.g. pytest) needs it
+    # restored before it can be run.
+    - name: Restore executable permissions
+      run: chmod -R +x "${{ github.workspace }}/install/bin"
+
     - name: Test pre-installed qdk_chemistry package
       run: |
         python -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
