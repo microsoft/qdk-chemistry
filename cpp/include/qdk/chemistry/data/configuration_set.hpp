@@ -248,8 +248,8 @@ class ConfigurationSet : public DataClass {
  private:
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
 
-  /// Immutable configuration storage.
-  std::shared_ptr<const std::vector<Configuration>> _configurations;
+  /// Configurations in the set
+  std::vector<Configuration> _configurations;
 
   /// Orbital information (holds active space definition)
   std::shared_ptr<Orbitals> _orbitals;

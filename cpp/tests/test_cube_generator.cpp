@@ -185,7 +185,8 @@ TEST(CubeGeneratorTest, EvaluatesHydrogenOrbitalFromNamedBasis) {
 
   const auto shells = basis->get_shells_for_atom(0);
   ASSERT_FALSE(shells.empty());
-  EXPECT_FALSE(shells.front().has_radial_powers());
+  ASSERT_TRUE(shells.front().has_radial_powers());
+  EXPECT_TRUE((shells.front().rpowers.array() == 0).all());
 
   CubeGenerator generator(basis);
   Eigen::VectorXd coefficients(1);

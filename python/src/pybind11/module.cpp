@@ -30,7 +30,6 @@ void bind_settings(py::module& m);
 void bind_structure(py::module& m);
 void bind_basis_set(py::module& m);
 void bind_auxiliary_basis(py::module& m);
-void bind_auxiliary_basis_functions(py::module& m);
 void bind_serialization(py::module& m);
 void bind_mc(py::module& m);
 void bind_mcscf(py::module& m);
@@ -95,7 +94,6 @@ PYBIND11_MODULE(_core, m) {
   bind_configuration(data);
   bind_configuration_set(data);
   bind_wavefunction(data);
-  bind_auxiliary_basis_functions(data);
   bind_ansatz(data);
   bind_stability_result(data);
   bind_nuclear_gradients(data);

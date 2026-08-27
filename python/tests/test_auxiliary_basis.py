@@ -82,22 +82,6 @@ def test_orbital_counts_and_shell_access():
         spherical.get_shells_for_atom(spherical.get_num_atoms())
 
 
-def test_shell_json_round_trip_and_local_potential_binding():
-    shell = Shell(2, OrbitalType.P, [2.0, 1.0], [0.7, 0.3])
-
-    restored = Shell.from_json(shell.to_json(), atom_index=2)
-    assert restored.atom_index == 2
-    assert restored.orbital_type == OrbitalType.P
-    assert np.allclose(restored.exponents, shell.exponents)
-    assert np.allclose(restored.coefficients, shell.coefficients)
-
-    local_potential = Shell(0, OrbitalType.UL, [2.0], [1.0], [0])
-    with pytest.raises(ValueError, match="radial powers"):
-        Shell.from_json(local_potential.to_json(), atom_index=0)
-    restored_local = Shell.from_json(local_potential.to_json(), atom_index=0, allow_radial_powers=True)
-    assert restored_local.orbital_type == OrbitalType.UL
-
-
 def test_shell_access_returns_copy_of_immutable_basis_data():
     structure = _make_structure()
     auxiliary = AuxiliaryBasis("aux", _make_shells(), structure)

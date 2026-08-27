@@ -269,7 +269,7 @@ Args:
                       std::vector<size_t>, std::vector<size_t>>> &indices) {
         warn_v1_deprecated(
             "Orbitals(coefficients, energies, ao_overlap, basis_set, "
-            "(active, inactive)) is deprecated in vTODO; pass "
+            "(active, inactive)) is deprecated in v2.0; pass "
             "SymmetryBlockedIndexSet active_indices/inactive_indices instead.");
         return std::make_unique<Orbitals>(coefficients, energies, ao_overlap,
                                           std::move(basis_set), indices);
@@ -307,7 +307,7 @@ Args:
         warn_v1_deprecated(
             "Orbitals(coefficients_alpha, coefficients_beta, ..., "
             "(active_alpha, active_beta, inactive_alpha, inactive_beta)) is "
-            "deprecated in vTODO; pass SymmetryBlockedIndexSet "
+            "deprecated in v2.0; pass SymmetryBlockedIndexSet "
             "active_indices/inactive_indices instead.");
         return std::make_unique<Orbitals>(
             coefficients_alpha, coefficients_beta, energies_alpha,
@@ -361,7 +361,7 @@ Args:
       "get_coefficients",
       [](const Orbitals &self) {
         warn_v1_deprecated(
-            "Orbitals.get_coefficients() is deprecated in vTODO; use "
+            "Orbitals.get_coefficients() is deprecated in v2.0; use "
             "coefficients() (SymmetryBlockedTensor) instead.");
         return self.get_coefficients();
       },
@@ -387,7 +387,7 @@ Examples:
       "get_energies",
       [](const Orbitals &self) {
         warn_v1_deprecated(
-            "Orbitals.get_energies() is deprecated in vTODO; use energies() "
+            "Orbitals.get_energies() is deprecated in v2.0; use energies() "
             "(SymmetryBlockedTensor) instead.");
         return self.get_energies();
       },
@@ -639,7 +639,7 @@ Examples:
   bind_deprecated_getter_as_property(
       orbitals, "get_coefficients_alpha", "coefficients_alpha",
       &Orbitals::get_coefficients_alpha,
-      "Orbitals.get_coefficients_alpha() is deprecated in vTODO; use "
+      "Orbitals.get_coefficients_alpha() is deprecated in v2.0; use "
       "coefficients() (SymmetryBlockedTensor) instead.",
       R"(
 Get alpha orbital coefficients matrix.
@@ -657,7 +657,7 @@ Examples:
   bind_deprecated_getter_as_property(
       orbitals, "get_coefficients_beta", "coefficients_beta",
       &Orbitals::get_coefficients_beta,
-      "Orbitals.get_coefficients_beta() is deprecated in vTODO; use "
+      "Orbitals.get_coefficients_beta() is deprecated in v2.0; use "
       "coefficients() (SymmetryBlockedTensor) instead.",
       R"(
 Get beta orbital coefficients matrix.
@@ -675,7 +675,7 @@ Examples:
   bind_deprecated_getter_as_property(
       orbitals, "get_energies_alpha", "energies_alpha",
       &Orbitals::get_energies_alpha,
-      "Orbitals.get_energies_alpha() is deprecated in vTODO; use energies() "
+      "Orbitals.get_energies_alpha() is deprecated in v2.0; use energies() "
       "(SymmetryBlockedTensor) instead.",
       R"(
 Get alpha orbital energies (Hartree).
@@ -693,7 +693,7 @@ Examples:
   bind_deprecated_getter_as_property(
       orbitals, "get_energies_beta", "energies_beta",
       &Orbitals::get_energies_beta,
-      "Orbitals.get_energies_beta() is deprecated in vTODO; use energies() "
+      "Orbitals.get_energies_beta() is deprecated in v2.0; use energies() "
       "(SymmetryBlockedTensor) instead.",
       R"(
 Get beta orbital energies (Hartree).
@@ -726,7 +726,7 @@ Examples:
       "get_active_space_indices",
       [](const Orbitals &self) {
         warn_v1_deprecated(
-            "Orbitals.get_active_space_indices() is deprecated in vTODO; use "
+            "Orbitals.get_active_space_indices() is deprecated in v2.0; use "
             "active_indices() (SymmetryBlockedIndexSet) instead.");
         return self.get_active_space_indices();
       },
@@ -746,7 +746,7 @@ Examples:
       "get_inactive_space_indices",
       [](const Orbitals &self) {
         warn_v1_deprecated(
-            "Orbitals.get_inactive_space_indices() is deprecated in vTODO; use "
+            "Orbitals.get_inactive_space_indices() is deprecated in v2.0; use "
             "inactive_indices() (SymmetryBlockedIndexSet) instead.");
         return self.get_inactive_space_indices();
       },
@@ -1092,18 +1092,17 @@ Args:
   // Deprecated v1 constructor taking a ``restricted`` flag. Maps the flag to a
   // spin symmetry axis (equivalent labels => restricted) and emits a
   // DeprecationWarning.
-  model_orbitals.def(py::init([](size_t basis_size, bool restricted) {
-                       warn_v1_deprecated(
-                           "ModelOrbitals(basis_size, restricted) is "
-                           "deprecated in vTODO; pass "
-                           "a SymmetryProduct instead, e.g. "
-                           "SymmetryProduct([axes.spin(1, restricted)]).");
-                       return std::make_unique<ModelOrbitals>(
-                           basis_size,
-                           std::make_shared<const SymmetryProduct>(
-                               SymmetryProduct({axes::spin(1, restricted)})));
-                     }),
-                     R"(
+  model_orbitals.def(
+      py::init([](size_t basis_size, bool restricted) {
+        warn_v1_deprecated(
+            "ModelOrbitals(basis_size, restricted) is deprecated in v2.0; pass "
+            "a SymmetryProduct instead, e.g. "
+            "SymmetryProduct([axes.spin(1, restricted)]).");
+        return std::make_unique<ModelOrbitals>(
+            basis_size, std::make_shared<const SymmetryProduct>(
+                            SymmetryProduct({axes::spin(1, restricted)})));
+      }),
+      R"(
 Deprecated v1 constructor taking a ``restricted`` flag.
 
 The flag is mapped to a spin symmetry axis (equivalent labels for restricted)
@@ -1113,7 +1112,7 @@ Args:
     basis_size (int): Number of single-particle modes.
     restricted (bool): Whether the calculation is restricted (``True``) or unrestricted (``False``).
 )",
-                     py::arg("basis_size"), py::arg("restricted"));
+      py::arg("basis_size"), py::arg("restricted"));
 
   // Deprecated v1 restricted constructor accepting a legacy
   // ``(active, inactive)`` index tuple.
@@ -1123,7 +1122,7 @@ Args:
                       &indices) {
         warn_v1_deprecated(
             "ModelOrbitals(basis_size, (active, inactive)) is deprecated in "
-            "vTODO; use the SymmetryBlockedIndexSet constructor instead.");
+            "v2.0; use the SymmetryBlockedIndexSet constructor instead.");
         return std::make_unique<ModelOrbitals>(basis_size, indices);
       }),
       R"(
@@ -1147,7 +1146,7 @@ Args:
                       &indices) {
         warn_v1_deprecated(
             "ModelOrbitals(basis_size, (active_alpha, active_beta, "
-            "inactive_alpha, inactive_beta)) is deprecated in vTODO; use the "
+            "inactive_alpha, inactive_beta)) is deprecated in v2.0; use the "
             "SymmetryBlockedIndexSet constructor instead.");
         return std::make_unique<ModelOrbitals>(basis_size, indices);
       }),

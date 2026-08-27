@@ -10,8 +10,6 @@
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
-#include <regex>
 #include <sstream>
 #include <stdexcept>
 
@@ -24,9 +22,7 @@ namespace qdk::chemistry::data {
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    AOType atomic_orbital_type)
-    : _name(name),
-      _atomic_orbital_type(atomic_orbital_type),
-      _ecp_name("none") {
+    : _name(name), _atomic_orbital_type(atomic_orbital_type), _ecp_name(name) {
   QDK_LOG_TRACE_ENTERING();
   // Organize shells by atom index
   for (const auto& shell : shells) {
@@ -42,6 +38,36 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
 
   // Initialize ECP electrons vector with zeros for each atom
   _ecp_electrons.resize(_shells_per_atom.size(), 0);
+
+  if (!_is_valid()) {
+    throw std::invalid_argument("Tried to generate invalid BasisSet");
+  }
+  _init_ao_symmetries(nullptr, {});
+}
+
+BasisSet::BasisSet(const std::string& name, const Structure& structure,
+                   AOType atomic_orbital_type)
+    : BasisSet(name, std::make_shared<Structure>(structure),
+               atomic_orbital_type) {
+  QDK_LOG_TRACE_ENTERING();
+}
+
+BasisSet::BasisSet(const std::string& name,
+                   std::shared_ptr<Structure> structure,
+                   AOType atomic_orbital_type)
+    : _name(name),
+      _atomic_orbital_type(atomic_orbital_type),
+      _structure(structure),
+      _ecp_name("none") {
+  QDK_LOG_TRACE_ENTERING();
+  if (_name.empty()) {
+    throw std::invalid_argument("BasisSet name cannot be empty");
+  }
+  if (!structure) {
+    throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
+  }
+
+  _ecp_electrons.resize(structure->get_num_atoms(), 0);
 
   if (!_is_valid()) {
     throw std::invalid_argument("Tried to generate invalid BasisSet");
@@ -66,88 +92,83 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    const std::vector<Shell>& ecp_shells,
-                   const std::vector<size_t>& ecp_electrons,
                    const Structure& structure, AOType atomic_orbital_type)
-    : BasisSet(name, shells, "", ecp_shells, ecp_electrons,
-               std::make_shared<Structure>(structure), atomic_orbital_type,
-               CanonicalConstructionTag{}) {
+    : BasisSet(name, shells, ecp_shells, std::make_shared<Structure>(structure),
+               atomic_orbital_type) {
   QDK_LOG_TRACE_ENTERING();
 }
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    const std::vector<Shell>& ecp_shells,
-                   const std::vector<size_t>& ecp_electrons,
                    std::shared_ptr<Structure> structure,
                    AOType atomic_orbital_type)
-    : BasisSet(name, shells, "", ecp_shells, ecp_electrons,
-               std::move(structure), atomic_orbital_type,
-               CanonicalConstructionTag{}) {
-  QDK_LOG_TRACE_ENTERING();
-}
-
-BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
-                   const std::string& ecp_name,
-                   const std::vector<Shell>& ecp_shells,
-                   const std::vector<size_t>& ecp_electrons,
-                   const Structure& structure, AOType atomic_orbital_type)
-    : BasisSet(name, shells, ecp_name, ecp_shells, ecp_electrons,
-               std::make_shared<Structure>(structure), atomic_orbital_type,
-               CanonicalConstructionTag{}) {
-  QDK_LOG_TRACE_ENTERING();
-}
-
-BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
-                   const std::string& ecp_name,
-                   const std::vector<Shell>& ecp_shells,
-                   const std::vector<size_t>& ecp_electrons,
-                   std::shared_ptr<Structure> structure,
-                   AOType atomic_orbital_type)
-    : BasisSet(name, shells, ecp_name, ecp_shells, ecp_electrons,
-               std::move(structure), atomic_orbital_type,
-               CanonicalConstructionTag{}) {
-  QDK_LOG_TRACE_ENTERING();
-}
-
-BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
-                   std::string ecp_name, const std::vector<Shell>& ecp_shells,
-                   const std::vector<size_t>& ecp_electrons,
-                   std::shared_ptr<Structure> structure,
-                   AOType atomic_orbital_type, CanonicalConstructionTag)
     : _name(name),
       _atomic_orbital_type(atomic_orbital_type),
       _structure(structure),
-      _ecp_name(std::move(ecp_name)),
-      _ecp_electrons(ecp_electrons) {
+      _ecp_name("none") {
   QDK_LOG_TRACE_ENTERING();
-  if (_name.empty()) {
-    throw std::invalid_argument("BasisSet name cannot be empty");
-  }
-
   if (!structure) {
     throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
   }
 
-  if ((!ecp_shells.empty() || !ecp_electrons.empty() || !ecp_name.empty()) &&
-      ecp_electrons.size() != structure->get_num_atoms()) {
+  for (const auto& shell : shells) {
+    size_t atom_index = shell.atom_index;
+    if (atom_index >= _shells_per_atom.size()) {
+      _shells_per_atom.resize(atom_index + 1);
+    }
+    _shells_per_atom[atom_index].push_back(shell);
+  }
+
+  for (const auto& ecp_shell : ecp_shells) {
+    size_t atom_index = ecp_shell.atom_index;
+    if (atom_index >= _ecp_shells_per_atom.size()) {
+      _ecp_shells_per_atom.resize(atom_index + 1);
+    }
+    _ecp_shells_per_atom[atom_index].push_back(ecp_shell);
+  }
+
+  _ecp_electrons.resize(structure->get_num_atoms(), 0);
+
+  if (!_is_valid()) {
+    throw std::invalid_argument("Tried to generate invalid BasisSet");
+  }
+  _init_ao_symmetries(nullptr, {});
+}
+
+BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
+                   const std::string& ecp_name,
+                   const std::vector<Shell>& ecp_shells,
+                   const std::vector<size_t>& ecp_electrons,
+                   const Structure& structure, AOType atomic_orbital_type)
+    : BasisSet(name, shells, ecp_name, ecp_shells, ecp_electrons,
+               std::make_shared<Structure>(structure), atomic_orbital_type) {
+  QDK_LOG_TRACE_ENTERING();
+}
+
+BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
+                   const std::string& ecp_name,
+                   const std::vector<Shell>& ecp_shells,
+                   const std::vector<size_t>& ecp_electrons,
+                   std::shared_ptr<Structure> structure,
+                   AOType atomic_orbital_type)
+    : _name(name),
+      _atomic_orbital_type(atomic_orbital_type),
+      _structure(structure),
+      _ecp_name(ecp_name),
+      _ecp_electrons(ecp_electrons) {
+  QDK_LOG_TRACE_ENTERING();
+  if (!structure) {
+    throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
+  }
+
+  if (ecp_electrons.size() != structure->get_num_atoms()) {
     throw std::invalid_argument(
         "ECP electrons vector size must match number of atoms");
   }
 
-  if (_ecp_electrons.empty()) {
-    _ecp_electrons.resize(structure->get_num_atoms(), 0);
-  }
-
-  const size_t num_atoms = structure->get_num_atoms();
-
   // Organize shells by atom index
   for (const auto& shell : shells) {
     size_t atom_index = shell.atom_index;
-    if (atom_index >= num_atoms) {
-      throw std::invalid_argument("Shell atom_index (" +
-                                  std::to_string(atom_index) +
-                                  ") is out of range for structure with " +
-                                  std::to_string(num_atoms) + " atoms");
-    }
 
     // Ensure we have enough space for this atom
     if (atom_index >= _shells_per_atom.size()) {
@@ -160,12 +181,6 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
   // Organize ECP shells by atom index
   for (const auto& ecp_shell : ecp_shells) {
     size_t atom_index = ecp_shell.atom_index;
-    if (atom_index >= num_atoms) {
-      throw std::invalid_argument("ECP shell atom_index (" +
-                                  std::to_string(atom_index) +
-                                  ") is out of range for structure with " +
-                                  std::to_string(num_atoms) + " atoms");
-    }
 
     // Ensure we have enough space for this atom
     if (atom_index >= _ecp_shells_per_atom.size()) {
@@ -173,11 +188,6 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
     }
 
     _ecp_shells_per_atom[atom_index].push_back(ecp_shell);
-  }
-
-  // "none" is the canonical ECP name for a basis set that carries no ECP.
-  if (_ecp_name.empty() && !has_ecp_shells() && !has_ecp_electrons()) {
-    _ecp_name = "none";
   }
 
   if (!_is_valid()) {
@@ -196,10 +206,6 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
       _structure(structure),
       _ecp_name("none") {
   QDK_LOG_TRACE_ENTERING();
-  if (_name.empty()) {
-    throw std::invalid_argument("BasisSet name cannot be empty");
-  }
-
   if (!structure) {
     throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
   }
@@ -221,26 +227,6 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
   }
 
   _init_ao_symmetries(std::move(ao_symmetries), std::move(ao_extents));
-}
-
-BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
-                   const EffectiveCorePotential& ecp,
-                   std::shared_ptr<Structure> structure,
-                   AOType atomic_orbital_type)
-    : BasisSet(name, shells, ecp.get_name(), ecp.get_shells(),
-               ecp.get_electrons(), std::move(structure), atomic_orbital_type,
-               CanonicalConstructionTag{}) {
-  QDK_LOG_TRACE_ENTERING();
-}
-
-std::shared_ptr<BasisSet> BasisSet::_from_components(
-    const std::string& name, const std::vector<Shell>& shells,
-    std::string ecp_name, const std::vector<Shell>& ecp_shells,
-    const std::vector<size_t>& ecp_electrons,
-    std::shared_ptr<Structure> structure, AOType atomic_orbital_type) {
-  return std::shared_ptr<BasisSet>(new BasisSet(
-      name, shells, std::move(ecp_name), ecp_shells, ecp_electrons,
-      std::move(structure), atomic_orbital_type, CanonicalConstructionTag{}));
 }
 
 std::vector<Element> BasisSet::get_supported_elements_for_basis_set(
@@ -354,14 +340,9 @@ std::shared_ptr<BasisSet> BasisSet::from_basis_name(
   // sort ecp shells
   sort_shells_inplace(all_ecp_shells);
 
-  const bool has_ecp_data =
-      !all_ecp_shells.empty() ||
-      std::any_of(all_ecp_electrons.begin(), all_ecp_electrons.end(),
-                  [](size_t electron_count) { return electron_count > 0; });
-  const std::string ecp_name = has_ecp_data ? basis_name : "";
-  return _from_components(basis_name, all_basis_shells, ecp_name,
-                          all_ecp_shells, all_ecp_electrons, structure,
-                          atomic_orbital_type);
+  return std::make_shared<BasisSet>(basis_name, all_basis_shells, basis_name,
+                                    all_ecp_shells, all_ecp_electrons,
+                                    structure, atomic_orbital_type);
 }
 
 std::shared_ptr<BasisSet> BasisSet::from_element_map(
@@ -446,23 +427,15 @@ std::shared_ptr<BasisSet> BasisSet::from_index_map(
   // sort ecp shells
   sort_shells_inplace(all_ecp_shells);
 
-  const bool has_ecp_data =
-      !all_ecp_shells.empty() ||
-      std::any_of(all_ecp_electrons.begin(), all_ecp_electrons.end(),
-                  [](size_t electron_count) { return electron_count > 0; });
-  const std::string ecp_name =
-      has_ecp_data ? std::string(BasisSet::custom_ecp_name) : std::string();
-  return _from_components(std::string(BasisSet::custom_name), all_basis_shells,
-                          ecp_name, all_ecp_shells, all_ecp_electrons,
-                          structure, atomic_orbital_type);
+  return std::make_shared<BasisSet>(
+      std::string(BasisSet::custom_name), all_basis_shells,
+      std::string(BasisSet::custom_ecp_name), all_ecp_shells, all_ecp_electrons,
+      structure, atomic_orbital_type);
 }
 
 BasisSet::BasisSet(const BasisSet& other)
     : _name(other._name),
       _atomic_orbital_type(other._atomic_orbital_type),
-      _structure(other._structure
-                     ? std::make_shared<Structure>(*other._structure)
-                     : nullptr),
       _shells_per_atom(other._shells_per_atom),
       _ecp_shells_per_atom(other._ecp_shells_per_atom),
       _ecp_name(other._ecp_name),
@@ -470,6 +443,9 @@ BasisSet::BasisSet(const BasisSet& other)
       _ao_symmetries(other._ao_symmetries),
       _ao_extents(other._ao_extents) {
   QDK_LOG_TRACE_ENTERING();
+  if (other._structure) {
+    _structure = std::make_shared<Structure>(*other._structure);
+  }
   // Cache will be invalidated by default (_cache_valid = false)
   if (!_is_valid()) {
     throw std::invalid_argument("Tried to generate invalid BasisSet");
@@ -992,23 +968,9 @@ bool BasisSet::_is_consistent_with_structure() const {
     return false;
   }
 
-  if (has_ecp_electrons() &&
-      (_ecp_electrons.size() != _structure->get_num_atoms())) {
-    return false;
-  }
-
   // Check if any atom has shells but is beyond the structure's atom count
   for (size_t atom_idx = 0; atom_idx < _shells_per_atom.size(); ++atom_idx) {
     if (!_shells_per_atom[atom_idx].empty() &&
-        atom_idx >= _structure->get_num_atoms()) {
-      return false;
-    }
-  }
-
-  // Check if any ECP shell references an atom beyond the structure's atom count
-  for (size_t atom_idx = 0; atom_idx < _ecp_shells_per_atom.size();
-       ++atom_idx) {
-    if (!_ecp_shells_per_atom[atom_idx].empty() &&
         atom_idx >= _structure->get_num_atoms()) {
       return false;
     }
@@ -1037,25 +999,7 @@ bool BasisSet::_is_valid() const {
       }
     }
   }
-  bool has_ecp = false;
-  for (const auto& atom_shells : _ecp_shells_per_atom) {
-    if (!atom_shells.empty()) {
-      has_ecp = true;
-
-      // Check if all shells have valid data
-      for (const auto& shell : atom_shells) {
-        if (shell.exponents.size() == 0 || shell.coefficients.size() == 0) {
-          return false;
-        }
-        if (shell.exponents.size() != shell.coefficients.size()) {
-          return false;
-        }
-      }
-    }
-  }
-  bool ecp_consistency = (has_ecp_electrons() == has_ecp_shells());
-
-  return has_shells && _is_consistent_with_structure() && ecp_consistency;
+  return has_shells && _is_consistent_with_structure();
 }
 
 std::string BasisSet::get_summary() const {
@@ -1069,16 +1013,6 @@ std::string BasisSet::get_summary() const {
   oss << "Total atomic orbitals: " << get_num_atomic_orbitals() << "\n";
   oss << "Number of atoms: " << get_num_atoms() << "\n";
 
-  oss << "Contains ECP: " << (has_ecp_electrons() ? "Yes" : "No") << "\n";
-  if (has_ecp_electrons()) {
-    oss << "ECP name: " << _ecp_name << "\n";
-    oss << "Number of ECP shells: " << get_num_ecp_shells() << "\n";
-    oss << "ECP electrons: ";
-    for (size_t e : _ecp_electrons) {
-      oss << e << " ";
-    }
-    oss << "\n";
-  }
   if (has_structure()) {
     oss << "Associated structure: " << _structure->get_num_atoms()
         << " atoms\n";
@@ -1399,13 +1333,12 @@ void BasisSet::to_hdf5(H5::Group& group) const {
     }
 
     // Save ECP name and electrons if present
-    if (has_ecp_shells() || has_ecp_electrons()) {
+    if (has_ecp_electrons() || !_ecp_name.empty()) {
       // Save ECP name as attribute
       H5::Attribute ecp_name_attr =
           group.createAttribute("ecp_name", string_type, scalar_space);
       ecp_name_attr.write(string_type, _ecp_name);
-    }
-    if (has_ecp_electrons()) {
+
       // Save ECP electrons array as dataset
       if (!_ecp_electrons.empty()) {
         hsize_t ecp_dims[1] = {_ecp_electrons.size()};
@@ -1681,35 +1614,27 @@ std::shared_ptr<BasisSet> BasisSet::from_hdf5(H5::Group& group) {
       ecp_electrons_ds.read(ecp_electrons.data(), H5::PredType::NATIVE_UINT64);
     }
 
-    if (!group.nameExists("structure")) {
-      const bool has_real_ecp_electrons =
-          std::any_of(ecp_electrons.begin(), ecp_electrons.end(),
-                      [](size_t n) { return n != 0; });
-      const bool has_real_ecp_name = !ecp_name.empty() && ecp_name != "none";
-      if (!ecp_shells.empty() || has_real_ecp_name || has_real_ecp_electrons) {
-        throw std::runtime_error(
-            "HDF5 BasisSet contains ECP data but no structure; "
-            "cannot reconstruct without losing information");
+    // Load nested structure if present
+    std::shared_ptr<BasisSet> basis_set;
+    if (group.nameExists("structure")) {
+      H5::Group structure_group = group.openGroup("structure");
+      auto structure = Structure::from_hdf5(structure_group);
+      if (!ecp_shells.empty()) {
+        if (!ecp_name.empty() && !ecp_electrons.empty()) {
+          basis_set = std::make_shared<BasisSet>(
+              name, shells, ecp_name, ecp_shells, ecp_electrons, *structure,
+              atomic_orbital_type);
+        } else {
+          basis_set = std::make_shared<BasisSet>(
+              name, shells, ecp_shells, *structure, atomic_orbital_type);
+        }
+      } else {
+        basis_set = std::make_shared<BasisSet>(name, shells, *structure,
+                                               atomic_orbital_type);
       }
-      return std::make_shared<BasisSet>(name, shells, atomic_orbital_type);
+    } else {
+      basis_set = std::make_shared<BasisSet>(name, shells, atomic_orbital_type);
     }
-
-    if (!ecp_shells.empty() && ecp_electrons.empty()) {
-      throw std::runtime_error(
-          "ECP electrons data is missing but ECP shells are present");
-    }
-
-    H5::Group structure_group = group.openGroup("structure");
-    auto structure = Structure::from_hdf5(structure_group);
-    const bool has_real_ecp_electrons =
-        std::any_of(ecp_electrons.begin(), ecp_electrons.end(),
-                    [](size_t n) { return n != 0; });
-    const std::string effective_ecp_name =
-        (!ecp_shells.empty() || has_real_ecp_electrons) ? ecp_name
-                                                        : std::string();
-    auto basis_set = _from_components(
-        name, shells, effective_ecp_name, ecp_shells, ecp_electrons,
-        std::move(structure), atomic_orbital_type);
 
     return basis_set;
 
@@ -1769,7 +1694,7 @@ nlohmann::json BasisSet::to_json() const {
     }
   }
 
-  if (has_ecp_shells() || has_ecp_electrons()) {
+  if (has_ecp_electrons() || !_ecp_name.empty()) {
     j["ecp_name"] = _ecp_name;
     j["ecp_electrons"] = _ecp_electrons;
   }
@@ -1952,40 +1877,35 @@ std::shared_ptr<BasisSet> BasisSet::from_json(const nlohmann::json& j) {
     // Load ECP name and electrons if present
     std::string ecp_name;
     std::vector<size_t> ecp_electrons;
-    if (j.contains("ecp_name")) {
+    if (j.contains("ecp_name") && j.contains("ecp_electrons")) {
       ecp_name = j["ecp_name"];
-    }
-    if (j.contains("ecp_electrons")) {
       ecp_electrons = j["ecp_electrons"].get<std::vector<size_t>>();
     }
 
-    if (!j.contains("structure")) {
-      const bool has_real_ecp_electrons =
-          std::any_of(ecp_electrons.begin(), ecp_electrons.end(),
-                      [](size_t n) { return n != 0; });
-      const bool has_real_ecp_name = !ecp_name.empty() && ecp_name != "none";
-      if (!ecp_shells.empty() || has_real_ecp_name || has_real_ecp_electrons) {
-        throw std::runtime_error(
-            "Cannot create BasisSet with ECP data but without structure");
+    // Create the BasisSet with or without structure
+    std::shared_ptr<BasisSet> basis_set;
+    if (j.contains("structure")) {
+      auto structure = Structure::from_json(j["structure"]);
+      if (!ecp_shells.empty()) {
+        if (!ecp_name.empty() && !ecp_electrons.empty()) {
+          basis_set = std::make_shared<BasisSet>(
+              name, shells, ecp_name, ecp_shells, ecp_electrons, *structure,
+              atomic_orbital_type);
+        } else {
+          basis_set = std::make_shared<BasisSet>(
+              name, shells, ecp_shells, *structure, atomic_orbital_type);
+        }
+      } else {
+        basis_set = std::make_shared<BasisSet>(name, shells, *structure,
+                                               atomic_orbital_type);
       }
-      return std::make_shared<BasisSet>(name, shells, atomic_orbital_type);
+    } else {
+      if (!ecp_shells.empty()) {
+        throw std::runtime_error(
+            "Cannot create BasisSet with ECP shells but without structure");
+      }
+      basis_set = std::make_shared<BasisSet>(name, shells, atomic_orbital_type);
     }
-
-    if (!ecp_shells.empty() && ecp_electrons.empty()) {
-      throw std::runtime_error(
-          "ECP electrons data is missing but ECP shells are present");
-    }
-
-    auto structure = Structure::from_json(j["structure"]);
-    const bool has_real_ecp_electrons =
-        std::any_of(ecp_electrons.begin(), ecp_electrons.end(),
-                    [](size_t n) { return n != 0; });
-    const std::string effective_ecp_name =
-        (!ecp_shells.empty() || has_real_ecp_electrons) ? ecp_name
-                                                        : std::string();
-    auto basis_set = _from_components(
-        name, shells, effective_ecp_name, ecp_shells, ecp_electrons,
-        std::move(structure), atomic_orbital_type);
     return basis_set;
 
   } catch (const std::exception& e) {
@@ -2202,64 +2122,6 @@ void BasisSet::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
   for (auto e : _ecp_electrons) {
     hash_value(ctx, static_cast<uint64_t>(e));
   }
-}
-
-EffectiveCorePotential::EffectiveCorePotential(std::vector<Shell> shells,
-                                               std::vector<size_t> electrons)
-    : EffectiveCorePotential(std::string(custom_name), std::move(shells),
-                             std::move(electrons)) {}
-
-EffectiveCorePotential::EffectiveCorePotential(std::string name,
-                                               std::vector<Shell> shells,
-                                               std::vector<size_t> electrons)
-    : _name(std::move(name)),
-      _shells(std::move(shells)),
-      _electrons(std::move(electrons)) {
-  if (_name.empty()) {
-    throw std::invalid_argument("EffectiveCorePotential name cannot be empty");
-  }
-  if (_shells.empty()) {
-    throw std::invalid_argument(
-        "EffectiveCorePotential shells cannot be empty");
-  }
-  if (_electrons.empty() ||
-      std::none_of(_electrons.begin(), _electrons.end(),
-                   [](size_t count) { return count > 0; })) {
-    throw std::invalid_argument(
-        "EffectiveCorePotential must replace at least one electron");
-  }
-
-  for (const auto& shell : _shells) {
-    if (!shell.has_radial_powers()) {
-      throw std::invalid_argument(
-          "EffectiveCorePotential shells must contain radial powers");
-    }
-    if (shell.exponents.size() == 0 || shell.coefficients.size() == 0 ||
-        shell.exponents.size() != shell.coefficients.size() ||
-        shell.rpowers.size() != shell.exponents.size()) {
-      throw std::invalid_argument(
-          "EffectiveCorePotential contains an invalid shell");
-    }
-    if (shell.atom_index >= _electrons.size()) {
-      throw std::invalid_argument(
-          "EffectiveCorePotential shell atom_index is out of range");
-    }
-  }
-
-  std::stable_sort(_shells.begin(), _shells.end(),
-                   [](const Shell& lhs, const Shell& rhs) {
-                     return lhs.atom_index < rhs.atom_index;
-                   });
-}
-
-const std::string& EffectiveCorePotential::get_name() const { return _name; }
-
-const std::vector<Shell>& EffectiveCorePotential::get_shells() const {
-  return _shells;
-}
-
-const std::vector<size_t>& EffectiveCorePotential::get_electrons() const {
-  return _electrons;
 }
 
 }  // namespace qdk::chemistry::data

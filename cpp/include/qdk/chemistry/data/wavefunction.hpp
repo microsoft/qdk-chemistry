@@ -849,8 +849,8 @@ class WavefunctionContainer {
   mutable std::shared_ptr<const SymmetryBlockedTensorVariant<4>>
       _active_two_rdm;
 
-  // entropy data (single-orbital, two-orbital, mutual information)
-  mutable std::shared_ptr<OrbitalEntropies> _entropies;
+  // Orbital entropies
+  mutable OrbitalEntropies _entropies;
 
   /** @brief Clear cached RDMs */
   void _clear_rdms() const;

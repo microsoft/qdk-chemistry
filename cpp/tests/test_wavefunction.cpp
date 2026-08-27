@@ -10,7 +10,6 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <stdexcept>
 #include <tuple>

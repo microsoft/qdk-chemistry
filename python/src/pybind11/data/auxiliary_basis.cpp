@@ -7,16 +7,28 @@
 
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/auxiliary_basis.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <utility>
+#include <vector>
 
 #include "path_utils.hpp"
-#include "shell_binding_utils.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::data;
 
 namespace {
+
+std::vector<Shell> auxiliary_shells_from_iterable(const py::iterable& shells) {
+  py::list list(shells);
+  const py::ssize_t size = py::len(list);
+  std::vector<Shell> result;
+  result.reserve(static_cast<size_t>(size));
+  for (py::ssize_t index = 0; index < size; ++index) {
+    result.push_back(
+        py::reinterpret_borrow<py::object>(PyList_GET_ITEM(list.ptr(), index))
+            .cast<Shell>());
+  }
+  return result;
+}
 
 void auxiliary_basis_to_file(AuxiliaryBasis& self, const py::object& filename,
                              const std::string& type) {
@@ -54,8 +66,6 @@ std::shared_ptr<AuxiliaryBasis> auxiliary_basis_from_hdf5_file(
 }  // namespace
 
 void bind_auxiliary_basis(py::module& module) {
-  using qdk::chemistry::python::utils::to_shell_vec;
-
   py::enum_<AuxiliaryBasisRole>(
       module, "AuxiliaryBasisRole",
       "Algorithm-facing purpose served by an auxiliary basis")
@@ -86,7 +96,8 @@ Examples:
       .def(py::init([](const py::iterable& shells,
                        std::shared_ptr<Structure> structure, AOType ao_type) {
              return std::make_shared<AuxiliaryBasis>(
-                 to_shell_vec(shells), std::move(structure), ao_type);
+                 auxiliary_shells_from_iterable(shells), std::move(structure),
+                 ao_type);
            }),
            py::arg("shells"), py::arg("structure"),
            py::arg("atomic_orbital_type") = AOType::Spherical,
@@ -113,7 +124,8 @@ Examples:
       .def(py::init([](const std::string& name, const py::iterable& shells,
                        std::shared_ptr<Structure> structure, AOType ao_type) {
              return std::make_shared<AuxiliaryBasis>(
-                 name, to_shell_vec(shells), std::move(structure), ao_type);
+                 name, auxiliary_shells_from_iterable(shells),
+                 std::move(structure), ao_type);
            }),
            py::arg("name"), py::arg("shells"), py::arg("structure"),
            py::arg("atomic_orbital_type") = AOType::Spherical,
@@ -645,15 +657,15 @@ Raises:
 Load a collection from an HDF5 file.
 
 Args:
-        filename (str | pathlib.Path): Source path ending in
-                ``.auxiliary_basis_collection.h5``
+    filename (str | pathlib.Path): Source path ending in
+    ``.auxiliary_basis_collection.h5``
 
 Returns:
-        AuxiliaryBasisCollection: Deserialized collection
+    AuxiliaryBasisCollection: Deserialized collection
 
 Raises:
-        ValueError: If the filename suffix or a collection entry is invalid
-        RuntimeError: If the file or serialized collection cannot be read
+    ValueError: If the filename suffix or a collection entry is invalid
+    RuntimeError: If the file or serialized collection cannot be read
 )")
       .def(
           "__repr__",
@@ -678,9 +690,7 @@ Raises:
 
   collection.attr("_data_type_name") =
       DATACLASS_TO_SNAKE_CASE(AuxiliaryBasisCollection);
-}
 
-void bind_auxiliary_basis_functions(py::module& module) {
   module.def(
       "with_auxiliary_basis",
       [](const AuxiliaryBasisCollection& collection, AuxiliaryBasisRole role,

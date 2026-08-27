@@ -2,7 +2,6 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include <algorithm>
 #include <fstream>
 #include <qdk/chemistry/data/auxiliary_basis.hpp>
 #include <sstream>
@@ -15,6 +14,16 @@
 #include "json_serialization.hpp"
 
 namespace qdk::chemistry::data {
+
+namespace {
+
+void clear_legacy_radial_powers(std::vector<Shell>& shells) {
+  for (auto& shell : shells) {
+    shell.rpowers.resize(0);
+  }
+}
+
+}  // namespace
 
 std::string to_string(const AuxiliaryBasisRole role) {
   switch (role) {
@@ -150,6 +159,7 @@ std::shared_ptr<AuxiliaryBasis> AuxiliaryBasis::from_basis_name(
     auto [atom_shells, ignored_ecp_shells, ignored_ecp_electrons] =
         detail::get_basis_for_nuclear_charge(nuclear_charges[atom_index],
                                              basis_name, atom_index);
+    clear_legacy_radial_powers(atom_shells);
     shells.insert(shells.end(), atom_shells.begin(), atom_shells.end());
   }
   return std::make_shared<AuxiliaryBasis>(
@@ -196,6 +206,7 @@ std::shared_ptr<AuxiliaryBasis> AuxiliaryBasis::from_index_map(
     auto [atom_shells, ignored_ecp_shells, ignored_ecp_electrons] =
         detail::get_basis_for_nuclear_charge(nuclear_charges[atom_index],
                                              basis_name, atom_index);
+    clear_legacy_radial_powers(atom_shells);
     shells.insert(shells.end(), atom_shells.begin(), atom_shells.end());
   }
 

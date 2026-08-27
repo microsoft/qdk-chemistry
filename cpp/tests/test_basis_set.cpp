@@ -12,11 +12,8 @@
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
-#include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <stdexcept>
 #include <string>
-#include <type_traits>
-#include <unordered_map>
 #include <vector>
 
 #include "ut_common.hpp"
@@ -31,14 +28,6 @@
   } while (0)
 
 using namespace qdk::chemistry::data;
-
-static_assert(!std::is_constructible_v<
-              BasisSet, const std::string&, const std::vector<Shell>&,
-              const EffectiveCorePotential&, const Structure&, AOType>);
-static_assert(
-    std::is_constructible_v<
-        BasisSet, const std::string&, const std::vector<Shell>&,
-        const EffectiveCorePotential&, std::shared_ptr<Structure>, AOType>);
 
 class BasisSetTest : public ::testing::Test {
  protected:
@@ -83,14 +72,6 @@ TEST_F(BasisSetTest, ShellConstructors) {
   EXPECT_EQ(OrbitalType::D, shell_with_data.orbital_type);
   EXPECT_EQ(exponents.size(), shell_with_data.exponents.size());
   EXPECT_EQ(coefficients.size(), shell_with_data.coefficients.size());
-
-  const auto shell_json = shell_with_data.to_json();
-  const auto restored_shell = Shell::from_json(shell_json, 2);
-  EXPECT_EQ(shell_with_data.atom_index, restored_shell.atom_index);
-  EXPECT_EQ(shell_with_data.orbital_type, restored_shell.orbital_type);
-  EXPECT_TRUE(shell_with_data.exponents.isApprox(restored_shell.exponents));
-  EXPECT_TRUE(
-      shell_with_data.coefficients.isApprox(restored_shell.coefficients));
 }
 
 TEST_F(BasisSetTest, Constructors) {
@@ -99,19 +80,21 @@ TEST_F(BasisSetTest, Constructors) {
   std::vector<std::string> symbols = {"H"};
   Structure structure(coords, symbols);
 
-  // Constructor with empty name should throw
-  std::vector<Shell> empty_name_shells;
-  empty_name_shells.emplace_back(
-      Shell(0, OrbitalType::S, std::vector{1.0}, std::vector{2.0}));
-  EXPECT_THROW(BasisSet basis1("", empty_name_shells, structure),
+  // Constructor with empty name and structure
+  EXPECT_THROW(BasisSet basis1("", structure), std::invalid_argument);
+
+  // Constructor with name and structure should throw (empty basis invalid)
+  EXPECT_THROW(BasisSet basis2("6-31G", structure), std::invalid_argument);
+
+  // Constructor with name, structure and basis type should throw (empty basis
+  // invalid)
+  EXPECT_THROW(BasisSet basis3("6-31G", structure, AOType::Cartesian),
                std::invalid_argument);
 
   // Constructor with shells should work
   std::vector<Shell> shells;
   shells.emplace_back(
       Shell(0, OrbitalType::S, std::vector{1.0}, std::vector{2.0}));
-  BasisSet basis3("6-31G", shells);
-
   BasisSet basis4("6-31G", shells, structure);
   EXPECT_EQ(std::string("6-31G"), basis4.get_name());
   EXPECT_EQ(AOType::Spherical, basis4.get_atomic_orbital_type());
@@ -247,6 +230,10 @@ TEST_F(BasisSetTest, AOTypeManagement) {
   std::vector<std::string> symbols = {"H"};
   Structure structure(coords, symbols);
 
+  // Test default basis type (spherical) - empty basis sets are invalid
+  EXPECT_THROW(BasisSet basis_spherical("test", structure),
+               std::invalid_argument);
+
   // Create cartesian basis set
   std::vector<Shell> shells;
   shells.emplace_back(
@@ -290,12 +277,6 @@ TEST_F(BasisSetTest, ShellWithRawPrimitives) {
 }
 
 TEST_F(BasisSetTest, OrbitalTypeUtilities) {
-  EXPECT_EQ(OrbitalType::UL, l_to_orbital_type(-1));
-  EXPECT_EQ(OrbitalType::S, l_to_orbital_type(0));
-  EXPECT_EQ(OrbitalType::I, l_to_orbital_type(6));
-  EXPECT_THROW(l_to_orbital_type(7), std::invalid_argument);
-  EXPECT_EQ(l_to_orbital_type(2), BasisSet::l_to_orbital_type(2));
-
   // Test orbital type sizes - spherical
   EXPECT_EQ(1u, BasisSet::get_num_orbitals_for_l(0, AOType::Spherical));
   EXPECT_EQ(3u, BasisSet::get_num_orbitals_for_l(1, AOType::Spherical));
@@ -411,6 +392,9 @@ TEST_F(BasisSetTest, Validation) {
   std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}};
   std::vector<std::string> symbols = {"H"};
   Structure structure(coords, symbols);
+
+  // Empty basis is invalid
+  EXPECT_THROW(BasisSet empty_basis("test", structure), std::invalid_argument);
 
   // Add a shell
   std::vector<Shell> shells;
@@ -575,9 +559,6 @@ TEST_F(BasisSetTest, ECPDefaultInitialization) {
   EXPECT_EQ(0u, basis.get_ecp_electrons()[0]);
   EXPECT_EQ(0u, basis.get_ecp_electrons()[1]);
 
-  BasisSet basis_without_structure("test-basis", shells);
-  EXPECT_EQ("none", basis_without_structure.get_ecp_name());
-
   // Check default ECP shell values
   EXPECT_FALSE(basis.has_ecp_shells());
   EXPECT_EQ(0u, basis.get_num_ecp_shells());
@@ -606,7 +587,7 @@ TEST_F(BasisSetTest, ECPGet) {
   // Test getting ECP data
   std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}};
   std::vector<std::string> symbols = {"Ag", "H"};
-  auto structure = std::make_shared<Structure>(coords, symbols);
+  Structure structure(coords, symbols);
 
   std::vector<Shell> shells;
   shells.emplace_back(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
@@ -647,81 +628,6 @@ TEST_F(BasisSetTest, ECPGet) {
   EXPECT_EQ(0u, basis.get_ecp_electrons()[1]);
 }
 
-TEST_F(BasisSetTest, EffectiveCorePotentialConvenienceConstructor) {
-  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}};
-  std::vector<std::string> symbols = {"Ag", "H"};
-  auto structure = std::make_shared<Structure>(coords, symbols);
-
-  std::vector<Shell> shells;
-  shells.emplace_back(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
-  shells.emplace_back(1, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
-
-  std::vector<Shell> ecp_shells;
-  ecp_shells.emplace_back(0, OrbitalType::S, std::vector{10.0},
-                          std::vector{50.0}, std::vector{0});
-  std::vector<size_t> ecp_electrons = {28, 0};
-
-  EffectiveCorePotential ecp("test-ecp", ecp_shells, ecp_electrons);
-  EffectiveCorePotential custom_ecp(ecp_shells, ecp_electrons);
-  BasisSet typed("test-basis", shells, ecp, structure);
-  BasisSet legacy("test-basis", shells, "test-ecp", ecp_shells, ecp_electrons,
-                  structure);
-
-  EXPECT_EQ("test-ecp", ecp.get_name());
-  EXPECT_EQ(std::string(EffectiveCorePotential::custom_name),
-            custom_ecp.get_name());
-  EXPECT_EQ(ecp_electrons, ecp.get_electrons());
-  EXPECT_EQ(1u, ecp.get_shells().size());
-  EXPECT_EQ(legacy.get_ecp_name(), typed.get_ecp_name());
-  EXPECT_EQ(legacy.get_ecp_electrons(), typed.get_ecp_electrons());
-  EXPECT_EQ(legacy.get_num_ecp_shells(), typed.get_num_ecp_shells());
-  EXPECT_EQ(legacy.content_hash(), typed.content_hash());
-}
-
-TEST_F(BasisSetTest, EffectiveCorePotentialValidation) {
-  std::vector<Shell> regular_shells;
-  regular_shells.emplace_back(0, OrbitalType::S, std::vector{1.0},
-                              std::vector{1.0});
-
-  EXPECT_THROW(EffectiveCorePotential("", regular_shells, {2}),
-               std::invalid_argument);
-  EXPECT_THROW(EffectiveCorePotential("ecp", {}, {2}), std::invalid_argument);
-  EXPECT_THROW(EffectiveCorePotential("ecp", regular_shells, {2}),
-               std::invalid_argument);
-  EXPECT_THROW(EffectiveCorePotential("ecp", regular_shells, {0}),
-               std::invalid_argument);
-
-  std::vector<Shell> out_of_range_shells;
-  out_of_range_shells.emplace_back(1, OrbitalType::S, std::vector{2.0},
-                                   std::vector{1.0}, std::vector{0});
-  EXPECT_THROW(EffectiveCorePotential("ecp", out_of_range_shells, {2}),
-               std::invalid_argument);
-
-  Shell malformed_shell(0, OrbitalType::S, std::vector{2.0}, std::vector{1.0},
-                        std::vector{0});
-  malformed_shell.rpowers.resize(2);
-  EXPECT_THROW(EffectiveCorePotential("ecp", {malformed_shell}, {2}),
-               std::invalid_argument);
-}
-
-TEST_F(BasisSetTest, EffectiveCorePotentialCanonicalizesAtomOrder) {
-  std::vector<Shell> ecp_shells;
-  ecp_shells.emplace_back(1, OrbitalType::P, std::vector{1.0}, std::vector{1.0},
-                          std::vector{0});
-  ecp_shells.emplace_back(0, OrbitalType::S, std::vector{2.0}, std::vector{1.0},
-                          std::vector{0});
-  ecp_shells.emplace_back(1, OrbitalType::S, std::vector{3.0}, std::vector{1.0},
-                          std::vector{0});
-
-  EffectiveCorePotential ecp("ecp", ecp_shells, {2, 2});
-  const auto& canonical_shells = ecp.get_shells();
-
-  ASSERT_EQ(3u, canonical_shells.size());
-  EXPECT_EQ(0u, canonical_shells[0].atom_index);
-  EXPECT_EQ(OrbitalType::P, canonical_shells[1].orbital_type);
-  EXPECT_EQ(OrbitalType::S, canonical_shells[2].orbital_type);
-}
-
 TEST_F(BasisSetTest, ECPShellConstruction) {
   // Test creating ECP shells with radial powers
   std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}};
@@ -752,7 +658,7 @@ TEST_F(BasisSetTest, ECPShellConstruction) {
   rpow_p << 1;
   ecp_shells.emplace_back(0, OrbitalType::P, exp_p, coeff_p, rpow_p);
 
-  BasisSet basis("test-basis", shells, ecp_shells, {2, 0}, structure);
+  BasisSet basis("test-basis", shells, ecp_shells, structure);
 
   // Check ECP shell data
   EXPECT_TRUE(basis.has_ecp_shells());
@@ -999,7 +905,7 @@ TEST_F(BasisSetTest, ECPShellQueries) {
   rpow_d << 2;
   ecp_shells.emplace_back(1, OrbitalType::D, exp_d, coeff_d, rpow_d);
 
-  BasisSet basis("test-basis", shells, ecp_shells, {0, 2, 0}, structure);
+  BasisSet basis("test-basis", shells, ecp_shells, structure);
 
   // Test get_num_ecp_shells
   EXPECT_EQ(3u, basis.get_num_ecp_shells());
@@ -1082,6 +988,33 @@ TEST_F(BasisSetTest, ECPShellValidation) {
   // Regular shell should not have radial powers
   Shell regular_shell(0, OrbitalType::S, exponents, coefficients);
   EXPECT_FALSE(regular_shell.has_radial_powers());
+}
+
+TEST_F(BasisSetTest, ECPShellsWithoutECPMetadata) {
+  // Test that we can have ECP shells without setting ECP metadata
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}};
+  std::vector<std::string> symbols = {"Ag"};
+  Structure structure(coords, symbols);
+
+  std::vector<Shell> shells;
+  shells.emplace_back(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
+
+  std::vector<Shell> ecp_shells;
+  Eigen::VectorXd exp(1), coeff(1);
+  Eigen::VectorXi rpow(1);
+  exp << 10.0;
+  coeff << 50.0;
+  rpow << 0;
+  ecp_shells.emplace_back(0, OrbitalType::S, exp, coeff, rpow);
+
+  BasisSet basis("test-basis", shells, ecp_shells, structure);
+
+  // Should have ECP shells but no ECP metadata
+  EXPECT_TRUE(basis.has_ecp_shells());
+  EXPECT_EQ(1u, basis.get_num_ecp_shells());
+  EXPECT_FALSE(basis.has_ecp_electrons());
+  EXPECT_EQ("none", basis.get_ecp_name());
+  EXPECT_EQ(0u, basis.get_ecp_electrons()[0]);
 }
 
 TEST_F(BasisSetTest, ECPHDF5Serialization) {
@@ -1925,161 +1858,4 @@ TEST_F(BasisSetTest, DataTypeName) {
   BasisSet basis("6-31G", shells, structure);
 
   EXPECT_EQ(basis.get_data_type_name(), "basis_set");
-}
-
-TEST_F(BasisSetTest, SharedPtrStructureConstructors) {
-  auto structure = std::make_shared<Structure>(
-      std::vector<Eigen::Vector3d>{{0.0, 0.0, 0.0}, {1.4, 0.0, 0.0}},
-      std::vector<std::string>{"Ag", "H"});
-
-  std::vector<Shell> shells;
-  shells.emplace_back(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
-  shells.emplace_back(1, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
-
-  // Constructor: (name, shells, shared_ptr<Structure>)
-  BasisSet b1("sp1", shells, structure);
-  EXPECT_TRUE(b1.has_structure());
-  EXPECT_EQ(2u, b1.get_num_shells());
-
-  // Constructor: (name, shells, ecp_shells, ecp_electrons, shared_ptr)
-  Eigen::VectorXd exp(1), coeff(1);
-  Eigen::VectorXi rpow(1);
-  exp << 10.0;
-  coeff << 50.0;
-  rpow << 0;
-  std::vector<Shell> ecp_shells;
-  ecp_shells.emplace_back(0, OrbitalType::S, exp, coeff, rpow);
-  std::vector<size_t> ecp_electrons = {28, 0};
-
-  BasisSet b2("sp2", shells, ecp_shells, ecp_electrons, structure);
-  EXPECT_TRUE(b2.has_ecp_shells());
-  EXPECT_TRUE(b2.has_structure());
-
-  // Constructor: (name, shells, ecp_name, ecp_shells, ecp_electrons,
-  // shared_ptr)
-  BasisSet b3("sp3", shells, "ecp", ecp_shells, ecp_electrons, structure);
-  EXPECT_EQ("ecp", b3.get_ecp_name());
-  EXPECT_TRUE(b3.has_structure());
-
-  EffectiveCorePotential typed_ecp("typed-ecp", ecp_shells, ecp_electrons);
-  BasisSet b4("sp4", shells, typed_ecp, structure);
-  EXPECT_EQ("typed-ecp", b4.get_ecp_name());
-  EXPECT_TRUE(b4.has_structure());
-}
-
-TEST_F(BasisSetTest, MoveConstructorAndAssignment) {
-  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {1.4, 0.0, 0.0}};
-  std::vector<std::string> symbols = {"H", "H"};
-  auto structure = std::make_shared<Structure>(coords, symbols);
-
-  std::vector<Shell> shells;
-  shells.emplace_back(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
-  shells.emplace_back(1, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
-
-  // Move constructor
-  BasisSet original("move-src", shells, structure);
-  BasisSet moved(std::move(original));
-
-  EXPECT_EQ("move-src", moved.get_name());
-  EXPECT_EQ(2u, moved.get_num_shells());
-  EXPECT_TRUE(moved.has_structure());
-
-  // Move assignment
-  BasisSet target("target", shells);
-  EXPECT_FALSE(target.has_structure());
-
-  BasisSet source("move-src2", shells, structure);
-  target = std::move(source);
-
-  EXPECT_EQ("move-src2", target.get_name());
-  EXPECT_EQ(2u, target.get_num_shells());
-  EXPECT_TRUE(target.has_structure());
-}
-
-namespace {
-
-std::vector<Shell> make_ao_symmetry_shells() {
-  std::vector<Shell> shells;
-  shells.emplace_back(
-      Shell(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0}));
-  shells.emplace_back(
-      Shell(0, OrbitalType::P, std::vector{1.0}, std::vector{1.0}));
-  return shells;
-}
-
-std::shared_ptr<Structure> make_ao_symmetry_structure() {
-  Eigen::MatrixXd coordinates(1, 3);
-  coordinates << 0.0, 0.0, 0.0;
-  return std::make_shared<Structure>(coordinates,
-                                     std::vector<std::string>{"H"});
-}
-
-}  // namespace
-
-TEST(BasisSetAoSymmetries, DefaultIsRestrictedSpin) {
-  BasisSet basis("custom", make_ao_symmetry_shells());
-
-  auto symmetries = basis.ao_symmetries();
-  ASSERT_NE(symmetries, nullptr);
-  EXPECT_TRUE(symmetries->has_axis(AxisName::Spin));
-  EXPECT_TRUE(symmetries->axis(AxisName::Spin).equivalent());
-
-  const auto& extents = basis.ao_extents();
-  const std::size_t num_atomic_orbitals = basis.get_num_atomic_orbitals();
-  EXPECT_EQ(extents.size(), 2u);
-  EXPECT_EQ(extents.at(SymmetryLabel{axes::alpha()}), num_atomic_orbitals);
-  EXPECT_EQ(extents.at(SymmetryLabel{axes::beta()}), num_atomic_orbitals);
-}
-
-TEST(BasisSetAoSymmetries, ExplicitDefaultedExtents) {
-  auto symmetries = std::make_shared<const SymmetryProduct>(
-      std::vector<SymmetryAxis>{axes::spin(1, true)});
-  BasisSet basis("custom", make_ao_symmetry_shells(),
-                 make_ao_symmetry_structure(), symmetries);
-
-  const std::size_t num_atomic_orbitals = basis.get_num_atomic_orbitals();
-  EXPECT_EQ(basis.ao_extents().at(SymmetryLabel{axes::alpha()}),
-            num_atomic_orbitals);
-  EXPECT_EQ(basis.ao_extents().at(SymmetryLabel{axes::beta()}),
-            num_atomic_orbitals);
-}
-
-TEST(BasisSetAoSymmetries, RestrictedExtentMismatchThrows) {
-  auto symmetries = std::make_shared<const SymmetryProduct>(
-      std::vector<SymmetryAxis>{axes::spin(1, true)});
-  std::unordered_map<SymmetryLabel, std::size_t> extents{
-      {SymmetryLabel{axes::alpha()}, 4},
-      {SymmetryLabel{axes::beta()}, 5},
-  };
-  EXPECT_THROW(
-      BasisSet("custom", make_ao_symmetry_shells(),
-               make_ao_symmetry_structure(), symmetries, std::move(extents)),
-      std::invalid_argument);
-}
-
-TEST(BasisSetAoSymmetries, UnrestrictedAllowsDistinctExtents) {
-  auto symmetries = std::make_shared<const SymmetryProduct>(
-      std::vector<SymmetryAxis>{axes::spin(1, false)});
-  std::unordered_map<SymmetryLabel, std::size_t> extents{
-      {SymmetryLabel{axes::alpha()}, 4},
-      {SymmetryLabel{axes::beta()}, 5},
-  };
-  BasisSet basis("custom", make_ao_symmetry_shells(),
-                 make_ao_symmetry_structure(), symmetries, std::move(extents));
-  EXPECT_EQ(basis.ao_extents().at(SymmetryLabel{axes::alpha()}), 4u);
-  EXPECT_EQ(basis.ao_extents().at(SymmetryLabel{axes::beta()}), 5u);
-}
-
-TEST(BasisSetAoSymmetries, CopyPreservesAoSymmetries) {
-  auto symmetries = std::make_shared<const SymmetryProduct>(
-      std::vector<SymmetryAxis>{axes::spin(1, false)});
-  std::unordered_map<SymmetryLabel, std::size_t> extents{
-      {SymmetryLabel{axes::alpha()}, 4},
-      {SymmetryLabel{axes::beta()}, 5},
-  };
-  BasisSet basis("custom", make_ao_symmetry_shells(),
-                 make_ao_symmetry_structure(), symmetries, std::move(extents));
-  BasisSet copy(basis);
-  EXPECT_EQ(copy.ao_extents().at(SymmetryLabel{axes::beta()}), 5u);
-  EXPECT_FALSE(copy.ao_symmetries()->axis(AxisName::Spin).equivalent());
 }

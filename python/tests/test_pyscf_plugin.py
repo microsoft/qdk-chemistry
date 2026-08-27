@@ -3025,21 +3025,12 @@ class TestQDKChemistryPySCFBasisConversion:
         # Edge case 1: ECP shells exist without ECP metadata
         shells = [Shell(0, OrbitalType.S, [1.0], [1.0])]
         ecp_shells = [Shell(0, OrbitalType.S, [10.0, 5.0], [50.0, 20.0], [0, 2])]
-        ecp_electrons = [10]
-        with pytest.warns(DeprecationWarning, match="ECP shells and electrons"):
-            qdk_basis_no_meta = BasisSet(
-                "test-basis",
-                shells,
-                ecp_shells,
-                ecp_electrons,
-                ag_structure,
-                AOType.Spherical,
-            )
+        qdk_basis_no_meta = BasisSet("test-basis", shells, ecp_shells, ag_structure, AOType.Spherical)
 
         assert qdk_basis_no_meta.has_ecp_shells()
         assert qdk_basis_no_meta.get_num_ecp_shells() == 1
-        assert qdk_basis_no_meta.has_ecp_electrons()
-        assert qdk_basis_no_meta.get_ecp_name() == ""
+        assert not qdk_basis_no_meta.has_ecp_electrons()  # No metadata set
+        assert qdk_basis_no_meta.get_ecp_name() == "none"
 
         # Edge case 2: Full ECP structure format roundtrip
         pyscf_mol_orig = pyscf.gto.M(atom="Ag 0 0 0", spin=1, basis="lanl2dz", ecp="lanl2dz", verbose=0)

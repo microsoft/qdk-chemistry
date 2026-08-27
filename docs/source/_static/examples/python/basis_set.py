@@ -17,7 +17,6 @@ from qdk_chemistry.data import (
     AuxiliaryBasisCollection,
     AuxiliaryBasisRole,
     BasisSet,
-    EffectiveCorePotential,
     OrbitalType,
     Shell,
     Structure,
@@ -156,32 +155,6 @@ basis_set = BasisSet.from_hdf5_file("molecule.basis_set.h5")
 # end-cell-serialization
 Path("molecule.basis_set.json").unlink()
 Path("molecule.basis_set.h5").unlink()
-################################################################################
-
-################################################################################
-# start-cell-ecp
-# Create an ECP shell with radial powers (r^n terms)
-ecp_exponents = np.array([10.0, 5.0])
-ecp_coefficients = np.array([50.0, 20.0])
-ecp_rpowers = np.array([0, 2], dtype=np.int32)
-ecp_shell = Shell(0, OrbitalType.S, ecp_exponents, ecp_coefficients, ecp_rpowers)
-
-# Create a basis set with ECP data
-ecp_shells = [ecp_shell]
-ecp_electrons = [28, 0, 0]  # 28 core electrons replaced on the first atom
-basis_with_ecp = BasisSet(
-    "my-basis",
-    [shell1, shell2],
-    EffectiveCorePotential("my-ecp", ecp_shells, ecp_electrons),
-    structure,
-)
-
-# Query ECP data
-print(f"Has ECP shells: {basis_with_ecp.has_ecp_shells()}")
-print(f"ECP name: {basis_with_ecp.get_ecp_name()}")
-print(f"ECP electrons: {list(basis_with_ecp.get_ecp_electrons())}")
-print(f"Num ECP shells: {basis_with_ecp.get_num_ecp_shells()}")
-# end-cell-ecp
 ################################################################################
 
 ################################################################################

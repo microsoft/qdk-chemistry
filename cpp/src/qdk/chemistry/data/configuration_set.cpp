@@ -16,9 +16,7 @@ namespace qdk::chemistry::data {
 ConfigurationSet::ConfigurationSet(
     const std::vector<Configuration>& configurations,
     std::shared_ptr<Orbitals> orbitals, std::string sector)
-    : _configurations(
-          std::make_shared<const std::vector<Configuration>>(configurations)),
-      _orbitals(orbitals) {
+    : _configurations(configurations), _orbitals(orbitals) {
   QDK_LOG_TRACE_ENTERING();
 
   if (!_orbitals) {
@@ -32,9 +30,7 @@ ConfigurationSet::ConfigurationSet(
 ConfigurationSet::ConfigurationSet(std::vector<Configuration>&& configurations,
                                    std::shared_ptr<Orbitals> orbitals,
                                    std::string sector)
-    : _configurations(std::make_shared<const std::vector<Configuration>>(
-          std::move(configurations))),
-      _orbitals(orbitals) {
+    : _configurations(std::move(configurations)), _orbitals(orbitals) {
   QDK_LOG_TRACE_ENTERING();
 
   if (!_orbitals) {
@@ -48,7 +44,7 @@ ConfigurationSet::ConfigurationSet(std::vector<Configuration>&& configurations,
 const std::vector<Configuration>& ConfigurationSet::get_configurations() const {
   QDK_LOG_TRACE_ENTERING();
 
-  return *_configurations;
+  return _configurations;
 }
 
 std::shared_ptr<Orbitals> ConfigurationSet::get_orbitals() const {
@@ -75,8 +71,8 @@ size_t ConfigurationSet::num_modes() const {
     return _orbitals->num_modes();
   }
   // Fallback: use the first configuration's padded capacity.
-  if (!_configurations->empty()) {
-    return (*_configurations)[0].get_orbital_capacity();
+  if (!_configurations.empty()) {
+    return _configurations[0].get_orbital_capacity();
   }
   return 0;
 }
@@ -84,45 +80,45 @@ size_t ConfigurationSet::num_modes() const {
 size_t ConfigurationSet::size() const {
   QDK_LOG_TRACE_ENTERING();
 
-  return _configurations->size();
+  return _configurations.size();
 }
 
 bool ConfigurationSet::empty() const {
   QDK_LOG_TRACE_ENTERING();
 
-  return _configurations->empty();
+  return _configurations.empty();
 }
 
 const Configuration& ConfigurationSet::operator[](size_t idx) const {
   QDK_LOG_TRACE_ENTERING();
 
-  return (*_configurations)[idx];
+  return _configurations[idx];
 }
 
 const Configuration& ConfigurationSet::at(size_t idx) const {
   QDK_LOG_TRACE_ENTERING();
 
-  return _configurations->at(idx);
+  return _configurations.at(idx);
 }
 
 std::vector<Configuration>::const_iterator ConfigurationSet::begin() const {
   QDK_LOG_TRACE_ENTERING();
-  return _configurations->begin();
+  return _configurations.begin();
 }
 
 std::vector<Configuration>::const_iterator ConfigurationSet::end() const {
   QDK_LOG_TRACE_ENTERING();
-  return _configurations->end();
+  return _configurations.end();
 }
 
 std::vector<Configuration>::const_iterator ConfigurationSet::cbegin() const {
   QDK_LOG_TRACE_ENTERING();
-  return _configurations->cbegin();
+  return _configurations.cbegin();
 }
 
 std::vector<Configuration>::const_iterator ConfigurationSet::cend() const {
   QDK_LOG_TRACE_ENTERING();
-  return _configurations->cend();
+  return _configurations.cend();
 }
 
 bool ConfigurationSet::operator==(const ConfigurationSet& other) const {
@@ -133,7 +129,7 @@ bool ConfigurationSet::operator==(const ConfigurationSet& other) const {
     return false;
   }
   // Check if configurations are equal
-  return *_configurations == *other._configurations;
+  return _configurations == other._configurations;
 }
 
 bool ConfigurationSet::operator!=(const ConfigurationSet& other) const {
@@ -145,15 +141,15 @@ bool ConfigurationSet::operator!=(const ConfigurationSet& other) const {
 void ConfigurationSet::_validate_configurations() const {
   QDK_LOG_TRACE_ENTERING();
 
-  if (_configurations->empty()) {
+  if (_configurations.empty()) {
     return;
   }
 
   // Structural check: all configurations must have the same orbital capacity.
-  size_t first_config_orbitals = (*_configurations)[0].get_orbital_capacity();
+  size_t first_config_orbitals = _configurations[0].get_orbital_capacity();
 
-  for (size_t i = 1; i < _configurations->size(); ++i) {
-    size_t config_num_orbitals = (*_configurations)[i].get_orbital_capacity();
+  for (size_t i = 1; i < _configurations.size(); ++i) {
+    size_t config_num_orbitals = _configurations[i].get_orbital_capacity();
     if (config_num_orbitals != first_config_orbitals) {
       throw std::invalid_argument(
           "ConfigurationSet: configuration at index " + std::to_string(i) +
@@ -176,8 +172,8 @@ void ConfigurationSet::_validate_configurations() const {
         spin_channel_indices(_orbitals->active_indices(), axes::alpha()).size();
 
     if (active_space_size != 0) {
-      for (size_t i = 0; i < _configurations->size(); ++i) {
-        const auto& config = (*_configurations)[i];
+      for (size_t i = 0; i < _configurations.size(); ++i) {
+        const auto& config = _configurations[i];
         const std::string config_str = config.to_string();
 
         if (config.get_orbital_capacity() < active_space_size) {
@@ -229,7 +225,7 @@ nlohmann::json ConfigurationSet::to_json() const {
 
   // Store configurations array
   j["configurations"] = nlohmann::json::array();
-  for (const auto& config : *_configurations) {
+  for (const auto& config : _configurations) {
     j["configurations"].push_back(config.to_json());
   }
 
@@ -280,7 +276,7 @@ void ConfigurationSet::to_hdf5(H5::Group& group) const {
         "sector", sector_str_type, H5::DataSpace(H5S_SCALAR));
     sector_attr.write(sector_str_type, _sector_layout.front().first);
 
-    if (_configurations->empty()) {
+    if (_configurations.empty()) {
       // Store empty flag
       H5::Attribute empty_attr = group.createAttribute(
           "is_empty", H5::PredType::NATIVE_HBOOL, H5::DataSpace(H5S_SCALAR));
@@ -291,11 +287,11 @@ void ConfigurationSet::to_hdf5(H5::Group& group) const {
 
     // Store as a 2D matrix of uint8_t for efficient I/O
     // Each row is the packed binary representation of one configuration
-    size_t num_configs = _configurations->size();
-    size_t packed_size = (*_configurations)[0]._packed_orbs.size();
+    size_t num_configs = _configurations.size();
+    size_t packed_size = _configurations[0]._packed_orbs.size();
 
     // Verify all configurations have the same packed size
-    for (const auto& config : *_configurations) {
+    for (const auto& config : _configurations) {
       if (config._packed_orbs.size() != packed_size) {
         throw std::runtime_error(
             "Inconsistent configuration sizes in ConfigurationSet");
@@ -312,7 +308,7 @@ void ConfigurationSet::to_hdf5(H5::Group& group) const {
     // Flatten the data for writing
     std::vector<uint8_t> flat_data;
     flat_data.reserve(num_configs * packed_size);
-    for (const auto& config : *_configurations) {
+    for (const auto& config : _configurations) {
       flat_data.insert(flat_data.end(), config._packed_orbs.begin(),
                        config._packed_orbs.end());
     }
@@ -333,14 +329,14 @@ void ConfigurationSet::to_hdf5(H5::Group& group) const {
 
     // Store orbital capacity (number of modes each configuration can
     // represent)
-    hsize_t orbital_capacity = (*_configurations)[0].get_orbital_capacity();
+    hsize_t orbital_capacity = _configurations[0].get_orbital_capacity();
     H5::Attribute orb_attr =
         dataset.createAttribute("orbital_capacity", H5::PredType::NATIVE_HSIZE,
                                 H5::DataSpace(H5S_SCALAR));
     orb_attr.write(H5::PredType::NATIVE_HSIZE, &orbital_capacity);
 
     // Store bits_per_mode for statistics-generic reconstruction.
-    uint8_t bpm = (*_configurations)[0].bits_per_mode();
+    uint8_t bpm = _configurations[0].bits_per_mode();
     H5::Attribute bpm_attr = dataset.createAttribute(
         "bits_per_mode", H5::PredType::NATIVE_UINT8, H5::DataSpace(H5S_SCALAR));
     bpm_attr.write(H5::PredType::NATIVE_UINT8, &bpm);
@@ -448,13 +444,12 @@ std::string ConfigurationSet::get_summary() const {
 
   std::string summary = "ConfigurationSet:\n";
   summary +=
-      "  Number of configurations: " + std::to_string(_configurations->size()) +
+      "  Number of configurations: " + std::to_string(_configurations.size()) +
       "\n";
 
-  if (!_configurations->empty()) {
+  if (!_configurations.empty()) {
     summary += "  Orbital capacity per configuration: " +
-               std::to_string((*_configurations)[0].get_orbital_capacity()) +
-               "\n";
+               std::to_string(_configurations[0].get_orbital_capacity()) + "\n";
   }
 
   if (_orbitals) {
@@ -584,8 +579,8 @@ ConfigurationSet ConfigurationSet::from_hdf5_file(const std::string& filename) {
 void ConfigurationSet::hash_update(
     qdk::chemistry::utils::HashContext& ctx) const {
   hash_value(ctx, get_data_type_name());
-  hash_value(ctx, static_cast<uint64_t>(_configurations->size()));
-  for (const auto& config : *_configurations) {
+  hash_value(ctx, static_cast<uint64_t>(_configurations.size()));
+  for (const auto& config : _configurations) {
     hash_value(ctx, config.content_hash());
   }
   hash_value(ctx, static_cast<uint64_t>(_sector_layout.size()));

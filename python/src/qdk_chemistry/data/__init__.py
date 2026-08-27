@@ -21,7 +21,6 @@ Exposed classes are:
 - :class:`ConfigurationSet`: Collection of electronic configurations with associated orbital information.
 - :class:`DataClass`: Base data class.
 - :class:`ElectronicStructureSettings`: Specialized settings for electronic structure calculations.
-- :class:`EffectiveCorePotential`: Effective core potential data associated with a basis set.
 - :class:`Element`: Represents a chemical element with its properties.
 - :class:`EnergyExpectationResult`: Result for Hamiltonian energy expectation value and variance.
 - :class:`Hamiltonian`: Quantum mechanical Hamiltonian operator representation.
@@ -85,7 +84,6 @@ from qdk_chemistry._core.data import (
     CholeskyHamiltonianContainer,
     Configuration,
     ConfigurationSet,
-    EffectiveCorePotential,
     ElectronicStructureSettings,
     Element,
     Hamiltonian,
@@ -164,7 +162,6 @@ __all__ = [
     "DataClass",
     "DrivenContainer",
     "DrivenQubitHamiltonian",
-    "EffectiveCorePotential",
     "ElectronicStructureSettings",
     "Element",
     "EnergyExpectationResult",

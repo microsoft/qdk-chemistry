@@ -13,7 +13,6 @@
 #endif
 
 #include <libint2.hpp>
-#include <memory>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <string>
@@ -273,10 +272,10 @@ qdk::chemistry::data::BasisSet convert_basis_set_to_qdk(
                                                  qdk_ecp_electrons, structure);
     return qdk_basis_set;
   } else {
-    qdk::chemistry::data::BasisSet qdk_basis_set(
-        basis_set.name, qdk_shells,
-        std::make_shared<qdk::chemistry::data::Structure>(
-            std::move(structure)));
+    // Create the BasisSet with shells, ECP shells, and structure (no ECP
+    // name/electrons)
+    qdk::chemistry::data::BasisSet qdk_basis_set(basis_set.name, qdk_shells,
+                                                 qdk_ecp_shells, structure);
     return qdk_basis_set;
   }
 }

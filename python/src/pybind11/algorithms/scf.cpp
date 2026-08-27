@@ -105,6 +105,7 @@ Args:
         - A ``qdk_chemistry.data.BasisSet`` object
         - A string specifying the name of a standard basis set (e.g., "sto-3g")
         - A ``qdk_chemistry.data.Orbitals`` object to be used as an initial guess
+
 Returns:
     tuple[float, qdk_chemistry.data.Wavefunction]: Converged total energy (nuclear + electronic) and the resulting wavefunction.
 

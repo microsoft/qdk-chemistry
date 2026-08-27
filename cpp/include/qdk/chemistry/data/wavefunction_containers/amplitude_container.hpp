@@ -318,7 +318,7 @@ class AmplitudeContainer : public WavefunctionContainer {
   std::shared_ptr<Orbitals> _orbitals;
   // Single-particle sector the orbitals belong to
   std::string _sector;
-  // Reference wavefunction provenance.
+  // Reference wavefunction
   std::shared_ptr<Wavefunction> _wavefunction;
   // Correlated method that produced the amplitudes
   AmplitudeType _amplitude_type;

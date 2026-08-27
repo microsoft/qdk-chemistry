@@ -173,7 +173,7 @@ Orbitals::Orbitals(
     if (overlap_matrix.rows() != overlap_matrix.cols()) {
       throw std::runtime_error("AO overlap matrix must be square");
     }
-    _ao_overlap = std::make_shared<const Eigen::MatrixXd>(ao_overlap.value());
+    _ao_overlap = std::make_unique<Eigen::MatrixXd>(ao_overlap.value());
   }
 
   _init_index_spaces(std::move(active_indices), std::move(inactive_indices),
@@ -271,7 +271,7 @@ Orbitals::Orbitals(
     if (overlap_matrix.rows() != overlap_matrix.cols()) {
       throw std::runtime_error("AO overlap matrix must be square");
     }
-    _ao_overlap = std::make_shared<const Eigen::MatrixXd>(ao_overlap.value());
+    _ao_overlap = std::make_unique<Eigen::MatrixXd>(ao_overlap.value());
   }
 
   _init_index_spaces(std::move(active_indices), std::move(inactive_indices),
@@ -350,7 +350,7 @@ Orbitals::Orbitals(
                      get_num_molecular_orbitals());
 
   if (ao_overlap) {
-    _ao_overlap = std::make_shared<const Eigen::MatrixXd>(*ao_overlap);
+    _ao_overlap = std::make_unique<Eigen::MatrixXd>(*ao_overlap);
   }
   _basis_set = std::move(basis_set);
 
@@ -368,8 +368,12 @@ Orbitals::Orbitals(const Orbitals& other) {
   _inactive_space_indices = other._inactive_space_indices;
   _build_space_index_sets();
 
-  // Immutable AO overlap storage can be shared.
-  _ao_overlap = other._ao_overlap;
+  // Copy AO overlap
+  if (other._ao_overlap) {
+    _ao_overlap = std::make_unique<Eigen::MatrixXd>(*other._ao_overlap);
+  } else {
+    _ao_overlap = nullptr;
+  }
 
   // Copy basis set (shared pointer can be safely copied)
   _basis_set = other._basis_set;
@@ -389,8 +393,12 @@ Orbitals& Orbitals::operator=(const Orbitals& other) {
     _inactive_space_indices = other._inactive_space_indices;
     _build_space_index_sets();
 
-    // Immutable AO overlap storage can be shared.
-    _ao_overlap = other._ao_overlap;
+    // Copy AO overlap
+    if (other._ao_overlap) {
+      _ao_overlap = std::make_unique<Eigen::MatrixXd>(*other._ao_overlap);
+    } else {
+      _ao_overlap = nullptr;
+    }
 
     // Copy basis set (shared pointer can be safely copied)
     _basis_set = other._basis_set;

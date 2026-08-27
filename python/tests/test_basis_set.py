@@ -15,15 +15,7 @@ import numpy as np
 import pytest
 
 import qdk_chemistry.algorithms as alg
-from qdk_chemistry.data import (
-    AOType,
-    BasisSet,
-    EffectiveCorePotential,
-    Element,
-    OrbitalType,
-    Shell,
-    Structure,
-)
+from qdk_chemistry.data import AOType, BasisSet, Element, OrbitalType, Shell, Structure
 from qdk_chemistry.data._type_name import class_data_type_name
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
@@ -334,15 +326,11 @@ def test_summary():
 def test_json_serialization():
     """Test JSON serialization and deserialization."""
     # Create a basis set with data
-    positions = np.array([[0.0, 0.0, 0.0]])
-    elements = ["H"]
-    structure = Structure(elements, positions)
-
     shells = [
         Shell(0, OrbitalType.S, [1.0], [1.0]),
         Shell(0, OrbitalType.P, [0.5], [1.0]),
     ]
-    basis_out = BasisSet("STO-3G", shells, structure)
+    basis_out = BasisSet("STO-3G", shells)
 
     # Test direct JSON conversion
     json_data = basis_out.to_json()
@@ -378,15 +366,11 @@ def test_json_serialization():
 def test_hdf5_serialization():
     """Test HDF5 serialization and deserialization."""
     # Create a basis set with data
-    positions = np.array([[0.0, 0.0, 0.0]])
-    elements = ["H"]
-    structure = Structure(elements, positions)
-
     shells = [
         Shell(0, OrbitalType.S, [1.0], [1.0]),
         Shell(0, OrbitalType.P, [0.5], [1.0]),
     ]
-    basis_out = BasisSet("cc-pVDZ", shells, structure, AOType.Spherical)
+    basis_out = BasisSet("cc-pVDZ", shells, AOType.Spherical)
 
     try:
         with tempfile.NamedTemporaryFile(suffix=".basis_set.h5", delete=False) as tmp:
@@ -1057,11 +1041,7 @@ def test_basis_set_pickling_and_repr():
         Shell(0, OrbitalType.P, [1.158, 0.325], [0.155916, 0.607684]),
     ]
 
-    # Create a basis set with a structure
-    positions = np.array([[0.0, 0.0, 0.0]])
-    elements = ["H"]
-    structure = Structure(elements, positions)
-    original = BasisSet("STO-3G", shells, structure)
+    original = BasisSet("STO-3G", shells)
 
     # Test pickling and unpickling
     pickled_data = pickle.dumps(original)
@@ -1161,12 +1141,11 @@ def test_basis_set_ecp_functionality():
     ecp_electrons = [10, 2, 0]
     # Create ECP shells for Cu (atom 0) and O (atom 1)
     ecp_shells = [
-        Shell(0, OrbitalType.S, [2.0, 1.5], [0.5, 0.5], [0, 0]),
-        Shell(0, OrbitalType.P, [2.0, 1.5], [0.5, 0.5], [0, 0]),
-        Shell(1, OrbitalType.S, [1.0], [1.0], [0]),
+        Shell(0, OrbitalType.S, [2.0, 1.5], [0.5, 0.5]),  # Cu ECP S-shell
+        Shell(0, OrbitalType.P, [2.0, 1.5], [0.5, 0.5]),  # Cu ECP P-shell
+        Shell(1, OrbitalType.S, [1.0], [1.0]),  # O ECP S-shell
     ]
-    ecp = EffectiveCorePotential(ecp_name, ecp_shells, ecp_electrons)
-    basis_with_ecp = BasisSet("test-basis", shells, ecp, structure)
+    basis_with_ecp = BasisSet("test-basis", shells, ecp_name, ecp_shells, ecp_electrons, structure)
 
     # Test getting ECP
     assert basis_with_ecp.has_ecp_electrons()
@@ -1174,11 +1153,8 @@ def test_basis_set_ecp_functionality():
     assert list(basis_with_ecp.get_ecp_electrons()) == ecp_electrons
 
     # Test ECP validation (wrong vector size should raise a ValueError)
-    with (
-        pytest.warns(DeprecationWarning, match="named ECP shells"),
-        pytest.raises(ValueError, match=r"ECP electrons vector size must match number of atoms"),
-    ):
-        BasisSet("test-basis", shells, "test-basis", ecp_shells, [10], structure)
+    with pytest.raises(ValueError, match=r"ECP electrons vector size must match number of atoms"):
+        BasisSet("test-basis", shells, "test-basis", ecp_shells, [10], structure)  # Only 1 element, but we have 3 atoms
 
     # Test ECP with JSON serialization
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -1231,7 +1207,7 @@ def test_basis_set_ecp_shells():
     ecp_shells = [ecp_shell_s, ecp_shell_p]
 
     # Create basis set with ECP shells
-    basis = BasisSet("test-basis", shells, EffectiveCorePotential(ecp_shells, [2]), structure)
+    basis = BasisSet("test-basis", shells, ecp_shells, structure)
 
     # Test ECP shell queries
     assert basis.has_ecp_shells()
@@ -1262,44 +1238,6 @@ def test_basis_set_ecp_shells():
     assert not regular_shell.has_radial_powers()
 
 
-def test_effective_core_potential_convenience_constructor():
-    """Typed ECP data delegates to the established BasisSet ECP API."""
-    structure = Structure(["Ag"], np.array([[0.0, 0.0, 0.0]]))
-    shells = [Shell(0, OrbitalType.S, [1.0], [1.0])]
-    ecp_shells = [Shell(0, OrbitalType.S, [10.0], [50.0], [0])]
-
-    ecp = EffectiveCorePotential("test-ecp", ecp_shells, [28])
-    custom_ecp = EffectiveCorePotential(ecp_shells, [28])
-    typed = BasisSet("test-basis", shells, ecp, structure)
-    with pytest.warns(DeprecationWarning, match="named ECP shells"):
-        legacy = BasisSet("test-basis", shells, "test-ecp", ecp_shells, [28], structure)
-
-    assert ecp.get_name() == "test-ecp"
-    assert custom_ecp.get_name() == EffectiveCorePotential.custom_name
-    assert len(ecp.get_shells()) == 1
-    assert list(ecp.get_electrons()) == [28]
-    assert typed.get_ecp_name() == legacy.get_ecp_name()
-    assert list(typed.get_ecp_electrons()) == list(legacy.get_ecp_electrons())
-    assert typed.get_num_ecp_shells() == legacy.get_num_ecp_shells()
-
-    with pytest.raises(ValueError, match="radial powers"):
-        EffectiveCorePotential("bad", shells, [28])
-
-
-def test_legacy_ecp_constructors_are_deprecated():
-    structure = Structure(["Ag"], np.array([[0.0, 0.0, 0.0]]))
-    shells = [Shell(0, OrbitalType.S, [1.0], [1.0])]
-    ecp_shells = [Shell(0, OrbitalType.S, [10.0], [50.0], [0])]
-
-    with pytest.warns(DeprecationWarning, match="ECP shells and electrons"):
-        unnamed = BasisSet("test-basis", shells, ecp_shells, [28], structure)
-    with pytest.warns(DeprecationWarning, match="named ECP shells"):
-        named = BasisSet("test-basis", shells, "test-ecp", ecp_shells, [28], structure)
-
-    assert unnamed.get_num_ecp_shells() == 1
-    assert named.get_ecp_name() == "test-ecp"
-
-
 def test_basis_set_ecp_shells_serialization():
     """Test ECP shells serialization and deserialization."""
     # Create structure
@@ -1312,12 +1250,7 @@ def test_basis_set_ecp_shells_serialization():
     ecp_shells = [Shell(0, OrbitalType.S, [10.0, 5.0], [50.0, 20.0], [0, 2])]
 
     # Create basis set with ECP shells and ECP metadata
-    basis = BasisSet(
-        "test-basis",
-        shells,
-        EffectiveCorePotential("test-ecp", ecp_shells, [28]),
-        structure,
-    )
+    basis = BasisSet("test-basis", shells, "test-ecp", ecp_shells, [28], structure)
 
     # Test JSON serialization
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -1360,12 +1293,7 @@ def test_basis_set_ecp_shells_copy():
     shells = [Shell(0, OrbitalType.S, [1.0], [1.0])]
     ecp_shells = [Shell(0, OrbitalType.S, [10.0, 5.0], [50.0, 20.0], [0, 2])]
 
-    basis = BasisSet(
-        "test-basis",
-        shells,
-        EffectiveCorePotential("test-ecp", ecp_shells, [28]),
-        structure,
-    )
+    basis = BasisSet("test-basis", shells, "test-ecp", ecp_shells, [28], structure)
 
     # Test copy constructor
     basis_copy = BasisSet(basis)
@@ -1402,12 +1330,7 @@ def test_basis_set_ecp_shells_multi_atom():
         Shell(1, OrbitalType.D, [12.0], [40.0], [2]),
     ]
 
-    basis = BasisSet(
-        "test-basis",
-        shells,
-        EffectiveCorePotential(ecp_shells, [0, 2, 0]),
-        structure,
-    )
+    basis = BasisSet("test-basis", shells, ecp_shells, structure)
 
     # Test total ECP shells
     assert basis.get_num_ecp_shells() == 3
@@ -1546,174 +1469,3 @@ def test_get_supported_elements_for_basis_set():
 def test_basis_set_data_type_name():
     """Test that BasisSet exposes its static wire-format identifier."""
     assert class_data_type_name(BasisSet) == "basis_set"
-
-
-# ---------------------------------------------------------------------------
-# Tests for __init__ dispatcher: positional, keyword, mixed, and error paths
-# ---------------------------------------------------------------------------
-
-
-class TestBasisSetConstructorDispatch:
-    """Tests for the BasisSet __init__ dispatcher.
-
-    Covers all constructor signatures with positional, keyword, and mixed
-    calling conventions.
-    """
-
-    @pytest.fixture
-    def shell(self):
-        return Shell(0, OrbitalType.S, [1.0], [1.0])
-
-    @pytest.fixture
-    def shells(self, shell):
-        return [shell]
-
-    @pytest.fixture
-    def structure(self):
-        positions = np.array([[0.0, 0.0, 0.0]])
-        return Structure(["H"], positions)
-
-    @pytest.fixture
-    def ecp_shells(self):
-        return [Shell(0, OrbitalType.S, [5.0], [10.0], [1])]
-
-    @pytest.fixture
-    def effective_core_potential(self, ecp_shells):
-        return EffectiveCorePotential("my-ecp", ecp_shells, [2])
-
-    # --- Copy constructor: BasisSet(other) ---
-
-    def test_copy_positional(self, shells):
-        original = BasisSet("orig", shells)
-        copy = BasisSet(original)
-        assert copy.get_name() == "orig"
-        assert copy.get_num_shells() == 1
-
-    def test_copy_rejects_kwargs(self, shells):
-        original = BasisSet("orig", shells)
-        with pytest.raises(TypeError, match="incompatible constructor arguments"):
-            BasisSet(original, atomic_orbital_type=AOType.Cartesian)
-
-    # --- (name, shells) ---
-
-    def test_name_shells_positional(self, shells):
-        b = BasisSet("test", shells)
-        assert b.get_name() == "test"
-        assert b.get_num_shells() == 1
-        assert b.get_atomic_orbital_type() == AOType.Spherical
-
-    def test_name_shells_all_kwargs(self, shells):
-        b = BasisSet(name="test", shells=shells)
-        assert b.get_name() == "test"
-        assert b.get_num_shells() == 1
-
-    def test_name_shells_mixed(self, shells):
-        b = BasisSet("test", shells=shells)
-        assert b.get_name() == "test"
-        assert b.get_num_shells() == 1
-
-    def test_name_shells_with_ao_kwarg(self, shells):
-        b = BasisSet("test", shells, atomic_orbital_type=AOType.Cartesian)
-        assert b.get_atomic_orbital_type() == AOType.Cartesian
-
-    def test_name_shells_with_ao_positional(self, shells):
-        b = BasisSet("test", shells, AOType.Cartesian)
-        assert b.get_atomic_orbital_type() == AOType.Cartesian
-
-    def test_name_shells_fully_kwarg_with_ao(self, shells):
-        b = BasisSet(name="test", shells=shells, atomic_orbital_type=AOType.Cartesian)
-        assert b.get_name() == "test"
-        assert b.get_atomic_orbital_type() == AOType.Cartesian
-
-    # --- (name, shells, structure) ---
-
-    def test_name_shells_structure_positional(self, shells, structure):
-        b = BasisSet("test", shells, structure)
-        assert b.has_structure()
-        assert b.get_structure().get_num_atoms() == 1
-
-    def test_name_shells_structure_kwarg(self, shells, structure):
-        b = BasisSet("test", shells, structure=structure)
-        assert b.has_structure()
-
-    def test_name_shells_structure_all_kwargs(self, shells, structure):
-        b = BasisSet(name="test", shells=shells, structure=structure)
-        assert b.has_structure()
-
-    def test_name_shells_structure_with_ao(self, shells, structure):
-        b = BasisSet("test", shells, structure, AOType.Cartesian)
-        assert b.has_structure()
-        assert b.get_atomic_orbital_type() == AOType.Cartesian
-
-    def test_name_shells_structure_ao_kwarg(self, shells, structure):
-        b = BasisSet("test", shells, structure=structure, atomic_orbital_type=AOType.Cartesian)
-        assert b.has_structure()
-        assert b.get_atomic_orbital_type() == AOType.Cartesian
-
-    # --- (name, shells, ecp_shells, ecp_electrons, structure) ---
-
-    def test_name_shells_ecp_ecpelec_structure_positional(self, shells, ecp_shells, structure):
-        with pytest.warns(DeprecationWarning, match="ECP shells and electrons"):
-            b = BasisSet("test", shells, ecp_shells, [2], structure)
-        assert b.has_ecp_shells()
-        assert b.get_num_ecp_shells() == 1
-        assert list(b.get_ecp_electrons()) == [2]
-
-    # --- (name, shells, ecp_name, ecp_shells, ecp_electrons, structure) ---
-
-    def test_name_shells_ecpname_ecp_ecpelec_structure(self, shells, ecp_shells, structure):
-        with pytest.warns(DeprecationWarning, match="named ECP shells"):
-            b = BasisSet("test", shells, "my-ecp", ecp_shells, [2], structure)
-        assert b.has_ecp_shells()
-        assert b.get_ecp_name() == "my-ecp"
-        assert list(b.get_ecp_electrons()) == [2]
-
-    # --- (name, shells, effective_core_potential, structure) ---
-
-    def test_name_shells_typed_ecp_structure_kwargs(self, shells, effective_core_potential, structure):
-        b = BasisSet(
-            name="test",
-            shells=shells,
-            ecp=effective_core_potential,
-            structure=structure,
-        )
-        assert b.get_ecp_name() == "my-ecp"
-        assert b.get_num_ecp_shells() == 1
-        assert list(b.get_ecp_electrons()) == [2]
-        assert b.has_structure()
-
-    # --- Error cases: unexpected kwargs ---
-
-    def test_rejects_unexpected_kwarg(self, shells):
-        with pytest.raises(TypeError, match="incompatible constructor arguments"):
-            BasisSet("test", shells, bogus=42)
-
-    def test_rejects_unexpected_kwarg_typo(self, shells):
-        with pytest.raises(TypeError, match="incompatible constructor arguments"):
-            BasisSet("test", shells, struture="oops")
-
-    # --- Error cases: multiple values ---
-
-    def test_rejects_name_multiple_values(self, shells):
-        with pytest.raises(TypeError, match="incompatible constructor arguments"):
-            BasisSet("test", name="other", shells=shells)
-
-    def test_rejects_shells_multiple_values(self, shells):
-        with pytest.raises(TypeError, match="incompatible constructor arguments"):
-            BasisSet("test", shells, shells=shells)
-
-    # --- Error cases: structure without shells ---
-
-    def test_rejects_structure_without_shells(self, structure):
-        with pytest.raises(TypeError, match="incompatible constructor arguments"):
-            BasisSet(name="test", structure=structure)
-
-    # --- Error cases: no matching constructor ---
-
-    def test_rejects_wrong_types(self):
-        with pytest.raises(TypeError):
-            BasisSet(123, 456)
-
-    def test_rejects_no_args(self):
-        with pytest.raises(TypeError):
-            BasisSet()

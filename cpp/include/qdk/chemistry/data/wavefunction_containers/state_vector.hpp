@@ -421,7 +421,7 @@ class StateVectorContainer : public WavefunctionContainer {
   static constexpr const char* SERIALIZATION_VERSION = "0.2.0";
 
   // Coefficients of the wavefunction
-  const std::shared_ptr<const CoeffContainer> _coefficients;
+  const CoeffContainer _coefficients;
   // Configuration set (contains determinants and orbital information)
   const ConfigurationSet _configuration_set;
 

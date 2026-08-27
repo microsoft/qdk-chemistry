@@ -13,7 +13,6 @@
 #include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/shell.hpp>
 #include <qdk/chemistry/data/structure.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <string>
 #include <string_view>
 #include <vector>

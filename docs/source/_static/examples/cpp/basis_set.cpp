@@ -14,7 +14,7 @@ int main() {
   std::vector<Eigen::Vector3d> coords = {
       {0.0, 0.0, 0.0}, {0.757, 0.586, 0.0}, {-0.757, 0.586, 0.0}};
   std::vector<std::string> symbols = {"O", "H", "H"};
-  auto structure = std::make_shared<Structure>(coords, symbols);
+  Structure structure(coords, symbols);
 
   // Create basis sets from the library using basis set name
   auto basis_from_name = BasisSet::from_basis_name("sto-3g", structure);
@@ -35,14 +35,16 @@ int main() {
   // start-cell-loading-with-aux
   // Build the primary and auxiliary inputs independently
   auto primary_basis = BasisSet::from_basis_name("def2-svp", structure);
-  auto aux_basis =
-      AuxiliaryBasis::from_basis_name("def2-universal-jfit", structure);
-  auto auxiliary_bases = std::make_shared<AuxiliaryBasisCollection>(
+  auto auxiliary_structure = std::make_shared<Structure>(structure);
+  auto aux_basis = AuxiliaryBasis::from_basis_name("def2-universal-jfit",
+                                                   auxiliary_structure);
+  auto named_auxiliary_bases = std::make_shared<AuxiliaryBasisCollection>(
       AuxiliaryBasisCollection::Map{{AuxiliaryBasisRole::JFit, aux_basis}});
 
-  assert(auxiliary_bases->get_auxiliary_basis(AuxiliaryBasisRole::JFit) ==
+  assert(named_auxiliary_bases->get_auxiliary_basis(AuxiliaryBasisRole::JFit) ==
          aux_basis);
-  assert(primary_basis->get_structure() == aux_basis->get_structure());
+  assert(primary_basis->get_structure()->content_hash() ==
+         aux_basis->get_structure()->content_hash());
   // end-cell-loading-with-aux
   // --------------------------------------------------------------------------------------------
 
@@ -185,30 +187,6 @@ int main() {
   // --------------------------------------------------------------------------------------------
 
   // --------------------------------------------------------------------------------------------
-  // start-cell-ecp
-  // Create an ECP shell with radial powers (r^n terms)
-  Eigen::VectorXd ecp_exp(2), ecp_coeff(2);
-  Eigen::VectorXi ecp_rpow(2);
-  ecp_exp << 10.0, 5.0;
-  ecp_coeff << 50.0, 20.0;
-  ecp_rpow << 0, 2;
-  Shell ecp_shell(0, OrbitalType::S, ecp_exp, ecp_coeff, ecp_rpow);
-
-  // Create a basis set with ECP data
-  std::vector<Shell> ecp_shells = {ecp_shell};
-  std::vector<size_t> ecp_electrons = {28, 0, 0};
-  BasisSet basis_with_ecp(
-      "my-basis", shells,
-      EffectiveCorePotential("my-ecp", ecp_shells, ecp_electrons), structure);
-
-  // Query ECP data
-  bool has_ecp = basis_with_ecp.has_ecp_shells();
-  std::string ecp_name = basis_with_ecp.get_ecp_name();
-  size_t num_ecp_shells = basis_with_ecp.get_num_ecp_shells();
-  // end-cell-ecp
-  // --------------------------------------------------------------------------------------------
-
-  // --------------------------------------------------------------------------------------------
   // start-cell-auxiliary
   // Create custom auxiliary shells
   std::vector<Shell> aux_shells;
@@ -218,14 +196,14 @@ int main() {
                           std::vector{1.5});
 
   // Construct a named auxiliary basis for this molecular structure
-  auto auxiliary_basis =
-      std::make_shared<AuxiliaryBasis>("my-aux-fit", aux_shells, structure);
-  AuxiliaryBasisCollection auxiliary_bases(
+  auto auxiliary_basis = std::make_shared<AuxiliaryBasis>(
+      "my-aux-fit", aux_shells, auxiliary_structure);
+  AuxiliaryBasisCollection custom_auxiliary_bases(
       {{AuxiliaryBasisRole::RIFit, auxiliary_basis}});
 
   // Query auxiliary data
   auto stored_aux =
-      auxiliary_bases.get_auxiliary_basis(AuxiliaryBasisRole::RIFit);
+      custom_auxiliary_bases.get_auxiliary_basis(AuxiliaryBasisRole::RIFit);
   std::string aux_name = stored_aux->get_name();
   size_t num_aux = stored_aux->get_num_shells();
 
