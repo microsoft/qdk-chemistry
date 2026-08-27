@@ -274,7 +274,7 @@ class RemoteBackend(ABC):
     def submit(self, payload: dict, *, job_dir: str | Path | None = None) -> Job:
         """Submit a job and return immediately with a ``Job``.
 
-        Unlike :meth:`submit_and_wait`, this method does **not** block.
+        This method does **not** block.
         The returned ``Job`` is self-contained: it can be
         saved to disk, loaded in a different process, and used to
         ``Job.check()``, ``Job.cancel()``, or
