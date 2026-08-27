@@ -54,11 +54,12 @@ To run the examples, either clone the repository or download the packaged exampl
    If you installed ``qdk-chemistry`` from PyPI, use the ``stable/major.minor`` branch
    when cloning the repository for examples.
    The ``main`` branch is the active development branch and may be incompatible with
-   the released pip package. For example, to clone the repository for the latest stable 1.0 release, use:
+   the released pip package. For example, if you have version ``<major>.<minor>.x``
+   installed (check with ``pip show qdk-chemistry``), use:
 
    .. code-block:: bash
 
-      git clone --branch stable/1.0 https://github.com/microsoft/qdk-chemistry.git
+      git clone --branch stable/<major>.<minor> https://github.com/microsoft/qdk-chemistry.git
 
    See the `examples README <https://github.com/microsoft/qdk-chemistry/blob/main/examples/README.md>`_ for details.
 

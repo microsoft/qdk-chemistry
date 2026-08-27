@@ -39,6 +39,7 @@ except ImportError:
 if PYSCF_AVAILABLE:
     from qdk_chemistry.constants import ANGSTROM_TO_BOHR
     from qdk_chemistry.data import AOType, BasisSet, OrbitalType, Shell
+    from qdk_chemistry.plugins.pyscf import population_analysis as pyscf_population_analysis
     from qdk_chemistry.plugins.pyscf.conversion import (
         basis_to_pyscf_mol,
         hamiltonian_to_scf,
@@ -90,6 +91,14 @@ def create_helium_structure():
 def create_li_structure():
     """Create a lithium atom structure."""
     return Structure(["Li"], np.array([[0.0, 0.0, 0.0]]))
+
+
+def create_lih_structure():
+    """Create a lithium hydride structure."""
+    return Structure(
+        ["Li", "H"],
+        np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.595 * ANGSTROM_TO_BOHR]]),
+    )
 
 
 def create_o2_structure():
@@ -155,6 +164,10 @@ class TestPyscfPlugin:
         available_stability_checkers = algorithms.available("stability_checker")
         assert "pyscf" in available_stability_checkers
 
+        available_population_analyzers = algorithms.available("population_analyzer")
+        assert "pyscf" in available_population_analyzers
+        assert "pyscf_mulliken" not in available_population_analyzers
+
     def test_pyscf_scf_solver_creation(self):
         """Test creating PySCF SCF solver."""
         scf_solver = algorithms.create("scf_solver", "pyscf")
@@ -184,6 +197,144 @@ class TestPyscfPlugin:
         """Test creating PySCF stability checker."""
         stability_checker = algorithms.create("stability_checker", "pyscf")
         assert stability_checker is not None
+
+    def test_pyscf_population_analyzer_creation(self):
+        """Test creating PySCF population analyzer."""
+        population_analyzer = algorithms.create("population_analyzer", "pyscf")
+        assert population_analyzer is not None
+        assert population_analyzer.settings().get("method") == "mulliken"
+        with pytest.raises(ValueError, match="Allowed options"):
+            population_analyzer.settings().set("method", "unsupported")
+
+    def test_pyscf_population_analysis_requires_basis_set(self):
+        """Test that PySCF population analysis rejects model-system orbitals."""
+        orbitals = data.ModelOrbitals(3)
+        determinant = data.Configuration.from_bitstring("110")
+        wavefunction = data.Wavefunction(data.StateVectorContainer(determinant, orbitals))
+        analyzer = algorithms.create("population_analyzer", "pyscf")
+
+        with pytest.raises(ValueError, match="requires orbitals with an associated basis set"):
+            analyzer.run(wavefunction)
+
+    def test_pyscf_population_analysis_requires_overlap(self):
+        """Test that PySCF population analysis requires a stored AO overlap matrix."""
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+        _, reference = scf_solver.run(create_lih_structure(), charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+        reference_orbitals = reference.get_orbitals()
+        coefficients = spin_channel_matrix(reference_orbitals.coefficients(), axes.alpha())
+        orbitals = data.Orbitals(
+            coefficients,
+            None,
+            None,
+            reference_orbitals.get_basis_set(),
+        )
+        determinant = data.Configuration.from_spin_half_string("220000")
+        wavefunction = data.Wavefunction(data.StateVectorContainer(determinant, orbitals))
+        analyzer = algorithms.create("population_analyzer", "pyscf")
+
+        with pytest.raises(RuntimeError, match="(?i)overlap"):
+            analyzer.run(wavefunction)
+
+    def test_pyscf_population_analysis_uses_stored_overlap(self, monkeypatch):
+        """Test that PySCF population analysis contracts with the orbitals' AO overlap."""
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+        _, reference = scf_solver.run(create_lih_structure(), charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+        reference_orbitals = reference.get_orbitals()
+        overlap = np.array(reference_orbitals.get_overlap_matrix(), copy=True)
+        overlap[0, 1] += 0.125
+        overlap[1, 0] += 0.125
+        coefficients = spin_channel_matrix(reference_orbitals.coefficients(), axes.alpha())
+        orbitals = data.Orbitals(
+            coefficients,
+            None,
+            overlap,
+            reference_orbitals.get_basis_set(),
+        )
+        determinant = data.Configuration.from_spin_half_string("220000")
+        wavefunction = data.Wavefunction(data.StateVectorContainer(determinant, orbitals))
+        analyzer = algorithms.create("population_analyzer", "pyscf")
+        captured = {}
+
+        def capture_overlap(*args, **kwargs):
+            captured["overlap"] = kwargs["s"]
+            return np.zeros(args[0].nao_nr()), None
+
+        monkeypatch.setattr(pyscf_population_analysis, "mulliken_pop", capture_overlap)
+
+        analyzer.run(wavefunction)
+
+        np.testing.assert_allclose(captured["overlap"], overlap)
+
+    def test_pyscf_lih_population_analysis(self):
+        """Test heteronuclear AO-to-atom population assignment."""
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+        _, wavefunction = scf_solver.run(create_lih_structure(), charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+        pyscf_analyzer = algorithms.create("population_analyzer", "pyscf")
+
+        pyscf_populations = pyscf_analyzer.run(wavefunction)
+
+        np.testing.assert_allclose(
+            pyscf_populations,
+            [3.0161156314704147, 0.9838843685295866],
+            atol=1e-6,
+            err_msg="LiH populations must follow the five-AO lithium and one-AO hydrogen boundary",
+        )
+
+    def test_pyscf_population_analysis_uses_correlated_one_rdm(self):
+        """Test that correlated populations use the 1-RDM in the current MO basis."""
+        h2 = Structure(
+            ["H", "H"],
+            np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4 * ANGSTROM_TO_BOHR]]),
+        )
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+        _, reference = scf_solver.run(h2, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+        reference_orbitals = reference.get_orbitals()
+        coefficients = np.array(
+            spin_channel_matrix(reference_orbitals.coefficients(), axes.alpha()),
+            copy=True,
+        )
+        for column in range(coefficients.shape[1]):
+            first_nonzero = np.flatnonzero(np.abs(coefficients[:, column]) > 1e-12)[0]
+            if coefficients[first_nonzero, column] < 0:
+                coefficients[:, column] *= -1
+        orbitals = data.Orbitals(
+            coefficients,
+            None,
+            reference_orbitals.get_overlap_matrix(),
+            reference_orbitals.get_basis_set(),
+        )
+        determinants = [
+            data.Configuration.from_spin_half_string("20"),
+            data.Configuration.from_spin_half_string("du"),
+        ]
+        coefficients = np.full(2, 1.0 / np.sqrt(2.0))
+        one_rdm = np.array([[1.5, 0.5], [0.5, 0.5]])
+        wavefunction = data.Wavefunction(data.StateVectorContainer(coefficients, determinants, orbitals, one_rdm))
+        pyscf_analyzer = algorithms.create("population_analyzer", "pyscf")
+
+        pyscf_populations = pyscf_analyzer.run(wavefunction)
+
+        np.testing.assert_allclose(
+            pyscf_populations,
+            [1.523406124803181, 0.4765938751968194],
+            atol=1e-8,
+            err_msg="Correlated population analysis must preserve off-diagonal 1-RDM contributions",
+        )
+
+    def test_pyscf_lih_cation_unrestricted_population_analysis(self):
+        """Test spin-summed heteronuclear populations from unrestricted orbitals."""
+        scf_solver = algorithms.create("scf_solver", "pyscf", scf_type="unrestricted")
+        _, wavefunction = scf_solver.run(create_lih_structure(), charge=1, spin_multiplicity=2, basis_or_guess="sto-3g")
+        pyscf_analyzer = algorithms.create("population_analyzer", "pyscf")
+
+        pyscf_populations = pyscf_analyzer.run(wavefunction)
+
+        np.testing.assert_allclose(
+            pyscf_populations,
+            [2.19786389376805, 0.8021361062319504],
+            atol=1e-8,
+            err_msg="Unrestricted LiH+ populations must include both spin-resolved 1-RDM blocks",
+        )
 
     def test_pyscf_scf_solver_settings(self):
         """Test PySCF SCF solver settings interface."""
@@ -2392,6 +2543,16 @@ class TestQDKChemistryPySCFBasisConversion:
             coords[0], [0.0, 0.0, 0.0], rtol=float_comparison_relative_tolerance, atol=plain_text_tolerance
         )
 
+    def test_qdk_to_pyscf_preserves_diffuse_exponent(self):
+        """Small valid exponents must not be rounded to zero."""
+        exponent = 1e-9
+        shell = Shell(0, OrbitalType.S, np.array([exponent]), np.array([1.0]))
+        qdk_basis = BasisSet("diffuse", [shell], self.he_structure)
+
+        pyscf_mol = basis_to_pyscf_mol(qdk_basis)
+
+        assert pyscf_mol.bas_exp(0)[0] == pytest.approx(exponent)
+
     def test_qdk_to_pyscf_conversion_water(self):
         """Test converting QDK/Chemistry basis set to PySCF for water."""
         qdk_basis = self.create_simple_basis_set(self.h2o_structure)
@@ -2633,6 +2794,153 @@ class TestQDKChemistryPySCFBasisConversion:
         assert len(ecp_electrons) == 1
         assert ecp_electrons[0] == 28  # LANL2DZ ECP for Ag removes 28 core electrons
 
+    def test_qdk_to_pyscf_preserves_atom_specific_ecp(self):
+        """Test mixed ECP treatment for atoms of the same element."""
+        structure = Structure(
+            ["Ag", "Ag"],
+            np.array(
+                [
+                    [0.0, 0.0, 0.0],
+                    [5.0, 0.0, 0.0],
+                ]
+            ),
+        )
+        basis = BasisSet.from_index_map({0: "def2-svp", 1: "ano-rcc"}, structure)
+
+        pyscf_mol = basis_to_pyscf_mol(basis)
+
+        assert basis.get_ecp_electrons() == [28, 0]
+        assert set(pyscf_mol.ecp) == {"Ag1"}
+        assert pyscf_mol.atom_charges().tolist() == [19, 47]
+        assert pyscf_mol.nelectron == 66
+
+        roundtrip_basis = pyscf_mol_to_qdk_basis(pyscf_mol, structure)
+        assert roundtrip_basis.get_ecp_electrons() == [28, 0]
+        assert roundtrip_basis.get_num_ecp_shells() == basis.get_num_ecp_shells()
+
+    def test_qdk_to_pyscf_preserves_uniform_element_ecp_key(self):
+        """Test uniform ECP treatment retains the conventional element key."""
+        structure = Structure(
+            ["Ag", "Ag"],
+            np.array(
+                [
+                    [0.0, 0.0, 0.0],
+                    [5.0, 0.0, 0.0],
+                ]
+            ),
+        )
+        basis = BasisSet.from_index_map({0: "def2-svp", 1: "def2-svp"}, structure)
+
+        pyscf_mol = basis_to_pyscf_mol(basis)
+
+        assert basis.get_ecp_electrons() == [28, 28]
+        assert set(pyscf_mol.ecp) == {"Ag"}
+        assert pyscf_mol.atom_charges().tolist() == [19, 19]
+        assert pyscf_mol.nelectron == 38
+
+    def test_qdk_to_pyscf_rejects_partial_explicit_ecp_data(self):
+        """Test explicit ECP metadata requires shells for every treated atom."""
+        structure = Structure(
+            ["Ag", "Ag"],
+            np.array(
+                [
+                    [0.0, 0.0, 0.0],
+                    [5.0, 0.0, 0.0],
+                ]
+            ),
+        )
+        complete_basis = BasisSet.from_index_map({0: "def2-svp", 1: "def2-svp"}, structure)
+        atom_zero_ecp_shells = [shell for shell in complete_basis.get_ecp_shells() if shell.atom_index == 0]
+        partial_basis = BasisSet(
+            "partial-explicit-ecp",
+            complete_basis.get_shells(),
+            complete_basis.get_ecp_name(),
+            atom_zero_ecp_shells,
+            [28, 28],
+            structure,
+        )
+
+        with pytest.raises(ValueError, match="Atom 1 has 28 ECP electrons but no explicit ECP shells"):
+            basis_to_pyscf_mol(partial_basis)
+
+    def test_qdk_to_pyscf_preserves_atom_specific_named_ecp(self):
+        """Test mixed ECP metadata without explicit ECP shells."""
+        structure = Structure(
+            ["Ag", "Ag"],
+            np.array(
+                [
+                    [0.0, 0.0, 0.0],
+                    [5.0, 0.0, 0.0],
+                ]
+            ),
+        )
+        orbital_basis = BasisSet.from_index_map({0: "lanl2dz", 1: "lanl2dz"}, structure)
+        basis = BasisSet(
+            "lanl2dz",
+            orbital_basis.get_shells(),
+            "lanl2dz",
+            [],
+            [28, 0],
+            structure,
+        )
+
+        pyscf_mol = basis_to_pyscf_mol(basis)
+
+        assert set(pyscf_mol.ecp) == {"Ag1"}
+        assert pyscf_mol.atom_charges().tolist() == [19, 47]
+        assert pyscf_mol.nelectron == 66
+
+    def test_qdk_to_pyscf_preserves_uniform_named_ecp_key(self):
+        """Test uniform named ECP metadata retains the conventional element key."""
+        structure = Structure(
+            ["Ag", "Ag"],
+            np.array(
+                [
+                    [0.0, 0.0, 0.0],
+                    [5.0, 0.0, 0.0],
+                ]
+            ),
+        )
+        orbital_basis = BasisSet.from_index_map({0: "lanl2dz", 1: "lanl2dz"}, structure)
+        basis = BasisSet(
+            "lanl2dz",
+            orbital_basis.get_shells(),
+            "lanl2dz",
+            [],
+            [28, 28],
+            structure,
+        )
+
+        pyscf_mol = basis_to_pyscf_mol(basis)
+
+        assert set(pyscf_mol.ecp) == {"Ag"}
+        assert pyscf_mol.atom_charges().tolist() == [19, 19]
+        assert pyscf_mol.nelectron == 38
+
+    def test_qdk_to_pyscf_rejects_named_ecp_count_mismatch(self):
+        """Test named ECP metadata matches the library's resolved core counts."""
+        structure = Structure(
+            ["Ag", "Ag"],
+            np.array(
+                [
+                    [0.0, 0.0, 0.0],
+                    [5.0, 0.0, 0.0],
+                ]
+            ),
+        )
+        orbital_basis = BasisSet.from_index_map({0: "lanl2dz", 1: "lanl2dz"}, structure)
+        basis = BasisSet(
+            "lanl2dz",
+            orbital_basis.get_shells(),
+            "lanl2dz",
+            [],
+            [28, 10],
+            structure,
+        )
+
+        with pytest.raises(ValueError, match="basis has 10, mol.atom_nelec_core has 28"):
+            basis_to_pyscf_mol(basis)
+
     def test_ecp_roundtrip_conversion(self):
         """Test round-trip conversion of ECP shells and metadata: QDK -> PySCF -> QDK."""
         ag_structure = Structure(["Ag"], np.array([[0.0, 0.0, 0.0]]))
@@ -2770,8 +3078,29 @@ class TestQDKChemistryPySCFBasisConversion:
         # Create QDK Structure
         structure = Structure(symbols=["Ag", "H"], coordinates=mol1.atom_coords())
 
+        # Run native QDK SCF once and compare its ECP-adjusted quantities with PySCF
+        qdk_scf = algorithms.create("scf_solver", "qdk")
+        qdk_energy, qdk_wavefunction = qdk_scf.run(structure, 0, 1, "def2-svp")
+        qdk_native_basis = qdk_wavefunction.get_orbitals().get_basis_set()
+
+        np.testing.assert_allclose(qdk_native_basis.get_effective_nuclear_charges(), mol1.atom_charges())
+        assert np.isclose(
+            qdk_native_basis.calculate_effective_nuclear_repulsion_energy(),
+            mol1.energy_nuc(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        # Allow small numerical differences between the independent QDK and PySCF integral engines.
+        assert np.isclose(qdk_energy, energy1, rtol=float_comparison_relative_tolerance, atol=10 * scf_energy_tolerance)
+
         # Convert PySCF Mole to QDK BasisSet
         qdk_basis = pyscf_mol_to_qdk_basis(mol1, structure, basis_name="def2-svp")
+        assert not np.isclose(
+            structure.calculate_nuclear_repulsion_energy(),
+            qdk_basis.calculate_effective_nuclear_repulsion_energy(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
 
         # Convert QDK BasisSet back to PySCF Mole
         mol2 = basis_to_pyscf_mol(qdk_basis)

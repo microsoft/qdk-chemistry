@@ -350,6 +350,13 @@ if (-not (Test-DepInstalled 'gauxc' $gauxcCommit 'gauxc*')) {
     git clone https://github.com/wavefunction91/gauxc.git $gauxcSrc
     git -C $gauxcSrc checkout $gauxcCommit
 
+    if ($isClangCl) {
+        Write-Host "Applying GauXC clang-cl compatibility patch..."
+        Push-Location $gauxcSrc
+        try   { cmake -P "$SrcDir\cpp\cmake\patches\gauxc-clang-cl-gau2grid-stdlib.cmake" }
+        finally { Pop-Location }
+    }
+
     Invoke-CMakeDep 'gauxc' $gauxcSrc (Get-DepPlan 'gauxc').CMakeArgs
     Remove-Item $gauxcSrc -Recurse -Force
     Set-DepStamp 'gauxc' $gauxcCommit

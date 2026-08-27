@@ -107,3 +107,9 @@ Get-Content sphinx-docs-warnings.txt, sphinx-autosummary-warnings.txt -ErrorActi
 ```
 
 Any output means the equivalent `make` build would have failed.
+
+## Regenerating tutorial figures
+
+The [ground-state QPE figure maintenance guide](source/_static/diagrams/README.md)
+documents source ownership, regeneration commands, and screenshot-derived asset
+maintenance.
