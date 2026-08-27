@@ -752,6 +752,7 @@ class TestJob:
             backend_state={},
         )
         job.check = MagicMock(return_value=JobStatus(job_id="x", status="unknown", error="Invalid PID file"))
+        job.attach_backend(MagicMock())
         sleep = MagicMock()
         monkeypatch.setattr(time, "sleep", sleep)
 
@@ -775,6 +776,7 @@ class TestJob:
                 JobStatus(job_id="x", status="succeeded"),
             ]
         )
+        job.attach_backend(MagicMock())
         sleep = MagicMock()
         monkeypatch.setattr(time, "sleep", sleep)
 

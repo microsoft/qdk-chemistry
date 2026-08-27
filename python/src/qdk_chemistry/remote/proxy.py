@@ -138,6 +138,7 @@ def submit(
 
     try:
         job = backend.submit(_build_payload_for(algorithm, args, kwargs), job_dir=job_dir)
+        job.attach_backend(backend)
         if owns_backend:
             job.detach_backend()
         return job
@@ -254,6 +255,9 @@ def run(
         job = resolved_cache.get_job(run_hash)
 
         if job is not None:
+            if remote is not None and not isinstance(remote, str):
+                job.attach_backend(remote)
+
             # 1a) Completed with outputs → reconstruct
             if job.output_hashes is not None:
                 result = _reconstruct_from_cache(resolved_cache, job)
@@ -303,6 +307,7 @@ def run(
                 payload["force_rerun"] = True
 
             job = backend.submit(payload)
+            job.attach_backend(backend)
             job.run_hash = run_hash
             resolved_cache.put_job(run_hash, job)
             if _on_job_submitted is not None:
