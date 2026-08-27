@@ -1,8 +1,4 @@
-"""Remote algorithm proxy for QDK/Chemistry.
-
-This module provides the RemoteAlgorithmProxy class that wraps algorithms
-to redirect their execution to remote systems via configurable backends.
-"""
+"""Remote execution and caching for QDK/Chemistry algorithms."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -12,159 +8,15 @@ to redirect their execution to remote systems via configurable backends.
 from __future__ import annotations
 
 import time
-from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from pathlib import Path
 
-    from qdk_chemistry.algorithms.base import Algorithm
-    from qdk_chemistry.remote.backends import RemoteBackend
     from qdk_chemistry.remote.backends.base import JobStatus
     from qdk_chemistry.remote.job import Job
 
 _CACHE_MISS = object()
-
-
-class RemoteAlgorithmProxy:
-    """Internal proxy used by the ``run()`` function for remote execution.
-
-    Not intended for direct use. Use ``algorithm.run(..., remote=..., cache=...)``
-    instead.
-
-    """
-
-    def __init__(
-        self,
-        algorithm: Algorithm,
-        remote: str | RemoteBackend,
-        **remote_config: Any,
-    ):
-        """Initialize the remote algorithm proxy.
-
-        Args:
-            algorithm: The algorithm instance to wrap.
-            remote: Either a backend name (str) like "local" or a name
-                registered by a plugin,
-                or a pre-configured RemoteBackend instance.
-            **remote_config: Backend-specific configuration options (only used
-                if remote is a string). Options include:
-
-                - host: Remote host to connect to
-                - python_path: Remote Python interpreter path
-                - timeout: Maximum execution time in seconds
-                - remote_workdir: Working directory on remote system
-                - Other backend-specific settings
-
-        """
-        self._algorithm = algorithm
-        self._remote_config = remote_config
-
-        # Store either the backend instance or the name for lazy creation
-        if isinstance(remote, str):
-            self._backend_name: str | None = remote
-            self._backend: RemoteBackend | None = None
-        else:
-            self._backend_name = None
-            self._backend = remote
-
-    @cached_property
-    def _resolved_backend(self) -> RemoteBackend:
-        """Lazily resolve and connect to the backend."""
-        if self._backend is not None:
-            # Already have a backend instance
-            return self._backend
-
-        # Create backend from name
-        from qdk_chemistry.remote.backends import get_backend  # noqa: PLC0415
-
-        backend = get_backend(self._backend_name, **self._remote_config)
-        backend.connect()
-        return backend
-
-    def run(self, *args: Any, **kwargs: Any) -> Any:
-        """Execute the algorithm on the remote system.
-
-        This method:
-        1. Serializes all arguments to HDF5
-        2. Uploads to the remote system
-        3. Generates a python script that deserializes the inputs, runs the algorithm, and serializes the outputs
-        4. Executes the script on the remote system (possible polling)
-        5. Downloads the results
-        6. Deserializes all results
-
-        Args:
-            *args: Positional arguments for the algorithm's run method.
-            **kwargs: Keyword arguments for the algorithm's run method.
-
-        Returns:
-            The result from the algorithm (e.g., (energy, wavefunction) tuple).
-
-        Raises:
-            RuntimeError: If remote execution fails.
-            ConnectionError: If connection to remote system fails.
-
-        """
-        # Build the execution payload
-        payload = _build_payload_for(self._algorithm, args, kwargs)
-
-        backend = self._resolved_backend
-        try:
-            return backend.submit_and_wait(payload)
-        finally:
-            if self._backend_name is not None:
-                backend.disconnect()
-                self.__dict__.pop("_resolved_backend", None)
-
-    def submit(self, *args: Any, job_dir: str | Path | None = None, **kwargs: Any) -> Job:
-        """Submit the algorithm for remote execution without blocking.
-
-        Returns a ``Job`` that persists to disk (if *job_dir*
-        is given) and can be used to ``Job.check()``,
-        ``Job.cancel()``, or ``Job.fetch()`` — even
-        from a completely different script.
-
-        Args:
-            *args: Positional arguments for the algorithm's run method.
-            job_dir: Optional directory where the job file is saved
-                automatically (as ``job_<id>.json``).
-            **kwargs: Keyword arguments for the algorithm's run method.
-
-        Returns:
-            A ``Job`` that tracks this submission.
-
-        """
-        payload = _build_payload_for(self._algorithm, args, kwargs)
-        return self._resolved_backend.submit(payload, job_dir=job_dir)
-
-    def settings(self):
-        """Forward settings access to the wrapped algorithm.
-
-        Returns:
-            The algorithm's Settings object.
-
-        """
-        return self._algorithm.settings()
-
-    def __getattr__(self, name: str) -> Any:
-        """Forward all other attribute access to the wrapped algorithm.
-
-        Args:
-            name: Attribute name to retrieve from the wrapped algorithm.
-
-        """
-        return getattr(self._algorithm, name)
-
-    def __repr__(self) -> str:
-        """Return string representation of the proxy."""
-        if self._backend_name:
-            backend_name = self._backend_name
-        elif self._backend is not None:
-            backend_name = self._backend.name
-        else:
-            backend_name = "unknown"
-        return f"<RemoteProxy({self._algorithm.name()}) -> {backend_name}>"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -292,7 +144,7 @@ def _poll_until_done(job: Any) -> JobStatus:
 
 
 def _run_uncached(algorithm: Any, remote: Any, args: tuple, kwargs: dict) -> Any:
-    """Execute without caching — locally or via a remote proxy.
+    """Execute without caching, locally or through a remote job.
 
     Args:
         algorithm: Algorithm-like object to execute.
@@ -301,10 +153,31 @@ def _run_uncached(algorithm: Any, remote: Any, args: tuple, kwargs: dict) -> Any
         kwargs: Keyword arguments for the algorithm.
 
     """
-    if remote is not None:
-        proxy = RemoteAlgorithmProxy(algorithm, remote)
-        return proxy.run(*args, **kwargs)
-    return algorithm.run(*args, **kwargs)
+    if remote is None:
+        return algorithm.run(*args, **kwargs)
+
+    from qdk_chemistry.remote.backends import get_backend  # noqa: PLC0415
+
+    owns_backend = isinstance(remote, str)
+    if owns_backend:
+        backend = get_backend(remote)
+        backend.connect()
+    else:
+        backend = remote
+
+    try:
+        payload = _build_payload_for(algorithm, args, kwargs)
+        job = backend.submit(payload)
+        final_status = _poll_until_done(job)
+        if not job.is_successful:
+            raise RuntimeError(
+                f"Remote job {job.job_id} ended with status: {final_status.status}\n"
+                f"Error: {final_status.error or 'unknown'}\nLogs:\n{final_status.logs}"
+            )
+        return job.fetch()
+    finally:
+        if owns_backend:
+            backend.disconnect()
 
 
 def run(

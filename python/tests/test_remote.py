@@ -1431,24 +1431,44 @@ class TestRunWithCache:
     def test_named_remote_without_cache_disconnects_owned_backend(self, monkeypatch):
         algo = self._mock_algorithm()
         backend = MagicMock()
-        backend.submit_and_wait.return_value = -75.5
+        job = Job(
+            job_id="remote-job",
+            backend="test",
+            backend_config={},
+            backend_state={},
+            status="succeeded",
+        )
+        job.fetch = MagicMock(return_value=-75.5)
+        backend.submit.return_value = job
         get_backend = MagicMock(return_value=backend)
         monkeypatch.setattr(remote_backends, "get_backend", get_backend)
 
         assert run(algo, "arg1", remote="test") == -75.5
 
         get_backend.assert_called_once_with("test")
+        backend.submit.assert_called_once()
+        job.fetch.assert_called_once_with()
         backend.connect.assert_called_once_with()
         backend.disconnect.assert_called_once_with()
 
     def test_injected_remote_without_cache_remains_connected(self):
         algo = self._mock_algorithm()
         backend = MagicMock()
-        backend.submit_and_wait.return_value = -75.5
+        job = Job(
+            job_id="remote-job",
+            backend="test",
+            backend_config={},
+            backend_state={},
+            status="succeeded",
+        )
+        job.fetch = MagicMock(return_value=-75.5)
+        backend.submit.return_value = job
 
         assert run(algo, "arg1", remote=backend) == -75.5
         gc.collect()
 
+        backend.submit.assert_called_once()
+        job.fetch.assert_called_once_with()
         backend.disconnect.assert_not_called()
 
     def test_named_remote_with_cache_disconnects_owned_backend(self, tmp_path, monkeypatch):
