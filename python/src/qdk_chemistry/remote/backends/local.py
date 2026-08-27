@@ -21,7 +21,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from .base import DEFAULT_POLL_INTERVAL, DEFAULT_TIMEOUT, JobStatus, RemoteBackend, register_backend
+from .base import DEFAULT_POLL_INTERVAL, DEFAULT_TIMEOUT, JobState, JobStatus, RemoteBackend, register_backend
 
 __all__ = ["LocalBackend"]
 
@@ -321,14 +321,16 @@ class LocalBackend(RemoteBackend):
         if process is not None:
             return_code = process.poll()
             if return_code is None:
-                status = "running"
+                status = JobState.RUNNING
             else:
                 self._processes.pop(pid, None)
-                status = "Succeeded" if return_code == 0 and manifest.exists() else "Failed"
-        elif _process_is_running(pid):
-            status = "running"
+                status = JobState.SUCCEEDED if return_code == 0 and manifest.exists() else JobState.FAILED
+        elif manifest.exists():
+            status = JobState.SUCCEEDED
         else:
-            status = "Succeeded" if manifest.exists() else "Failed"
+            expected_identity = backend_state.get("process_identity")
+            identity_matches = expected_identity is None or _process_identity(pid) == expected_identity
+            status = JobState.RUNNING if identity_matches and _process_is_running(pid) else JobState.FAILED
 
         # Read logs if available
         logs = ""

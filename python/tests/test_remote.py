@@ -31,7 +31,7 @@ from qdk_chemistry.data import AlgorithmRef, Orbitals, Settings, Structure
 from qdk_chemistry.data._hashing import _item_content_hash, collect_content_hashes
 from qdk_chemistry.plugins import DuplicateRegistrationError
 from qdk_chemistry.remote.backends import available_backends, get_backend
-from qdk_chemistry.remote.backends.base import JobStatus, RemoteBackend, register_backend
+from qdk_chemistry.remote.backends.base import JobState, JobStatus, RemoteBackend, register_backend
 from qdk_chemistry.remote.backends.local import LocalBackend
 from qdk_chemistry.remote.cache.folder import FolderCache
 from qdk_chemistry.remote.cache.tiered import TieredCache
@@ -1295,9 +1295,9 @@ class TestLocalBackendSpecific:
             assert state["job_id"] == job_id
             running_status = backend.check(state)
             failed_status = backend.check(state)
-            assert running_status.status == "running"
+            assert running_status.status is JobState.RUNNING
             assert running_status.job_id == job_id
-            assert failed_status.status == "Failed"
+            assert failed_status.status is JobState.FAILED
             assert failed_status.job_id == job_id
         finally:
             backend.disconnect()
@@ -1314,9 +1314,52 @@ class TestLocalBackendSpecific:
         }
 
         status = backend.check(state)
-        assert status.status == "Failed"
+        assert status.status is JobState.FAILED
         assert status.job_id == "job-id"
         process_is_running.assert_called_once_with(1234)
+
+    def test_check_rehydrated_job_prefers_completed_manifest(self, tmp_path, monkeypatch):
+        output_dir = tmp_path / "output"
+        output_dir.mkdir()
+        (output_dir / "manifest.json").write_text("{}")
+        process_is_running = MagicMock(return_value=True)
+        process_identity = MagicMock(return_value="linux:789")
+        monkeypatch.setattr(local_backend_module, "_process_is_running", process_is_running)
+        monkeypatch.setattr(local_backend_module, "_process_identity", process_identity)
+        backend = LocalBackend()
+        state = {
+            "job_id": "job-id",
+            "pid": 1234,
+            "process_identity": "linux:456",
+            "output_dir": str(output_dir),
+            "job_workdir": str(tmp_path),
+        }
+
+        status = backend.check(state)
+
+        assert status.status is JobState.SUCCEEDED
+        process_is_running.assert_not_called()
+        process_identity.assert_not_called()
+
+    def test_check_rehydrated_job_rejects_reused_pid(self, tmp_path, monkeypatch):
+        process_is_running = MagicMock(return_value=True)
+        process_identity = MagicMock(return_value="linux:789")
+        monkeypatch.setattr(local_backend_module, "_process_is_running", process_is_running)
+        monkeypatch.setattr(local_backend_module, "_process_identity", process_identity)
+        backend = LocalBackend()
+        state = {
+            "job_id": "job-id",
+            "pid": 1234,
+            "process_identity": "linux:456",
+            "output_dir": str(tmp_path / "output"),
+            "job_workdir": str(tmp_path),
+        }
+
+        status = backend.check(state)
+
+        assert status.status is JobState.FAILED
+        process_identity.assert_called_once_with(1234)
+        process_is_running.assert_not_called()
 
     def test_cancel_rehydrated_job_requires_matching_process_identity(self, monkeypatch):
         backend = LocalBackend()
