@@ -8,7 +8,6 @@
 #include <map>
 #include <memory>
 #include <nlohmann/json.hpp>
-#include <qdk/chemistry/data/auxiliary_basis.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/shell.hpp>
 #include <qdk/chemistry/data/structure.hpp>
@@ -98,9 +97,6 @@ class EffectiveCorePotential {
 class BasisSet : public DataClass,
                  public std::enable_shared_from_this<BasisSet> {
  public:
-  using AuxiliaryBasisMap =
-      std::map<AuxiliaryBasisRole, std::shared_ptr<AuxiliaryBasis>>;
-
   /**
    * @brief Constructor with shells
    * @param name Name of the basis set
@@ -273,8 +269,7 @@ class BasisSet : public DataClass,
   /**
    * @brief Copy constructor
    *
-   * Shell, ECP, structure, and cache-relevant state are copied. Immutable
-   * auxiliary-basis values are structurally shared through their pointers.
+   * Shell, ECP, structure, and cache-relevant state are copied.
    */
   BasisSet(const BasisSet& other);
 
@@ -286,8 +281,7 @@ class BasisSet : public DataClass,
   /**
    * @brief Copy assignment operator
    *
-   * Shell, ECP, structure, and cache-relevant state are copied. Immutable
-   * auxiliary-basis values are structurally shared through their pointers.
+   * Shell, ECP, structure, and cache-relevant state are copied.
    */
   BasisSet& operator=(const BasisSet& other);
 
@@ -636,30 +630,6 @@ class BasisSet : public DataClass,
    */
   bool has_structure() const;
 
-  /** @brief Whether an auxiliary basis is associated with an exact role. */
-  bool has_auxiliary_basis(AuxiliaryBasisRole role) const;
-
-  /**
-   * @brief Get the auxiliary basis associated with an exact role.
-   * @throws std::out_of_range if the role has no association
-   */
-  std::shared_ptr<AuxiliaryBasis> get_auxiliary_basis(
-      AuxiliaryBasisRole role) const;
-
-  /**
-   * @brief Resolve a basis compatible with a required role.
-   *
-   * Exact associations take precedence. A JKFit basis may satisfy a JFit
-   * requirement, but the inverse fallback is not permitted.
-   *
-   * @throws std::out_of_range if no compatible association exists
-   */
-  std::shared_ptr<AuxiliaryBasis> resolve_auxiliary_basis(
-      AuxiliaryBasisRole role) const;
-
-  /** @brief Get all exact auxiliary-basis associations. */
-  const AuxiliaryBasisMap& get_auxiliary_bases() const;
-
   /**
    * @brief Get the ECP name
    * @return Name of the ECP
@@ -850,9 +820,6 @@ class BasisSet : public DataClass,
   static AOType string_to_atomic_orbital_type(const std::string& basis_string);
 
  private:
-  /** Copies this value and updates only its auxiliary-role map. */
-  friend struct detail::BasisEnrichmentAccess;
-
   /**
    * @brief Select the private canonical constructor without exposing it as a
    * public overload.
@@ -907,9 +874,6 @@ class BasisSet : public DataClass,
   /// Per-label AO extents.
   std::unordered_map<SymmetryLabel, std::size_t> _ao_extents;
 
-  /// Auxiliary bases keyed by their algorithm-facing roles.
-  AuxiliaryBasisMap _auxiliary_bases;
-
   /// Lazily computed cache for atomic orbital to atom mapping
   mutable std::vector<size_t> _basis_to_atom_map;
 
@@ -926,8 +890,7 @@ class BasisSet : public DataClass,
   mutable bool _cache_valid = false;
 
   /// Serialization version
-  static constexpr const char* SERIALIZATION_VERSION = "0.2.0";
-  static constexpr const char* LEGACY_SERIALIZATION_VERSION = "0.1.0";
+  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
 
   /**
    * @brief Check if basis set is valid and complete

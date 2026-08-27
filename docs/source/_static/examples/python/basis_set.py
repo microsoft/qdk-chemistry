@@ -11,17 +11,16 @@
 from pathlib import Path
 
 import numpy as np
-from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
     AOType,
     AuxiliaryBasis,
+    AuxiliaryBasisCollection,
     AuxiliaryBasisRole,
     BasisSet,
     EffectiveCorePotential,
     OrbitalType,
     Shell,
     Structure,
-    with_auxiliary_basis,
 )
 
 # Load a water molecule structure from inline XYZ file
@@ -48,33 +47,15 @@ basis_from_index = BasisSet.from_index_map(index_basis_map, structure)
 
 ################################################################################
 # start-cell-loading-with-aux
-# Obtain a wavefunction without knowing its later auxiliary-basis requirements
+# Build the primary and auxiliary inputs independently
 primary_basis = BasisSet.from_basis_name("def2-svp", structure)
-_, wavefunction = create("scf_solver").run(
-    structure,
-    charge=0,
-    spin_multiplicity=1,
-    basis_or_guess=primary_basis,
-)
+aux_basis = AuxiliaryBasis.from_basis_name("def2-universal-jfit", structure)
+auxiliary_bases = AuxiliaryBasisCollection({AuxiliaryBasisRole.JFIT: aux_basis})
 
-# Later, derive the structure from that wavefunction and attach the required basis
-wavefunction_structure = wavefunction.get_orbitals().get_basis_set().get_structure()
-aux_basis = AuxiliaryBasis.from_basis_name(
-    "def2-universal-jfit", wavefunction_structure
-)
-wavefunction_with_jfit = with_auxiliary_basis(
-    wavefunction, AuxiliaryBasisRole.JFIT, aux_basis
-)
-
+assert auxiliary_bases.get_auxiliary_basis(AuxiliaryBasisRole.JFIT) is aux_basis
 assert (
-    not wavefunction.get_orbitals()
-    .get_basis_set()
-    .has_auxiliary_basis(AuxiliaryBasisRole.JFIT)
-)
-assert (
-    wavefunction_with_jfit.get_orbitals()
-    .get_basis_set()
-    .has_auxiliary_basis(AuxiliaryBasisRole.JFIT)
+    primary_basis.get_structure().content_hash()
+    == aux_basis.get_structure().content_hash()
 )
 print(f"Primary shells: {primary_basis.get_num_shells()}")
 print(f"Auxiliary shells: {aux_basis.get_num_shells()}")
@@ -213,10 +194,8 @@ aux_shells = [
 
 # Construct a named auxiliary basis for this molecular structure
 auxiliary_basis = AuxiliaryBasis("my-aux-fit", aux_shells, structure)
-basis_with_rifit = with_auxiliary_basis(
-    basis_set, AuxiliaryBasisRole.RIFIT, auxiliary_basis
-)
-stored_auxiliary = basis_with_rifit.get_auxiliary_basis(AuxiliaryBasisRole.RIFIT)
+auxiliary_bases = AuxiliaryBasisCollection({AuxiliaryBasisRole.RIFIT: auxiliary_basis})
+stored_auxiliary = auxiliary_bases.get_auxiliary_basis(AuxiliaryBasisRole.RIFIT)
 
 # Query auxiliary data
 print(f"Auxiliary name: {stored_auxiliary.get_name()}")

@@ -314,17 +314,11 @@ class AmplitudeContainer : public WavefunctionContainer {
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
 
  private:
-  AmplitudeContainer(const AmplitudeContainer& source,
-                     std::shared_ptr<Orbitals> enriched_orbitals);
-
-  std::unique_ptr<WavefunctionContainer> _clone_for_basis_enrichment(
-      std::shared_ptr<BasisSet> enriched_basis) const override;
-
   // Orbital information
   std::shared_ptr<Orbitals> _orbitals;
   // Single-particle sector the orbitals belong to
   std::string _sector;
-  // Reference wavefunction provenance; shared unchanged during enrichment.
+  // Reference wavefunction provenance.
   std::shared_ptr<Wavefunction> _wavefunction;
   // Correlated method that produced the amplitudes
   AmplitudeType _amplitude_type;

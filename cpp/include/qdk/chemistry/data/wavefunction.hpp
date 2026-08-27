@@ -774,24 +774,6 @@ class WavefunctionContainer {
   virtual void hash_update(qdk::chemistry::utils::HashContext& ctx) const;
 
  protected:
-  /** Invokes the non-public polymorphic enrichment hook. */
-  friend struct detail::BasisEnrichmentAccess;
-
-  /**
-   * @brief Internal clone hook used while enriching a wavefunction's basis.
-   *
-   * This is intentionally not public API: callers attach auxiliary bases
-   * through @ref with_auxiliary_basis rather than replacing orbitals
-   * arbitrarily. Container-specific wavefunction data must be preserved.
-   * The default implementation throws so unsupported downstream containers
-   * fail explicitly.
-   *
-   * @param enriched_basis Primary basis carrying the new association
-   * @return Unique pointer to the cloned container
-   */
-  virtual std::unique_ptr<WavefunctionContainer> _clone_for_basis_enrichment(
-      std::shared_ptr<BasisSet> enriched_basis) const;
-
   /// Wavefunction type (SelfDual or NotSelfDual)
   WavefunctionType _type;
   /// Serialization version
@@ -1493,9 +1475,6 @@ class Wavefunction : public DataClass,
   bool is_complex() const;
 
  private:
-  /** Rebuilds this facade around an enriched container. */
-  friend struct detail::BasisEnrichmentAccess;
-
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
 
   /// Container holding the wavefunction implementation

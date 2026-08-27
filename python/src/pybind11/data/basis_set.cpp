@@ -126,15 +126,6 @@ void bind_basis_set(py::module& m) {
   using namespace qdk::chemistry::data;
   using qdk::chemistry::python::utils::bind_getter_as_property;
 
-  py::enum_<AuxiliaryBasisRole>(
-      m, "AuxiliaryBasisRole",
-      "Algorithm-facing purpose served by an auxiliary basis")
-      .value("JFIT", AuxiliaryBasisRole::JFit, "Coulomb density-fitting basis")
-      .value("JKFIT", AuxiliaryBasisRole::JKFit,
-             "Coulomb and exchange density-fitting basis")
-      .value("RIFIT", AuxiliaryBasisRole::RIFit, "Correlation-fitting basis")
-      .value("CABS", AuxiliaryBasisRole::CABS, "Complementary auxiliary basis");
-
   // Bind OrbitalType enum
   py::enum_<OrbitalType>(m, "OrbitalType", "Enumeration of orbital types")
       .value("UL", OrbitalType::UL, "ECP local potential (l=-1)")
@@ -888,59 +879,6 @@ Examples:
     ...     structure = basis_set.get_structure()
     ... else:
     ...     print("No structure associated with basis set")
-)");
-
-  basis_set.def("has_auxiliary_basis", &BasisSet::has_auxiliary_basis,
-                py::arg("role"),
-                R"(
-Check whether an auxiliary basis is associated with an exact role.
-
-Args:
-    role (AuxiliaryBasisRole): Exact role to inspect
-
-Returns:
-    bool: Whether that role has an associated basis
-)");
-
-  basis_set.def("get_auxiliary_basis", &BasisSet::get_auxiliary_basis,
-                py::arg("role"),
-                R"(
-Get the auxiliary basis associated with an exact role.
-
-Args:
-    role (AuxiliaryBasisRole): Exact role to retrieve
-
-Returns:
-    AuxiliaryBasis: Associated auxiliary basis
-
-Raises:
-    IndexError: If the role has no association
-)");
-
-  basis_set.def("resolve_auxiliary_basis", &BasisSet::resolve_auxiliary_basis,
-                py::arg("role"),
-                R"(
-Resolve an auxiliary basis compatible with a required role.
-
-Exact associations take precedence. A JKFIT basis may satisfy a JFIT
-requirement, but JFIT cannot satisfy JKFIT.
-
-Args:
-    role (AuxiliaryBasisRole): Required role
-
-Returns:
-    AuxiliaryBasis: Exact or compatible auxiliary basis
-
-Raises:
-    IndexError: If no compatible basis is available
-)");
-
-  basis_set.def("get_auxiliary_bases", &BasisSet::get_auxiliary_bases,
-                R"(
-Get all exact auxiliary-basis associations.
-
-Returns:
-    dict[AuxiliaryBasisRole, AuxiliaryBasis]: Role-keyed associations
 )");
 
   basis_set.def("get_ecp_name", &BasisSet::get_ecp_name,

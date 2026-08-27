@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <algorithm>
 #include <fstream>
 #include <qdk/chemistry/data/auxiliary_basis.hpp>
 #include <sstream>
@@ -368,6 +369,206 @@ void AuxiliaryBasis::hash_update(
       hash_value(context, shell.coefficients);
     }
   }
+}
+
+AuxiliaryBasisCollection::AuxiliaryBasisCollection(Map auxiliary_bases)
+    : _auxiliary_bases(std::move(auxiliary_bases)) {
+  _validate();
+}
+
+bool AuxiliaryBasisCollection::has_auxiliary_basis(
+    const AuxiliaryBasisRole role) const {
+  return _auxiliary_bases.contains(role);
+}
+
+std::shared_ptr<AuxiliaryBasis> AuxiliaryBasisCollection::get_auxiliary_basis(
+    const AuxiliaryBasisRole role) const {
+  auto basis = _auxiliary_bases.find(role);
+  if (basis == _auxiliary_bases.end()) {
+    throw std::out_of_range("No auxiliary basis is associated with role " +
+                            to_string(role));
+  }
+  return basis->second;
+}
+
+std::shared_ptr<AuxiliaryBasis>
+AuxiliaryBasisCollection::resolve_auxiliary_basis(
+    const AuxiliaryBasisRole role) const {
+  if (has_auxiliary_basis(role)) {
+    return get_auxiliary_basis(role);
+  }
+  if (role == AuxiliaryBasisRole::JFit &&
+      has_auxiliary_basis(AuxiliaryBasisRole::JKFit)) {
+    return get_auxiliary_basis(AuxiliaryBasisRole::JKFit);
+  }
+  throw std::out_of_range("No auxiliary basis can satisfy role " +
+                          to_string(role));
+}
+
+const AuxiliaryBasisCollection::Map&
+AuxiliaryBasisCollection::get_auxiliary_bases() const {
+  return _auxiliary_bases;
+}
+
+std::string AuxiliaryBasisCollection::get_summary() const {
+  std::ostringstream output;
+  output << "AuxiliaryBasisCollection: " << _auxiliary_bases.size()
+         << " role(s)";
+  for (const auto& [role, basis] : _auxiliary_bases) {
+    output << "\n" << to_string(role) << ": " << basis->get_name();
+  }
+  return output.str();
+}
+
+void AuxiliaryBasisCollection::to_file(const std::string& filename,
+                                       const std::string& type) const {
+  if (type == "json") {
+    to_json_file(filename);
+  } else if (type == "hdf5") {
+    to_hdf5_file(filename);
+  } else {
+    throw std::runtime_error("Unsupported file type: " + type);
+  }
+}
+
+nlohmann::json AuxiliaryBasisCollection::to_json() const {
+  nlohmann::json json;
+  json["version"] = SERIALIZATION_VERSION;
+  json["auxiliary_bases"] = nlohmann::json::object();
+  for (const auto& [role, basis] : _auxiliary_bases) {
+    json["auxiliary_bases"][to_string(role)] = basis->to_json();
+  }
+  return json;
+}
+
+std::shared_ptr<AuxiliaryBasisCollection> AuxiliaryBasisCollection::from_json(
+    const nlohmann::json& json) {
+  if (!json.contains("version")) {
+    throw std::runtime_error("Invalid JSON: missing version field");
+  }
+  validate_serialization_version(SERIALIZATION_VERSION, json["version"]);
+  if (!json.contains("auxiliary_bases") ||
+      !json["auxiliary_bases"].is_object()) {
+    throw std::runtime_error(
+        "AuxiliaryBasisCollection JSON must contain an auxiliary_bases "
+        "object");
+  }
+
+  Map auxiliary_bases;
+  for (const auto& [role_name, basis_json] : json["auxiliary_bases"].items()) {
+    const auto role = auxiliary_basis_role_from_string(role_name);
+    auxiliary_bases.emplace(role, AuxiliaryBasis::from_json(basis_json));
+  }
+  return std::make_shared<AuxiliaryBasisCollection>(std::move(auxiliary_bases));
+}
+
+void AuxiliaryBasisCollection::to_json_file(const std::string& filename) const {
+  std::string validated = DataTypeFilename::validate_write_suffix(
+      filename, DATACLASS_TO_SNAKE_CASE(AuxiliaryBasisCollection));
+  std::ofstream output(validated);
+  if (!output) {
+    throw std::runtime_error("Unable to open file for writing: " + validated);
+  }
+  output << to_json().dump(2);
+}
+
+std::shared_ptr<AuxiliaryBasisCollection>
+AuxiliaryBasisCollection::from_json_file(const std::string& filename) {
+  std::string validated = DataTypeFilename::validate_read_suffix(
+      filename, DATACLASS_TO_SNAKE_CASE(AuxiliaryBasisCollection));
+  std::ifstream input(validated);
+  if (!input) {
+    throw std::runtime_error("Unable to open file for reading: " + validated);
+  }
+  nlohmann::json json;
+  input >> json;
+  return from_json(json);
+}
+
+void AuxiliaryBasisCollection::to_hdf5(H5::Group& group) const {
+  H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
+  H5::DataSpace scalar_space(H5S_SCALAR);
+  H5::Attribute attribute =
+      group.createAttribute("json", string_type, scalar_space);
+  std::string json = to_json().dump();
+  attribute.write(string_type, json);
+}
+
+std::shared_ptr<AuxiliaryBasisCollection> AuxiliaryBasisCollection::from_hdf5(
+    H5::Group& group) {
+  H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
+  H5::Attribute attribute = group.openAttribute("json");
+  std::string json;
+  attribute.read(string_type, json);
+  return from_json(nlohmann::json::parse(json));
+}
+
+void AuxiliaryBasisCollection::to_hdf5_file(const std::string& filename) const {
+  std::string validated = DataTypeFilename::validate_write_suffix(
+      filename, DATACLASS_TO_SNAKE_CASE(AuxiliaryBasisCollection));
+  H5::H5File file(validated, H5F_ACC_TRUNC);
+  H5::Group group = file.createGroup("/auxiliary_basis_collection");
+  to_hdf5(group);
+}
+
+std::shared_ptr<AuxiliaryBasisCollection>
+AuxiliaryBasisCollection::from_hdf5_file(const std::string& filename) {
+  if (hdf5_errors_should_be_suppressed()) {
+    H5::Exception::dontPrint();
+  }
+  std::string validated = DataTypeFilename::validate_read_suffix(
+      filename, DATACLASS_TO_SNAKE_CASE(AuxiliaryBasisCollection));
+  H5::H5File file(validated, H5F_ACC_RDONLY);
+  H5::Group group = file.openGroup("/auxiliary_basis_collection");
+  return from_hdf5(group);
+}
+
+std::shared_ptr<AuxiliaryBasisCollection> AuxiliaryBasisCollection::from_file(
+    const std::string& filename, const std::string& type) {
+  if (type == "json") {
+    return from_json_file(filename);
+  }
+  if (type == "hdf5") {
+    return from_hdf5_file(filename);
+  }
+  throw std::runtime_error("Unsupported file type: " + type);
+}
+
+void AuxiliaryBasisCollection::_validate() const {
+  std::string structure_hash;
+  for (const auto& [role, basis] : _auxiliary_bases) {
+    if (!basis) {
+      throw std::invalid_argument("Auxiliary basis for role " +
+                                  to_string(role) + " cannot be null");
+    }
+    const auto basis_structure_hash = basis->get_structure()->content_hash();
+    if (structure_hash.empty()) {
+      structure_hash = basis_structure_hash;
+    } else if (basis_structure_hash != structure_hash) {
+      throw std::invalid_argument(
+          "All auxiliary bases in a collection must describe the same "
+          "molecular structure");
+    }
+  }
+}
+
+void AuxiliaryBasisCollection::hash_update(
+    qdk::chemistry::utils::HashContext& context) const {
+  using qdk::chemistry::utils::hash_value;
+  hash_value(context, get_data_type_name());
+  hash_value(context, static_cast<uint64_t>(_auxiliary_bases.size()));
+  for (const auto& [role, basis] : _auxiliary_bases) {
+    hash_value(context, to_string(role));
+    hash_value(context, basis->content_hash());
+  }
+}
+
+std::shared_ptr<AuxiliaryBasisCollection> with_auxiliary_basis(
+    const AuxiliaryBasisCollection& collection, const AuxiliaryBasisRole role,
+    std::shared_ptr<AuxiliaryBasis> auxiliary_basis) {
+  auto auxiliary_bases = collection.get_auxiliary_bases();
+  auxiliary_bases[role] = std::move(auxiliary_basis);
+  return std::make_shared<AuxiliaryBasisCollection>(std::move(auxiliary_bases));
 }
 
 }  // namespace qdk::chemistry::data

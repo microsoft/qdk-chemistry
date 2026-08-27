@@ -9,7 +9,6 @@
 #include <cstdio>
 #include <memory>
 #include <nlohmann/json.hpp>
-#include <qdk/chemistry/data/auxiliary_basis.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
@@ -139,115 +138,6 @@ TEST_F(WavefunctionCoreTest, CoefficientsGet) {
             std::complex<double>(0.4, 0.5));
   EXPECT_EQ(std::get<Eigen::VectorXcd>(coeffs_from_method)(2),
             std::complex<double>(0.6, 0.7));
-}
-
-TEST_F(WavefunctionCoreTest, ImmutableAuxiliaryBasisEnrichment) {
-  auto primary_basis = orbitals->get_basis_set();
-  auto auxiliary = std::make_shared<AuxiliaryBasis>(
-      "test-jkfit", primary_basis->get_shells(),
-      primary_basis->get_structure());
-
-  auto enriched =
-      with_auxiliary_basis(*wf, AuxiliaryBasisRole::JKFit, auxiliary);
-
-  EXPECT_FALSE(primary_basis->has_auxiliary_basis(AuxiliaryBasisRole::JKFit));
-  auto enriched_basis = enriched->get_orbitals()->get_basis_set();
-  EXPECT_EQ(auxiliary,
-            enriched_basis->get_auxiliary_basis(AuxiliaryBasisRole::JKFit));
-  EXPECT_EQ(orbitals->coefficients(), enriched->get_orbitals()->coefficients());
-  EXPECT_EQ(orbitals->has_energies(), enriched->get_orbitals()->has_energies());
-  EXPECT_EQ(orbitals->has_overlap_matrix(),
-            enriched->get_orbitals()->has_overlap_matrix());
-  EXPECT_EQ(orbitals->active_indices(),
-            enriched->get_orbitals()->active_indices());
-  EXPECT_EQ(orbitals->inactive_indices(),
-            enriched->get_orbitals()->inactive_indices());
-  const auto& source_container = wf->get_container<StateVectorContainer>();
-  const auto& enriched_container =
-      enriched->get_container<StateVectorContainer>();
-  EXPECT_EQ(&source_container.get_coefficients(),
-            &enriched_container.get_coefficients());
-  EXPECT_EQ(&source_container.get_active_determinants(),
-            &enriched_container.get_active_determinants());
-  EXPECT_EQ(wf->get_active_determinants(), enriched->get_active_determinants());
-  EXPECT_TRUE(
-      std::get<Eigen::VectorXcd>(wf->get_coefficients())
-          .isApprox(std::get<Eigen::VectorXcd>(enriched->get_coefficients())));
-  EXPECT_NE(wf->content_hash(), enriched->content_hash());
-
-  auto round_trip = Wavefunction::from_json(enriched->to_json());
-  EXPECT_EQ(enriched->content_hash(), round_trip->content_hash());
-  EXPECT_TRUE(round_trip->get_orbitals()->get_basis_set()->has_auxiliary_basis(
-      AuxiliaryBasisRole::JKFit));
-}
-
-TEST_F(WavefunctionCoreTest, AuxiliaryBasisEnrichmentSharesOrbitalStorage) {
-  auto primary_basis = orbitals->get_basis_set();
-  const Eigen::Index size =
-      static_cast<Eigen::Index>(primary_basis->get_num_atomic_orbitals());
-  Eigen::MatrixXd coefficients = Eigen::MatrixXd::Identity(size, size);
-  Eigen::VectorXd energies = Eigen::VectorXd::LinSpaced(size, -1.0, 1.0);
-  Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(size, size);
-  auto source_orbitals = std::make_shared<Orbitals>(
-      coefficients, energies, overlap, primary_basis,
-      orbitals->active_indices(), orbitals->inactive_indices());
-  Wavefunction source(std::make_unique<StateVectorContainer>(
-      Configuration::from_spin_half_string(
-          "2" + std::string(static_cast<size_t>(size - 1), '0')),
-      source_orbitals));
-  auto auxiliary = std::make_shared<AuxiliaryBasis>(
-      "test-jfit", primary_basis->get_shells(), primary_basis->get_structure());
-
-  auto enriched =
-      with_auxiliary_basis(source, AuxiliaryBasisRole::JFit, auxiliary);
-  auto enriched_orbitals = enriched->get_orbitals();
-
-  EXPECT_EQ(source_orbitals->coefficients(), enriched_orbitals->coefficients());
-  EXPECT_EQ(source_orbitals->energies(), enriched_orbitals->energies());
-  EXPECT_EQ(&source_orbitals->get_overlap_matrix(),
-            &enriched_orbitals->get_overlap_matrix());
-  EXPECT_EQ(source_orbitals->active_indices(),
-            enriched_orbitals->active_indices());
-  EXPECT_EQ(source_orbitals->inactive_indices(),
-            enriched_orbitals->inactive_indices());
-}
-
-TEST_F(WavefunctionCoreTest,
-       AuxiliaryBasisEnrichmentPreservesAmplitudeContainer) {
-  auto primary_basis = orbitals->get_basis_set();
-  auto auxiliary = std::make_shared<AuxiliaryBasis>(
-      "test-rifit", primary_basis->get_shells(),
-      primary_basis->get_structure());
-  auto reference = std::make_shared<Wavefunction>(*wf);
-  std::optional<ContainerTypes::VectorVariant> t1{
-      ContainerTypes::VectorVariant{Eigen::VectorXd::Zero(8).eval()}};
-  std::optional<ContainerTypes::VectorVariant> t2{
-      ContainerTypes::VectorVariant{Eigen::VectorXd::Zero(64).eval()}};
-  Wavefunction amplitude_wavefunction(std::make_unique<AmplitudeContainer>(
-      orbitals, reference, AmplitudeType::CoupledCluster, t1, t2));
-
-  auto enriched = with_auxiliary_basis(amplitude_wavefunction,
-                                       AuxiliaryBasisRole::RIFit, auxiliary);
-
-  ASSERT_TRUE(enriched->has_container_type<AmplitudeContainer>());
-  const auto& source_container =
-      amplitude_wavefunction.get_container<AmplitudeContainer>();
-  const auto& container = enriched->get_container<AmplitudeContainer>();
-  EXPECT_EQ(AmplitudeType::CoupledCluster, container.get_amplitude_type());
-  EXPECT_EQ(reference, container.get_wavefunction());
-  const auto source_t1 = source_container.get_t1_amplitudes();
-  const auto enriched_t1 = container.get_t1_amplitudes();
-  EXPECT_EQ(&source_t1.first, &enriched_t1.first);
-  EXPECT_EQ(&source_t1.second, &enriched_t1.second);
-  const auto source_t2 = source_container.get_t2_amplitudes();
-  const auto enriched_t2 = container.get_t2_amplitudes();
-  EXPECT_EQ(&std::get<0>(source_t2), &std::get<0>(enriched_t2));
-  EXPECT_EQ(&std::get<1>(source_t2), &std::get<1>(enriched_t2));
-  EXPECT_EQ(&std::get<2>(source_t2), &std::get<2>(enriched_t2));
-  EXPECT_EQ(auxiliary,
-            enriched->get_orbitals()->get_basis_set()->get_auxiliary_basis(
-                AuxiliaryBasisRole::RIFit));
-  EXPECT_FALSE(primary_basis->has_auxiliary_basis(AuxiliaryBasisRole::RIFit));
 }
 
 // Test get determinants (immutable interface)

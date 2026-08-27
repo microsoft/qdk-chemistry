@@ -378,45 +378,6 @@ Orbitals::Orbitals(const Orbitals& other) {
   _post_construction_validate();
 }
 
-Orbitals::Orbitals(const Orbitals& source,
-                   std::shared_ptr<BasisSet> enriched_basis)
-    : _coefficients(source._coefficients),
-      _energies(source._energies),
-      _symmetries(source._symmetries),
-      _active_space_indices(source._active_space_indices),
-      _active_indices(source._active_indices),
-      _inactive_space_indices(source._inactive_space_indices),
-      _inactive_indices(source._inactive_indices),
-      _ao_overlap(source._ao_overlap),
-      _basis_set(std::move(enriched_basis)) {
-  QDK_LOG_TRACE_ENTERING();
-  _post_construction_validate();
-}
-
-std::shared_ptr<Orbitals> detail::BasisEnrichmentAccess::rebind_basis(
-    const Orbitals& orbitals, std::shared_ptr<BasisSet> enriched_basis) {
-  QDK_LOG_TRACE_ENTERING();
-  auto expected_basis = enriched_basis;
-  auto enriched_orbitals = std::shared_ptr<Orbitals>(
-      new Orbitals(orbitals, std::move(enriched_basis)));
-
-  if (enriched_orbitals->_coefficients != orbitals._coefficients ||
-      enriched_orbitals->_energies != orbitals._energies ||
-      enriched_orbitals->_symmetries != orbitals._symmetries ||
-      enriched_orbitals->_active_space_indices !=
-          orbitals._active_space_indices ||
-      enriched_orbitals->_active_indices != orbitals._active_indices ||
-      enriched_orbitals->_inactive_space_indices !=
-          orbitals._inactive_space_indices ||
-      enriched_orbitals->_inactive_indices != orbitals._inactive_indices ||
-      enriched_orbitals->_ao_overlap != orbitals._ao_overlap ||
-      enriched_orbitals->_basis_set != expected_basis) {
-    throw std::logic_error(
-        "Auxiliary-basis enrichment changed non-basis orbital data");
-  }
-  return enriched_orbitals;
-}
-
 Orbitals& Orbitals::operator=(const Orbitals& other) {
   QDK_LOG_TRACE_ENTERING();
   if (this != &other) {  // Self-assignment check

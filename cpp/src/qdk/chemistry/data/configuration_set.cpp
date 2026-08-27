@@ -45,28 +45,6 @@ ConfigurationSet::ConfigurationSet(std::vector<Configuration>&& configurations,
   _validate_configurations();
 }
 
-ConfigurationSet::ConfigurationSet(
-    std::shared_ptr<const std::vector<Configuration>> configurations,
-    std::shared_ptr<Orbitals> orbitals, std::string sector)
-    : _configurations(std::move(configurations)),
-      _orbitals(std::move(orbitals)) {
-  QDK_LOG_TRACE_ENTERING();
-  if (!_configurations || !_orbitals) {
-    throw std::invalid_argument(
-        "ConfigurationSet enrichment storage cannot be null");
-  }
-  _sector_layout = {{std::move(sector), _orbitals}};
-}
-
-ConfigurationSet detail::BasisEnrichmentAccess::rebind_orbitals(
-    const ConfigurationSet& configuration_set,
-    std::shared_ptr<Orbitals> enriched_orbitals) {
-  QDK_LOG_TRACE_ENTERING();
-  return ConfigurationSet(configuration_set._configurations,
-                          std::move(enriched_orbitals),
-                          configuration_set._sector_layout.front().first);
-}
-
 const std::vector<Configuration>& ConfigurationSet::get_configurations() const {
   QDK_LOG_TRACE_ENTERING();
 

@@ -468,8 +468,7 @@ BasisSet::BasisSet(const BasisSet& other)
       _ecp_name(other._ecp_name),
       _ecp_electrons(other._ecp_electrons),
       _ao_symmetries(other._ao_symmetries),
-      _ao_extents(other._ao_extents),
-      _auxiliary_bases(other._auxiliary_bases) {
+      _ao_extents(other._ao_extents) {
   QDK_LOG_TRACE_ENTERING();
   // Cache will be invalidated by default (_cache_valid = false)
   if (!_is_valid()) {
@@ -489,7 +488,6 @@ BasisSet& BasisSet::operator=(const BasisSet& other) {
     _ecp_electrons = other._ecp_electrons;
     _ao_symmetries = other._ao_symmetries;
     _ao_extents = other._ao_extents;
-    _auxiliary_bases = other._auxiliary_bases;
     if (other._structure) {
       _structure = std::make_shared<Structure>(*other._structure);
     } else {
@@ -913,72 +911,6 @@ bool BasisSet::has_structure() const {
   QDK_LOG_TRACE_ENTERING();
 
   return _structure != nullptr;
-}
-
-bool BasisSet::has_auxiliary_basis(const AuxiliaryBasisRole role) const {
-  QDK_LOG_TRACE_ENTERING();
-  return _auxiliary_bases.contains(role);
-}
-
-std::shared_ptr<AuxiliaryBasis> BasisSet::get_auxiliary_basis(
-    const AuxiliaryBasisRole role) const {
-  QDK_LOG_TRACE_ENTERING();
-  auto it = _auxiliary_bases.find(role);
-  if (it == _auxiliary_bases.end()) {
-    throw std::out_of_range("No auxiliary basis associated with role '" +
-                            to_string(role) + "'");
-  }
-  return it->second;
-}
-
-std::shared_ptr<AuxiliaryBasis> BasisSet::resolve_auxiliary_basis(
-    const AuxiliaryBasisRole role) const {
-  QDK_LOG_TRACE_ENTERING();
-  if (has_auxiliary_basis(role)) {
-    return get_auxiliary_basis(role);
-  }
-  if (role == AuxiliaryBasisRole::JFit &&
-      has_auxiliary_basis(AuxiliaryBasisRole::JKFit)) {
-    return get_auxiliary_basis(AuxiliaryBasisRole::JKFit);
-  }
-  throw std::out_of_range("No auxiliary basis compatible with role '" +
-                          to_string(role) + "'");
-}
-
-const BasisSet::AuxiliaryBasisMap& BasisSet::get_auxiliary_bases() const {
-  QDK_LOG_TRACE_ENTERING();
-  return _auxiliary_bases;
-}
-
-std::shared_ptr<BasisSet> with_auxiliary_basis(
-    const BasisSet& basis_set, const AuxiliaryBasisRole role,
-    std::shared_ptr<AuxiliaryBasis> auxiliary_basis) {
-  return detail::BasisEnrichmentAccess::enrich_basis(
-      basis_set, role, std::move(auxiliary_basis));
-}
-
-std::shared_ptr<BasisSet> detail::BasisEnrichmentAccess::enrich_basis(
-    const BasisSet& basis_set, const AuxiliaryBasisRole role,
-    std::shared_ptr<AuxiliaryBasis> auxiliary_basis) {
-  QDK_LOG_TRACE_ENTERING();
-  if (!auxiliary_basis) {
-    throw std::invalid_argument("Auxiliary basis pointer cannot be nullptr");
-  }
-  if (!basis_set.has_structure()) {
-    throw std::invalid_argument(
-        "Cannot associate an auxiliary basis with a BasisSet that has no "
-        "molecular structure");
-  }
-  if (basis_set.get_structure()->content_hash() !=
-      auxiliary_basis->get_structure()->content_hash()) {
-    throw std::invalid_argument(
-        "Primary and auxiliary basis sets must describe the same molecular "
-        "structure");
-  }
-
-  auto enriched = std::make_shared<BasisSet>(basis_set);
-  enriched->_auxiliary_bases[role] = std::move(auxiliary_basis);
-  return enriched;
 }
 
 const std::string& BasisSet::get_ecp_name() const {
@@ -1490,14 +1422,6 @@ void BasisSet::to_hdf5(H5::Group& group) const {
       _structure->to_hdf5(structure_group);
     }
 
-    if (!_auxiliary_bases.empty()) {
-      H5::Group auxiliary_group = group.createGroup("auxiliary_bases");
-      for (const auto& [role, auxiliary_basis] : _auxiliary_bases) {
-        H5::Group role_group = auxiliary_group.createGroup(to_string(role));
-        auxiliary_basis->to_hdf5(role_group);
-      }
-    }
-
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
   }
@@ -1545,9 +1469,7 @@ std::shared_ptr<BasisSet> BasisSet::from_hdf5(H5::Group& group) {
     H5::Attribute version_attr = group.openAttribute("version");
     std::string version_str;
     version_attr.read(string_type, version_str);
-    if (version_str != LEGACY_SERIALIZATION_VERSION) {
-      validate_serialization_version(SERIALIZATION_VERSION, version_str);
-    }
+    validate_serialization_version(SERIALIZATION_VERSION, version_str);
 
     // Load metadata
     H5::Group metadata_group = group.openGroup("metadata");
@@ -1763,17 +1685,11 @@ std::shared_ptr<BasisSet> BasisSet::from_hdf5(H5::Group& group) {
       const bool has_real_ecp_electrons =
           std::any_of(ecp_electrons.begin(), ecp_electrons.end(),
                       [](size_t n) { return n != 0; });
-        const bool has_real_ecp_name =
-          !ecp_name.empty() && ecp_name != "none";
-        if (!ecp_shells.empty() || has_real_ecp_name ||
-          has_real_ecp_electrons) {
+      const bool has_real_ecp_name = !ecp_name.empty() && ecp_name != "none";
+      if (!ecp_shells.empty() || has_real_ecp_name || has_real_ecp_electrons) {
         throw std::runtime_error(
             "HDF5 BasisSet contains ECP data but no structure; "
             "cannot reconstruct without losing information");
-      }
-      if (group.nameExists("auxiliary_bases")) {
-        throw std::runtime_error(
-            "HDF5 BasisSet contains auxiliary bases but no structure");
       }
       return std::make_shared<BasisSet>(name, shells, atomic_orbital_type);
     }
@@ -1795,25 +1711,6 @@ std::shared_ptr<BasisSet> BasisSet::from_hdf5(H5::Group& group) {
         name, shells, effective_ecp_name, ecp_shells, ecp_electrons,
         std::move(structure), atomic_orbital_type);
 
-    if (group.nameExists("auxiliary_bases")) {
-      H5::Group auxiliary_group = group.openGroup("auxiliary_bases");
-      const hsize_t role_count = auxiliary_group.getNumObjs();
-      for (hsize_t index = 0; index < role_count; ++index) {
-        if (auxiliary_group.getObjTypeByIdx(index) != H5G_GROUP) {
-          throw std::runtime_error(
-              "Auxiliary-basis HDF5 entries must be groups");
-        }
-        const std::string role_name = auxiliary_group.getObjnameByIdx(index);
-        const auto role = auxiliary_basis_role_from_string(role_name);
-        if (basis_set->has_auxiliary_basis(role)) {
-          throw std::runtime_error("Duplicate auxiliary-basis role in HDF5: " +
-                                   role_name);
-        }
-        H5::Group role_group = auxiliary_group.openGroup(role_name);
-        basis_set = with_auxiliary_basis(*basis_set, role,
-                                         AuxiliaryBasis::from_hdf5(role_group));
-      }
-    }
     return basis_set;
 
   } catch (const H5::Exception& e) {
@@ -1881,13 +1778,6 @@ nlohmann::json BasisSet::to_json() const {
     j["structure"] = _structure->to_json();
   }
 
-  if (!_auxiliary_bases.empty()) {
-    j["auxiliary_bases"] = nlohmann::json::object();
-    for (const auto& [role, auxiliary_basis] : _auxiliary_bases) {
-      j["auxiliary_bases"][to_string(role)] = auxiliary_basis->to_json();
-    }
-  }
-
   return j;
 }
 
@@ -1900,14 +1790,7 @@ std::shared_ptr<BasisSet> BasisSet::from_json(const nlohmann::json& j) {
       throw std::runtime_error("Invalid JSON: missing version field");
     }
     const std::string version = j["version"];
-    if (version != LEGACY_SERIALIZATION_VERSION) {
-      validate_serialization_version(SERIALIZATION_VERSION, version);
-    }
-
-    if (j.contains("auxiliary_bases") && !j["auxiliary_bases"].is_object()) {
-      throw std::runtime_error(
-          "BasisSet auxiliary_bases must be a JSON object");
-    }
+    validate_serialization_version(SERIALIZATION_VERSION, version);
 
     std::string name = j.value("name", "");
 
@@ -2080,17 +1963,10 @@ std::shared_ptr<BasisSet> BasisSet::from_json(const nlohmann::json& j) {
       const bool has_real_ecp_electrons =
           std::any_of(ecp_electrons.begin(), ecp_electrons.end(),
                       [](size_t n) { return n != 0; });
-        const bool has_real_ecp_name =
-          !ecp_name.empty() && ecp_name != "none";
-        if (!ecp_shells.empty() || has_real_ecp_name ||
-          has_real_ecp_electrons) {
+      const bool has_real_ecp_name = !ecp_name.empty() && ecp_name != "none";
+      if (!ecp_shells.empty() || has_real_ecp_name || has_real_ecp_electrons) {
         throw std::runtime_error(
             "Cannot create BasisSet with ECP data but without structure");
-      }
-      if (j.contains("auxiliary_bases") && !j["auxiliary_bases"].empty()) {
-        throw std::runtime_error(
-            "Cannot create BasisSet with auxiliary bases but without "
-            "structure");
       }
       return std::make_shared<BasisSet>(name, shells, atomic_orbital_type);
     }
@@ -2110,18 +1986,6 @@ std::shared_ptr<BasisSet> BasisSet::from_json(const nlohmann::json& j) {
     auto basis_set = _from_components(
         name, shells, effective_ecp_name, ecp_shells, ecp_electrons,
         std::move(structure), atomic_orbital_type);
-    if (j.contains("auxiliary_bases")) {
-      for (const auto& [role_name, auxiliary_json] :
-           j["auxiliary_bases"].items()) {
-        const auto role = auxiliary_basis_role_from_string(role_name);
-        if (basis_set->has_auxiliary_basis(role)) {
-          throw std::runtime_error("Duplicate auxiliary-basis role in JSON: " +
-                                   role_name);
-        }
-        basis_set = with_auxiliary_basis(
-            *basis_set, role, AuxiliaryBasis::from_json(auxiliary_json));
-      }
-    }
     return basis_set;
 
   } catch (const std::exception& e) {
@@ -2337,11 +2201,6 @@ void BasisSet::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
   hash_value(ctx, static_cast<uint64_t>(_ecp_electrons.size()));
   for (auto e : _ecp_electrons) {
     hash_value(ctx, static_cast<uint64_t>(e));
-  }
-  hash_value(ctx, static_cast<uint64_t>(_auxiliary_bases.size()));
-  for (const auto& [role, auxiliary_basis] : _auxiliary_bases) {
-    hash_value(ctx, to_string(role));
-    hash_value(ctx, auxiliary_basis->content_hash());
   }
 }
 

@@ -17,10 +17,6 @@ namespace qdk::chemistry::data {
 
 class Wavefunction;  // forward declaration for DEFAULT_SECTOR
 
-namespace detail {
-struct BasisEnrichmentAccess;
-}
-
 /**
  * @class ConfigurationSet
  * @brief Associates a collection of Configuration objects with orbital
@@ -250,16 +246,9 @@ class ConfigurationSet : public DataClass {
   static ConfigurationSet from_hdf5_file(const std::string& filename);
 
  private:
-  /** Rebinds orbitals while sharing immutable configurations. */
-  friend struct detail::BasisEnrichmentAccess;
-
-  ConfigurationSet(
-      std::shared_ptr<const std::vector<Configuration>> configurations,
-      std::shared_ptr<Orbitals> orbitals, std::string sector);
-
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
 
-  /// Immutable configurations; basis enrichment shares this storage.
+  /// Immutable configuration storage.
   std::shared_ptr<const std::vector<Configuration>> _configurations;
 
   /// Orbital information (holds active space definition)

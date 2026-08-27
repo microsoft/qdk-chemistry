@@ -417,12 +417,6 @@ class StateVectorContainer : public WavefunctionContainer {
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
 
  private:
-  StateVectorContainer(const StateVectorContainer& source,
-                       std::shared_ptr<Orbitals> enriched_orbitals);
-
-  std::unique_ptr<WavefunctionContainer> _clone_for_basis_enrichment(
-      std::shared_ptr<BasisSet> enriched_basis) const override;
-
   /// Serialization version
   static constexpr const char* SERIALIZATION_VERSION = "0.2.0";
 

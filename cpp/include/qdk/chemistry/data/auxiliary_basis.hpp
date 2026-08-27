@@ -20,14 +20,6 @@
 
 namespace qdk::chemistry::data {
 
-// Avoid cyclic includes among data types used by the enrichment capability.
-class AuxiliaryBasis;
-class BasisSet;
-class ConfigurationSet;
-class Orbitals;
-class Wavefunction;
-class WavefunctionContainer;
-
 /** @brief Algorithm-facing purpose served by an auxiliary basis. */
 enum class AuxiliaryBasisRole {
   JFit,   ///< Coulomb density fitting
@@ -35,32 +27,6 @@ enum class AuxiliaryBasisRole {
   RIFit,  ///< Correlation integral fitting
   CABS    ///< Complementary auxiliary basis for explicitly correlated methods
 };
-
-namespace detail {
-
-/** Internal capability for immutable, structurally shared basis enrichment. */
-struct BasisEnrichmentAccess {
-  static std::shared_ptr<BasisSet> enrich_basis(
-      const BasisSet& basis_set, AuxiliaryBasisRole role,
-      std::shared_ptr<AuxiliaryBasis> auxiliary_basis);
-
-  static std::shared_ptr<Orbitals> rebind_basis(
-      const Orbitals& orbitals, std::shared_ptr<BasisSet> enriched_basis);
-
-  static ConfigurationSet rebind_orbitals(
-      const ConfigurationSet& configuration_set,
-      std::shared_ptr<Orbitals> enriched_orbitals);
-
-  static std::unique_ptr<WavefunctionContainer> enrich_container(
-      const WavefunctionContainer& container,
-      std::shared_ptr<BasisSet> enriched_basis);
-
-  static std::shared_ptr<Wavefunction> enrich_wavefunction(
-      const Wavefunction& wavefunction, AuxiliaryBasisRole role,
-      std::shared_ptr<AuxiliaryBasis> auxiliary_basis);
-};
-
-}  // namespace detail
 
 /**
  * @brief Return the stable wire-format name for an auxiliary-basis role.
@@ -201,13 +167,13 @@ class AuxiliaryBasis : public DataClass,
       std::shared_ptr<Structure> structure,
       AOType atomic_orbital_type = AOType::Spherical);
 
-    /** @brief Get the stable data-class type name. @return @c auxiliary_basis. */
-    static std::string data_type_name() {
-        return DATACLASS_TO_SNAKE_CASE(AuxiliaryBasis);
-    }
+  /** @brief Get the stable data-class type name. @return @c auxiliary_basis. */
+  static std::string data_type_name() {
+    return DATACLASS_TO_SNAKE_CASE(AuxiliaryBasis);
+  }
 
-    /** @brief Get the data-class type name for this instance. */
-    std::string get_data_type_name() const override { return data_type_name(); }
+  /** @brief Get the data-class type name for this instance. */
+  std::string get_data_type_name() const override { return data_type_name(); }
 
   /** @brief Get a human-readable summary. @return Summary string. */
   std::string get_summary() const override;
@@ -274,44 +240,222 @@ class AuxiliaryBasis : public DataClass,
 };
 
 /**
- * @brief Return a new basis set carrying an auxiliary basis under @p role.
+ * @class AuxiliaryBasisCollection
+ * @brief Immutable collection of auxiliary bases keyed by algorithm-facing
+ *        roles
  *
- * The input basis set is unchanged. An existing association for the same role
- * is replaced in the returned value.
- *
- * @param basis_set Primary basis set to enrich
- * @param role Role under which to associate the auxiliary basis
- * @param auxiliary_basis Auxiliary basis to associate
- * @return New enriched basis set
- * @throws std::invalid_argument if either basis lacks a compatible structure
+ * The collection is independent of a primary @ref BasisSet or wavefunction and
+ * is intended for algorithms that explicitly accept auxiliary-basis inputs.
+ * It does not itself enable density fitting or change algorithm behavior. All
+ * entries must describe the same molecular structure.
  */
-std::shared_ptr<BasisSet> with_auxiliary_basis(
-    const BasisSet& basis_set, AuxiliaryBasisRole role,
-    std::shared_ptr<AuxiliaryBasis> auxiliary_basis);
+class AuxiliaryBasisCollection
+    : public DataClass,
+      public std::enable_shared_from_this<AuxiliaryBasisCollection> {
+ public:
+  using Map = std::map<AuxiliaryBasisRole, std::shared_ptr<AuxiliaryBasis>>;
+
+  /**
+   * @brief Construct an empty auxiliary-basis collection.
+   */
+  AuxiliaryBasisCollection() = default;
+
+  /**
+   * @brief Construct a collection from exact role associations.
+   *
+   * Every non-null entry is retained under its exact role. All entries must
+   * describe the same molecular structure.
+   *
+   * @param auxiliary_bases Auxiliary bases keyed by role
+   * @throws std::invalid_argument if an entry is null or structures differ
+   */
+  explicit AuxiliaryBasisCollection(Map auxiliary_bases);
+
+  /**
+   * @brief Check whether an exact role has an associated auxiliary basis.
+   * @param role Exact role to inspect
+   * @return @c true if @p role is present, otherwise @c false
+   */
+  bool has_auxiliary_basis(AuxiliaryBasisRole role) const;
+
+  /**
+   * @brief Get the auxiliary basis associated with an exact role.
+   * @param role Exact role to retrieve
+   * @return Auxiliary basis associated with @p role
+   * @throws std::out_of_range if the role has no association
+   */
+  std::shared_ptr<AuxiliaryBasis> get_auxiliary_basis(
+      AuxiliaryBasisRole role) const;
+
+  /**
+   * @brief Resolve a basis compatible with a required role.
+   *
+   * Exact associations take precedence. A JKFit basis may satisfy a JFit
+   * requirement, but the inverse fallback is not permitted.
+   *
+   * @param role Required auxiliary-basis role
+   * @return Exact or compatible auxiliary basis
+   * @throws std::out_of_range if no compatible association exists
+   */
+  std::shared_ptr<AuxiliaryBasis> resolve_auxiliary_basis(
+      AuxiliaryBasisRole role) const;
+
+  /**
+   * @brief Get all exact role associations.
+   * @return Read-only role-to-basis map owned by this collection
+   */
+  const Map& get_auxiliary_bases() const;
+
+  /**
+   * @brief Get the stable data-class type name.
+   * @return @c auxiliary_basis_collection
+   */
+  static std::string data_type_name() {
+    return DATACLASS_TO_SNAKE_CASE(AuxiliaryBasisCollection);
+  }
+
+  /**
+   * @brief Get the data-class type name for this instance.
+   * @return @c auxiliary_basis_collection
+   */
+  std::string get_data_type_name() const override { return data_type_name(); }
+
+  /**
+   * @brief Get a human-readable summary of the tagged auxiliary bases.
+   * @return Summary containing the role count and each role-to-name mapping
+   */
+  std::string get_summary() const override;
+
+  /**
+   * @brief Save the collection in a supported file format.
+   * @param filename Destination filename
+   * @param type File type, @c json or @c hdf5
+   * @throws std::runtime_error if @p type is unsupported or writing fails
+   */
+  void to_file(const std::string& filename,
+               const std::string& type) const override;
+
+  /**
+   * @brief Serialize the collection to JSON.
+   * @return JSON object containing the version and exact role associations
+   */
+  nlohmann::json to_json() const override;
+
+  /**
+   * @brief Save the collection to a JSON file.
+   * @param filename Destination filename with an
+   *        @c .auxiliary_basis_collection.json suffix
+   * @throws std::invalid_argument if the filename suffix is invalid
+   * @throws std::runtime_error if the file cannot be written
+   */
+  void to_json_file(const std::string& filename) const override;
+
+  /**
+   * @brief Serialize the collection into an HDF5 group.
+   * @param group Destination HDF5 group
+   * @throws H5::Exception if the group cannot be written
+   */
+  void to_hdf5(H5::Group& group) const override;
+
+  /**
+   * @brief Save the collection to an HDF5 file.
+   * @param filename Destination filename with an
+   *        @c .auxiliary_basis_collection.h5 suffix
+   * @throws std::invalid_argument if the filename suffix is invalid
+   * @throws H5::Exception if the file cannot be written
+   */
+  void to_hdf5_file(const std::string& filename) const override;
+
+  /**
+   * @brief Load a collection from a supported file format.
+   * @param filename Source filename
+   * @param type File type, @c json or @c hdf5
+   * @return Deserialized auxiliary-basis collection
+   * @throws std::runtime_error if @p type is unsupported or reading fails
+   */
+  static std::shared_ptr<AuxiliaryBasisCollection> from_file(
+      const std::string& filename, const std::string& type);
+
+  /**
+   * @brief Deserialize a collection from JSON.
+   * @param json JSON object containing the serialized collection
+   * @return Deserialized auxiliary-basis collection
+   * @throws std::runtime_error if required fields or the version are invalid
+   * @throws std::invalid_argument if an entry is invalid or structures differ
+   */
+  static std::shared_ptr<AuxiliaryBasisCollection> from_json(
+      const nlohmann::json& json);
+
+  /**
+   * @brief Load a collection from a JSON file.
+   * @param filename Source filename with an
+   *        @c .auxiliary_basis_collection.json suffix
+   * @return Deserialized auxiliary-basis collection
+   * @throws std::invalid_argument if the filename suffix or an entry is invalid
+   * @throws std::runtime_error if the file cannot be read
+   */
+  static std::shared_ptr<AuxiliaryBasisCollection> from_json_file(
+      const std::string& filename);
+
+  /**
+   * @brief Deserialize a collection from an HDF5 group.
+   * @param group Source HDF5 group
+   * @return Deserialized auxiliary-basis collection
+   * @throws H5::Exception if the serialized attribute cannot be read
+   * @throws std::runtime_error if the stored JSON is invalid
+   */
+  static std::shared_ptr<AuxiliaryBasisCollection> from_hdf5(H5::Group& group);
+
+  /**
+   * @brief Load a collection from an HDF5 file.
+   * @param filename Source filename with an
+   *        @c .auxiliary_basis_collection.h5 suffix
+   * @return Deserialized auxiliary-basis collection
+   * @throws std::invalid_argument if the filename suffix is invalid
+   * @throws H5::Exception if the file or collection group cannot be read
+   */
+  static std::shared_ptr<AuxiliaryBasisCollection> from_hdf5_file(
+      const std::string& filename);
+
+ private:
+  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
+
+  Map _auxiliary_bases;
+
+  /**
+   * @brief Validate collection entries and their shared molecular structure.
+   * @throws std::invalid_argument if an entry is null or structures differ
+   */
+  void _validate() const;
+
+  /**
+   * @brief Feed exact role associations into a content-hash context.
+   * @param ctx Hash context to update
+   */
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+};
 
 /**
- * @brief Return a new wavefunction whose primary basis carries an auxiliary
- * basis under @p role.
+ * @brief Return a new collection carrying an auxiliary basis under @p role.
  *
- * The input wavefunction is unchanged. Its immutable coefficients,
- * configurations, amplitudes, RDMs, entropy data, and orbital tensors are
- * structurally shared; only the enriched BasisSet and lightweight owning
- * containers are newly allocated.
+ * The input collection is unchanged. An existing association for the same
+ * role is replaced in the returned value.
  *
- * @param wavefunction Wavefunction to enrich
- * @param role Role under which to associate the auxiliary basis
- * @param auxiliary_basis Auxiliary basis to associate
- * @return New wavefunction preserving the original payload
- * @throws std::invalid_argument if the wavefunction has no primary basis or
- *         the structures are incompatible
- * @throws std::runtime_error if the concrete wavefunction container cannot
- *         preserve its payload while enriching the basis
+ * @param collection Source collection
+ * @param role Exact role to add or replace
+ * @param auxiliary_basis Auxiliary basis to associate with @p role
+ * @return New collection containing the requested association
+ * @throws std::invalid_argument if @p auxiliary_basis is null or its structure
+ *         differs from another collection entry
  */
-std::shared_ptr<Wavefunction> with_auxiliary_basis(
-    const Wavefunction& wavefunction, AuxiliaryBasisRole role,
+std::shared_ptr<AuxiliaryBasisCollection> with_auxiliary_basis(
+    const AuxiliaryBasisCollection& collection, AuxiliaryBasisRole role,
     std::shared_ptr<AuxiliaryBasis> auxiliary_basis);
 
 static_assert(DataClassCompliant<AuxiliaryBasis>,
               "AuxiliaryBasis must implement the complete DataClass interface");
+static_assert(
+    DataClassCompliant<AuxiliaryBasisCollection>,
+    "AuxiliaryBasisCollection must implement the complete DataClass interface");
 
 }  // namespace qdk::chemistry::data

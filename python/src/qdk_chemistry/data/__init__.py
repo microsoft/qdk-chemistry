@@ -11,6 +11,7 @@ Exposed classes are:
 - :class:`Ansatz`: Quantum chemical ansatz combining a Hamiltonian and wavefunction for energy calculations.
 - :class:`AOType`: Enumeration of basis set types (STO-3G, 6-31G, etc.).
 - :class:`AuxiliaryBasis`: Secondary basis supplied to algorithms that require one, such as density fitting.
+- :class:`AuxiliaryBasisCollection`: Role-tagged collection of auxiliary bases for algorithm inputs.
 - :class:`AuxiliaryBasisRole`: Algorithm-facing purpose served by an auxiliary basis.
 - :class:`BasisSet`: Gaussian basis set definitions for quantum calculations.
 - :class:`CanonicalFourCenterHamiltonianContainer`: Container for four-center two-electron integrals in canonical form.
@@ -77,6 +78,7 @@ from qdk_chemistry._core.data import (
     Ansatz,
     AOType,
     AuxiliaryBasis,
+    AuxiliaryBasisCollection,
     AuxiliaryBasisRole,
     BasisSet,
     CanonicalFourCenterHamiltonianContainer,
@@ -150,6 +152,7 @@ __all__ = [
     "AmplitudeType",
     "Ansatz",
     "AuxiliaryBasis",
+    "AuxiliaryBasisCollection",
     "AuxiliaryBasisRole",
     "BasisSet",
     "CanonicalFourCenterHamiltonianContainer",

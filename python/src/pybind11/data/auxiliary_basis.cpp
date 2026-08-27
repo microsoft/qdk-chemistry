@@ -7,8 +7,6 @@
 
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/auxiliary_basis.hpp>
-#include <qdk/chemistry/data/basis_set.hpp>
-#include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 #include <utility>
 
@@ -57,6 +55,15 @@ std::shared_ptr<AuxiliaryBasis> auxiliary_basis_from_hdf5_file(
 
 void bind_auxiliary_basis(py::module& module) {
   using qdk::chemistry::python::utils::to_shell_vec;
+
+  py::enum_<AuxiliaryBasisRole>(
+      module, "AuxiliaryBasisRole",
+      "Algorithm-facing purpose served by an auxiliary basis")
+      .value("JFIT", AuxiliaryBasisRole::JFit, "Coulomb density-fitting basis")
+      .value("JKFIT", AuxiliaryBasisRole::JKFit,
+             "Coulomb and exchange density-fitting basis")
+      .value("RIFIT", AuxiliaryBasisRole::RIFit, "Correlation-fitting basis")
+      .value("CABS", AuxiliaryBasisRole::CABS, "Complementary auxiliary basis");
 
   py::class_<AuxiliaryBasis, DataClass, py::smart_holder> auxiliary_basis(
       module, "AuxiliaryBasis",
@@ -414,55 +421,286 @@ Type:
 
   auxiliary_basis.attr("_data_type_name") =
       DATACLASS_TO_SNAKE_CASE(AuxiliaryBasis);
+
+  py::class_<AuxiliaryBasisCollection, DataClass, py::smart_holder> collection(
+      module, "AuxiliaryBasisCollection",
+      R"(
+Immutable collection of auxiliary bases keyed by their algorithm-facing roles.
+
+The collection is independent of a primary basis set or wavefunction and is
+intended for algorithms that explicitly accept auxiliary-basis inputs. It does
+not itself enable density fitting or change algorithm behavior.
+)");
+
+  collection
+      .def(py::init<>(), R"(
+Create an empty auxiliary-basis collection.
+
+The collection can be populated immutably with
+:func:`with_auxiliary_basis`.
+)")
+      .def(py::init<AuxiliaryBasisCollection::Map>(),
+           py::arg("auxiliary_bases"),
+           R"(
+Create a tagged auxiliary-basis collection.
+
+Args:
+    auxiliary_bases (dict[AuxiliaryBasisRole, AuxiliaryBasis]): Exact role associations
+
+Raises:
+    ValueError: If an entry is null or the bases describe different structures
+)")
+      .def("has_auxiliary_basis",
+           &AuxiliaryBasisCollection::has_auxiliary_basis, py::arg("role"),
+           R"(
+Check whether an auxiliary basis is associated with an exact role.
+
+This method does not apply compatibility fallbacks. For example, a collection
+containing only ``JKFIT`` reports ``False`` for ``JFIT``.
+
+Args:
+    role (AuxiliaryBasisRole): Exact role to inspect
+
+Returns:
+    bool: Whether the exact role has an associated auxiliary basis
+)")
+      .def("get_auxiliary_basis",
+           &AuxiliaryBasisCollection::get_auxiliary_basis, py::arg("role"),
+           R"(
+Get the auxiliary basis associated with an exact role.
+
+Args:
+    role (AuxiliaryBasisRole): Exact role to retrieve
+
+Returns:
+    AuxiliaryBasis: Basis associated with the exact role
+
+Raises:
+    IndexError: If the collection has no entry for the role
+)")
+      .def("resolve_auxiliary_basis",
+           &AuxiliaryBasisCollection::resolve_auxiliary_basis, py::arg("role"),
+           R"(
+Resolve an auxiliary basis compatible with a required role.
+
+Exact associations take precedence. A ``JKFIT`` basis may satisfy a ``JFIT``
+request, but a ``JFIT`` basis cannot satisfy ``JKFIT``. Other roles require an
+exact match.
+
+Args:
+    role (AuxiliaryBasisRole): Required auxiliary-basis role
+
+Returns:
+    AuxiliaryBasis: Exact or compatible auxiliary basis
+
+Raises:
+    IndexError: If no collection entry can satisfy the requested role
+)")
+      .def("get_auxiliary_bases",
+           &AuxiliaryBasisCollection::get_auxiliary_bases,
+           R"(
+Get all exact auxiliary-basis associations.
+
+Returns:
+    dict[AuxiliaryBasisRole, AuxiliaryBasis]: Copy of the role-keyed mapping
+)")
+      .def(
+          "to_json",
+          [](const AuxiliaryBasisCollection& self) {
+            return self.to_json().dump();
+          },
+          R"(
+Serialize the collection to a JSON string.
+
+Returns:
+    str: Versioned JSON containing all exact role associations
+)")
+      .def_static(
+          "from_json",
+          [](const std::string& json) {
+            return AuxiliaryBasisCollection::from_json(
+                nlohmann::json::parse(json));
+          },
+          py::arg("json"),
+          R"(
+Deserialize an auxiliary-basis collection from JSON.
+
+Args:
+    json (str): JSON string produced by :meth:`to_json`
+
+Returns:
+    AuxiliaryBasisCollection: Deserialized collection
+
+Raises:
+    RuntimeError: If the JSON, version, or required fields are invalid
+    ValueError: If an entry is null or structures differ
+)")
+      .def(
+          "to_file",
+          [](const AuxiliaryBasisCollection& self, const py::object& filename,
+             const std::string& type) {
+            self.to_file(
+                qdk::chemistry::python::utils::to_string_path(filename), type);
+          },
+          py::arg("filename"), py::arg("type"),
+          R"(
+Save the collection in a supported file format.
+
+Args:
+    filename (str | pathlib.Path): Destination path with an
+        ``.auxiliary_basis_collection`` data-type suffix
+    type (str): File format, either ``"json"`` or ``"hdf5"``
+
+Raises:
+    ValueError: If the filename suffix is invalid
+    RuntimeError: If the format is unsupported or the file cannot be written
+)")
+      .def_static(
+          "from_file",
+          [](const py::object& filename, const std::string& type) {
+            return AuxiliaryBasisCollection::from_file(
+                qdk::chemistry::python::utils::to_string_path(filename), type);
+          },
+          py::arg("filename"), py::arg("type"),
+          R"(
+Load a collection from a supported file format.
+
+Args:
+    filename (str | pathlib.Path): Source path with an
+        ``.auxiliary_basis_collection`` data-type suffix
+    type (str): File format, either ``"json"`` or ``"hdf5"``
+
+Returns:
+    AuxiliaryBasisCollection: Deserialized collection
+
+Raises:
+    ValueError: If the filename suffix or a collection entry is invalid
+    RuntimeError: If the format is unsupported or the file cannot be read
+)")
+      .def(
+          "to_json_file",
+          [](const AuxiliaryBasisCollection& self, const py::object& filename) {
+            self.to_json_file(
+                qdk::chemistry::python::utils::to_string_path(filename));
+          },
+          py::arg("filename"),
+          R"(
+Save the collection to a JSON file.
+
+Args:
+    filename (str | pathlib.Path): Destination path ending in
+        ``.auxiliary_basis_collection.json``
+
+Raises:
+    ValueError: If the filename suffix is invalid
+    RuntimeError: If the file cannot be written
+)")
+      .def_static(
+          "from_json_file",
+          [](const py::object& filename) {
+            return AuxiliaryBasisCollection::from_json_file(
+                qdk::chemistry::python::utils::to_string_path(filename));
+          },
+          py::arg("filename"),
+          R"(
+Load a collection from a JSON file.
+
+Args:
+    filename (str | pathlib.Path): Source path ending in
+        ``.auxiliary_basis_collection.json``
+
+Returns:
+    AuxiliaryBasisCollection: Deserialized collection
+
+Raises:
+    ValueError: If the filename suffix or a collection entry is invalid
+    RuntimeError: If the file or serialized JSON cannot be read
+)")
+      .def(
+          "to_hdf5_file",
+          [](const AuxiliaryBasisCollection& self, const py::object& filename) {
+            self.to_hdf5_file(
+                qdk::chemistry::python::utils::to_string_path(filename));
+          },
+          py::arg("filename"),
+          R"(
+Save the collection to an HDF5 file.
+
+Args:
+    filename (str | pathlib.Path): Destination path ending in
+        ``.auxiliary_basis_collection.h5``
+
+Raises:
+    ValueError: If the filename suffix is invalid
+    RuntimeError: If the file cannot be written
+)")
+      .def_static(
+          "from_hdf5_file",
+          [](const py::object& filename) {
+            return AuxiliaryBasisCollection::from_hdf5_file(
+                qdk::chemistry::python::utils::to_string_path(filename));
+          },
+          py::arg("filename"),
+          R"(
+Load a collection from an HDF5 file.
+
+Args:
+        filename (str | pathlib.Path): Source path ending in
+                ``.auxiliary_basis_collection.h5``
+
+Returns:
+        AuxiliaryBasisCollection: Deserialized collection
+
+Raises:
+        ValueError: If the filename suffix or a collection entry is invalid
+        RuntimeError: If the file or serialized collection cannot be read
+)")
+      .def(
+          "__repr__",
+          [](const AuxiliaryBasisCollection& self) {
+            return self.get_summary();
+          },
+          "Return the human-readable collection summary.")
+      .def(
+          "__str__",
+          [](const AuxiliaryBasisCollection& self) {
+            return self.get_summary();
+          },
+          "Return the human-readable collection summary.")
+      .def(py::pickle(
+          [](const AuxiliaryBasisCollection& self) {
+            return self.to_json().dump();
+          },
+          [](const std::string& json) {
+            return *AuxiliaryBasisCollection::from_json(
+                nlohmann::json::parse(json));
+          }));
+
+  collection.attr("_data_type_name") =
+      DATACLASS_TO_SNAKE_CASE(AuxiliaryBasisCollection);
 }
 
 void bind_auxiliary_basis_functions(py::module& module) {
   module.def(
       "with_auxiliary_basis",
-      [](const BasisSet& basis_set, AuxiliaryBasisRole role,
+      [](const AuxiliaryBasisCollection& collection, AuxiliaryBasisRole role,
          std::shared_ptr<AuxiliaryBasis> auxiliary_basis) {
-        return with_auxiliary_basis(basis_set, role,
+        return with_auxiliary_basis(collection, role,
                                     std::move(auxiliary_basis));
       },
-      py::arg("data"), py::arg("role"), py::arg("auxiliary_basis"),
+      py::arg("collection"), py::arg("role"), py::arg("auxiliary_basis"),
       R"(
-Return an immutable copy of a basis set with an auxiliary-basis association.
+Return an immutable collection with an auxiliary-basis association.
 
 Args:
-    data (BasisSet): Primary basis set to enrich
+    collection (AuxiliaryBasisCollection): Collection to enrich
     role (AuxiliaryBasisRole): Role served by the auxiliary basis
     auxiliary_basis (AuxiliaryBasis): Auxiliary basis to associate
 
 Returns:
-    BasisSet: New enriched basis set; ``data`` is unchanged
+    AuxiliaryBasisCollection: New collection; ``collection`` is unchanged
 
 Raises:
-    ValueError: If the primary and auxiliary bases describe different structures
-)");
-  module.def(
-      "with_auxiliary_basis",
-      [](const Wavefunction& wavefunction, AuxiliaryBasisRole role,
-         std::shared_ptr<AuxiliaryBasis> auxiliary_basis) {
-        return with_auxiliary_basis(wavefunction, role,
-                                    std::move(auxiliary_basis));
-      },
-      py::arg("data"), py::arg("role"), py::arg("auxiliary_basis"),
-      R"(
-Return an immutable copy of a wavefunction with an auxiliary-basis association.
-
-The wavefunction payload is preserved while its nested orbitals receive a new
-primary basis carrying the association.
-
-Args:
-    data (Wavefunction): Wavefunction to enrich
-    role (AuxiliaryBasisRole): Role served by the auxiliary basis
-    auxiliary_basis (AuxiliaryBasis): Auxiliary basis to associate
-
-Returns:
-    Wavefunction: New enriched wavefunction; ``data`` is unchanged
-
-Raises:
-    ValueError: If the wavefunction has no primary basis or structures differ
-    RuntimeError: If its concrete container cannot preserve the payload
+    ValueError: If an entry is null or structures differ
 )");
 }

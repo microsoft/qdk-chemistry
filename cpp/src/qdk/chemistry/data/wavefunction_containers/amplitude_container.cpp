@@ -221,27 +221,6 @@ AmplitudeContainer::AmplitudeContainer(
   }
 }
 
-AmplitudeContainer::AmplitudeContainer(
-    const AmplitudeContainer& source,
-    std::shared_ptr<Orbitals> enriched_orbitals)
-    : WavefunctionContainer(source.get_type()),
-      _orbitals(std::move(enriched_orbitals)),
-      _sector(source._sector),
-      _wavefunction(source._wavefunction),
-      _amplitude_type(source._amplitude_type),
-      _t1_amplitudes_aa(source._t1_amplitudes_aa),
-      _t1_amplitudes_bb(source._t1_amplitudes_bb),
-      _t2_amplitudes_abab(source._t2_amplitudes_abab),
-      _t2_amplitudes_aaaa(source._t2_amplitudes_aaaa),
-      _t2_amplitudes_bbbb(source._t2_amplitudes_bbbb) {
-  QDK_LOG_TRACE_ENTERING();
-  _one_rdm_spin_traced = source._one_rdm_spin_traced;
-  _two_rdm_spin_traced = source._two_rdm_spin_traced;
-  _active_one_rdm = source._active_one_rdm;
-  _active_two_rdm = source._active_two_rdm;
-  _entropies = source._entropies;
-}
-
 std::unique_ptr<WavefunctionContainer> AmplitudeContainer::clone() const {
   QDK_LOG_TRACE_ENTERING();
   auto as_optional = [](const std::shared_ptr<VectorVariant>& p) {
@@ -252,32 +231,6 @@ std::unique_ptr<WavefunctionContainer> AmplitudeContainer::clone() const {
       as_optional(_t1_amplitudes_bb), as_optional(_t2_amplitudes_abab),
       as_optional(_t2_amplitudes_aaaa), as_optional(_t2_amplitudes_bbbb),
       _sector);
-}
-
-std::unique_ptr<WavefunctionContainer>
-AmplitudeContainer::_clone_for_basis_enrichment(
-    std::shared_ptr<BasisSet> enriched_basis) const {
-  QDK_LOG_TRACE_ENTERING();
-  auto enriched = std::unique_ptr<AmplitudeContainer>(new AmplitudeContainer(
-      *this, detail::BasisEnrichmentAccess::rebind_basis(
-                 *_orbitals, std::move(enriched_basis))));
-  if (enriched->_wavefunction != _wavefunction ||
-      enriched->_amplitude_type != _amplitude_type ||
-      enriched->_sector != _sector ||
-      enriched->_t1_amplitudes_aa != _t1_amplitudes_aa ||
-      enriched->_t1_amplitudes_bb != _t1_amplitudes_bb ||
-      enriched->_t2_amplitudes_abab != _t2_amplitudes_abab ||
-      enriched->_t2_amplitudes_aaaa != _t2_amplitudes_aaaa ||
-      enriched->_t2_amplitudes_bbbb != _t2_amplitudes_bbbb ||
-      enriched->_one_rdm_spin_traced != _one_rdm_spin_traced ||
-      enriched->_two_rdm_spin_traced != _two_rdm_spin_traced ||
-      enriched->_active_one_rdm != _active_one_rdm ||
-      enriched->_active_two_rdm != _active_two_rdm ||
-      enriched->_entropies != _entropies) {
-    throw std::logic_error(
-        "Basis enrichment copied or changed amplitude payload data");
-  }
-  return enriched;
 }
 
 std::shared_ptr<Orbitals> AmplitudeContainer::get_orbitals() const {

@@ -1045,23 +1045,6 @@ size_t WavefunctionContainer::size() const {
   throw std::runtime_error(detail::kNotDeterminantExpansionMessage);
 }
 
-std::unique_ptr<WavefunctionContainer>
-WavefunctionContainer::_clone_for_basis_enrichment(
-    std::shared_ptr<BasisSet>) const {
-  QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error("Wavefunction container type '" +
-                           get_container_type() +
-                           "' does not support auxiliary-basis enrichment");
-}
-
-std::unique_ptr<WavefunctionContainer>
-detail::BasisEnrichmentAccess::enrich_container(
-    const WavefunctionContainer& container,
-    std::shared_ptr<BasisSet> enriched_basis) {
-  QDK_LOG_TRACE_ENTERING();
-  return container._clone_for_basis_enrichment(std::move(enriched_basis));
-}
-
 // Wavefunction implementations
 Wavefunction::Wavefunction(std::unique_ptr<WavefunctionContainer> container)
     : _container(std::move(container)) {
@@ -1081,32 +1064,6 @@ Wavefunction& Wavefunction::operator=(const Wavefunction& other) {
     _container = other._container->clone();
   }
   return *this;
-}
-
-std::shared_ptr<Wavefunction>
-detail::BasisEnrichmentAccess::enrich_wavefunction(
-    const Wavefunction& wavefunction, const AuxiliaryBasisRole role,
-    std::shared_ptr<AuxiliaryBasis> auxiliary_basis) {
-  QDK_LOG_TRACE_ENTERING();
-  auto orbitals = wavefunction.get_orbitals();
-  if (!orbitals || !orbitals->has_basis_set()) {
-    throw std::invalid_argument(
-        "Wavefunction orbitals must carry a primary BasisSet before an "
-        "auxiliary basis can be associated");
-  }
-
-  auto enriched_basis = enrich_basis(*orbitals->get_basis_set(), role,
-                                     std::move(auxiliary_basis));
-  return std::make_shared<Wavefunction>(
-      enrich_container(*wavefunction._container, std::move(enriched_basis)));
-}
-
-std::shared_ptr<Wavefunction> with_auxiliary_basis(
-    const Wavefunction& wavefunction, const AuxiliaryBasisRole role,
-    std::shared_ptr<AuxiliaryBasis> auxiliary_basis) {
-  QDK_LOG_TRACE_ENTERING();
-  return detail::BasisEnrichmentAccess::enrich_wavefunction(
-      wavefunction, role, std::move(auxiliary_basis));
 }
 
 std::vector<std::string> Wavefunction::sectors() const {

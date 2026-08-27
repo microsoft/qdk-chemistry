@@ -22,10 +22,6 @@
 
 namespace qdk::chemistry::data {
 
-namespace detail {
-struct BasisEnrichmentAccess;
-}
-
 /**
  * @class Orbitals
  * @brief Represents molecular orbitals with coefficients and energies.
@@ -606,12 +602,6 @@ class Orbitals : public DataClass,
   static std::shared_ptr<Orbitals> from_json(const nlohmann::json& j);
 
  private:
-  /** Rebinds the basis while sharing every other orbital field. */
-  friend struct detail::BasisEnrichmentAccess;
-
-  /** @brief Share all orbital data while replacing only the primary basis. */
-  Orbitals(const Orbitals& source, std::shared_ptr<BasisSet> enriched_basis);
-
  protected:
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
 

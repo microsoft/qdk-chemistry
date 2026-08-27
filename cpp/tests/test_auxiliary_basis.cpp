@@ -19,8 +19,10 @@ class AuxiliaryBasisTest : public ::testing::Test {
  protected:
   static constexpr const char* json_filename = "test.auxiliary_basis.json";
   static constexpr const char* hdf5_filename = "test.auxiliary_basis.h5";
-  static constexpr const char* enriched_hdf5_filename =
-      "test.enriched.basis_set.h5";
+  static constexpr const char* collection_json_filename =
+      "test.auxiliary_basis_collection.json";
+  static constexpr const char* collection_hdf5_filename =
+      "test.auxiliary_basis_collection.h5";
 
   void SetUp() override { remove_test_files(); }
   void TearDown() override { remove_test_files(); }
@@ -29,7 +31,8 @@ class AuxiliaryBasisTest : public ::testing::Test {
     std::error_code error;
     std::filesystem::remove(json_filename, error);
     std::filesystem::remove(hdf5_filename, error);
-    std::filesystem::remove(enriched_hdf5_filename, error);
+    std::filesystem::remove(collection_json_filename, error);
+    std::filesystem::remove(collection_hdf5_filename, error);
   }
 
   static std::shared_ptr<Structure> make_structure(
@@ -222,74 +225,98 @@ TEST_F(AuxiliaryBasisTest, HDF5FileRoundTrip) {
   EXPECT_EQ(4u, loaded->get_num_shells());
 }
 
-TEST_F(AuxiliaryBasisTest, ImmutableBasisSetEnrichmentAndRoundTrips) {
+TEST_F(AuxiliaryBasisTest, ImmutableCollectionLookupAndRoundTrips) {
   auto structure = make_structure();
-  BasisSet primary("primary", make_shells(), structure);
   auto jfit =
       std::make_shared<AuxiliaryBasis>("jfit-basis", make_shells(), structure);
   auto jkfit =
       std::make_shared<AuxiliaryBasis>("jkfit-basis", make_shells(), structure);
+  AuxiliaryBasisCollection empty;
 
-  auto jk_enriched =
-      with_auxiliary_basis(primary, AuxiliaryBasisRole::JKFit, jkfit);
-  EXPECT_FALSE(primary.has_auxiliary_basis(AuxiliaryBasisRole::JKFit));
+  auto jk_collection =
+      with_auxiliary_basis(empty, AuxiliaryBasisRole::JKFit, jkfit);
+  EXPECT_FALSE(empty.has_auxiliary_basis(AuxiliaryBasisRole::JKFit));
   EXPECT_EQ(jkfit,
-            jk_enriched->resolve_auxiliary_basis(AuxiliaryBasisRole::JFit));
+            jk_collection->resolve_auxiliary_basis(AuxiliaryBasisRole::JFit));
 
-  auto j_enriched =
-      with_auxiliary_basis(primary, AuxiliaryBasisRole::JFit, jfit);
-  EXPECT_THROW(j_enriched->resolve_auxiliary_basis(AuxiliaryBasisRole::JKFit),
+  auto j_collection =
+      with_auxiliary_basis(empty, AuxiliaryBasisRole::JFit, jfit);
+  EXPECT_THROW(j_collection->resolve_auxiliary_basis(AuxiliaryBasisRole::JKFit),
                std::out_of_range);
 
-  auto enriched =
-      with_auxiliary_basis(*jk_enriched, AuxiliaryBasisRole::JFit, jfit);
-  EXPECT_EQ(2u, enriched->get_auxiliary_bases().size());
-  EXPECT_EQ(jfit, enriched->get_auxiliary_basis(AuxiliaryBasisRole::JFit));
-  EXPECT_EQ(jfit, enriched->resolve_auxiliary_basis(AuxiliaryBasisRole::JFit));
-  EXPECT_THROW(enriched->resolve_auxiliary_basis(AuxiliaryBasisRole::RIFit),
+  auto collection =
+      with_auxiliary_basis(*jk_collection, AuxiliaryBasisRole::JFit, jfit);
+  EXPECT_EQ(2u, collection->get_auxiliary_bases().size());
+  EXPECT_EQ(jfit, collection->get_auxiliary_basis(AuxiliaryBasisRole::JFit));
+  EXPECT_EQ(jfit,
+            collection->resolve_auxiliary_basis(AuxiliaryBasisRole::JFit));
+  EXPECT_THROW(collection->resolve_auxiliary_basis(AuxiliaryBasisRole::RIFit),
                std::out_of_range);
-  EXPECT_NE(primary.content_hash(), enriched->content_hash());
-
-  auto primary_json = primary.to_json();
-  auto enriched_primary_json = enriched->to_json();
-  enriched_primary_json.erase("auxiliary_bases");
-  EXPECT_EQ(primary_json, enriched_primary_json);
+  EXPECT_NE(empty.content_hash(), collection->content_hash());
 
   auto replacement = std::make_shared<AuxiliaryBasis>("replacement-jfit",
                                                       make_shells(), structure);
   auto replaced =
-      with_auxiliary_basis(*enriched, AuxiliaryBasisRole::JFit, replacement);
-  EXPECT_EQ(jfit, enriched->get_auxiliary_basis(AuxiliaryBasisRole::JFit));
+      with_auxiliary_basis(*collection, AuxiliaryBasisRole::JFit, replacement);
+  EXPECT_EQ(jfit, collection->get_auxiliary_basis(AuxiliaryBasisRole::JFit));
   EXPECT_EQ(replacement,
             replaced->get_auxiliary_basis(AuxiliaryBasisRole::JFit));
 
-  const auto json = enriched->to_json();
-  EXPECT_EQ("0.2.0", json.at("version"));
+  const auto json = collection->to_json();
+  EXPECT_EQ("0.1.0", json.at("version"));
   EXPECT_TRUE(json.at("auxiliary_bases").contains("jfit"));
   EXPECT_TRUE(json.at("auxiliary_bases").contains("jkfit"));
-  auto from_json = BasisSet::from_json(json);
-  EXPECT_EQ(enriched->content_hash(), from_json->content_hash());
+  auto from_json = AuxiliaryBasisCollection::from_json(json);
+  EXPECT_EQ(collection->content_hash(), from_json->content_hash());
 
-  enriched->to_hdf5_file(enriched_hdf5_filename);
-  auto from_hdf5 = BasisSet::from_hdf5_file(enriched_hdf5_filename);
-  EXPECT_EQ(enriched->content_hash(), from_hdf5->content_hash());
+  collection->to_json_file(collection_json_filename);
+  auto from_json_file =
+      AuxiliaryBasisCollection::from_json_file(collection_json_filename);
+  EXPECT_EQ(collection->content_hash(), from_json_file->content_hash());
+
+  collection->to_hdf5_file(collection_hdf5_filename);
+  auto from_hdf5 =
+      AuxiliaryBasisCollection::from_hdf5_file(collection_hdf5_filename);
+  EXPECT_EQ(collection->content_hash(), from_hdf5->content_hash());
   EXPECT_EQ(
       "jfit-basis",
       from_hdf5->get_auxiliary_basis(AuxiliaryBasisRole::JFit)->get_name());
 }
 
-TEST_F(AuxiliaryBasisTest, EnrichmentRejectsMismatchedStructures) {
+TEST_F(AuxiliaryBasisTest, CollectionRejectsInvalidEntries) {
   auto structure = make_structure();
-  BasisSet primary("primary", make_shells(), structure);
+  auto matching =
+      std::make_shared<AuxiliaryBasis>("matching", make_shells(), structure);
   auto different_structure = make_structure({"H", "He", "H"});
-  auto auxiliary = std::make_shared<AuxiliaryBasis>("mismatched", make_shells(),
-                                                    different_structure);
+  auto mismatched = std::make_shared<AuxiliaryBasis>(
+      "mismatched", make_shells(), different_structure);
 
   EXPECT_THROW(
-      with_auxiliary_basis(primary, AuxiliaryBasisRole::JFit, auxiliary),
+      AuxiliaryBasisCollection({{AuxiliaryBasisRole::JFit, matching},
+                                {AuxiliaryBasisRole::RIFit, mismatched}}),
       std::invalid_argument);
-  EXPECT_THROW(with_auxiliary_basis(primary, AuxiliaryBasisRole::JFit, nullptr),
+  EXPECT_THROW(AuxiliaryBasisCollection({{AuxiliaryBasisRole::JFit, nullptr}}),
                std::invalid_argument);
+
+  AuxiliaryBasisCollection collection({{AuxiliaryBasisRole::JFit, matching}});
+  EXPECT_THROW(
+      with_auxiliary_basis(collection, AuxiliaryBasisRole::RIFit, mismatched),
+      std::invalid_argument);
+}
+
+TEST_F(AuxiliaryBasisTest, CollectionIsIndependentOfPrimaryBasis) {
+  auto structure = make_structure();
+  BasisSet primary("primary", make_shells(), structure);
+  const auto primary_hash = primary.content_hash();
+  auto auxiliary =
+      std::make_shared<AuxiliaryBasis>("jfit", make_shells(), structure);
+
+  AuxiliaryBasisCollection collection({{AuxiliaryBasisRole::JFit, auxiliary}});
+
+  EXPECT_EQ(primary_hash, primary.content_hash());
+  EXPECT_FALSE(primary.to_json().contains("auxiliary_bases"));
+  EXPECT_EQ(auxiliary,
+            collection.get_auxiliary_basis(AuxiliaryBasisRole::JFit));
 }
 
 TEST_F(AuxiliaryBasisTest, ShellAccessAndErrorPaths) {

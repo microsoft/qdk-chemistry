@@ -160,21 +160,6 @@ StateVectorContainer::StateVectorContainer(
   }
 }
 
-StateVectorContainer::StateVectorContainer(
-    const StateVectorContainer& source,
-    std::shared_ptr<Orbitals> enriched_orbitals)
-    : WavefunctionContainer(source.get_type()),
-      _coefficients(source._coefficients),
-      _configuration_set(detail::BasisEnrichmentAccess::rebind_orbitals(
-          source._configuration_set, std::move(enriched_orbitals))) {
-  QDK_LOG_TRACE_ENTERING();
-  _one_rdm_spin_traced = source._one_rdm_spin_traced;
-  _two_rdm_spin_traced = source._two_rdm_spin_traced;
-  _active_one_rdm = source._active_one_rdm;
-  _active_two_rdm = source._active_two_rdm;
-  _entropies = source._entropies;
-}
-
 // ---------------------------------------------------------------------------
 // Basic accessors
 // ---------------------------------------------------------------------------
@@ -280,29 +265,6 @@ std::unique_ptr<WavefunctionContainer> StateVectorContainer::clone() const {
       _active_one_rdm, _active_two_rdm,
       _configuration_set.sector_layout().front().first, *_entropies,
       this->get_type());
-}
-
-std::unique_ptr<WavefunctionContainer>
-StateVectorContainer::_clone_for_basis_enrichment(
-    std::shared_ptr<BasisSet> enriched_basis) const {
-  QDK_LOG_TRACE_ENTERING();
-
-  auto enriched =
-      std::unique_ptr<StateVectorContainer>(new StateVectorContainer(
-          *this, detail::BasisEnrichmentAccess::rebind_basis(
-                     *get_orbitals(), std::move(enriched_basis))));
-  if (enriched->_coefficients != _coefficients ||
-      &enriched->_configuration_set.get_configurations() !=
-          &_configuration_set.get_configurations() ||
-      enriched->_one_rdm_spin_traced != _one_rdm_spin_traced ||
-      enriched->_two_rdm_spin_traced != _two_rdm_spin_traced ||
-      enriched->_active_one_rdm != _active_one_rdm ||
-      enriched->_active_two_rdm != _active_two_rdm ||
-      enriched->_entropies != _entropies) {
-    throw std::logic_error(
-        "Basis enrichment copied or changed state-vector payload data");
-  }
-  return enriched;
 }
 
 std::shared_ptr<Orbitals> StateVectorContainer::get_orbitals() const {
@@ -800,7 +762,8 @@ const VectorVariant& StateVectorContainer::get_active_two_rdm_spin_traced()
 Eigen::VectorXd StateVectorContainer::get_single_orbital_entropies() const {
   QDK_LOG_TRACE_ENTERING();
   if (_is_single_determinant() && _one_rdm_matches_single_determinant() &&
-      !_entropies->single_orbital && !_active_two_rdm && !_two_rdm_spin_traced) {
+      !_entropies->single_orbital && !_active_two_rdm &&
+      !_two_rdm_spin_traced) {
     // For a single Slater determinant with no provided entropies, all orbitals
     // are either fully occupied or unoccupied, giving zero entropy each.
     const auto active_ai = get_orbitals()->active_indices();

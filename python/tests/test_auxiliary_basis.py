@@ -12,19 +12,14 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.data import (
-    AmplitudeContainer,
-    AmplitudeType,
     AOType,
     AuxiliaryBasis,
+    AuxiliaryBasisCollection,
     AuxiliaryBasisRole,
     BasisSet,
-    Configuration,
-    Orbitals,
     OrbitalType,
     Shell,
-    StateVectorContainer,
     Structure,
-    Wavefunction,
     with_auxiliary_basis,
 )
 
@@ -218,85 +213,77 @@ def test_hdf5_file_round_trip_and_pickle(tmp_path: Path):
     assert restored.get_structure().content_hash() == basis.get_structure().content_hash()
 
 
-def test_role_keyed_basis_enrichment_and_persistence(tmp_path: Path):
+def test_role_keyed_collection_and_persistence(tmp_path: Path):
     structure = _make_structure()
-    primary = BasisSet("primary", _make_shells(), structure)
     jfit = AuxiliaryBasis("jfit-basis", _make_shells(), structure)
     jkfit = AuxiliaryBasis("jkfit-basis", _make_shells(), structure)
+    empty = AuxiliaryBasisCollection()
 
-    jk_enriched = with_auxiliary_basis(primary, AuxiliaryBasisRole.JKFIT, jkfit)
-    assert not primary.has_auxiliary_basis(AuxiliaryBasisRole.JKFIT)
-    assert jk_enriched.resolve_auxiliary_basis(AuxiliaryBasisRole.JFIT).get_name() == "jkfit-basis"
+    jk_collection = with_auxiliary_basis(empty, AuxiliaryBasisRole.JKFIT, jkfit)
+    assert not empty.has_auxiliary_basis(AuxiliaryBasisRole.JKFIT)
+    assert jk_collection.resolve_auxiliary_basis(AuxiliaryBasisRole.JFIT).get_name() == "jkfit-basis"
 
-    j_enriched = with_auxiliary_basis(primary, AuxiliaryBasisRole.JFIT, jfit)
+    j_collection = with_auxiliary_basis(empty, AuxiliaryBasisRole.JFIT, jfit)
     with pytest.raises(IndexError, match=r"JKFIT|jkfit"):
-        j_enriched.resolve_auxiliary_basis(AuxiliaryBasisRole.JKFIT)
+        j_collection.resolve_auxiliary_basis(AuxiliaryBasisRole.JKFIT)
 
-    enriched = with_auxiliary_basis(jk_enriched, AuxiliaryBasisRole.JFIT, jfit)
-    assert set(enriched.get_auxiliary_bases()) == {
+    collection = with_auxiliary_basis(jk_collection, AuxiliaryBasisRole.JFIT, jfit)
+    assert set(collection.get_auxiliary_bases()) == {
         AuxiliaryBasisRole.JFIT,
         AuxiliaryBasisRole.JKFIT,
     }
-    assert enriched.get_auxiliary_basis(AuxiliaryBasisRole.JFIT).get_name() == "jfit-basis"
-    assert enriched.content_hash() != primary.content_hash()
+    assert collection.get_auxiliary_basis(AuxiliaryBasisRole.JFIT).get_name() == "jfit-basis"
+    assert collection.content_hash() != empty.content_hash()
 
-    restored = BasisSet.from_json(enriched.to_json())
-    assert restored.content_hash() == enriched.content_hash()
+    restored = AuxiliaryBasisCollection.from_json(collection.to_json())
+    assert restored.content_hash() == collection.content_hash()
 
-    path = tmp_path / "enriched.basis_set.h5"
-    enriched.to_hdf5_file(path)
-    restored = BasisSet.from_hdf5_file(path)
-    assert restored.content_hash() == enriched.content_hash()
+    json_path = tmp_path / "fits.auxiliary_basis_collection.json"
+    collection.to_json_file(json_path)
+    restored = AuxiliaryBasisCollection.from_json_file(json_path)
+    assert restored.content_hash() == collection.content_hash()
+
+    hdf5_path = tmp_path / "fits.auxiliary_basis_collection.h5"
+    collection.to_hdf5_file(hdf5_path)
+    restored = AuxiliaryBasisCollection.from_hdf5_file(hdf5_path)
+    assert restored.content_hash() == collection.content_hash()
+
+    assert pickle.loads(pickle.dumps(collection)).content_hash() == collection.content_hash()
 
 
-def test_basis_enrichment_rejects_mismatched_structure():
+def test_collection_rejects_invalid_entries():
     structure = _make_structure()
-    primary = BasisSet("primary", _make_shells(), structure)
+    matching = AuxiliaryBasis("matching", _make_shells(), structure)
     shifted = Structure(
         ["H", "H", "H"],
         np.array([[0.1, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]]),
     )
-    auxiliary = AuxiliaryBasis("shifted", _make_shells(), shifted)
+    mismatched = AuxiliaryBasis("shifted", _make_shells(), shifted)
 
     with pytest.raises(ValueError, match="same molecular structure"):
-        with_auxiliary_basis(primary, AuxiliaryBasisRole.JFIT, auxiliary)
+        AuxiliaryBasisCollection(
+            {
+                AuxiliaryBasisRole.JFIT: matching,
+                AuxiliaryBasisRole.RIFIT: mismatched,
+            }
+        )
+
+    with pytest.raises(ValueError, match="cannot be null"):
+        AuxiliaryBasisCollection({AuxiliaryBasisRole.JFIT: None})
+
+    collection = AuxiliaryBasisCollection({AuxiliaryBasisRole.JFIT: matching})
+    with pytest.raises(ValueError, match="same molecular structure"):
+        with_auxiliary_basis(collection, AuxiliaryBasisRole.RIFIT, mismatched)
 
 
-def test_wavefunction_enrichment_preserves_payload_and_source():
+def test_collection_is_independent_of_primary_basis():
     structure = _make_structure()
     primary = BasisSet("primary", _make_shells(), structure)
-    num_orbitals = primary.get_num_atomic_orbitals()
-    orbitals = Orbitals(np.eye(num_orbitals), None, None, primary)
-    determinant = Configuration.from_spin_half_string("2" + "0" * (num_orbitals - 1))
-    wavefunction = Wavefunction(StateVectorContainer(determinant, orbitals))
-    auxiliary = AuxiliaryBasis("jkfit-basis", _make_shells(), structure)
+    primary_hash = primary.content_hash()
+    auxiliary = AuxiliaryBasis("jfit", _make_shells(), structure)
 
-    enriched = with_auxiliary_basis(wavefunction, AuxiliaryBasisRole.JKFIT, auxiliary)
+    collection = AuxiliaryBasisCollection({AuxiliaryBasisRole.JFIT: auxiliary})
 
-    assert not primary.has_auxiliary_basis(AuxiliaryBasisRole.JKFIT)
-    assert enriched.get_orbitals().get_basis_set().has_auxiliary_basis(AuxiliaryBasisRole.JKFIT)
-    assert enriched.get_active_determinants() == wavefunction.get_active_determinants()
-    assert enriched.content_hash() != wavefunction.content_hash()
-    assert Wavefunction.from_json(enriched.to_json()).content_hash() == enriched.content_hash()
-
-
-def test_wavefunction_enrichment_preserves_amplitude_container():
-    structure = _make_structure()
-    primary = BasisSet("primary", _make_shells(), structure)
-    num_orbitals = primary.get_num_atomic_orbitals()
-    orbitals = Orbitals(np.eye(num_orbitals), None, None, primary)
-    determinant = Configuration.from_spin_half_string("2" + "0" * (num_orbitals - 1))
-    reference = Wavefunction(StateVectorContainer(determinant, orbitals))
-    wavefunction = Wavefunction(AmplitudeContainer(orbitals, reference, AmplitudeType.CoupledCluster))
-    auxiliary = AuxiliaryBasis("rifit-basis", _make_shells(), structure)
-
-    enriched = with_auxiliary_basis(wavefunction, AuxiliaryBasisRole.RIFIT, auxiliary)
-
-    container = enriched.get_container()
-    assert container.get_amplitude_type() == AmplitudeType.CoupledCluster
-    assert container.get_wavefunction().content_hash() == reference.content_hash()
-    assert (
-        enriched.get_orbitals().get_basis_set().get_auxiliary_basis(AuxiliaryBasisRole.RIFIT).get_name()
-        == "rifit-basis"
-    )
-    assert not primary.has_auxiliary_basis(AuxiliaryBasisRole.RIFIT)
+    assert primary.content_hash() == primary_hash
+    assert "auxiliary_bases" not in primary.to_json()
+    assert collection.get_auxiliary_basis(AuxiliaryBasisRole.JFIT).content_hash() == auxiliary.content_hash()

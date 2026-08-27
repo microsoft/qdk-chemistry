@@ -33,25 +33,16 @@ int main() {
 
   // --------------------------------------------------------------------------------------------
   // start-cell-loading-with-aux
-  // Obtain a wavefunction without knowing its later auxiliary-basis needs
+  // Build the primary and auxiliary inputs independently
   auto primary_basis = BasisSet::from_basis_name("def2-svp", structure);
-  auto scf_solver = qdk::chemistry::algorithms::ScfSolverFactory::create();
-  auto scf_result = scf_solver->run(structure, 0, 1, primary_basis);
-  auto wavefunction = scf_result.second;
+  auto aux_basis =
+      AuxiliaryBasis::from_basis_name("def2-universal-jfit", structure);
+  auto auxiliary_bases = std::make_shared<AuxiliaryBasisCollection>(
+      AuxiliaryBasisCollection::Map{{AuxiliaryBasisRole::JFit, aux_basis}});
 
-  // Later, derive the structure from that wavefunction and attach the basis
-  auto wavefunction_structure =
-      wavefunction->get_orbitals()->get_basis_set()->get_structure();
-  auto aux_basis = AuxiliaryBasis::from_basis_name("def2-universal-jfit",
-                                                   wavefunction_structure);
-  auto wavefunction_with_jfit =
-      with_auxiliary_basis(*wavefunction, AuxiliaryBasisRole::JFit, aux_basis);
-
-  assert(!wavefunction->get_orbitals()->get_basis_set()->has_auxiliary_basis(
-      AuxiliaryBasisRole::JFit));
-  assert(wavefunction_with_jfit->get_orbitals()
-             ->get_basis_set()
-             ->has_auxiliary_basis(AuxiliaryBasisRole::JFit));
+  assert(auxiliary_bases->get_auxiliary_basis(AuxiliaryBasisRole::JFit) ==
+         aux_basis);
+  assert(primary_basis->get_structure() == aux_basis->get_structure());
   // end-cell-loading-with-aux
   // --------------------------------------------------------------------------------------------
 
@@ -229,12 +220,12 @@ int main() {
   // Construct a named auxiliary basis for this molecular structure
   auto auxiliary_basis =
       std::make_shared<AuxiliaryBasis>("my-aux-fit", aux_shells, structure);
-  auto basis_with_rifit = with_auxiliary_basis(
-      basis_set, AuxiliaryBasisRole::RIFit, auxiliary_basis);
+  AuxiliaryBasisCollection auxiliary_bases(
+      {{AuxiliaryBasisRole::RIFit, auxiliary_basis}});
 
   // Query auxiliary data
   auto stored_aux =
-      basis_with_rifit->get_auxiliary_basis(AuxiliaryBasisRole::RIFit);
+      auxiliary_bases.get_auxiliary_basis(AuxiliaryBasisRole::RIFit);
   std::string aux_name = stored_aux->get_name();
   size_t num_aux = stored_aux->get_num_shells();
 
