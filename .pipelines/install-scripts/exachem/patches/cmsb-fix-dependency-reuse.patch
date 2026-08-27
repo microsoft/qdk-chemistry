@@ -20,10 +20,20 @@
 #    FindBLAS.cmake/FindLAPACK.cmake (MODULE mode) and correctly finds the system OpenBLAS. Safe because
 #    cmsb_find_dependency links BLAS/LAPACK via raw library file paths (FindBLAS/FindLAPACK set e.g.
 #    BLAS_LIBRARIES to absolute .so/.a paths), not an imported target, so nothing about how they get
-#    exported/consumed downstream changes. (GlobalArrays itself does not go through this path any more: it is
-#    now built and installed ourselves, before TAMM/ExaChem's own configure runs -- see install-exachem.sh and
-#    globalarrays-fix-linalg-preference.patch -- so CMSB's own cmake/build_external/BuildGlobalArrays.cmake,
-#    which resolves BLAS/LAPACK for GA's OWN nested build, never runs and needs no patching here.)
+#    exported/consumed downstream changes.
+#
+#    NOT CURRENTLY EXERCISED by our own TAMM/ExaChem configuration -- kept anyway as a genuine, harmless upstream
+#    CMSB bug fix (verified against CMSB's own source at the pinned commit): "BLAS"/"LAPACK" are only ever
+#    requested via cmsb_find_dependency() from inside cmake/build_external/BuildGlobalArrays.cmake,
+#    BuildGauXC.cmake, and BuildMACIS.cmake -- i.e. only when CMSB itself falls through to BUILDING one of those
+#    three dependencies from source. Our build sets BUILD_GlobalArrays=OFF/BUILD_GauXC=OFF (both are reused, see
+#    globalarrays-fix-linalg-preference.patch and install-exachem.sh) and never requests TAMM's MACIS
+#    dependency (that's gated on `"FCI" IN_LIST MODULES` in TAMM's own CMakeLists.txt; install-exachem.sh always
+#    sets MODULES=CC) -- so none of those three Build*.cmake files are ever included for us, and this fallback
+#    is never actually reached. Left in (rather than dropped) since it's a real, correct, upstream-portable fix
+#    that would matter the moment any of those three build-from-source paths ever does run (e.g. a future
+#    MODULES=FCI or TAMM_ENABLE_ELPA build) -- but do not treat "the ADO/GHA build succeeded" as validating this
+#    specific fix; it hasn't been exercised by any CI run so far.
 #
 # 2. SPDLOG / EcpInt (cmake/CMSBTargetConfig.cmake.in, cmake/macros/BuildCMSBModule.cmake): unlike BLAS/LAPACK,
 #    cmsb_find_dependency links these (like every DEP_ABUILD_MISC item) via an external IMPORTED target
