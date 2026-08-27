@@ -6,9 +6,11 @@
 # CMAKE_PREFIX_PATH; LibInt2/GauXC/spdlog/EcpInt/nlohmann_json via explicit -D*_ROOT below; numactl via a seeded
 # flat copy in INSTALL_PREFIX -- see the seeding step below for why apt's libnuma-dev can't be pointed at
 # directly), and the system MPI (e.g. apt-installed openmpi-bin/libopenmpi-dev on Ubuntu). GPU is not supported
-# here. TAMM's own CMSB superbuild (NWChemEx-Project/CMakeBuild) is patched (see
-# patches/cmsb-fix-dependency-reuse.patch) so it also reuses the system OpenBLAS/LAPACK/spdlog/EcpInt/
-# nlohmann_json/numactl instead of building its own redundant copies.
+# here. GlobalArrays (a TAMM/CMSB dependency) is built+installed ourselves too, patched via
+# patches/globalarrays-fix-linalg-preference.patch, rather than left to CMSB's own (unpatched) fetch+build --
+# see the GlobalArrays build step below for why. TAMM's own CMSB superbuild (NWChemEx-Project/CMakeBuild) is
+# patched (see patches/cmsb-fix-dependency-reuse.patch) so it also reuses the system OpenBLAS/LAPACK/spdlog/
+# EcpInt/nlohmann_json/numactl instead of building its own redundant copies.
 #
 # TAMM/ExaChem's commits are hardcoded below (TAMM_COMMIT/EXACHEM_COMMIT), not read from
 # cpp/manifest/qdk-chemistry/cgmanifest.json: unlike the deps install-cpp-deps.sh builds, TAMM/ExaChem are never
@@ -125,6 +127,62 @@ cp -L "${NUMA_LIB}" "${INSTALL_PREFIX}/lib/libnuma.so"
 echo "==> Seeded numactl (numa.h + libnuma.so) into ${INSTALL_PREFIX}"
 
 # --------------------------------------------------------------------------------------------------------------------
+# Build + install GlobalArrays (patched) ourselves, before TAMM's own configure runs, instead of letting CMSB fetch
+# and build its own copy: CMSB's cmsb_find_dependency() already tries a plain find_package(GlobalArrays QUIET)
+# before ever falling back to include(BuildGlobalArrays) (see cmake/macros/DependencyMacros.cmake -- this is its
+# existing default behavior whenever CMSB_DEBUG_CMAKE is unset, which we never set), so installing GA into
+# INSTALL_PREFIX (already on CMAKE_PREFIX_PATH below) makes CMSB detect and reuse this build directly, without
+# ever cloning/configuring/building its own. -DBUILD_GlobalArrays=OFF (in COMMON_CMAKE_ARGS below) turns a failed
+# detection into a loud configure-time error instead of a silent, redundant rebuild -- matching the same
+# fail-loud convention already used for LibInt2/GauXC/SPDLOG/EcpInt/NJSON/numactl.
+#
+# Patched via patches/globalarrays-fix-linalg-preference.patch (a real git-apply patch, not a live PATCH_COMMAND
+# string-replace step against a fresh CMSB-driven clone): GA's own bundled cmake/ga-linalg.cmake unconditionally
+# overwrites LAPACK_PREFERENCE_LIST for LINALG_VENDOR=BLIS/OpenBLAS/IBMESSL (see the patch file for the full
+# writeup), which -- left unpatched -- would make GA's own LAPACK resolve to its bundled Netlib ReferenceLAPACK
+# instead of libFLAME, reintroducing the "multiple definition of `dsytrd_'" conflict fix #5 in
+# cmsb-fix-dependency-reuse.patch already solves for every OTHER CMSB consumer sub-build. Building GA ourselves
+# (rather than patching CMSB to patch GA mid-ExternalProject-build) also lets GA's own LAPACK_PREFERENCE_LIST
+# choice bake permanently into its installed globalarrays-config.cmake (a plain @-substitution at GA's own build
+# time), so nothing downstream needs to re-forward it when GlobalArrays::ga is re-imported later.
+GA_REPO="https://github.com/GlobalArrays/ga.git"
+GA_COMMIT="635d6b341faf928cb5a0cddc38b1a0cbbc2b5bc4"
+
+echo "=== Building GlobalArrays (${GA_COMMIT}) ==="
+git clone "${GA_REPO}" "${BUILD_ROOT}/ga"
+git -C "${BUILD_ROOT}/ga" checkout "${GA_COMMIT}"
+git -C "${BUILD_ROOT}/ga" apply --verbose "${SCRIPT_DIR}/patches/globalarrays-fix-linalg-preference.patch"
+
+GA_CMAKE_ARGS=(
+  -DCMAKE_BUILD_TYPE=Release
+  -DCMAKE_C_FLAGS="-march=${MARCH}"
+  -DCMAKE_CXX_FLAGS="-march=${MARCH}"
+  -DCMAKE_Fortran_FLAGS="-march=${MARCH}"
+  -DBUILD_SHARED_LIBS=OFF
+  -DENABLE_BLAS=ON
+  -DLINALG_VENDOR="${LINALG_VENDOR}"
+  -DLINALG_REQUIRED_COMPONENTS=lp64
+  -DGA_RUNTIME="${GA_RUNTIME}"
+  -DENABLE_SYSV=OFF
+  -DENABLE_PROFILING=OFF
+)
+if [ -n "${LINALG_PREFIX}" ]; then
+  GA_CMAKE_ARGS+=(-DLINALG_PREFIX="${LINALG_PREFIX}")
+fi
+if [ "${LINALG_VENDOR}" = "BLIS" ]; then
+  # Same reasoning as COMMON_CMAKE_ARGS's own LAPACK_PREFERENCE_LIST below: BLIS has no LAPACK routines, so
+  # without this GA's own LAPACK resolves to its bundled ReferenceLAPACK instead of libFLAME.
+  GA_CMAKE_ARGS+=(-DLAPACK_PREFERENCE_LIST="FLAME;ReferenceLAPACK")
+fi
+
+CC=gcc CXX=g++ FC=gfortran cmake -S "${BUILD_ROOT}/ga" -B "${BUILD_ROOT}/ga/build" \
+  -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" \
+  "${GA_CMAKE_ARGS[@]}"
+cmake --build "${BUILD_ROOT}/ga/build" -j "${JOBS}"
+cmake --install "${BUILD_ROOT}/ga/build"
+echo "==> GlobalArrays installed to ${INSTALL_PREFIX}"
+
+# --------------------------------------------------------------------------------------------------------------------
 # Serial HDF5 discovery. Ubuntu's `libhdf5-dev` (already installed by the workflow for qdk-chemistry itself) puts
 # headers under a "serial" subdirectory and installs a pkg-config file on most releases; fall back to the
 # well-known Debian/Ubuntu multiarch layout when pkg-config can't find it.
@@ -177,24 +235,22 @@ COMMON_CMAKE_ARGS=(
   -DNJSON_ROOT="${CPP_DEPS_PREFIX}"
   -DNUMACTL_ROOT="${INSTALL_PREFIX}"
   -DFETCHCONTENT_SOURCE_DIR_CMAKEBUILD="${CMSB_SRC_DIR}"
-  # Patches GlobalArrays' own cmake/ga-linalg.cmake (fetched fresh by CMSB via git clone, so not something we can
-  # override via FETCHCONTENT_SOURCE_DIR the way CMSB itself is patched above) so its LAPACK_PREFERENCE_LIST
-  # default becomes overridable instead of an unconditional clobber -- see patches/cmsb-fix-dependency-reuse.patch
-  # fix #6. Applied unconditionally (harmless for GHA's OpenBLAS: LAPACK_PREFERENCE_LIST is left unset there, so
-  # the now-conditional default still resolves to ReferenceLAPACK exactly as before).
-  -DGA_LINALG_PATCH_SCRIPT="${SCRIPT_DIR}/patches/fix-ga-linalg-preference.cmake"
   # Enforce reuse instead of leaving it best-effort: CMSB's find_or_build_dependency() only hard-errors
   # ("Could not locate <dep> and user has requested we do not build one") when BUILD_<dep> is explicitly set to
   # OFF; if left unset, a failed find silently falls through to include(Build<dep>) and rebuilds from source
-  # (cmake/macros/DependencyMacros.cmake). Passing -DBUILD_<dep>=OFF for all six reused deps -- not just
+  # (cmake/macros/DependencyMacros.cmake). Passing -DBUILD_<dep>=OFF for all seven reused deps -- not just
   # LibInt2/GauXC as before -- makes a broken *_ROOT/reuse patch fail loudly at configure time instead of
   # silently degrading into a redundant rebuild that's only visible by eyeballing the configure log.
+  # BUILD_GlobalArrays=OFF here relies on GA already being installed into INSTALL_PREFIX above (which
+  # cmsb_find_dependency() detects via a plain find_package(GlobalArrays QUIET)) -- if that detection ever
+  # fails, this turns it into a loud configure error instead of CMSB silently cloning+building an unpatched GA.
   -DBUILD_LibInt2=OFF
   -DBUILD_GauXC=OFF
   -DBUILD_SPDLOG=OFF
   -DBUILD_EcpInt=OFF
   -DBUILD_NJSON=OFF
   -DBUILD_numactl=OFF
+  -DBUILD_GlobalArrays=OFF
 )
 
 # LINALG_PREFIX/LAPACK_PREFERENCE_LIST are appended conditionally rather than baked into the array literal above,
@@ -216,7 +272,9 @@ if [ "${LINALG_VENDOR}" = "BLIS" ]; then
 fi
 
 # --------------------------------------------------------------------------------------------------------------------
-# Step 1: build TAMM (CMSB superbuild: GlobalArrays, HPTT, Librett, EcpInt, Eigen3, doctest, ... + TAMM itself).
+# Step 1: build TAMM (CMSB superbuild: HPTT, Librett, EcpInt, doctest, ... + TAMM itself; GlobalArrays/Eigen3 are
+# reused from what we built/seeded above, not built here -- see the steps above and COMMON_CMAKE_ARGS's BUILD_*=OFF
+# flags).
 # --------------------------------------------------------------------------------------------------------------------
 echo "=== Building TAMM (${TAMM_COMMIT}) ==="
 git clone "${TAMM_REPO}" "${BUILD_ROOT}/TAMM"
