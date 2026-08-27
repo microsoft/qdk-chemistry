@@ -13,7 +13,7 @@ from qdk_chemistry.data import AlgorithmRef, Settings
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
-from qdk_chemistry.data.unitary_representation.containers.block_encoding import LCUContainer, Select
+from qdk_chemistry.data.unitary_representation.containers.block_encoding import LCUContainer
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -90,36 +90,6 @@ class PSPMapper(CircuitMapper):
         """
         return "circuit_mapper"
 
-    @staticmethod
-    def _build_pauli_select_op(select: Select):
-        """Build the Pauli SELECT Q# operation from a Select data object.
-
-        Converts each controlled operation's Pauli string into Q# ``Pauli`` enums
-        and packages them with sign phases into a ``PauliSelectParams`` struct.
-
-        Args:
-            select: The SELECT oracle data object containing controlled operations,
-                phases, and qubit layout.
-
-        Returns:
-            A Q# callable implementing the Pauli SELECT oracle.
-
-        """
-        pauli_terms: list[list[qsharp.Pauli]] = []
-        control_states: list[int] = []
-        for op in select.controlled_operations:
-            base_paulis = [qsharp.Pauli.I] * select.num_target_qubits
-            for i, pauli_char in enumerate(reversed(op.operation)):
-                if pauli_char != "I":
-                    base_paulis[i] = getattr(qsharp.Pauli, pauli_char)
-            pauli_terms.append(base_paulis)
-            control_states.append(op.ctrl_state)
-        phases = [int(s) for s in select.phases]
-        select_params = QSHARP_UTILS.Select.PauliSelectParams(
-            pauliTerms=pauli_terms, signs=phases, controlStates=control_states
-        )
-        return QSHARP_UTILS.Select.MakeSelectOp(select_params)
-
     def resolve_lcu(self, container: UnitaryContainer) -> tuple[LCUContainer, bool]:
         """Unwrap a container into its LCU data and whether it is a quantum walk.
 
@@ -145,6 +115,9 @@ class PSPMapper(CircuitMapper):
     def build_select_ops(self, container: UnitaryContainer) -> tuple[Any, int]:
         """Return the SELECT oracle and the width of the system register it targets.
 
+        Each controlled operation's Pauli string becomes a list of Q# ``Pauli`` enums,
+        packaged with the sign phases into a ``PauliSelectParams`` struct.
+
         Args:
             container: The container held by the unitary representation.
 
@@ -153,7 +126,20 @@ class PSPMapper(CircuitMapper):
 
         """
         lcu, _ = self.resolve_lcu(container)
-        return self._build_pauli_select_op(lcu.select), lcu.select.num_target_qubits
+        select = lcu.select
+        pauli_terms: list[list[qsharp.Pauli]] = []
+        control_states: list[int] = []
+        for op in select.controlled_operations:
+            base_paulis = [qsharp.Pauli.I] * select.num_target_qubits
+            for i, pauli_char in enumerate(reversed(op.operation)):
+                if pauli_char != "I":
+                    base_paulis[i] = getattr(qsharp.Pauli, pauli_char)
+            pauli_terms.append(base_paulis)
+            control_states.append(op.ctrl_state)
+        select_params = QSHARP_UTILS.Select.PauliSelectParams(
+            pauliTerms=pauli_terms, signs=[int(s) for s in select.phases], controlStates=control_states
+        )
+        return QSHARP_UTILS.Select.MakeSelectOp(select_params), select.num_target_qubits
 
     def build_prep_ops(self, container: UnitaryContainer) -> tuple[Any, int, int]:
         """Return the PREPARE oracle and the widths of the ancilla it acts on.
