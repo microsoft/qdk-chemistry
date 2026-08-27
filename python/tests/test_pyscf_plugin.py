@@ -2794,6 +2794,153 @@ class TestQDKChemistryPySCFBasisConversion:
         assert len(ecp_electrons) == 1
         assert ecp_electrons[0] == 28  # LANL2DZ ECP for Ag removes 28 core electrons
 
+    def test_qdk_to_pyscf_preserves_atom_specific_ecp(self):
+        """Test mixed ECP treatment for atoms of the same element."""
+        structure = Structure(
+            ["Ag", "Ag"],
+            np.array(
+                [
+                    [0.0, 0.0, 0.0],
+                    [5.0, 0.0, 0.0],
+                ]
+            ),
+        )
+        basis = BasisSet.from_index_map({0: "def2-svp", 1: "ano-rcc"}, structure)
+
+        pyscf_mol = basis_to_pyscf_mol(basis)
+
+        assert basis.get_ecp_electrons() == [28, 0]
+        assert set(pyscf_mol.ecp) == {"Ag1"}
+        assert pyscf_mol.atom_charges().tolist() == [19, 47]
+        assert pyscf_mol.nelectron == 66
+
+        roundtrip_basis = pyscf_mol_to_qdk_basis(pyscf_mol, structure)
+        assert roundtrip_basis.get_ecp_electrons() == [28, 0]
+        assert roundtrip_basis.get_num_ecp_shells() == basis.get_num_ecp_shells()
+
+    def test_qdk_to_pyscf_preserves_uniform_element_ecp_key(self):
+        """Test uniform ECP treatment retains the conventional element key."""
+        structure = Structure(
+            ["Ag", "Ag"],
+            np.array(
+                [
+                    [0.0, 0.0, 0.0],
+                    [5.0, 0.0, 0.0],
+                ]
+            ),
+        )
+        basis = BasisSet.from_index_map({0: "def2-svp", 1: "def2-svp"}, structure)
+
+        pyscf_mol = basis_to_pyscf_mol(basis)
+
+        assert basis.get_ecp_electrons() == [28, 28]
+        assert set(pyscf_mol.ecp) == {"Ag"}
+        assert pyscf_mol.atom_charges().tolist() == [19, 19]
+        assert pyscf_mol.nelectron == 38
+
+    def test_qdk_to_pyscf_rejects_partial_explicit_ecp_data(self):
+        """Test explicit ECP metadata requires shells for every treated atom."""
+        structure = Structure(
+            ["Ag", "Ag"],
+            np.array(
+                [
+                    [0.0, 0.0, 0.0],
+                    [5.0, 0.0, 0.0],
+                ]
+            ),
+        )
+        complete_basis = BasisSet.from_index_map({0: "def2-svp", 1: "def2-svp"}, structure)
+        atom_zero_ecp_shells = [shell for shell in complete_basis.get_ecp_shells() if shell.atom_index == 0]
+        partial_basis = BasisSet(
+            "partial-explicit-ecp",
+            complete_basis.get_shells(),
+            complete_basis.get_ecp_name(),
+            atom_zero_ecp_shells,
+            [28, 28],
+            structure,
+        )
+
+        with pytest.raises(ValueError, match="Atom 1 has 28 ECP electrons but no explicit ECP shells"):
+            basis_to_pyscf_mol(partial_basis)
+
+    def test_qdk_to_pyscf_preserves_atom_specific_named_ecp(self):
+        """Test mixed ECP metadata without explicit ECP shells."""
+        structure = Structure(
+            ["Ag", "Ag"],
+            np.array(
+                [
+                    [0.0, 0.0, 0.0],
+                    [5.0, 0.0, 0.0],
+                ]
+            ),
+        )
+        orbital_basis = BasisSet.from_index_map({0: "lanl2dz", 1: "lanl2dz"}, structure)
+        basis = BasisSet(
+            "lanl2dz",
+            orbital_basis.get_shells(),
+            "lanl2dz",
+            [],
+            [28, 0],
+            structure,
+        )
+
+        pyscf_mol = basis_to_pyscf_mol(basis)
+
+        assert set(pyscf_mol.ecp) == {"Ag1"}
+        assert pyscf_mol.atom_charges().tolist() == [19, 47]
+        assert pyscf_mol.nelectron == 66
+
+    def test_qdk_to_pyscf_preserves_uniform_named_ecp_key(self):
+        """Test uniform named ECP metadata retains the conventional element key."""
+        structure = Structure(
+            ["Ag", "Ag"],
+            np.array(
+                [
+                    [0.0, 0.0, 0.0],
+                    [5.0, 0.0, 0.0],
+                ]
+            ),
+        )
+        orbital_basis = BasisSet.from_index_map({0: "lanl2dz", 1: "lanl2dz"}, structure)
+        basis = BasisSet(
+            "lanl2dz",
+            orbital_basis.get_shells(),
+            "lanl2dz",
+            [],
+            [28, 28],
+            structure,
+        )
+
+        pyscf_mol = basis_to_pyscf_mol(basis)
+
+        assert set(pyscf_mol.ecp) == {"Ag"}
+        assert pyscf_mol.atom_charges().tolist() == [19, 19]
+        assert pyscf_mol.nelectron == 38
+
+    def test_qdk_to_pyscf_rejects_named_ecp_count_mismatch(self):
+        """Test named ECP metadata matches the library's resolved core counts."""
+        structure = Structure(
+            ["Ag", "Ag"],
+            np.array(
+                [
+                    [0.0, 0.0, 0.0],
+                    [5.0, 0.0, 0.0],
+                ]
+            ),
+        )
+        orbital_basis = BasisSet.from_index_map({0: "lanl2dz", 1: "lanl2dz"}, structure)
+        basis = BasisSet(
+            "lanl2dz",
+            orbital_basis.get_shells(),
+            "lanl2dz",
+            [],
+            [28, 10],
+            structure,
+        )
+
+        with pytest.raises(ValueError, match="basis has 10, mol.atom_nelec_core has 28"):
+            basis_to_pyscf_mol(basis)
+
     def test_ecp_roundtrip_conversion(self):
         """Test round-trip conversion of ECP shells and metadata: QDK -> PySCF -> QDK."""
         ag_structure = Structure(["Ag"], np.array([[0.0, 0.0, 0.0]]))
