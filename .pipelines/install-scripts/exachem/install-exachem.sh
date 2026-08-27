@@ -6,11 +6,11 @@
 # its own copies (see patches/cmsb-fix-dependency-reuse.patch). GlobalArrays is also built here, patched via
 # patches/globalarrays-fix-linalg-preference.patch.
 #
-# TAMM/ExaChem/CMSB/GlobalArrays commits are pinned below and tracked as development dependencies in
-# cgmanifest.json (for Component Governance visibility, since they execute in CI even though never shipped in
-# the wheel) -- but this script's pins are authoritative for the actual build; keep cgmanifest.json's commits
-# in sync manually if these are ever bumped. The four pins and the five patches under patches/ are validated
-# together as a set -- bumping one requires re-running this script and re-checking every patch still applies.
+# TAMM/ExaChem/CMSB/GlobalArrays commits are read from cgmanifest.json (this repo's Component Governance
+# manifest), not hardcoded here -- tracked there as development dependencies since all four execute in CI even
+# though none ship in the qdk_chemistry wheel. The four pins and the five patches under patches/ are validated
+# together as a set -- bumping one commit in cgmanifest.json requires re-running this script and re-checking
+# every patch still applies.
 #
 # Usage: install-exachem.sh
 # Required env vars: CPP_DEPS_PREFIX
@@ -23,6 +23,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CGMANIFEST="$(cd "${SCRIPT_DIR}/../../.." && pwd)/cpp/manifest/qdk-chemistry/cgmanifest.json"
 
 : "${CPP_DEPS_PREFIX:?CPP_DEPS_PREFIX must be set to the cached qdk-chemistry C++ deps prefix (provides LibInt2/GauXC/BLAS++/LAPACK++)}"
 
@@ -30,6 +31,43 @@ if ! command -v mpicc >/dev/null 2>&1; then
   echo "ERROR: mpicc not found on PATH. Install an MPI runtime (e.g. 'sudo apt-get install -y openmpi-bin libopenmpi-dev') before running this script." >&2
   exit 1
 fi
+
+if [ ! -f "${CGMANIFEST}" ]; then
+  echo "ERROR: cgmanifest.json not found at ${CGMANIFEST}" >&2
+  exit 1
+fi
+
+# Resolve a pinned git dependency's repositoryUrl/commitHash from cgmanifest.json by matching a substring of
+# the registered repositoryUrl -- mirrors install-cpp-deps.sh's own manifest-reading helpers.
+get_repo_url() {
+  local manifest="$1"
+  local repo_pattern="$2"
+  python3 -c "
+import json
+with open('$manifest') as f:
+    data = json.load(f)
+for reg in data['registrations']:
+    comp = reg['component']
+    if comp['type'] == 'git' and '$repo_pattern' in comp['git'].get('repositoryUrl', ''):
+        print(comp['git']['repositoryUrl'])
+        break
+"
+}
+
+get_commit_hash() {
+  local manifest="$1"
+  local repo_pattern="$2"
+  python3 -c "
+import json
+with open('$manifest') as f:
+    data = json.load(f)
+for reg in data['registrations']:
+    comp = reg['component']
+    if comp['type'] == 'git' and '$repo_pattern' in comp['git'].get('repositoryUrl', ''):
+        print(comp['git']['commitHash'].strip())
+        break
+"
+}
 
 # INSTALL_PREFIX: final TAMM + ExaChem install location (this is what CI puts on PATH/LD_LIBRARY_PATH).
 INSTALL_PREFIX="${INSTALL_PREFIX:-/tmp/exachem_install}"
@@ -45,15 +83,25 @@ LINALG_PREFIX="${LINALG_PREFIX:-}"
 GA_RUNTIME="${GA_RUNTIME:-MPI_PROGRESS_RANK}"
 
 # Pinned to specific commits, not tags: newer TAMM/ExaChem require GCC >= 14.1 (our runners default to GCC 13).
-TAMM_REPO="https://github.com/NWChemEx/TAMM.git"
-TAMM_COMMIT="63c274e37c102a316e844f954bb2387988b0256c"
-EXACHEM_REPO="https://github.com/ExaChem/exachem.git"
-EXACHEM_COMMIT="45c192e840fd1e0417871d926e9ab87748111e53"
+TAMM_REPO="$(get_repo_url "${CGMANIFEST}" "NWChemEx/TAMM")"
+TAMM_COMMIT="$(get_commit_hash "${CGMANIFEST}" "NWChemEx/TAMM")"
+EXACHEM_REPO="$(get_repo_url "${CGMANIFEST}" "ExaChem/exachem")"
+EXACHEM_COMMIT="$(get_commit_hash "${CGMANIFEST}" "ExaChem/exachem")"
 
 # CMSB (TAMM/ExaChem's superbuild helper) is pinned too: upstream TAMM doesn't pin it, and
 # cmsb-fix-dependency-reuse.patch needs a fixed target to stay valid against.
-CMSB_REPO="https://github.com/NWChemEx-Project/CMakeBuild.git"
-CMSB_COMMIT="f5be7e2472e8ebb9bc51163d424da7c25716ce9a"
+CMSB_REPO="$(get_repo_url "${CGMANIFEST}" "NWChemEx-Project/CMakeBuild")"
+CMSB_COMMIT="$(get_commit_hash "${CGMANIFEST}" "NWChemEx-Project/CMakeBuild")"
+
+GA_REPO="$(get_repo_url "${CGMANIFEST}" "GlobalArrays/ga")"
+GA_COMMIT="$(get_commit_hash "${CGMANIFEST}" "GlobalArrays/ga")"
+
+for _v in TAMM_REPO TAMM_COMMIT EXACHEM_REPO EXACHEM_COMMIT CMSB_REPO CMSB_COMMIT GA_REPO GA_COMMIT; do
+  if [ -z "${!_v}" ]; then
+    echo "ERROR: could not resolve ${_v} from ${CGMANIFEST}" >&2
+    exit 1
+  fi
+done
 
 echo "==> ExaChem CI build: march=${MARCH} jobs=${JOBS} modules=${MODULES} ga_runtime=${GA_RUNTIME} linalg_vendor=${LINALG_VENDOR}"
 echo "==> TAMM: ${TAMM_COMMIT} / ExaChem: ${EXACHEM_COMMIT} / CMSB: ${CMSB_COMMIT}"
@@ -105,9 +153,6 @@ echo "==> Seeded numactl (numa.h + libnuma.so) into ${INSTALL_PREFIX}"
 # loudly if detection fails). Patched via patches/globalarrays-fix-linalg-preference.patch to resolve LAPACK to
 # libFLAME instead of GA's bundled ReferenceLAPACK -- see that patch for details.
 # --------------------------------------------------------------------------------------------------------------------
-GA_REPO="https://github.com/GlobalArrays/ga.git"
-GA_COMMIT="635d6b341faf928cb5a0cddc38b1a0cbbc2b5bc4"
-
 echo "=== Building GlobalArrays (${GA_COMMIT}) ==="
 git clone "${GA_REPO}" "${BUILD_ROOT}/ga"
 git -C "${BUILD_ROOT}/ga" checkout "${GA_COMMIT}"
