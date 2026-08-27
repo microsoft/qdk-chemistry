@@ -332,8 +332,10 @@ def run(
         *args: Positional arguments for ``algorithm.run()``.
         cache: Cache backend — a ``CacheBackend``, a path (``str`` /
             ``Path`` → ``FolderCache``), or ``None``. For remote execution,
-            shared backends are also used by the compute node. A
-            ``TieredCache`` can combine local and shared backends.
+            complete caller-side records are cache hits whether or not the
+            backend is shared. Shared backends are also used by the compute
+            node as transport. A ``TieredCache`` can combine local and shared
+            backends.
         remote: Remote backend name or instance, or ``None`` for local.
         force_rerun: If ``True``, skip the cache lookup and re-execute,
             overwriting any previously cached result.

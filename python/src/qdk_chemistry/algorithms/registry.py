@@ -44,6 +44,9 @@ if TYPE_CHECKING:
     from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 
 
+_CACHE_MISS = object()
+
+
 class _AlgorithmWrapper:
     """Thin wrapper that adds a ``cache`` kwarg to ``run()``.
 
@@ -82,7 +85,9 @@ class _AlgorithmWrapper:
             *args: Positional arguments for the algorithm.
             cache: Cache backend — a :class:`CacheBackend`, a path
                 (``str`` / ``Path`` → :class:`FolderCache`), or ``None``.
-                Remote compute nodes use only backends marked as shared.
+                Complete records are local cache hits regardless of whether
+                the backend is shared. Remote compute nodes use only backends
+                marked as shared.
             remote: Remote backend name or instance, or ``None`` for local execution.
             force_rerun: If ``True``, skip the cache lookup and re-execute,
                 overwriting any previously cached result.
@@ -137,7 +142,7 @@ class _AlgorithmWrapper:
         # Check the cache (skip on force_rerun)
         if not force_rerun:
             hit = _try_cache_hit(resolved_cache, run_hash)
-            if hit is not None:
+            if hit is not _CACHE_MISS:
                 return hit
 
         # Cache miss — execute locally and store
@@ -155,11 +160,11 @@ class _AlgorithmWrapper:
         return repr(self._algo)
 
 
-def _try_cache_hit(cache: Any, run_hash: str) -> Any | None:
-    """Return the cached result if available, else None."""
+def _try_cache_hit(cache: Any, run_hash: str) -> Any:
+    """Return the cached result if available, else the cache-miss sentinel."""
     job = cache.get_job(run_hash)
-    if job is None or not job.output_hashes:
-        return None
+    if job is None or job.output_hashes is None or job.output_is_tuple is None:
+        return _CACHE_MISS
 
     items: list[Any] = []
     for entry in job.output_hashes:
@@ -168,9 +173,11 @@ def _try_cache_hit(cache: Any, run_hash: str) -> Any | None:
         else:
             data = cache.get_data(entry["hash"])
             if data is None:
-                return None
+                return _CACHE_MISS
             items.append(data)
-    return items[0] if len(items) == 1 else tuple(items)
+    if job.output_is_tuple:
+        return tuple(items)
+    return items[0] if len(items) == 1 else _CACHE_MISS
 
 
 def _store_result(
@@ -189,9 +196,9 @@ def _store_result(
 
     input_hashes: dict[str, str] = {}
     for i, arg in enumerate(args):
-        input_hashes[f"arg_{i}"] = _item_content_hash(arg)
+        input_hashes[f"args.arg_{i}"] = _item_content_hash(arg)
     for key, val in kwargs.items():
-        input_hashes[key] = _item_content_hash(val)
+        input_hashes[f"kwargs.{key}"] = _item_content_hash(val)
 
     job = Job(
         job_id=run_hash[:12],
@@ -207,6 +214,7 @@ def _store_result(
         run_hash=run_hash,
         input_hashes=input_hashes or None,
         output_hashes=output_hashes,
+        output_is_tuple=isinstance(result, tuple),
     )
 
     # Persist DataClass blobs
