@@ -50,7 +50,7 @@ class DensePureStatePreparation(StatePreparation):
             Circuit: A Circuit object implementing the state preparation.
 
         """
-        statevector, n_qubits = self.dense_state_vector(wavefunction, "Dense state preparation")
+        statevector, n_qubits = self._dense_state_vector(wavefunction, "Dense state preparation")
         row_map = list(range(n_qubits - 1, -1, -1))
         state_prep_params = QSHARP_UTILS.StatePreparation.StatePreparationParams(
             rowMap=row_map,
