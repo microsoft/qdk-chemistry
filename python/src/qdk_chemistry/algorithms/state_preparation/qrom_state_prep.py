@@ -109,7 +109,7 @@ class QROMStatePreparation(StatePreparation):
                 contains a non-finite coefficient, or is all zeros.
 
         """
-        coeffs, num_state_qubits = self.dense_state_vector(wavefunction, "QROM state preparation")
+        coeffs, num_state_qubits = self._dense_state_vector(wavefunction, "QROM state preparation")
         if not np.all(np.isfinite(coeffs)) or not np.any(coeffs != 0.0):
             raise ValueError("QROM state preparation requires finite, non-zero coefficients.")
 
