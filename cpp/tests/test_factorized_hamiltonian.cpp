@@ -115,13 +115,13 @@ TEST_F(FactorizedHamiltonianTest, Properties) {
   EXPECT_NEAR(gapped.get_lambda_eff(), 1.3527749258468684, 1e-12);
 }
 
-// The identity weight wB is a *gauge* parameter: paper Eq. 26 builds the
+// The identity weight wB is a *gauge* parameter: paper Eq. 24 builds the
 // two-body tensor purely from (u, w), so moving wB must leave it bit-identical
-// -- while Eq. 38 and Lambda must both respond, which is what makes wB a knob
+// -- while Eq. 36 and Lambda must both respond, which is what makes wB a knob
 // rather than dead data.
 //
 // This pins the two halves against each other. Folding wB into the
-// reconstruction (a tempting "fix" when reading Eq. 26 next to Eq. 38) breaks
+// reconstruction (a tempting "fix" when reading Eq. 24 next to Eq. 36) breaks
 // the first half; dropping it from get_h1_majorana breaks the second.
 TEST_F(FactorizedHamiltonianTest, IdentityWeightIsGaugeForTwoBodyOnly) {
   auto reference = make_container();
@@ -154,7 +154,7 @@ TEST_F(FactorizedHamiltonianTest, IdentityWeightIsGaugeForTwoBodyOnly) {
   }
 }
 
-// Eq. 38 as printed lists two corrections; get_h1_majorana applies three. The
+// Eq. 36 as printed lists two corrections; get_h1_majorana applies three. The
 // extra -1/2 (M M)_pq converts the stored normal-ordered h2 = (pq|rs) to the
 // paper's plain-product convention, so it is required rather than optional.
 //
@@ -187,7 +187,7 @@ TEST_F(FactorizedHamiltonianTest, MajoranaOneBodyCarriesNormalOrderingTerm) {
     expected += m.trace() * m;  // (b)
     expected -= wb_value * m;   // (c)
     EXPECT_TRUE(container.get_h1_majorana().isApprox(expected, 1e-12))
-        << "three-term Eq. 38 model failed at wB=" << wb_value;
+        << "three-term Eq. 36 model failed at wB=" << wb_value;
 
     // Dropping term (a) is not a rounding-level difference.
     const Eigen::MatrixXd without_normal_ordering = expected + 0.5 * (m * m);

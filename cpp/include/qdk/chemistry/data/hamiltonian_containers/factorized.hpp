@@ -140,20 +140,20 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
   double get_energy_gap() const;
 
   /**
-   * @brief Compute the block-encoding normalization (Eq. 35).
+   * @brief Compute the block-encoding normalization (Eq. 33).
    * Λ = Σ|eig(h1_majorana)| + 1/4 Σ_{rc} (|WB^{rc}| + Σ_b |W^{rc}_b|)²
    */
   double get_lambda() const;
 
   /**
-   * @brief Compute the effective SOS normalization (Eq. 13).
+   * @brief Compute the effective SOS normalization (Eq. 11).
    * λ_eff = √(E_gap · (2Λ - E_gap))
    * @throws std::runtime_error if E_gap is non-positive or >= 2Λ.
    */
   double get_lambda_eff() const;
 
   /**
-   * @brief Compute the adjusted Majorana one-body matrix (Eq. 38).
+   * @brief Compute the adjusted Majorana one-body matrix (Eq. 36).
    *
    * Writing the rank-r copy-c leaf as
    *   M^{rc}_{pq} = Σ_{b∈[B]} W^{rc}_b U^r_{bp} U^r_{bq},
@@ -162,7 +162,7 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    *                        + Σ_{rc} tr(M^{rc}) M^{rc}_{pq}
    *                        - Σ_{rc} WB^{rc} M^{rc}_{pq}
    *
-   * The leading -½ (M M) term has no counterpart in Eq. 38 as printed: the
+   * The leading -½ (M M) term has no counterpart in Eq. 36 as printed: the
    * paper writes the two-body operator as a plain product while this container
    * stores h2 = (pq|rs) normal-ordered, and unpacking that difference leaves
    * exactly -½ Σ_s h2_{pssq}. It is required, not optional -- see the
@@ -178,7 +178,7 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    *                      (Σ_{b'} U^r_{b'r} U^r_{b's} W^r_{b'c})
    *
    * Note this is built purely from (U, W): the identity weight WB is
-   * deliberately absent, matching Eq. 26. WB enters only get_h1_majorana() and
+   * deliberately absent, matching Eq. 24. WB enters only get_h1_majorana() and
    * get_lambda(), so it is a gauge parameter for the two-body tensor rather
    * than unused data.
    *

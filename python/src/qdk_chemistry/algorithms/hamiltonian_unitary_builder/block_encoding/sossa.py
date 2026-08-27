@@ -149,9 +149,12 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         square roots, because both the normalization
         :math:`\Lambda = \frac{1}{2}\sum_{x_o} c_{x_o}^2` and the energy decoding
         :math:`E = \Lambda(1 + \cos 2\pi\varphi)` are read off those amplitudes
-        (Eqs. (7) and (9) of :cite:`Low2025`). Backends that discretize their input as a
-        probability distribution therefore have to be handed
-        :math:`c_{x_o}^2`, which is what ``outer_prepare_probabilities`` holds.
+        (Eqs. (7) and (9) of :cite:`Low2025`). Every state-preparation backend takes
+        *amplitudes* and squares them internally to obtain its own distribution, so
+        :math:`c_{x_o}` is what gets handed to one -- see ``build_outer_prep`` in
+        ``ControlledSOSSACircuitMapper``. ``outer_prepare_probabilities`` holds
+        :math:`c_{x_o}^2` for serialization and introspection only; feeding it to a
+        backend would square a second time and prepare :math:`c^4`.
         """
         one_body = _SQRT_TWO * _row_l1_norms(sossa.one_body.coeffs)
         spin_free = [_INV_SQRT_TWO * (abs(row[-1]) + float(np.sum(np.abs(row[:-1])))) for row in sossa.two_body.coeffs]

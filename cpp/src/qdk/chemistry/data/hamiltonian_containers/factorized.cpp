@@ -210,7 +210,7 @@ double FactorizedHamiltonianContainer::get_energy_gap() const {
 }
 
 double FactorizedHamiltonianContainer::get_lambda() const {
-  // norm (Eq. 35):
+  // norm (Eq. 33):
   // Λ = Σ|eig(h1_majorana)| + 1/4 Σ_{rc} (|WB^{rc}| + Σ_b |W^{rc}_b|)^2.
   Eigen::MatrixXd h1m = get_h1_majorana();
   Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(h1m);
@@ -240,7 +240,7 @@ double FactorizedHamiltonianContainer::get_lambda() const {
 }
 
 double FactorizedHamiltonianContainer::get_lambda_eff() const {
-  // Effective SOS-walk normalization (Eq. 13): λ_eff = √(E_gap·(2Λ - E_gap)).
+  // Effective SOS-walk normalization (Eq. 11): λ_eff = √(E_gap·(2Λ - E_gap)).
   double lambda = get_lambda();
   if (_energy_gap <= 0.0) {
     throw std::runtime_error("E_gap must be positive for a valid SOS walk");
@@ -253,14 +253,14 @@ double FactorizedHamiltonianContainer::get_lambda_eff() const {
 }
 
 Eigen::MatrixXd FactorizedHamiltonianContainer::get_h1_majorana() const {
-  // Majorana one-body shift (Eq. 38). Writing the rank-r copy-c leaf as
+  // Majorana one-body shift (Eq. 36). Writing the rank-r copy-c leaf as
   //   M^{rc}_{pq} = Σ_{b∈[B]} w_b^{rc} u^r_{b,p} u^r_{b,q},
   // the three accumulated corrections are
   //   h1'_{pq} = h1_{pq} - ½ Σ_{rc} (M^{rc} M^{rc})_{pq}   (a) normal-ordering
   //                      + Σ_{rc} tr(M^{rc}) M^{rc}_{pq}   (b)
   //                      - Σ_{rc} wB^{rc} M^{rc}_{pq}      (c)
   //
-  // Term (a) has no counterpart in Eq. 38 as printed, because the paper writes
+  // Term (a) has no counterpart in Eq. 36 as printed, because the paper writes
   // the two-body term as a plain product of E operators while this container
   // stores h2 = (pq|rs) normal-ordered, i.e.
   //   H = E_core + Σ h1_{pq} E_pq + ½ Σ h2_{pqrs} (E_pq E_rs - δ_qr E_ps).
