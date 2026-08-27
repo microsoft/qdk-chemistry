@@ -69,6 +69,7 @@ F12HartreeFockInput f12_input_from_wavefunction(
   auto cabs = scf::cabs::build_cabs(obs_libint, aux_libint);
 
   F12HartreeFockInput input;
+  input.scf_basis_set = obs_scf;
   input.obs = obs_libint;
   input.mo_coefficients = orbitals->get_coefficients_alpha();
   input.orbital_energies = orbitals->get_energies_alpha();

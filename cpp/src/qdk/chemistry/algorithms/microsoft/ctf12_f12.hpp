@@ -8,8 +8,13 @@
 #include <array>
 #include <cstddef>
 #include <libint2.hpp>
+#include <memory>
 #include <utility>
 #include <vector>
+
+namespace qdk::chemistry::scf {
+class BasisSet;
+}
 
 namespace qdk::chemistry::algorithms::microsoft::ctf12 {
 
@@ -23,6 +28,8 @@ namespace qdk::chemistry::algorithms::microsoft::ctf12 {
  * (a) convention.
  */
 struct F12HartreeFockInput {
+  std::shared_ptr<scf::BasisSet>
+      scf_basis_set;                 ///< Internal OBS metadata for SCF.
   ::libint2::BasisSet obs;           ///< Orbital basis set.
   Eigen::MatrixXd mo_coefficients;   ///< MO coefficients, @c [n_ao, n_mo].
   Eigen::VectorXd orbital_energies;  ///< Canonical orbital energies, @c [n_mo].
@@ -145,8 +152,8 @@ struct DressedHamiltonian {
   Eigen::VectorXd orbital_energies;  ///< Orbital energies, @c [n_mo].
   Eigen::MatrixXd one_body;  ///< Dressed one-body integrals, @c [n_mo, n_mo].
   std::vector<double> two_body;  ///< Dressed (pq|rs), flat @c n_mo^4.
-  double e_hf = 0.0;             ///< Bare Hartree-Fock energy.
-  double e_f12hf = 0.0;          ///< Self-consistent F12-HF energy.
+  double e_hf = 0.0;             ///< Bare Hartree-Fock electronic energy.
+  double e_f12hf = 0.0;          ///< Self-consistent F12-HF electronic energy.
 };
 
 /**

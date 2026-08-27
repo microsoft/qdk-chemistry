@@ -8,6 +8,7 @@
 #include <qdk/chemistry/scf/core/scf.h>
 #include <qdk/chemistry/scf/core/types.h>
 
+#include <cstddef>
 #include <memory>
 #include <vector>
 
@@ -181,6 +182,26 @@ class SCF {
       std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
       std::shared_ptr<BasisSet> basis_set,
       std::shared_ptr<BasisSet> raw_basis_set);
+
+  /**
+   * @brief Create a restricted SCF solver over dense in-memory integrals.
+   *
+   * The supplied matrices are expressed in an orthonormal orbital basis. The
+   * four-index tensor uses the physicists' layout expected by the CT-F12
+   * dressed mean field, with flat index @c ((p*n+q)*n+r)*n+s.
+   *
+   * @param cfg Restricted SCF configuration. The density initialization method
+   * must be @ref DensityInitializationMethod::UserProvided.
+   * @param one_body Dense one-body Hamiltonian.
+   * @param two_body_physicist Dense four-index interaction tensor.
+   * @param n_occupied Number of doubly occupied orbitals.
+   * @param basis_set Basis set supplying dimensions and molecular metadata.
+   * @param scalar_energy Constant contribution to the reported SCF energy.
+   */
+  static std::unique_ptr<SCF> make_restricted_dense_hamiltonian_solver(
+      const SCFConfig& cfg, const RowMajorMatrix& one_body,
+      const std::vector<double>& two_body_physicist, std::size_t n_occupied,
+      std::shared_ptr<BasisSet> basis_set, double scalar_energy = 0.0);
 
   /**
    * @brief Create a Kohn-Sham DFT solver

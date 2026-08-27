@@ -32,6 +32,11 @@ class CtF12HamiltonianSettings : public qdk::chemistry::data::Settings {
     set_default<int64_t>("frozen_core", 0,
                          "Number of frozen core orbitals (formulation (a))",
                          data::BoundConstraint<int64_t>{0});
+    set_default<int64_t>(
+        "max_mos", 0,
+        "Post-dressing active-space cutoff: maximum number of molecular "
+        "orbitals in the emitted Hamiltonian; zero includes all orbitals",
+        data::BoundConstraint<int64_t>{0});
     set_default("eri_method", std::string("direct"),
                 "ERI evaluation method: 'direct' computes integrals "
                 "on-the-fly, 'incore' stores all integrals in memory",
@@ -52,8 +57,9 @@ class CtF12HamiltonianSettings : public qdk::chemistry::data::Settings {
                 data::ListConstraint<std::string>{
                     {std::vector<std::string>{"relaxed", "reference"}}});
     set_default("symmetrize_two_body", false,
-                "Symmetrize the dressed two-body tensor for solvers that "
-                "assume 8-fold permutational symmetry");
+                "Experimental 8-fold averaging for external solvers that "
+                "require it; changes the CT-F12 Hamiltonian and is not "
+                "required by native QDK MP2 or MACIS");
   }
   ~CtF12HamiltonianSettings() override = default;
 };

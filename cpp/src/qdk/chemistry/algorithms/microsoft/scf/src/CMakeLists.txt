@@ -84,6 +84,7 @@ target_sources(chemistry PRIVATE
   scf/cpscf.cpp
   scf/guess.cpp
   scf/scf_impl.cpp
+  scf/dense_hamiltonian_scf.cpp
   scf/ks_impl.cpp
   scf/scf_solver.cpp
 )

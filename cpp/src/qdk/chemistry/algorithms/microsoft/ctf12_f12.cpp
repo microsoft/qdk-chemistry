@@ -4,6 +4,7 @@
 
 #include "ctf12_f12.hpp"
 
+#include <qdk/chemistry/scf/scf/scf_solver.h>
 #include <qdk/chemistry/scf/util/geminal_eri.h>
 
 #include <algorithm>
@@ -475,44 +476,32 @@ DressedResult run_f12_hf(const F12HartreeFockInput& in) {
   };
   auto run_scf = [&](const Eigen::MatrixXd& hh,
                      const std::vector<double>& gg) -> ScfOut {
-    Eigen::MatrixXd cmo = Eigen::MatrixXd::Identity(nbf, nbf);
-    Eigen::MatrixXd d_old = Eigen::MatrixXd::Zero(nbf, nbf);
-    Eigen::VectorXd eps = Eigen::VectorXd::Zero(nbf);
-    double e_old = 0.0;
-    for (int iter = 0; iter < 200; ++iter) {
-      Eigen::MatrixXd d = Eigen::MatrixXd::Zero(nbf, nbf);
-      for (std::size_t i = 0; i < nocc; ++i)
-        d += 2.0 * cmo.col(static_cast<int>(i)) *
-             cmo.col(static_cast<int>(i)).transpose();
-      const double dd_change = (d - d_old).cwiseAbs().maxCoeff();
-      d_old = d;
-      Eigen::MatrixXd f = hh;
-      for (std::size_t p = 0; p < nbf; ++p)
-        for (std::size_t q = 0; q < nbf; ++q) {
-          double jv = 0.0, kv = 0.0;
-          for (std::size_t r = 0; r < nbf; ++r)
-            for (std::size_t s = 0; s < nbf; ++s) {
-              const double dd = d(static_cast<int>(r), static_cast<int>(s));
-              jv += gg[gpidx(p, r, q, s)] * dd;
-              kv += gg[gpidx(p, r, s, q)] * dd;
-            }
-          f(static_cast<int>(p), static_cast<int>(q)) += jv - 0.5 * kv;
-        }
-      f = 0.5 * (f + f.transpose()).eval();
-      double e = 0.0;
-      for (std::size_t p = 0; p < nbf; ++p)
-        for (std::size_t q = 0; q < nbf; ++q)
-          e += 0.5 * d(static_cast<int>(q), static_cast<int>(p)) *
-               (hh(static_cast<int>(p), static_cast<int>(q)) +
-                f(static_cast<int>(p), static_cast<int>(q)));
-      Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(f);
-      cmo = es.eigenvectors();
-      eps = es.eigenvalues();
-      if (iter > 0 && std::abs(e - e_old) < 1e-12 && dd_change < 1e-11)
-        return {e, cmo, eps};
-      e_old = e;
-    }
-    return {e_old, cmo, eps};
+    if (!in.scf_basis_set)
+      throw std::invalid_argument(
+          "CT-F12 dense SCF requires internal orbital-basis metadata");
+
+    scf::SCFConfig config;
+    config.mpi = scf::mpi_default_input();
+    config.scf_orbital_type = scf::SCFOrbitalType::Restricted;
+    config.output_basis_mode = scf::BasisMode::PSI4;
+    config.density_init_method = scf::DensityInitializationMethod::UserProvided;
+    config.require_gradient = false;
+    config.require_polarizability = false;
+    config.verbose = 0;
+    config.scf_algorithm.method = scf::SCFAlgorithmName::DIIS_GDM;
+    config.scf_algorithm.max_iteration = 300;
+    config.scf_algorithm.density_threshold = 1e-8;
+    config.scf_algorithm.og_threshold = 1e-8;
+
+    const scf::RowMajorMatrix one_body = hh;
+    auto solver = scf::SCF::make_restricted_dense_hamiltonian_solver(
+        config, one_body, gg, nocc, in.scf_basis_set);
+    const scf::SCFContext& context = solver->run();
+    Eigen::MatrixXd coefficients = solver->get_orbitals_matrix();
+    Eigen::VectorXd orbital_energies =
+        solver->get_eigenvalues().row(0).transpose();
+    return {context.result.scf_total_energy, std::move(coefficients),
+            std::move(orbital_energies)};
   };
 
   // ---- Dressed two-body correction C2bar (paper Eq. 20-22) over OBS^4 ----
@@ -752,9 +741,23 @@ DressedResult run_f12_hf(const F12HartreeFockInput& in) {
               0.25 * (c2[c2idx(p, r, q, s)] + c2[c2idx(r, p, s, q)] +
                       c2[c2idx(q, s, p, r)] + c2[c2idx(s, q, r, p)]);
 
-  const ScfOut hf = run_scf(hmo, gp);
+  double reference_hf_energy = 0.0;
+  for (std::size_t i = 0; i < nocc; ++i) {
+    reference_hf_energy += 2.0 * hmo(static_cast<int>(i), static_cast<int>(i));
+    for (std::size_t j = 0; j < nocc; ++j)
+      reference_hf_energy +=
+          2.0 * gp[gpidx(i, j, i, j)] - gp[gpidx(i, j, j, i)];
+  }
   const ScfOut f12 = run_scf(hbar, gbar);
-  return {hf.e, f12.e, std::move(gbar), hbar, f12.c, f12.eps, nbf, nocc, nc};
+  return {reference_hf_energy,
+          f12.e,
+          std::move(gbar),
+          hbar,
+          f12.c,
+          f12.eps,
+          nbf,
+          nocc,
+          nc};
 }
 
 }  // namespace

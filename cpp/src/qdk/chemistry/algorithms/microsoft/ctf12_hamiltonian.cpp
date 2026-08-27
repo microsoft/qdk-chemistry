@@ -34,6 +34,8 @@ std::shared_ptr<data::Hamiltonian> CtF12HamiltonianConstructor::_run_impl(
   const std::string cabs_basis = _settings->get<std::string>("cabs_basis");
   const auto frozen_core =
       static_cast<std::size_t>(_settings->get<std::int64_t>("frozen_core"));
+  const auto max_mos =
+      static_cast<std::size_t>(_settings->get<std::int64_t>("max_mos"));
   const bool relax = _settings->get<std::string>("orbital_basis") == "relaxed";
   const bool symmetrize = _settings->get<bool>("symmetrize_two_body");
 
@@ -44,7 +46,12 @@ std::shared_ptr<data::Hamiltonian> CtF12HamiltonianConstructor::_run_impl(
 
   const std::size_t n = dressed.n_mo;
   const std::size_t nc = dressed.n_core;
-  const std::size_t nact = n - nc;
+  const std::size_t active_end = max_mos == 0 || max_mos > n ? n : max_mos;
+  if (active_end < dressed.n_occupied) {
+    throw std::invalid_argument(
+        "CT-F12: max_mos must include all occupied molecular orbitals");
+  }
+  const std::size_t nact = active_end - nc;
   const Eigen::MatrixXd& h1 = dressed.one_body;
   std::vector<double> g = dressed.two_body;  // chemists' (pq|rs), flat n^4
   auto gidx = [&](std::size_t p, std::size_t q, std::size_t r, std::size_t s) {
@@ -103,7 +110,7 @@ std::shared_ptr<data::Hamiltonian> CtF12HamiltonianConstructor::_run_impl(
         f_inactive(static_cast<Eigen::Index>(i), static_cast<Eigen::Index>(i));
 
   // Build the orbitals of the emitted Hamiltonian (relaxed F12-HF or reference
-  // basis), carrying the frozen-core active space.
+  // basis), carrying the selected contiguous active space.
   auto reference_orbitals = reference->get_orbitals();
   auto basis_set = reference_orbitals->get_basis_set();
   std::optional<Eigen::MatrixXd> ao_overlap;
@@ -112,7 +119,7 @@ std::shared_ptr<data::Hamiltonian> CtF12HamiltonianConstructor::_run_impl(
 
   std::vector<std::size_t> active_indices, inactive_indices;
   for (std::size_t i = 0; i < nc; ++i) inactive_indices.push_back(i);
-  for (std::size_t i = nc; i < n; ++i) active_indices.push_back(i);
+  for (std::size_t i = nc; i < active_end; ++i) active_indices.push_back(i);
 
   auto orbitals = std::make_shared<data::Orbitals>(
       dressed.mo_coefficients, std::make_optional(dressed.orbital_energies),

@@ -14,6 +14,7 @@
 #include <memory>
 #include <qdk/chemistry/algorithms/dynamical_correlation_calculator.hpp>
 #include <qdk/chemistry/algorithms/effective_hamiltonian.hpp>
+#include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
 #include <qdk/chemistry/data/configuration.hpp>
@@ -23,6 +24,7 @@
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "qdk/chemistry/algorithms/microsoft/ctf12_f12.hpp"
@@ -120,6 +122,73 @@ void run_neon_effective_hamiltonian_mp2(const std::string& obs_name,
 
 TEST(CtF12EffectiveHamiltonian, NeonAugCcPvdzMp2) {
   run_neon_effective_hamiltonian_mp2("aug-cc-pvdz", "aug-cc-pvdz-optri", 1e-12);
+}
+
+TEST(CtF12EffectiveHamiltonian, NeonMaxMosDefinesPostDressingActiveSpace) {
+  scf::QDKChemistryConfig::set_resources_dir(TEST_RESOURCES_DIR);
+  struct LibintGuard {
+    LibintGuard() { ::libint2::initialize(); }
+    ~LibintGuard() { ::libint2::finalize(); }
+  } libint_guard;
+
+  Eigen::MatrixXd coords = Eigen::MatrixXd::Zero(1, 3);
+  auto structure =
+      std::make_shared<data::Structure>(coords, std::vector<std::string>{"Ne"});
+  auto scf_solver = algorithms::ScfSolverFactory::create("qdk");
+  const auto reference = scf_solver->run(structure, 0, 1, "aug-cc-pvdz").second;
+
+  auto constructor =
+      algorithms::EffectiveHamiltonianConstructorFactory::create("qdk_ct_f12");
+  constructor->settings().set("gamma", 1.5);
+  constructor->settings().set("frozen_core", std::int64_t{1});
+  constructor->settings().set("max_mos", std::int64_t{6});
+  constructor->settings().set("cabs_basis", std::string("aug-cc-pvdz-optri"));
+  const auto dressed_hamiltonian = constructor->run(reference);
+
+  const auto orbitals = dressed_hamiltonian->get_orbitals();
+  const auto [active_alpha, active_beta] = orbitals->get_active_space_indices();
+  const auto [inactive_alpha, inactive_beta] =
+      orbitals->get_inactive_space_indices();
+  const std::vector<std::size_t> expected_active{1, 2, 3, 4, 5};
+  const std::vector<std::size_t> expected_inactive{0};
+
+  EXPECT_EQ(active_alpha, expected_active);
+  EXPECT_EQ(active_beta, expected_active);
+  EXPECT_EQ(inactive_alpha, expected_inactive);
+  EXPECT_EQ(inactive_beta, expected_inactive);
+  EXPECT_GT(orbitals->get_num_molecular_orbitals(), 6u);
+  EXPECT_EQ(std::get<0>(dressed_hamiltonian->get_one_body_integrals()).rows(),
+            5);
+  EXPECT_EQ(std::get<0>(dressed_hamiltonian->get_two_body_integrals()).size(),
+            5 * 5 * 5 * 5);
+
+  std::string occupations(expected_active.size(), '0');
+  for (std::size_t i = 0; i < 4; ++i) occupations[i] = '2';
+  auto determinant = data::Configuration::from_spin_half_string(occupations);
+  auto container = std::make_unique<data::StateVectorContainer>(
+      determinant, orbitals, "electrons");
+  auto wavefunction =
+      std::make_shared<data::Wavefunction>(std::move(container));
+  const double determinant_energy =
+      data::Ansatz(*dressed_hamiltonian, *wavefunction).calculate_energy();
+
+  const ctf12::F12HartreeFockInput input = ctf12::f12_input_from_wavefunction(
+      *reference, 1.5, "aug-cc-pvdz-optri", 1);
+  const ctf12::DressedHamiltonian dressed =
+      ctf12::build_dressed_hamiltonian(input, /*relax_orbitals=*/true);
+  EXPECT_NEAR(determinant_energy, dressed.e_f12hf, 1e-11);
+
+  auto asci =
+      algorithms::MultiConfigurationCalculatorFactory::create("macis_asci");
+  asci->settings().set("ntdets_max", std::int64_t{1});
+  asci->settings().set("ntdets_min", std::int64_t{1});
+  asci->settings().set("ncdets_max", std::int64_t{1});
+  asci->settings().set("max_refine_iter", std::int64_t{0});
+  const auto [asci_energy, asci_wavefunction] =
+      asci->run(dressed_hamiltonian, 4, 4);
+  EXPECT_NEAR(asci_energy, determinant_energy, 1e-11);
+  ASSERT_NE(asci_wavefunction, nullptr);
+  EXPECT_EQ(asci_wavefunction->size(), 1u);
 }
 
 namespace {

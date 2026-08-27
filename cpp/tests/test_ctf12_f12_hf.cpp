@@ -44,6 +44,7 @@ ctf12::F12HartreeFockInput neon_input(const std::string& obs_name,
   auto cabs = scf::cabs::build_cabs(obs_libint, aux_libint);
 
   ctf12::F12HartreeFockInput input;
+  input.scf_basis_set = obs_scf;
   input.obs = obs_libint;
   input.mo_coefficients = orbitals->get_coefficients_alpha();
   input.orbital_energies = orbitals->get_energies_alpha();
