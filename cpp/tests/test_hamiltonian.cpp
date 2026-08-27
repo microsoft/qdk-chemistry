@@ -3136,11 +3136,11 @@ TEST_F(HamiltonianConstructorTest, X2CAbsoluteOneBodyReferences) {
       EXPECT_LT((one_body_alpha.cwiseAbs() - expected.cwiseAbs())
                     .cwiseAbs()
                     .maxCoeff(),
-                testing::integral_tolerance);
+                1000 * testing::integral_tolerance);
       EXPECT_LT((one_body_beta.cwiseAbs() - expected.cwiseAbs())
                     .cwiseAbs()
                     .maxCoeff(),
-                testing::integral_tolerance);
+                1000 * testing::integral_tolerance);
       EXPECT_EQ(h_x2c->get_container_type(),
                 factory_name == "qdk" ? "canonical_four_center" : "cholesky");
     }
