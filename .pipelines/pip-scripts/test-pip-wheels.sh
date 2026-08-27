@@ -1,5 +1,5 @@
 #!/bin/bash
-set -ex
+set -exo pipefail
 PYTHON_VERSION=${1:-3.11}
 MAC_BUILD=${2:-OFF}
 export MAC_BUILD
@@ -67,7 +67,9 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     # deps installed here -- this is a fresh container, not the one it was built in. Matches exactly the package
     # set build-exachem-linux.sh installs on the build side (see that script for why each one is needed); apt
     # pulls in any further transitive runtime libs (e.g. libopenmpi3, libgfortran5) automatically.
-    if [ -n "$EXACHEM_INSTALL_DIR" ]; then
+    # NOTE: checks the directory directly (not $EXACHEM_INSTALL_DIR, which isn't assigned until later, below --
+    # see the "ExaChem/TAMM ... is optional" block) so this doesn't silently no-op under `set -e` (no `-u`).
+    if [ -d "/workspace/qdk-chemistry/exachem_install" ]; then
         echo "Installing ExaChem runtime apt dependencies..."
         apt-get install -y -q \
             gfortran \
@@ -137,8 +139,9 @@ export QSHARP_PYTHON_TELEMETRY=false
 if [ -d "/workspace/qdk-chemistry/exachem_install" ]; then
     EXACHEM_INSTALL_DIR="/workspace/qdk-chemistry/exachem_install"
 
-    # ExaChem's binary/libs are only needed here, for the ExaChem CCSD integration test's shutil.which("ExaChem")
-    # lookup -- scoped to just this pytest invocation so nothing else in this script is affected by it.
+    # ExaChem's binary/libs are only needed here, for an ExaChem CCSD integration test's shutil.which("ExaChem")
+    # lookup (landing separately in PR #611, not yet part of this branch's own python/tests tree) -- scoped to
+    # just this pytest invocation so nothing else in this script is affected by it.
     export PATH="${EXACHEM_INSTALL_DIR}/bin:${PATH}"
     export LD_LIBRARY_PATH="${EXACHEM_INSTALL_DIR}/lib:${EXACHEM_INSTALL_DIR}/lib64:${LD_LIBRARY_PATH:-}"
 fi
