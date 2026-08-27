@@ -81,7 +81,7 @@ class StatePreparation(Algorithm):
         return super().run(wavefunction)
 
     @staticmethod
-    def dense_state_vector(wavefunction: Wavefunction, label: str) -> tuple[np.ndarray, int]:
+    def _dense_state_vector(wavefunction: Wavefunction, label: str) -> tuple[np.ndarray, int]:
         """Scatter a wavefunction's coefficients onto their determinant-derived indices.
 
         A ``Wavefunction`` stores only occupied determinants, so the coefficient list is not
