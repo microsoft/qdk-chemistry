@@ -121,6 +121,7 @@ from qdk_chemistry.data.qubit_operator import QubitHamiltonian, QubitOperator
 from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorContainer
 from qdk_chemistry.data.qubit_operator.containers.pauli_lcu import PauliLCUContainer
 from qdk_chemistry.data.qubit_operator.containers.sossa import RotatedPaulis, SOSSAContainer
+from qdk_chemistry.data.registry import available_dataclasses, get_dataclass_type, register_dataclass
 from qdk_chemistry.data.symmetries import Symmetries
 from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
 from qdk_chemistry.data.time_dependent_qubit_hamiltonian.base import TimeDependentQubitHamiltonian
