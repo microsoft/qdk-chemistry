@@ -137,9 +137,11 @@ TEST(DoubleFactorizerTest, RejectsInvalidInput) {
   EXPECT_THROW(factorizer->run(make_unrestricted_hamiltonian(norb)),
                std::invalid_argument);
 
-  // A threshold that discards every fragment would leave no two-body term.
-  factorizer->settings().set("truncation_threshold", 1e6);
-  EXPECT_THROW(factorizer->run(hamiltonian), std::invalid_argument);
+  // run() locks settings, so a threshold that discards every fragment --
+  // leaving no two-body term at all -- needs its own instance.
+  auto truncating = DoubleFactorizerFactory::create("eigen_decomposition");
+  truncating->settings().set("truncation_threshold", 1e6);
+  EXPECT_THROW(truncating->run(hamiltonian), std::invalid_argument);
 }
 
 // eigen_decompose_two_body() is public API: symmetry-shift and one-norm
