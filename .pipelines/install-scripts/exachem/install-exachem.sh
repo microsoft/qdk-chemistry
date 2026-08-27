@@ -6,9 +6,11 @@
 # its own copies (see patches/cmsb-fix-dependency-reuse.patch). GlobalArrays is also built here, patched via
 # patches/globalarrays-fix-linalg-preference.patch.
 #
-# TAMM/ExaChem/CMSB/GlobalArrays commits are pinned below, not in cgmanifest.json: they're CI-only, never
-# shipped in the wheel. The four pins and the five patches under patches/ are validated together as a set --
-# bumping one requires re-running this script and re-checking every patch still applies.
+# TAMM/ExaChem/CMSB/GlobalArrays commits are pinned below and tracked as development dependencies in
+# cgmanifest.json (for Component Governance visibility, since they execute in CI even though never shipped in
+# the wheel) -- but this script's pins are authoritative for the actual build; keep cgmanifest.json's commits
+# in sync manually if these are ever bumped. The four pins and the five patches under patches/ are validated
+# together as a set -- bumping one requires re-running this script and re-checking every patch still applies.
 #
 # Usage: install-exachem.sh
 # Required env vars: CPP_DEPS_PREFIX
