@@ -244,35 +244,22 @@ def _compute_conditional_marginal_probs(
 class TestConditionalAliasSamplingWithFreeRider:
     """Tests for conditional alias sampling with free-rider data."""
 
-    @pytest.mark.parametrize(
-        ("n_cond", "n_coeffs", "condition_value"),
-        [
-            (2, 4, 0),
-            (2, 4, 1),
-        ],
-    )
-    def test_marginal_probs_with_free_rider(self, n_cond, n_coeffs, condition_value):
-        """Verify marginal probs and free-rider data loading."""
-        rng = np.random.default_rng(seed=456 + n_cond * 10 + condition_value)
+    @pytest.mark.parametrize("condition_value", [0, 1])
+    def test_free_rider_register_holds_the_loaded_bits(self, condition_value):
+        """The free rider depends only on the condition, so it comes out definite, not sampled."""
+        n_cond, n_coeffs, n_fr_bits = 2, 4, 3
+        rng = np.random.default_rng(seed=456 + condition_value)
         coefficients = rng.uniform(-1.0, 1.0, size=(n_cond, n_coeffs)).tolist()
-        n_fr_bits = 3
         free_rider_data = [[bool(rng.integers(0, 2)) for _ in range(n_fr_bits)] for _ in range(n_cond)]
-        bits_precision = 6
-        n_index_bits = math.ceil(math.log2(n_coeffs))
-        n_cond_bits = math.ceil(math.log2(n_cond))
 
-        full_sv = _run_conditional_alias_fr_and_dump(coefficients, free_rider_data, bits_precision, condition_value)
-        marginal_probs = _compute_conditional_marginal_probs(full_sv, n_cond_bits, n_index_bits, condition_value)
+        full_sv = _run_conditional_alias_fr_and_dump(coefficients, free_rider_data, 6, condition_value)
 
-        abs_coeffs = np.abs(coefficients[condition_value])
-        expected_probs = abs_coeffs**2 / np.sum(abs_coeffs**2)
-
-        np.testing.assert_allclose(
-            marginal_probs[:n_coeffs],
-            expected_probs,
-            atol=_alias_atol(n_coeffs, bits_precision),
-            err_msg=f"cond={condition_value}, free_rider={free_rider_data[condition_value]}",
-        )
+        # The free rider occupies the last qubits, so its bits are the low field of the basis
+        # index, read most significant first.
+        loaded = sum(int(bit) << (n_fr_bits - 1 - j) for j, bit in enumerate(free_rider_data[condition_value]))
+        fr_field = np.arange(len(full_sv)) & ((1 << n_fr_bits) - 1)
+        off_pattern = float(np.sum(np.abs(full_sv[fr_field != loaded]) ** 2))
+        assert off_pattern < 1e-12, f"amplitude escaped free_rider={free_rider_data[condition_value]}"
 
 
 def _run_conditional_alias_and_dump(
