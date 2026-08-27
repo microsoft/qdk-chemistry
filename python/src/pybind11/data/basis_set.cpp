@@ -215,9 +215,9 @@ A shell represents a group of atomic orbitals with the same atom, angular moment
 Examples:
     Create a simple basis set:
 
-    >>> from qdk_chemistry.data import BasisSet, OrbitalType
-    >>> basis = BasisSet("STO-3G")
-    >>> basis.add_shell(0, OrbitalType.S, 1.0, 1.0)  # s orbital on atom 0
+    >>> from qdk_chemistry.data import BasisSet, OrbitalType, Shell
+    >>> shell = Shell(0, OrbitalType.S, [1.0], [1.0])
+    >>> basis = BasisSet("STO-3G", [shell])
     >>> print(f"Number of atomic orbitals: {basis.get_num_atomic_orbitals()}")
 )");
 
@@ -274,7 +274,8 @@ Examples:
     >>> print(f"Basis set for {structure.get_num_atoms()} atoms")
 )",
                 py::arg("name"), py::arg("structure"),
-                py::arg("atomic_orbital_type") = AOType::Spherical);
+                py::arg("atomic_orbital_type") = AOType::Spherical,
+                py::keep_alive<1, 2>());
 
   basis_set.def(
       py::init<const std::string&, const std::vector<Shell>&, AOType>(),
@@ -296,6 +297,7 @@ Examples:
 )",
       py::arg("name"), py::arg("shells"),
       py::arg("atomic_orbital_type") = AOType::Spherical);
+
   basis_set.def(py::init<const std::string&, const std::vector<Shell>&,
                          const Structure&, AOType>(),
                 R"(
@@ -319,6 +321,7 @@ Examples:
 )",
                 py::arg("name"), py::arg("shells"), py::arg("structure"),
                 py::arg("atomic_orbital_type") = AOType::Spherical);
+
   basis_set.def(py::init<const std::string&, const std::vector<Shell>&,
                          const std::vector<Shell>&, const Structure&, AOType>(),
                 R"(
@@ -345,6 +348,7 @@ Examples:
                 py::arg("name"), py::arg("shells"), py::arg("ecp_shells"),
                 py::arg("structure"),
                 py::arg("atomic_orbital_type") = AOType::Spherical);
+
   basis_set.def(
       py::init<const std::string&, const std::vector<Shell>&,
                const std::string&, const std::vector<Shell>&,
@@ -376,6 +380,7 @@ Examples:
       py::arg("name"), py::arg("shells"), py::arg("ecp_name"),
       py::arg("ecp_shells"), py::arg("ecp_electrons"), py::arg("structure"),
       py::arg("atomic_orbital_type") = AOType::Spherical);
+
   basis_set.def(py::init<const BasisSet&>(),
                 R"(
 Copy constructor.
@@ -389,7 +394,8 @@ Examples:
     >>> original = BasisSet("cc-pVDZ")
     >>> copy = BasisSet(original)
     >>> print(f"Copied basis set: {copy.get_name()}")
-)");
+)",
+                py::arg("other"));
 
   // Basis type management
   basis_set.def("get_atomic_orbital_type", &BasisSet::get_atomic_orbital_type,
@@ -1200,7 +1206,6 @@ Examples:
 )",
       py::arg("index_to_basis_map"), py::arg("structure"),
       py::arg("atomic_orbital_type") = AOType::Spherical);
-
   // Utility functions (static methods);
   basis_set.def_static("orbital_type_to_string",
                        &BasisSet::orbital_type_to_string,
@@ -1374,7 +1379,6 @@ Name used for custom ECP basis sets.
 Type:
     str
 )");
-
   // Data type name class attribute
   basis_set.def_static("data_type_name", &BasisSet::data_type_name, R"(
 Return the wire-format identifier for basis sets.
