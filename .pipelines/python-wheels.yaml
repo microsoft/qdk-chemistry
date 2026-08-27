@@ -189,7 +189,7 @@ extends:
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: windows
-          ${{ else }}:
+          ${{ elseif eq(target.name, 'linux_x86_64') }}:
             dependsOn: Build_linux_x86_64_exachem
             pool:
               name: $(CPU_POOL_X86)
