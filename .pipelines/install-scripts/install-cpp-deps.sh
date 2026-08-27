@@ -3,27 +3,20 @@ set -e
 
 # install-cpp-deps.sh — build and install qdk-chemistry's C++ dependencies for CI pipelines.
 #
-# Builds from source (into install_prefix): nlohmann_json, googletest, Catch2, spdlog, BLAS++, LAPACK++, LibInt2,
-# ECPint (libecpint), GauXC.
-# Reused from the OS instead of built here: the actual BLAS/LAPACK implementation that BLAS++/LAPACK++ link
-# against (e.g. OpenBLAS via apt on Linux, Apple's Accelerate framework via macOS's "auto" vendor -- see
-# blas_vendor below).
+# Builds from source: nlohmann_json, googletest, Catch2, spdlog, BLAS++, LAPACK++, LibInt2, ECPint, GauXC.
+# The actual BLAS/LAPACK implementation (OpenBLAS via apt, or Apple Accelerate on macOS) is reused from the
+# system, not built here.
 #
-# For context, qdk-chemistry's own C++ build (cpp/cmake/third_party.cmake, external/macis) also requires several
-# dependencies to already be installed on the system, independently of this script: Eigen3, HDF5, Boost, OpenMP,
-# Threads, and MPI (only when built with ExaChem support). These are installed via apt/brew by the pipeline
-# before this script runs (see build-and-test.yaml), not by install-cpp-deps.sh itself. GoogleTest and Catch2
-# are each resolved via a find_package(...) call that falls back to fetching+building from source if not found
-# (cpp/tests/CMakeLists.txt and external/macis/cmake/macis-catch2.cmake, respectively); installing both here
-# lets that find_package() succeed and avoids the redundant per-job fetch+rebuild.
+# GoogleTest/Catch2 are installed here so qdk-chemistry's own find_package() calls succeed, avoiding a
+# redundant per-job FetchContent rebuild. Eigen3/HDF5/Boost/OpenMP/MPI are installed separately by the
+# pipeline (apt/brew), not by this script.
 #
 # Usage: install-cpp-deps.sh <cpp_cgmanifest_path> <macis_cgmanifest_path> [blas_vendor]
 #
 # Arguments:
-#   cpp_cgmanifest_path   - Full path to cpp/manifest/qdk-chemistry/cgmanifest.json
-#   macis_cgmanifest_path - Full path to external/macis/manifest/cgmanifest.json
-#   blas_vendor           - BLAS++'s `-Dblas=` value (default: "auto" -- see install-blaspp.sh for the full set
-#                           of supported values).
+#   cpp_cgmanifest_path   - Path to cpp/manifest/qdk-chemistry/cgmanifest.json
+#   macis_cgmanifest_path - Path to external/macis/manifest/cgmanifest.json
+#   blas_vendor           - BLAS++'s `-Dblas=` value (default: "auto"; see install-blaspp.sh).
 
 if [[ $# -lt 2 || $# -gt 3 ]]; then
     echo "Usage: $0 <cpp_cgmanifest_path> <macis_cgmanifest_path> [blas_vendor]"
@@ -221,9 +214,7 @@ make install
 cd "$BUILD_DIR"
 rm -rf nlohmann_json
 
-# Install googletest (qdk-chemistry's own cpp/tests/CMakeLists.txt finds this via find_package(GTest QUIET),
-# falling back to fetching+building v1.14.0 itself if not found -- installing it here once, cached alongside
-# the other C++ deps, avoids that redundant per-job rebuild).
+# Install googletest (avoids a redundant per-job FetchContent rebuild; see header).
 echo "=== Installing googletest ==="
 git clone https://github.com/google/googletest.git googletest
 cd googletest
@@ -240,9 +231,7 @@ make install
 cd "$BUILD_DIR"
 rm -rf googletest
 
-# Install Catch2 (external/macis's own cmake/macis-catch2.cmake finds this via
-# find_package(Catch2 3.0.1 CONFIG QUIET), falling back to fetching+building v3.3.2 itself if not found -- same
-# rationale as googletest above).
+# Install Catch2 (same rationale as googletest above).
 echo "=== Installing Catch2 ==="
 git clone https://github.com/catchorg/Catch2.git catch2
 cd catch2

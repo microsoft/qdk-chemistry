@@ -1,28 +1,17 @@
 #!/bin/bash
 set -ex
 
-# build-exachem-linux.sh — build ExaChem (+ its TAMM tensor backend) for the ADO python-wheels pipeline's Linux
-# x86_64 test environment.
+# build-exachem-linux.sh — build ExaChem (+ TAMM) for the ADO python-wheels pipeline's Linux x86_64 test
+# environment.
 #
-# Runs inside the same ubuntu:24.04 Docker container used to build/test the qdk-chemistry wheel itself (see
-# build-pip-wheels.sh / test-pip-wheels.sh) -- NOT directly on the ADO host pool -- so the resulting ExaChem
-# binary stays ABI-compatible with the test container regardless of what OS the host pool itself runs (the pool
-# is expected to migrate from Ubuntu to Azure Linux at some point; this script doesn't need to change for that).
+# Runs inside the same ubuntu:24.04 container used to build/test the qdk-chemistry wheel, not on the ADO host
+# pool, so the binary stays ABI-compatible regardless of host OS. Uses BLIS+LibFLAME (unlike GHA's OpenBLAS).
 #
-# Uses BLIS+LibFLAME as its BLAS/LAPACK vendor, unlike GHA's OpenBLAS -- see build-pip-wheels.sh's own comment
-# for why, and install-exachem.sh's LINALG_VENDOR=BLIS handling for the LAPACK_PREFERENCE_LIST fix that combo
-# needs.
-#
-# Only the final exachem_install directory is written under the bind-mounted repo checkout (so it survives to be
-# published as a pipeline artifact / cached across pipeline runs -- see .pipelines/templates/build-exachem-linux.yml);
-# cpp_deps_install and the ExaChem/TAMM build trees are written under /tmp (container-local, discarded on exit)
-# since nothing downstream needs them -- BLAS++/LAPACK++/LibInt2/GauXC/EcpInt/spdlog/nlohmann_json are all built
-# static (BUILD_SHARED_LIBS=OFF), so they end up statically linked into the ExaChem binary itself, not left as
-# separate runtime artifacts to carry forward.
+# Only ./exachem_install is written under the bind-mounted checkout (published/cached across runs); everything
+# else is written under /tmp and discarded, since all dependencies are built static.
 #
 # Usage: build-exachem-linux.sh [march] [blis_version] [libflame_version]
-# Must be run from the repo root (uses relative paths to cpp/manifest, external/macis/manifest, and the other
-# .pipelines/install-scripts/* scripts it delegates to), and writes ./exachem_install into the current directory.
+# Must be run from the repo root; writes ./exachem_install into the current directory.
 
 MARCH=${1:-x86-64-v3}
 BLIS_VERSION=${2:-2.0}

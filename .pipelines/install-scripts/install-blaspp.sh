@@ -11,9 +11,7 @@ set -e
 # Usage: install-blaspp.sh <install_prefix> <commit> [blas_vendor] [march] [build_shared_libs]
 #   install_prefix     - CMAKE_INSTALL_PREFIX (also searched for an existing BLAS install, e.g. OpenBLAS/BLIS).
 #   commit              - blaspp commit hash, resolved from external/macis/manifest/cgmanifest.json.
-#   blas_vendor         - BLAS++'s `-Dblas=` value: "openblas" (default; qdk-chemistry's own CI/devcontainer
-#                         vendor) or "blis" (for the ADO wheel pipeline's BLIS+LibFLAME stack). See BLAS++'s
-#                         cmake/BLASFinder.cmake for the full set of supported values.
+#   blas_vendor         - BLAS++'s `-Dblas=` value: "openblas" (default) or "blis" (ADO's BLIS+LibFLAME stack).
 #   march               - -march= value for CMAKE_CXX_FLAGS (default: x86-64-v3).
 #   build_shared_libs   - ON/OFF (default: OFF, matches its callers' static default).
 

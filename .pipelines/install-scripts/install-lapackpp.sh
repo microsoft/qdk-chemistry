@@ -16,10 +16,8 @@ set -e
 #   march               - -march= value for CMAKE_CXX_FLAGS (default: x86-64-v3).
 #   build_shared_libs   - ON/OFF (default: OFF, matches its callers' static default).
 #
-# NOTE: LAPACK++ only accepts `-Dlapack=auto`/`generic` -- there's no vendor-specific value; vendor selection
-# belongs entirely to BLAS++'s `-Dblas=` option (install-blaspp.sh). `auto` link-tests against the already-found
-# BLAS++ target, and OpenBLAS/BLIS+LibFLAME both provide LAPACK in that same library, so no separate liblapack
-# install is needed.
+# NOTE: LAPACK++ only accepts `-Dlapack=auto`/`generic` -- vendor selection belongs entirely to BLAS++'s
+# `-Dblas=` option (install-blaspp.sh). `auto` link-tests against the already-found BLAS++ target.
 
 INSTALL_PREFIX=${1:-/usr/local}
 COMMIT=${2:?commit hash is required (resolve it from external/macis/manifest/cgmanifest.json)}

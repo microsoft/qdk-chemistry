@@ -1,29 +1,16 @@
 # globalarrays-fix-linalg-preference.patch
 # ----------------------------------------------------------------------------------------------------------------------
-# Applied directly (git apply) to GlobalArrays (GlobalArrays/ga) before we build+install it ourselves for TAMM/ExaChem
-# to reuse (see install-exachem.sh) -- fixes packaging issues in GA's own build that otherwise resolve LAPACK to its
-# bundled Netlib ReferenceLAPACK instead of libFLAME when LINALG_VENDOR=BLIS, causing "multiple definition of
-# `dsytrd_'" and similar link errors once GlobalArrays::ga, ReferenceLAPACK, and libFLAME all end up statically linked
-# into the same executable:
+# Applied to GlobalArrays before we build+install it ourselves for TAMM/ExaChem to reuse (see install-exachem.sh).
+# Fixes GA's own build resolving LAPACK to its bundled ReferenceLAPACK instead of libFLAME when
+# LINALG_VENDOR=BLIS, which causes "multiple definition of `dsytrd_'" once both end up statically linked.
 #
-# 1. cmake/ga-linalg.cmake unconditionally overwrites LAPACK_PREFERENCE_LIST -- TWICE -- for
-#    LINALG_VENDOR=BLIS/OpenBLAS/IBMESSL: first to `${LINALG_VENDOR}` (e.g. "BLIS"), then to "ReferenceLAPACK",
-#    clobbering whatever a caller passes in (e.g. "FLAME;ReferenceLAPACK" for a BLIS+libFLAME stack) either way.
-#    Snapshots the caller-supplied value (if any) into _qdk_caller_lapack_preference_list before the first
-#    overwrite, and guards both assignments against that snapshot -- preserving the caller's value end-to-end when
-#    given, and reproducing the exact original default chain (${LINALG_VENDOR} then "ReferenceLAPACK") when it isn't.
+# 1. cmake/ga-linalg.cmake overwrites LAPACK_PREFERENCE_LIST twice, clobbering any caller-supplied value. Guard
+#    both overwrites so a caller-supplied preference (e.g. "FLAME;ReferenceLAPACK") survives.
 #
-# 2 & 3. cmake/linalg-modules/LinAlgModulesMacros.cmake's install_linalg_modules() installs a fixed subset of
-#    Find<Vendor>.cmake modules alongside GA's exported globalarrays-config.cmake, for downstream consumers (e.g.
-#    TAMM/ExaChem re-importing GlobalArrays::ga) to re-resolve BLAS/LAPACK without GA's own build-time source tree.
-#    That subset omits FindFLAME.cmake even though GA's own build supports FLAME as a LAPACK vendor -- so a
-#    downstream find_package(FLAME) against GA's installed config always fails to find even the finder module,
-#    before ever falling through to ReferenceLAPACK. Fix 2 adds FindFLAME.cmake to that installed list. Fix 3
-#    additionally mirrors GA's own CMakeLists.txt workaround for two other files (FindILP64.cmake/
-#    FindStandardFortran.cmake, installed a second time via an explicit install(FILES ...), with a "#FIXME: Not sure
-#    why this file is not installed via ExternalProject build of GA" comment) -- since that comment indicates
-#    install_linalg_modules()'s own install() calls are not reliably reached under an ExternalProject-style build,
-#    FindFLAME.cmake gets the same explicit, redundant install() rather than relying on fix 2 alone.
+# 2 & 3. LinAlgModulesMacros.cmake's install_linalg_modules() doesn't install FindFLAME.cmake alongside GA's
+#    exported config, so downstream consumers can't re-resolve libFLAME. Fix 2 adds it to the installed list;
+#    fix 3 also installs it explicitly in CMakeLists.txt, mirroring GA's own workaround for two other finder
+#    modules under the same "not reliably installed via ExternalProject" comment.
 #
 # Verified against GlobalArrays/ga commit 635d6b341faf928cb5a0cddc38b1a0cbbc2b5bc4.
 # ----------------------------------------------------------------------------------------------------------------------

@@ -63,12 +63,9 @@ if [ "$MAC_BUILD" == "OFF" ]; then
         xz-utils \
         zlib1g-dev
 
-    # ExaChem is a separate MPI process (not linked into the qdk_chemistry wheel), so it needs its own runtime
-    # deps installed here -- this is a fresh container, not the one it was built in. Matches exactly the package
-    # set build-exachem-linux.sh installs on the build side (see that script for why each one is needed); apt
-    # pulls in any further transitive runtime libs (e.g. libopenmpi3, libgfortran5) automatically.
-    # NOTE: checks the directory directly (not $EXACHEM_INSTALL_DIR, which isn't assigned until later, below --
-    # see the "ExaChem/TAMM ... is optional" block) so this doesn't silently no-op under `set -e` (no `-u`).
+    # ExaChem runs as a separate MPI process in a fresh container, so it needs its own runtime deps here --
+    # matches build-exachem-linux.sh's package set. Checks the directory directly (not $EXACHEM_INSTALL_DIR,
+    # assigned later below) so this doesn't silently no-op under `set -e`.
     if [ -d "/workspace/qdk-chemistry/exachem_install" ]; then
         echo "Installing ExaChem runtime apt dependencies..."
         apt-get install -y -q \
@@ -134,14 +131,12 @@ python3 -m pip install --dry-run --ignore-installed --quiet \
 # Disable telemetry during testing
 export QSHARP_PYTHON_TELEMETRY=false
 
-# ExaChem/TAMM (built separately, in a preliminary .pipelines/templates/build-exachem-linux.yml job and
-# downloaded here as a pipeline artifact) is optional: only present for the Linux x86_64 leg.
+# ExaChem/TAMM is optional: only present for the Linux x86_64 leg (built separately, downloaded as an artifact).
 if [ -d "/workspace/qdk-chemistry/exachem_install" ]; then
     EXACHEM_INSTALL_DIR="/workspace/qdk-chemistry/exachem_install"
 
-    # ExaChem's binary/libs are only needed here, for an ExaChem CCSD integration test's shutil.which("ExaChem")
-    # lookup (landing separately in PR #611, not yet part of this branch's own python/tests tree) -- scoped to
-    # just this pytest invocation so nothing else in this script is affected by it.
+    # Scoped to just this pytest invocation, for the (upcoming, PR #611) ExaChem CCSD integration test's
+    # shutil.which("ExaChem") lookup.
     export PATH="${EXACHEM_INSTALL_DIR}/bin:${PATH}"
     export LD_LIBRARY_PATH="${EXACHEM_INSTALL_DIR}/lib:${EXACHEM_INSTALL_DIR}/lib64:${LD_LIBRARY_PATH:-}"
 fi

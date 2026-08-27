@@ -1,150 +1,37 @@
 # cmsb-fix-dependency-reuse.patch
 # ----------------------------------------------------------------------------------------------------------------------
-# Make NWChemEx-Project/CMakeBuild (CMSB, TAMM/ExaChem's superbuild helper) reuse already-installed system/build
-# dependencies -- BLAS, LAPACK, spdlog, EcpInt, nlohmann_json (NJSON), numactl -- instead of always rebuilding its own
-# copies from source, without touching the global CMSB_DEBUG_CMAKE option (an earlier, broader attempt at this
-# via -DCMSB_DEBUG_CMAKE=OFF was tried and reverted: it also changes how every *other* TAMM dependency is
-# resolved in CMSB's nested "TAMM_External"/"EXACHEM_External" build phase, which broke that phase outright with
-# a hard CMake configure error -- "could not find TARGET NJSON_External" -- since CMSB has no build-from-source
-# fallback in that nested re-resolution path). This patch is instead scoped to exactly the affected code paths,
-# leaving everything else byte-for-byte unchanged.
+# Makes NWChemEx-Project/CMakeBuild (CMSB, TAMM/ExaChem's superbuild helper) reuse already-installed
+# dependencies -- BLAS, LAPACK, spdlog, EcpInt, nlohmann_json, numactl -- instead of always rebuilding its own
+# copies from source. Five independent fixes:
 #
-# Five independent root causes/fixes, across cmake/macros/DependencyMacros.cmake, cmake/macros/BuildCMSBModule.cmake,
-# cmake/CMSBTargetConfig.cmake.in and cmake/find_external/Findnumactl.cmake:
+# 1. BLAS/LAPACK (DependencyMacros.cmake): add a plain find_package(BLAS/LAPACK QUIET) fallback so system
+#    OpenBLAS is found instead of rebuilt. NOT currently exercised by our own build (GlobalArrays/GauXC are
+#    reused directly instead, and MACIS is never requested) -- kept as a genuine, harmless upstream fix in case
+#    that changes; CI success does not validate this specific fix.
 #
-# 1. BLAS/LAPACK (cmake/macros/DependencyMacros.cmake): BLAS/LAPACK are DEP_ABUILD items, so
-#    cmsb_find_dependency() only looks them up via find_package(<name> CONFIG NO_DEFAULT_PATH), which apt's
-#    libopenblas-dev satisfies for neither (it ships no BLASConfig.cmake/LAPACKConfig.cmake) -- so CMSB always
-#    rebuilds its own static, generic-target OpenBLAS. Fix: add a plain find_package(BLAS/LAPACK QUIET) fallback
-#    in cmsb_find_dependency() (mirroring the existing ELPA/HDF5/numactl special cases), which uses CMake's own
-#    FindBLAS.cmake/FindLAPACK.cmake (MODULE mode) and correctly finds the system OpenBLAS. Safe because
-#    cmsb_find_dependency links BLAS/LAPACK via raw library file paths (FindBLAS/FindLAPACK set e.g.
-#    BLAS_LIBRARIES to absolute .so/.a paths), not an imported target, so nothing about how they get
-#    exported/consumed downstream changes.
+# 2. SPDLOG / EcpInt (CMSBTargetConfig.cmake.in, BuildCMSBModule.cmake): bake a *_ROOT hint into the generated
+#    tamm-config.cmake for these two, same as CMSB already does for LibInt2/HDF5/HPTT, so a later cmake
+#    invocation (e.g. ExaChem's own configure) can re-resolve spdlog::spdlog/ECPINT::ecpint reliably.
 #
-#    NOT CURRENTLY EXERCISED by our own TAMM/ExaChem configuration -- kept anyway as a genuine, harmless upstream
-#    CMSB bug fix (verified against CMSB's own source at the pinned commit): "BLAS"/"LAPACK" are only ever
-#    requested via cmsb_find_dependency() from inside cmake/build_external/BuildGlobalArrays.cmake,
-#    BuildGauXC.cmake, and BuildMACIS.cmake -- i.e. only when CMSB itself falls through to BUILDING one of those
-#    three dependencies from source. Our build sets BUILD_GlobalArrays=OFF/BUILD_GauXC=OFF (both are reused, see
-#    globalarrays-fix-linalg-preference.patch and install-exachem.sh) and never requests TAMM's MACIS
-#    dependency (that's gated on `"FCI" IN_LIST MODULES` in TAMM's own CMakeLists.txt; install-exachem.sh always
-#    sets MODULES=CC) -- so none of those three Build*.cmake files are ever included for us, and this fallback
-#    is never actually reached. Left in (rather than dropped) since it's a real, correct, upstream-portable fix
-#    that would matter the moment any of those three build-from-source paths ever does run (e.g. a future
-#    MODULES=FCI or TAMM_ENABLE_ELPA build) -- but do not treat "the ADO/GHA build succeeded" as validating this
-#    specific fix; it hasn't been exercised by any CI run so far.
+# 3. NJSON (nlohmann_json): same gap and fix as SPDLOG/EcpInt above. Point NJSON_ROOT at a build >= 3.12.0 --
+#    ExaChem uses a private nlohmann_json API only present from that version on.
 #
-# 2. SPDLOG / EcpInt (cmake/CMSBTargetConfig.cmake.in, cmake/macros/BuildCMSBModule.cmake): unlike BLAS/LAPACK,
-#    cmsb_find_dependency links these (like every DEP_ABUILD_MISC item) via an external IMPORTED target
-#    reference (spdlog::spdlog, ECPINT::ecpint), so TAMM's generated tamm-config.cmake must be able to
-#    RE-RESOLVE that target when consumed by a LATER, SEPARATE cmake invocation (e.g. ExaChem's own
-#    outer/nested configure). CMSBTargetConfig.cmake.in's per-dependency find_path(... NO_DEFAULT_PATH)
-#    re-resolution loop only ever bakes a reliable, build-independent *_ROOT hint (via a literal
-#    `set(<name>_ROOT @<name>_ROOT@)`, substituted once at TAMM's own build time via configure_file) for
-#    LibInt2/HDF5/HPTT -- SPDLOG/EcpInt never got the same treatment, so their re-resolution relied entirely on
-#    CMAKE_PREFIX_PATH being correctly forwarded through CMSB's nested ExternalProject_Add machinery, which is
-#    unreliable in practice: EcpInt resolves but SPDLOG doesn't via an identical forwarding path, hard-erroring
-#    on tamm::tamm's own set_target_properties(), "the target spdlog::spdlog was not found". Fix: extend the
-#    exact same baked-@ROOT@ mechanism CMSB already uses for LibInt2/HDF5/HPTT to SPDLOG/EcpInt too, and forward
-#    -DSPDLOG_ROOT/-DEcpInt_ROOT into CMSB's nested *_External sub-builds the same way -DHDF5_ROOT/-DHPTT_ROOT/
-#    -DLibInt2_ROOT already are.
+# 4. numactl (Findnumactl.cmake): CMSB forwards a `numactl_ROOT` hint to nested sub-builds, but
+#    Findnumactl.cmake reads `NUMACTL_ROOT` -- a casing mismatch unique to numactl. Fix: add a default-path
+#    fallback search instead of plumbing the mismatched variable through every nested layer.
 #
-# 3. NJSON (nlohmann_json): same gap and same fix as SPDLOG/EcpInt above -- NJSON's elseif branch in
-#    CMSBTargetConfig.cmake.in never set `_dep_pp` either. Callers wanting NJSON reused should point NJSON_ROOT
-#    at an install providing the exact nlohmann_json version their own code needs (this is an API/ABI-sensitive
-#    dependency: nlohmann_json's public API is stable, but code reaching into its detail:: namespace, as
-#    ExaChem's own source does, is not -- verify version compatibility before pointing NJSON_ROOT at a system
-#    package).
+# 5. LAPACK_PREFERENCE_LIST not forwarded to consumer sub-builds (BuildCMSBModule.cmake): with
+#    LINALG_VENDOR=BLIS, LAPACK falls back to CMSB's bundled ReferenceLAPACK instead of libFLAME, and both end
+#    up statically linked into the same binary ("multiple definition of `dsytrd_'"). Fix: forward
+#    LAPACK_PREFERENCE_LIST via bundle_cmake_list() (bundle_cmake_strings() mis-escapes its semicolon-separated
+#    value).
 #
-# 4. numactl (cmake/find_external/Findnumactl.cmake): numactl is a DEP_ABUILD item (not DEP_ABUILD_MISC) with its
-#    own module finder that searches numa.h / libnuma with NO_DEFAULT_PATH, hinting ONLY the CMSB install/stage
-#    prefix and ${NUMACTL_ROOT}. Passing -DNUMACTL_ROOT=<prefix> makes the OUTER TAMM/ExaChem configure find it,
-#    but that hint does NOT reliably reach CMSB's NESTED *_External sub-builds (TAMM_External/EXACHEM_External):
-#    CMSB auto-forwards per-dependency roots to those nested builds via DEPENDENCY_ROOT_DIRS
-#    (cmake/macros/BuildCMSBModule.cmake) keyed on the *dependency name as listed in TAMM_DEPENDENCIES* -- i.e. it
-#    forwards `numactl_ROOT` (lower-case, matching the dep name "numactl"), whereas Findnumactl reads the
-#    UPPER-case `NUMACTL_ROOT` -- a case mismatch unique to numactl (LibInt2/HDF5/HPTT/SPDLOG/EcpInt/NJSON all use
-#    the same casing for dep-name and finder-var, e.g. "SPDLOG"/SPDLOG_ROOT, so their forwarding just works).
-#    A first attempt at fixing this the same way as SPDLOG/EcpInt/NJSON above (baking @NUMACTL_ROOT@ into the
-#    CMSBTargetConfig.cmake.in consumer re-resolution, forwarding -DNUMACTL_ROOT via bundle_cmake_args) does not
-#    work: it only helps the *consumer* re-resolution path, not the nested TAMM_External build, which re-resolves
-#    TAMM_DEPENDENCIES from scratch in its own cmake process and hard-errors on the uncreated numactl_External
-#    target once -DBUILD_numactl=OFF is also set. Rather than plumb the case-mismatched variable through every nested layer, the fix
-#    instead makes reuse work in EVERY CMSB configure phase (outer, nested, and downstream consumer) with no
-#    forwarding at all: Findnumactl gets a default-path FALLBACK search (a second find_path/find_library WITHOUT
-#    NO_DEFAULT_PATH) after its existing NO_DEFAULT_PATH search. Since find_path/find_library are no-ops once the
-#    result var is cached, CMSB's own staged/built copy still takes priority; the fallback only adds a normal
-#    system search that locates an OS-packaged numactl in a default prefix. When numactl is force-built
-#    (BUILD_numactl=ON), cmsb_find_dependency never calls the finder at all, so the fallback cannot shadow an
-#    intended source build. -DNUMACTL_ROOT=<prefix> remains a useful (if now non-essential) primary-search hint.
-#    This also incidentally makes reuse robust on Debian/Ubuntu multiarch systems, where apt's libnuma-dev
-#    installs libnuma.so under /usr/lib/<triplet>/ -- a path Findnumactl.cmake's hardcoded PATH_SUFFIXES
-#    (lib/lib32/lib64) never match directly, but CMake's own *default* find_library search is multiarch-aware
-#    (via CMAKE_LIBRARY_ARCHITECTURE) and covers it automatically, no extra suffix/hint needed.
+# GlobalArrays is no longer built by CMSB at all (see install-exachem.sh): it's built+installed ourselves and
+# reused via a plain find_package(GlobalArrays QUIET), sidestepping the same LAPACK_PREFERENCE_LIST issue in
+# GA's own build separately (see globalarrays-fix-linalg-preference.patch).
 #
-# 5. LAPACK_PREFERENCE_LIST not forwarded to consumer sub-builds (cmake/macros/BuildCMSBModule.cmake): with
-#    LINALG_VENDOR=BLIS, BLAS resolves fine (BLIS provides it), but LAPACK does not: BLIS ships no LAPACK
-#    routines, so the shared icl-utk-edu/linalg-cmake-modules ecosystem (vendored into every CMSB/TAMM/ExaChem
-#    consumer's CMAKE_MODULE_PATH as CMSB_LAM_PATH) falls back to its own bundled Netlib "ReferenceLAPACK"
-#    (cmake/linalg-modules/FindLAPACK.cmake's default LAPACK_PREFERENCE_LIST is "ReferenceLAPACK;FLAME" --
-#    ReferenceLAPACK is tried, and found/reused first, since CMSB already built one earlier in the same
-#    superbuild for GlobalArrays -- so FLAME, i.e. libFLAME, our actual intended LAPACK provider alongside BLIS,
-#    is never reached). This ReferenceLAPACK is independently re-resolved by EVERY CMSB consumer sub-build that
-#    lists LAPACK in its CMSB_DEPENDENCIES (e.g. "<project>_Methods_External", a fresh nested cmake process with
-#    no access to the outer process's already-resolved CMake targets) -- and ExaChem's own consumer resolution
-#    picks up libFLAME too (via BLAS++/LAPACK++, reused from install-cpp-deps.sh, whose own -Dblas=blis vendor
-#    logic always pairs BLIS with libFLAME for LAPACK -- see install-blaspp.sh). Both a static ReferenceLAPACK.a
-#    and a static libFLAME.a end up on the same final executable's link line, and since both are full,
-#    conforming implementations of the same netlib LAPACK Fortran API (libFLAME is built with
-#    --enable-legacy-lapack), every routine collides: "multiple definition of `dsytrd_'" etc. Fix: forward
-#    LAPACK_PREFERENCE_LIST (not previously in any of BuildCMSBModule.cmake's bundling lists) to every consumer
-#    sub-build via bundle_cmake_list()/CORE_CMAKE_LISTS -- NOT bundle_cmake_strings()/CORE_CMAKE_STRINGS, which
-#    embeds each -D<var>:STRING=<value> as one element of an outer CMake list: since our own value itself
-#    contains a semicolon ("FLAME;ReferenceLAPACK"), that collides with the outer list's own element separator
-#    and gets silently split/truncated, so LAPACK_PREFERENCE_LIST never actually reaches the sub-build and
-#    ReferenceLAPACK keeps winning. bundle_cmake_list()'s :LIST= typed cache args are what ExternalProject_Add's
-#    CMAKE_CACHE_ARGS escapes correctly for exactly this multi-value case. So a caller can pin it explicitly
-#    (e.g. -DLAPACK_PREFERENCE_LIST="FLAME;ReferenceLAPACK" for the BLIS+libFLAME stack -- see
-#    install-exachem.sh) and have libFLAME resolved consistently everywhere instead of ReferenceLAPACK winning by
-#    default ordering. Deliberately NOT using -DBLA_VENDOR=<vendor> for this (the codebase's own
-#    emulate_kitware_linalg_modules() helper would honor it, but only if BLA_VENDOR is ALSO forwarded, which it
-#    isn't either) because BLA_VENDOR feeds BOTH BLAS_PREFERENCE_LIST and LAPACK_PREFERENCE_LIST identically --
-#    forcing BLAS_PREFERENCE_LIST to "FLAME" too would risk silently swapping away our fast, already-working BLIS
-#    BLAS resolution for whatever (slower, reference) BLAS routines libFLAME may or may not itself bundle.
-#    LAPACK_PREFERENCE_LIST is scoped to LAPACK alone, leaving BLAS_PREFERENCE_LIST's existing (working) default
-#    untouched. No matching *_PREFIX hint is needed: libFLAME is installed to the same prefix as BLIS
-#    (LINALG_PREFIX, already forwarded), which the Find*.cmake modules fall through to via
-#    CMAKE_C_IMPLICIT_LINK_DIRECTORIES when no explicit *_PREFIX is given -- exactly how BLIS itself is already
-#    found today without any BLIS_PREFIX hint.
-#
-# Note: GlobalArrays (a CMSB dependency of TAMM) is no longer built by CMSB at all -- we build+install our own
-# patched copy ourselves before TAMM/ExaChem's own configure runs (see install-exachem.sh and
-# globalarrays-fix-linalg-preference.patch), and CMSB's cmsb_find_dependency() finds it via a plain
-# find_package(GlobalArrays QUIET) (already CMSB's existing default behavior when CMSB_DEBUG_CMAKE is unset --
-# see cmsb_find_dependency() in cmake/macros/DependencyMacros.cmake) rather than ever falling through to
-# include(BuildGlobalArrays). That sidesteps an identical "LAPACK_PREFERENCE_LIST clobbered to ReferenceLAPACK"
-# bug in GlobalArrays' OWN bundled cmake/ga-linalg.cmake (which fix #5 above does not touch, since it's GA's own
-# nested build, not a CMSB consumer sub-build) without needing to patch CMSB's cmake/build_external/
-# BuildGlobalArrays.cmake at all.
-#
-# Callers wanting BLAS/LAPACK/SPDLOG/EcpInt/NJSON reused (not rebuilt) should pass -DSPDLOG_ROOT=<prefix>
-# -DEcpInt_ROOT=<prefix> -DNJSON_ROOT=<prefix> on BOTH the outer TAMM and outer ExaChem (or any other
-# CMSB_PROJECTS consumer) cmake invocations, alongside the pre-existing -DLibInt2_ROOT/-DGauXC_ROOT pattern (see
-# install-exachem.sh). BLAS/LAPACK reuse itself needs no extra flag beyond LINALG_VENDOR=OpenBLAS/BLIS/IBMESSL --
-# except when LINALG_VENDOR=BLIS, which additionally needs -DLAPACK_PREFERENCE_LIST="FLAME;ReferenceLAPACK" (fix
-# #5) to make LAPACK resolve to libFLAME instead of CMSB's own bundled ReferenceLAPACK for those consumer
-# sub-builds (GlobalArrays' own LAPACK resolution is handled separately -- see the note above).
-# numactl reuse (fix #4) needs no per-consumer flag thanks to the finder fallback, but -DBUILD_numactl=OFF is
-# recommended to turn a failed reuse into a loud error, and -DNUMACTL_ROOT=<prefix> may still be passed to hint
-# the primary search.
-#
-# Applied to a local FetchContent_MakeAvailable(CMakeBuild) source checkout via -DFETCHCONTENT_SOURCE_DIR_CMAKEBUILD
-# (see install-exachem.sh) rather than to a vendored copy in this repo, since CMSB isn't a qdk-chemistry dependency
-# in its own right -- it's fetched at a pinned commit (CMSB_COMMIT in install-exachem.sh; upstream TAMM itself does
-# not pin CMSB, defaulting CMSB_TAG to "main") as part of TAMM/ExaChem's own build.
-# Candidate for upstreaming to NWChemEx-Project/CMakeBuild: these are genuine gaps (not qdk-chemistry-specific
-# behavior), following the exact pattern CMSB already uses for LibInt2/HDF5/HPTT/ELPA/numactl.
+# Applied via -DFETCHCONTENT_SOURCE_DIR_CMAKEBUILD against a pinned CMSB commit (see install-exachem.sh), not
+# vendored in this repo. Candidate for upstreaming: these are genuine CMSB gaps, not qdk-chemistry-specific.
 #
 # Apply: git -C <cmsb-src> apply cmsb-fix-dependency-reuse.patch
 # ----------------------------------------------------------------------------------------------------------------------

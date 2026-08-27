@@ -1,43 +1,22 @@
 #!/usr/bin/env bash
 #
-# install-exachem.sh — build and install ExaChem (+ its TAMM tensor backend) for CI, to run as an external MPI
-# process. Reuses OpenBLAS/BLAS++/LAPACK++/LibInt2/GauXC/spdlog/EcpInt/nlohmann_json/numactl already built into
-# CPP_DEPS_PREFIX by install-cpp-deps.sh (TAMM finds BLAS++/LAPACK++ via its default find_package on
-# CMAKE_PREFIX_PATH; LibInt2/GauXC/spdlog/EcpInt/nlohmann_json via explicit -D*_ROOT below; numactl via a seeded
-# flat copy in INSTALL_PREFIX -- see the seeding step below for why apt's libnuma-dev can't be pointed at
-# directly), and the system MPI (e.g. apt-installed openmpi-bin/libopenmpi-dev on Ubuntu). GPU is not supported
-# here. GlobalArrays (a TAMM/CMSB dependency) is built+installed ourselves too, patched via
-# patches/globalarrays-fix-linalg-preference.patch, rather than left to CMSB's own (unpatched) fetch+build --
-# see the GlobalArrays build step below for why. TAMM's own CMSB superbuild (NWChemEx-Project/CMakeBuild) is
-# patched (see patches/cmsb-fix-dependency-reuse.patch) so it also reuses the system OpenBLAS/LAPACK/spdlog/
-# EcpInt/nlohmann_json/numactl instead of building its own redundant copies.
+# install-exachem.sh — build and install ExaChem (+ its TAMM tensor backend) for CI, run as an external MPI
+# process (not linked into the qdk_chemistry wheel). Reuses BLAS++/LAPACK++/LibInt2/GauXC/spdlog/EcpInt/
+# nlohmann_json/numactl already built by install-cpp-deps.sh instead of letting TAMM's CMSB superbuild rebuild
+# its own copies (see patches/cmsb-fix-dependency-reuse.patch). GlobalArrays is also built here, patched via
+# patches/globalarrays-fix-linalg-preference.patch.
 #
-# TAMM/ExaChem's commits are hardcoded below (TAMM_COMMIT/EXACHEM_COMMIT), not read from
-# cpp/manifest/qdk-chemistry/cgmanifest.json: unlike the deps install-cpp-deps.sh builds, TAMM/ExaChem are never
-# shipped in the qdk-chemistry wheel or linked into its binary -- they're only used as an external MPI
-# subprocess in GHA CI test runs -- so they aren't Component Governance-relevant and don't belong in cgmanifest.
-#
-# All four pins below (TAMM_COMMIT/EXACHEM_COMMIT/CMSB_COMMIT/GA_COMMIT) plus the five patches under patches/ are
-# validated together, as a set, against each other -- not independently: e.g. each ExaChem patch's header states
-# the exact TAMM/ExaChem commit it was verified against, and cmsb-fix-dependency-reuse.patch/
-# globalarrays-fix-linalg-preference.patch are each verified against their own pinned commit only. Bumping any
-# one of these four pins requires re-running this script's full build in CI and re-checking (via the "Applied
-# against commit ..." note in each patch's header) that all five patches still apply -- a mismatched pin/patch
-# combination fails loudly (git apply --verbose under set -euo pipefail aborts the script), not silently, but
-# figuring out *why* still means checking all five patch headers plus this comment.
+# TAMM/ExaChem/CMSB/GlobalArrays commits are pinned below, not in cgmanifest.json: they're CI-only, never
+# shipped in the wheel. The four pins and the five patches under patches/ are validated together as a set --
+# bumping one requires re-running this script and re-checking every patch still applies.
 #
 # Usage: install-exachem.sh
 # Required env vars: CPP_DEPS_PREFIX
 # Optional env vars: INSTALL_PREFIX, BUILD_ROOT, MARCH, JOBS, KEEP_BUILD_DIR, LINALG_VENDOR, LINALG_PREFIX
 #
-#   LINALG_VENDOR  - CMSB's -DLINALG_VENDOR= value (default: OpenBLAS, matching GHA's apt-installed OpenBLAS).
-#                    Pass "BLIS" for the ADO wheel pipeline's BLIS+LibFLAME stack. With LINALG_VENDOR=BLIS, every
-#                    CMSB/TAMM/ExaChem consumer sub-build resolves LAPACK via the shared icl-utk-edu/
-#                    linalg-cmake-modules ecosystem's own bundled Netlib "ReferenceLAPACK" by default (BLIS alone
-#                    provides no LAPACK routines) -- see LAPACK_PREFERENCE_LIST below for why that collides with
-#                    libFLAME and how it's fixed.
-#   LINALG_PREFIX  - CMSB's -DLINALG_PREFIX= value (default: empty, i.e. rely on the system default search path
-#                    for OpenBLAS). Pass the BLIS+LibFLAME install prefix (e.g. /usr/local) when LINALG_VENDOR=BLIS.
+#   LINALG_VENDOR  - CMSB's -DLINALG_VENDOR= value (default: OpenBLAS). Pass "BLIS" for the ADO wheel pipeline.
+#   LINALG_PREFIX  - CMSB's -DLINALG_PREFIX= value (default: empty). Pass the BLIS+LibFLAME prefix when
+#                    LINALG_VENDOR=BLIS.
 #
 set -euo pipefail
 
@@ -60,23 +39,17 @@ JOBS="${JOBS:-$(nproc)}"
 MODULES="${MODULES:-CC}"
 LINALG_VENDOR="${LINALG_VENDOR:-OpenBLAS}"
 LINALG_PREFIX="${LINALG_PREFIX:-}"
-# MPI_PROGRESS_RANK is the only Global Arrays runtime that makes progress on a plain shm/TCP transport (no RDMA
-# NIC on these runners); it requires >= 2 MPI ranks (1 data-server rank + >= 1 compute rank).
+# MPI_PROGRESS_RANK works without an RDMA NIC on these runners; requires >= 2 MPI ranks.
 GA_RUNTIME="${GA_RUNTIME:-MPI_PROGRESS_RANK}"
 
-# TAMM/ExaChem are pinned to specific commits rather than tagged releases: newer upstream main requires GCC >= 14.1
-# for C++20 features GCC 13 miscompiles at -O2/-O3, and GitHub's Ubuntu runners default to GCC 13.
+# Pinned to specific commits, not tags: newer TAMM/ExaChem require GCC >= 14.1 (our runners default to GCC 13).
 TAMM_REPO="https://github.com/NWChemEx/TAMM.git"
 TAMM_COMMIT="63c274e37c102a316e844f954bb2387988b0256c"
 EXACHEM_REPO="https://github.com/ExaChem/exachem.git"
 EXACHEM_COMMIT="45c192e840fd1e0417871d926e9ab87748111e53"
 
-# CMSB (NWChemEx-Project/CMakeBuild, TAMM/ExaChem's superbuild helper) is pinned too, for the same reproducibility
-# reason as TAMM/ExaChem above: upstream TAMM's own CMakeLists.txt does not pin it either (it defaults CMSB_TAG to
-# "main" if unset), so without a pin here we'd be building against whatever CMSB main happens to be on the day CI
-# runs -- and our cmsb-fix-dependency-reuse.patch (below) could silently stop applying if those exact files change
-# upstream. Pinned to CMSB main's HEAD as of the CI run that validated this patch end-to-end (see
-# patches/cmsb-fix-dependency-reuse.patch for the patch itself).
+# CMSB (TAMM/ExaChem's superbuild helper) is pinned too: upstream TAMM doesn't pin it, and
+# cmsb-fix-dependency-reuse.patch needs a fixed target to stay valid against.
 CMSB_REPO="https://github.com/NWChemEx-Project/CMakeBuild.git"
 CMSB_COMMIT="f5be7e2472e8ebb9bc51163d424da7c25716ce9a"
 
@@ -88,18 +61,13 @@ echo "==> INSTALL_PREFIX=${INSTALL_PREFIX}"
 rm -rf "${BUILD_ROOT}"
 mkdir -p "${BUILD_ROOT}" "${INSTALL_PREFIX}"
 
-# BLAS++/LAPACK++ are found via TAMM's default find_package search (no NO_DEFAULT_PATH), so putting
-# CPP_DEPS_PREFIX on CMAKE_PREFIX_PATH is enough for them -- unlike LibInt2/GauXC below, which need explicit
-# -D*_ROOT flags. INSTALL_PREFIX is added too so the seeded Eigen3 below (and anything CMSB itself installs) is
-# found consistently by both the outer TAMM configure and its nested TAMM_External re-configure.
+# CPP_DEPS_PREFIX finds BLAS++/LAPACK++ via plain find_package; INSTALL_PREFIX is added for the seeded Eigen3
+# below and CMSB's own installs.
 export CMAKE_PREFIX_PATH="${CPP_DEPS_PREFIX}:${INSTALL_PREFIX}:${CMAKE_PREFIX_PATH:-}"
 
-# TAMM's CMSB superbuild always tries find_package(Eigen3 CONFIG) first and only falls back to git-cloning its own
-# copy (from gitlab.com, unreachable from these CI runners) if that fails. Rather than relying on CMake flags --
-# which CMSB's nested TAMM_External re-configure does not forward -- seed INSTALL_PREFIX with a copy of the
-# apt-installed libeigen3-dev, mirroring the same relative layout (share/eigen3/cmake + include/eigen3) that CMSB
-# would have produced had it built Eigen3 itself. INSTALL_PREFIX is on CMAKE_PREFIX_PATH for every CMSB configure
-# pass (outer and nested alike), so this is found everywhere without further flags.
+# CMSB falls back to cloning Eigen3 from gitlab.com (unreachable in CI) if find_package fails. Seed
+# INSTALL_PREFIX with apt's libeigen3-dev instead, in the layout CMSB itself would produce, so it's found
+# everywhere without extra flags.
 EIGEN3_CONFIG="$(find /usr -maxdepth 6 -name 'Eigen3Config.cmake' -print -quit 2>/dev/null || true)"
 if [ -z "${EIGEN3_CONFIG}" ]; then
   echo "ERROR: Eigen3Config.cmake not found under /usr (expected from apt's libeigen3-dev)." >&2
@@ -108,25 +76,15 @@ fi
 EIGEN3_CMAKE_DIR="$(dirname "${EIGEN3_CONFIG}")"                     # e.g. /usr/share/eigen3/cmake
 EIGEN3_SHARE_DIR="$(dirname "${EIGEN3_CMAKE_DIR}")"                  # e.g. /usr/share/eigen3
 EIGEN3_PREFIX="$(dirname "$(dirname "${EIGEN3_SHARE_DIR}")")"        # e.g. /usr
-# rm -rf the destinations first: cp -r into an already-existing directory (e.g. a stale INSTALL_PREFIX left over
-# from a previous run against the same prefix) copies INTO it as a subdirectory instead of refreshing it, which
-# would silently leave a stale Eigen3Config.cmake in place at the path CMake actually resolves.
+# rm -rf first: cp -r into an already-existing directory would nest instead of refreshing it.
 rm -rf "${INSTALL_PREFIX}/share/eigen3/cmake" "${INSTALL_PREFIX}/include/eigen3"
 mkdir -p "${INSTALL_PREFIX}/share/eigen3" "${INSTALL_PREFIX}/include"
 cp -r "${EIGEN3_CMAKE_DIR}" "${INSTALL_PREFIX}/share/eigen3/cmake"
 cp -r "${EIGEN3_PREFIX}/include/eigen3" "${INSTALL_PREFIX}/include/eigen3"
 echo "==> Seeded Eigen3 from ${EIGEN3_PREFIX} into ${INSTALL_PREFIX}"
 
-# TAMM's CMSB Findnumactl.cmake module (cmake/find_external/Findnumactl.cmake) hardcodes NO_DEFAULT_PATH on both
-# its find_path/find_library calls and only searches CMAKE_INSTALL_PREFIX -- so apt's libnuma-dev (system-wide,
-# under /usr) is invisible to it too, exactly like Eigen3 above. Seed numa.h + libnuma.so into INSTALL_PREFIX
-# (NOTE: pointing -DNUMACTL_ROOT at /usr directly instead, as qaml's container pipeline does, would NOT reliably
-# work here -- Ubuntu's libnuma-dev installs libnuma.so under the multiarch triplet dir /usr/lib/x86_64-linux-gnu/,
-# which Findnumactl.cmake's hardcoded PATH_SUFFIXES lib/lib32/lib64 never match on the *primary*, NO_DEFAULT_PATH
-# search; seeding a flat copy at a path those suffixes DO match sidesteps that. patches/cmsb-fix-dependency-reuse.patch
-# also gives Findnumactl.cmake a default-path *fallback* search -- which, being a plain default find_library with
-# no explicit PATHS, IS multiarch-aware and would likely find the OS copy on its own -- but the seeding here is kept
-# as the primary, more surgical mechanism rather than relying on that broader fallback finding the right copy).
+# CMSB's Findnumactl.cmake only searches CMAKE_INSTALL_PREFIX, so apt's libnuma-dev is invisible to it. Seed
+# numa.h + libnuma.so into INSTALL_PREFIX instead (cmsb-fix-dependency-reuse.patch adds a complementary fallback).
 NUMA_HEADER="$(find /usr -maxdepth 6 -name 'numa.h' -print -quit 2>/dev/null || true)"
 NUMA_LIB="$(find /usr -maxdepth 6 -name 'libnuma.so' -print -quit 2>/dev/null || true)"
 if [ -z "${NUMA_HEADER}" ] || [ -z "${NUMA_LIB}" ]; then
@@ -140,24 +98,11 @@ cp -L "${NUMA_LIB}" "${INSTALL_PREFIX}/lib/libnuma.so"
 echo "==> Seeded numactl (numa.h + libnuma.so) into ${INSTALL_PREFIX}"
 
 # --------------------------------------------------------------------------------------------------------------------
-# Build + install GlobalArrays (patched) ourselves, before TAMM's own configure runs, instead of letting CMSB fetch
-# and build its own copy: CMSB's cmsb_find_dependency() already tries a plain find_package(GlobalArrays QUIET)
-# before ever falling back to include(BuildGlobalArrays) (see cmake/macros/DependencyMacros.cmake -- this is its
-# existing default behavior whenever CMSB_DEBUG_CMAKE is unset, which we never set), so installing GA into
-# INSTALL_PREFIX (already on CMAKE_PREFIX_PATH below) makes CMSB detect and reuse this build directly, without
-# ever cloning/configuring/building its own. -DBUILD_GlobalArrays=OFF (in COMMON_CMAKE_ARGS below) turns a failed
-# detection into a loud configure-time error instead of a silent, redundant rebuild -- matching the same
-# fail-loud convention already used for LibInt2/GauXC/SPDLOG/EcpInt/NJSON/numactl.
-#
-# Patched via patches/globalarrays-fix-linalg-preference.patch (a real git-apply patch, not a live PATCH_COMMAND
-# string-replace step against a fresh CMSB-driven clone): GA's own bundled cmake/ga-linalg.cmake unconditionally
-# overwrites LAPACK_PREFERENCE_LIST for LINALG_VENDOR=BLIS/OpenBLAS/IBMESSL (see the patch file for the full
-# writeup), which -- left unpatched -- would make GA's own LAPACK resolve to its bundled Netlib ReferenceLAPACK
-# instead of libFLAME, reintroducing the "multiple definition of `dsytrd_'" conflict fix #5 in
-# cmsb-fix-dependency-reuse.patch already solves for every OTHER CMSB consumer sub-build. Building GA ourselves
-# (rather than patching CMSB to patch GA mid-ExternalProject-build) also lets GA's own LAPACK_PREFERENCE_LIST
-# choice bake permanently into its installed globalarrays-config.cmake (a plain @-substitution at GA's own build
-# time), so nothing downstream needs to re-forward it when GlobalArrays::ga is re-imported later.
+# Build + install GlobalArrays ourselves, before TAMM's configure runs: CMSB's find_package(GlobalArrays QUIET)
+# then detects and reuses this build instead of fetching/building its own (BUILD_GlobalArrays=OFF below fails
+# loudly if detection fails). Patched via patches/globalarrays-fix-linalg-preference.patch to resolve LAPACK to
+# libFLAME instead of GA's bundled ReferenceLAPACK -- see that patch for details.
+# --------------------------------------------------------------------------------------------------------------------
 GA_REPO="https://github.com/GlobalArrays/ga.git"
 GA_COMMIT="635d6b341faf928cb5a0cddc38b1a0cbbc2b5bc4"
 
@@ -178,19 +123,13 @@ GA_CMAKE_ARGS=(
   -DGA_RUNTIME="${GA_RUNTIME}"
   -DENABLE_SYSV=OFF
   -DENABLE_PROFILING=OFF
-  # GA's own cmake/ga-linalg.cmake (check_ga_blas_options()) hard-errors ("ENABLE_BLAS=ON but the options to
-  # specify the root of the LinAlg libraries installation are not set") whenever ENABLE_BLAS=ON and
-  # LINALG_PREFIX is unset OR does not point at an existing directory -- regardless of whether the actual
-  # library search then succeeds via other means. For GHA's OpenBLAS, LINALG_PREFIX itself is intentionally
-  # left empty (apt's OpenBLAS resolves via CMake's own default system search paths, not an explicit hint), so
-  # fall back to INSTALL_PREFIX (already created above, always an existing directory) purely to satisfy this
-  # existence check -- CMSB's own BuildGlobalArrays.cmake did exactly this too (always pointing LINALG_PREFIX at
-  # its own CMAKE_INSTALL_PREFIX for BLIS/OpenBLAS, never the real BLAS location) when it used to build GA.
+  # GA requires LINALG_PREFIX to point at an existing directory whenever ENABLE_BLAS=ON, even when the real
+  # BLAS is found via other means (e.g. GHA's OpenBLAS, where LINALG_PREFIX is otherwise left empty). Fall back
+  # to INSTALL_PREFIX purely to satisfy that check.
   -DLINALG_PREFIX="${LINALG_PREFIX:-${INSTALL_PREFIX}}"
 )
 if [ "${LINALG_VENDOR}" = "BLIS" ]; then
-  # Same reasoning as COMMON_CMAKE_ARGS's own LAPACK_PREFERENCE_LIST below: BLIS has no LAPACK routines, so
-  # without this GA's own LAPACK resolves to its bundled ReferenceLAPACK instead of libFLAME.
+  # BLIS has no LAPACK routines; prefer libFLAME over GA's bundled ReferenceLAPACK.
   GA_CMAKE_ARGS+=(-DLAPACK_PREFERENCE_LIST="FLAME;ReferenceLAPACK")
 fi
 
@@ -202,9 +141,7 @@ cmake --install "${BUILD_ROOT}/ga/build"
 echo "==> GlobalArrays installed to ${INSTALL_PREFIX}"
 
 # --------------------------------------------------------------------------------------------------------------------
-# Serial HDF5 discovery. Ubuntu's `libhdf5-dev` (already installed by the workflow for qdk-chemistry itself) puts
-# headers under a "serial" subdirectory and installs a pkg-config file on most releases; fall back to the
-# well-known Debian/Ubuntu multiarch layout when pkg-config can't find it.
+# Serial HDF5 discovery: prefer pkg-config, fall back to the standard Debian/Ubuntu multiarch layout.
 # --------------------------------------------------------------------------------------------------------------------
 if pkg-config --exists hdf5-serial 2>/dev/null; then
   HDF5_CFLAGS="$(pkg-config --cflags hdf5-serial)"
@@ -221,17 +158,9 @@ else
 fi
 echo "==> HDF5: cflags='${HDF5_CFLAGS}' libs='${HDF5_LIBS}'"
 
-# Flags shared by both the TAMM and ExaChem configure lines below. USE_HDF5=OFF disables TAMM's parallel-HDF5 layer
-# (the base HDF5 here, like qdk-chemistry's own, is serial-only); USE_SERIAL_IO selects ExaChem's serial-I/O SCF
-# path instead. These MUST be identical on both configure lines, or ExaChem's CMSB reconfigures/rebuilds TAMM.
-#
-# Without patches/cmsb-fix-dependency-reuse.patch, TAMM's CMSB would rebuild its own copies of system BLAS/LAPACK/
-# spdlog/EcpInt/nlohmann_json instead of reusing them -- see that file for the full per-dependency root-cause
-# writeup and candidate upstream fix.
-#
-# NJSON_ROOT specifically must point at a nlohmann_json >= 3.12.0 (built by install-cpp-deps.sh, matching
-# cgmanifest.json's pin): ExaChem's own source reaches into nlohmann's private detail:: namespace
-# (string_input_adapter_type), only present from 3.12.0 onward, which apt's nlohmann-json3-dev (3.11.3) predates.
+# Flags shared by TAMM and ExaChem's configure below -- must be identical on both, or ExaChem's CMSB
+# reconfigures/rebuilds TAMM. NJSON_ROOT must be >= 3.12.0 (ExaChem uses a private nlohmann_json API only
+# present from that version on).
 CMSB_SRC_DIR="${BUILD_ROOT}/CMakeBuild-patched"
 mkdir -p "${CMSB_SRC_DIR}"
 git -C "${CMSB_SRC_DIR}" init -q
@@ -254,15 +183,8 @@ COMMON_CMAKE_ARGS=(
   -DNJSON_ROOT="${CPP_DEPS_PREFIX}"
   -DNUMACTL_ROOT="${INSTALL_PREFIX}"
   -DFETCHCONTENT_SOURCE_DIR_CMAKEBUILD="${CMSB_SRC_DIR}"
-  # Enforce reuse instead of leaving it best-effort: CMSB's find_or_build_dependency() only hard-errors
-  # ("Could not locate <dep> and user has requested we do not build one") when BUILD_<dep> is explicitly set to
-  # OFF; if left unset, a failed find silently falls through to include(Build<dep>) and rebuilds from source
-  # (cmake/macros/DependencyMacros.cmake). Passing -DBUILD_<dep>=OFF for all seven reused deps -- not just
-  # LibInt2/GauXC as before -- makes a broken *_ROOT/reuse patch fail loudly at configure time instead of
-  # silently degrading into a redundant rebuild that's only visible by eyeballing the configure log.
-  # BUILD_GlobalArrays=OFF here relies on GA already being installed into INSTALL_PREFIX above (which
-  # cmsb_find_dependency() detects via a plain find_package(GlobalArrays QUIET)) -- if that detection ever
-  # fails, this turns it into a loud configure error instead of CMSB silently cloning+building an unpatched GA.
+  # -DBUILD_<dep>=OFF makes a failed reuse fail loudly at configure time instead of silently rebuilding from
+  # source.
   -DBUILD_LibInt2=OFF
   -DBUILD_GauXC=OFF
   -DBUILD_SPDLOG=OFF
@@ -272,34 +194,24 @@ COMMON_CMAKE_ARGS=(
   -DBUILD_GlobalArrays=OFF
 )
 
-# LINALG_PREFIX/LAPACK_PREFERENCE_LIST are appended conditionally rather than baked into the array literal above,
-# since they only apply for a non-default LINALG_VENDOR (e.g. the ADO wheel pipeline's BLIS+LibFLAME stack; GHA's
-# default OpenBLAS needs neither -- apt's OpenBLAS is a single combined library providing both BLAS and LAPACK,
-# so CMSB's own stock find_package(BLAS/LAPACK) fallback (patches/cmsb-fix-dependency-reuse.patch fix #1) finds
-# it directly, without any vendor/preference hint).
+# LINALG_PREFIX/LAPACK_PREFERENCE_LIST only apply for a non-default vendor (e.g. ADO's BLIS+LibFLAME); GHA's
+# OpenBLAS needs neither.
 if [ -n "${LINALG_PREFIX}" ]; then
   COMMON_CMAKE_ARGS+=(-DLINALG_PREFIX="${LINALG_PREFIX}")
 fi
 if [ "${LINALG_VENDOR}" = "BLIS" ]; then
-  # BLIS has no LAPACK routines, so every CMSB consumer sub-build falls back to CMSB's own bundled Netlib
-  # ReferenceLAPACK -- which wins over libFLAME (our actual LAPACK provider alongside BLIS) by default list
-  # order, and both end up statically linked into the same executable ("multiple definition of `dsytrd_'" etc).
-  # Prefer FLAME explicitly instead; see patches/cmsb-fix-dependency-reuse.patch fix #5 for the full mechanism.
-  # Not using -DBLA_VENDOR=FLAME here: it feeds BLAS_PREFERENCE_LIST too, which would risk swapping away our
-  # already-working BLIS BLAS resolution. No *_PREFIX hint needed: libFLAME shares BLIS's prefix (LINALG_PREFIX).
+  # BLIS has no LAPACK routines; without this, CMSB's bundled ReferenceLAPACK wins over libFLAME and both end
+  # up statically linked (symbol collisions). See cmsb-fix-dependency-reuse.patch fix #5.
   COMMON_CMAKE_ARGS+=(-DLAPACK_PREFERENCE_LIST="FLAME;ReferenceLAPACK")
 fi
 
 # --------------------------------------------------------------------------------------------------------------------
-# Step 1: build TAMM (CMSB superbuild: HPTT, Librett, EcpInt, doctest, ... + TAMM itself; GlobalArrays/Eigen3 are
-# reused from what we built/seeded above, not built here -- see the steps above and COMMON_CMAKE_ARGS's BUILD_*=OFF
-# flags).
+# Step 1: build TAMM (CMSB superbuild). GlobalArrays/Eigen3 are reused, not built here.
 # --------------------------------------------------------------------------------------------------------------------
 echo "=== Building TAMM (${TAMM_COMMIT}) ==="
 git clone "${TAMM_REPO}" "${BUILD_ROOT}/TAMM"
 git -C "${BUILD_ROOT}/TAMM" checkout "${TAMM_COMMIT}"
-# Use the default Unix Makefiles generator, not Ninja: CMSB's CMakeBuild_External sub-build invokes
-# "<generator-tool> install DESTDIR=<stage>", which ninja rejects as an unknown target.
+# Default Unix Makefiles generator, not Ninja: CMSB's nested sub-build needs "make install DESTDIR=...".
 CC=gcc CXX=g++ FC=gfortran cmake -S "${BUILD_ROOT}/TAMM" -B "${BUILD_ROOT}/TAMM/build" \
   -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" \
   "${COMMON_CMAKE_ARGS[@]}" \
@@ -308,9 +220,7 @@ CC=gcc CXX=g++ FC=gfortran cmake -S "${BUILD_ROOT}/TAMM" -B "${BUILD_ROOT}/TAMM/
 cmake --build "${BUILD_ROOT}/TAMM/build" -j "${JOBS}"
 cmake --install "${BUILD_ROOT}/TAMM/build"
 
-# CMSB's generated tamm-config.cmake bakes in LibInt2_ROOT (CMSBTargetConfig.cmake.in) but not GauXC_ROOT, so
-# downstream consumers (ExaChem's outer configure and its nested EXACHEM_External sub-project) can't re-import
-# gauxc::gauxc from the reused install without this. Patch it in if not already present.
+# tamm-config.cmake bakes in LibInt2_ROOT but not GauXC_ROOT; patch it in so ExaChem can re-import gauxc::gauxc.
 TAMM_CFG="${INSTALL_PREFIX}/share/cmake/tamm/tamm-config.cmake"
 if [ -f "${TAMM_CFG}" ] && ! grep -q 'set(GauXC_ROOT' "${TAMM_CFG}"; then
   sed -i "/^set(LibInt2_ROOT/a set(GauXC_ROOT ${CPP_DEPS_PREFIX})" "${TAMM_CFG}"
@@ -318,8 +228,7 @@ if [ -f "${TAMM_CFG}" ] && ! grep -q 'set(GauXC_ROOT' "${TAMM_CFG}"; then
 fi
 
 # --------------------------------------------------------------------------------------------------------------------
-# Step 2: build ExaChem, patched to compile against the reused (MPI-off) GauXC and (2.9.0) LibInt2. Same configure
-# shape + same install prefix as TAMM (ExaChem find_package()s the TAMM just installed).
+# Step 2: build ExaChem against the just-installed TAMM, patched for the reused (MPI-off) GauXC and LibInt2.
 # --------------------------------------------------------------------------------------------------------------------
 echo "=== Building ExaChem (${EXACHEM_COMMIT}) ==="
 git clone "${EXACHEM_REPO}" "${BUILD_ROOT}/exachem"
@@ -348,10 +257,8 @@ if [ -n "${missing}" ]; then
   exit 1
 fi
 
-# Minimal end-to-end run: a 6-site Hubbard SCF+CCSD input (ExaChem's own CI uses the same file, from the source
-# tree already cloned above at ${BUILD_ROOT}/exachem) -- small enough to run in seconds, but exercises the real
-# GA/TAMM/CCSD path, not just linking. GA_RUNTIME=MPI_PROGRESS_RANK (the default above) needs >= 2 MPI ranks.
-# OMPI_ALLOW_RUN_AS_ROOT*: this script may run inside a root Docker container (e.g. the ADO pipeline).
+# Minimal end-to-end run (ExaChem's own CI input): exercises the real GA/TAMM/CCSD path, not just linking.
+# OMPI_ALLOW_RUN_AS_ROOT*: this may run inside a root Docker container.
 SMOKE_TEST_INPUT="${BUILD_ROOT}/exachem/inputs/ci/hub_1d_6s.json"
 SMOKE_TEST_DIR="$(mktemp -d)"
 trap 'rm -rf "${SMOKE_TEST_DIR}"' EXIT

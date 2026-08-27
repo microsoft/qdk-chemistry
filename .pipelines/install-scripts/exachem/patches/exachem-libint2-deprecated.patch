@@ -1,28 +1,15 @@
 # exachem-libint2-deprecated.patch
 # ----------------------------------------------------------------------------------------------------------------------
-# Make ExaChem compile against LibInt2 2.9.0 (the version qdk-chemistry itself pins), whose <libint2/basis.h>
-# decorates a few BasisSet factory methods with an unprefixed `DEPRECATED` macro (from libint2/util/deprecated.h).
+# Make ExaChem compile against LibInt2 2.9.0 (the version qdk-chemistry pins). A TAMM-transitive header defines
+# its own function-like `DEPRECATED(msg)` macro, which shadows libint2/basis.h's object-like `DEPRECATED` use --
+# leaving it as a bare identifier and breaking compilation for any TU that includes tamm.hpp before
+# libint2_includes.hpp.
 #
-# Root cause (ExaChem 45c192e + LibInt2 2.9.0):
-#   ExaChem TUs that include "tamm/tamm.hpp" before exachem/common/libint2_includes.hpp
-#   (e.g. common/options/parse_options.cpp) pull in a TAMM-transitive header
-#   (Global Arrays is the likely source) that defines its own function-like
-#   `DEPRECATED(msg)` macro. A function-like macro is not expanded unless
-#   followed by "(", so basis.h's `DEPRECATED static size_t nbf(...)` leaves
-#   DEPRECATED as a bare identifier -> error: 'DEPRECATED' does not name a
-#   type (basis.h:623/627/631). TUs that reach the header without tamm.hpp
-#   first (e.g. common/ecatom.cpp) compile fine. This is the same class of
-#   clash ExaChem already guards for ROCm in libint2_includes.hpp.
-#   -> Wrap ExaChem's three libint2 includes with push_macro / #undef / #define
-#      DEPRECATED [[deprecated]] / ...includes... / pop_macro. A naive
-#      `#ifndef DEPRECATED` is INSUFFICIENT (the foreign macro *is* defined).
+# Fix: push_macro/#undef/#define DEPRECATED [[deprecated]] around ExaChem's libint2 includes, then pop_macro to
+# restore the foreign macro. Semantically null: DEPRECATED only decorates overloads ExaChem never calls.
 #
-# Semantically null: DEPRECATED only decorates deprecated overloads ExaChem never calls; forcing it changes no behaviour
-# or ABI.
-#
-# Version note: this is a 2.9.0-only artifact. Upstream libint2 renamed the macro DEPRECATED -> LIBINT2_DEPRECATED at
-# v2.10.1 ("avoid clashing with previous definitions"); >=2.10.1 is immune. CMSB pins 2.11.2. Long-term fix: bump
-# qdk-chemistry's libint2 to 2.11.2, then this patch can be dropped.
+# Version note: this is a 2.9.0-only artifact. Upstream libint2 renamed the macro at v2.10.1, avoiding the clash
+# entirely -- drop this patch once qdk-chemistry bumps past that version.
 #
 # Apply: git -C <exachem-src> apply exachem-libint2-deprecated.patch
 # ----------------------------------------------------------------------------------------------------------------------
