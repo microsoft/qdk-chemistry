@@ -13,6 +13,7 @@ be recovered across sessions.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import pathlib
 import tempfile
@@ -24,6 +25,8 @@ if TYPE_CHECKING:
     from qdk_chemistry.remote.backends.base import JobStatus, RemoteBackend
 
 __all__ = ["Job"]
+
+logger = logging.getLogger(__name__)
 
 _JOB_FILE_VERSION = 2
 
@@ -333,7 +336,11 @@ class Job:
                 self.output_hashes = collect_content_hashes(result)
                 self.output_is_tuple = isinstance(result, tuple)
             except Exception:  # noqa: BLE001
-                pass
+                logger.warning(
+                    "Failed to collect output hashes for job %s; result will not be cached",
+                    self.job_id,
+                    exc_info=True,
+                )
             if self.file_path is not None:
                 self.save()
             if cleanup:

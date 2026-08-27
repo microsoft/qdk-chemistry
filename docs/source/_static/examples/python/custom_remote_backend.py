@@ -275,6 +275,7 @@ class SSHBackend(RemoteBackend):
         # Job persists this opaque state in JSON and passes it back to check,
         # cancel, and fetch, so every value must be JSON-serializable.
         backend_state = {
+            "job_id": job_id,
             "remote_job_dir": remote_job_dir,
             "remote_output_dir": remote_output_dir,
         }
@@ -297,13 +298,17 @@ class SSHBackend(RemoteBackend):
         pid_result = self._run_remote(f"cat {pid_path}", timeout=10)
         if pid_result.returncode != 0:
             return JobStatus(
-                job_id="", status=JobState.FAILED, error="Could not read PID file"
+                job_id=backend_state["job_id"],
+                status=JobState.FAILED,
+                error="Could not read PID file",
             )
 
         pid = _parse_remote_pid(pid_result.stdout)
         if pid is None:
             return JobStatus(
-                job_id="", status=JobState.FAILED, error="Invalid PID file"
+                job_id=backend_state["job_id"],
+                status=JobState.FAILED,
+                error="Invalid PID file",
             )
 
         # ``kill -0`` is this transport's process-liveness probe. A scheduler
@@ -330,7 +335,7 @@ class SSHBackend(RemoteBackend):
         logs = logs_result.stdout if logs_result.returncode == 0 else ""
 
         return JobStatus(
-            job_id="",
+            job_id=backend_state["job_id"],
             status=status,
             logs=logs,
             metadata={"pid": pid, "remote_job_dir": remote_job_dir},

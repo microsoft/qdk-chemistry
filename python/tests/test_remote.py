@@ -510,10 +510,11 @@ def test_worker_logs_remote_cache_load_failure(tmp_path, monkeypatch, caplog):
     monkeypatch.setattr(remote_cache_module, "get_cache", MagicMock(side_effect=RuntimeError("cache unavailable")))
 
     with caplog.at_level(logging.WARNING, logger=remote_worker.__name__):
-        cache, run_hash = remote_worker._load_remote_cache(input_dir)
+        cache, run_hash, force_rerun = remote_worker._load_remote_cache(input_dir)
 
     assert cache is None
     assert run_hash == "testhash"
+    assert force_rerun is False
     record = next(record for record in caplog.records if record.name == remote_worker.__name__)
     assert record.levelno == logging.WARNING
     assert record.exc_info is not None
@@ -530,10 +531,11 @@ def test_worker_validates_manifest_before_loading_remote_cache(tmp_path, monkeyp
     monkeypatch.setattr(remote_cache_module, "get_cache", get_cache)
 
     with caplog.at_level(logging.WARNING, logger=remote_worker.__name__):
-        cache, run_hash = remote_worker._load_remote_cache(input_dir)
+        cache, run_hash, force_rerun = remote_worker._load_remote_cache(input_dir)
 
     assert cache is None
     assert run_hash is None
+    assert force_rerun is False
     get_cache.assert_not_called()
     record = next(record for record in caplog.records if record.name == remote_worker.__name__)
     assert "Unsupported manifest version 2; expected 1" in record.exc_text
@@ -551,6 +553,28 @@ def test_worker_logs_cache_read_failure(caplog):
     assert record.levelno == logging.WARNING
     assert record.exc_info is not None
     assert "Failed to read cached result for run testhash" in record.message
+
+
+def test_worker_cache_hit_skips_input_deserialization(tmp_path, monkeypatch):
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    serialize_inputs(
+        input_dir,
+        args=(),
+        kwargs={},
+        algorithm_type="test_algorithm",
+        algorithm_name="plugin",
+        settings={},
+        run_hash="testhash",
+    )
+    monkeypatch.setattr(remote_worker, "_load_remote_cache", MagicMock(return_value=(MagicMock(), "testhash", False)))
+    monkeypatch.setattr(remote_worker, "_get_cached_result", MagicMock(return_value=6))
+    deserialize = MagicMock()
+    monkeypatch.setattr(serialization_module, "deserialize_inputs", deserialize)
+
+    assert execute_job(input_dir, output_dir) == 6
+    deserialize.assert_not_called()
+    assert deserialize_outputs(output_dir) == 6
 
 
 @pytest.mark.parametrize(
@@ -1426,7 +1450,7 @@ class TestRunWithCache:
         backend.submit.assert_called_once()
         assert backend.check.call_count == 2
         backend.fetch.assert_called_once_with({}, local_dir=None)
-        backend.cleanup_job.assert_called_once_with({})
+        backend.cleanup_job.assert_not_called()
         backend.connect.assert_called_once_with()
         backend.disconnect.assert_called_once_with()
 
@@ -1449,7 +1473,7 @@ class TestRunWithCache:
 
         backend.submit.assert_called_once()
         job.fetch.assert_called_once_with()
-        job.cleanup.assert_called_once_with()
+        job.cleanup.assert_not_called()
         backend.disconnect.assert_not_called()
 
     def test_injected_unregistered_backend_runs_to_completion(self):
@@ -1487,6 +1511,38 @@ class TestRunWithCache:
 
         assert run(self._mock_algorithm(), remote=UnregisteredBackend()) == -75.5
 
+    def test_injected_backend_without_cleanup_runs_to_completion(self):
+        class UnregisteredBackend(RemoteBackend):
+            name = "unregistered"
+
+            def __init__(self):
+                super().__init__(poll_interval=0, timeout=1)
+                self.statuses = iter(["running", "succeeded"])
+
+            def connect(self):
+                pass
+
+            def disconnect(self):
+                pass
+
+            def upload(self, local_path, remote_path):
+                pass
+
+            def download(self, remote_path, local_path):
+                pass
+
+            def _submit(self, _payload):
+                return "remote-job", {}
+
+            def check(self, _backend_state):
+                return JobStatus(job_id="remote-job", status=next(self.statuses))
+
+            def fetch(self, _backend_state, local_dir=None):
+                del local_dir
+                return -75.5
+
+        assert run(self._mock_algorithm(), remote=UnregisteredBackend()) == -75.5
+
     def test_submit_returns_job_for_injected_backend(self):
         algo = self._mock_algorithm()
         backend = MagicMock()
@@ -1509,12 +1565,7 @@ class TestRunWithCache:
         )
         job.fetch = MagicMock(return_value=-75.5)
 
-        def verify_result_was_stored():
-            cached_job = cache.get_job("testhash1234abcd")
-            assert cached_job is not None
-            assert cached_job.output_hashes is not None
-
-        job.cleanup = MagicMock(side_effect=verify_result_was_stored)
+        job.cleanup = MagicMock()
         backend.submit.return_value = job
         get_backend = MagicMock(return_value=backend)
         monkeypatch.setattr(remote_backends, "get_backend", get_backend)
@@ -1524,7 +1575,7 @@ class TestRunWithCache:
         get_backend.assert_called_once_with("test")
         backend.connect.assert_called_once_with()
         backend.disconnect.assert_called_once_with()
-        job.cleanup.assert_called_once_with()
+        job.cleanup.assert_not_called()
         payload = backend.submit.call_args.args[0]
         assert "remote_cache" not in payload
         assert "remote_cache_backend" not in payload
@@ -1589,7 +1640,7 @@ class TestRunWithCache:
 
         backend.submit.assert_not_called()
         sleep.assert_not_called()
-        cleanup.assert_called_once_with()
+        cleanup.assert_not_called()
 
     def test_cached_success_without_outputs_retries_fetch(self, tmp_path, monkeypatch):
         """A persisted success is fetched again instead of being resubmitted."""
@@ -1613,7 +1664,7 @@ class TestRunWithCache:
         assert run(algo, "arg1", cache=cache, remote=backend) == -75.5
 
         fetch.assert_called_once_with()
-        cleanup.assert_called_once_with()
+        cleanup.assert_not_called()
         backend.submit.assert_not_called()
 
     def test_remote_uses_shared_tier_from_cache(self, tmp_path):
@@ -1642,7 +1693,7 @@ class TestRunWithCache:
             "is_shared": True,
         }
         assert payload["remote_cache_backend"] is shared_cache
-        job.cleanup.assert_called_once_with()
+        job.cleanup.assert_not_called()
 
     @pytest.mark.parametrize(
         "result",
@@ -1687,7 +1738,7 @@ class TestRunWithCache:
 
         assert run(algo, cache=cache, remote=backend) == result
         submitted_job.fetch.assert_not_called()
-        submitted_job.cleanup.assert_called_once_with()
+        submitted_job.cleanup.assert_not_called()
 
     def test_run_stores_in_cache(self, tmp_path):
         cache = FolderCache(path=tmp_path / "cache")
@@ -1758,7 +1809,7 @@ class TestRunWithCache:
         assert run(algo, "arg1", cache=cache, remote=backend, force_rerun=True) == -75.5
 
         assert backend.submit.call_args.args[0]["force_rerun"] is True
-        job.cleanup.assert_called_once_with()
+        job.cleanup.assert_not_called()
 
     def test_remote_submission_callback_runs_after_handle_is_persisted(self, tmp_path):
         cache = FolderCache(path=tmp_path / "cache")
@@ -1790,7 +1841,7 @@ class TestRunWithCache:
         assert result == -75.5
         assert persisted_jobs[0] is not None
         assert persisted_jobs[0].job_id == "remote-job"
-        job.cleanup.assert_called_once_with()
+        job.cleanup.assert_not_called()
 
     def test_string_cache_path(self, tmp_path):
         algo = self._mock_algorithm(result=42)

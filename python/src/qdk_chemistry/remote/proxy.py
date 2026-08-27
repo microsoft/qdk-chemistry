@@ -176,9 +176,7 @@ def _run_uncached(algorithm: Any, remote: Any, args: tuple, kwargs: dict) -> Any
                 f"Remote job {job.job_id} ended with status: {final_status.status}\n"
                 f"Error: {final_status.error or 'unknown'}\nLogs:\n{final_status.logs}"
             )
-        result = job.fetch()
-        job.cleanup()
-        return result
+        return job.fetch()
     finally:
         if owns_backend:
             backend.disconnect()
@@ -272,7 +270,6 @@ def run(
             if job.is_successful:
                 result = job.fetch()
                 _store_result(resolved_cache, run_hash, job, result)
-                job.cleanup()
                 return result
 
             # 1d) Failed → fall through and re-submit
@@ -334,6 +331,8 @@ def run(
 
             if result is _CACHE_MISS:
                 result = job.fetch()
+            if owns_backend:
+                job.detach_backend()
         finally:
             if owns_backend:
                 backend.disconnect()
@@ -358,6 +357,4 @@ def run(
         )
 
     _store_result(resolved_cache, run_hash, job, result)
-    if remote is not None:
-        job.cleanup()
     return result

@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 _CACHE_MISS = object()
 
 
-def _load_remote_cache(input_dir: Path) -> tuple[Any, str | None]:
+def _load_remote_cache(input_dir: Path) -> tuple[Any, str | None, bool]:
     """Create the cache described by an input manifest, when available.
 
     Args:
@@ -29,23 +29,25 @@ def _load_remote_cache(input_dir: Path) -> tuple[Any, str | None]:
 
     """
     run_hash = None
+    force_rerun = False
     try:
         from qdk_chemistry.remote.serialization import _load_manifest  # noqa: PLC0415
 
         manifest = _load_manifest(input_dir / "manifest.json")
         run_hash = manifest.get("run_hash")
+        force_rerun = manifest.get("force_rerun", False)
         cache_info = manifest.get("remote_cache")
         if not cache_info or not cache_info.get("name"):
-            return None, run_hash
+            return None, run_hash, force_rerun
 
         from qdk_chemistry.remote.cache import get_cache  # noqa: PLC0415
 
         cache_name = cache_info["name"]
         cache_config = {key: value for key, value in cache_info.items() if key != "name"}
-        return get_cache(cache_name, **cache_config), run_hash
+        return get_cache(cache_name, **cache_config), run_hash, force_rerun
     except Exception:  # noqa: BLE001
         logger.warning("Failed to load remote cache", exc_info=True)
-        return None, run_hash
+        return None, run_hash, force_rerun
 
 
 def _get_cached_result(cache: Any, run_hash: str | None) -> Any:
@@ -152,11 +154,11 @@ def execute_job(input_dir: str | Path, output_dir: str | Path) -> Any:
 
     input_path = Path(input_dir)
     output_path = Path(output_dir)
-    cache, run_hash = _load_remote_cache(input_path)
-    inputs = deserialize_inputs(input_path, cache=cache)
-    result = _CACHE_MISS if inputs["force_rerun"] else _get_cached_result(cache, run_hash)
+    cache, run_hash, force_rerun = _load_remote_cache(input_path)
+    result = _CACHE_MISS if force_rerun else _get_cached_result(cache, run_hash)
 
     if result is _CACHE_MISS:
+        inputs = deserialize_inputs(input_path, cache=cache)
         algorithm = create_algorithm(inputs["algorithm_type"], inputs["algorithm_name"])
         for key, value in inputs["settings"].items():
             algorithm.settings().set(key, value)
