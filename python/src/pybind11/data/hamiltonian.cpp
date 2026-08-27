@@ -986,29 +986,41 @@ Args:
       py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
 
   // ============================================================================
-  // FactorizedHamiltonianContainer - factorized container
+  // FactorizedHamiltonianContainer - double-factorized container
   // ============================================================================
   py::class_<FactorizedHamiltonianContainer, HamiltonianContainer,
              py::smart_holder>
       factorized_container(data, "FactorizedHamiltonianContainer", R"(
-Represents a molecular Hamiltonian using Double-Factorized Tensor Hypercontraction.
+Represents a molecular Hamiltonian using a double factorization of the two-body integrals.
 
-This class stores the factorized two-body integrals:
+This class stores the factorized two-body integrals as a *signed* sum of
+low-rank "perfect squares":
 
-    h2_{pqrs} = sum_{r,c} (sum_b U^r_{bp} U^r_{bq} W^r_{bc})
-                           (sum_b' U^r_{b'r} U^r_{b's} W^r_{b'c})
+    h2_{pqrs} = sum_{r,c} s_r (sum_b U^r_{bp} U^r_{bq} W^r_{bc})
+                              (sum_b' U^r_{b'r} U^r_{b's} W^r_{b'c})
 
-along with an identity weight matrix WB[R,C] and optional BLISS energy shift.
-This container is always restricted (uses spin-free integrals).
+along with an identity weight matrix WB[R,C]. This container is always
+restricted (uses spin-free integrals).
+
+The per-rank signs ``s_r`` are what allow indefinite two-body tensors to be
+stored: without them the representation is a plain sum of squares and is
+therefore positive semi-definite in the (pq) pair space. Exact electron
+repulsion integrals are positive semi-definite, but symmetry-shifted or
+downfolded tensors need not be. Consumers that require a genuine
+sum-of-squares form (for example a sum-of-squares block encoding) must check
+``get_signs()`` themselves.
+
+References:
+    :cite:`Low2025`
 )");
 
   factorized_container.def(
       py::init<double, const Eigen::VectorXd&, const Eigen::VectorXd&,
                const Eigen::MatrixXd&, const Eigen::MatrixXd&,
-               const Eigen::MatrixXd&, std::shared_ptr<Orbitals>, double,
-               double, HamiltonianType>(),
+               const Eigen::MatrixXd&, std::shared_ptr<Orbitals>,
+               const Eigen::VectorXd&, double, HamiltonianType>(),
       R"(
-Constructor for factorized Hamiltonian.
+Constructor for a double-factorized Hamiltonian.
 
 Args:
     core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
@@ -1018,14 +1030,19 @@ Args:
     one_body_integrals (numpy.ndarray): One-electron integrals [N x N]
     inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix [N x N]
     orbitals (Orbitals): Molecular orbital data
-    bliss_shift (float, optional): BLISS core energy shift (default 0)
+    signs (numpy.ndarray, optional): Per-rank signs [R], each exactly +1 or -1.
+        An empty array (the default) means all fragments are positive.
     energy_gap (float, optional): E_gap for SOS block encoding (default 0)
     type (HamiltonianType, optional): Hamiltonian type (Hermitian by default)
+
+Raises:
+    RuntimeError: If ``signs`` is neither empty nor of length R, or contains a
+        value other than +1 or -1.
 )",
       py::arg("core_energy"), py::arg("u_matrices"), py::arg("w_matrices"),
       py::arg("wb_matrix"), py::arg("one_body_integrals"),
       py::arg("inactive_fock_matrix"), py::arg("orbitals"),
-      py::arg("bliss_shift") = 0.0, py::arg("energy_gap") = 0.0,
+      py::arg("signs") = Eigen::VectorXd(), py::arg("energy_gap") = 0.0,
       py::arg("type") = HamiltonianType::Hermitian);
 
   factorized_container.def("get_u_matrices",
@@ -1088,12 +1105,15 @@ Returns:
     int: Number of copies per rank
 )");
 
-  factorized_container.def("get_bliss_shift",
-                           &FactorizedHamiltonianContainer::get_bliss_shift, R"(
-BLISS core energy shift.
+  factorized_container.def("get_signs",
+                           &FactorizedHamiltonianContainer::get_signs,
+                           py::return_value_policy::reference_internal, R"(
+Per-rank signs of the factorization.
 
 Returns:
-    float: The BLISS core energy shift value
+    numpy.ndarray: Array of length R, each entry exactly +1.0 or -1.0. A
+    fragment with a negative sign contributes with a flipped overall sign, so
+    a container is a genuine sum of squares only if every entry is +1.0.
 )");
 
   factorized_container.def("get_energy_gap",
@@ -1135,6 +1155,8 @@ Adjusted one-body matrix in Majorana basis.
 
 ``h'(1)_{pq} = h1_{pq} - 0.5*sum_{rs} h2_{prrs->pq} + sum_{rs} h2_{pqrr} - sum_{rc,b} WB_{rc} W_{rb,c} U_{bp} U_{bq}``
 
+Every correction term is scaled by that rank's sign.
+
 Returns:
     numpy.ndarray: The modified one-body matrix [N x N]
 )");
@@ -1142,7 +1164,7 @@ Returns:
   factorized_container.def(
       "reconstruct_two_body_integrals",
       &FactorizedHamiltonianContainer::reconstruct_two_body_integrals, R"(
-Reconstruct approximate two-body integrals from factorization.
+Reconstruct the two-body integrals from the factorization.
 
 Returns:
     numpy.ndarray: Flat vector of reconstructed two-body integrals [N^4]
@@ -1447,6 +1469,28 @@ Get the type of the underlying container.
 
 Returns:
     str: Container type identifier (e.g., "canonical_four_center")
+)");
+
+  hamiltonian.def(
+      "get_container",
+      [](const Hamiltonian& self) -> const HamiltonianContainer& {
+        return self.get_container<HamiltonianContainer>();
+      },
+      py::return_value_policy::reference_internal,
+      R"(
+Get the underlying container.
+
+The returned object is the most derived bound container type, so it can be
+type-checked with ``isinstance`` to reach representation-specific accessors.
+
+Returns:
+    HamiltonianContainer: The container holding this Hamiltonian's data. The
+    returned reference keeps the owning Hamiltonian alive.
+
+Examples:
+    >>> container = hamiltonian.get_container()
+    >>> if isinstance(container, FactorizedHamiltonianContainer):
+    ...     print(container.get_num_ranks())
 )");
 
   // Summary

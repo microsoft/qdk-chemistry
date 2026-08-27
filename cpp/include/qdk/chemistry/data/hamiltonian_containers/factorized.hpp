@@ -17,10 +17,12 @@ namespace qdk::chemistry::data {
 
 /**
  * @class FactorizedHamiltonianContainer
- * @brief Restricted, spin-free double-factorized THC Hamiltonian container.
+ * @brief Restricted, spin-free double-factorized THC Hamiltonian container
+ *        (Low 2025).
  *
- * Stores factorized matrices and metadata. See Low et al.,
- * arXiv:2502.15882.
+ * @note Consumers that genuinely require a sum of squares -- SOS spectral
+ *       amplification above all -- must check get_signs() themselves; this
+ *       container deliberately does not enforce it.
  */
 class FactorizedHamiltonianContainer : public HamiltonianContainer {
  public:
@@ -34,18 +36,20 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    * @param one_body_integrals One-body integrals [N,N].
    * @param inactive_fock_matrix Inactive Fock matrix.
    * @param orbitals Orbitals with an active space.
-   * @param bliss_shift BLISS core shift.
+   * @param signs Per-rank signs, length R, each exactly +1.0 or -1.0. Pass an
+   *        empty vector (the default) for an all-positive factorization.
    * @param energy_gap E_gap for SOS block encoding.
    * @param type Hamiltonian type.
-   * @throws std::invalid_argument if dimensions or required data are invalid.
+   * @throws std::invalid_argument if dimensions or required data are invalid,
+   *         or if any entry of `signs` is neither +1.0 nor -1.0.
    */
   FactorizedHamiltonianContainer(
       double core_energy, const Eigen::VectorXd& u_matrices,
       const Eigen::VectorXd& w_matrices, const Eigen::MatrixXd& wb_matrix,
       const Eigen::MatrixXd& one_body_integrals,
       const Eigen::MatrixXd& inactive_fock_matrix,
-      std::shared_ptr<Orbitals> orbitals, double bliss_shift = 0.0,
-      double energy_gap = 0.0,
+      std::shared_ptr<Orbitals> orbitals,
+      const Eigen::VectorXd& signs = Eigen::VectorXd(), double energy_gap = 0.0,
       HamiltonianType type = HamiltonianType::Hermitian);
 
   /** @brief Destructor. */
@@ -121,6 +125,9 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
   /** @return Identity weights WB with shape [R,C]. */
   const Eigen::MatrixXd& get_wb_matrix() const;
 
+  /** @return Per-rank signs, length R, each +1.0 or -1.0. */
+  const Eigen::VectorXd& get_signs() const;
+
   /** @return Number N of active spatial orbitals. */
   size_t get_num_orbitals() const;
 
@@ -133,36 +140,39 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
   /** @return Number of copies C, inferred from the WB columns. */
   size_t get_num_copies() const;
 
-  /** @return BLISS energy shift. */
-  double get_bliss_shift() const;
-
   /** @return Energy gap E_gap for SOS block encoding. */
   double get_energy_gap() const;
 
   /**
-   * @brief Compute the block-encoding normalization (Eq. 33).
+   * @brief Compute the block-encoding normalization (Eq. 34).
    * Λ = Σ|eig(h1_majorana)| + 1/4 Σ_{rc} (|WB^{rc}| + Σ_b |W^{rc}_b|)²
+   *
+   * The per-rank signs do not appear: every two-body term enters through an
+   * absolute value, and |sign| is 1.
    */
   double get_lambda() const;
 
   /**
-   * @brief Compute the effective SOS normalization (Eq. 11).
+   * @brief Compute the effective SOS normalization (Eq. 12).
    * λ_eff = √(E_gap · (2Λ - E_gap))
    * @throws std::runtime_error if E_gap is non-positive or >= 2Λ.
    */
   double get_lambda_eff() const;
 
   /**
-   * @brief Compute the adjusted Majorana one-body matrix (Eq. 36).
+   * @brief Compute the adjusted Majorana one-body matrix (Eq. 37).
    *
    * Writing the rank-r copy-c leaf as
    *   M^{rc}_{pq} = Σ_{b∈[B]} W^{rc}_b U^r_{bp} U^r_{bq},
-   * this accumulates three corrections:
-   *   h'(1)_{pq} = h1_{pq} - ½ Σ_{rc} (M^{rc} M^{rc})_{pq}
-   *                        + Σ_{rc} tr(M^{rc}) M^{rc}_{pq}
-   *                        - Σ_{rc} WB^{rc} M^{rc}_{pq}
+   * this accumulates three corrections, each scaled by that rank's sign:
+   *   h'(1)_{pq} = h1_{pq} - ½ Σ_{rc} s_r (M^{rc} M^{rc})_{pq}
+   *                        + Σ_{rc} s_r tr(M^{rc}) M^{rc}_{pq}
+   *                        - Σ_{rc} s_r WB^{rc} M^{rc}_{pq}
    *
-   * The leading -½ (M M) term has no counterpart in Eq. 36 as printed: the
+   * All three terms come from the same rank-r fragment operator, so negating
+   * the fragment negates all of them together.
+   *
+   * The leading -½ (M M) term has no counterpart in Eq. 37 as printed: the
    * paper writes the two-body operator as a plain product while this container
    * stores h2 = (pq|rs) normal-ordered, and unpacking that difference leaves
    * exactly -½ Σ_s h2_{pssq}. It is required, not optional -- see the
@@ -174,13 +184,13 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
 
   /**
    * @brief Reconstruct the approximate two-body integrals.
-   * h2_{pqrs} = Σ_{r,c} (Σ_b U^r_{bp} U^r_{bq} W^r_{bc})
-   *                      (Σ_{b'} U^r_{b'r} U^r_{b's} W^r_{b'c})
+   * h2_{pqrs} = Σ_{r,c} s_r (Σ_b U^r_{bp} U^r_{bq} W^r_{bc})
+   *                          (Σ_{b'} U^r_{b'r} U^r_{b's} W^r_{b'c})
    *
-   * Note this is built purely from (U, W): the identity weight WB is
-   * deliberately absent, matching Eq. 24. WB enters only get_h1_majorana() and
-   * get_lambda(), so it is a gauge parameter for the two-body tensor rather
-   * than unused data.
+   * Note this is built purely from (U, W) and the per-rank signs: the identity
+   * weight WB is deliberately absent, matching Eq. 25. WB enters only
+   * get_h1_majorana() and get_lambda(), so it is a gauge parameter for the
+   * two-body tensor rather than unused data.
    *
    * @return A flat N^4 vector in [p,q,r,s] order.
    */
@@ -190,16 +200,18 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
   /** @brief Add all serialized state to a hash. */
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
 
-  /** @throws std::invalid_argument if U, W, or WB dimensions are invalid. */
+  /**
+   * @throws std::invalid_argument if U, W, WB or sign dimensions are invalid,
+   *         or if a sign is neither +1.0 nor -1.0.
+   */
   void validate_integral_dimensions() const override final;
 
-  Eigen::VectorXd _u;   ///< Flat U matrices [R*B*N]
-  Eigen::VectorXd _w;   ///< Flat W matrices [R*B*C]
-  Eigen::MatrixXd _wb;  ///< Identity weights [R*C]
+  Eigen::VectorXd _u;      ///< Flat U matrices [R*B*N]
+  Eigen::VectorXd _w;      ///< Flat W matrices [R*B*C]
+  Eigen::MatrixXd _wb;     ///< Identity weights [R*C]
+  Eigen::VectorXd _signs;  ///< Per-rank signs [R], each +1.0 or -1.0
 
-  // TODO: add the full bliss object for one-body/two-body shifts.
-  double _bliss_shift;  ///< BLISS energy shift
-  double _energy_gap;   ///< E_gap for SOS block encoding
+  double _energy_gap;  ///< E_gap for SOS block encoding
 
   /// Lazily computed four-center integrals (shared for all channels,
   /// restricted)

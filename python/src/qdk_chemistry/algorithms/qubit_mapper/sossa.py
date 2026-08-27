@@ -42,6 +42,12 @@ class SOSSAQubitMapper(QubitMapper):
         mapping: MajoranaMapping,
     ) -> QubitOperator:
         """Map a validated factorized container to a SOSSA qubit operator."""
+        if np.any(np.asarray(container.get_signs(), dtype=float) < 0.0):
+            raise ValueError(
+                "SOSSAQubitMapper requires a positive semi-definite factorization: the container "
+                "has negative per-rank signs, so it is not a sum of squares"
+            )
+
         num_orbitals = container.get_num_orbitals()
         num_ranks = container.get_num_ranks()
         num_bases = container.get_num_bases()
@@ -90,9 +96,7 @@ class SOSSAQubitMapper(QubitMapper):
         negative_sum = float(-np.sum(eigenvalues[neg_mask]))
         w0 = identity_weights - weights_rbc.sum(axis=1)
         w0_square_sum = float(np.sum(w0**2))
-        energy_shift = (
-            container.get_core_energy() + container.get_bliss_shift() - 2.0 * negative_sum - 0.5 * w0_square_sum
-        )
+        energy_shift = container.get_core_energy() - 2.0 * negative_sum - 0.5 * w0_square_sum
 
         return QubitOperator(
             SOSSAContainer(

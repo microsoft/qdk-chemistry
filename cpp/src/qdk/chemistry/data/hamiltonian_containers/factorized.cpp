@@ -20,14 +20,15 @@ FactorizedHamiltonianContainer::FactorizedHamiltonianContainer(
     const Eigen::VectorXd& w_matrices, const Eigen::MatrixXd& wb_matrix,
     const Eigen::MatrixXd& one_body_integrals,
     const Eigen::MatrixXd& inactive_fock_matrix,
-    std::shared_ptr<Orbitals> orbitals, double bliss_shift, double energy_gap,
-    HamiltonianType type)
+    std::shared_ptr<Orbitals> orbitals, const Eigen::VectorXd& signs,
+    double energy_gap, HamiltonianType type)
     : HamiltonianContainer(one_body_integrals, orbitals, core_energy,
                            inactive_fock_matrix, type),
       _u(u_matrices),
       _w(w_matrices),
       _wb(wb_matrix),
-      _bliss_shift(bliss_shift),
+      _signs(signs.size() > 0 ? signs
+                              : Eigen::VectorXd::Ones(wb_matrix.rows())),
       _energy_gap(energy_gap) {
   QDK_LOG_TRACE_ENTERING();
 
@@ -53,7 +54,7 @@ std::unique_ptr<HamiltonianContainer> FactorizedHamiltonianContainer::clone()
     fock_alpha = fa;
   }
   return std::make_unique<FactorizedHamiltonianContainer>(
-      _core_energy, _u, _w, _wb, h1_alpha, fock_alpha, _orbitals, _bliss_shift,
+      _core_energy, _u, _w, _wb, h1_alpha, fock_alpha, _orbitals, _signs,
       _energy_gap, _type);
 }
 
@@ -119,6 +120,7 @@ bool FactorizedHamiltonianContainer::is_valid() const {
   if (static_cast<size_t>(_u.size()) % (R * norb) != 0) return false;
   size_t B = static_cast<size_t>(_u.size()) / (R * norb);
   if (static_cast<size_t>(_w.size()) != R * B * C) return false;
+  if (static_cast<size_t>(_signs.size()) != R) return false;
   return true;
 }
 
@@ -126,7 +128,7 @@ bool FactorizedHamiltonianContainer::is_valid() const {
 
 Eigen::VectorXd FactorizedHamiltonianContainer::reconstruct_two_body_integrals()
     const {
-  //   h2_{pqrs} = Σ_{r,c} M^{rc}_{pq} M^{rc}_{rs},
+  //   h2_{pqrs} = Σ_{r,c} s_r M^{rc}_{pq} M^{rc}_{rs},
   //   M^{rc}_{pq} = Σ_b W^r_{bc} U^r_{bp} U^r_{bq},
   size_t norb = get_num_orbitals();
   size_t R = get_num_ranks();
@@ -157,7 +159,7 @@ Eigen::VectorXd FactorizedHamiltonianContainer::reconstruct_two_body_integrals()
     }
 
     Eigen::MatrixXd M = Wr.transpose() * pair_products;
-    h2_matrix.noalias() += M.transpose() * M;
+    h2_matrix.noalias() += _signs(r) * (M.transpose() * M);
   }
 
   return h2;
@@ -183,6 +185,10 @@ const Eigen::MatrixXd& FactorizedHamiltonianContainer::get_wb_matrix() const {
   return _wb;
 }
 
+const Eigen::VectorXd& FactorizedHamiltonianContainer::get_signs() const {
+  return _signs;
+}
+
 size_t FactorizedHamiltonianContainer::get_num_orbitals() const {
   return _orbitals->get_active_space_indices().first.size();
 }
@@ -201,17 +207,18 @@ size_t FactorizedHamiltonianContainer::get_num_copies() const {
   return static_cast<size_t>(_wb.cols());
 }
 
-double FactorizedHamiltonianContainer::get_bliss_shift() const {
-  return _bliss_shift;
-}
-
 double FactorizedHamiltonianContainer::get_energy_gap() const {
   return _energy_gap;
 }
 
 double FactorizedHamiltonianContainer::get_lambda() const {
-  // norm (Eq. 33):
+  // norm (Eq. 34):
   // Λ = Σ|eig(h1_majorana)| + 1/4 Σ_{rc} (|WB^{rc}| + Σ_b |W^{rc}_b|)^2.
+  //
+  // The per-rank signs are absent on purpose: every two-body contribution
+  // enters through an absolute value and |s_r| = 1, so a negated fragment has
+  // exactly the same 1-norm. They do still reach this function indirectly,
+  // through get_h1_majorana().
   Eigen::MatrixXd h1m = get_h1_majorana();
   Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(h1m);
   double one_body_norm = solver.eigenvalues().array().abs().sum();
@@ -240,7 +247,7 @@ double FactorizedHamiltonianContainer::get_lambda() const {
 }
 
 double FactorizedHamiltonianContainer::get_lambda_eff() const {
-  // Effective SOS-walk normalization (Eq. 11): λ_eff = √(E_gap·(2Λ - E_gap)).
+  // Effective SOS-walk normalization (Eq. 12): λ_eff = √(E_gap·(2Λ - E_gap)).
   double lambda = get_lambda();
   if (_energy_gap <= 0.0) {
     throw std::runtime_error("E_gap must be positive for a valid SOS walk");
@@ -253,20 +260,24 @@ double FactorizedHamiltonianContainer::get_lambda_eff() const {
 }
 
 Eigen::MatrixXd FactorizedHamiltonianContainer::get_h1_majorana() const {
-  // Majorana one-body shift (Eq. 36). Writing the rank-r copy-c leaf as
+  // Majorana one-body shift (Eq. 37). Writing the rank-r copy-c leaf as
   //   M^{rc}_{pq} = Σ_{b∈[B]} w_b^{rc} u^r_{b,p} u^r_{b,q},
   // the three accumulated corrections are
-  //   h1'_{pq} = h1_{pq} - ½ Σ_{rc} (M^{rc} M^{rc})_{pq}   (a) normal-ordering
-  //                      + Σ_{rc} tr(M^{rc}) M^{rc}_{pq}   (b)
-  //                      - Σ_{rc} wB^{rc} M^{rc}_{pq}      (c)
+  //   h1'_{pq} = h1_{pq} - ½ Σ_{rc} s_r (M^{rc} M^{rc})_{pq}  (a) normal-order
+  //                      + Σ_{rc} s_r tr(M^{rc}) M^{rc}_{pq}  (b)
+  //                      - Σ_{rc} s_r wB^{rc} M^{rc}_{pq}     (c)
   //
-  // Term (a) has no counterpart in Eq. 36 as printed, because the paper writes
+  // All three carry the rank's sign s_r: they are the one-body residue of the
+  // single fragment operator s_r (Σ_b w_b n_b - wB)², so negating the fragment
+  // negates the square, the cross term and the trace correction together.
+  //
+  // Term (a) has no counterpart in Eq. 37 as printed, because the paper writes
   // the two-body term as a plain product of E operators while this container
   // stores h2 = (pq|rs) normal-ordered, i.e.
   //   H = E_core + Σ h1_{pq} E_pq + ½ Σ h2_{pqrs} (E_pq E_rs - δ_qr E_ps).
   // Unpacking that -½ δ_qr E_ps piece leaves the one-body remainder
-  // -½ Σ_s h2_{pssq} = -½ Σ_{rc} (M^{rc} M^{rc})_{pq}. Dropping it would make
-  // h1' -- and hence Λ -- silently wrong. See also the docstring in
+  // -½ Σ_s h2_{pssq} = -½ Σ_{rc} s_r (M^{rc} M^{rc})_{pq}. Dropping it would
+  // make h1' -- and hence Λ -- silently wrong. See also the docstring in
   // factorized.hpp, which lists all three terms.
   size_t norb = get_num_orbitals();
   size_t R = get_num_ranks();
@@ -276,7 +287,7 @@ Eigen::MatrixXd FactorizedHamiltonianContainer::get_h1_majorana() const {
   auto [h1_alpha, h1_beta] = get_one_body_integrals();
   Eigen::MatrixXd h1 = 0.5 * (h1_alpha + h1_beta);
 
-  // h2[p,q,r,s] = Σ_rank Σ_c M_rc[p,q] * M_rc[r,s]
+  // h2[p,q,r,s] = Σ_rank Σ_c s_rank * M_rc[p,q] * M_rc[r,s]
   // where M_rc[p,q] = Σ_b W[rank,b,c] * U[rank,b,p] * U[rank,b,q]
   //                  = (U_r^T * diag(w_c) * U_r)[p,q]
   for (size_t r = 0; r < R; ++r) {
@@ -284,6 +295,8 @@ Eigen::MatrixXd FactorizedHamiltonianContainer::get_h1_majorana() const {
     Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
                                    Eigen::RowMajor>>
         Ur(_u.data() + r * B * norb, B, norb);
+
+    const double sign = _signs(r);
 
     for (size_t c = 0; c < C; ++c) {
       // Build scaled = diag(w[r,:,c]) * U_r,  shape [B x norb]
@@ -296,14 +309,14 @@ Eigen::MatrixXd FactorizedHamiltonianContainer::get_h1_majorana() const {
       // M_rc = U_r^T * scaled = U_r^T * diag(w_c) * U_r,  shape [N x N]
       Eigen::MatrixXd Mrc = Ur.transpose() * scaled;
 
-      // h1 -= 0.5 * M_rc^2  (contraction of einsum "prrq")
-      h1.noalias() -= 0.5 * (Mrc * Mrc);
+      // h1 -= 0.5 * s_r * M_rc^2  (contraction of einsum "prrq")
+      h1.noalias() -= 0.5 * sign * (Mrc * Mrc);
 
-      // h1 += tr(M_rc) * M_rc  (contraction of einsum "pqrr")
-      h1 += Mrc.trace() * Mrc;
+      // h1 += s_r * tr(M_rc) * M_rc  (contraction of einsum "pqrr")
+      h1 += sign * Mrc.trace() * Mrc;
 
-      // h1 -= wb[r,c] * M_rc  (wb term)
-      h1 -= _wb(r, c) * Mrc;
+      // h1 -= s_r * wb[r,c] * M_rc  (wb term)
+      h1 -= sign * _wb(r, c) * Mrc;
     }
   }
 
@@ -323,11 +336,11 @@ nlohmann::json FactorizedHamiltonianContainer::to_json() const {
   j["u_matrices"] = vector_to_json(_u);
   j["w_matrices"] = vector_to_json(_w);
   j["wb_matrix"] = matrix_to_json(_wb);
+  j["signs"] = vector_to_json(_signs);
   j["num_ranks"] = get_num_ranks();
   j["num_bases"] = get_num_bases();
   j["num_copies"] = get_num_copies();
   j["core_energy"] = _core_energy;
-  j["bliss_shift"] = _bliss_shift;
   j["energy_gap"] = _energy_gap;
 
   if (has_orbitals()) {
@@ -351,8 +364,12 @@ FactorizedHamiltonianContainer::from_json(const nlohmann::json& j) {
   auto u = json_to_vector(j["u_matrices"]);
   auto w = json_to_vector(j["w_matrices"]);
   auto wb = json_to_matrix(j["wb_matrix"]);
+  // Optional: an absent sign vector means an all-positive factorization.
+  Eigen::VectorXd signs;
+  if (j.contains("signs")) {
+    signs = json_to_vector(j.at("signs"));
+  }
   double core_energy = j["core_energy"];
-  double bliss_shift = j.value("bliss_shift", 0.0);
   double energy_gap = j.at("energy_gap");
 
   auto orbitals = Orbitals::from_json(j["orbitals"]);
@@ -363,7 +380,7 @@ FactorizedHamiltonianContainer::from_json(const nlohmann::json& j) {
   }
 
   return std::make_unique<FactorizedHamiltonianContainer>(
-      core_energy, u, w, wb, h1, fock, orbitals, bliss_shift, energy_gap);
+      core_energy, u, w, wb, h1, fock, orbitals, signs, energy_gap);
 }
 
 void FactorizedHamiltonianContainer::to_hdf5(H5::Group& group) const {
@@ -384,10 +401,6 @@ void FactorizedHamiltonianContainer::to_hdf5(H5::Group& group) const {
       .createAttribute("core_energy", H5::PredType::NATIVE_DOUBLE,
                        H5::DataSpace(H5S_SCALAR))
       .write(H5::PredType::NATIVE_DOUBLE, &_core_energy);
-  group
-      .createAttribute("bliss_shift", H5::PredType::NATIVE_DOUBLE,
-                       H5::DataSpace(H5S_SCALAR))
-      .write(H5::PredType::NATIVE_DOUBLE, &_bliss_shift);
   group
       .createAttribute("energy_gap", H5::PredType::NATIVE_DOUBLE,
                        H5::DataSpace(H5S_SCALAR))
@@ -428,6 +441,7 @@ void FactorizedHamiltonianContainer::to_hdf5(H5::Group& group) const {
   write_vector("u_matrices", _u);
   write_vector("w_matrices", _w);
   write_matrix("wb_matrix", _wb);
+  write_vector("signs", _signs);
 
   if (has_inactive_fock_matrix()) {
     auto [fock_a, fock_b] = get_inactive_fock_matrix();
@@ -450,11 +464,9 @@ FactorizedHamiltonianContainer::from_hdf5(H5::Group& group) {
   version_attr.read(string_type, version);
   validate_serialization_version(SERIALIZATION_VERSION, version);
 
-  double core_energy, bliss_shift, energy_gap;
+  double core_energy, energy_gap;
   group.openAttribute("core_energy")
       .read(H5::PredType::NATIVE_DOUBLE, &core_energy);
-  group.openAttribute("bliss_shift")
-      .read(H5::PredType::NATIVE_DOUBLE, &bliss_shift);
   group.openAttribute("energy_gap")
       .read(H5::PredType::NATIVE_DOUBLE, &energy_gap);
 
@@ -482,6 +494,11 @@ FactorizedHamiltonianContainer::from_hdf5(H5::Group& group) {
   auto u = read_vector("u_matrices");
   auto w = read_vector("w_matrices");
   auto wb = read_matrix("wb_matrix");
+  // Optional: an absent sign vector means an all-positive factorization.
+  Eigen::VectorXd signs;
+  if (group.nameExists("signs")) {
+    signs = read_vector("signs");
+  }
 
   std::shared_ptr<Orbitals> orbitals;
   if (group.nameExists("orbitals")) {
@@ -495,7 +512,7 @@ FactorizedHamiltonianContainer::from_hdf5(H5::Group& group) {
   }
 
   return std::make_unique<FactorizedHamiltonianContainer>(
-      core_energy, u, w, wb, h1, fock, orbitals, bliss_shift, energy_gap);
+      core_energy, u, w, wb, h1, fock, orbitals, signs, energy_gap);
 }
 
 // === Validation ===
@@ -530,6 +547,18 @@ void FactorizedHamiltonianContainer::validate_integral_dimensions() const {
         ", B=" + std::to_string(B) + ", C=" + std::to_string(C) + "), got " +
         std::to_string(_w.size()) + ".");
   }
+  if (static_cast<size_t>(_signs.size()) != R) {
+    throw std::invalid_argument(
+        "Sign vector size mismatch: expected one sign per rank R = " +
+        std::to_string(R) + ", got " + std::to_string(_signs.size()) + ".");
+  }
+  for (Eigen::Index r = 0; r < _signs.size(); ++r) {
+    if (_signs(r) != 1.0 && _signs(r) != -1.0) {
+      throw std::invalid_argument("Sign for rank " + std::to_string(r) +
+                                  " must be exactly +1.0 or -1.0, got " +
+                                  std::to_string(_signs(r)) + ".");
+    }
+  }
 }
 
 // === Hashing ===
@@ -541,11 +570,11 @@ void FactorizedHamiltonianContainer::hash_update(
   hash_value(ctx, static_cast<int64_t>(get_num_ranks()));
   hash_value(ctx, static_cast<int64_t>(get_num_bases()));
   hash_value(ctx, static_cast<int64_t>(get_num_copies()));
-  hash_value(ctx, _bliss_shift);
   hash_value(ctx, _energy_gap);
   hash_value(ctx, _u);
   hash_value(ctx, _w);
   hash_value(ctx, _wb);
+  hash_value(ctx, _signs);
 }
 
 }  // namespace qdk::chemistry::data

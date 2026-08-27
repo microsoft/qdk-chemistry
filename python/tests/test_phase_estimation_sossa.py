@@ -944,20 +944,15 @@ class TestSOSSAQPEIntegration:
             orbitals,
         )
         # ``_to_sossa_operator`` transfers ownership of the C++ container, so read the
-        # scalar offsets off ``fh`` before it is consumed.
+        # scalar offset off ``fh`` before it is consumed.
         core_energy = fh.get_core_energy()
-        bliss_shift = fh.get_bliss_shift()
         container = _to_sossa_operator(fh).get_container()
 
-        expected = (
-            core_energy
-            + bliss_shift
-            + _sos_energy_shift(
-                data["h1"],
-                data["basis_vectors"],
-                data["two_body_weights"],
-                data["identity_weight"],
-            )
+        expected = core_energy + _sos_energy_shift(
+            data["h1"],
+            data["basis_vectors"],
+            data["two_body_weights"],
+            data["identity_weight"],
         )
         assert container.energy_shift == pytest.approx(expected, abs=1e-12)
 
