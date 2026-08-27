@@ -56,13 +56,6 @@ class StatePreparation(Algorithm):
             2. Use state preparation to create a :class:`~qdk_chemistry.data.Circuit`
             3. Both will have ``encoding="jordan-wigner"`` and will be compatible
 
-        The encoding always describes the index register: a coefficient is placed at the
-        index its determinant's occupation-number bits spell, so qubit *i* is mode *i*.
-        ``alias_sampling`` and ``qrom`` index their amplitudes exactly this way too, and
-        the registers they add on top carry no fermionic meaning -- alias sampling's
-        garbage ancilla stay entangled with the index, and QROM's phase gradient ancilla
-        hold the rotation angles.
-
         Support for additional encodings is planned for future releases.
 
     """
@@ -94,7 +87,8 @@ class StatePreparation(Algorithm):
         A ``Wavefunction`` stores only occupied determinants, so the coefficient list is not
         positionally aligned with the basis index. Each coefficient is placed at the index its
         determinant's bits encode (little-endian), and the register width comes from the
-        configuration set rather than the coefficient count.
+        configuration set rather than the coefficient count. Those bits are occupation numbers,
+        so qubit *i* holds mode *i* and the result is in the Jordan-Wigner basis.
 
         Args:
             wavefunction: The target wavefunction.
