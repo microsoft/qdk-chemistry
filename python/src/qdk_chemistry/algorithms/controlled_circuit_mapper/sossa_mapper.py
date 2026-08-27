@@ -80,7 +80,7 @@ class SOSSAMapper(ControlledCircuitMapper):
         The outer PREPARE must produce amplitudes proportional to the generator
         one-norms :math:`c_{x_o}` themselves, not to their square roots, because the
         SOS block encoding reads off :math:`\sum_{x_o} c_{x_o}^2 = 2\Lambda` from the
-        amplitudes (Eq. 88 of :cite:`Low2025`).
+        amplitudes (Eqs. (7) and (9) of :cite:`Low2025`).
 
         Args:
             container: The SOSSA container with outer_prepare coefficients.
@@ -99,17 +99,32 @@ class SOSSAMapper(ControlledCircuitMapper):
             padded = coeffs + [0.0] * (n_padded - len(coeffs))
             return QSHARP_UTILS.SOSSAWalk.MakeOuterPreparePureState(padded)
         prepare_algorithm = self._create_nested("outer_prepare")
-        outer_prepare = container.outer_prepare
         if ref.algorithm_name == "alias_sampling":
-            # Keep the op's precision in sync with the outer register size (see _compute_register_sizes).
-            prepare_algorithm.bits_precision = self._settings.get("coefficient_bit_precision")
-            # One-dimensional alias sampling discretizes its input as a probability
-            # distribution, so it has to be handed the squared coefficients the
-            # builder precomputed. The 2D conditional table used by the inner
-            # PREPARE squares its input itself.
-            outer_prepare = container.outer_prepare_probabilities
-        circuit = prepare_algorithm.run(outer_prepare)
-        return circuit._qsharp_op  # noqa: SLF001
+            # Keep the op's precision in sync with the outer register size (see
+            # _compute_register_sizes, which widths the outer register as
+            # 2*xo + 2*mu + 1). This must go through settings(): the algorithm reads
+            # mu from its Settings, so a plain attribute assignment would bind a dead
+            # attribute and leave the op on the default mu while the register was
+            # sized from coefficient_bit_precision.
+            prepare_algorithm.settings().set("bits_precision", self._settings.get("coefficient_bit_precision"))
+        # Every state-preparation backend takes *amplitudes* and derives its own
+        # distribution: AliasSampling squares its input (``_sampling_weights`` returns
+        # ``|c|^2``) before handing it to Q#, which treats those as probabilities. So the
+        # amplitudes ``c_{x_o}`` are what belongs here -- passing the precomputed
+        # ``outer_prepare_probabilities`` instead squares a second time and prepares a
+        # distribution proportional to ``c^4``.
+        circuit = prepare_algorithm.run(container.outer_prepare)
+        op = circuit._qsharp_op  # noqa: SLF001
+        num_gradient = circuit.metadata.num_phase_gradient_ancillas
+        if num_gradient:
+            # SOSSABlockEncodingOnRegister hands the outer PREPARE only `outerReg` and routes
+            # the persistent gradient to SELECT alone, so a PREPARE that declares gradient
+            # ancillas (QROM) has to own them. Left unwrapped, its op would index past
+            # `outerReg` into the inner register.
+            op = QSHARP_UTILS.CircuitComposition.MakeOwnedAncillaOp(
+                op, QSHARP_UTILS.PhaseGradient.PreparePhaseGradientState, num_gradient
+            )
+        return op
 
     def build_inner_prep(self, container: SOSSAWalkContainer) -> Any:
         r"""Build the Q# inner (controlled) PREPARE callable.

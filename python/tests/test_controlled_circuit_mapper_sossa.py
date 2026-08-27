@@ -88,11 +88,12 @@ class TestOuterPrep:
         against the expected normalized state:
           |ψ⟩ = Σ_j (a_j / ||a||) |j⟩
 
-        Note: MakeOuterPreparePureState (dense_pure_state) uses Reversed(register) to
-        convert PreparePureStateD's big-endian convention to little-endian for
-        Select. dump_machine() reports in big-endian order, so coefficient[k]
-        appears at dump index bit_reverse(k). We account for this by building
-        expected in LE-address space.
+        Note: both backends leave the index register little-endian, which is the address
+        order Select expects (``MakeOuterPreparePureState`` gets there via
+        ``Reversed(register)`` over ``PreparePureStateD``; the QROM prep writes its
+        ``target`` LE directly). ``dump_machine()`` reports big-endian, so coefficient[k]
+        appears at dump index bit_reverse(k). We account for this by building expected in
+        LE-address space.
         """
         controlled_unitary = _build_controlled_unitary()
         container = controlled_unitary.get_container()
@@ -110,13 +111,9 @@ class TestOuterPrep:
         expected = np.zeros(n_states)
         for j, amp in enumerate(coefficients):
             if j < n_states:
-                if algorithm == "dense_pure_state":
-                    # MakeOuterPreparePureState uses Reversed(register):
-                    # coefficient[k] → LE address k → BE dump index bit_reverse(k)
-                    be_idx = int(format(j, f"0{num_qubits}b")[::-1], 2)
-                    expected[be_idx] = amp
-                else:
-                    expected[j] = amp
+                # coefficient[k] → LE address k → BE dump index bit_reverse(k)
+                be_idx = int(format(j, f"0{num_qubits}b")[::-1], 2)
+                expected[be_idx] = amp
         expected /= np.linalg.norm(expected)
 
         fidelity = abs(np.dot(np.conj(actual_sv), expected))

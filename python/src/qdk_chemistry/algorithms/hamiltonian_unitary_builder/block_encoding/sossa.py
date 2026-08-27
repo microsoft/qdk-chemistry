@@ -149,7 +149,7 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         square roots, because both the normalization
         :math:`\Lambda = \frac{1}{2}\sum_{x_o} c_{x_o}^2` and the energy decoding
         :math:`E = \Lambda(1 + \cos 2\pi\varphi)` are read off those amplitudes
-        (Eq. 88 of :cite:`Low2025`). Backends that discretize their input as a
+        (Eqs. (7) and (9) of :cite:`Low2025`). Backends that discretize their input as a
         probability distribution therefore have to be handed
         :math:`c_{x_o}^2`, which is what ``outer_prepare_probabilities`` holds.
         """
@@ -243,7 +243,8 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
             - Q1 (hole):     ``[False, True]``
             - SF (two-body): ``[True,  True]``
 
-        Reference: Eq. 82 in :cite:`Low2025`.
+        The D/Q/SF generator taxonomy is Eqs. (28)-(32) of :cite:`Low2025`; the
+        two-bit packing above is this implementation's own layout choice.
 
         """
         xo_dim = n_orbitals + n_ranks * n_copies

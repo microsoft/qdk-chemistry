@@ -8,7 +8,7 @@
 /// is built independently as a Q# callable. The walk step composes them with
 /// reflections.
 ///
-/// Walk operator (arXiv:2502.15882v1, Eq. 77):
+/// Walk operator (Low et al., Phys. Rev. X 15 (2025), inline above Eq. (9); App. A 2):
 ///   W = Ref_{a,B} · U† · Ref_B · U
 /// where U = OuterPREP · within{InnerPREP} apply{SELECT}.
 ///

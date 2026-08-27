@@ -364,9 +364,18 @@ def test_no_mapper_partially_renames_a_probed_capability(capability: str) -> Non
     )
 
 
+#: Mappers recorded as advertising the probed capabilities, so that a silent drop is caught.
+#:
+#: ``ControlledPSPMapper`` sat here until the PSP mapper was re-architected around
+#: ``_block_mapper`` / ``_run_impl`` (see ``controlled_psp_mapper.py``): it composes the walk
+#: inline and no longer defines ``get_ancilla_prep_op`` or ``num_ancilla_qubits`` at all, so
+#: the probes below can only report ``False`` for it. Dropping it from this set is the
+#: "genuinely should stop providing it" branch the assertion below names, and it is done here
+#: rather than left to fail so the guard keeps its meaning for ``SOSSAMapper``, which is now
+#: the sole provider. This records the removal; it does not certify that the fallback width
+#: the builders use in its place is the right one for every PREPARE the PSP path accepts.
 _CAPABILITY_PROVIDERS = frozenset(
     {
-        "controlled_psp_mapper.py::ControlledPSPMapper",
         "sossa_mapper.py::SOSSAMapper",
     }
 )

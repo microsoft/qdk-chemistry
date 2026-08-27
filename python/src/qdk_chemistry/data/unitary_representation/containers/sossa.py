@@ -169,7 +169,8 @@ class SOSSASelect:
 class SOSSAWalkContainer(QuantumWalkContainer):
     r"""Container for the Sum of Squares Spectral Amplification (SOSSA) block encoding.
 
-    The walk operator is (:cite:`Low2025`, Eq. 77):
+    The walk operator is defined inline above Eq. (9) of :cite:`Low2025` and derived in
+    its Appendix A 2, with spectrum :math:`e^{\pm i \arccos(E_k/\Lambda - 1)}`:
 
     .. math::
 

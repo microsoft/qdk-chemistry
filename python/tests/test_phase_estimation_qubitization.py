@@ -5,12 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from collections.abc import Iterator
-
 import numpy as np
 import pytest
-import qdk
-from qdk import TargetProfile
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import IterativePhaseEstimation
@@ -18,7 +14,7 @@ from qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation import 
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_AER
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, use_qsharp_context
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
@@ -102,18 +98,6 @@ def h2_hamiltonian() -> QubitOperator:
         pauli_strings=h2_pauli_strings,
         coefficients=h2_coefficients,
     )
-
-
-# The qubitization walk lowers to measurement-based AND uncompute under the default
-# Adaptive_RIF profile, so its QIR carries `mz`/`read_result` and converts to a Qiskit
-# circuit that owns classical bits. These two tests then feed that circuit to
-# `to_gate()`/`compose()`, which reject classical bits. The Base profile emits the
-# ancilla-free form instead, so pin just these two.
-@pytest.fixture
-def use_base_qdk_ctx() -> Iterator[qdk.Context]:
-    """Route the library's shared context to a ``TargetProfile.Base`` build."""
-    with use_qsharp_context(create_qsharp_context(TargetProfile.Base)) as context:
-        yield context
 
 
 class TestQPEWithQubitization:
