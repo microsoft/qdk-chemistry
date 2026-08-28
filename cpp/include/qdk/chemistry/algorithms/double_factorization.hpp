@@ -28,13 +28,13 @@ inline constexpr double DEFAULT_TRUNCATION_THRESHOLD = 1e-12;
 ///
 /// g^(f)_pqrs = sign * (sum_b eps_b U_pb U_qb) (sum_b' eps_b' U_rb' U_sb')
 struct TwoBodyFragment {
-  Eigen::MatrixXd U;    ///< norb x norb orbital rotation. Column bis
-                        ///< new-orbital vector in the original basis.
+  Eigen::MatrixXd U;    ///< norb x norb orbital rotation. Column b is
+                        ///< new-orbital vector b in the original basis.
   Eigen::VectorXd eps;  ///< norb coefficients, scaled by
                         ///< sqrt(|supermatrix eigenvalue|).
   double sign = 1.0;    ///< +1.0 or -1.0.
 
-  /// Fermionic 1-norm, 0.5 * (sum_b |eps_b|)^2 (Patel 2024). Rescale this by
+  /// Fermionic 1-norm, 0.5 * (sum_b |eps_b|)^2 (Patel 2025). Rescale this by
   /// the square of any factor applied to `eps`.
   double lambda_df = 0.0;
 };
