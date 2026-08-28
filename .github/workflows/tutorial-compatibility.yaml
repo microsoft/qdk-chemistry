@@ -93,7 +93,7 @@ jobs:
         python -m pip install --upgrade pip
         # Restore this published-wheel installation as part of TODO #625:
         # python -m pip install \
-        #   "qdk-chemistry[jupyter]==${{ steps.tutorial-version.outputs.version }}" \
+        #   "qdk-chemistry==${{ steps.tutorial-version.outputs.version }}" \
         #   nbclient \
         #   nbformat \
         #   pytest \
