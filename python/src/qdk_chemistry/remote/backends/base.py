@@ -12,17 +12,21 @@ status, and retrieve serialized outputs.
 
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Type  # noqa: UP035
 
 from qdk_chemistry._core import DuplicateRegistrationError as _DuplicateRegistrationError
+from qdk_chemistry.utils.enum import CaseInsensitiveStrEnum
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from qdk_chemistry.remote.job import Job
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_POLL_INTERVAL = 5.0
 DEFAULT_TIMEOUT = 3600.0
@@ -30,6 +34,7 @@ DEFAULT_TIMEOUT = 3600.0
 __all__ = [
     "DEFAULT_POLL_INTERVAL",
     "DEFAULT_TIMEOUT",
+    "JobState",
     "JobStatus",
     "RemoteBackend",
     "available_backends",
@@ -37,6 +42,18 @@ __all__ = [
     "get_backend",
     "register_backend",
 ]
+
+
+class JobState(CaseInsensitiveStrEnum):
+    """Canonical states in the remote job lifecycle."""
+
+    SUBMITTED = "submitted"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELED = "canceled"
+    CANCELLED = "cancelled"
+    RETRIEVED = "retrieved"
 
 
 @dataclass
@@ -47,7 +64,13 @@ class JobStatus:
     """
 
     TERMINAL_STATUSES: ClassVar[frozenset[str]] = frozenset(
-        {"succeeded", "failed", "canceled", "cancelled", "retrieved"}
+        {
+            JobState.SUCCEEDED,
+            JobState.FAILED,
+            JobState.CANCELED,
+            JobState.CANCELLED,
+            JobState.RETRIEVED,
+        }
     )
 
     job_id: str
@@ -94,7 +117,7 @@ class JobStatus:
             *True* if the status represents successful execution; otherwise, *False*.
 
         """
-        return cls.normalize_status(status) == "succeeded"
+        return cls.normalize_status(status) == JobState.SUCCEEDED
 
     @property
     def is_terminal(self) -> bool:
@@ -120,17 +143,34 @@ class JobStatus:
 class RemoteBackend(ABC):
     """Abstract base class for remote execution backends.
 
-    Backends must implement:
+    Backends must implement these core operations:
 
     - **connect** / **disconnect**: lifecycle management
-    - **upload** / **download**: file transfer to/from the remote system
+    - **upload** / **download**: default file transfer to/from the remote system
     - **_submit**: launch a job asynchronously (returns job_id + state)
     - **check**: poll job status
     - **fetch**: download and deserialize results
 
+    Backends may optionally implement:
+
+    - **cancel**: cancel a running or queued job
+    - **cleanup_job**: remove artifacts for a terminal job
+
+    :meth:`upload` and :meth:`download` are the normal transport for serialized
+    job files. A backend with access to a cache shared by the client and compute
+    node may use it instead for cache-backed artifacts, avoiding redundant file
+    transfers. Files unavailable through that cache still use the default
+    transport.
+
     The remote node executes ``python -m qdk_chemistry.remote.worker`` which handles
     input deserialization, algorithm execution, caching, and output
     serialization.
+
+    Backend artifacts are retained after a job reaches a terminal state. Callers
+    are responsible for removing them with
+    :meth:`~qdk_chemistry.remote.job.Job.cleanup` or
+    :meth:`~qdk_chemistry.remote.job.Job.fetch` with ``cleanup=True``. Backend cleanup does not remove
+    caller-owned local job records or result directories.
 
     To create a custom backend:
 
@@ -143,12 +183,18 @@ class RemoteBackend(ABC):
         >>> class SlurmBackend(RemoteBackend):
         ...     name = "slurm"
         ...
-        ...     def __init__(self, **config):
-        ...         super().__init__(**config)
-        ...         self.partition = config.get("partition", "default")
+        ...     def __init__(self, *, host, partition="default", poll_interval=5.0, timeout=3600.0):
+        ...         super().__init__(
+        ...             host=host,
+        ...             partition=partition,
+        ...             poll_interval=poll_interval,
+        ...             timeout=timeout,
+        ...         )
+        ...         self.host = host
+        ...         self.partition = partition
         ...
         ...     def connect(self):
-        ...         self._client = SlurmClient(self.config.get("host"))
+        ...         self._client = SlurmClient(self.host)
         ...
         ...     def upload(self, local_path, remote_path):
         ...         self._client.sftp_put(local_path, remote_path)
@@ -167,25 +213,16 @@ class RemoteBackend(ABC):
 
     name: str  # Backend name (e.g., "scheduler", "local")
 
-    def __init__(self, *, poll_interval: float = DEFAULT_POLL_INTERVAL, **config: Any):
-        """Initialize the backend with configuration options.
+    def __init__(self, **backend_args: Any) -> None:
+        """Store the arguments needed to recreate the concrete backend.
 
         Args:
-            poll_interval: Seconds between remote job status checks.
-            **config: Backend-specific options such as:
-
-                - host: Remote host to connect to
-                - timeout: Maximum execution time in seconds
-                - remote_workdir: Working directory on remote system
-                - Any other backend-specific settings
+            **backend_args: Constructor arguments supplied by the concrete backend.
+                Persisted jobs normalize path-like values to strings and require
+                every remaining value to be JSON-serializable.
 
         """
-        self.config = {**config, "poll_interval": poll_interval}
-
-        # Common defaults
-        self.poll_interval = poll_interval
-        self.remote_workdir = config.get("remote_workdir", "/tmp/qdk_remote")
-        self.timeout = config.get("timeout", DEFAULT_TIMEOUT)
+        self._backend_args = backend_args
 
     @abstractmethod
     def connect(self) -> None:
@@ -198,16 +235,20 @@ class RemoteBackend(ABC):
 
     @abstractmethod
     def disconnect(self) -> None:
-        """Clean up connection to the remote system.
+        """Close the connection to the remote system.
 
-        Called after all operations are complete. Use this to close connections,
-        clean up temporary files, etc.
+        Called after connection-scoped operations are complete. This must not
+        cancel submitted jobs or remove artifacts referenced by persisted jobs.
 
         """
 
     @abstractmethod
     def upload(self, local_path: str | Path, remote_path: str) -> None:
         """Upload a file from local system to remote system.
+
+        Backend implementations normally call this while staging the files
+        produced by input serialization. Cache-backed files may be omitted
+        when the compute node can read them from a shared cache.
 
         Args:
             local_path: Path to the local file.
@@ -219,59 +260,21 @@ class RemoteBackend(ABC):
     def download(self, remote_path: str, local_path: str | Path) -> None:
         """Download a file from remote system to local system.
 
+        Backend implementations normally call this from :meth:`fetch` for
+        serialized outputs that were not retrieved through a shared cache.
+
         Args:
             remote_path: Path to the file on the remote system.
             local_path: Destination path on the local system.
 
         """
 
-    def submit_and_wait(self, payload: dict) -> Any:
-        """Submit a job and block until results are available.
-
-        Uses ``_submit()`` to launch the job asynchronously, polls via
-        :meth:`check`, and then :meth:`fetch` es the result.
-
-        Args:
-            payload: Execution request containing algorithm_type,
-                algorithm_name, settings, args, kwargs.
-
-        Returns:
-            The deserialized result from the algorithm.
-
-        """
-        import time  # noqa: PLC0415
-
-        job_id, backend_state = self._submit(payload)
-        timeout = getattr(self, "timeout", DEFAULT_TIMEOUT)
-        deadline = time.monotonic() + timeout
-
-        while True:
-            status = self.check(backend_state)
-            if status.is_terminal:
-                break
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise TimeoutError(
-                    f"Remote job {job_id} did not reach a terminal state within {timeout} seconds\n"
-                    f"Last status: {status.status}\n"
-                    f"Error: {status.error or 'unknown'}\nLogs:\n{status.logs}"
-                )
-            time.sleep(min(self.poll_interval, remaining))
-
-        if not status.is_successful:
-            raise RuntimeError(
-                f"Remote job {job_id} ended with status: {status.status}\n"
-                f"Error: {status.error or 'unknown'}\nLogs:\n{status.logs}"
-            )
-
-        return self.fetch(backend_state)
-
     # ── Async job primitives ─────────────────────────────────────────────
 
     def submit(self, payload: dict, *, job_dir: str | Path | None = None) -> Job:
         """Submit a job and return immediately with a ``Job``.
 
-        Unlike :meth:`submit_and_wait`, this method does **not** block.
+        This method does **not** block.
         The returned ``Job`` is self-contained: it can be
         saved to disk, loaded in a different process, and used to
         ``Job.check()``, ``Job.cancel()``, or
@@ -281,7 +284,7 @@ class RemoteBackend(ABC):
         backend-specific implementation.
 
         Args:
-            payload: Execution request (same format as *submit_and_wait*).
+            payload: Execution request containing algorithm metadata and inputs.
             job_dir: Optional directory where the job file is saved
                 automatically (as ``<id>.job.json``).  If *None* the job
                 is returned in-memory only.
@@ -290,23 +293,48 @@ class RemoteBackend(ABC):
             A ``Job`` that tracks this submission.
 
         """
-        from qdk_chemistry.remote.job import Job  # noqa: PLC0415
+        from qdk_chemistry.remote.job import Job, _prepare_persisted_value  # noqa: PLC0415
 
-        job_id, backend_state = self._submit(payload)
-
-        job = Job(
-            job_id=job_id,
-            backend=self.name,
-            backend_config=self.config,
-            backend_state=backend_state,
-            algorithm_info={
+        backend_name = _prepare_persisted_value(self.name, "backend")
+        backend_config = _prepare_persisted_value(dict(self._backend_args), "backend_config")
+        algorithm_info = _prepare_persisted_value(
+            {
                 "type": payload.get("algorithm_type"),
                 "name": payload.get("algorithm_name"),
                 "settings": payload.get("settings"),
             },
-            run_hash=payload.get("run_hash"),
-            input_hashes=payload.get("input_hashes"),
+            "algorithm_info",
         )
+        run_hash = _prepare_persisted_value(payload.get("run_hash"), "run_hash")
+        input_hashes = _prepare_persisted_value(payload.get("input_hashes"), "input_hashes")
+
+        job_id, backend_state = self._submit(payload)
+        try:
+            persisted_job_id = _prepare_persisted_value(job_id, "job_id")
+            persisted_backend_state = _prepare_persisted_value(backend_state, "backend_state")
+        except TypeError:
+            for operation, label in ((self.cancel, "cancel"), (self.cleanup_job, "clean up")):
+                try:
+                    operation(backend_state)
+                except Exception:  # noqa: BLE001
+                    logger.warning(
+                        "Failed to %s remote job %s after metadata validation failed",
+                        label,
+                        job_id,
+                        exc_info=True,
+                    )
+            raise
+
+        job = Job(
+            job_id=persisted_job_id,
+            backend=backend_name,
+            backend_config=backend_config,
+            backend_state=persisted_backend_state,
+            algorithm_info=algorithm_info,
+            run_hash=run_hash,
+            input_hashes=input_hashes,
+        )
+        job.attach_backend(self)
 
         if job_dir is not None:
             job_dir = Path(job_dir)
@@ -314,8 +342,9 @@ class RemoteBackend(ABC):
 
         return job
 
+    @abstractmethod
     def _submit(self, payload: dict) -> tuple[str, dict]:
-        """Backend-specific async submission (override in subclasses).
+        """Backend-specific async submission.
 
         Args:
             payload: Execution request.
@@ -323,11 +352,14 @@ class RemoteBackend(ABC):
         Returns:
             A ``(job_id, backend_state)`` tuple where *backend_state* is
             an opaque dict that will be passed back to :meth:`check`,
-            :meth:`cancel`, and :meth:`fetch`.
+            :meth:`cancel`, and :meth:`fetch`. Its values must be
+            JSON-serializable or path-like. Lifecycle methods must accept the
+            persisted representation, in which path-like values are strings.
 
         """
         raise NotImplementedError(f"Backend '{self.name}' does not support async submission")
 
+    @abstractmethod
     def check(self, backend_state: dict) -> JobStatus:
         """Query the current status of a previously submitted job.
 
@@ -343,13 +375,21 @@ class RemoteBackend(ABC):
     def cancel(self, backend_state: dict) -> None:
         """Cancel a running or queued job.
 
+        This operation is optional. The default implementation raises
+        :class:`NotImplementedError`.
+
         Args:
             backend_state: The opaque state dict produced by ``_submit()``.
 
         """
         raise NotImplementedError(f"Backend '{self.name}' does not support cancellation")
 
-    def fetch(self, backend_state: dict, local_dir: str | Path | None = None) -> dict:
+    @abstractmethod
+    def fetch(
+        self,
+        backend_state: dict,
+        local_dir: str | Path | None = None,
+    ) -> Any:
         """Download and deserialize results for a completed job.
 
         Args:
@@ -360,10 +400,23 @@ class RemoteBackend(ABC):
 
         Returns:
             The deserialized algorithm results (same format as the return
-            value of :meth:`submit_and_wait`).
+            value of the completed algorithm run).
 
         """
         raise NotImplementedError(f"Backend '{self.name}' does not support result fetching")
+
+    def cleanup_job(self, backend_state: dict) -> None:
+        """Remove artifacts owned by a terminal job.
+
+        This operation is optional. Implementations must make repeated calls
+        safe and must not remove shared backend work directories. The default
+        implementation raises :class:`NotImplementedError`.
+
+        Args:
+            backend_state: The opaque state dict produced by ``_submit()``.
+
+        """
+        raise NotImplementedError(f"Backend '{self.name}' does not support job cleanup")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -374,7 +427,13 @@ _BACKENDS: dict[str, type[RemoteBackend]] = {}
 
 
 def _register_backend(name: str, cls: Type[RemoteBackend]) -> Type[RemoteBackend]:  # noqa: UP006
-    """Register one backend class after validating registry ownership."""
+    """Register one backend class after validating registry ownership.
+
+    Args:
+        name: Registry name for the backend.
+        cls: Backend class to register.
+
+    """
     if name in _BACKENDS:
         raise _DuplicateRegistrationError(f"Remote backend name '{name}' is already registered")
     for registered_name, registered_cls in _BACKENDS.items():
@@ -418,7 +477,7 @@ def get_backend(name: str, **config) -> RemoteBackend:
 
     Args:
         name: Backend name (e.g., "custom" or "local")
-        **config: Backend-specific configuration
+        **config: Backend-specific configuration.
 
     Returns:
         Configured RemoteBackend instance
@@ -439,7 +498,7 @@ def create_remote(name: str, **config) -> RemoteBackend:
 
     Args:
         name: Backend name (e.g., "custom" or "local")
-        **config: Backend-specific configuration options
+        **config: Backend-specific configuration options.
 
     Returns:
         Configured RemoteBackend instance ready for use

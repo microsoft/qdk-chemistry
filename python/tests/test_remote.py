@@ -11,6 +11,7 @@ import gc
 import json
 import logging
 import shutil
+import signal
 import time
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -23,18 +24,19 @@ import qdk_chemistry.remote.backends as remote_backends
 import qdk_chemistry.remote.backends.base as remote_backend_registry
 import qdk_chemistry.remote.backends.local as local_backend_module
 import qdk_chemistry.remote.cache as remote_cache_module
+import qdk_chemistry.remote.job as job_module
 import qdk_chemistry.remote.serialization as serialization_module
 import qdk_chemistry.remote.worker as remote_worker
 from qdk_chemistry.data import AlgorithmRef, Orbitals, Settings, Structure
 from qdk_chemistry.data._hashing import _item_content_hash, collect_content_hashes
 from qdk_chemistry.plugins import DuplicateRegistrationError
 from qdk_chemistry.remote.backends import available_backends, get_backend
-from qdk_chemistry.remote.backends.base import JobStatus, RemoteBackend, register_backend
+from qdk_chemistry.remote.backends.base import JobState, JobStatus, RemoteBackend, register_backend
 from qdk_chemistry.remote.backends.local import LocalBackend
 from qdk_chemistry.remote.cache.folder import FolderCache
 from qdk_chemistry.remote.cache.tiered import TieredCache
 from qdk_chemistry.remote.job import Job
-from qdk_chemistry.remote.proxy import _poll_until_done, run
+from qdk_chemistry.remote.proxy import _build_payload_for, run, submit
 from qdk_chemistry.remote.serialization import (
     FileSerializer,
     deserialize_inputs,
@@ -58,6 +60,31 @@ def h2_structure():
 
 
 class TestFileSerializerPrimitives:
+    def test_build_payload_hashes_algorithm_ref_argument(self):
+        """A serializable algorithm reference can be submitted as an input."""
+
+        class FakeSettings:
+            def to_dict(self):
+                return {}
+
+        class FakeAlgorithm:
+            def type_name(self):
+                return "test_algorithm"
+
+            def name(self):
+                return "test"
+
+            def settings(self):
+                return FakeSettings()
+
+            def hash(self, *_args, **_kwargs):
+                return "run_hash"
+
+        reference = AlgorithmRef()
+        payload = _build_payload_for(FakeAlgorithm(), (reference,), {})
+
+        assert payload["input_hashes"] == {"args.arg_0": _item_content_hash(reference)}
+
     @pytest.mark.parametrize(
         ("value", "type_tag"),
         [
@@ -90,27 +117,11 @@ class TestFileSerializerPrimitives:
         assert result == value
         assert isinstance(result, tuple)
 
-    def test_dict_round_trip(self, tmp_path):
-        value = {"a": 1, "b": 2.0, "c": "three"}
-        entry = FileSerializer.serialize_value(tmp_path, "dct", value)
-        assert entry["type"] == "dict"
-        assert FileSerializer.deserialize_value(tmp_path, entry) == value
-
-    def test_dict_round_trip_preserves_key_types(self, tmp_path):
-        """Dictionary keys retain their values, types, and insertion order."""
-        value = {1: "integer", "1": "string", (2, "two"): "tuple"}
-        entry = FileSerializer.serialize_value(tmp_path, "dct", value)
-
-        result = FileSerializer.deserialize_value(tmp_path, entry)
-
-        assert list(result) == [1, "1", (2, "two")]
-        assert result == value
-
     def test_nested_structures(self, tmp_path):
-        value = [{"x": [1, 2]}, (True, None)]
+        value = [[1, 2], (True, None)]
         entry = FileSerializer.serialize_value(tmp_path, "nested", value)
         result = FileSerializer.deserialize_value(tmp_path, entry)
-        assert result[0] == {"x": [1, 2]}
+        assert result[0] == [1, 2]
         assert result[1] == (True, None)
 
     def test_unsupported_type_raises(self, tmp_path):
@@ -138,18 +149,18 @@ class TestFileSerializerDataClass:
         assert isinstance(loaded, Structure)
         np.testing.assert_array_almost_equal(loaded.get_coordinates(), h2_structure.get_coordinates())
 
-    def test_dict_blob_filenames_do_not_depend_on_keys(self, tmp_path, h2_structure):
-        """Distinct dictionary entries cannot resolve to the same blob file."""
+    def test_nested_blob_filenames_are_unique(self, tmp_path, h2_structure):
+        """Distinct nested values cannot resolve to the same blob file."""
         helium = Structure(["He"], np.array([[1.0, 0.0, 0.0]]))
-        entry = FileSerializer.serialize_value(tmp_path, "structures", {"/": h2_structure, "_": helium})
+        entry = FileSerializer.serialize_value(tmp_path, "structures", [h2_structure, helium])
 
-        filenames = [item["value"]["file"] for item in entry["entries"]]
+        filenames = [item["file"] for item in entry["items"]]
         assert len(set(filenames)) == 2
         assert all((tmp_path / filename).exists() for filename in filenames)
 
         result = FileSerializer.deserialize_value(tmp_path, entry)
-        np.testing.assert_array_equal(result["/"].get_coordinates(), h2_structure.get_coordinates())
-        np.testing.assert_array_equal(result["_"].get_coordinates(), helium.get_coordinates())
+        np.testing.assert_array_equal(result[0].get_coordinates(), h2_structure.get_coordinates())
+        np.testing.assert_array_equal(result[1].get_coordinates(), helium.get_coordinates())
 
     def test_is_dataclass(self, sample_orbitals):
         assert FileSerializer.is_dataclass(sample_orbitals)
@@ -200,7 +211,11 @@ class TestInputSerialization:
             settings={"/": h2_structure, "_": helium},
         )
 
-        assert len({path.name for path in files}) == 5
+        assert {path.name for path in files} == {
+            "manifest.json",
+            f"{h2_structure.content_hash()}.structure.h5",
+            f"{helium.content_hash()}.structure.h5",
+        }
         result = deserialize_inputs(tmp_path / "job")
         for values in (result["settings"], result["kwargs"]):
             np.testing.assert_array_equal(values["/"].get_coordinates(), h2_structure.get_coordinates())
@@ -361,12 +376,12 @@ class TestInputSerialization:
             algorithm_type="scf_solver",
             algorithm_name="qdk",
             settings={},
-            input_hashes={"arg_0": "hash_of_arg0"},
+            input_hashes={"args.arg_0": "hash_of_arg0"},
         )
         manifest = json.loads((tmp_path / "job" / "manifest.json").read_text())
-        assert manifest["input_hashes"] == {"arg_0": "hash_of_arg0"}
+        assert manifest["input_hashes"] == {"args.arg_0": "hash_of_arg0"}
         assert manifest["args"][0]["content_hash"] == "hash_of_arg0"
-        assert deserialize_inputs(tmp_path / "job")["input_hashes"] == {"arg_0": "hash_of_arg0"}
+        assert deserialize_inputs(tmp_path / "job")["input_hashes"] == {"args.arg_0": "hash_of_arg0"}
 
 
 class TestOutputSerialization:
@@ -399,8 +414,7 @@ class TestOutputSerialization:
 
         assert {path.name for path in files} == {
             "manifest.json",
-            "result_item_0.orbitals.h5",
-            "result_item_1.orbitals.h5",
+            f"{sample_orbitals.content_hash()}.orbitals.h5",
         }
         for path in files:
             shutil.copy2(path, destination_dir / path.name)
@@ -461,23 +475,70 @@ def test_worker_executes_serialized_algorithm(tmp_path, monkeypatch):
     algorithm.run.assert_called_once_with(2, scale=3)
 
 
+def test_worker_force_rerun_bypasses_remote_cache(tmp_path, monkeypatch):
+    """The compute node ignores a shared-cache result when forced to rerun."""
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    serialize_inputs(
+        input_dir,
+        args=(),
+        kwargs={},
+        algorithm_type="test_algorithm",
+        algorithm_name="plugin",
+        settings={},
+        run_hash="testhash",
+        force_rerun=True,
+    )
+    monkeypatch.setattr(remote_worker, "_load_remote_cache", MagicMock(return_value=(MagicMock(), "testhash", True)))
+    get_cached_result = MagicMock(return_value=-75.5)
+    monkeypatch.setattr(remote_worker, "_get_cached_result", get_cached_result)
+    algorithm = MagicMock()
+    algorithm.run.return_value = 6
+    monkeypatch.setattr(algorithms_module, "create", MagicMock(return_value=algorithm))
+
+    assert execute_job(input_dir, output_dir) == 6
+    get_cached_result.assert_not_called()
+    algorithm.run.assert_called_once_with()
+
+
 def test_worker_logs_remote_cache_load_failure(tmp_path, monkeypatch, caplog):
     input_dir = tmp_path / "input"
     input_dir.mkdir()
     (input_dir / "manifest.json").write_text(
-        json.dumps({"run_hash": "testhash", "remote_cache": {"name": "unavailable"}})
+        json.dumps({"version": 1, "run_hash": "testhash", "remote_cache": {"name": "unavailable"}})
     )
     monkeypatch.setattr(remote_cache_module, "get_cache", MagicMock(side_effect=RuntimeError("cache unavailable")))
 
     with caplog.at_level(logging.WARNING, logger=remote_worker.__name__):
-        cache, run_hash = remote_worker._load_remote_cache(input_dir)
+        cache, run_hash, force_rerun = remote_worker._load_remote_cache(input_dir)
 
     assert cache is None
     assert run_hash == "testhash"
+    assert force_rerun is False
     record = next(record for record in caplog.records if record.name == remote_worker.__name__)
     assert record.levelno == logging.WARNING
     assert record.exc_info is not None
     assert "Failed to load remote cache" in record.message
+
+
+def test_worker_validates_manifest_before_loading_remote_cache(tmp_path, monkeypatch, caplog):
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    (input_dir / "manifest.json").write_text(
+        json.dumps({"version": 2, "run_hash": "testhash", "remote_cache": {"name": "shared"}})
+    )
+    get_cache = MagicMock()
+    monkeypatch.setattr(remote_cache_module, "get_cache", get_cache)
+
+    with caplog.at_level(logging.WARNING, logger=remote_worker.__name__):
+        cache, run_hash, force_rerun = remote_worker._load_remote_cache(input_dir)
+
+    assert cache is None
+    assert run_hash is None
+    assert force_rerun is False
+    get_cache.assert_not_called()
+    record = next(record for record in caplog.records if record.name == remote_worker.__name__)
+    assert "Unsupported manifest version 2; expected 1" in record.exc_text
 
 
 def test_worker_logs_cache_read_failure(caplog):
@@ -492,6 +553,53 @@ def test_worker_logs_cache_read_failure(caplog):
     assert record.levelno == logging.WARNING
     assert record.exc_info is not None
     assert "Failed to read cached result for run testhash" in record.message
+
+
+def test_worker_cache_hit_skips_input_deserialization(tmp_path, monkeypatch):
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    serialize_inputs(
+        input_dir,
+        args=(),
+        kwargs={},
+        algorithm_type="test_algorithm",
+        algorithm_name="plugin",
+        settings={},
+        run_hash="testhash",
+    )
+    monkeypatch.setattr(remote_worker, "_load_remote_cache", MagicMock(return_value=(MagicMock(), "testhash", False)))
+    monkeypatch.setattr(remote_worker, "_get_cached_result", MagicMock(return_value=6))
+    deserialize = MagicMock()
+    monkeypatch.setattr(serialization_module, "deserialize_inputs", deserialize)
+
+    assert execute_job(input_dir, output_dir) == 6
+    deserialize.assert_not_called()
+    assert deserialize_outputs(output_dir) == 6
+
+
+@pytest.mark.parametrize(
+    ("result", "output_is_tuple"),
+    [
+        pytest.param(None, False, id="none"),
+        pytest.param((42,), True, id="singleton-tuple"),
+        pytest.param((), True, id="empty-tuple"),
+        pytest.param((None,), True, id="singleton-none-tuple"),
+    ],
+)
+def test_worker_cache_preserves_result_shape(tmp_path, result, output_is_tuple):
+    cache = FolderCache(path=tmp_path / "cache")
+    inputs = {
+        "algorithm_type": "test_algorithm",
+        "algorithm_name": "plugin",
+        "settings": {},
+    }
+
+    remote_worker._store_cached_result(cache, "testhash", inputs, result)
+
+    assert remote_worker._get_cached_result(cache, "testhash") == result
+    job = cache.get_job("testhash")
+    assert job is not None
+    assert job.output_is_tuple is output_is_tuple
 
 
 def test_worker_logs_cache_write_failure(caplog):
@@ -529,9 +637,7 @@ def test_worker_executes_transferred_nested_dataclasses(tmp_path, monkeypatch, h
 
     assert {path.name for path in files} == {
         "manifest.json",
-        "setting_0.structure.h5",
-        "arg_0_item_0.structure.h5",
-        "arg_0_item_1.structure.h5",
+        f"{h2_structure.content_hash()}.structure.h5",
     }
     for path in files:
         shutil.copy2(path, input_dir / path.name)
@@ -557,7 +663,7 @@ class TestJob:
             algorithm_info={"type": "scf_solver"},
             status="submitted",
             run_hash="aaaa",
-            input_hashes={"arg_0": "hash0"},
+            input_hashes={"args.arg_0": "hash0"},
         )
         loaded = Job.load(job.save(tmp_path / "job_j1.json"))
         assert loaded.job_id == "j1"
@@ -565,7 +671,53 @@ class TestJob:
         assert loaded.backend_config == {"timeout": 60}
         assert loaded.backend_state == {"pid": 1234}
         assert loaded.run_hash == "aaaa"
-        assert loaded.input_hashes == {"arg_0": "hash0"}
+        assert loaded.input_hashes == {"args.arg_0": "hash0"}
+
+    def test_load_requires_status(self, tmp_path):
+        path = tmp_path / "job_j1.json"
+        path.write_text(json.dumps({"job_id": "j1", "backend": "local"}))
+
+        with pytest.raises(ValueError, match="missing required field 'status'"):
+            Job.load(path)
+
+    def test_to_dict_normalizes_paths_and_algorithm_refs(self, tmp_path):
+        """Job metadata uses the same durable representation as remote settings."""
+        energy_calculator = AlgorithmRef("scf_solver", "qdk")
+        job = Job(
+            job_id="j1",
+            backend="local",
+            backend_config={"workdir": tmp_path},
+            backend_state={"output_dir": tmp_path / "output"},
+            algorithm_info={"settings": {"energy_calculator": energy_calculator}},
+        )
+
+        persisted = job.to_dict()
+
+        assert persisted["backend_config"]["workdir"] == str(tmp_path)
+        assert persisted["backend_state"]["output_dir"] == str(tmp_path / "output")
+        serialized_ref = persisted["algorithm_info"]["settings"]["energy_calculator"]
+        assert serialized_ref["__type__"] == "algorithm_ref"
+        assert serialized_ref["algorithm_type"] == "scf_solver"
+        json.dumps(persisted)
+
+    def test_save_is_atomic(self, tmp_path, monkeypatch):
+        """A failed temporary write must preserve the existing job handle."""
+        path = tmp_path / "job_x.json"
+        original_job = '{"job_id": "x", "status": "submitted"}'
+        path.write_text(original_job)
+
+        def fail_after_partial_write(_value, file, **_kwargs):
+            file.write('{"partial"')
+            raise OSError("simulated job write failure")
+
+        monkeypatch.setattr(job_module.json, "dump", fail_after_partial_write)
+        job = Job(job_id="x", backend="local", backend_config={}, backend_state={}, status="running")
+
+        with pytest.raises(OSError, match="simulated job write failure"):
+            job.save(path)
+
+        assert path.read_text() == original_job
+        assert not list(tmp_path.glob("*.tmp"))
 
     @pytest.mark.parametrize(
         "status",
@@ -578,6 +730,10 @@ class TestJob:
     def test_terminal_statuses_are_public(self):
         assert frozenset({"succeeded", "failed", "canceled", "cancelled", "retrieved"}) == JobStatus.TERMINAL_STATUSES
 
+    def test_job_states_are_case_insensitive(self):
+        assert remote_backends.JobState("RUNNING") is remote_backends.JobState.RUNNING
+        assert remote_backends.JobState("Succeeded") is remote_backends.JobState.SUCCEEDED
+
     @pytest.mark.parametrize("status", ["succeeded", "Succeeded", "SUCCEEDED"])
     def test_is_successful(self, status):
         job = Job(job_id="x", backend="local", backend_config={}, backend_state={}, status=status)
@@ -588,7 +744,7 @@ class TestJob:
         job = Job(job_id="x", backend="local", backend_config={}, backend_state={}, status=status)
         assert not job.is_terminal
 
-    def test_poll_until_done_times_out_with_backend_error(self, monkeypatch):
+    def test_wait_times_out_with_backend_error(self, monkeypatch):
         job = Job(
             job_id="x",
             backend="test-remote",
@@ -596,16 +752,17 @@ class TestJob:
             backend_state={},
         )
         job.check = MagicMock(return_value=JobStatus(job_id="x", status="unknown", error="Invalid PID file"))
+        job.attach_backend(MagicMock())
         sleep = MagicMock()
         monkeypatch.setattr(time, "sleep", sleep)
 
         with pytest.raises(TimeoutError, match="Invalid PID file"):
-            _poll_until_done(job)
+            job.wait()
 
         job.check.assert_called_once_with()
         sleep.assert_not_called()
 
-    def test_poll_until_done_uses_backend_poll_interval(self, monkeypatch):
+    def test_wait_uses_backend_poll_interval(self, monkeypatch):
         job = Job(
             job_id="x",
             backend="test-remote",
@@ -619,12 +776,37 @@ class TestJob:
                 JobStatus(job_id="x", status="succeeded"),
             ]
         )
+        job.attach_backend(MagicMock())
         sleep = MagicMock()
         monkeypatch.setattr(time, "sleep", sleep)
 
-        _poll_until_done(job)
+        job.wait()
 
         sleep.assert_called_once_with(0.25)
+
+    def test_wait_reuses_reconstructed_backend(self, monkeypatch):
+        backend = MagicMock()
+        backend.check.side_effect = [
+            JobStatus(job_id="x", status="running"),
+            JobStatus(job_id="x", status="succeeded"),
+        ]
+        get_backend = MagicMock(return_value=backend)
+        monkeypatch.setattr(remote_backends, "get_backend", get_backend)
+        job = Job(
+            job_id="x",
+            backend="test-remote",
+            backend_config={"poll_interval": 0, "timeout": 1},
+            backend_state={"operation_id": "operation"},
+        )
+
+        status = job.wait()
+
+        assert status.status == "succeeded"
+        get_backend.assert_called_once_with("test-remote", poll_interval=0, timeout=1)
+        backend.connect.assert_called_once_with()
+        assert backend.check.call_count == 2
+        backend.disconnect.assert_called_once_with()
+        assert job._active_backend is None
 
     def test_discover_finds_jobs(self, tmp_path):
         for i in range(3):
@@ -702,7 +884,8 @@ class TestJob:
         backend.disconnect.assert_called_once_with()
         assert Job.load(tmp_path / "job_x.json").status == "canceled"
 
-    def test_fetch_delegates_to_backend_and_persists_results(self, tmp_path, monkeypatch):
+    @pytest.mark.parametrize("cleanup", [False, True])
+    def test_fetch_delegates_to_backend_and_persists_results(self, tmp_path, monkeypatch, cleanup):
         backend = MagicMock()
         backend.fetch.return_value = (-1.0, "wavefunction.h5")
         monkeypatch.setattr(remote_backends, "get_backend", MagicMock(return_value=backend))
@@ -715,20 +898,88 @@ class TestJob:
         )
         result_dir = tmp_path / "results"
 
-        result = job.fetch(local_dir=result_dir)
+        def assert_persisted_before_cleanup(backend_state):
+            assert backend_state == {"operation_id": "operation"}
+            persisted = Job.load(tmp_path / "job_x.json")
+            assert persisted.status == "retrieved"
+            assert persisted.output_hashes is not None
+            assert persisted.output_is_tuple is True
+
+        backend.cleanup_job.side_effect = assert_persisted_before_cleanup
+
+        result = job.fetch(local_dir=result_dir, cleanup=cleanup)
 
         backend.connect.assert_called_once_with()
         backend.fetch.assert_called_once_with({"operation_id": "operation"}, local_dir=result_dir)
+        if cleanup:
+            backend.cleanup_job.assert_called_once_with({"operation_id": "operation"})
+        else:
+            backend.cleanup_job.assert_not_called()
         backend.disconnect.assert_called_once_with()
         assert result == (-1.0, "wavefunction.h5")
         persisted = Job.load(tmp_path / "job_x.json")
         assert persisted.status == "retrieved"
         assert persisted.output_hashes is not None
+        assert persisted.output_is_tuple is True
+
+    def test_fetch_failure_preserves_backend_artifacts(self, monkeypatch):
+        backend = MagicMock()
+        backend.fetch.side_effect = ValueError("invalid output")
+        monkeypatch.setattr(remote_backends, "get_backend", MagicMock(return_value=backend))
+        job = Job(
+            job_id="x",
+            backend="discovery",
+            backend_config={},
+            backend_state={"operation_id": "operation"},
+        )
+
+        with pytest.raises(ValueError, match="invalid output"):
+            job.fetch(cleanup=True)
+
+        backend.cleanup_job.assert_not_called()
+        backend.disconnect.assert_called_once_with()
+
+    def test_cleanup_delegates_for_terminal_job(self, monkeypatch):
+        backend = MagicMock()
+        monkeypatch.setattr(remote_backends, "get_backend", MagicMock(return_value=backend))
+        job = Job(
+            job_id="x",
+            backend="discovery",
+            backend_config={},
+            backend_state={"operation_id": "operation"},
+            status="succeeded",
+        )
+
+        job.cleanup()
+
+        backend.connect.assert_called_once_with()
+        backend.cleanup_job.assert_called_once_with({"operation_id": "operation"})
+        backend.disconnect.assert_called_once_with()
+
+    def test_cleanup_rejects_nonterminal_job(self):
+        job = Job(
+            job_id="x",
+            backend="discovery",
+            backend_config={},
+            backend_state={"operation_id": "operation"},
+        )
+
+        with pytest.raises(RuntimeError, match="terminal state"):
+            job.cleanup()
 
     def test_output_hashes_round_trip(self, tmp_path):
         hashes = [{"hash": "h1", "type": "float", "value": -75.5}, {"hash": "h2", "type": "wavefunction"}]
-        job = Job(job_id="x", backend="local", backend_config={}, backend_state={}, output_hashes=hashes)
-        assert Job.load(job.save(tmp_path / "job_x.json")).output_hashes == hashes
+        job = Job(
+            job_id="x",
+            backend="local",
+            backend_config={},
+            backend_state={},
+            output_hashes=hashes,
+            output_is_tuple=True,
+        )
+        loaded = Job.load(job.save(tmp_path / "job_x.json"))
+        assert loaded.output_hashes == hashes
+        assert loaded.output_is_tuple is True
 
 
 class TestBackendRegistry:
@@ -781,6 +1032,15 @@ class TestBackendRegistry:
             def download(self, remote_path, local_path):
                 pass
 
+            def _submit(self, payload):
+                raise NotImplementedError
+
+            def check(self, backend_state):
+                raise NotImplementedError
+
+            def fetch(self, backend_state, local_dir=None):
+                raise NotImplementedError
+
         register_backend("_test_stub")(StubBackend)
 
         assert "_test_stub" in available_backends()
@@ -805,51 +1065,68 @@ def backend(request):
 class TestBackendContract:
     """Shared tests every backend must satisfy. Parameterized via the `backend` fixture."""
 
-    def test_submit_and_wait_uses_backend_poll_interval(self, monkeypatch):
-        """Blocking submission polls at the backend's configured interval."""
-        backend = LocalBackend(poll_interval=0.25)
-        backend._submit = MagicMock(return_value=("job-id", {"backend": "state"}))
-        backend.check = MagicMock(
-            side_effect=[
-                JobStatus(job_id="job-id", status="running"),
-                JobStatus(job_id="job-id", status="succeeded"),
-            ]
-        )
-        backend.fetch = MagicMock(return_value={"result": 42})
-        sleep = MagicMock()
-        monkeypatch.setattr(time, "sleep", sleep)
-
-        assert backend.submit_and_wait({}) == {"result": 42}
-
-        assert backend.config["poll_interval"] == 0.25
-        sleep.assert_called_once_with(0.25)
-
-    def test_submit_and_wait_accepts_lowercase_success(self):
+    @staticmethod
+    def _mock_backend(*, backend_config=None, backend_state=None):
+        """Create a backend double with configurable persisted metadata."""
         backend = MagicMock(spec=RemoteBackend)
-        backend._submit.return_value = ("job-id", {"backend": "state"})
-        backend.check.return_value = JobStatus(job_id="job-id", status="succeeded")
-        backend.fetch.return_value = {"result": 42}
+        backend.name = "test-remote"
+        backend._backend_args = backend_config or {}
+        backend._submit.return_value = ("job-id", backend_state or {})
+        return backend
 
-        assert RemoteBackend.submit_and_wait(backend, {}) == {"result": 42}
-
-        backend.fetch.assert_called_once_with({"backend": "state"})
-
-    def test_submit_and_wait_times_out_with_backend_error(self, monkeypatch):
-        backend = LocalBackend(timeout=0)
-        backend._submit = MagicMock(return_value=("job-id", {"backend": "state"}))
-        backend.check = MagicMock(
-            return_value=JobStatus(job_id="job-id", status="unknown", error="Could not read PID file")
+    def test_submit_normalizes_persisted_metadata(self, tmp_path):
+        """Supported rich values are normalized before a job is returned."""
+        backend = self._mock_backend(
+            backend_config={"workdir": tmp_path},
+            backend_state={"output_dir": tmp_path / "output"},
         )
-        backend.fetch = MagicMock()
-        sleep = MagicMock()
-        monkeypatch.setattr(time, "sleep", sleep)
+        energy_calculator = AlgorithmRef("scf_solver", "qdk")
 
-        with pytest.raises(TimeoutError, match="Could not read PID file"):
-            backend.submit_and_wait({})
+        job = RemoteBackend.submit(
+            backend,
+            {
+                "algorithm_type": "test_algorithm",
+                "algorithm_name": "plugin",
+                "settings": {"energy_calculator": energy_calculator},
+            },
+            job_dir=tmp_path,
+        )
 
-        backend.check.assert_called_once_with({"backend": "state"})
-        backend.fetch.assert_not_called()
-        sleep.assert_not_called()
+        loaded = Job.load(tmp_path / "job-id.job.json")
+        assert loaded.backend_config == {"workdir": str(tmp_path)}
+        assert loaded.backend_state == {"output_dir": str(tmp_path / "output")}
+        assert loaded.algorithm_info["settings"]["energy_calculator"]["__type__"] == "algorithm_ref"
+        assert job.to_dict() == loaded.to_dict()
+        backend._submit.assert_called_once()
+
+    @pytest.mark.parametrize(
+        ("backend_config", "payload", "field"),
+        [
+            ({"client": object()}, {"settings": {}}, "backend_config"),
+            ({}, {"settings": {"client": object()}}, "algorithm_info"),
+            ({}, {"settings": {}, "run_hash": object()}, "run_hash"),
+            ({}, {"settings": {}, "input_hashes": {"arg": object()}}, "input_hashes"),
+        ],
+    )
+    def test_submit_rejects_unpersistable_metadata_before_launch(self, backend_config, payload, field):
+        """Known unpersistable metadata prevents backend submission."""
+        backend = self._mock_backend(backend_config=backend_config)
+
+        with pytest.raises(TypeError, match=field):
+            RemoteBackend.submit(backend, payload)
+
+        backend._submit.assert_not_called()
+
+    def test_submit_discards_job_with_unpersistable_backend_state(self):
+        """Invalid state triggers best-effort cancellation and cleanup."""
+        backend_state = {"client": object()}
+        backend = self._mock_backend(backend_state=backend_state)
+
+        with pytest.raises(TypeError, match="backend_state"):
+            RemoteBackend.submit(backend, {"settings": {}})
+
+        backend.cancel.assert_called_once_with(backend_state)
+        backend.cleanup_job.assert_called_once_with(backend_state)
 
     def test_upload_download_round_trip(self, backend, tmp_path):
         src = tmp_path / "input.txt"
@@ -883,26 +1160,100 @@ class TestBackendContract:
 
 
 class TestLocalBackendSpecific:
+    def test_constructor_arguments_are_persisted(self, monkeypatch):
+        backend = LocalBackend(
+            poll_interval=0.25,
+            timeout=60,
+            python_path="/custom/python",
+        )
+        monkeypatch.setattr(backend, "_submit", MagicMock(return_value=("job-id", {})))
+
+        job = backend.submit({})
+
+        assert job.backend_config == {
+            "poll_interval": 0.25,
+            "timeout": 60,
+            "python_path": "/custom/python",
+        }
+        assert backend._backend_args == job.backend_config
+
+    def test_constructor_rejects_unknown_arguments(self):
+        with pytest.raises(TypeError, match="unexpected keyword argument"):
+            get_backend("local", timeot=60)
+
     def test_connect_creates_workdir(self):
-        b = LocalBackend()
-        b.connect()
-        assert Path(b.remote_workdir).exists()
-        b.disconnect()
+        backend = LocalBackend()
+        backend.connect()
+        assert Path(backend.remote_workdir).exists()
+        backend.disconnect()
 
     def test_disconnect_removes_workdir(self):
-        b = LocalBackend()
-        b.connect()
-        workdir = b.remote_workdir
-        b.disconnect()
+        backend = LocalBackend()
+        backend.connect()
+        workdir = backend.remote_workdir
+        backend.disconnect()
         assert not Path(workdir).exists()
 
-    def test_keep_workdir_option(self):
-        b = LocalBackend(keep_workdir=True)
-        b.connect()
-        workdir = b.remote_workdir
-        b.disconnect()
+    def test_disconnect_preserves_nonempty_workdir(self):
+        backend = LocalBackend()
+        backend.connect()
+        workdir = Path(backend.remote_workdir)
+        (workdir / "job_running").mkdir()
+
+        backend.disconnect()
+
         assert Path(workdir).exists()
         shutil.rmtree(workdir, ignore_errors=True)
+
+    def test_cleanup_job_is_idempotent_and_removes_empty_workdir(self, tmp_path):
+        workdir = tmp_path / "qdk_local"
+        job_workdir = workdir / "job_x"
+        output_dir = job_workdir / "output"
+        output_dir.mkdir(parents=True)
+        state = {
+            "workdir": str(workdir),
+            "job_workdir": str(job_workdir),
+            "output_dir": str(output_dir),
+        }
+        backend = LocalBackend()
+
+        backend.cleanup_job(state)
+        backend.cleanup_job(state)
+
+        assert not job_workdir.exists()
+        assert not workdir.exists()
+
+    def test_cleanup_job_preserves_sibling_jobs(self, tmp_path):
+        workdir = tmp_path / "qdk_local"
+        job_workdir = workdir / "job_x"
+        output_dir = job_workdir / "output"
+        output_dir.mkdir(parents=True)
+        sibling = workdir / "job_y"
+        sibling.mkdir()
+        backend = LocalBackend()
+
+        backend.cleanup_job(
+            {
+                "workdir": str(workdir),
+                "job_workdir": str(job_workdir),
+                "output_dir": str(output_dir),
+            }
+        )
+
+        assert not job_workdir.exists()
+        assert sibling.exists()
+
+    def test_cleanup_job_rejects_inconsistent_paths(self, tmp_path):
+        backend = LocalBackend()
+
+        with pytest.raises(ValueError, match="inconsistent"):
+            backend.cleanup_job(
+                {
+                    "workdir": str(tmp_path / "workdir"),
+                    "job_workdir": str(tmp_path / "other" / "job_x"),
+                    "output_dir": str(tmp_path / "other" / "job_x" / "output"),
+                }
+            )
 
     def test_submit_launches_remote_worker_module(self, monkeypatch):
         backend = LocalBackend()
@@ -932,7 +1283,7 @@ class TestLocalBackendSpecific:
         process.poll.side_effect = [None, 1]
         monkeypatch.setattr("subprocess.Popen", MagicMock(return_value=process))
         try:
-            _, state = backend._submit(
+            job_id, state = backend._submit(
                 {
                     "algorithm_type": "test_algorithm",
                     "algorithm_name": "plugin",
@@ -942,8 +1293,13 @@ class TestLocalBackendSpecific:
                 }
             )
 
-            assert backend.check(state).status == "running"
-            assert backend.check(state).status == "Failed"
+            assert state["job_id"] == job_id
+            running_status = backend.check(state)
+            failed_status = backend.check(state)
+            assert running_status.status is JobState.RUNNING
+            assert running_status.job_id == job_id
+            assert failed_status.status is JobState.FAILED
+            assert failed_status.job_id == job_id
         finally:
             backend.disconnect()
 
@@ -952,13 +1308,80 @@ class TestLocalBackendSpecific:
         monkeypatch.setattr(local_backend_module, "_process_is_running", process_is_running)
         backend = LocalBackend()
         state = {
+            "job_id": "job-id",
             "pid": 1234,
             "output_dir": str(tmp_path / "output"),
             "job_workdir": str(tmp_path),
         }
 
-        assert backend.check(state).status == "Failed"
+        status = backend.check(state)
+        assert status.status is JobState.FAILED
+        assert status.job_id == "job-id"
         process_is_running.assert_called_once_with(1234)
+
+    def test_check_rehydrated_job_prefers_completed_manifest(self, tmp_path, monkeypatch):
+        output_dir = tmp_path / "output"
+        output_dir.mkdir()
+        (output_dir / "manifest.json").write_text("{}")
+        process_is_running = MagicMock(return_value=True)
+        process_identity = MagicMock(return_value="linux:789")
+        monkeypatch.setattr(local_backend_module, "_process_is_running", process_is_running)
+        monkeypatch.setattr(local_backend_module, "_process_identity", process_identity)
+        backend = LocalBackend()
+        state = {
+            "job_id": "job-id",
+            "pid": 1234,
+            "process_identity": "linux:456",
+            "output_dir": str(output_dir),
+            "job_workdir": str(tmp_path),
+        }
+
+        status = backend.check(state)
+
+        assert status.status is JobState.SUCCEEDED
+        process_is_running.assert_not_called()
+        process_identity.assert_not_called()
+
+    def test_check_rehydrated_job_rejects_reused_pid(self, tmp_path, monkeypatch):
+        process_is_running = MagicMock(return_value=True)
+        process_identity = MagicMock(return_value="linux:789")
+        monkeypatch.setattr(local_backend_module, "_process_is_running", process_is_running)
+        monkeypatch.setattr(local_backend_module, "_process_identity", process_identity)
+        backend = LocalBackend()
+        state = {
+            "job_id": "job-id",
+            "pid": 1234,
+            "process_identity": "linux:456",
+            "output_dir": str(tmp_path / "output"),
+            "job_workdir": str(tmp_path),
+        }
+
+        status = backend.check(state)
+
+        assert status.status is JobState.FAILED
+        process_identity.assert_called_once_with(1234)
+        process_is_running.assert_not_called()
+
+    def test_cancel_rehydrated_job_requires_matching_process_identity(self, monkeypatch):
+        backend = LocalBackend()
+        kill = MagicMock()
+        monkeypatch.setattr("os.kill", kill)
+        monkeypatch.setattr(local_backend_module, "_process_identity", MagicMock(return_value="linux:456"))
+
+        backend.cancel({"pid": 1234, "process_identity": "linux:456"})
+
+        kill.assert_called_once_with(1234, signal.SIGTERM)
+
+    def test_cancel_rehydrated_job_refuses_unverified_process(self, monkeypatch):
+        backend = LocalBackend()
+        kill = MagicMock()
+        monkeypatch.setattr("os.kill", kill)
+        monkeypatch.setattr(local_backend_module, "_process_identity", MagicMock(return_value="linux:789"))
+
+        with pytest.raises(RuntimeError, match="Cannot verify local job process identity"):
+            backend.cancel({"pid": 1234, "process_identity": "linux:456"})
+
+        kill.assert_not_called()
 
 
 class TestRunWithCache:
@@ -972,6 +1395,35 @@ class TestRunWithCache:
         algo.run.return_value = result
         return algo
 
+    def test_input_hash_namespaces_do_not_collide(self, tmp_path):
+        """Keep a keyword named arg_0 distinct from positional argument zero."""
+        positional = np.array([1.0])
+        keyword = np.array([2.0])
+        payload = _build_payload_for(self._mock_algorithm(), (positional,), {"arg_0": keyword})
+        input_hashes = payload["input_hashes"]
+        assert input_hashes == {
+            "args.arg_0": _item_content_hash(positional),
+            "kwargs.arg_0": _item_content_hash(keyword),
+        }
+
+        shared_cache = FolderCache(path=tmp_path / "shared", is_shared=True)
+        shared_cache.put_data(input_hashes["args.arg_0"], positional)
+        shared_cache.put_data(input_hashes["kwargs.arg_0"], keyword)
+        serialize_inputs(
+            tmp_path / "input",
+            args=payload["args"],
+            kwargs=payload["kwargs"],
+            algorithm_type=payload["algorithm_type"],
+            algorithm_name=payload["algorithm_name"],
+            settings=payload["settings"],
+            input_hashes=input_hashes,
+            remote_cache_backend=shared_cache,
+        )
+        restored = deserialize_inputs(tmp_path / "input", cache=shared_cache)
+
+        np.testing.assert_array_equal(restored["args"][0], positional)
+        np.testing.assert_array_equal(restored["kwargs"]["arg_0"], keyword)
+
     def test_run_no_cache(self):
         algo = self._mock_algorithm()
         assert run(algo, "arg1", cache=None, remote=None) == -75.5
@@ -979,26 +1431,128 @@ class TestRunWithCache:
 
     def test_named_remote_without_cache_disconnects_owned_backend(self, monkeypatch):
         algo = self._mock_algorithm()
-        backend = MagicMock()
-        backend.submit_and_wait.return_value = -75.5
+        backend = MagicMock(spec=RemoteBackend)
+        backend.name = "test"
+        backend._backend_args = {"poll_interval": 0, "timeout": 1}
+        backend._submit.return_value = ("remote-job", {})
+        backend.submit.side_effect = lambda payload, job_dir=None: RemoteBackend.submit(
+            backend, payload, job_dir=job_dir
+        )
+        backend.check.side_effect = [
+            JobStatus(job_id="remote-job", status="running"),
+            JobStatus(job_id="remote-job", status="succeeded"),
+        ]
+        backend.fetch.return_value = -75.5
         get_backend = MagicMock(return_value=backend)
         monkeypatch.setattr(remote_backends, "get_backend", get_backend)
 
         assert run(algo, "arg1", remote="test") == -75.5
 
         get_backend.assert_called_once_with("test")
+        backend.submit.assert_called_once()
+        assert backend.check.call_count == 2
+        backend.fetch.assert_called_once_with({}, local_dir=None)
+        backend.cleanup_job.assert_not_called()
         backend.connect.assert_called_once_with()
         backend.disconnect.assert_called_once_with()
 
     def test_injected_remote_without_cache_remains_connected(self):
         algo = self._mock_algorithm()
         backend = MagicMock()
-        backend.submit_and_wait.return_value = -75.5
+        job = Job(
+            job_id="remote-job",
+            backend="test",
+            backend_config={},
+            backend_state={},
+            status="succeeded",
+        )
+        job.fetch = MagicMock(return_value=-75.5)
+        job.cleanup = MagicMock()
+        backend.submit.return_value = job
 
         assert run(algo, "arg1", remote=backend) == -75.5
         gc.collect()
 
+        backend.submit.assert_called_once()
+        job.fetch.assert_called_once_with()
+        job.cleanup.assert_not_called()
         backend.disconnect.assert_not_called()
+
+    def test_injected_unregistered_backend_runs_to_completion(self):
+        class UnregisteredBackend(RemoteBackend):
+            name = "unregistered"
+
+            def __init__(self):
+                super().__init__(poll_interval=0, timeout=1)
+                self.statuses = iter(["running", "succeeded"])
+
+            def connect(self):
+                pass
+
+            def disconnect(self):
+                pass
+
+            def upload(self, local_path, remote_path):
+                pass
+
+            def download(self, remote_path, local_path):
+                pass
+
+            def _submit(self, _payload):
+                return "remote-job", {}
+
+            def check(self, _backend_state):
+                return JobStatus(job_id="remote-job", status=next(self.statuses))
+
+            def fetch(self, _backend_state, local_dir=None):
+                del local_dir
+                return -75.5
+
+            def cleanup_job(self, _backend_state):
+                pass
+
+        assert run(self._mock_algorithm(), remote=UnregisteredBackend()) == -75.5
+
+    def test_injected_backend_without_cleanup_runs_to_completion(self):
+        class UnregisteredBackend(RemoteBackend):
+            name = "unregistered"
+
+            def __init__(self):
+                super().__init__(poll_interval=0, timeout=1)
+                self.statuses = iter(["running", "succeeded"])
+
+            def connect(self):
+                pass
+
+            def disconnect(self):
+                pass
+
+            def upload(self, local_path, remote_path):
+                pass
+
+            def download(self, remote_path, local_path):
+                pass
+
+            def _submit(self, _payload):
+                return "remote-job", {}
+
+            def check(self, _backend_state):
+                return JobStatus(job_id="remote-job", status=next(self.statuses))
+
+            def fetch(self, _backend_state, local_dir=None):
+                del local_dir
+                return -75.5
+
+        assert run(self._mock_algorithm(), remote=UnregisteredBackend()) == -75.5
+
+    def test_submit_returns_job_for_injected_backend(self):
+        algo = self._mock_algorithm()
+        backend = MagicMock()
+        job = MagicMock(spec=Job)
+        backend.submit.return_value = job
+
+        assert submit(algo, "arg1", remote=backend) is job
+        backend.submit.assert_called_once()
 
     def test_named_remote_with_cache_disconnects_owned_backend(self, tmp_path, monkeypatch):
         cache = FolderCache(path=tmp_path / "cache")
@@ -1012,6 +1566,8 @@ class TestRunWithCache:
             status="Succeeded",
         )
         job.fetch = MagicMock(return_value=-75.5)
+
+        job.cleanup = MagicMock()
         backend.submit.return_value = job
         get_backend = MagicMock(return_value=backend)
         monkeypatch.setattr(remote_backends, "get_backend", get_backend)
@@ -1021,9 +1577,41 @@ class TestRunWithCache:
         get_backend.assert_called_once_with("test")
         backend.connect.assert_called_once_with()
         backend.disconnect.assert_called_once_with()
+        job.cleanup.assert_not_called()
         payload = backend.submit.call_args.args[0]
         assert "remote_cache" not in payload
         assert "remote_cache_backend" not in payload
+
+    def test_remote_failure_includes_backend_diagnostics(self, tmp_path):
+        """A terminal remote failure reports backend error details and logs."""
+        cache = FolderCache(path=tmp_path / "cache")
+        algo = self._mock_algorithm()
+        backend = MagicMock()
+        job = Job(
+            job_id="remote-job",
+            backend="test",
+            backend_config={"poll_interval": 0},
+            backend_state={},
+        )
+
+        def fail_job():
+            job.status = "failed"
+            return JobStatus(
+                job_id=job.job_id,
+                status="failed",
+                error="Remote worker exited with code 1",
+                logs="Traceback (most recent call last): ...",
+            )
+
+        job.check = MagicMock(side_effect=fail_job)
+        backend.submit.return_value = job
+
+        with pytest.raises(RuntimeError) as error:
+            run(algo, "arg1", cache=cache, remote=backend)
+
+        assert "failed" in str(error.value)
+        assert "Remote worker exited with code 1" in str(error.value)
+        assert "Traceback (most recent call last): ..." in str(error.value)
 
     def test_cached_poll_accepts_lowercase_success(self, tmp_path, monkeypatch):
         cache = FolderCache(path=tmp_path / "cache")
@@ -1045,6 +1633,8 @@ class TestRunWithCache:
 
         monkeypatch.setattr(Job, "check", complete_job)
         monkeypatch.setattr(Job, "fetch", MagicMock(return_value=-75.5))
+        cleanup = MagicMock()
+        monkeypatch.setattr(Job, "cleanup", cleanup)
         sleep = MagicMock()
         monkeypatch.setattr(time, "sleep", sleep)
 
@@ -1052,6 +1642,32 @@ class TestRunWithCache:
 
         backend.submit.assert_not_called()
         sleep.assert_not_called()
+        cleanup.assert_not_called()
+
+    def test_cached_success_without_outputs_retries_fetch(self, tmp_path, monkeypatch):
+        """A persisted success is fetched again instead of being resubmitted."""
+        cache = FolderCache(path=tmp_path / "cache")
+        algo = self._mock_algorithm()
+        backend = MagicMock()
+        job = Job(
+            job_id="remote-job",
+            backend="test",
+            backend_config={},
+            backend_state={},
+            status="succeeded",
+            run_hash="testhash1234abcd",
+        )
+        cache.put_job("testhash1234abcd", job)
+        fetch = MagicMock(return_value=-75.5)
+        monkeypatch.setattr(Job, "fetch", fetch)
+        cleanup = MagicMock()
+        monkeypatch.setattr(Job, "cleanup", cleanup)
+
+        assert run(algo, "arg1", cache=cache, remote=backend) == -75.5
+
+        fetch.assert_called_once_with()
+        cleanup.assert_not_called()
+        backend.submit.assert_not_called()
 
     def test_remote_uses_shared_tier_from_cache(self, tmp_path):
         local_cache = FolderCache(path=tmp_path / "local")
@@ -1067,6 +1683,7 @@ class TestRunWithCache:
             status="Succeeded",
         )
         job.fetch = MagicMock(return_value=-75.5)
+        job.cleanup = MagicMock()
         backend.submit.return_value = job
 
         assert run(algo, "arg1", cache=cache, remote=backend) == -75.5
@@ -1078,6 +1695,52 @@ class TestRunWithCache:
             "is_shared": True,
         }
         assert payload["remote_cache_backend"] is shared_cache
+        job.cleanup.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "result",
+        [
+            pytest.param(None, id="none"),
+            pytest.param((42,), id="singleton-tuple"),
+            pytest.param((), id="empty-tuple"),
+        ],
+    )
+    def test_remote_reconstructs_result_from_shared_cache(self, tmp_path, result):
+        local_cache = FolderCache(path=tmp_path / "local")
+        shared_cache = FolderCache(path=tmp_path / "shared", is_shared=True)
+        cache = TieredCache([local_cache, shared_cache])
+        algo = self._mock_algorithm(result=result)
+        backend = MagicMock()
+        submitted_job = Job(
+            job_id="remote-job",
+            backend="test",
+            backend_config={"poll_interval": 0},
+            backend_state={},
+            status="running",
+        )
+        submitted_job.fetch = MagicMock(return_value="fetched")
+        submitted_job.cleanup = MagicMock()
+        remote_job = Job(
+            job_id="remote-job",
+            backend="remote",
+            backend_config={},
+            backend_state={},
+            status="retrieved",
+            output_hashes=collect_content_hashes(result),
+            output_is_tuple=isinstance(result, tuple),
+        )
+
+        def complete_job():
+            shared_cache.put_job("testhash1234abcd", remote_job)
+            submitted_job.status = "succeeded"
+            return JobStatus(job_id=submitted_job.job_id, status="succeeded")
+
+        submitted_job.check = MagicMock(side_effect=complete_job)
+        backend.submit.return_value = submitted_job
+
+        assert run(algo, cache=cache, remote=backend) == result
+        submitted_job.fetch.assert_not_called()
+        submitted_job.cleanup.assert_not_called()
 
     def test_run_stores_in_cache(self, tmp_path):
         cache = FolderCache(path=tmp_path / "cache")
@@ -1098,6 +1761,28 @@ class TestRunWithCache:
         assert run(algo, "arg1", cache=cache, remote=None) == -75.5
         algo.run.assert_not_called()
 
+    @pytest.mark.parametrize(
+        ("result", "output_is_tuple"),
+        [
+            pytest.param(None, False, id="none"),
+            pytest.param((42,), True, id="singleton-tuple"),
+            pytest.param((), True, id="empty-tuple"),
+            pytest.param((None,), True, id="singleton-none-tuple"),
+        ],
+    )
+    def test_cache_hit_preserves_result_shape(self, tmp_path, result, output_is_tuple):
+        cache = FolderCache(path=tmp_path / "cache")
+        algo = self._mock_algorithm(result=result)
+
+        assert run(algo, cache=cache, remote=None) == result
+        algo.run.reset_mock()
+
+        assert run(algo, cache=cache, remote=None) == result
+        algo.run.assert_not_called()
+        job = cache.get_job("testhash1234abcd")
+        assert job is not None
+        assert job.output_is_tuple is output_is_tuple
+
     def test_force_rerun(self, tmp_path):
         cache = FolderCache(path=tmp_path / "cache")
         algo = self._mock_algorithm()
@@ -1107,6 +1792,26 @@ class TestRunWithCache:
 
         run(algo, "arg1", cache=cache, remote=None, force_rerun=True)
         algo.run.assert_called_once()
+
+    def test_force_rerun_reaches_remote_worker(self, tmp_path):
+        cache = FolderCache(path=tmp_path / "cache")
+        algo = self._mock_algorithm()
+        backend = MagicMock()
+        job = Job(
+            job_id="remote-job",
+            backend="test",
+            backend_config={},
+            backend_state={},
+            status="Succeeded",
+        )
+        job.fetch = MagicMock(return_value=-75.5)
+        job.cleanup = MagicMock()
+        backend.submit.return_value = job
+
+        assert run(algo, "arg1", cache=cache, remote=backend, force_rerun=True) == -75.5
+
+        assert backend.submit.call_args.args[0]["force_rerun"] is True
+        job.cleanup.assert_not_called()
 
     def test_remote_submission_callback_runs_after_handle_is_persisted(self, tmp_path):
         cache = FolderCache(path=tmp_path / "cache")
@@ -1120,6 +1825,7 @@ class TestRunWithCache:
             status="Succeeded",
         )
         job.fetch = MagicMock(return_value=-75.5)
+        job.cleanup = MagicMock()
         backend.submit.return_value = job
         persisted_jobs = []
 
@@ -1137,6 +1843,7 @@ class TestRunWithCache:
         assert result == -75.5
         assert persisted_jobs[0] is not None
         assert persisted_jobs[0].job_id == "remote-job"
+        job.cleanup.assert_not_called()
 
     def test_string_cache_path(self, tmp_path):
         algo = self._mock_algorithm(result=42)

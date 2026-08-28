@@ -1,8 +1,4 @@
-"""Remote algorithm proxy for QDK/Chemistry.
-
-This module provides the RemoteAlgorithmProxy class that wraps algorithms
-to redirect their execution to remote systems via configurable backends.
-"""
+"""Remote execution and caching for QDK/Chemistry algorithms."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -11,150 +7,15 @@ to redirect their execution to remote systems via configurable backends.
 
 from __future__ import annotations
 
-import time
-from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
-    from qdk_chemistry.algorithms.base import Algorithm
-    from qdk_chemistry.remote.backends import RemoteBackend
     from qdk_chemistry.remote.job import Job
 
-
-class RemoteAlgorithmProxy:
-    """Internal proxy used by the ``run()`` function for remote execution.
-
-    Not intended for direct use. Use ``algorithm.run(..., remote=..., cache=...)``
-    instead.
-
-    """
-
-    def __init__(
-        self,
-        algorithm: Algorithm,
-        remote: str | RemoteBackend,
-        **remote_config: Any,
-    ):
-        """Initialize the remote algorithm proxy.
-
-        Args:
-            algorithm: The algorithm instance to wrap.
-            remote: Either a backend name (str) like "local" or a name
-                registered by a plugin,
-                or a pre-configured RemoteBackend instance.
-            **remote_config: Backend-specific configuration options (only used
-                if remote is a string). Options include:
-
-                - host: Remote host to connect to
-                - python_path: Remote Python interpreter path
-                - timeout: Maximum execution time in seconds
-                - remote_workdir: Working directory on remote system
-                - Other backend-specific settings
-
-        """
-        self._algorithm = algorithm
-        self._remote_config = remote_config
-
-        # Store either the backend instance or the name for lazy creation
-        if isinstance(remote, str):
-            self._backend_name: str | None = remote
-            self._backend: RemoteBackend | None = None
-        else:
-            self._backend_name = None
-            self._backend = remote
-
-    @cached_property
-    def _resolved_backend(self) -> RemoteBackend:
-        """Lazily resolve and connect to the backend."""
-        if self._backend is not None:
-            # Already have a backend instance
-            return self._backend
-
-        # Create backend from name
-        from qdk_chemistry.remote.backends import get_backend  # noqa: PLC0415
-
-        backend = get_backend(self._backend_name, **self._remote_config)
-        backend.connect()
-        return backend
-
-    def run(self, *args: Any, **kwargs: Any) -> Any:
-        """Execute the algorithm on the remote system.
-
-        This method:
-        1. Serializes all arguments to HDF5
-        2. Uploads to the remote system
-        3. Generates and executes a Python script
-        4. Downloads and deserializes the results
-
-        Args:
-            *args: Positional arguments for the algorithm's run method.
-            **kwargs: Keyword arguments for the algorithm's run method.
-
-        Returns:
-            The result from the algorithm (e.g., (energy, wavefunction) tuple).
-
-        Raises:
-            RuntimeError: If remote execution fails.
-            ConnectionError: If connection to remote system fails.
-
-        """
-        # Build the execution payload
-        payload = _build_payload_for(self._algorithm, args, kwargs)
-
-        backend = self._resolved_backend
-        try:
-            return backend.submit_and_wait(payload)
-        finally:
-            if self._backend_name is not None:
-                backend.disconnect()
-                self.__dict__.pop("_resolved_backend", None)
-
-    def submit(self, *args: Any, job_dir: str | Path | None = None, **kwargs: Any) -> Job:
-        """Submit the algorithm for remote execution without blocking.
-
-        Returns a ``Job`` that persists to disk (if *job_dir*
-        is given) and can be used to ``Job.check()``,
-        ``Job.cancel()``, or ``Job.fetch()`` — even
-        from a completely different script.
-
-        Args:
-            *args: Positional arguments for the algorithm's run method.
-            job_dir: Optional directory where the job file is saved
-                automatically (as ``job_<id>.json``).
-            **kwargs: Keyword arguments for the algorithm's run method.
-
-        Returns:
-            A ``Job`` that tracks this submission.
-
-        """
-        payload = _build_payload_for(self._algorithm, args, kwargs)
-        return self._resolved_backend.submit(payload, job_dir=job_dir)
-
-    def settings(self):
-        """Forward settings access to the wrapped algorithm.
-
-        Returns:
-            The algorithm's Settings object.
-
-        """
-        return self._algorithm.settings()
-
-    def __getattr__(self, name: str) -> Any:
-        """Forward all other attribute access to the wrapped algorithm."""
-        return getattr(self._algorithm, name)
-
-    def __repr__(self) -> str:
-        """Return string representation of the proxy."""
-        if self._backend_name:
-            backend_name = self._backend_name
-        elif self._backend is not None:
-            backend_name = self._backend.name
-        else:
-            backend_name = "unknown"
-        return f"<RemoteProxy({self._algorithm.name()}) -> {backend_name}>"
+_CACHE_MISS = object()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -163,7 +24,14 @@ class RemoteAlgorithmProxy:
 
 
 def _build_payload_for(algorithm: Any, args: tuple, kwargs: dict) -> dict:
-    """Build an execution payload from any algorithm-like object."""
+    """Build an execution payload from any algorithm-like object.
+
+    Args:
+        algorithm: Algorithm-like object providing execution metadata.
+        args: Positional arguments for the algorithm.
+        kwargs: Keyword arguments for the algorithm.
+
+    """
     import contextlib  # noqa: PLC0415
 
     from qdk_chemistry.data._hashing import _item_content_hash  # noqa: PLC0415
@@ -181,9 +49,9 @@ def _build_payload_for(algorithm: Any, args: tuple, kwargs: dict) -> dict:
 
     input_hashes: dict[str, str] = {}
     for i, arg in enumerate(args):
-        input_hashes[f"arg_{i}"] = _item_content_hash(arg)
+        input_hashes[f"args.arg_{i}"] = _item_content_hash(arg)
     for key, val in kwargs.items():
-        input_hashes[key] = _item_content_hash(val)
+        input_hashes[f"kwargs.{key}"] = _item_content_hash(val)
     if input_hashes:
         payload["input_hashes"] = input_hashes
 
@@ -191,10 +59,19 @@ def _build_payload_for(algorithm: Any, args: tuple, kwargs: dict) -> dict:
 
 
 def _store_result(cache: Any, run_hash: str, job: Any, result: Any) -> None:
-    """Hash result items, persist DataClass blobs, update job in cache."""
+    """Hash result items, persist DataClass blobs, update job in cache.
+
+    Args:
+        cache: Cache backend receiving result data and job metadata.
+        run_hash: Deterministic cache key for the execution.
+        job: Job record to update with output hashes.
+        result: Algorithm result to persist.
+
+    """
     from qdk_chemistry.data._hashing import collect_content_hashes  # noqa: PLC0415
 
     job.output_hashes = collect_content_hashes(result)
+    job.output_is_tuple = isinstance(result, tuple)
     job.status = "retrieved"
 
     items = result if isinstance(result, tuple) else (result,)
@@ -205,8 +82,17 @@ def _store_result(cache: Any, run_hash: str, job: Any, result: Any) -> None:
     cache.put_job(run_hash, job)
 
 
-def _reconstruct_from_cache(cache: Any, job: Any) -> Any | None:
-    """Reconstruct the full result from cached data, or None on partial miss."""
+def _reconstruct_from_cache(cache: Any, job: Any) -> Any:
+    """Reconstruct the full result from cached data, or return the cache-miss sentinel.
+
+    Args:
+        cache: Cache backend containing result data.
+        job: Job record containing output-hash descriptors.
+
+    """
+    if job.output_hashes is None or job.output_is_tuple is None:
+        return _CACHE_MISS
+
     items: list[Any] = []
     for entry in job.output_hashes:
         if "value" in entry:
@@ -214,38 +100,87 @@ def _reconstruct_from_cache(cache: Any, job: Any) -> Any | None:
         else:
             data = cache.get_data(entry["hash"])
             if data is None:
-                return None
+                return _CACHE_MISS
             items.append(data)
-    return items[0] if len(items) == 1 else tuple(items)
+    if job.output_is_tuple:
+        return tuple(items)
+    return items[0] if len(items) == 1 else _CACHE_MISS
 
 
-def _poll_until_done(job: Any) -> None:
-    """Block until the job reaches a terminal state."""
-    from qdk_chemistry.remote.backends.base import DEFAULT_POLL_INTERVAL, DEFAULT_TIMEOUT  # noqa: PLC0415
+def submit(
+    algorithm: Any,
+    *args: Any,
+    remote: Any,
+    job_dir: str | Path | None = None,
+    **kwargs: Any,
+) -> Job:
+    """Submit an algorithm for remote execution without blocking.
 
-    poll_interval = job.backend_config.get("poll_interval", DEFAULT_POLL_INTERVAL)
-    timeout = job.backend_config.get("timeout", DEFAULT_TIMEOUT)
-    deadline = time.monotonic() + timeout
-    while not job.is_terminal:
-        status = job.check()
-        if status.is_terminal:
-            return
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            raise TimeoutError(
-                f"Remote job {job.job_id} did not reach a terminal state within {timeout} seconds\n"
-                f"Last status: {status.status}\n"
-                f"Error: {status.error or 'unknown'}\nLogs:\n{status.logs}"
-            )
-        time.sleep(min(poll_interval, remaining))
+    Args:
+        algorithm: Algorithm-like object to execute remotely.
+        *args: Positional arguments for the algorithm.
+        remote: Remote backend name or connected backend instance.
+        job_dir: Optional directory where the job record is saved.
+        **kwargs: Keyword arguments for the algorithm.
+
+    Returns:
+        A job handle that can be checked, canceled, fetched, or waited on.
+
+    """
+    from qdk_chemistry.remote.backends import get_backend  # noqa: PLC0415
+
+    owns_backend = isinstance(remote, str)
+    if owns_backend:
+        backend = get_backend(remote)
+        backend.connect()
+    else:
+        backend = remote
+
+    try:
+        job = backend.submit(_build_payload_for(algorithm, args, kwargs), job_dir=job_dir)
+        job.attach_backend(backend)
+        if owns_backend:
+            job.detach_backend()
+        return job
+    finally:
+        if owns_backend:
+            backend.disconnect()
 
 
 def _run_uncached(algorithm: Any, remote: Any, args: tuple, kwargs: dict) -> Any:
-    """Execute without caching — locally or via a remote proxy."""
-    if remote is not None:
-        proxy = RemoteAlgorithmProxy(algorithm, remote)
-        return proxy.run(*args, **kwargs)
-    return algorithm.run(*args, **kwargs)
+    """Execute without caching, locally or through a remote job.
+
+    Args:
+        algorithm: Algorithm-like object to execute.
+        remote: Remote backend name or instance, or ``None`` for local execution.
+        args: Positional arguments for the algorithm.
+        kwargs: Keyword arguments for the algorithm.
+
+    """
+    if remote is None:
+        return algorithm.run(*args, **kwargs)
+
+    from qdk_chemistry.remote.backends import get_backend  # noqa: PLC0415
+
+    owns_backend = isinstance(remote, str)
+    if owns_backend:
+        backend = get_backend(remote)
+        backend.connect()
+    else:
+        backend = remote
+
+    try:
+        job = submit(algorithm, *args, remote=backend, **kwargs)
+        final_status = job.wait()
+        if not job.is_successful:
+            raise RuntimeError(
+                f"Remote job {job.job_id} ended with status: {final_status.status}\n"
+                f"Error: {final_status.error or 'unknown'}\nLogs:\n{final_status.logs}"
+            )
+        return job.fetch()
+    finally:
+        if owns_backend:
+            backend.disconnect()
 
 
 def run(
@@ -273,8 +208,10 @@ def run(
         *args: Positional arguments for ``algorithm.run()``.
         cache: Cache backend — a ``CacheBackend``, a path (``str`` /
             ``Path`` → ``FolderCache``), or ``None``. For remote execution,
-            shared backends are also used by the compute node. A
-            ``TieredCache`` can combine local and shared backends.
+            complete caller-side records are cache hits whether or not the
+            backend is shared. Shared backends are also used by the compute
+            node as transport. A ``TieredCache`` can combine local and shared
+            backends.
         remote: Remote backend name or instance, or ``None`` for local.
         force_rerun: If ``True``, skip the cache lookup and re-execute,
             overwriting any previously cached result.
@@ -318,23 +255,28 @@ def run(
         job = resolved_cache.get_job(run_hash)
 
         if job is not None:
+            if remote is not None and not isinstance(remote, str):
+                job.attach_backend(remote)
+
             # 1a) Completed with outputs → reconstruct
-            if job.is_terminal and job.output_hashes:
+            if job.output_hashes is not None:
                 result = _reconstruct_from_cache(resolved_cache, job)
-                if result is not None:
+                if result is not _CACHE_MISS:
                     return result
 
             # 1b) Still in-flight → resume polling
             if not job.is_terminal:
                 if _on_job_submitted is not None:
                     _on_job_submitted(job)
-                _poll_until_done(job)
-                if job.is_successful:
-                    result = job.fetch()
-                    _store_result(resolved_cache, run_hash, job, result)
-                    return result
+                job.wait()
 
-            # 1c) Failed → fall through and re-submit
+            # 1c) Execution finished but cached outputs are unavailable → fetch again
+            if job.is_successful:
+                result = job.fetch()
+                _store_result(resolved_cache, run_hash, job, result)
+                return result
+
+            # 1d) Failed → fall through and re-submit
 
     # 2) Cache miss — execute
     if remote is not None:
@@ -361,31 +303,41 @@ def run(
                 if resolved_remote_cache.is_shared:
                     payload["remote_cache_backend"] = resolved_remote_cache
 
+            if force_rerun:
+                payload["force_rerun"] = True
+
             job = backend.submit(payload)
+            job.attach_backend(backend)
             job.run_hash = run_hash
             resolved_cache.put_job(run_hash, job)
             if _on_job_submitted is not None:
                 _on_job_submitted(job)
 
-            _poll_until_done(job)
+            final_status = job.wait()
 
             if not job.is_successful:
                 resolved_cache.put_job(run_hash, job)
-                raise RuntimeError(f"Remote job {job.job_id} ended with status: {job.status}")
+                raise RuntimeError(
+                    f"Remote job {job.job_id} ended with status: {final_status.status}\n"
+                    f"Error: {final_status.error or 'unknown'}\nLogs:\n{final_status.logs}"
+                )
 
             # If the remote wrote results to a shared cache, reconstruct
             # from there directly — avoiding an expensive fetch/download.
-            result = None
+            result = _CACHE_MISS
             if resolved_remote_cache is not None and resolved_remote_cache.is_shared:
                 remote_job = resolved_remote_cache.get_job(run_hash)
-                if remote_job is not None and remote_job.output_hashes:
+                if remote_job is not None and remote_job.output_hashes is not None:
                     result = _reconstruct_from_cache(resolved_remote_cache, remote_job)
-                    if result is not None:
+                    if result is not _CACHE_MISS:
                         job.output_hashes = remote_job.output_hashes
+                        job.output_is_tuple = remote_job.output_is_tuple
                         job.status = "retrieved"
 
-            if result is None:
+            if result is _CACHE_MISS:
                 result = job.fetch()
+            if owns_backend:
+                job.detach_backend()
         finally:
             if owns_backend:
                 backend.disconnect()

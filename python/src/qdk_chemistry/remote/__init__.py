@@ -26,7 +26,7 @@ from qdk_chemistry.remote.backends import (
     get_backend,
 )
 from qdk_chemistry.remote.cache import resolve_cache
-from qdk_chemistry.remote.proxy import run
+from qdk_chemistry.remote.proxy import run, submit
 
 if TYPE_CHECKING:
     from qdk_chemistry.remote.backends.base import RemoteBackend
@@ -40,11 +40,17 @@ __all__ = [
     "get_backend",
     "resolve_cache",
     "run",
+    "submit",
 ]
 
 
 def __getattr__(name: str):
-    """Load re-exported remote types on first access."""
+    """Load re-exported remote types on first access.
+
+    Args:
+        name: Name of the re-exported remote type to load.
+
+    """
     if name == "Job":
         from qdk_chemistry.remote.job import Job  # noqa: PLC0415
 

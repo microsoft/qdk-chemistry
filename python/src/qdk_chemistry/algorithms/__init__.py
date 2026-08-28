@@ -21,7 +21,8 @@ from qdk_chemistry.algorithms.active_space_selector import (
     QdkOccupationActiveSpaceSelector,
     QdkValenceActiveSpaceSelector,
 )
-from qdk_chemistry.algorithms.amplitude_amplification import AmplitudeAmplification, phase_marking_oracle
+from qdk_chemistry.algorithms.amplitude_amplification.amplitude_amplification import AmplitudeAmplification
+from qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace import QPESubspaceMarking
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.controlled_circuit_mapper.base import ControlledCircuitMapper
 from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator, QdkMP2Calculator
@@ -48,6 +49,8 @@ from qdk_chemistry.algorithms.nuclear_derivative import (
 )
 from qdk_chemistry.algorithms.orbital_localizer import (
     OrbitalLocalizer,
+    QdkActiveSpaceQIOLocalizer,
+    QdkGaugeFixingLocalizer,
     QdkMP2NaturalOrbitalLocalizer,
     QdkNaturalOrbitalLocalizer,
     QdkPipekMezeyLocalizer,
@@ -90,9 +93,12 @@ __all__ = [
     "PhaseEstimation",
     "PopulationAnalyzer",
     "ProjectedMultiConfigurationCalculator",
+    "QPESubspaceMarking",
+    "QdkActiveSpaceQIOLocalizer",
     "QdkAutocasActiveSpaceSelector",
     "QdkAutocasEosActiveSpaceSelector",
     "QdkExpectationEstimator",
+    "QdkGaugeFixingLocalizer",
     "QdkHamiltonianConstructor",
     "QdkMP2Calculator",
     "QdkMP2NaturalOrbitalLocalizer",
@@ -121,7 +127,6 @@ __all__ = [
     "available",
     "create",
     "inspect_settings",
-    "phase_marking_oracle",
     "print_settings",
     "register",
     "show_default",

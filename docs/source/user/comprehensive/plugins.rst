@@ -205,7 +205,7 @@ Registration names must be unique within their registry. Registering a second al
 Automatic discovery
 ~~~~~~~~~~~~~~~~~~~
 
-The preferred plugin contract is a :class:`~qdk_chemistry.plugins.base.QdkChemistryPlugin` subclass exposed through the ``qdk_chemistry.plugins`` entry-point group. For example, a plugin package declares this in its ``pyproject.toml``:
+The plugin contract is a :class:`~qdk_chemistry.plugins.base.QdkChemistryPlugin` subclass exposed through the ``qdk_chemistry.plugins`` entry-point group. A plugin package declares this in its ``pyproject.toml``:
 
 .. code-block:: toml
 
@@ -239,15 +239,13 @@ Each plugin-defined ``DataClass`` used in algorithm inputs or outputs must decla
 
 The value returned by ``data_type_name()`` identifies the serialized format during remote and cache deserialization. A canonical loader must declare this static method directly and return a non-empty string. A subclass must declare a unique identifier and register as its own loader. Registration raises ``TypeError`` when the declaration is missing or empty, and :class:`~qdk_chemistry.plugins.DuplicateRegistrationError` when another loader already owns the identifier.
 
-Register these classes explicitly with ``register_dataclass`` or pass them through the ``data_classes`` argument of ``register_algorithm``. Python return annotations are not used for discovery.
-
-The existing direct registration functions, the :class:`~qdk_chemistry.plugins.base.ChemistryPlugin` compatibility alias, and the ``qdk_chemistry.cache_backends`` entry-point group remain supported. New plugin packages should use :class:`~qdk_chemistry.plugins.base.QdkChemistryPlugin` and the unified entry point.
+Register these classes with :meth:`~qdk_chemistry.plugins.base.PluginRegistrar.register_dataclass` or pass them through the ``data_classes`` argument of :meth:`~qdk_chemistry.plugins.base.PluginRegistrar.register_algorithm`. Python return annotations are not used for discovery.
 
 .. rubric:: Naming and call order
 
 An algorithm implementation name must be unique within its algorithm type; remote backend and cache backend names must be unique within their respective registries. Third-party plugins should use package- or organization-prefixed names to avoid collisions with built-in implementations and other plugins.
 
-Registration is first come, first served and does not override an existing name. Core built-ins are registered before external registrations reach each registry. Unified plugin entry points are then called in the order returned by Python's entry-point discovery, followed by supported legacy entry points and bundled optional internal integrations. Calling a registration function directly with an existing name raises :class:`~qdk_chemistry.plugins.DuplicateRegistrationError` and keeps the earlier registration unchanged. During entry-point discovery, QDK/Chemistry catches that exception, emits a ``UserWarning`` identifying the plugin that failed to register, and continues loading other plugins. Because entry-point order can vary between environments, plugins must not rely on discovery order to override another implementation.
+Registration is first come, first served and does not override an existing name. Core built-ins are registered before external registrations reach each registry. Unified plugin entry points are called in the order returned by Python's entry-point discovery, followed by bundled optional integrations. If a plugin reuses an existing name, registration raises :class:`~qdk_chemistry.plugins.DuplicateRegistrationError` and keeps the earlier implementation unchanged. During entry-point discovery, QDK/Chemistry catches that exception, emits a ``UserWarning`` identifying the plugin that failed to register, and continues loading other plugins. Because entry-point order can vary between environments, plugins must not rely on discovery order to override another implementation.
 
 .. _adding-remote-backends:
 
@@ -259,6 +257,11 @@ A remote backend implements the transport and job lifecycle required to execute 
 .. note::
 
    This example targets a directly SSH-accessible machine with ``python3`` and QDK/Chemistry available in its default environment. It does not submit through a queue scheduler such as SLURM or PBS. Queue-managed systems should provide a backend designed for their scheduler and site policy.
+
+   The example retains each remote job directory, including its inputs, outputs,
+   PID file, and logs, after the job reaches a terminal state. Applications are
+   responsible for removing these artifacts through job cleanup. That cleanup
+   does not remove caller-owned local job records or result directories.
 
 .. rubric:: Backend implementation
 
@@ -298,35 +301,23 @@ The discovered backend is available through the standard remote backend registry
 
 Algorithms created through :func:`qdk_chemistry.algorithms.create` accept ``remote`` and ``cache`` keyword arguments on ``run``. :func:`~qdk_chemistry.remote.backends.base.create_remote` returns a connected backend, which the caller disconnects when it is no longer needed:
 
-.. code-block:: python
+.. literalinclude:: ../../_static/examples/python/custom_remote_backend.py
+   :language: python
+   :start-after: # start-cell-custom-remote-run
+   :end-before: # end-cell-custom-remote-run
 
-   from qdk_chemistry.algorithms import create
-   from qdk_chemistry.remote import create_remote
+Remote argument and result values support QDK Chemistry data classes, NumPy arrays with non-object and non-structured data types, ``None``, booleans, integers, floats, strings, NumPy scalar equivalents, and lists or tuples recursively containing supported values. :class:`~qdk_chemistry.data.AlgorithmRef` values are also supported in arguments and settings, including nested algorithm-reference settings. Generic dictionaries are not supported as argument or result values. Keyword arguments and algorithm settings remain mappings because the protocol serializes their entries separately; use a QDK Chemistry data class for other structured values.
 
-   scf = create("scf_solver")
-   remote = create_remote("ssh", host="user@compute.example.com")
-   try:
-      energy, wavefunction = scf.run(
-         structure,
-         0,
-         1,
-         "cc-pvdz",
-         remote=remote,
-         cache="./cache",
-      )
-   finally:
-      remote.disconnect()
+Disconnecting closes connection-scoped resources but does not remove artifacts belonging to submitted jobs. For an asynchronous :class:`~qdk_chemistry.remote.job.Job`, pass ``cleanup=True`` to :meth:`~qdk_chemistry.remote.job.Job.fetch` to remove backend artifacts after the result is successfully retrieved and persisted. Call :meth:`~qdk_chemistry.remote.job.Job.cleanup` to remove artifacts separately for any terminal job. Cleanup is idempotent; failed retrieval leaves artifacts available for inspection or retry.
 
 Passing a path as ``cache`` creates a local :class:`~qdk_chemistry.remote.cache.folder.FolderCache`. On a completed cache hit, ``run`` reconstructs and returns the result without submitting another remote job. If the cache contains an in-flight job for the same algorithm, settings, and inputs, polling resumes instead of creating a duplicate. Pass ``force_rerun=True`` to bypass the lookup and execute again.
 
 By default, a cache is local to the calling machine. Set ``is_shared=True`` only when the same backing store is reachable from both the calling machine and remote compute node, such as a network-mounted directory:
 
-.. code-block:: python
-
-   from qdk_chemistry.remote.cache import FolderCache
-
-   cache = FolderCache("/mnt/shared/qdk-cache", is_shared=True)
-   result = algorithm.run(*args, remote=remote, cache=cache)
+.. literalinclude:: ../../_static/examples/python/custom_remote_backend.py
+   :language: python
+   :start-after: # start-cell-custom-remote-shared-cache
+   :end-before: # end-cell-custom-remote-shared-cache
 
 A shared cache lets the remote worker reuse content-addressed inputs already present there and publish results without transferring those files through the backend. Do not mark a caller-local directory as shared; the remote worker must be able to recreate and access the configured cache.
 

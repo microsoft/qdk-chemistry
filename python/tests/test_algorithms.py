@@ -24,6 +24,7 @@ from qdk_chemistry.algorithms import (
 )
 from qdk_chemistry.algorithms.hashing import run_content_hash
 from qdk_chemistry.data import (
+    AlgorithmRef,
     AmplitudeContainer,
     AmplitudeType,
     Ansatz,
@@ -891,6 +892,30 @@ class TestAlgorithmClasses:
 
         with pytest.raises(TypeError, match="Unsupported hash argument type"):
             run_content_hash("test_type", "test_name", Settings(), UnsupportedArgument())
+
+    def test_run_content_hash_supports_nested_algorithm_refs(self):
+        """Algorithm references contribute their nested configuration to run hashes."""
+        settings = Settings.from_json(
+            '{"circuit_executor": {'
+            '"__type__": "algorithm_ref", '
+            '"algorithm_type": "circuit_executor", '
+            '"algorithm_name": "qdk_sparse_state_simulator", '
+            '"settings": {"seed": 1}}}'
+        )
+        reference = AlgorithmRef("state_preparation", "dense_pure_state", settings)
+        matching_hash = run_content_hash("test_type", "test_name", Settings(), reference)
+
+        changed_settings = Settings.from_json(
+            '{"circuit_executor": {'
+            '"__type__": "algorithm_ref", '
+            '"algorithm_type": "circuit_executor", '
+            '"algorithm_name": "qdk_sparse_state_simulator", '
+            '"settings": {"seed": 2}}}'
+        )
+        changed_reference = AlgorithmRef("state_preparation", "dense_pure_state", changed_settings)
+
+        assert matching_hash == run_content_hash("test_type", "test_name", Settings(), reference)
+        assert matching_hash != run_content_hash("test_type", "test_name", Settings(), changed_reference)
 
     def test_run_content_hash_disambiguates_argument_types(self):
         """Test algorithm hashing tags argument types to avoid cache collisions."""

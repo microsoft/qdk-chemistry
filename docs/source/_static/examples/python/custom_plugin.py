@@ -107,7 +107,7 @@ class CustomScfPlugin(QdkChemistryPlugin):
 
 
 # Installed plugins are registered automatically through their entry point.
-# This direct call only makes the standalone documentation example executable.
+# This call only makes the standalone documentation example executable.
 CustomScfPlugin().register(PluginRegistrar())
 # end-cell-registration
 ################################################################################

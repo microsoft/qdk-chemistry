@@ -9,7 +9,6 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from types import ModuleType
 from unittest.mock import MagicMock, call
 
 import pytest
@@ -21,13 +20,11 @@ from qdk_chemistry.algorithms import ScfSolver, registry
 from qdk_chemistry.data import DataClass, Structure, register_dataclass
 from qdk_chemistry.data import registry as dataclass_registry
 from qdk_chemistry.plugins import ChemistryPlugin, DuplicateRegistrationError, PluginRegistrar, QdkChemistryPlugin
-from qdk_chemistry.remote import cache as remote_cache
 from qdk_chemistry.remote.backends import RemoteBackend, get_backend
 from qdk_chemistry.remote.backends import base as remote_backend_registry
 from qdk_chemistry.remote.cache import FolderCache
 
 _BUNDLED_PLUGIN_AUTOLOAD_CASES = (
-    ("discovery", "QDK_CHEMISTRY_DISABLE_DISCOVERY_AUTOLOAD"),
     ("pyscf", "QDK_CHEMISTRY_DISABLE_PYSCF_AUTOLOAD"),
     ("qiskit", "QDK_CHEMISTRY_DISABLE_QISKIT_AUTOLOAD"),
     ("openfermion", "QDK_CHEMISTRY_DISABLE_OPENFERMION_AUTOLOAD"),
@@ -36,22 +33,13 @@ _BUNDLED_PLUGIN_AUTOLOAD_CASES = (
 )
 
 
-class _Distribution:
-    """Minimal entry-point distribution stub."""
-
-    def __init__(self, name):
-        """Store the distribution name."""
-        self.name = name
-
-
 class _EntryPoint:
     """Minimal importlib entry-point stub."""
 
-    def __init__(self, name, target, distribution=None):
+    def __init__(self, name, target):
         """Store entry-point metadata and its load target."""
         self.name = name
         self._target = target
-        self.dist = _Distribution(distribution) if distribution is not None else None
 
     def load(self):
         """Return the target or reproduce its import failure."""
@@ -195,7 +183,6 @@ assert algorithm.run() == "loaded through pip entry point"
 def test_duplicate_registration_error_is_public_value_error():
     """The plugin API exposes the native collision error as a ValueError subtype."""
     assert DuplicateRegistrationError is CoreDuplicateRegistrationError
-    assert DuplicateRegistrationError is qdk_chemistry.DuplicateRegistrationError
     assert issubclass(DuplicateRegistrationError, ValueError)
 
 
@@ -298,24 +285,21 @@ def test_unified_plugin_entry_points_load_independently(monkeypatch):
             loaded.append(registrar)
 
     entry_points = [
-        _EntryPoint("broken", RuntimeError("cannot import"), "broken-package"),
-        _EntryPoint("healthy", HealthyPlugin, "healthy-package"),
+        _EntryPoint("broken", RuntimeError("cannot import")),
+        _EntryPoint("healthy", HealthyPlugin),
     ]
 
     def find_entry_points(*, group):
         assert group == "qdk_chemistry.plugins"
         return entry_points
 
-    distributions: set[str] = set()
     monkeypatch.setattr("importlib.metadata.entry_points", find_entry_points)
-    monkeypatch.setattr(plugins, "_UNIFIED_PLUGIN_DISTRIBUTIONS", distributions)
 
     with pytest.warns(UserWarning, match="plugin 'broken'.*cannot import"):
         plugins._load_plugins()
 
     assert len(loaded) == 1
     assert isinstance(loaded[0], PluginRegistrar)
-    assert distributions == {"healthy-package"}
 
 
 def test_failed_plugin_registration_does_not_latch_filtered_dataclass_discovery(monkeypatch, tmp_path):
@@ -353,15 +337,14 @@ def test_failed_plugin_registration_does_not_latch_filtered_dataclass_discovery(
 
 
 def test_unified_plugins_load_before_bundled_integrations(monkeypatch):
-    """Unified and legacy entry points register before bundled integrations."""
+    """Unified entry points register before bundled integrations."""
     calls = []
     monkeypatch.setattr(plugins, "_load_plugins", lambda: calls.append("unified"))
-    monkeypatch.setattr(remote_cache, "_load_plugin_caches", lambda: calls.append("legacy-cache"))
     monkeypatch.setattr(qdk_chemistry, "_load_bundled_plugin", lambda *args: calls.append(args[0]))
 
     qdk_chemistry._import_plugins()
 
-    assert calls == ["unified", "legacy-cache", *(name for name, _ in _BUNDLED_PLUGIN_AUTOLOAD_CASES)]
+    assert calls == ["unified", *(plugin_name for plugin_name, _ in _BUNDLED_PLUGIN_AUTOLOAD_CASES)]
 
 
 @pytest.mark.parametrize(("plugin_name", "disable_env_var"), _BUNDLED_PLUGIN_AUTOLOAD_CASES)
@@ -374,41 +357,6 @@ def test_bundled_plugin_autoload_can_be_disabled(monkeypatch, plugin_name, disab
     qdk_chemistry._load_bundled_plugin(plugin_name, disable_env_var)
 
     import_module.assert_not_called()
-
-
-def test_discovery_plugin_registers_backend_when_sdk_is_available(monkeypatch):
-    """The bundled Discovery plugin activates when its SDK can be imported."""
-    from qdk_chemistry.plugins import discovery  # noqa: PLC0415
-    from qdk_chemistry.plugins.discovery.backend import DiscoveryBackend  # noqa: PLC0415
-
-    sdk = ModuleType("azure.ai.discovery")
-    import_module = MagicMock(return_value=sdk)
-    register_remote_backend = MagicMock()
-    monkeypatch.setattr(discovery, "_loaded", False)
-    monkeypatch.setattr(discovery.importlib, "import_module", import_module)
-    monkeypatch.setattr(PluginRegistrar, "register_remote_backend", register_remote_backend)
-
-    discovery.load()
-
-    import_module.assert_called_once_with("azure.ai.discovery")
-    register_remote_backend.assert_called_once_with("discovery", DiscoveryBackend)
-    assert discovery._loaded
-
-
-def test_discovery_plugin_stays_inactive_without_sdk(monkeypatch):
-    """An absent Discovery SDK prevents backend registration."""
-    from qdk_chemistry.plugins import discovery  # noqa: PLC0415
-
-    register_remote_backend = MagicMock()
-    monkeypatch.setattr(discovery, "_loaded", False)
-    monkeypatch.setattr(discovery.importlib, "import_module", MagicMock(side_effect=ModuleNotFoundError))
-    monkeypatch.setattr(PluginRegistrar, "register_remote_backend", register_remote_backend)
-
-    with pytest.raises(ModuleNotFoundError):
-        discovery.load()
-
-    register_remote_backend.assert_not_called()
-    assert not discovery._loaded
 
 
 def test_bundled_plugin_duplicate_warns_with_disable_hint_and_propagates(monkeypatch):
@@ -469,6 +417,18 @@ def test_unified_plugin_registers_remote_backend(monkeypatch):
         def download(self, remote_path, local_path):
             """Accept a download for the test backend."""
 
+        def _submit(self, payload):
+            """Reject submission because this registration test has no worker."""
+            raise NotImplementedError
+
+        def check(self, backend_state):
+            """Reject status checks because this registration test has no worker."""
+            raise NotImplementedError
+
+        def fetch(self, backend_state, local_dir=None):
+            """Reject result fetching because this registration test has no worker."""
+            raise NotImplementedError
+
     class RemotePlugin(QdkChemistryPlugin):
         """Plugin that contributes a remote backend."""
 
@@ -479,109 +439,13 @@ def test_unified_plugin_registers_remote_backend(monkeypatch):
     def find_entry_points(*, group):
         """Return the remote plugin through the unified group."""
         assert group == "qdk_chemistry.plugins"
-        return [_EntryPoint("remote", RemotePlugin, "remote-package")]
+        return [_EntryPoint("remote", RemotePlugin)]
 
     monkeypatch.setattr("importlib.metadata.entry_points", find_entry_points)
-    monkeypatch.setattr(plugins, "_UNIFIED_PLUGIN_DISTRIBUTIONS", set())
     monkeypatch.setattr(remote_backend_registry, "_BACKENDS", {})
 
     plugins._load_plugins()
 
     backend = get_backend("plugin-remote", endpoint="compute.example.com")
     assert isinstance(backend, PluginRemoteBackend)
-    assert backend.config["endpoint"] == "compute.example.com"
-
-
-def test_legacy_cache_entry_points_load_independently(monkeypatch):
-    """A broken legacy cache entry point does not prevent later caches from loading."""
-    healthy_cache = object()
-    entry_points = [
-        _EntryPoint("broken", RuntimeError("cannot import"), "broken-package"),
-        _EntryPoint("healthy", healthy_cache, "healthy-package"),
-    ]
-
-    def find_entry_points(*, group):
-        """Return entry points for the legacy cache group."""
-        assert group == "qdk_chemistry.cache_backends"
-        return entry_points
-
-    register = MagicMock()
-    register_cache = MagicMock(return_value=register)
-    monkeypatch.setattr("importlib.metadata.entry_points", find_entry_points)
-    monkeypatch.setattr(plugins, "_UNIFIED_PLUGIN_DISTRIBUTIONS", set())
-    monkeypatch.setattr(remote_cache, "register_cache", register_cache)
-
-    with pytest.warns(UserWarning, match="cache plugin 'broken'.*cannot import"):
-        remote_cache._load_plugin_caches()
-
-    register_cache.assert_called_once_with("healthy")
-    register.assert_called_once_with(healthy_cache)
-
-
-def test_unified_entry_point_suppresses_legacy_cache_entry_point(monkeypatch):
-    """A distribution can publish old and new cache metadata without loading twice."""
-    monkeypatch.setattr(plugins, "_UNIFIED_PLUGIN_DISTRIBUTIONS", {"dual-package"})
-
-    assert not plugins._legacy_cache_entry_point_enabled(_EntryPoint("legacy", object(), "dual-package"))
-    assert plugins._legacy_cache_entry_point_enabled(_EntryPoint("legacy", object(), "legacy-only-package"))
-
-
-@pytest.mark.parametrize(
-    "distribution_order",
-    [("package-a", "package-b"), ("package-b", "package-a")],
-)
-def test_unified_plugins_suppress_legacy_caches_regardless_of_order(monkeypatch, distribution_order):
-    """All successful unified distributions suppress their legacy cache metadata."""
-
-    class CachePlugin(QdkChemistryPlugin):
-        """Unified plugin used to mark its distribution as loaded."""
-
-        def register(self, registrar):
-            """Accept the registrar without adding capabilities."""
-
-    unified_entry_points = [_EntryPoint(name, CachePlugin, name) for name in distribution_order]
-    legacy_entry_points = [_EntryPoint(f"legacy-{name}", object(), name) for name in distribution_order]
-
-    def find_entry_points(*, group):
-        """Return unified or legacy entry points for the requested group."""
-        if group == "qdk_chemistry.plugins":
-            return unified_entry_points
-        assert group == "qdk_chemistry.cache_backends"
-        return legacy_entry_points
-
-    register_cache = MagicMock()
-    monkeypatch.setattr("importlib.metadata.entry_points", find_entry_points)
-    monkeypatch.setattr(plugins, "_UNIFIED_PLUGIN_DISTRIBUTIONS", set())
-    monkeypatch.setattr(remote_cache, "register_cache", register_cache)
-
-    plugins._load_plugins()
-    remote_cache._load_plugin_caches()
-
-    register_cache.assert_not_called()
-
-
-def test_failed_unified_plugin_falls_back_to_legacy_cache(monkeypatch):
-    """A failed unified plugin does not suppress working legacy cache metadata."""
-    unified_entry_point = _EntryPoint("unified", RuntimeError("cannot import"), "dual-package")
-    legacy_cache = object()
-    legacy_entry_point = _EntryPoint("legacy", legacy_cache, "dual-package")
-
-    def find_entry_points(*, group):
-        """Return unified or legacy entry points for the requested group."""
-        if group == "qdk_chemistry.plugins":
-            return [unified_entry_point]
-        assert group == "qdk_chemistry.cache_backends"
-        return [legacy_entry_point]
-
-    register = MagicMock()
-    register_cache = MagicMock(return_value=register)
-    monkeypatch.setattr("importlib.metadata.entry_points", find_entry_points)
-    monkeypatch.setattr(plugins, "_UNIFIED_PLUGIN_DISTRIBUTIONS", set())
-    monkeypatch.setattr(remote_cache, "register_cache", register_cache)
-
-    with pytest.warns(UserWarning, match="plugin 'unified'.*cannot import"):
-        plugins._load_plugins()
-    remote_cache._load_plugin_caches()
-
-    register_cache.assert_called_once_with("legacy")
-    register.assert_called_once_with(legacy_cache)
+    assert backend._backend_args["endpoint"] == "compute.example.com"

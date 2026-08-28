@@ -36,3 +36,9 @@ make clean all
 
 This will generate the HTML documentation in the `docs/build/html/` directory.
 You can open the [`index.html`](docs/build/html/index.html) file in that directory with your web browser to view the documentation.
+
+## Regenerating tutorial figures
+
+The [ground-state QPE figure maintenance guide](source/_static/diagrams/README.md)
+documents source ownership, regeneration commands, and screenshot-derived asset
+maintenance.

@@ -22,6 +22,9 @@ class PluginRegistrar:
     def register_algorithm_factory(self, factory: AlgorithmFactory) -> None:
         """Register a factory that introduces an algorithm type.
 
+        Args:
+            factory: Factory that defines and creates the algorithm type.
+
         Raises:
             DuplicateRegistrationError: If the algorithm type is already registered.
 
@@ -37,6 +40,10 @@ class PluginRegistrar:
         data_classes: Iterable[Type[Any]] = (),  # noqa: UP006
     ) -> None:
         """Register an algorithm factory and its DataClass input or output types.
+
+        Args:
+            factory: Factory that creates the algorithm implementation.
+            data_classes: DataClass loaders used by the algorithm's inputs or outputs.
 
         Raises:
             DuplicateRegistrationError: If the algorithm name or a DataClass wire type is already registered.
@@ -68,6 +75,10 @@ class PluginRegistrar:
     def register_remote_backend(self, name: str, backend_type: Type[Any]) -> None:  # noqa: UP006
         """Register a remote execution backend.
 
+        Args:
+            name: Registry name for the backend.
+            backend_type: Backend class to register.
+
         Raises:
             DuplicateRegistrationError: If the backend name or class is already registered.
 
@@ -78,6 +89,10 @@ class PluginRegistrar:
 
     def register_cache_backend(self, name: str, backend_type: Type[Any]) -> None:  # noqa: UP006
         """Register a cache backend.
+
+        Args:
+            name: Registry name for the cache backend.
+            backend_type: Cache backend class to register.
 
         Raises:
             DuplicateRegistrationError: If the cache name or class is already registered.

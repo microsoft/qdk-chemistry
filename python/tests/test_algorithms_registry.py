@@ -7,16 +7,19 @@
 
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
 
 from qdk_chemistry._core._algorithms import ScfSolverFactory
 from qdk_chemistry.algorithms import ScfSolver, registry
+from qdk_chemistry.data import AlgorithmRef
 from qdk_chemistry.plugins import DuplicateRegistrationError
 from qdk_chemistry.plugins.qiskit import (
     QDK_CHEMISTRY_HAS_QISKIT,
     QDK_CHEMISTRY_HAS_QISKIT_AER,
     QDK_CHEMISTRY_HAS_QISKIT_NATURE,
 )
+from qdk_chemistry.remote.job import Job
 
 try:
     import pyscf  # noqa: F401
@@ -55,6 +58,83 @@ def test_algorithm_wrapper_forwards_remote_execution_options(monkeypatch):
         remote=backend,
         force_rerun=True,
     )
+
+
+@pytest.mark.parametrize(
+    "result",
+    [
+        pytest.param(None, id="none"),
+        pytest.param((42,), id="singleton-tuple"),
+        pytest.param((), id="empty-tuple"),
+    ],
+)
+def test_algorithm_wrapper_local_cache_satisfies_remote_run(tmp_path, result):
+    """A complete local result is a cache hit when a remote is later requested."""
+
+    class CachedAlgorithm:
+        calls = 0
+
+        def hash(self):
+            return "cached_result"
+
+        def run(self):
+            self.calls += 1
+            return result
+
+        def type_name(self):
+            return "test_algorithm"
+
+        def name(self):
+            return "cached_result"
+
+        def settings(self):
+            settings = MagicMock()
+            settings.to_dict.return_value = {}
+            return settings
+
+    implementation = CachedAlgorithm()
+    algorithm = registry._AlgorithmWrapper(implementation)
+    backend = MagicMock()
+    backend.submit.side_effect = AssertionError("remote backend was submitted")
+
+    assert algorithm.run(cache=tmp_path) == result
+    assert algorithm.run(cache=tmp_path, remote=backend) == result
+    assert implementation.calls == 1
+    backend.submit.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "result",
+    [
+        pytest.param(None, id="none"),
+        pytest.param((42,), id="singleton-tuple"),
+        pytest.param((), id="empty-tuple"),
+    ],
+)
+def test_algorithm_wrapper_remote_cache_satisfies_local_run(tmp_path, result):
+    """A remotely fetched result is a cache hit for a later local request."""
+    implementation = MagicMock()
+    implementation.hash.return_value = "cached_result"
+    implementation.type_name.return_value = "test_algorithm"
+    implementation.name.return_value = "cached_result"
+    implementation.settings().to_dict.return_value = {}
+    algorithm = registry._AlgorithmWrapper(implementation)
+    backend = MagicMock()
+    job = Job(
+        job_id="remote-job",
+        backend="test",
+        backend_config={},
+        backend_state={},
+        status="succeeded",
+    )
+    job.fetch = MagicMock(return_value=result)
+    job.attach_backend(backend)
+    backend.submit.return_value = job
+
+    assert algorithm.run(cache=tmp_path, remote=backend) == result
+    assert algorithm.run(cache=tmp_path) == result
+    implementation.run.assert_not_called()
+    backend.submit.assert_called_once()
 
 
 def test_algorithm_wrapper_does_not_reserve_poll_interval():
@@ -319,6 +399,46 @@ class TestRegistryCachingWarnings:
             result = algorithm.run("input", cache=tmp_path, option=True)
 
         assert result == (("input",), {"option": True})
+
+    def test_cache_round_trip_numpy_scalar_and_array_result(self, tmp_path):
+        """Cache an algorithm result containing a NumPy scalar and array."""
+
+        class NumpyResultAlgorithm:
+            calls = 0
+
+            def hash(self):
+                """Return a stable run hash."""
+                return "numpy_result"
+
+            def run(self):
+                """Return a NumPy scalar and array result."""
+                self.calls += 1
+                return np.float32(1.25), np.array([1.0, 2.0], dtype=np.float32)
+
+            def type_name(self):
+                """Return the test algorithm type."""
+                return "test_algorithm"
+
+            def name(self):
+                """Return the test algorithm name."""
+                return "numpy_result"
+
+            def settings(self):
+                """Return empty algorithm settings."""
+                settings = MagicMock()
+                settings.to_dict.return_value = {}
+                return settings
+
+        implementation = NumpyResultAlgorithm()
+        algorithm = registry._AlgorithmWrapper(implementation)
+
+        algorithm.run(cache=tmp_path)
+        energy, state = algorithm.run(cache=tmp_path)
+
+        assert implementation.calls == 1
+        assert energy == 1.25
+        assert type(energy) is float
+        np.testing.assert_array_equal(state, np.array([1.0, 2.0], dtype=np.float32))
 
 
 class TestRegistryAvailable:
@@ -714,6 +834,69 @@ class TestRegistryRegisterUnregister:
             assert replacement.registration_owner == "replacement"
         finally:
             registry.unregister("expectation_estimator", "aliased_python_algorithm")
+
+    def test_python_factory_alias_lookup_only_constructs_selected_algorithm(self):
+        """Alias lookup does not construct unrelated registered algorithms."""
+        construction_counts = {"first": 0, "second": 0}
+
+        class FirstAlgorithm:
+            """Unrelated algorithm whose construction count is tracked."""
+
+            def __init__(self):
+                construction_counts["first"] += 1
+
+            def type_name(self):
+                return "expectation_estimator"
+
+            def name(self):
+                return "first_counted_algorithm"
+
+            def aliases(self):
+                return [self.name(), "first_counted_alias"]
+
+            def settings(self):
+                return MagicMock()
+
+        class SecondAlgorithm(FirstAlgorithm):
+            """Algorithm selected by alias."""
+
+            def __init__(self):
+                construction_counts["second"] += 1
+
+            def name(self):
+                return "second_counted_algorithm"
+
+            def aliases(self):
+                return [self.name(), "second_counted_alias"]
+
+        registry.register(FirstAlgorithm)
+        registry.register(SecondAlgorithm)
+        try:
+            counts_after_registration = construction_counts.copy()
+
+            selected = registry.create("expectation_estimator", "second_counted_alias")
+
+            assert selected.name() == "second_counted_algorithm"
+            assert construction_counts == {
+                "first": counts_after_registration["first"],
+                "second": counts_after_registration["second"] + 1,
+            }
+        finally:
+            registry.unregister("expectation_estimator", "first_counted_algorithm")
+            registry.unregister("expectation_estimator", "second_counted_algorithm")
+
+    def test_builtin_registration_resolves_nested_algorithm_ref(self):
+        """Built-in registration resolves nested algorithms without recursive construction."""
+        sparse = registry.create(
+            "state_prep",
+            "sparse_isometry",
+            dense_state_prep=AlgorithmRef("state_prep", "dense_pure_state"),
+        )
+
+        dense_ref = sparse.settings().get("dense_state_prep")
+        dense = registry.create(dense_ref.algorithm_type, dense_ref.algorithm_name)
+
+        assert dense.name() == "dense_pure_state"
 
     def test_python_factory_rejects_duplicate_alias(self):
         """Registration rejects an alias owned by another implementation."""
