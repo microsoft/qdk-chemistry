@@ -10,6 +10,7 @@ from __future__ import annotations
 import base64
 import gzip
 import json
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
@@ -203,6 +204,23 @@ def test_cache_transport_fetches_result_without_blob(monkeypatch: pytest.MonkeyP
     )
 
     assert result == (-1.5, [1, 2])
+
+
+def test_fetch_rejects_output_file_outside_destination(tmp_path) -> None:
+    """Artifact names cannot cause downloads outside the requested destination."""
+    backend = _backend()
+    downloads: list[tuple[str, Any]] = []
+
+    def download(remote_path: str, local_path: Any) -> None:
+        downloads.append((remote_path, local_path))
+        Path(local_path).write_text(json.dumps({"results": [{"file": "/outside"}]}))
+
+    backend.download = download
+
+    with pytest.raises(ValueError, match="outside the serialization directory"):
+        backend.fetch({"output_dir": "qdk_chemistry/job/output"}, tmp_path / "outputs")
+
+    assert downloads == [("qdk_chemistry/job/output/manifest.json", tmp_path / "outputs" / "manifest.json")]
 
 
 def test_auto_transport_requires_cache_or_blob() -> None:
