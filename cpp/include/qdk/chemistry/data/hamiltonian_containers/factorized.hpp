@@ -17,10 +17,11 @@ namespace qdk::chemistry::data {
 
 /**
  * @class FactorizedHamiltonianContainer
- * @brief Restricted, spin-free double-factorized tensor hypercontraction(DFTHC) 
+ * @brief Restricted, spin-free double-factorized tensor hypercontraction(DFTHC)
  *        Hamiltonian container (Low 2025).
  *
- * @note Consumers that genuinely require a sum of squares must check get_signs().
+ * @note Consumers that genuinely require a sum of squares must check
+ * get_signs().
  */
 class FactorizedHamiltonianContainer : public HamiltonianContainer {
  public:
