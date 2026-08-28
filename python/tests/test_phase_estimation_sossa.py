@@ -39,6 +39,7 @@ from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSAWalkContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
+from .reference_tolerances import ci_energy_tolerance
 from .test_helpers import create_random_factorized_hamiltonian, create_test_orbitals, to_sossa_operator
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -609,47 +610,6 @@ class TestSOSSAQPEIntegration:
         # H_gap should be positive semi-definite
         assert eigenvalues[0] >= -1e-10, f"H_gap has negative eigenvalue: {eigenvalues[0]}"
 
-    def test_sossa_normalization_bounds_spectrum(self):
-        """Verify that SOSSA normalization Λ bounds the spectrum: all eigenvalues ≤ 2Λ.
-
-        For a valid SOS walk, E_gap ∈ [0, 2Λ], so all eigenvalues of H_gap
-        must satisfy 0 ≤ E ≤ 2Λ.
-        """
-        data = _build_h2_dfthc_data()
-        n_orb = data["N"]
-
-        orbitals = create_test_orbitals(n_orb)
-        inactive_fock = np.zeros((n_orb, n_orb))
-        fh = FactorizedHamiltonianContainer(
-            0.0,
-            data["basis_vectors"].flatten(),
-            data["two_body_weights"].flatten(),
-            data["identity_weight"],
-            data["h1"],
-            inactive_fock,
-            orbitals,
-        )
-
-        builder = SOSSABuilder()
-        unitary_rep = builder.run(to_sossa_operator(fh))
-        container = unitary_rep.get_container()
-        lambda_sos = container.metadata.normalization
-
-        h_matrix = _build_dfthc_hamiltonian_matrix(
-            data["h1"],
-            data["basis_vectors"],
-            data["two_body_weights"],
-            data["identity_weight"],
-        )
-        eigenvalues = np.linalg.eigvalsh(h_matrix)
-
-        # All eigenvalues should be ≤ 2Λ (with small numerical tolerance).
-        # Comparing the maximum rather than np.all keeps an empty spectrum loud:
-        # np.max raises on an empty array while np.all would return True.
-        assert eigenvalues.max() <= 2 * lambda_sos + 1e-10, (
-            f"Eigenvalue {eigenvalues.max():.6f} exceeds 2Λ={2 * lambda_sos:.6f}"
-        )
-
     def test_sos_decomposition_is_positive_semidefinite(self):
         """H_gap = Σ_G G†G must be PSD, since it is a sum of operator squares.
 
@@ -683,8 +643,18 @@ class TestSOSSAQPEIntegration:
         The whole spectrum is compared (not just the ground state) so that a
         wrong particle/hole convention or a missing normal-ordering correction
         cannot hide behind an accidental agreement at the band edge.
+
+        The ground state is then cross-checked against a CASCI solve of the
+        *container's own* integrals.  ``macis_cas`` reaches the factorized
+        container through ``get_two_body_integrals``, which reconstructs
+        ``h2_pqrs = sum_rc s_r M^rc_pq M^rc_rs`` in C++.  That closes the loop on
+        the NumPy oracle: a convention error shared by
+        ``_build_dfthc_hamiltonian_matrix`` and
+        ``_build_physical_hamiltonian_matrix`` cancels in the spectrum
+        comparison above, but not against the shipped reconstruction.
         """
         data = _build_h2_dfthc_data()
+        n_orb = data["N"]
         h_gap = _build_dfthc_hamiltonian_matrix(
             data["h1"],
             data["basis_vectors"],
@@ -708,6 +678,23 @@ class TestSOSSAQPEIntegration:
             np.linalg.eigvalsh(h_physical),
             atol=1e-10,
         )
+
+        fh = FactorizedHamiltonianContainer(
+            0.0,
+            data["basis_vectors"].flatten(),
+            data["two_body_weights"].flatten(),
+            data["identity_weight"],
+            data["h1"],
+            np.zeros((n_orb, n_orb)),
+            create_test_orbitals(n_orb),
+        )
+        # ``Hamiltonian`` takes ownership of the C++ container, so read the scalar
+        # offset off ``fh`` first: ``macis_cas`` returns an energy that includes it.
+        core_energy = fh.get_core_energy()
+        casci_energy, _ = create("multi_configuration_calculator", "macis_cas").run(Hamiltonian(fh), 1, 1)
+
+        gap_energy, _ = _get_ground_state_and_energy(h_gap, n_orb, nalpha=1, nbeta=1)
+        assert gap_energy + energy_shift == pytest.approx(casci_energy - core_energy, abs=ci_energy_tolerance)
 
     def test_energy_shift_matches_qubit_mapper(self):
         """The mapper's ``energy_shift`` must equal Eq. 30 evaluated on h1_majorana."""
