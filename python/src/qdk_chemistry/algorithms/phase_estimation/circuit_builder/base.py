@@ -98,7 +98,7 @@ class QpeCircuitBuilder(Algorithm):
         self,
         qubit_hamiltonian: QubitOperator,
         power: int,
-    ) -> tuple[Circuit, int, Circuit | None]:
+    ) -> tuple[Circuit, int]:
         r"""Create the controlled circuit for the given Hamiltonian and power.
 
         Sets the ``power`` on the unitary builder so it produces :math:`U^{\\text{power}}`
@@ -109,34 +109,19 @@ class QpeCircuitBuilder(Algorithm):
             power: The power to which the unitary should be raised.
 
         Returns:
-            A tuple of (circuit, num_ancilla_qubits, ancilla_prep_op) where circuit
-            implements controlled-:math:`U^{\\text{power}}`, num_ancilla_qubits is the
-            number of ancilla qubits used by the unitary beyond the system qubits, and
-            ancilla_prep_op is the mapper's ancilla preparation callable, or ``None``
-            when the mapper does not provide one.
+            A tuple of (circuit, num_ancilla_qubits) where circuit implements
+            controlled-:math:`U^{\\text{power}}` and num_ancilla_qubits is the number
+            of ancilla qubits used by the unitary beyond the system qubits.
 
         """
         unitary_builder = self._create_nested("unitary_builder")
         unitary_builder.settings().update("power", power)
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
+        num_ancilla_qubits = unitary_rep.get_num_qubits() - qubit_hamiltonian.num_qubits
         circuit_mapper = self._create_nested("controlled_circuit_mapper")
         circuit_mapper.settings().update("control_indices", [0])
         circuit = circuit_mapper.run(unitary_rep)
-
-        # Use mapper's num_ancilla_qubits if available
-        if hasattr(circuit_mapper, "num_ancilla_qubits"):
-            container = unitary_rep.get_container()
-            num_ancilla_qubits = circuit_mapper.num_ancilla_qubits(container)
-        else:
-            num_ancilla_qubits = unitary_rep.get_num_qubits() - qubit_hamiltonian.num_qubits
-
-        # Get ancilla prep circuit from mapper if available.
-        if hasattr(circuit_mapper, "get_ancilla_prep_op"):
-            ancilla_prep_circuit = circuit_mapper.get_ancilla_prep_op()
-        else:
-            ancilla_prep_circuit = None
-
-        return circuit, num_ancilla_qubits, ancilla_prep_circuit
+        return circuit, num_ancilla_qubits
 
 
 class QpeCircuitBuilderFactory(AlgorithmFactory):

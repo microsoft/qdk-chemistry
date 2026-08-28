@@ -12,6 +12,7 @@ from pathlib import Path
 import h5py
 import numpy as np
 import pytest
+import qdk
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.algorithms.qubit_mapper.sossa import SOSSAQubitMapper
@@ -29,6 +30,7 @@ from qdk_chemistry.data.unitary_representation.containers.sossa import (
     SOSSAWalkContainer,
     sossa_register_bits,
 )
+from qdk_chemistry.utils.qsharp import create_qsharp_context
 
 from .reference_tolerances import float_comparison_absolute_tolerance
 from .test_helpers import create_random_factorized_hamiltonian
@@ -36,6 +38,16 @@ from .test_helpers import create_random_factorized_hamiltonian
 # ═══════════════════════════════════════════════════════════════════════════════
 # Test helpers
 # ═══════════════════════════════════════════════════════════════════════════════
+
+
+@pytest.fixture
+def qdk_ctx() -> qdk.Context:
+    """Fresh Q# context, isolated from the library's shared one.
+
+    Tests that inspect quantum state need their own interpreter, because
+    ``dump_machine`` reports every qubit currently allocated in the context.
+    """
+    return create_qsharp_context()
 
 
 def _to_sossa_operator(factorized_hamiltonian):
@@ -79,7 +91,7 @@ def _make_sossa_unitary_representation():
     dets = []
     for idx, amp in enumerate(outer_statevector):
         if amp != 0.0:
-            bitstring = format(idx, f"0{num_outer_qubits}b")
+            bitstring = format(idx, f"0{num_outer_qubits}b")[::-1]
             dets.append(Configuration.from_bitstring(bitstring))
             coeffs_list.append(float(amp))
     orbitals = ModelOrbitals(num_outer_qubits)
@@ -329,43 +341,6 @@ class TestSOSSABuilder:
 # ═══════════════════════════════════════════════════════════════════════════════
 # Q# component tests
 # ═══════════════════════════════════════════════════════════════════════════════
-
-
-class TestOuterPrepareQSharp:
-    """Test the Q# OuterPrepare sub-operations via dump_machine."""
-
-    def test_pure_state_preparation(self, qdk_ctx):
-        """Test MakeOuterPreparePureState produces the correct statevector.
-
-        Applies PreparePureStateD to |0⟩ and verifies amplitudes via dump_machine.
-        MakeOuterPreparePureState uses Reversed(register) so coefficient[k]
-        appears at bit-reversed dump index.
-        """
-        coefficients = [0.5, 0.3, 0.7, 0.1]
-        norm = np.sqrt(sum(c**2 for c in coefficients))
-        n_qubits = 2
-
-        # Build expected in dump_machine order (big-endian):
-        # coefficient[k] → bit_reverse(k) in dump output
-        n_states = 2**n_qubits
-        expected = np.zeros(n_states)
-        for k, c in enumerate(coefficients):
-            be_idx = int(format(k, f"0{n_qubits}b")[::-1], 2)
-            expected[be_idx] = c / norm
-
-        sv_str = "[" + ", ".join(f"{c:.16f}" for c in coefficients) + "]"
-        qdk_ctx.eval(f"use qs = Qubit[{n_qubits}];")
-        qdk_ctx.eval(f"let op = QDKChemistry.Utils.SOSSAWalk.MakeOuterPreparePureState({sv_str}); op(qs);")
-        state = qdk_ctx.dump_machine()
-        amplitudes = np.array(state.as_dense_state())
-
-        # Check amplitudes match expected (up to global phase)
-        assert np.allclose(
-            np.abs(amplitudes[: len(expected)]),
-            np.abs(expected),
-            atol=float_comparison_absolute_tolerance,
-        )
-        qdk_ctx.eval("ResetAll(qs)")
 
 
 class TestInnerPrepareQSharp:

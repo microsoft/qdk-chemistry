@@ -1,0 +1,356 @@
+"""QDK/Chemistry SOSSA (Sum of Squares Spectral Amplification) circuit mapper :cite:`Low2025`."""
+
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
+from typing import Any
+
+from qdk_chemistry.data import AlgorithmRef, Settings
+from qdk_chemistry.data.circuit import Circuit, CircuitMetadata, QsharpFactoryData
+from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
+from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSAWalkContainer, sossa_register_bits
+from qdk_chemistry.utils import Logger
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+
+from .base import CircuitMapper
+
+__all__: list[str] = [
+    "SOSSAMapper",
+    "SOSSAMapperSettings",
+]
+
+
+class SOSSAMapperSettings(Settings):
+    """Settings for the SOSSAMapper."""
+
+    def __init__(self):
+        """Initialize settings for SOSSAMapper."""
+        super().__init__()
+        self._set_default(
+            "outer_prepare",
+            "algorithm_ref",
+            AlgorithmRef("state_prep", "alias_sampling"),
+        )
+        self._set_default(
+            "inner_prepare_algorithm",
+            "string",
+            "controlled_alias_sampling",
+            "Inner PREPARE algorithm: controlled_alias_sampling or direct.",
+        )
+        self._set_default(
+            "select_algorithm",
+            "string",
+            "qrom_phase_gradient",
+            "SELECT algorithm: qrom_phase_gradient or direct.",
+        )
+        self._set_default(
+            "rotation_bit_precision",
+            "int",
+            10,
+            "Number of bits for Givens rotation angle precision.",
+        )
+        self._set_default(
+            "coefficient_bit_precision",
+            "int",
+            10,
+            "Number of bits for alias sampling coefficient precision.",
+        )
+
+
+class SOSSAMapper(CircuitMapper):
+    r"""Circuit mapper for the SOSSA block encoding :math:`B` :cite:`Low2025`.
+
+    Emits :math:`B = U^\dagger \cdot \mathrm{Ref}_B \cdot U` on the flat register
+    ``[system | ancillas | phase gradient]``, the same shape
+    :class:`~qdk_chemistry.algorithms.circuit_mapper.psp_mapper.PSPMapper` produces. The
+    walk :math:`W = \mathrm{Ref}_{a,B} \cdot B` is left to the caller, which reflects about
+    the ancillas ahead of the phase gradient; that reflection is the generic
+    ``MakeAncillaReflectionOp`` because the ancillas the all-zero state flags are the
+    leading contiguous block.
+    """
+
+    def __init__(self):
+        """Initialize the SOSSAMapper."""
+        super().__init__()
+        self._settings = SOSSAMapperSettings()
+
+    def name(self) -> str:
+        """Return the algorithm name."""
+        return "sossa"
+
+    def type_name(self) -> str:
+        """Return the algorithm type name."""
+        return "circuit_mapper"
+
+    def build_outer_prep(self, container: SOSSAWalkContainer) -> tuple[Any, int]:
+        r"""Build the Q# outer PREPARE callable and the gradient width it expects.
+
+        Every state-preparation backend takes *amplitudes* on a little-endian index
+        register and derives its own distribution from them, so the coefficients handed
+        over are the generator one-norms :math:`c_{x_o}` themselves rather than their
+        squares: the SOS block encoding reads :math:`\sum_{x_o} c_{x_o}^2 = 2\Lambda` off
+        the amplitudes (Eqs. (7) and (9) of :cite:`Low2025`), and alias sampling squares
+        its input again on the way to Q#.
+
+        Args:
+            container: The SOSSA container with outer_prepare coefficients.
+
+        Returns:
+            A Q# callable ``(Qubit[]) => Unit is Adj + Ctl`` and the number of shared
+            phase-gradient qubits it expects appended to the outer register.
+
+        """
+        prepare_algorithm = self._create_nested("outer_prepare")
+        ref: AlgorithmRef = self._settings.get("outer_prepare")
+        if ref.algorithm_name == "alias_sampling":
+            prepare_algorithm.settings().set("bits_precision", self._settings.get("coefficient_bit_precision"))
+        circuit = prepare_algorithm.run(container.outer_prepare)
+        return circuit._qsharp_op, circuit.metadata.num_phase_gradient_ancillas  # noqa: SLF001
+
+    def build_inner_prep(self, container: SOSSAWalkContainer) -> Any:
+        r"""Build the Q# inner (controlled) PREPARE callable.
+
+        Creates a superposition over bases :math:`b` conditioned on :math:`x_o`.
+
+        Algorithms:
+            - ``"controlled_alias_sampling"``: 2D alias sampling with free-rider data.
+            - ``"direct"``: Direct multiplexed preparation (ControlledPureStatePrep).
+
+        Args:
+            container: The SOSSA container with inner_prepare coefficients.
+
+        Returns:
+            A Q# callable ``(Qubit[], Qubit[]) => Unit is Adj``.
+
+        """
+        algorithm = self._settings.get("inner_prepare_algorithm")
+        coeff_bits = self._settings.get("coefficient_bit_precision")
+        coefficients = container.inner_prepare.conditional_coefficients.tolist()
+        free_rider_data = container.inner_prepare.free_rider_data
+        free_rider_data = free_rider_data.tolist() if free_rider_data is not None else []
+
+        if algorithm == "controlled_alias_sampling":
+            return QSHARP_UTILS.SOSSAWalk.MakeInnerPrepareAliasSampling(coefficients, free_rider_data, coeff_bits)
+        return QSHARP_UTILS.SOSSAWalk.MakeInnerPrepareDirect(coefficients, free_rider_data)
+
+    def build_select(self, container: SOSSAWalkContainer) -> Any:
+        r"""Build the SELECT step.
+
+        Algorithms:
+            - ``"qrom_phase_gradient"``: Load angles via QROM, apply via phase gradient adders.
+            - ``"direct"``: Direct rotation synthesis.
+
+        Args:
+            container: The SOSSA container with rotation angles and structure.
+
+        Returns:
+            A Q# callable for the SELECT oracle.
+
+        """
+        algorithm = self._settings.get("select_algorithm")
+        rot_bits = self._settings.get("rotation_bit_precision")
+
+        num_free_rider_bits = sossa_register_bits(
+            container.num_orbitals, container.num_ranks, container.num_bases, container.num_copies
+        )["num_free_rider_bits"]
+
+        select_data = {
+            "numOrbitals": container.num_orbitals,
+            "numRanks": container.num_ranks,
+            "numBases": container.num_bases,
+            "numCopies": container.num_copies,
+            "numPositiveOneBody": container.select.num_positive_one_body_terms,
+            "OneBodyRotationAngles": container.select.one_body_rotation_angles.tolist(),
+            "TwoBodyRotationAngles": container.select.two_body_rotation_angles.tolist(),
+            "rotationBitPrecision": rot_bits,
+            "numFreeRiderBits": num_free_rider_bits,
+        }
+        if algorithm == "qrom_phase_gradient":
+            return QSHARP_UTILS.SOSSAWalk.MakeSelectPhaseGradient(select_data)
+        return QSHARP_UTILS.SOSSAWalk.MakeSelectDirectRotation(select_data)
+
+    @property
+    def num_phase_gradient_qubits(self) -> int:
+        """Width of the persistent phase gradient register, zero when none is needed.
+
+        Only the QROM backends read a gradient at all, and the outer PREPARE sizes its
+        own from its ``rotation_bit_precision`` rather than the mapper's. The outer
+        PREPARE and SELECT share a single register, so the two widths have to agree; a
+        mismatch is a configuration error rather than something to paper over by taking
+        the wider of the two.
+
+        Raises:
+            ValueError: If the outer PREPARE and SELECT ask for different widths.
+
+        """
+        outer_ref: AlgorithmRef = self._settings.get("outer_prepare")
+        outer_bits = (
+            int(self._create_nested("outer_prepare").settings().get("rotation_bit_precision"))
+            if outer_ref.algorithm_name == "qrom"
+            else 0
+        )
+        select_bits = (
+            int(self._settings.get("rotation_bit_precision"))
+            if self._settings.get("select_algorithm") == "qrom_phase_gradient"
+            else 0
+        )
+        if outer_bits and select_bits and outer_bits != select_bits:
+            raise ValueError(
+                "The outer PREPARE and SELECT share one phase gradient register and must agree "
+                f"on its width, but the outer PREPARE asks for {outer_bits} qubits and SELECT for "
+                f"{select_bits}. Set the same rotation_bit_precision on both."
+            )
+        return max(outer_bits, select_bits)
+
+    def _compute_register_sizes(self, container: SOSSAWalkContainer) -> dict[str, int]:
+        """Compute register sizes from container structure and settings."""
+        num_orbitals = container.num_orbitals
+        num_system_qubits = 2 * num_orbitals
+        reg_bits = sossa_register_bits(num_orbitals, container.num_ranks, container.num_bases, container.num_copies)
+        xo_bits = reg_bits["xo_bits"]
+        b_bits = reg_bits["b_bits"]
+        num_free_rider_bits = reg_bits["num_free_rider_bits"]
+
+        outer_ref: AlgorithmRef = self._settings.get("outer_prepare")
+        if outer_ref.algorithm_name == "alias_sampling":
+            mu_outer = self._settings.get("coefficient_bit_precision")
+            num_outer_qubits = 2 * xo_bits + 2 * mu_outer + 1
+        else:
+            num_outer_qubits = xo_bits
+
+        if self._settings.get("inner_prepare_algorithm") == "controlled_alias_sampling":
+            mu_inner = self._settings.get("coefficient_bit_precision")
+            num_inner_qubits = 2 * b_bits + 2 * mu_inner + 3 + num_free_rider_bits
+            num_reflect_inner = b_bits + mu_inner + 1
+        else:
+            num_inner_qubits = b_bits + num_free_rider_bits
+            num_reflect_inner = b_bits
+
+        num_phase_gradient_qubits = self.num_phase_gradient_qubits
+
+        return {
+            "num_system_qubits": num_system_qubits,
+            "num_outer_qubits": num_outer_qubits,
+            "num_outer_index_qubits": xo_bits,
+            "num_inner_qubits": num_inner_qubits,
+            "num_reflect_inner": num_reflect_inner,
+            "num_phase_gradient_qubits": num_phase_gradient_qubits,
+            # The shared register is one width, so the outer PREPARE either reads all of
+            # it or none of it.
+            "num_outer_prepare_gradient_qubits": (
+                num_phase_gradient_qubits if outer_ref.algorithm_name == "qrom" else 0
+            ),
+        }
+
+    def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
+        r"""Construct the SOSSA block encoding on the flat ``[system | ancilla]`` register.
+
+        Args:
+            unitary: The unitary representation containing the SOSSA decomposition.
+
+        Returns:
+            Circuit: The block encoding :math:`B`, declaring the full register width and the
+            phase gradient qubits its caller must prepare.
+
+        Raises:
+            ValueError: If the container is not a :class:`SOSSAWalkContainer`.
+
+        """
+        container = unitary.get_container()
+        if not isinstance(container, SOSSAWalkContainer):
+            raise ValueError(
+                f"The {unitary.get_container_type()} container type is not supported. "
+                "SOSSAMapper only supports SOSSAWalkContainer."
+            )
+        if container.power != 1:
+            Logger.warn(
+                f"The container's walk power {container.power} is ignored; SOSSAMapper emits the "
+                "block encoding and leaves the reflection and the query schedule to the caller."
+            )
+
+        regs = self._compute_register_sizes(container)
+        outer_prepare_op, inner_prepare_op, select_op = self._build_walk_oracles(container, regs)
+        layout = self._build_walk_layout(regs)
+
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.SOSSAWalk.MakeSOSSABlockEncodingCircuit,
+            parameter={
+                "outerPrepareOp": outer_prepare_op,
+                "innerPrepareOp": inner_prepare_op,
+                "selectOp": select_op,
+                "layout": layout,
+            },
+        )
+        qsharp_op = QSHARP_UTILS.SOSSAWalk.MakeSOSSABlockEncodingOp(
+            outer_prepare_op,
+            inner_prepare_op,
+            select_op,
+            layout,
+        )
+
+        return Circuit(
+            qsharp_factory=qsharp_factory,
+            qsharp_op=qsharp_op,
+            num_qubits=regs["num_system_qubits"] + self._num_ancilla_qubits(regs),
+            metadata=CircuitMetadata(num_phase_gradient_ancillas=regs["num_phase_gradient_qubits"]),
+        )
+
+    def _build_walk_oracles(self, container: SOSSAWalkContainer, regs: dict[str, int]) -> tuple[Any, Any, Any]:
+        """Build the outer PREPARE, inner PREPARE and SELECT callables of the block encoding.
+
+        Raises:
+            ValueError: If the outer PREPARE circuit declares a different phase gradient
+                width than the walk layout reserves for it.
+
+        """
+        outer_prepare_op, outer_gradient_qubits = self.build_outer_prep(container)
+        reserved = regs["num_outer_prepare_gradient_qubits"]
+        if outer_gradient_qubits != reserved:
+            raise ValueError(
+                f"The outer PREPARE circuit declares {outer_gradient_qubits} phase gradient ancillas "
+                f"but the walk layout reserves {reserved} for it, so the register handed to it would "
+                "be the wrong width."
+            )
+        return (
+            outer_prepare_op,
+            self.build_inner_prep(container),
+            self.build_select(container),
+        )
+
+    def _build_walk_layout(self, regs: dict[str, int]) -> Any:
+        """Build the Q# ``SOSSAWalkLayout`` describing the register sizes of the walk."""
+        return QSHARP_UTILS.SOSSAWalk.SOSSAWalkLayout(
+            numSystemQubits=regs["num_system_qubits"],
+            numOuterQubits=regs["num_outer_qubits"],
+            numOuterIndexQubits=regs["num_outer_index_qubits"],
+            numInnerQubits=regs["num_inner_qubits"],
+            numReflectInner=regs["num_reflect_inner"],
+            numPhaseGradientQubits=regs["num_phase_gradient_qubits"],
+            numOuterPrepareGradientQubits=regs["num_outer_prepare_gradient_qubits"],
+        )
+
+    def num_ancilla_qubits(self, container: SOSSAWalkContainer) -> int:
+        """Ancilla qubits the block encoding acts on, past the system register.
+
+        Covers the reflected ancillas and the phase gradient tail behind them, which is what
+        the flat register width is. The inner PREPARE's QROM scratch is excluded: the Q#
+        block encoding allocates it internally.
+
+        Args:
+            container: The SOSSA walk container describing the block encoding.
+
+        Returns:
+            The width of the ancilla part of the ``[system | ancilla]`` register.
+
+        """
+        return self._num_ancilla_qubits(self._compute_register_sizes(container))
+
+    @staticmethod
+    def _num_ancilla_qubits(regs: dict[str, int]) -> int:
+        """Ancilla width implied by already-computed register sizes."""
+        num_spin_qubits = 2  # spinDQ + spinSF, matches Q# SOSSAWalk.qs
+        return (
+            regs["num_outer_qubits"] + regs["num_reflect_inner"] + num_spin_qubits + regs["num_phase_gradient_qubits"]
+        )

@@ -12,10 +12,6 @@ from .controlled_swap_pauli_sequence_mapper import (
     ControlledSwapPauliSequenceMapper,
     ControlledSwapPauliSequenceMapperSettings,
 )
-from .sossa_mapper import (
-    SOSSAMapper,
-    SOSSAMapperSettings,
-)
 
 __all__ = [
     "ControlledCircuitMapperFactory",
@@ -25,6 +21,4 @@ __all__ = [
     "ControlledPauliSequenceMapper",
     "ControlledSwapPauliSequenceMapper",
     "ControlledSwapPauliSequenceMapperSettings",
-    "SOSSAMapper",
-    "SOSSAMapperSettings",
 ]

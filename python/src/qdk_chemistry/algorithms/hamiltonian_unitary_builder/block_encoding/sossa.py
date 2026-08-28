@@ -17,11 +17,11 @@ from qdk_chemistry.data import (
     Configuration,
     ModelOrbitals,
     QubitOperator,
-    SOSSAContainer,
     StateVectorContainer,
     UnitaryRepresentation,
     Wavefunction,
 )
+from qdk_chemistry.data.qubit_operator.containers.sossa import SOSSAContainer
 from qdk_chemistry.data.unitary_representation.containers.sossa import (
     SOSSAInnerPrepare,
     SOSSASelect,
@@ -216,7 +216,10 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         dets: list[Configuration] = []
         for idx, amp in enumerate(statevector):
             if amp != 0.0:
-                bitstring = format(idx, f"0{num_qubits}b")
+                # Little-endian: mode ``p`` of the determinant carries bit ``p`` of ``idx``,
+                # matching how state preparation densifies a Wavefunction back into an
+                # amplitude vector and how SELECT reads the outer index register.
+                bitstring = format(idx, f"0{num_qubits}b")[::-1]
                 dets.append(Configuration.from_bitstring(bitstring))
                 coeffs_list.append(float(amp))
         orbitals = ModelOrbitals(num_qubits)

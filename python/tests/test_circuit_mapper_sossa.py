@@ -9,14 +9,53 @@ import math
 
 import numpy as np
 import pytest
+import qdk
 
-from qdk_chemistry.algorithms.controlled_circuit_mapper import SOSSAMapper
+from qdk_chemistry.algorithms.circuit_mapper import SOSSAMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.algorithms.qubit_mapper.sossa import SOSSAQubitMapper
 from qdk_chemistry.data import AlgorithmRef, Circuit, Hamiltonian, MajoranaMapping
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context
 
 from .test_helpers import create_random_factorized_hamiltonian
+
+
+@pytest.fixture
+def qdk_ctx() -> qdk.Context:
+    """Fresh Q# context, isolated from the library's shared one.
+
+    Tests that inspect quantum state need their own interpreter, because
+    ``dump_machine`` reports every qubit currently allocated in the context.
+    """
+    return create_qsharp_context()
+
+
+def _reverse_bits(x: int, n: int) -> int:
+    """Reverse the bit order of *x* within an *n*-bit field."""
+    return int(format(x, f"0{n}b")[::-1], 2)
+
+
+def _alias_atol(num_coefficients: int, bits_precision: int) -> float:
+    """Tolerance on a marginal probability for an L-term, mu-bit alias table.
+
+    Same bound the dedicated alias-sampling tests assert against; see
+    ``_alias_atol`` in ``test_state_preparation_alias.py``.
+    """
+    return 1.0 / (num_coefficients * 2**bits_precision)
+
+
+def _with_prepared_gradient(op, num_gradient: int):
+    """Wrap an outer PREPARE so it prepares and restores the gradient it reads.
+
+    The walk hands the outer PREPARE a slice of the persistent gradient register that
+    phase estimation prepares once; a standalone simulation has to supply it.
+    """
+    if not num_gradient:
+        return op
+    return QSHARP_UTILS.CircuitComposition.MakeSharedAncillaOp(
+        op, QSHARP_UTILS.PhaseGradient.PreparePhaseGradientState, num_gradient
+    )
 
 
 def _to_sossa_operator(factorized_hamiltonian):
@@ -26,7 +65,7 @@ def _to_sossa_operator(factorized_hamiltonian):
     return SOSSAQubitMapper().run(hamiltonian, MajoranaMapping.jordan_wigner(num_modes))
 
 
-def _build_controlled_unitary(
+def _build_sossa_unitary(
     num_orbitals: int = 2,
     num_ranks: int = 2,
     num_bases: int = 1,
@@ -74,11 +113,12 @@ class TestOuterPrep:
     @pytest.mark.parametrize("algorithm", ["alias_sampling", "dense_pure_state", "qrom"])
     def test_build_outer_prep_returns_callable(self, algorithm):
         """Verify build_outer_prep produces a Q# callable for each algorithm."""
-        controlled_unitary = _build_controlled_unitary()
-        container = controlled_unitary.get_container()
+        sossa_unitary = _build_sossa_unitary()
+        container = sossa_unitary.get_container()
         mapper = _make_sossa_mapper(outer_algorithm=algorithm)
-        op = mapper.build_outer_prep(container)
+        op, num_gradient = mapper.build_outer_prep(container)
         assert op is not None
+        assert num_gradient == (10 if algorithm == "qrom" else 0)
 
     @pytest.mark.parametrize("algorithm", ["dense_pure_state", "qrom"])
     def test_build_outer_prep_fidelity(self, algorithm, qdk_ctx):
@@ -88,35 +128,33 @@ class TestOuterPrep:
         against the expected normalized state:
           |ψ⟩ = Σ_j (a_j / ||a||) |j⟩
 
-        Note: ``dump_machine()`` reports big-endian, and the two backends differ in
-        where they leave coefficient ``k``. ``MakeOuterPreparePureState``
-        (``dense_pure_state``) wraps ``PreparePureStateD`` in ``Reversed(register)``,
-        so coefficient ``k`` lands at dump index ``bit_reverse(k)``. The QROM prep
-        writes its ``target`` in dump order, so coefficient ``k`` lands at index ``k``.
-        Expected is built to match whichever applies.
+        Every backend writes the outer index register little-endian, which is how SELECT
+        reads it back, so the backend a caller picks cannot change which generator an
+        amplitude belongs to. ``dump_machine()`` reports big-endian, so coefficient ``j``
+        is expected at the bit-reversed dump index for all of them.
         """
-        controlled_unitary = _build_controlled_unitary()
-        container = controlled_unitary.get_container()
+        sossa_unitary = _build_sossa_unitary()
+        container = sossa_unitary.get_container()
         mapper = _make_sossa_mapper(outer_algorithm=algorithm)
-        op = mapper.build_outer_prep(container)
+        op, num_gradient = mapper.build_outer_prep(container)
 
         coefficients = np.asarray(container.outer_prepare.get_coefficients())
         num_qubits = math.ceil(math.log2(len(coefficients))) if len(coefficients) > 1 else 1
 
-        qdk_ctx.code.QDKChemistry.Utils.SOSSAWalk.TestApplyOuterPrep(op, num_qubits)
+        qdk_ctx.code.QDKChemistry.Utils.SOSSAWalk.TestApplyOuterPrep(
+            _with_prepared_gradient(op, num_gradient), num_qubits + num_gradient
+        )
         state = qdk_ctx.dump_machine()
-        actual_sv = np.array(state.as_dense_state())
+        # The gradient is restored by the wrapper, so the state register is the |0..0⟩
+        # gradient column of the dump.
+        full_sv = np.array(state.as_dense_state())
+        actual_sv = full_sv.reshape(2**num_qubits, 2**num_gradient)[:, 0]
 
         n_states = 2**num_qubits
         expected = np.zeros(n_states)
         for j, amp in enumerate(coefficients):
             if j < n_states:
-                if algorithm == "dense_pure_state":
-                    # Reversed(register) over PreparePureStateD puts coefficient[k]
-                    # at big-endian dump index bit_reverse(k).
-                    expected[int(format(j, f"0{num_qubits}b")[::-1], 2)] = amp
-                else:
-                    expected[j] = amp
+                expected[_reverse_bits(j, num_qubits)] = amp
         expected /= np.linalg.norm(expected)
 
         fidelity = abs(np.dot(np.conj(actual_sv), expected))
@@ -133,11 +171,12 @@ class TestOuterPrep:
         distribution, so the marginal on the index register must come out as
         :math:`p(l) = c_l^2 / \sum_j c_j^2` rather than :math:`|c_l| / \sum_j |c_j|`.
         """
-        controlled_unitary = _build_controlled_unitary()
-        container = controlled_unitary.get_container()
+        sossa_unitary = _build_sossa_unitary()
+        container = sossa_unitary.get_container()
         bit_precision = 10
         mapper = _make_sossa_mapper(outer_algorithm="alias_sampling", coefficient_bit_precision=bit_precision)
-        op = mapper.build_outer_prep(container)
+        op, num_gradient = mapper.build_outer_prep(container)
+        assert num_gradient == 0
 
         coefficients = np.asarray(container.outer_prepare.get_coefficients())
         num_index_qubits = math.ceil(math.log2(len(coefficients))) if len(coefficients) > 1 else 1
@@ -147,8 +186,8 @@ class TestOuterPrep:
         state = qdk_ctx.dump_machine()
         full_sv = np.array(state.as_dense_state())
 
-        # Marginal over the index register (top bits of the big-endian dump). Alias
-        # sampling writes its index register in dump order, so no bit reversal here.
+        # Marginal over the index register (top bits of the big-endian dump), so the
+        # little-endian index l shows up at the bit-reversed position.
         n_index = 2**num_index_qubits
         shift = total_qubits - num_index_qubits
         probs = np.zeros(n_index)
@@ -156,10 +195,12 @@ class TestOuterPrep:
             probs[(i >> shift) & (n_index - 1)] += abs(full_sv[i]) ** 2
 
         squared_coeffs = np.abs(coefficients) ** 2
-        expected_probs = squared_coeffs / np.sum(squared_coeffs)
+        expected_probs = np.zeros(n_index)
+        for j, p in enumerate(squared_coeffs / np.sum(squared_coeffs)):
+            expected_probs[_reverse_bits(j, num_index_qubits)] = p
 
-        atol = 2.0 / (2**bit_precision)
-        np.testing.assert_allclose(probs[: len(coefficients)], expected_probs, atol=atol)
+        atol = _alias_atol(len(coefficients), bit_precision)
+        np.testing.assert_allclose(probs, expected_probs, atol=atol)
 
 
 class TestInnerPrep:
@@ -176,12 +217,12 @@ class TestInnerPrep:
             P(b|l) ≈ |c_{l,b}|² / Σ_j |c_{l,j}|²
         """
         # Use num_bases=2 for a non-trivial inner dimension (B+1=3)
-        controlled_unitary = _build_controlled_unitary(num_orbitals=2, num_ranks=2, num_bases=2, num_copies=1)
-        container = controlled_unitary.get_container()
+        sossa_unitary = _build_sossa_unitary(num_orbitals=2, num_ranks=2, num_bases=2, num_copies=1)
+        container = sossa_unitary.get_container()
 
         # Build outer prep (exact, dense_pure)
         outer_mapper = _make_sossa_mapper(outer_algorithm="dense_pure_state")
-        outer_op = outer_mapper.build_outer_prep(container)
+        outer_op, _ = outer_mapper.build_outer_prep(container)
 
         # Build inner prep
         bit_precision = 6
@@ -245,7 +286,7 @@ class TestInnerPrep:
             abs_coeffs = np.abs(inner_coeffs[ell])
             expected_probs = abs_coeffs**2 / np.sum(abs_coeffs**2)
 
-            atol = 2.0 / (2**bit_precision) if algorithm == "controlled_alias_sampling" else 1e-3
+            atol = _alias_atol(n_coeffs, bit_precision) if algorithm == "controlled_alias_sampling" else 1e-3
             np.testing.assert_allclose(
                 probs[:n_coeffs], expected_probs, atol=atol, err_msg=f"outer={ell}, algorithm={algorithm}"
             )
@@ -257,7 +298,7 @@ class TestInnerPrep:
 
 
 class TestSOSSAMapper:
-    """Tests for the SOSSA controlled circuit mapper."""
+    """Tests for the SOSSA block-encoding circuit mapper."""
 
     def test_rejects_non_sossa_container(self):
         """Verify SOSSAMapper raises ValueError for non-SOSSAWalkContainer containers."""
@@ -273,15 +314,6 @@ class TestSOSSAMapper:
 
         mapper = SOSSAMapper()
         with pytest.raises(ValueError, match="not supported"):
-            mapper.run(unitary_rep)
-
-    def test_rejects_multiple_control_qubits(self):
-        """Verify SOSSAMapper raises ValueError for multiple control qubits."""
-        unitary_rep = _build_controlled_unitary()
-
-        mapper = SOSSAMapper()
-        mapper.settings().set("control_indices", [0, 1])
-        with pytest.raises(ValueError, match="single control qubit"):
             mapper.run(unitary_rep)
 
     @pytest.mark.parametrize(
@@ -303,17 +335,35 @@ class TestSOSSAMapper:
     )
     def test_all_algorithm_combinations_produce_circuit(self, outer_alg, inner_alg, select_alg):
         """Test that all valid algorithm combinations produce a Circuit."""
-        controlled_unitary = _build_controlled_unitary()
+        unitary = _build_sossa_unitary()
         mapper = _make_sossa_mapper(
             outer_algorithm=outer_alg,
             inner_algorithm=inner_alg,
             select_algorithm=select_alg,
         )
-        circuit = mapper.run(controlled_unitary)
+        circuit = mapper.run(unitary)
 
         assert isinstance(circuit, Circuit)
         assert circuit._qsharp_op is not None
         assert circuit._qsharp_factory is not None
+
+    def test_declares_the_register_the_walk_reflects_about(self):
+        """The block encoding reports a flat register the caller can size the reflection from.
+
+        Unary QPE reads the reflected width off ``num_qubits`` minus the system register and
+        the gradient tail, so those three have to be consistent for the reflection it builds
+        with ``MakeAncillaReflectionOp`` to cover exactly the flagging ancillas.
+        """
+        unitary = _build_sossa_unitary()
+        container = unitary.get_container()
+        mapper = _make_sossa_mapper()
+        circuit = mapper.run(unitary)
+
+        num_system_qubits = 2 * container.num_orbitals
+        num_gradient = circuit.metadata.num_phase_gradient_ancillas
+        assert num_gradient == mapper.num_phase_gradient_qubits
+        assert circuit.num_qubits == num_system_qubits + mapper.num_ancilla_qubits(container)
+        assert circuit.num_qubits - num_system_qubits - num_gradient > 0
 
     @pytest.mark.parametrize(
         ("num_orbitals", "num_ranks", "num_bases", "num_copies"),
@@ -326,14 +376,14 @@ class TestSOSSAMapper:
     )
     def test_mapping_parametrized_dimensions(self, num_orbitals, num_ranks, num_bases, num_copies):
         """Test mapping for various (N, R, B, C) configurations."""
-        controlled_unitary = _build_controlled_unitary(
+        unitary = _build_sossa_unitary(
             num_orbitals=num_orbitals,
             num_ranks=num_ranks,
             num_bases=num_bases,
             num_copies=num_copies,
         )
         mapper = SOSSAMapper()
-        circuit = mapper.run(controlled_unitary)
+        circuit = mapper.run(unitary)
 
         assert isinstance(circuit, Circuit)
         assert circuit._qsharp_op is not None
@@ -430,7 +480,7 @@ class TestSOSSAWalkLogicalCounts:
     )
     def test_qubit_count_matches_formula(self, num_orbitals, num_ranks, num_bases, num_copies):
         """Verify numQubits matches the paper formula bounds."""
-        controlled_unitary = _build_controlled_unitary(
+        sossa_unitary = _build_sossa_unitary(
             num_orbitals=num_orbitals,
             num_ranks=num_ranks,
             num_bases=num_bases,
@@ -442,7 +492,7 @@ class TestSOSSAWalkLogicalCounts:
             select_algorithm="direct",
             rotation_bit_precision=10,
         )
-        circuit = mapper.run(controlled_unitary)
+        circuit = mapper.run(sossa_unitary)
 
         factory = circuit._qsharp_factory
         ctx = factory.program._qdk_context

@@ -104,31 +104,6 @@ namespace QDKChemistry.Utils.PhaseGradient {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Ancilla preparation helpers
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    /// Build an ancillaPrep callback that prepares the phase gradient state
-    /// on the last `numPhaseGradientQubits` qubits of the beAncillas array.
-    /// Returns a no-op when numPhaseGradientQubits == 0.
-    ///
-    /// Kept here rather than inlined at the call site because the SOSSA controlled
-    /// mapper exposes it as an `ancillaPrep` capability to external algorithms
-    /// (`sossa_mapper.get_ancilla_prep_op`), which hand it to phase estimation.
-    function MakePhaseGradientAncillaPrep(numPhaseGradientQubits : Int) : Qubit[] => Unit is Adj {
-        (beAncillas) => {
-            if numPhaseGradientQubits > 0 {
-                let n = Length(beAncillas);
-                let pgReg = beAncillas[n - numPhaseGradientQubits..n - 1];
-                PreparePhaseGradientState(pgReg);
-            }
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Test wrappers
-    // ═══════════════════════════════════════════════════════════════════════════
-
     /// Test wrapper: Rz via phase gradient on `[target | angle | gradient]`.
     internal function MakeTestRzOnPlusOp(angleValue : Int, nBits : Int) : Qubit[] => Unit {
         (qs) => {

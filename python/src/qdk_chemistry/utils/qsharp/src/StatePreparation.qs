@@ -142,11 +142,6 @@ namespace QDKChemistry.Utils.StatePreparation {
         PrepareHadamardAll(_)
     }
 
-    /// No-op ancilla preparation (used when no persistent ancilla init is needed).
-    function MakeNoOpAncillaPrep() : Qubit[] => Unit is Adj {
-        (beAncillas) => {}
-    }
-
     /// Prepares the dense statevector on the qubit subset given by rowMap.
     operation ApplyDensePreparation(
         rowMap : Int[],

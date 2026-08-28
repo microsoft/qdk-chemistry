@@ -53,11 +53,6 @@ class ControlledPSPMapper(ControlledCircuitMapper):
 
         W = (2|0\rangle\langle 0| - I) \cdot B[H]
 
-    That walk is a self-inverse block encoding plus a reflection, which is the shape
-    unary-iteration phase estimation schedules. It is assembled inline while the circuit is
-    built, when the container resolves to a walk; this class exposes no separate
-    walk-construction entry point.
-
     """
 
     def __init__(self):

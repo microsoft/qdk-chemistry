@@ -220,8 +220,14 @@ class QubitOperator(DataClass):
 
     @classmethod
     def from_json(cls, json_data: dict[str, Any]) -> QubitOperator:
-        """Create a qubit operator from a JSON dictionary."""
-        container_type = json_data.get("container_type")
+        """Create a qubit operator from a JSON dictionary.
+
+        Documents written before this class delegated to a container carry no
+        ``container_type``; they are all Pauli LCU operators, so a missing key reads as
+        one rather than failing. ``_serialization_version`` did not change when the key
+        was added, so the version guard cannot distinguish them.
+        """
+        container_type = json_data.get("container_type", "pauli_lcu")
         if container_type == "pauli_lcu":
             container = PauliLCUContainer.from_json(json_data)
         elif container_type == "sossa":
@@ -232,8 +238,12 @@ class QubitOperator(DataClass):
 
     @classmethod
     def from_hdf5(cls, group: h5py.Group) -> QubitOperator:
-        """Create a qubit operator from an HDF5 group."""
-        container_type = group.attrs.get("container_type")
+        """Create a qubit operator from an HDF5 group.
+
+        A group without a ``container_type`` attribute predates container delegation and
+        holds a Pauli LCU operator; see :meth:`from_json`.
+        """
+        container_type = group.attrs.get("container_type", "pauli_lcu")
         if container_type == "pauli_lcu":
             container = PauliLCUContainer.from_hdf5(group)
         elif container_type == "sossa":

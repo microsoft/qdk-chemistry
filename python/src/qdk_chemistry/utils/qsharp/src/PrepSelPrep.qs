@@ -23,14 +23,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     /// No-op PREPARE callable for single-term Hamiltonians (0-ancilla case).
     operation NoOpPrepare(ancillaRegister : Qubit[]) : Unit is Adj + Ctl {}
 
-    /// REFLECT oracle: reflection about the zero state on the ancilla register.
-    ///
-    /// Uses AND-ladder with measurement-based uncompute for n >= 2.
-    /// Cost: n-2 Toffoli for n qubits (vs 2n-5 for standard multi-controlled-Z).
-    ///
-    /// $$
-    ///     \mathrm{REFLECT} = 2|0\rangle\langle 0| - I
-    /// $$
+    /// Reflection about the zero state on the ancilla register.
     operation Reflect(ancillaRegister : Qubit[]) : Unit is Adj + Ctl {
         body ... {
             let n = Length(ancillaRegister);
@@ -139,28 +132,6 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         controlled adjoint auto;
     }
 
-    /// Qubitization walk: PREPARE† · SELECT · PREPARE followed by REFLECT.
-    operation PSPWalk(
-        prepareOp : Qubit[] => Unit is Adj + Ctl,
-        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
-        targetRegister : Qubit[],
-        ancillaRegister : Qubit[],
-    ) : Unit is Adj + Ctl {
-        body ... {
-            PrepSelPrep(prepareOp, selectOp, targetRegister, ancillaRegister, Length(ancillaRegister));
-            Reflect(ancillaRegister);
-        }
-        adjoint auto;
-        controlled (ctls, ...) {
-            Controlled PrepSelPrep(
-                ctls,
-                (prepareOp, selectOp, targetRegister, ancillaRegister, Length(ancillaRegister))
-            );
-            Controlled Reflect(ctls, ancillaRegister);
-        }
-        controlled adjoint auto;
-    }
-
     /// # Summary
     /// Reflection about the all-zero state of the block-encoding ancillas of a flat
     /// `[systemReg | blockAncilla]` register.
@@ -223,30 +194,6 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         }
     }
 
-    /// # Summary
-    /// Creates a controlled PSP-based quantum-walk callable.
-    ///
-    /// System and ancilla qubits are passed together; the caller is responsible
-    /// for allocation since the walk operator leaves ancilla entangled.
-    function MakeControlledPSPWalkOp(
-        prepareOp : Qubit[] => Unit is Adj + Ctl,
-        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
-        numSystemQubits : Int,
-        numAncillaQubits : Int,
-        power : Int,
-    ) : (Qubit, Qubit[]) => Unit is Adj + Ctl {
-        (control, allQubits) => {
-            let systems = allQubits[0..numSystemQubits - 1];
-            let ancilla = allQubits[numSystemQubits...];
-            for _ in 0..power - 1 {
-                if BeginEstimateCaching("ControlledPSPWalk", SingleVariant()) {
-                    Controlled PSPWalk([control], (prepareOp, selectOp, systems, ancilla));
-                    EndEstimateCaching();
-                }
-            }
-        }
-    }
-
     /// Circuit entry point for the singly-controlled block encoding
     operation MakeControlledPrepSelPrepCircuit(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
@@ -286,26 +233,5 @@ namespace QDKChemistry.Utils.PrepSelPrep {
             1,
             1
         )
-    }
-
-    /// Applies the PSP walk to a computational basis state, leaking the qubits.
-    ///
-    /// The qubits are leaked with `QIR.Runtime.AllocateQubitArray` so the full statevector
-    /// survives until the caller dumps it, which lets a test reconstruct the walk operator
-    /// column by column and check its spectrum without a Qiskit round trip. Register layout
-    /// is `[systemReg | ancillaReg]`.
-    operation TestPSPWalkOnBasisState(
-        prepareOp : Qubit[] => Unit is Adj + Ctl,
-        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
-        numSystemQubits : Int,
-        numAncillaQubits : Int,
-        power : Int,
-        basisState : Int,
-    ) : Unit {
-        let qs = QIR.Runtime.AllocateQubitArray(numSystemQubits + numAncillaQubits);
-        ApplyXorInPlace(basisState, qs);
-        for _ in 1..power {
-            PSPWalk(prepareOp, selectOp, qs[0..numSystemQubits - 1], qs[numSystemQubits...]);
-        }
     }
 }

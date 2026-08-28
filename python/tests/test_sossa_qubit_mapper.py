@@ -7,9 +7,11 @@
 
 import pytest
 
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.algorithms.qubit_mapper.sossa import SOSSAQubitMapper
-from qdk_chemistry.data import Hamiltonian, MajoranaMapping, QubitOperator, SOSSAContainer
+from qdk_chemistry.data import Hamiltonian, MajoranaMapping, QubitOperator
+from qdk_chemistry.data.qubit_operator.containers.sossa import SOSSAContainer
 
 from .test_helpers import create_random_factorized_hamiltonian
 
@@ -30,3 +32,8 @@ def test_maps_factorized_hamiltonian_to_sos_qubit_operator() -> None:
     # The block-encoding normalization is derived by the builder from the container generators.
     walk = SOSSABuilder().run(result).get_container()
     assert walk.normalization == pytest.approx(expected_normalization)
+
+
+def test_sossa_qubit_mapper_is_reachable_through_the_registry() -> None:
+    """``create`` is the supported entry point, so the mapper has to be registered under it."""
+    assert isinstance(create("qubit_mapper", "sossa"), SOSSAQubitMapper)

@@ -65,88 +65,13 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
         statePrepUsesShared : Bool,
         blockEncodingUsesShared : Bool,
     ) : Result[] {
+        Fact(numSystemQubits > 0, "numSystemQubits must be positive");
+        Fact(numAncillas >= 0, "numAncillas must be non-negative");
+        Fact(numSharedAncillas >= 0, "numSharedAncillas must be non-negative");
         Fact(
             numSharedAncillas > 0 or not (statePrepUsesShared or blockEncodingUsesShared),
             "consuming shared ancilla requires a non-empty shared register"
         );
-        return RunUnaryQpe(
-            statePrep,
-            (phaseReg, targets, shared) => {
-                let blockEncoding =
-                    blockEncodingUsesShared
-                    ? (register) => applyBlockEncoding(register + shared)
-                    | applyBlockEncoding;
-                ApplySignedPowerSchedule(blockEncoding, applyReflection, numQueries, phaseReg, targets);
-            },
-            phaseQubitPrep,
-            prepareSharedOp,
-            numQueries,
-            numSystemQubits,
-            numAncillas,
-            numSharedAncillas,
-            statePrepUsesShared
-        );
-    }
-
-    /// Unary-iteration QPE driven by a walk that already owns its whole register layout.
-    ///
-    /// `MakeUnaryQPECircuit` composes the schedule itself out of a block encoding and a
-    /// separately controlled reflection. A block encoding whose reflection is fused into the
-    /// walk cannot be split into those two callables, so this entry point takes the assembled
-    /// schedule instead: `applySchedule(phaseReg, targets)` must apply `numQueries` queries
-    /// addressed by `phaseReg`, omitting the reflection that `phaseReg` selects.
-    ///
-    /// The shared ancillas are always appended to the target register here, so the schedule
-    /// sees one contiguous `[system | ancillas | shared]` register. That differs from
-    /// `MakeUnaryQPECircuit`, which appends them only to the block encoding; a fused walk has
-    /// no seam at which to hand them over separately.
-    operation MakeUnaryQPECircuitFromSchedule(
-        statePrep : Qubit[] => Unit,
-        applySchedule : ((Qubit[], Qubit[]) => Unit),
-        phaseQubitPrep : Qubit[] => Unit,
-        prepareSharedOp : Qubit[] => Unit is Adj + Ctl,
-        numQueries : Int,
-        numSystemQubits : Int,
-        numAncillas : Int,
-        numSharedAncillas : Int,
-        statePrepUsesShared : Bool,
-    ) : Result[] {
-        Fact(
-            numSharedAncillas > 0 or not statePrepUsesShared,
-            "consuming shared ancilla requires a non-empty shared register"
-        );
-        return RunUnaryQpe(
-            statePrep,
-            (phaseReg, targets, shared) => applySchedule(phaseReg, targets + shared),
-            phaseQubitPrep,
-            prepareSharedOp,
-            numQueries,
-            numSystemQubits,
-            numAncillas,
-            numSharedAncillas,
-            statePrepUsesShared
-        );
-    }
-
-    /// Allocate the QPE registers, run a query schedule, and read out the phase register.
-    ///
-    /// `applySchedule` receives `(Reversed(phaseReg), allTargets, sharedQubits)` and owns the
-    /// decision of what to do with the shared register, which is why the two public entry
-    /// points above can share this driver despite disagreeing on that point.
-    internal operation RunUnaryQpe(
-        statePrep : Qubit[] => Unit,
-        applySchedule : ((Qubit[], Qubit[], Qubit[]) => Unit),
-        phaseQubitPrep : Qubit[] => Unit,
-        prepareSharedOp : Qubit[] => Unit is Adj + Ctl,
-        numQueries : Int,
-        numSystemQubits : Int,
-        numAncillas : Int,
-        numSharedAncillas : Int,
-        statePrepUsesShared : Bool,
-    ) : Result[] {
-        Fact(numSystemQubits > 0, "numSystemQubits must be positive");
-        Fact(numAncillas >= 0, "numAncillas must be non-negative");
-        Fact(numSharedAncillas >= 0, "numSharedAncillas must be non-negative");
         let numPhaseQubits = PhaseRegisterSize(numQueries);
 
         use qs = Qubit[numPhaseQubits + numSystemQubits + numAncillas + numSharedAncillas];
@@ -163,7 +88,11 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
             }
         } apply {
             statePrep(statePrepUsesShared ? systemQubits + sharedQubits | systemQubits);
-            applySchedule(Reversed(phaseQubits), allTargets, sharedQubits);
+            let blockEncoding =
+                blockEncodingUsesShared
+                ? (register) => applyBlockEncoding(register + sharedQubits)
+                | applyBlockEncoding;
+            ApplySignedPowerSchedule(blockEncoding, applyReflection, numQueries, Reversed(phaseQubits), allTargets);
         }
 
         Adjoint ApplyQFT(phaseQubits);

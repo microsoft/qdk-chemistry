@@ -5,16 +5,14 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import h5py
 import numpy as np
 import pytest
 
-from qdk_chemistry.data import (
-    PauliLCUContainer,
-    QubitOperator,
-    QubitOperatorContainer,
-    RotatedPaulis,
-    SOSSAContainer,
-)
+from qdk_chemistry.data import QubitOperator
+from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorContainer
+from qdk_chemistry.data.qubit_operator.containers.pauli_lcu import PauliLCUContainer
+from qdk_chemistry.data.qubit_operator.containers.sossa import RotatedPaulis, SOSSAContainer
 
 
 def test_qubit_operator_wraps_pauli_lcu_container() -> None:
@@ -47,10 +45,53 @@ def test_qubit_operator_wraps_pauli_lcu_container() -> None:
     assert restored.content_hash() == operator.content_hash()
 
 
-def test_qubit_operator_rejects_legacy_constructor() -> None:
-    """The removed direct Pauli constructor is intentionally unsupported."""
+def test_qubit_operator_requires_coefficients_with_pauli_strings() -> None:
+    """Pauli strings alone are neither a container nor a complete legacy call."""
     with pytest.raises(TypeError, match="QubitOperator requires a QubitOperatorContainer"):
         QubitOperator(["X"])  # type: ignore[arg-type]
+
+
+def test_qubit_operator_still_accepts_the_legacy_positional_constructor() -> None:
+    """``QubitOperator(pauli_strings, coefficients)`` is a shipped signature and still works."""
+    operator = QubitOperator(["XI", "ZZ"], np.array([0.5, -0.25]))
+
+    assert operator.get_container_type() == "pauli_lcu"
+    assert operator.pauli_strings == ["XI", "ZZ"]
+    np.testing.assert_allclose(operator.coefficients, np.array([0.5, -0.25]))
+
+
+def test_qubit_operator_reads_documents_written_before_container_dispatch() -> None:
+    """A document with no ``container_type`` loads as a Pauli LCU operator.
+
+    Releases through 2.1.0 wrote no ``container_type`` and this PR did not bump
+    ``_serialization_version``, so the version guard cannot tell those documents apart
+    from current ones. Defaulting the missing key is what keeps them readable.
+    """
+    current = QubitOperator(PauliLCUContainer(["XI", "ZZ"], np.array([0.5, -0.25]), "jordan-wigner")).to_json()
+    legacy = {key: value for key, value in current.items() if key != "container_type"}
+    assert "container_type" not in legacy
+
+    restored = QubitOperator.from_json(legacy)
+
+    assert restored.get_container_type() == "pauli_lcu"
+    assert restored.pauli_strings == ["XI", "ZZ"]
+    np.testing.assert_allclose(restored.coefficients, np.array([0.5, -0.25]))
+
+
+def test_qubit_operator_reads_hdf5_groups_written_before_container_dispatch(tmp_path) -> None:
+    """The same missing-``container_type`` default applies to HDF5 groups."""
+    operator = QubitOperator(PauliLCUContainer(["XI", "ZZ"], np.array([0.5, -0.25]), "jordan-wigner"))
+    path = tmp_path / "legacy.h5"
+    with h5py.File(path, "w") as handle:
+        group = handle.create_group("operator")
+        operator.to_hdf5(group)
+        del group.attrs["container_type"]
+
+    with h5py.File(path, "r") as handle:
+        restored = QubitOperator.from_hdf5(handle["operator"])
+
+    assert restored.get_container_type() == "pauli_lcu"
+    assert restored.pauli_strings == ["XI", "ZZ"]
 
 
 def test_sos_container_json_roundtrip_preserves_complex_coefficients() -> None:

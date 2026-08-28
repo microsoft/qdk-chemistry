@@ -18,6 +18,8 @@ from typing import TYPE_CHECKING, Any
 import h5py
 import numpy as np
 
+from qdk_chemistry.data._hashing import _hash_arg, _hash_str
+
 from .block_encoding import _wavefunction_from_hdf5, _wavefunction_to_hdf5
 from .quantum_walk import QuantumWalkContainer
 
@@ -180,8 +182,21 @@ class SOSSAWalkContainer(QuantumWalkContainer):
 
     """
 
-    _data_type_name = "sossa_container"
     _serialization_version = "0.1.0"
+
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for SOSSA-walk containers.
+
+        Distinct from the ``"sossa_container"`` claimed by
+        :class:`qdk_chemistry.data.qubit_operator.containers.sossa.SumOfSquaresContainer`,
+        which holds the operator this block encoding is built from.
+
+        Returns:
+            ``"sossa_walk_container"``.
+
+        """
+        return "sossa_walk_container"
 
     def __init__(
         self,
@@ -372,6 +387,11 @@ class SOSSAWalkContainer(QuantumWalkContainer):
             f"  System: {2 * n} spin-orbitals\n"
         )
 
+    def _hash_update(self, h) -> None:
+        """Feed identifying data into the hasher."""
+        _hash_str(h, self.type)
+        _hash_arg(h, self.to_json())
+
     def eigenvalue_from_phase(self, phase_fraction: float) -> float:
         r"""Recover a Hamiltonian eigenvalue from the SOSSA walk operator phase.
 
@@ -389,7 +409,12 @@ class SOSSAWalkContainer(QuantumWalkContainer):
 
         """
         phi = phase_fraction % 1.0
-        return float(self.normalization * (1.0 + np.cos(2.0 * np.pi * phi)) + self.energy_shift)
+        # Evaluated as the algebraically equal 2cos^2(pi*phi). The literal
+        # 1 + cos(2*pi*phi) cancels catastrophically near phi = 1/2, which is exactly
+        # where the amplified ground state sits: both terms approach 1 and -1, so the
+        # difference loses every significant digit. The squared half-angle form keeps
+        # full relative precision there because cos(pi*phi) is computed small and accurate.
+        return float(2.0 * self.normalization * np.cos(np.pi * phi) ** 2 + self.energy_shift)
 
     def combine(self, other: "SOSSAWalkContainer") -> "SOSSAWalkContainer":  # type: ignore[override]
         """Not supported for SOSSA containers.

@@ -80,49 +80,6 @@ namespace QDKChemistry.Utils.CircuitComposition {
         }
     }
 
-    /// Returns `op` wrapped so it allocates, prepares, and releases its own trailing ancillas.
-    ///
-    /// The counterpart to `MakeSharedAncillaOp`: that one leaves the ancillas in the caller's
-    /// register, so the returned callable still spans `op`'s full width. This one hides them,
-    /// so the callable takes only the leading register and can be handed to a caller whose
-    /// layout has no slot for them. `numOwned` of 0 leaves `op` unwrapped.
-    ///
-    /// The ancillas are restored by the `within` block before release, so the wrapper stays
-    /// Adj + Ctl and the visible register is safe to reflect about |0⟩.
-    ///
-    /// Cost note: `prepareOwned` runs on every invocation, so a caller that invokes the
-    /// returned callable repeatedly (a walk step calls PREPARE and PREPARE† once each,
-    /// repeated once per phase-estimation query) pays for the preparation each time. Where
-    /// the caller already owns a persistent register of the same width, hoisting the
-    /// preparation out and using `MakeSharedAncillaOp` is cheaper; this wrapper exists for
-    /// callers whose register layout has no slot for the ancillas at all.
-    operation ApplyWithOwnedAncillas(
-        op : Qubit[] => Unit is Adj + Ctl,
-        prepareOwned : Qubit[] => Unit is Adj + Ctl,
-        numOwned : Int,
-        qs : Qubit[]
-    ) : Unit is Adj + Ctl {
-        if numOwned == 0 {
-            op(qs);
-        } else {
-            use owned = Qubit[numOwned];
-            within {
-                prepareOwned(owned);
-            } apply {
-                op(qs + owned);
-            }
-        }
-    }
-
-    /// Returns `op` wrapped so it owns its trailing `numOwned` ancillas. See `ApplyWithOwnedAncillas`.
-    function MakeOwnedAncillaOp(
-        op : Qubit[] => Unit is Adj + Ctl,
-        prepareOwned : Qubit[] => Unit is Adj + Ctl,
-        numOwned : Int
-    ) : Qubit[] => Unit is Adj + Ctl {
-        ApplyWithOwnedAncillas(op, prepareOwned, numOwned, _)
-    }
-
     /// Returns the maximum element of the given array of integers.
     function MaxInt(values : Int[]) : Int {
         // Caller is responsible for not passing an empty array.
