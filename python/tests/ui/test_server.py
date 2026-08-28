@@ -1231,7 +1231,7 @@ class TestPhaseEstimationFunctions:
             charge=0,
             algorithm_name="qdk_valence",
         )
-        active_wfn = data.Wavefunction.from_json_file(str(project_path / "active.wavefunction.json"))
+        active_wfn = data.Wavefunction.from_json_file(str(project_path / _active_wfn_filename))
         active_wfn.get_orbitals().to_json_file(str(project_path / "orbitals.orbitals.json"))
         ham_filename = run_hamiltonian_constructor(
             project_name="test_rteb",
