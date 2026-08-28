@@ -145,16 +145,16 @@ class FolderCache(CacheBackend):
             items.append(dataclass_type.from_hdf5_file(str(matches[0])))  # type: ignore[attr-defined]
         return items  # type: ignore[return-value]
 
-    def _get_generic_data_list(self, manifest_path: pathlib.Path) -> list | None:
-        """Reconstruct a nested list/tuple result from a generic manifest."""
+    def _get_generic_data_list(self, manifest_path: pathlib.Path) -> list | tuple | None:
+        """Reconstruct a nested list or tuple result from a generic manifest."""
         try:
             manifest = json.loads(manifest_path.read_text())
-            if manifest.get("kind") != "sequence" or manifest.get("sequence_type") != "list":
+            if manifest.get("kind") != "sequence" or manifest.get("sequence_type") not in {"list", "tuple"}:
                 return None
             data = self._node_to_data(manifest)
         except (json.JSONDecodeError, KeyError, OSError, TypeError, ValueError):
             return None
-        return data if isinstance(data, list) else None
+        return data if isinstance(data, list | tuple) else None
 
     def put_data(self, content_hash: str, data: Any, *, shared_only: bool = False) -> None:
         """Store data by content hash unless shared storage is required but unavailable."""

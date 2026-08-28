@@ -236,6 +236,16 @@ class TestFolderCacheData:
         np.testing.assert_array_equal(loaded[0], value[0])
         assert loaded[1] == (3, 4.0)
 
+    def test_put_and_get_tuple(self, folder_cache):
+        """Round-trip a generic tuple through the cache."""
+        value = ("result", (1, 2))
+
+        folder_cache.put_data("tuple_hash", value)
+        loaded = folder_cache.get_data("tuple_hash")
+
+        assert loaded == value
+        assert isinstance(loaded, tuple)
+
     def test_delete_list_removes_nested_numpy_arrays(self, folder_cache, cache_dir):
         """Delete array blobs referenced by a cached list manifest."""
         folder_cache.put_data("numpy_list_hash", [np.array([1.0, 2.0])])
