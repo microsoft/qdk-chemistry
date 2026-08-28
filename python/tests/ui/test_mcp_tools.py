@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import errno
 import os
 import tempfile
 import threading
@@ -455,6 +456,20 @@ def test_config_jobs_dir_env():
         finally:
             del os.environ["QDK_JOBS_DIR"]
             del os.environ["QDK_SCRATCH_DIR"]
+
+
+def test_config_falls_back_from_read_only_default_scratch(monkeypatch, tmp_path):
+    def read_only_default_scratch(self, *args, **kwargs):
+        if self == Path("/scratch"):
+            raise OSError(errno.EROFS, "Read-only file system")
+        return original_mkdir(self, *args, **kwargs)
+
+    monkeypatch.delenv("QDK_SCRATCH_DIR", raising=False)
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    original_mkdir = Path.mkdir
+    monkeypatch.setattr(Path, "mkdir", read_only_default_scratch)
+
+    assert QDKMCPConfig().scratch_dir == tmp_path / ".qdk_chem" / "scratch"
 
 
 # ── Version injection ────────────────────────────────────────────────────

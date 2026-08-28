@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import errno
 import os
 from pathlib import Path
 
@@ -62,7 +63,9 @@ class QDKMCPConfig:
 
         try:
             self._setup_directories()
-        except PermissionError:
+        except OSError as error:
+            if error.errno not in (errno.EACCES, errno.EROFS):
+                raise
             self.scratch_dir = bckp_scratch
             self.projects_dir = self.scratch_dir / "projects"
             if "QDK_CACHE_DIR" not in os.environ:
