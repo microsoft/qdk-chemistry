@@ -40,7 +40,7 @@ handle_dependency(nlohmann_json
 )
 
 # Libint2 for CPU Integral evaluation
-set(_libint2_source_subdir "SOURCE_SUBDIR;libint-2.9.0")
+set(_libint2_source_subdir "SOURCE_SUBDIR;libint-2.13.1-mpqc4")
 if(APPLE)
     set(_libint2_source_subdir "")
 endif()
@@ -52,7 +52,7 @@ if(MSVC AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     )
 endif()
 handle_dependency(libint2
-  URL https://github.com/evaleev/libint/releases/download/v2.9.0/libint-2.9.0-mpqc4.tgz
+  URL https://github.com/evaleev/libint/releases/download/v2.13.1/libint-2.13.1-mpqc4.tgz
   BUILD_TARGET Libint2::cxx
   INSTALL_TARGET Libint2::cxx
   ${_libint2_source_subdir}

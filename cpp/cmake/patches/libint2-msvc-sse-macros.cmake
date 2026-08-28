@@ -4,7 +4,7 @@
 # vector_x86.h to define these macros. Applied via PATCH_COMMAND in FetchContent.
 # Usage: cmake -P libint2-msvc-sse-macros.cmake  (run from libint2 source root)
 
-set(_file "libint-2.9.0/include/libint2/util/vector_x86.h")
+set(_file "libint-2.13.1-mpqc4/include/libint2/util/vector_x86.h")
 if(NOT EXISTS "${_file}")
     message(WARNING "libint2-msvc-sse-macros: ${_file} not found, skipping patch")
     return()
@@ -51,7 +51,7 @@ message(STATUS "libint2 MSVC SSE macro patching complete.")
 # constructor required by MSVC Debug CRT (_ITERATOR_DEBUG_LEVEL=2).
 # The vector destructor rebinds allocator<T,N> to allocator<_ContainerProxy,N>,
 # which requires a converting constructor that the class lacks (C2440 error).
-set(_alloc_file "libint-2.9.0/include/libint2/util/array_adaptor.h")
+set(_alloc_file "libint-2.13.1-mpqc4/include/libint2/util/array_adaptor.h")
 if(NOT EXISTS "${_alloc_file}")
     message(WARNING "libint2-msvc-sse-macros: ${_alloc_file} not found, skipping")
     return()

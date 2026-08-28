@@ -218,7 +218,7 @@ These dependencies are automatically downloaded and built by the CMake build sys
 | Dependency | Description | Tested Versions | Source Location | Ubuntu / Debian | Redhat |
 |------------|-------------|--------------------|-----------------|-----------------|---------|
 | nlohmann/json | A C++ library for JSON manipulation | v3.12.0 | [source](https://github.com/nlohmann/json) | `apt install nlohmann-json3-dev` | `dnf install json-devel` |
-| Libint2 | A C++ library for molecular integral evaluation | v2.9.0 | [source](https://github.com/evaleev/libint) | N/A | N/A |
+| Libint2 | A C++ library for molecular integral evaluation | v2.13.1 | [source](https://github.com/evaleev/libint) | N/A | N/A |
 | Libecpint | A C++ library for molecular integrals involving [effective core potentials](https://en.wikipedia.org/wiki/Pseudopotential) | v1.0.7 | [source](https://github.com/robashaw/libecpint) | `apt install libecpint-dev` | N/A |
 | GauXC | A C++ library for molecular integrals on numerical grids | v1.0 | [source](https://github.com/wavefunction91/gauxc) | N/A | N/A |
 | MACIS | A C++ library for configuration interaction methods | N/A | [source](https://github.com/wavefunction91/macis) | N/A | N/A |
