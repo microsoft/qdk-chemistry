@@ -208,6 +208,38 @@ This method uses regular isometry synthesis via `Qiskit <https://quantum.cloud.i
 
 For more details on how QDK/Chemistry interfaces with external packages, see the :ref:`plugin system <plugin-system>` documentation.
 
+Alias Sampling
+~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"alias_sampling"``
+
+This method implements the coherent alias sampling oracle of Babbush et al. :cite:`Babbush2018` (section III.D). Given :math:`L` non-negative coefficients :math:`c_\ell`, it prepares
+
+.. math::
+
+   \sum_{\ell} \sqrt{\tilde{p}_\ell} \left| \ell \right\rangle \left| \mathrm{garbage}_\ell \right\rangle ,
+   \qquad \tilde{p}_\ell \approx \frac{c_\ell^2}{\sum_k c_k^2} ,
+
+where :math:`\tilde{p}` is the target distribution discretized to :math:`\mu` bits.
+
+.. warning::
+   This is a **block-encoding subroutine, not a general-purpose state preparation**. The index register is left entangled with ancilla, so the output is only meaningful inside an :term:`LCU` or qubitization circuit where :math:`\mathrm{PREPARE}^\dagger` later uncomputes the garbage. It has no way to represent a coefficient's sign, so negative coefficients are rejected.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 25 50
+
+   * - Setting
+     - Type
+     - Description
+   * - ``bits_precision``
+     - int
+     - Number of bits :math:`\mu` of precision for the alias table's keep probabilities. Each prepared probability is within :math:`1/(L 2^{\mu})` of the target for :math:`L` coefficients. The upper bound of 30 is a sanity limit as :math:`2^{-30}` is far below chemical accuracy. Default is 10.
+
+The prepared index register stays entangled with the ancillas, so this method is only meaningful inside a block encoding that applies :math:`\mathrm{PREPARE}^\dagger` to uncompute them. The ``prepare_select_prepare`` circuit mapper supplies those ancillas and uncomputes them after SELECT.
+
 Related classes
 ---------------
 
