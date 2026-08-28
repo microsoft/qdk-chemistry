@@ -1,0 +1,58 @@
+{
+    "version": "0.1.0",
+    "container": {
+        "version": "0.1.0",
+        "container_type": "factorized",
+        "num_ranks": 1,
+        "num_bases": 2,
+        "num_copies": 1,
+        "core_energy": 0.0,
+        "bliss_core_shift": 0.0,
+        "energy_gap": 0.5,
+        "one_body_integrals": [
+            [
+                0.16800908511538495,
+                -1.6400461878163037e-07
+            ],
+            [
+                -1.6400461883249777e-07,
+                0.17792751562281245
+            ]
+        ],
+        "u_matrices": [
+            0.004117746784605163,
+            0.9999915220447712,
+            -0.29419346229983717,
+            -0.9557458902553725
+        ],
+        "w_matrices": [
+            -0.00038483429986995127,
+            -0.0012564196337474707
+        ],
+        "wb_matrix": [
+            [
+                0.4491530150331189
+            ]
+        ],
+        "orbitals": {
+            "version": "0.2.0",
+            "type": "ModelOrbitals",
+            "num_orbitals": 2,
+            "is_restricted": true,
+            "active_space_indices": {
+                "alpha": [
+                    0,
+                    1
+                ],
+                "beta": [
+                    0,
+                    1
+                ]
+            },
+            "inactive_space_indices": {
+                "alpha": [],
+                "beta": []
+            }
+        }
+    }
+}
