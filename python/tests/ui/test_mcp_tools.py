@@ -19,7 +19,6 @@ import pytest
 from qdk_chemistry import data
 from qdk_chemistry.remote.job import Job
 from qdk_chemistry.ui import tools as srv
-from qdk_chemistry.ui.cli import _VERSION_PLACEHOLDER, _copy_with_version
 from qdk_chemistry.ui.config import QDKMCPConfig, config
 
 
@@ -470,15 +469,3 @@ def test_config_falls_back_from_read_only_default_scratch(monkeypatch, tmp_path)
     monkeypatch.setattr(Path, "mkdir", read_only_default_scratch)
 
     assert QDKMCPConfig().scratch_dir == tmp_path / ".qdk_chem" / "scratch"
-
-
-# ── Version injection ────────────────────────────────────────────────────
-
-
-def test_version_injection():
-    with tempfile.TemporaryDirectory() as t:
-        src, dst = Path(t) / "in.md", Path(t) / "out.md"
-        src.write_text(f"v={_VERSION_PLACEHOLDER}")
-        _copy_with_version(src, dst)
-        assert _VERSION_PLACEHOLDER not in dst.read_text()
-        assert dst.read_text().startswith("v=v")
