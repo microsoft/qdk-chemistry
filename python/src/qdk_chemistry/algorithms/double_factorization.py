@@ -10,6 +10,4 @@ internal package paths.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry._core._algorithms import DoubleFactorizer
-
-__all__ = ["DoubleFactorizer"]
+from qdk_chemistry._core._algorithms import DoubleFactorizer # noqa: F401 - re-export
