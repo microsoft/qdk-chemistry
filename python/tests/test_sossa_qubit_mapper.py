@@ -32,7 +32,7 @@ def test_maps_factorized_hamiltonian_to_sos_qubit_operator() -> None:
     assert container.two_body.coeffs.shape == (meta.num_ranks * meta.num_copies, meta.num_bases + 1)
     # The block-encoding normalization is derived by the builder from the container generators.
     walk = SOSSABuilder().run(result).get_container()
-    assert walk.normalization == pytest.approx(expected_normalization)
+    assert walk.metadata.normalization == pytest.approx(expected_normalization)
 
 
 def test_sossa_qubit_mapper_is_reachable_through_the_registry() -> None:

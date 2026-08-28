@@ -25,9 +25,9 @@ from qdk_chemistry.data import (
 from qdk_chemistry.data.qubit_operator.containers.sossa import SOSContainer
 from qdk_chemistry.data.unitary_representation.containers.sossa import (
     SOSSAInnerPrepare,
+    SOSSARegisterLayout,
     SOSSASelect,
     SOSSAWalkContainer,
-    sossa_register_bits,
 )
 
 __all__: list[str] = ["SOSSABuilder", "SOSSASettings"]
@@ -46,16 +46,6 @@ def _row_l1_norms(coeffs: np.ndarray) -> np.ndarray:
 
 class SOSSASettings(HamiltonianUnitaryBuilderSettings):
     """Settings for the SOSSA block encoding builder."""
-
-    def __init__(self):
-        """Initialize SOSSASettings with default values."""
-        super().__init__()
-        self._set_default(
-            "tolerance",
-            "float",
-            1e-12,
-            "Minimum normalization below which the SOSSA decomposition is ill-defined.",
-        )
 
 
 class SOSSABuilder(HamiltonianUnitaryBuilder):
@@ -99,18 +89,18 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
 
         outer_coefficients = self._outer_coefficients(sossa)
         normalization = 0.5 * float(np.sum(outer_coefficients**2))
-        if normalization <= self._settings.get("tolerance"):
-            raise ValueError("the SOSSA operator normalization is below the configured tolerance")
 
         one_body_rotation_angles = sossa.one_body.angles
         two_body_rotation_angles = self._two_body_rotation_angles(
             sossa.two_body.angles, meta.num_ranks, meta.num_bases, n_orbitals
         )
 
-        reg_bits = sossa_register_bits(n_orbitals, meta.num_ranks, meta.num_bases, meta.num_copies)
-        num_outer_qubits = reg_bits["xo_bits"]
+        reg_bits = self._sossa_register_bits(n_orbitals, meta.num_ranks, meta.num_bases, meta.num_copies)
+        num_outer_qubits = reg_bits.outer_prep_bits
 
-        free_rider = self._compute_free_rider_data(num_positive, n_orbitals, meta.num_ranks, meta.num_copies)
+        free_rider = self._compute_free_rider_data(
+            num_positive, n_orbitals, meta.num_ranks, meta.num_copies, reg_bits.rank_bits
+        )
 
         container = SOSSAWalkContainer(
             outer_prepare=self._build_outer_prepare(outer_coefficients, num_outer_qubits),
@@ -123,10 +113,39 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
                 two_body_rotation_angles=two_body_rotation_angles,
             ),
             metadata=replace(meta, normalization=normalization),
+            layout=reg_bits,
             power=self._settings.get("power"),
         )
 
         return UnitaryRepresentation(container=container)
+
+    @staticmethod
+    def _sossa_register_bits(
+        num_orbitals: int,
+        num_ranks: int,
+        num_bases: int,
+        num_copies: int,
+    ) -> SOSSARegisterLayout:
+        r"""Derive the structural ancilla register widths implied by ``(N, R, B, C)``.
+
+        Args:
+            num_orbitals: Number of spatial orbitals ``N``.
+            num_ranks: Number of DFTHC ranks ``R``.
+            num_bases: Number of bases ``B`` (``B + 1`` inner entries including the identity term).
+            num_copies: Number of copies ``C``.
+
+        Returns:
+            SOSSARegisterLayout: The widths the walk container carries for its consumers.
+
+        """
+        outer_prep_dim = num_orbitals + num_ranks * num_copies
+        rank_bits = ceil(log2(num_ranks)) if num_ranks > 1 else 0
+        return SOSSARegisterLayout(
+            outer_prep_bits=ceil(log2(outer_prep_dim)) if outer_prep_dim > 1 else 1,
+            inner_prep_bits=ceil(log2(num_bases + 1)) if num_bases + 1 > 1 else 1,
+            rank_bits=rank_bits,
+            num_free_rider_bits=2 + rank_bits,
+        )
 
     @staticmethod
     def _outer_coefficients(sossa: SOSContainer) -> np.ndarray:
@@ -136,16 +155,6 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         one-norms; each generator contributes two Pauli terms (X and Y) whose
         magnitudes are summed. The spin-free coefficients are the per-``(rank,
         copy)`` two-body row one-norms scaled by :math:`1/\sqrt{2}`.
-
-        The SOS block encoding needs the outer PREPARE to produce amplitudes
-        proportional to these coefficients :math:`c_{x_o}` themselves, not to their
-        square roots, because both the normalization
-        :math:`\Lambda = \frac{1}{2}\sum_{x_o} c_{x_o}^2` and the energy decoding
-        :math:`E = \Lambda(1 + \cos 2\pi\varphi)` are read off those amplitudes
-        (Eqs. (7) and (9) of :cite:`Low2025`). Every state-preparation backend takes
-        *amplitudes* and squares them internally to obtain its own distribution, so
-        :math:`c_{x_o}` is what gets handed to one -- see ``build_outer_prep`` in
-        :class:`~qdk_chemistry.algorithms.circuit_mapper.sossa_mapper.SOSSAMapper`.
         """
         one_body = _SQRT_TWO * _row_l1_norms(sossa.one_body.coeffs)
         spin_free = [_INV_SQRT_TWO * (abs(row[-1]) + float(np.sum(np.abs(row[:-1])))) for row in sossa.two_body.coeffs]
@@ -207,9 +216,6 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         dets: list[Configuration] = []
         for idx, amp in enumerate(statevector):
             if amp != 0.0:
-                # Little-endian: mode ``p`` of the determinant carries bit ``p`` of ``idx``,
-                # matching how state preparation densifies a Wavefunction back into an
-                # amplitude vector and how SELECT reads the outer index register.
                 bitstring = format(idx, f"0{num_qubits}b")[::-1]
                 dets.append(Configuration.from_bitstring(bitstring))
                 coeffs_list.append(float(amp))
@@ -227,6 +233,7 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         n_orbitals: int,
         n_ranks: int,
         n_copies: int,
+        rank_bits: int,
     ) -> list[list[bool]]:
         r"""Compute QROM free-rider data encoding (G, r) for each outer index.
 
@@ -245,7 +252,6 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
 
         """
         xo_dim = n_orbitals + n_ranks * n_copies
-        r_bits = ceil(log2(n_ranks)) if n_ranks > 1 else 0
 
         data: list[list[bool]] = []
         for x_o in range(xo_dim):
@@ -259,7 +265,7 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
                 g_bits = [True, True]
                 r_val = (x_o - n_orbitals) // n_copies
 
-            r_enc = [(r_val >> k) & 1 == 1 for k in range(r_bits)]
+            r_enc = [(r_val >> k) & 1 == 1 for k in range(rank_bits)]
             data.append(g_bits + r_enc)
 
         return data

@@ -167,11 +167,6 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         if not isinstance(container, QuantumWalkContainer):
             raise ValueError(f"Requires a LCU or SOSSA walk unitary representation, got '{container.type}'.")
 
-        # A LCU walk carries the block encoding it queries, because PSPMapper assembles the walk
-        # itself when handed the walk container; unwrapping it leaves only the bare query, with
-        # the power shed since the schedule picks its own per slot. A SOSSA walk container is
-        # itself what SOSSAMapper block-encodes. Either way the reflection is left to this
-        # builder, which schedules one per query slot.
         nested = getattr(container, "block_encoding", None)
         container_power = getattr(container, "power", 1)
         if container_power != 1 or getattr(nested, "power", 1) != 1:

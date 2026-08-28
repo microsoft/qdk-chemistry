@@ -28,7 +28,6 @@ from qdk_chemistry.data.unitary_representation.containers.sossa import (
     SOSSAInnerPrepare,
     SOSSASelect,
     SOSSAWalkContainer,
-    sossa_register_bits,
 )
 from qdk_chemistry.utils.qsharp import create_qsharp_context
 
@@ -82,8 +81,8 @@ def _make_sossa_unitary_representation():
     dq_rotation_angles = np.array([[0.3], [0.5]])
     sf_rotation_angles = np.array([[0.1], [0.2], [0.15], [0.25]])
 
-    _reg_bits = sossa_register_bits(num_orbitals, num_ranks, num_bases, num_copies)
-    num_outer_qubits = _reg_bits["xo_bits"]
+    layout = SOSSABuilder._sossa_register_bits(num_orbitals, num_ranks, num_bases, num_copies)
+    num_outer_qubits = layout.outer_prep_bits
 
     # Build outer prepare Wavefunction
     coeffs_list = []
@@ -122,6 +121,7 @@ def _make_sossa_unitary_representation():
             energy_shift=0.0,
             normalization=normalization,
         ),
+        layout=layout,
         power=1,
     )
 
@@ -146,7 +146,7 @@ class TestSOSSAWalkContainer:
 
         assert restored.type == container.type
         assert restored.power == container.power
-        assert np.isclose(restored.normalization, container.normalization)
+        assert np.isclose(restored.metadata.normalization, container.metadata.normalization)
         assert np.allclose(
             restored.outer_prepare.get_coefficients(),
             container.outer_prepare.get_coefficients(),
@@ -177,7 +177,7 @@ class TestSOSSAWalkContainer:
 
         assert restored.type == container.type
         assert restored.power == container.power
-        assert np.isclose(restored.normalization, container.normalization)
+        assert np.isclose(restored.metadata.normalization, container.metadata.normalization)
         assert np.allclose(restored.outer_prepare.get_coefficients(), container.outer_prepare.get_coefficients())
         assert np.allclose(restored.select.two_body_rotation_angles, container.select.two_body_rotation_angles)
 
@@ -203,10 +203,15 @@ class TestSOSSAWalkContainer:
         """
         container = _make_sossa_unitary_representation().get_container()
         meta = container.metadata
-        reg_bits = sossa_register_bits(meta.num_spatial_orbitals, meta.num_ranks, meta.num_bases, meta.num_copies)
+        expected = SOSSABuilder._sossa_register_bits(
+            meta.num_spatial_orbitals, meta.num_ranks, meta.num_bases, meta.num_copies
+        )
+
+        # The stored layout is derived data, so pin it against the formula it came from.
+        assert container.layout == expected
 
         num_system = 2 * meta.num_spatial_orbitals
-        expected_ancilla = reg_bits["xo_bits"] + reg_bits["b_bits"] + reg_bits["num_free_rider_bits"] + 2
+        expected_ancilla = expected.outer_prep_bits + expected.inner_prep_bits + expected.num_free_rider_bits + 2
 
         assert container.num_qubits - num_system == expected_ancilla
 
@@ -245,7 +250,7 @@ class TestSOSSABuilder:
         x_o_dim = num_orbitals + num_ranks * num_copies
         assert len(container.outer_prepare.get_coefficients()) == x_o_dim
         assert container.inner_prepare.conditional_coefficients.shape[0] == x_o_dim
-        assert container.normalization > 0
+        assert container.metadata.normalization > 0
 
     @pytest.mark.parametrize(
         ("num_orbitals", "num_ranks", "num_bases", "num_copies"),
@@ -278,8 +283,8 @@ class TestSOSSABuilder:
 
         # sum_xo c_xo^2 = 2 Lambda, so the unnormalized coefficients are recovered
         # from the stored amplitudes by scaling with sqrt(2 Lambda).
-        unnormalized = amplitudes * np.sqrt(2.0 * container.normalization)
-        assert np.isclose(np.sum(unnormalized**2), 2.0 * container.normalization)
+        unnormalized = amplitudes * np.sqrt(2.0 * container.metadata.normalization)
+        assert np.isclose(np.sum(unnormalized**2), 2.0 * container.metadata.normalization)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

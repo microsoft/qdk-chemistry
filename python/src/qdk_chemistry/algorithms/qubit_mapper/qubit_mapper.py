@@ -133,7 +133,7 @@ class QubitMapper(Algorithm):
     ``QubitMapper`` backends fall into two groups, and they use the
     :class:`~qdk_chemistry.data.MajoranaMapping` argument differently:
 
-    *  **Table-driven backends** (e.g. ``QdkQubitMapper``) read
+    *  **Table-driven backends** (e.g. :class:`QdkQubitMapper`) read
        ``mapping.table`` — the Pauli strings that define the encoding —
        and feed them directly to the mapping engine.  Any valid table
        works, including custom encodings with no standard name.
@@ -247,7 +247,7 @@ class QubitMapper(Algorithm):
 
         .. important::
 
-           **Table-driven** backends (e.g. ``QdkQubitMapper``) read
+           **Table-driven** backends (e.g. :class:`QdkQubitMapper`) read
            ``mapping.table`` and pass the Pauli strings to the native engine.
 
            **Third-party** backends (e.g. ``OpenFermionQubitMapper``)

@@ -108,21 +108,21 @@ def _make_sossa_mapper(
 
 
 class TestOuterPrep:
-    """Tests for SOSSAMapper.build_outer_prep."""
+    """Tests for SOSSAMapper._build_outer_prep."""
 
     @pytest.mark.parametrize("algorithm", ["alias_sampling", "dense_pure_state", "qrom"])
     def test_build_outer_prep_returns_callable(self, algorithm):
-        """Verify build_outer_prep produces a Q# callable for each algorithm."""
+        """Verify _build_outer_prep produces a Q# callable for each algorithm."""
         sossa_unitary = _build_sossa_unitary()
         container = sossa_unitary.get_container()
         mapper = _make_sossa_mapper(outer_algorithm=algorithm)
-        op, num_gradient = mapper.build_outer_prep(container)
+        op, num_gradient = mapper._build_outer_prep(container)
         assert op is not None
         assert num_gradient == (10 if algorithm == "qrom" else 0)
 
     @pytest.mark.parametrize("algorithm", ["dense_pure_state", "qrom"])
     def test_build_outer_prep_fidelity(self, algorithm, qdk_ctx):
-        """Verify build_outer_prep's callable prepares the correct statevector.
+        """Verify _build_outer_prep's callable prepares the correct statevector.
 
         Simulates the Q# callable in the global Q# session and checks fidelity
         against the expected normalized state:
@@ -136,7 +136,7 @@ class TestOuterPrep:
         sossa_unitary = _build_sossa_unitary()
         container = sossa_unitary.get_container()
         mapper = _make_sossa_mapper(outer_algorithm=algorithm)
-        op, num_gradient = mapper.build_outer_prep(container)
+        op, num_gradient = mapper._build_outer_prep(container)
 
         coefficients = np.asarray(container.outer_prepare.get_coefficients())
         num_qubits = math.ceil(math.log2(len(coefficients))) if len(coefficients) > 1 else 1
@@ -175,7 +175,7 @@ class TestOuterPrep:
         container = sossa_unitary.get_container()
         bit_precision = 10
         mapper = _make_sossa_mapper(outer_algorithm="alias_sampling", coefficient_bit_precision=bit_precision)
-        op, num_gradient = mapper.build_outer_prep(container)
+        op, num_gradient = mapper._build_outer_prep(container)
         assert num_gradient == 0
 
         coefficients = np.asarray(container.outer_prepare.get_coefficients())
@@ -204,7 +204,7 @@ class TestOuterPrep:
 
 
 class TestInnerPrep:
-    """Tests for SOSSAMapper.build_inner_prep."""
+    """Tests for SOSSAMapper._build_inner_prep."""
 
     @pytest.mark.parametrize("algorithm", ["controlled_alias_sampling", "direct"])
     def test_build_inner_prep_fidelity(self, algorithm, qdk_ctx):
@@ -222,12 +222,12 @@ class TestInnerPrep:
 
         # Build outer prep (exact, dense_pure)
         outer_mapper = _make_sossa_mapper(outer_algorithm="dense_pure_state")
-        outer_op, _ = outer_mapper.build_outer_prep(container)
+        outer_op, _ = outer_mapper._build_outer_prep(container)
 
         # Build inner prep
         bit_precision = 6
         inner_mapper = _make_sossa_mapper(inner_algorithm=algorithm, coefficient_bit_precision=bit_precision)
-        inner_op = inner_mapper.build_inner_prep(container)
+        inner_op = inner_mapper._build_inner_prep(container)
 
         # Compute register sizes
         outer_coeffs = np.asarray(container.outer_prepare.get_coefficients())
@@ -361,8 +361,8 @@ class TestSOSSAMapper:
 
         num_system_qubits = 2 * container.metadata.num_spatial_orbitals
         num_gradient = circuit.metadata.num_phase_gradient_ancillas
-        assert num_gradient == mapper.num_phase_gradient_qubits
-        assert circuit.num_qubits == num_system_qubits + mapper.num_ancilla_qubits(container)
+        assert num_gradient == mapper._num_phase_gradient_qubits
+        assert circuit.num_qubits == num_system_qubits + mapper._num_ancilla_qubits(container)
         assert circuit.num_qubits - num_system_qubits - num_gradient > 0
 
     @pytest.mark.parametrize(

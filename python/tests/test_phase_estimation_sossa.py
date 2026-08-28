@@ -479,7 +479,7 @@ def _run_sossa_unary_qpe(num_queries, mapper_kwargs=None, shots=100, seed=202508
     )
     result = qpe.run(qubit_hamiltonian=sossa_op, state_preparation=state_prep)
 
-    exact_phase = _energy_to_qpe_phase(gs_energy, container.normalization)
+    exact_phase = _energy_to_qpe_phase(gs_energy, container.metadata.normalization)
     exact_doubled_phase = 2.0 * min(exact_phase, 0.5 - exact_phase)
     bin_error = abs(result.phase_fraction - exact_doubled_phase) * num_bins
     assert bin_error <= 1.0, (
@@ -521,17 +521,17 @@ class TestSOSSAQPEIntegration:
         num_queries = 31
         result, gs_energy, container = _run_sossa_unary_qpe(num_queries)
 
-        measured_e_gap = result.raw_energy - container.energy_shift
+        measured_e_gap = result.raw_energy - container.metadata.energy_shift
 
         # _run_sossa_unary_qpe bounds the *doubled* phase to one bin, and raw_energy is
         # decoded from the canonical phase, which is half of it -- so the canonical phase
         # carries half a bin of uncertainty.
         half_bin = 1.0 / (2.0 * (num_queries + 1))
-        exact_phase = _energy_to_qpe_phase(gs_energy, container.normalization)
+        exact_phase = _energy_to_qpe_phase(gs_energy, container.metadata.normalization)
         # E_gap(phi) = 2*Lambda*cos^2(pi*phi) is monotone across the canonical range
         # [0, 1/2], so the widest energy excursion over the window sits at an edge.
         edges = [min(0.5, max(0.0, exact_phase + sign * half_bin)) for sign in (-1.0, 1.0)]
-        tol = max(abs(container.eigenvalue_from_phase(p) - container.energy_shift - gs_energy) for p in edges)
+        tol = max(abs(container.eigenvalue_from_phase(p) - container.metadata.energy_shift - gs_energy) for p in edges)
 
         assert abs(measured_e_gap - gs_energy) <= tol, (
             f"Energy mismatch: measured E_gap={measured_e_gap:.6f}, expected={gs_energy:.6f}, tol={tol:.6f}"
@@ -599,11 +599,11 @@ class TestSOSSAQPEIntegration:
         # Verify circuit has all required components
         assert circuit._qsharp_op is not None
         assert circuit._qsharp_factory is not None
-        assert circuit.num_qubits == 2 * n_orb + mapper.num_ancilla_qubits(container)
+        assert circuit.num_qubits == 2 * n_orb + mapper._num_ancilla_qubits(container)
         assert circuit.metadata.num_phase_gradient_ancillas == 0
 
         # Step 3: Verify normalization is accessible
-        lambda_sos = container.normalization
+        lambda_sos = container.metadata.normalization
         assert lambda_sos > 0
 
         # Step 4: Compute expected spectrum
@@ -641,7 +641,7 @@ class TestSOSSAQPEIntegration:
         builder = SOSSABuilder()
         unitary_rep = builder.run(_to_sossa_operator(fh))
         container = unitary_rep.get_container()
-        lambda_sos = container.normalization
+        lambda_sos = container.metadata.normalization
 
         h_matrix = _build_dfthc_hamiltonian_matrix(
             data["h1"],
@@ -778,7 +778,8 @@ class TestSOSSAQPEIntegration:
         gap_energy, _ = _get_ground_state_and_energy(h_gap, n_orb, nalpha=1, nbeta=1)
 
         # Gap energy -> walk phase fraction, then back through the container decoder.
-        phase_fraction = math.acos(np.clip(gap_energy / container.normalization - 1.0, -1.0, 1.0)) / (2 * math.pi)
+        lambda_sos = container.metadata.normalization
+        phase_fraction = math.acos(np.clip(gap_energy / lambda_sos - 1.0, -1.0, 1.0)) / (2 * math.pi)
         recovered = container.eigenvalue_from_phase(phase_fraction)
 
         h_physical = _build_physical_hamiltonian_matrix(
