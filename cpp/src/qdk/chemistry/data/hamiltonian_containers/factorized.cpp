@@ -389,6 +389,9 @@ nlohmann::json FactorizedHamiltonianContainer::to_json() const {
   j["num_copies"] = get_num_copies();
   j["core_energy"] = _core_energy;
   j["energy_gap"] = _energy_gap;
+  j["type"] =
+      (_type == HamiltonianType::Hermitian) ? "Hermitian" : "NonHermitian";
+  j["is_restricted"] = is_restricted();
 
   // Orbitals are guaranteed non-null by the base container constructor, so
   // this is unconditional and from_json() can read it back the same way.
@@ -419,6 +422,12 @@ FactorizedHamiltonianContainer::from_json(const nlohmann::json& j) {
   double core_energy = j.at("core_energy");
   double energy_gap = j.at("energy_gap");
 
+  // Optional: payloads written before the type was serialized are Hermitian.
+  HamiltonianType type = HamiltonianType::Hermitian;
+  if (j.contains("type") && j.at("type").get<std::string>() == "NonHermitian") {
+    type = HamiltonianType::NonHermitian;
+  }
+
   validate_stored_shape(j.at("num_ranks").get<std::size_t>(),
                         j.at("num_bases").get<std::size_t>(),
                         j.at("num_copies").get<std::size_t>(), u.size(),
@@ -432,7 +441,7 @@ FactorizedHamiltonianContainer::from_json(const nlohmann::json& j) {
   }
 
   return std::make_unique<FactorizedHamiltonianContainer>(
-      core_energy, u, w, wb, h1, fock, orbitals, signs, energy_gap);
+      core_energy, u, w, wb, h1, fock, orbitals, signs, energy_gap, type);
 }
 
 void FactorizedHamiltonianContainer::to_hdf5(H5::Group& group) const {
@@ -477,6 +486,19 @@ void FactorizedHamiltonianContainer::to_hdf5(H5::Group& group) const {
                        H5::DataSpace(H5S_SCALAR))
       .write(H5::PredType::NATIVE_HSIZE, &c_val);
 
+  std::string type_str =
+      (_type == HamiltonianType::Hermitian) ? "Hermitian" : "NonHermitian";
+  H5::StrType type_string_type(H5::PredType::C_S1, type_str.length() + 1);
+  metadata_group
+      .createAttribute("type", type_string_type, H5::DataSpace(H5S_SCALAR))
+      .write(type_string_type, type_str.c_str());
+
+  hbool_t is_restricted_flag = is_restricted() ? 1 : 0;
+  metadata_group
+      .createAttribute("is_restricted", H5::PredType::NATIVE_HBOOL,
+                       H5::DataSpace(H5S_SCALAR))
+      .write(H5::PredType::NATIVE_HBOOL, &is_restricted_flag);
+
   auto [h1_alpha, h1_beta] = get_one_body_integrals();
   save_matrix_to_group(group, "one_body_integrals", h1_alpha);
   save_vector_to_group(group, "u_matrices", _u);
@@ -519,6 +541,17 @@ FactorizedHamiltonianContainer::from_hdf5(H5::Group& group) {
   metadata_group.openAttribute("num_copies")
       .read(H5::PredType::NATIVE_HSIZE, &num_copies);
 
+  // Optional: payloads written before the type was serialized are Hermitian.
+  HamiltonianType type = HamiltonianType::Hermitian;
+  if (metadata_group.attrExists("type")) {
+    H5::Attribute type_attr = metadata_group.openAttribute("type");
+    std::string type_str;
+    type_attr.read(type_attr.getStrType(), type_str);
+    if (type_str == "NonHermitian") {
+      type = HamiltonianType::NonHermitian;
+    }
+  }
+
   auto h1 = load_matrix_from_group(group, "one_body_integrals");
   auto u = load_vector_from_group(group, "u_matrices");
   auto w = load_vector_from_group(group, "w_matrices");
@@ -541,7 +574,7 @@ FactorizedHamiltonianContainer::from_hdf5(H5::Group& group) {
   }
 
   return std::make_unique<FactorizedHamiltonianContainer>(
-      core_energy, u, w, wb, h1, fock, orbitals, signs, energy_gap);
+      core_energy, u, w, wb, h1, fock, orbitals, signs, energy_gap, type);
 }
 
 // === Validation ===
