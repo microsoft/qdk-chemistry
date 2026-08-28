@@ -350,7 +350,15 @@ def test_fetch_rejects_output_file_outside_destination(tmp_path) -> None:
 
     def download(remote_path: str, local_path: Any) -> None:
         downloads.append((remote_path, local_path))
-        Path(local_path).write_text(json.dumps({"results": [{"file": "/outside"}]}))
+        Path(local_path).write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "is_tuple": False,
+                    "results": [{"type": "ndarray", "file": "/outside"}],
+                }
+            )
+        )
 
     backend.download = download
 
