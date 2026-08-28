@@ -35,7 +35,6 @@ jobs:
   current-source-baseline:
     name: Current-source baseline (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 480
     strategy:
       fail-fast: false
       matrix:
