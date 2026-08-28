@@ -119,6 +119,8 @@ jobs:
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
       with:
         python-version: ${{ matrix.python-version }}
+        cache: pip
+        cache-dependency-path: python/pyproject.toml
 
     - name: Install Linux system packages
       if: matrix.os-name == 'Linux'
@@ -577,6 +579,8 @@ jobs:
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
       with:
         python-version: '3.13'
+        cache: pip
+        cache-dependency-path: python/pyproject.toml
 
     - name: Set memory-aware build parallelism
       shell: pwsh
@@ -765,14 +769,8 @@ jobs:
         compiler: [msvc, clang-cl]
     env:
       VCPKG_TRIPLET: arm64-windows-static-md
-      # QDK_UARCH is deliberately not set here, unlike the x86_64 job. MSVC has
-      # no /arch: value for a generic ARM64 baseline, so forcing one makes
-      # qdk-uarch.cmake build /arch:armv8-a, fail its own flag check and warn on
-      # every MSVC run -- and again from macis-uarch.cmake. clang-cl does accept
-      # -march=armv8-a. qdk-uarch.cmake derives exactly the right answer for
-      # each from CMAKE_SYSTEM_PROCESSOR: unset for MSVC, armv8-a for clang-cl.
-      # Note it reads the environment as well as the cache variable, so leaving
-      # this unset is what lets both the C++ and the Python builds auto-detect.
+      # Leave QDK_UARCH unset: MSVC has no generic ARM64 /arch value, and
+      # clang-cl auto-detects armv8-a.
       # Bump to force a rebuild of the cached dependencies.
       DEPS_CACHE_VERSION: v2
       CMAKE_POLICY_VERSION_MINIMUM: '3.5'
@@ -797,6 +795,8 @@ jobs:
       with:
         python-version: '3.13'
         architecture: arm64
+        cache: pip
+        cache-dependency-path: python/pyproject.toml
 
     - name: Verify the interpreter is native ARM64
       shell: pwsh
@@ -820,13 +820,7 @@ jobs:
         "CMAKE_BUILD_PARALLEL_LEVEL=$jobs" >> $env:GITHUB_ENV
         Get-PSDrive -PSProvider FileSystem | Format-Table Name, Used, Free
 
-    # The dependency cache key uses a hash of the build plan rather than of the
-    # build script. Hashing the script meant any edit to it -- even one that only
-    # touched a comment or a diagnostic -- discarded the cache and forced a cold
-    # rebuild, which on the ARM64 runner takes over five hours against a six hour
-    # ceiling. The fingerprint is produced by the same script that performs the
-    # build, from the same plan object the build consumes, so it moves when the
-    # build would actually differ and stays put otherwise.
+    # Hash the dependency build plan, not the script text, for cache keys.
     - name: Compute dependency build plan fingerprint
       id: deps-fp
       shell: pwsh
@@ -1048,6 +1042,8 @@ jobs:
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
       with:
         python-version: '3.13'
+        cache: pip
+        cache-dependency-path: python/pyproject.toml
 
     - name: Install Linux system packages
       run: |
