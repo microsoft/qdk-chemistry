@@ -220,7 +220,6 @@ TEST(DoubleFactorizerTest, PreservesOneBodyTermAndCoreEnergy) {
   EXPECT_TRUE(factorized->is_restricted());
 }
 
-
 TEST(DoubleFactorizerTest, TruncationDiscardsSmallFragments) {
   constexpr std::size_t norb = 4;
   const auto two_body = make_two_body(norb, {1.0, 1e-4, 1e-4}, 23);

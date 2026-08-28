@@ -38,7 +38,9 @@ std::vector<TwoBodyFragment> eigen_decompose_two_body(
   const std::size_t expected = pair_dim * pair_dim;
   if (static_cast<std::size_t>(two_body_integrals.size()) != expected) {
     throw std::invalid_argument(
-        "eigen_decompose_two_body: expected a tensor of norb^4 , got " +
+        "eigen_decompose_two_body: expected norb^4 = " +
+        std::to_string(expected) +
+        " elements for norb = " + std::to_string(norb) + ", got " +
         std::to_string(two_body_integrals.size()) + ".");
   }
 
@@ -47,7 +49,7 @@ std::vector<TwoBodyFragment> eigen_decompose_two_body(
 
   // Reshape g_ijkl into the (ij),(kl) supermatrix.
   const Eigen::Map<const RowMajorMatrix> raw_supermatrix(
-    two_body_integrals.data(), pair_size, pair_size);
+      two_body_integrals.data(), pair_size, pair_size);
   // Defensive symmetrization against numerical noise in the input tensor.
   Eigen::MatrixXd supermatrix =
       0.5 * (raw_supermatrix + raw_supermatrix.transpose());
@@ -84,7 +86,6 @@ std::vector<TwoBodyFragment> eigen_decompose_two_body(
     if (std::abs(eigenvalue) < truncation_threshold) {
       continue;
     }
-
 
     // Reshape the eigenvector into an norb x norb matrix. For a
     // non-degenerate eigenvalue this matrix is automatically symmetric
