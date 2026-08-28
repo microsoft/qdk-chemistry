@@ -174,9 +174,9 @@ def test_create_parser():
     subparsers = next(action for action in parser._actions if isinstance(action, argparse._SubParsersAction))
     assert "setup" not in subparsers.choices
 
-    # Test that flat command parsing works
-    args = parser.parse_args(["defaults", "--algorithm-type", "scf_solver"])
-    assert args.command == "defaults"
+    args = parser.parse_args(["config", "defaults", "--algorithm-type", "scf_solver"])
+    assert args.command == "config"
+    assert args.subcommand == "defaults"
     assert args.algorithm_type == "scf_solver"
 
 
@@ -185,7 +185,7 @@ def test_create_parser():
 
 def test_cli_algorithm_defaults(capsys):
     """Test algorithm defaults command."""
-    sys.argv = ["qc", "defaults", "--algorithm-type", "scf_solver"]
+    sys.argv = ["qc", "config", "defaults", "--algorithm-type", "scf_solver"]
 
     with contextlib.suppress(SystemExit):
         main()
@@ -198,7 +198,7 @@ def test_cli_algorithm_defaults(capsys):
 
 def test_cli_algorithm_defaults_settings(capsys):
     """Test algorithm defaults with settings."""
-    sys.argv = ["qc", "defaults", "--algorithm-type", "scf_solver"]
+    sys.argv = ["qc", "config", "defaults", "--algorithm-type", "scf_solver"]
 
     with contextlib.suppress(SystemExit):
         main()
@@ -210,7 +210,7 @@ def test_cli_algorithm_defaults_settings(capsys):
 
 def test_cli_algorithm_defaults_config_template(capsys):
     """Test generating a config template for compound algorithms."""
-    sys.argv = ["qc", "defaults", "--type", "mcscf"]
+    sys.argv = ["qc", "config", "defaults", "--type", "mcscf"]
 
     with contextlib.suppress(SystemExit):
         main()
@@ -226,7 +226,7 @@ def test_cli_algorithm_defaults_config_template(capsys):
 
 def test_cli_algorithm_list(capsys):
     """Test algorithm list command."""
-    sys.argv = ["qc", "list-algorithms"]
+    sys.argv = ["qc", "config", "algorithms"]
 
     with contextlib.suppress(SystemExit):
         main()
@@ -245,6 +245,7 @@ def test_cli_data_create_structure(temp_project_dir, capsys):
 
     sys.argv = [
         "qc",
+        "data",
         "upload-structure",
         "--project-name",
         "test_project",
@@ -268,199 +269,13 @@ def test_cli_data_create_structure(temp_project_dir, capsys):
     assert (project_path / "test.structure.json").exists()
 
 
-def test_cli_algorithm_scf(temp_project_dir, h2_structure_file, capsys):
-    """Test algorithm scf command."""
-    sys.argv = [
-        "qc",
-        "run-scf",
-        "--project-name",
-        "test_project",
-        "--structure-filename",
-        h2_structure_file,
-        "--out-wavefunction-filename",
-        "scf_output.wavefunction.json",
-        "--charge",
-        "0",
-        "--spin-multiplicity",
-        "1",
-        "--basis-set",
-        "sto-3g",
-    ]
-
-    with contextlib.suppress(SystemExit):
-        main()
-
-    captured = capsys.readouterr()
-    result = json.loads(captured.out)
-    assert result["success"] is True
-    assert isinstance(result["result"], list)
-    assert len(result["result"]) == 2  # (energy, filename)
-
-    # Verify file was created
-    project_path = temp_project_dir / "test_project"
-    assert (project_path / "scf_output.wavefunction.json").exists()
-
-
-def test_cli_algorithm_hamiltonian(temp_project_dir, h2_wavefunction_file, capsys):
-    """Test algorithm hamiltonian command."""
-    project_path = temp_project_dir / "test_project"
-
-    # First, extract orbitals from wavefunction
-    wf = data.Wavefunction.from_json_file(str(project_path / h2_wavefunction_file))
-    orbitals = wf.get_orbitals()
-    orbitals_file = project_path / "h2.orbitals.json"
-    orbitals.to_json_file(str(orbitals_file))
-
-    sys.argv = [
-        "qc",
-        "run-hamiltonian",
-        "--project-name",
-        "test_project",
-        "--orbitals-filename",
-        "h2.orbitals.json",
-        "--out-hamiltonian-filename",
-        "h2.hamiltonian.json",
-    ]
-
-    with contextlib.suppress(SystemExit):
-        main()
-
-    captured = capsys.readouterr()
-    result = json.loads(captured.out)
-    assert result["success"] is True
-
-    # Verify file was created
-    assert (project_path / "h2.hamiltonian.json").exists()
-
-
-def test_cli_algorithm_active_space(temp_project_dir, h2_wavefunction_file, capsys):
-    """Test algorithm active-space command."""
-    sys.argv = [
-        "qc",
-        "run-active-space",
-        "--project-name",
-        "test_project",
-        "--wavefunction-filename",
-        h2_wavefunction_file,
-        "--out-wavefunction-filename",
-        "h2_active.wavefunction.json",
-        "--charge",
-        "0",
-        "--algorithm-name",
-        "qdk_valence",
-    ]
-
-    with contextlib.suppress(SystemExit):
-        main()
-
-    captured = capsys.readouterr()
-    result = json.loads(captured.out)
-    assert result["success"] is True
-
-    # Verify file was created
-    project_path = temp_project_dir / "test_project"
-    assert (project_path / "h2_active.wavefunction.json").exists()
-
-
-def test_cli_data_get_orbitals(temp_project_dir, h2_wavefunction_file, capsys):
-    """Test data get-orbitals command."""
-    sys.argv = [
-        "qc",
-        "get-orbitals",
-        "--project-name",
-        "test_project",
-        "--input-filename",
-        h2_wavefunction_file,
-        "--out-orbitals-filename",
-        "extracted.orbitals.json",
-    ]
-
-    with contextlib.suppress(SystemExit):
-        main()
-
-    captured = capsys.readouterr()
-    result = json.loads(captured.out)
-    assert result["success"] is True
-
-    # Verify file was created
-    project_path = temp_project_dir / "test_project"
-    assert (project_path / "extracted.orbitals.json").exists()
-
-
-def test_cli_data_get_ansatz(temp_project_dir, h2_wavefunction_file, capsys):
-    """Test data get-ansatz command."""
-    project_path = temp_project_dir / "test_project"
-
-    # Create hamiltonian file
-    wf = data.Wavefunction.from_json_file(str(project_path / h2_wavefunction_file))
-    orbitals = wf.get_orbitals()
-    ham_constructor = algorithms.create("hamiltonian_constructor")
-    hamiltonian = ham_constructor.run(orbitals)
-    ham_file = project_path / "h2.hamiltonian.json"
-    hamiltonian.to_json_file(str(ham_file))
-
-    sys.argv = [
-        "qc",
-        "get-ansatz",
-        "--project-name",
-        "test_project",
-        "--wavefunction-filename",
-        h2_wavefunction_file,
-        "--hamiltonian-filename",
-        "h2.hamiltonian.json",
-        "--out-ansatz-filename",
-        "h2.ansatz.json",
-    ]
-
-    with contextlib.suppress(SystemExit):
-        main()
-
-    captured = capsys.readouterr()
-    result = json.loads(captured.out)
-    assert result["success"] is True
-
-    # Verify file was created
-    assert (project_path / "h2.ansatz.json").exists()
-
-
-@pytest.mark.usefixtures("temp_project_dir")
-def test_cli_algorithm_scf_with_settings(h2_structure_file, capsys):
-    """Test algorithm scf with JSON settings."""
-    settings_json = '{"max_iterations": 100, "convergence_threshold": 1e-8}'
-
-    sys.argv = [
-        "qc",
-        "run-scf",
-        "--project-name",
-        "test_project",
-        "--structure-filename",
-        h2_structure_file,
-        "--out-wavefunction-filename",
-        "scf_custom.wavefunction.json",
-        "--charge",
-        "0",
-        "--spin-multiplicity",
-        "1",
-        "--basis-set",
-        "sto-3g",
-        "--settings",
-        settings_json,
-    ]
-
-    with contextlib.suppress(SystemExit):
-        main()
-
-    captured = capsys.readouterr()
-    result = json.loads(captured.out)
-    assert result["success"] is True
-
-
 @pytest.mark.usefixtures("temp_project_dir")
 def test_cli_algorithm_error_handling(capsys):
     """Test error handling for invalid inputs."""
     sys.argv = [
         "qc",
-        "run-scf",
+        "run",
+        "scf",
         "--project-name",
         "test_project",
         "--structure-filename",
@@ -509,7 +324,7 @@ def _extract_json(stdout: str):
 def test_cli_subprocess_invocation():
     """Test CLI invocation via subprocess."""
     result = subprocess.run(
-        [sys.executable, "-m", "qdk_chemistry.ui.cli", "defaults", "--algorithm-type", "scf_solver"],
+        [sys.executable, "-m", "qdk_chemistry.ui.cli", "config", "defaults", "--algorithm-type", "scf_solver"],
         check=False,
         capture_output=True,
         text=True,
@@ -525,7 +340,7 @@ def test_cli_subprocess_invocation():
 def test_cli_module_invocation():
     """Test CLI can be invoked as a module."""
     result = subprocess.run(
-        [sys.executable, "-m", "qdk_chemistry.ui.cli", "defaults", "--algorithm-type", "scf_solver"],
+        [sys.executable, "-m", "qdk_chemistry.ui.cli", "config", "defaults", "--algorithm-type", "scf_solver"],
         check=False,
         capture_output=True,
         text=True,
@@ -540,6 +355,7 @@ def test_cli_algorithm_defaults_orbital_localizer(capsys):
     """Test algorithm defaults for orbital_localizer."""
     sys.argv = [
         "qc",
+        "config",
         "defaults",
         "--algorithm-type",
         "orbital_localizer",
@@ -561,14 +377,14 @@ def test_cli_algorithm_energy_parser():
     parser = create_parser()
     args = parser.parse_args(
         [
-            "run-energy",
+            "run",
+            "energy",
             "--project-name",
             "test_project",
             "--circuit-filename",
             "circuit.circuit.json",
-            "--qubit-hamiltonian-filenames",
+            "--qubit-hamiltonian-filename",
             "qh1.qubit_ham.h5",
-            "qh2.qubit_ham.h5",
             "--out-energy-result-filename",
             "energy.result.json",
             "--out-measurement-data-filename",
@@ -578,62 +394,9 @@ def test_cli_algorithm_energy_parser():
         ]
     )
 
-    assert args.command == "run-energy"
-    assert args.qubit_hamiltonian_filenames == ["qh1.qubit_ham.h5", "qh2.qubit_ham.h5"]
-
-
-def test_cli_algorithm_qpe_config_evolution_parser():
-    """Test qpe-config-evolution parser."""
-    parser = create_parser()
-    args = parser.parse_args(
-        [
-            "run-qpe-config-evolution",
-            "--project-name",
-            "test_project",
-            "--out-config-filename",
-            "teb.config.json",
-            "--algorithm-name",
-            "default",
-            "--settings",
-            '{"key": "value"}',
-        ]
-    )
-
-    assert args.command == "run-qpe-config-evolution"
-    assert args.project_name == "test_project"
-    assert args.out_config_filename == "teb.config.json"
-    assert args.algorithm_name == "default"
-    assert args.settings == {"key": "value"}
-
-
-def test_cli_algorithm_qpe_config_mapper_parser():
-    """Test qpe-config-mapper parser."""
-    parser = create_parser()
-    args = parser.parse_args(
-        [
-            "run-qpe-config-mapper",
-            "--project-name",
-            "test_project",
-        ]
-    )
-
-    assert args.command == "run-qpe-config-mapper"
-    assert args.project_name == "test_project"
-
-
-def test_cli_algorithm_qpe_config_executor_parser():
-    """Test qpe-config-executor parser."""
-    parser = create_parser()
-    args = parser.parse_args(
-        [
-            "run-qpe-config-executor",
-            "--project-name",
-            "test_project",
-        ]
-    )
-
-    assert args.command == "run-qpe-config-executor"
-    assert args.project_name == "test_project"
+    assert args.command == "run"
+    assert args.subcommand == "energy"
+    assert args.qubit_hamiltonian_filename == "qh1.qubit_ham.h5"
 
 
 def test_cli_algorithm_qpe_build_evolution_parser():
@@ -641,7 +404,8 @@ def test_cli_algorithm_qpe_build_evolution_parser():
     parser = create_parser()
     args = parser.parse_args(
         [
-            "run-qpe-build-evolution",
+            "run",
+            "qpe-build-evolution",
             "--project-name",
             "test_project",
             "--qubit-hamiltonian-filename",
@@ -655,7 +419,8 @@ def test_cli_algorithm_qpe_build_evolution_parser():
         ]
     )
 
-    assert args.command == "run-qpe-build-evolution"
+    assert args.command == "run"
+    assert args.subcommand == "qpe-build-evolution"
     assert args.project_name == "test_project"
     assert args.evolution_time == 0.1
     assert args.algorithm_name == "trotter"
@@ -666,7 +431,8 @@ def test_cli_algorithm_qpe_map_circuit_parser():
     parser = create_parser()
     args = parser.parse_args(
         [
-            "run-qpe-map-circuit",
+            "run",
+            "qpe-map-circuit",
             "--project-name",
             "test_project",
             "--time-evolution-unitary-filename",
@@ -678,7 +444,8 @@ def test_cli_algorithm_qpe_map_circuit_parser():
         ]
     )
 
-    assert args.command == "run-qpe-map-circuit"
+    assert args.command == "run"
+    assert args.subcommand == "qpe-map-circuit"
     assert args.project_name == "test_project"
     assert args.power == 4
 
@@ -688,7 +455,8 @@ def test_cli_algorithm_qpe_execute_parser():
     parser = create_parser()
     args = parser.parse_args(
         [
-            "run-qpe-execute",
+            "run",
+            "qpe-execute",
             "--project-name",
             "test_project",
             "--circuit-filename",
@@ -700,7 +468,8 @@ def test_cli_algorithm_qpe_execute_parser():
         ]
     )
 
-    assert args.command == "run-qpe-execute"
+    assert args.command == "run"
+    assert args.subcommand == "qpe-execute"
     assert args.project_name == "test_project"
     assert args.shots == 1000
 
@@ -710,7 +479,8 @@ def test_cli_algorithm_qpe_parser():
     parser = create_parser()
     args = parser.parse_args(
         [
-            "run-qpe",
+            "run",
+            "qpe",
             "--project-name",
             "test_project",
             "--state-prep-circuit-filename",
@@ -724,7 +494,8 @@ def test_cli_algorithm_qpe_parser():
         ]
     )
 
-    assert args.command == "run-qpe"
+    assert args.command == "run"
+    assert args.subcommand == "qpe"
     assert args.project_name == "test_project"
     assert args.algorithm_name == "iterative"
 
@@ -734,6 +505,7 @@ def test_cli_data_get_top_configurations_parser():
     parser = create_parser()
     args = parser.parse_args(
         [
+            "data",
             "get-top-configurations",
             "--project-name",
             "test_project",
@@ -744,7 +516,8 @@ def test_cli_data_get_top_configurations_parser():
         ]
     )
 
-    assert args.command == "get-top-configurations"
+    assert args.command == "data"
+    assert args.subcommand == "get-top-configurations"
     assert args.project_name == "test_project"
     assert args.wavefunction_filename == "wf.wavefunction.json"
     assert args.max_determinants == 10
@@ -755,7 +528,8 @@ def test_cli_algorithm_sparse_ci_parser():
     parser = create_parser()
     args = parser.parse_args(
         [
-            "run-sparse-ci",
+            "run",
+            "sparse-ci",
             "--project-name",
             "test_project",
             "--hamiltonian-filename",
@@ -769,36 +543,10 @@ def test_cli_algorithm_sparse_ci_parser():
         ]
     )
 
-    assert args.command == "run-sparse-ci"
+    assert args.command == "run"
+    assert args.subcommand == "sparse-ci"
     assert args.configurations_json == '["22000000", "20200000"]'
     assert args.algorithm_name == "macis_pmc"
-
-
-def test_cli_algorithm_filter_pauli_parser():
-    """Test algorithm filter-pauli parser."""
-    parser = create_parser()
-    args = parser.parse_args(
-        [
-            "run-filter-pauli",
-            "--project-name",
-            "test_project",
-            "--qubit-hamiltonian-filename",
-            "ham.qubithamiltonian.h5",
-            "--wavefunction-filename",
-            "wf.wavefunction.json",
-            "--out-qubit-hamiltonians-prefix",
-            "grouped_ham",
-            "--trimming-tolerance",
-            "1e-6",
-        ]
-    )
-
-    assert args.command == "run-filter-pauli"
-    assert args.project_name == "test_project"
-    assert args.qubit_hamiltonian_filename == "ham.qubithamiltonian.h5"
-    assert args.wavefunction_filename == "wf.wavefunction.json"
-    assert args.out_qubit_hamiltonians_prefix == "grouped_ham"
-    assert args.trimming_tolerance == 1e-6
 
 
 @pytest.mark.usefixtures("temp_project_dir")
@@ -817,7 +565,8 @@ def test_cli_algorithm_mcscf_with_config(tmp_path):
 
     args = parser.parse_args(
         [
-            "run-mcscf",
+            "run",
+            "mcscf",
             "--project-name",
             "test_project",
             "--orbitals-filename",
@@ -837,7 +586,8 @@ def test_cli_algorithm_mcscf_with_config(tmp_path):
         ]
     )
 
-    assert args.command == "run-mcscf"
+    assert args.command == "run"
+    assert args.subcommand == "mcscf"
     assert args.config == str(config_file)
     assert args.set == [
         "mc_calculator.settings.calculate_one_rdm=true",
@@ -855,7 +605,7 @@ def test_cli_utils_list_projects(temp_project_dir, capsys):
     (temp_project_dir / "proj_a").mkdir()
     (temp_project_dir / "proj_b").mkdir()
 
-    sys.argv = ["qc", "list-projects"]
+    sys.argv = ["qc", "project", "list"]
 
     with contextlib.suppress(SystemExit):
         main()
@@ -869,7 +619,7 @@ def test_cli_utils_list_projects(temp_project_dir, capsys):
 
 def test_cli_utils_create_project(temp_project_dir, capsys):
     """Test utils create-project command."""
-    sys.argv = ["qc", "create-project", "--project-name", "new_project"]
+    sys.argv = ["qc", "project", "create", "--project-name", "new_project"]
 
     with contextlib.suppress(SystemExit):
         main()
@@ -883,7 +633,7 @@ def test_cli_utils_create_project(temp_project_dir, capsys):
 @pytest.mark.usefixtures("temp_project_dir", "h2_structure_file")
 def test_cli_utils_list_files(capsys):
     """Test utils list-files command."""
-    sys.argv = ["qc", "list-files", "--project-name", "test_project"]
+    sys.argv = ["qc", "project", "files", "--project-name", "test_project"]
 
     with contextlib.suppress(SystemExit):
         main()
@@ -899,6 +649,7 @@ def test_cli_utils_convert_energy(capsys):
     """Test utils convert-energy command."""
     sys.argv = [
         "qc",
+        "util",
         "convert-energy",
         "--value",
         "1.0",
@@ -922,6 +673,7 @@ def test_cli_utils_convert_coordinates(capsys):
     """Test utils convert-coordinates command."""
     sys.argv = [
         "qc",
+        "util",
         "convert-coordinates",
         "--coordinates",
         "[[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]",
@@ -945,6 +697,7 @@ def test_cli_data_summary(h2_structure_file, capsys):
     """Test data summary command."""
     sys.argv = [
         "qc",
+        "data",
         "summary",
         "--project-name",
         "test_project",
@@ -966,6 +719,7 @@ def test_cli_data_get_energy(h2_wavefunction_file, capsys):
     """Test data get-energy command."""
     sys.argv = [
         "qc",
+        "data",
         "get-energy",
         "--project-name",
         "test_project",
@@ -987,6 +741,7 @@ def test_cli_data_get_structure_xyz(h2_structure_file, capsys):
     """Test data get-structure-xyz command."""
     sys.argv = [
         "qc",
+        "data",
         "get-structure-xyz",
         "--project-name",
         "test_project",

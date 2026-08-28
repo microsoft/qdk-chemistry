@@ -21,11 +21,16 @@ assert _SPEC is not None
 assert _SPEC.loader is not None
 workspace = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(workspace)
+_REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
 
 @pytest.fixture(autouse=True)
 def _reset_workspace_binding(monkeypatch: pytest.MonkeyPatch):
-    original_cwd = os.getcwd()
+    try:
+        original_cwd = Path.cwd()
+    except FileNotFoundError:
+        original_cwd = _REPOSITORY_ROOT
+        os.chdir(original_cwd)
     monkeypatch.setattr(workspace, "_WORKSPACE_ROOT", None)
     yield
     os.chdir(original_cwd)

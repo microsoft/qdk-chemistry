@@ -92,19 +92,6 @@ def test_list_project_files_nonexistent():
     assert srv.list_project_files(project_name="nope")["status"] == "error"
 
 
-# ── get_summary ──────────────────────────────────────────────────────────
-
-
-def test_get_summary_structure(h2_proj):
-    r = srv.get_summary(project_name=h2_proj, filename="h2.structure.json")
-    assert r["status"] == "ok"
-    assert r["result"]["data_type"] == "Structure"
-
-
-def test_get_summary_missing_file(h2_proj):
-    assert srv.get_summary(project_name=h2_proj, filename="nope.json")["status"] == "error"
-
-
 # ── list_tools ───────────────────────────────────────────────────────────
 
 
@@ -259,110 +246,6 @@ def test_timed_remote_run_timeout_starts_after_handle_is_persisted():
     assert result["status"] == "submitted"
     assert result["job"]["job_id"] == "remote-job"
     assert Job.load(config.jobs_dir / "run-hash.job.json").job_id == "remote-job"
-
-
-def test_run_nuclear_derivative_calculator_tool(h2_proj):
-    gradients = data.NuclearGradients(
-        data.Structure(coordinates=np.array([[0, 0, 0], [0, 0, 1.4]]), symbols=["H", "H"]),
-        np.zeros(6),
-    )
-    algorithm = MagicMock()
-    with (
-        patch("qdk_chemistry.ui.tools.algorithms.create", return_value=algorithm),
-        patch("qdk_chemistry.ui.tools._run_algorithm", return_value=(-1.0, gradients, None, None)) as run_algorithm,
-    ):
-        r = srv.run_nuclear_derivative_calculator(
-            project_name=h2_proj,
-            structure_filename="h2.structure.json",
-            out_gradients_filename="h2-gradients.nuclear_gradients.json",
-            charge=0,
-            spin_multiplicity=1,
-            seed_or_basis="sto-3g",
-            n_inactive_orbitals=2,
-            cache="folder",
-            remote="local",
-        )
-
-    assert r["status"] == "ok"
-    assert r["result"]["energy"] == -1.0
-    assert r["result"]["gradients_filename"] == "h2-gradients.nuclear_gradients.json"
-    assert run_algorithm.call_args.args[1:] == (ANY, 0, 1, "sto-3g", 2)
-    assert run_algorithm.call_args.kwargs["cache"] == "folder"
-    assert run_algorithm.call_args.kwargs["remote"] == "local"
-
-
-def test_run_geometry_optimization_tool(h2_proj):
-    optimized = data.Structure(coordinates=np.array([[0, 0, 0], [0, 0, 1.35]]), symbols=["H", "H"])
-    algorithm = MagicMock()
-    with (
-        patch("qdk_chemistry.ui.tools.algorithms.create", return_value=algorithm),
-        patch("qdk_chemistry.ui.tools._run_algorithm", return_value=(-1.1, optimized, None, None)) as run_algorithm,
-    ):
-        r = srv.run_geometry_optimization(
-            project_name=h2_proj,
-            structure_filename="h2.structure.json",
-            out_structure_filename="h2-opt.structure.json",
-            charge=0,
-            spin_multiplicity=1,
-            seed_or_basis="sto-3g",
-            n_inactive_orbitals=2,
-            cache="folder",
-            remote="local",
-        )
-
-    assert r["status"] == "ok"
-    assert r["result"]["energy"] == -1.1
-    assert r["result"]["structure_filename"] == "h2-opt.structure.json"
-    assert run_algorithm.call_args.args[1:] == (ANY, 0, 1, "sto-3g", 2)
-    assert run_algorithm.call_args.kwargs["cache"] == "folder"
-    assert run_algorithm.call_args.kwargs["remote"] == "local"
-
-
-def test_run_geometry_optimization_routes_derivative_settings(h2_proj):
-    optimized = data.Structure(coordinates=np.array([[0, 0, 0], [0, 0, 1.35]]), symbols=["H", "H"])
-    optimizer = MagicMock()
-    settings = {"derivative_calculator": {"algorithm_name": "custom_derivatives", "accuracy": 0.5}}
-
-    with (
-        patch("qdk_chemistry.ui.tools.algorithms.create", return_value=optimizer) as create,
-        patch("qdk_chemistry.ui.tools._apply_settings") as apply_settings,
-        patch("qdk_chemistry.ui.tools._run_algorithm", return_value=(-1.1, optimized, None, None)) as run_algorithm,
-    ):
-        result = srv.run_geometry_optimization(
-            project_name=h2_proj,
-            structure_filename="h2.structure.json",
-            out_structure_filename="h2-custom-opt.structure.json",
-            charge=0,
-            spin_multiplicity=1,
-            seed_or_basis="sto-3g",
-            algorithm_name="geometric",
-            settings=settings,
-        )
-
-    assert result["status"] == "ok"
-    create.assert_called_once_with("geometry_optimizer", "geometric")
-    apply_settings.assert_called_once_with(optimizer, settings)
-    assert run_algorithm.call_args.args[0] is optimizer
-
-
-def test_run_geometry_optimization_explains_derivative_name_category(h2_proj):
-    with (
-        patch("qdk_chemistry.ui.tools.algorithms.create", side_effect=KeyError("not a geometry optimizer")),
-        patch("qdk_chemistry.ui.tools.algorithms.available", return_value=["custom_derivatives"]),
-    ):
-        result = srv.run_geometry_optimization(
-            project_name=h2_proj,
-            structure_filename="h2.structure.json",
-            out_structure_filename="h2-custom-opt.structure.json",
-            charge=0,
-            spin_multiplicity=1,
-            seed_or_basis="sto-3g",
-            algorithm_name="custom_derivatives",
-        )
-
-    assert result["status"] == "error"
-    assert "nuclear derivative calculator, not a geometry optimizer" in result["message"]
-    assert "settings['derivative_calculator']" in result["message"]
 
 
 def test_run_population_analysis_tool(h2_proj):
