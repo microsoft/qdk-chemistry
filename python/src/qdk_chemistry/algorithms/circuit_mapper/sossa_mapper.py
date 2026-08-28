@@ -279,7 +279,6 @@ class SOSSAMapper(CircuitMapper):
         regs, _ = self._compute_register_sizes(container)
         return regs["num_ancilla_qubits"]
 
-
     def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
         r"""Construct the SOSSA block encoding on the flat ``[system | ancilla]`` register.
 
