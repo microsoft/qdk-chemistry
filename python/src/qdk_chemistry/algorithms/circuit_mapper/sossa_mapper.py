@@ -152,16 +152,17 @@ class SOSSAMapper(CircuitMapper):
         algorithm = self._settings.get("select_algorithm")
         rot_bits = self._settings.get("rotation_bit_precision")
 
+        meta = container.metadata
         num_free_rider_bits = sossa_register_bits(
-            container.num_orbitals, container.num_ranks, container.num_bases, container.num_copies
+            meta.num_spatial_orbitals, meta.num_ranks, meta.num_bases, meta.num_copies
         )["num_free_rider_bits"]
 
         select_data = {
-            "numOrbitals": container.num_orbitals,
-            "numRanks": container.num_ranks,
-            "numBases": container.num_bases,
-            "numCopies": container.num_copies,
-            "numPositiveOneBody": container.select.num_positive_one_body_terms,
+            "numOrbitals": meta.num_spatial_orbitals,
+            "numRanks": meta.num_ranks,
+            "numBases": meta.num_bases,
+            "numCopies": meta.num_copies,
+            "numPositiveOneBody": meta.num_positive_one_body_terms,
             "OneBodyRotationAngles": container.select.one_body_rotation_angles.tolist(),
             "TwoBodyRotationAngles": container.select.two_body_rotation_angles.tolist(),
             "rotationBitPrecision": rot_bits,
@@ -206,9 +207,10 @@ class SOSSAMapper(CircuitMapper):
 
     def _compute_register_sizes(self, container: SOSSAWalkContainer) -> dict[str, int]:
         """Compute register sizes from container structure and settings."""
-        num_orbitals = container.num_orbitals
+        meta = container.metadata
+        num_orbitals = meta.num_spatial_orbitals
         num_system_qubits = 2 * num_orbitals
-        reg_bits = sossa_register_bits(num_orbitals, container.num_ranks, container.num_bases, container.num_copies)
+        reg_bits = sossa_register_bits(num_orbitals, meta.num_ranks, meta.num_bases, meta.num_copies)
         xo_bits = reg_bits["xo_bits"]
         b_bits = reg_bits["b_bits"]
         num_free_rider_bits = reg_bits["num_free_rider_bits"]

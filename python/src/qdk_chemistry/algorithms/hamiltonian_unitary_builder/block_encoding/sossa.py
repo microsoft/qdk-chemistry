@@ -5,6 +5,7 @@ r"""QDK/Chemistry implementation of the SOSSA (Sum of Squares Spectral Amplifica
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from dataclasses import replace
 from math import ceil, log2, sqrt
 
 import numpy as np
@@ -21,7 +22,7 @@ from qdk_chemistry.data import (
     UnitaryRepresentation,
     Wavefunction,
 )
-from qdk_chemistry.data.qubit_operator.containers.sossa import SOSSAContainer
+from qdk_chemistry.data.qubit_operator.containers.sossa import SOSContainer
 from qdk_chemistry.data.unitary_representation.containers.sossa import (
     SOSSAInnerPrepare,
     SOSSASelect,
@@ -78,22 +79,23 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         """Build the SOSSA block encoding from qubit operator.
 
         Args:
-            qubit_hamiltonian: Qubit operator with SOSSAContainer.
+            qubit_hamiltonian: Qubit operator with SOSContainer.
 
         Returns:
             UnitaryRepresentation wrapping the SOSSAWalkContainer.
 
         """
         if not isinstance(qubit_hamiltonian, QubitOperator):
-            raise TypeError("SOSSABuilder requires a QubitOperator containing an SOSSAContainer")
+            raise TypeError("SOSSABuilder requires a QubitOperator containing an SOSContainer")
         sossa = qubit_hamiltonian.get_container()
-        if not isinstance(sossa, SOSSAContainer):
-            raise TypeError("SOSSABuilder requires a QubitOperator containing an SOSSAContainer")
+        if not isinstance(sossa, SOSContainer):
+            raise TypeError("SOSSABuilder requires a QubitOperator containing an SOSContainer")
         if sossa.encoding != "jordan-wigner" or sossa.fermion_mode_order != "blocked":
             raise ValueError("the SOSSA circuit builder currently supports blocked Jordan-Wigner operators only")
 
-        n_orbitals = sossa.num_spatial_orbitals
-        num_positive = sossa.num_positive_one_body_terms
+        meta = sossa.metadata
+        n_orbitals = meta.num_spatial_orbitals
+        num_positive = meta.num_positive_one_body_terms
 
         outer_coefficients = self._outer_coefficients(sossa)
         normalization = 0.5 * float(np.sum(outer_coefficients**2))
@@ -102,41 +104,32 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
 
         one_body_rotation_angles = sossa.one_body.angles
         two_body_rotation_angles = self._two_body_rotation_angles(
-            sossa.two_body.angles, sossa.num_ranks, sossa.num_bases, n_orbitals
+            sossa.two_body.angles, meta.num_ranks, meta.num_bases, n_orbitals
         )
 
-        reg_bits = sossa_register_bits(n_orbitals, sossa.num_ranks, sossa.num_bases, sossa.num_copies)
+        reg_bits = sossa_register_bits(n_orbitals, meta.num_ranks, meta.num_bases, meta.num_copies)
         num_outer_qubits = reg_bits["xo_bits"]
-        num_inner_qubits = reg_bits["b_bits"]
 
-        free_rider = self._compute_free_rider_data(num_positive, n_orbitals, sossa.num_ranks, sossa.num_copies)
+        free_rider = self._compute_free_rider_data(num_positive, n_orbitals, meta.num_ranks, meta.num_copies)
 
         container = SOSSAWalkContainer(
             outer_prepare=self._build_outer_prepare(outer_coefficients, num_outer_qubits),
-            outer_prepare_probabilities=self._build_outer_prepare(outer_coefficients**2, num_outer_qubits),
             inner_prepare=SOSSAInnerPrepare(
                 conditional_coefficients=self._inner_conditional_coefficients(sossa, len(one_body_rotation_angles)),
-                num_inner_qubits=num_inner_qubits,
                 free_rider_data=np.array(free_rider, dtype=bool) if free_rider else None,
             ),
             select=SOSSASelect(
                 one_body_rotation_angles=one_body_rotation_angles,
                 two_body_rotation_angles=two_body_rotation_angles,
-                num_positive_one_body_terms=num_positive,
             ),
-            num_orbitals=n_orbitals,
-            num_ranks=sossa.num_ranks,
-            num_bases=sossa.num_bases,
-            num_copies=sossa.num_copies,
-            normalization=normalization,
+            metadata=replace(meta, normalization=normalization),
             power=self._settings.get("power"),
-            energy_shift=sossa.energy_shift,
         )
 
         return UnitaryRepresentation(container=container)
 
     @staticmethod
-    def _outer_coefficients(sossa: SOSSAContainer) -> np.ndarray:
+    def _outer_coefficients(sossa: SOSContainer) -> np.ndarray:
         r"""Compute the outer PREPARE LCU coefficients from the container generators.
 
         The one-body coefficients are :math:`\sqrt{2}` times the D1/Q1 generator
@@ -152,23 +145,21 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         (Eqs. (7) and (9) of :cite:`Low2025`). Every state-preparation backend takes
         *amplitudes* and squares them internally to obtain its own distribution, so
         :math:`c_{x_o}` is what gets handed to one -- see ``build_outer_prep`` in
-        ``ControlledSOSSACircuitMapper``. ``outer_prepare_probabilities`` holds
-        :math:`c_{x_o}^2` for serialization and introspection only; feeding it to a
-        backend would square a second time and prepare :math:`c^4`.
+        :class:`~qdk_chemistry.algorithms.circuit_mapper.sossa_mapper.SOSSAMapper`.
         """
         one_body = _SQRT_TWO * _row_l1_norms(sossa.one_body.coeffs)
         spin_free = [_INV_SQRT_TWO * (abs(row[-1]) + float(np.sum(np.abs(row[:-1])))) for row in sossa.two_body.coeffs]
         return np.concatenate([one_body, np.asarray(spin_free, dtype=float)])
 
     @staticmethod
-    def _inner_conditional_coefficients(sossa: SOSSAContainer, num_one_body: int) -> np.ndarray:
+    def _inner_conditional_coefficients(sossa: SOSContainer, num_one_body: int) -> np.ndarray:
         r"""Assemble the inner-PREPARE conditional distribution ``[Xo, B+1]``.
 
         One delta row (``b = 0``) per one-body generator, then one spin-free row
         per ``(rank, copy)``: the rotated-``Z`` coefficients followed by the
         absolute identity weight (the ``b == B`` free-rider magnitude).
         """
-        b_plus_1 = sossa.num_bases + 1
+        b_plus_1 = sossa.metadata.num_bases + 1
         delta = np.zeros((num_one_body, b_plus_1))
         if num_one_body:
             delta[:, 0] = 1.0

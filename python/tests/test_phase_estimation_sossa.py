@@ -25,7 +25,7 @@ from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.circuit_mapper.sossa_mapper import SOSSAMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import UnaryPhaseEstimation
-from qdk_chemistry.algorithms.qubit_mapper.sossa import SOSSAQubitMapper
+from qdk_chemistry.algorithms.qubit_mapper.sos import SOSQubitMapper
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
@@ -46,7 +46,7 @@ from .test_helpers import create_random_factorized_hamiltonian, create_test_orbi
 def _to_sossa_operator(factorized_hamiltonian):
     num_modes = 2 * factorized_hamiltonian.get_num_orbitals()
     hamiltonian = Hamiltonian(factorized_hamiltonian)
-    return SOSSAQubitMapper().run(hamiltonian, MajoranaMapping.jordan_wigner(num_modes))
+    return SOSQubitMapper().run(hamiltonian, MajoranaMapping.jordan_wigner(num_modes))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -172,7 +172,7 @@ def _h1_majorana(h1, basis_vectors, two_body_weights, identity_weight):
 
 
 def _sos_energy_shift(h1, basis_vectors, two_body_weights, identity_weight):
-    """Replicate ``SOSSAQubitMapper`` ``energy_shift`` (Eq. 30), with zero core/BLISS.
+    """Replicate ``SOSQubitMapper`` ``energy_shift`` (Eq. 30), with zero core/BLISS.
 
     ``E_SOS = -2 sum_r w_-^{(r)} - 1/2 sum_rc |W^{(rc)}|^2``.
     """
@@ -186,7 +186,7 @@ def _build_dfthc_hamiltonian_matrix(h1, basis_vectors, two_body_weights, identit
     r"""Build the SOSSA gap Hamiltonian ``H_gap = sum_G G† G`` via Jordan-Wigner.
 
     The one-body generators come from diagonalizing the *Majorana-corrected*
-    one-body matrix (Eq. 36), matching ``SOSSAQubitMapper``, which reads
+    one-body matrix (Eq. 36), matching ``SOSQubitMapper``, which reads
     ``container.get_h1_majorana()`` rather than the bare ``h1``.
 
     For eigenvalue :math:`\lambda_k` of that matrix the mapper emits the LCU
@@ -742,7 +742,7 @@ class TestSOSSAQPEIntegration:
             data["two_body_weights"],
             data["identity_weight"],
         )
-        assert container.energy_shift == pytest.approx(expected, abs=1e-12)
+        assert container.metadata.energy_shift == pytest.approx(expected, abs=1e-12)
 
     def test_ground_state_energy_recovered_from_walk_eigenphase(self):
         """Decoding a walk eigenphase must return the exact physical ground energy.

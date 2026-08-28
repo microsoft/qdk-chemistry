@@ -13,7 +13,7 @@ import qdk
 
 from qdk_chemistry.algorithms.circuit_mapper import SOSSAMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
-from qdk_chemistry.algorithms.qubit_mapper.sossa import SOSSAQubitMapper
+from qdk_chemistry.algorithms.qubit_mapper.sos import SOSQubitMapper
 from qdk_chemistry.data import AlgorithmRef, Circuit, Hamiltonian, MajoranaMapping
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context
@@ -62,7 +62,7 @@ def _to_sossa_operator(factorized_hamiltonian):
     """Wrap a factorized Hamiltonian in the QubitOperator the SOSSA builder expects."""
     num_modes = 2 * factorized_hamiltonian.get_num_orbitals()
     hamiltonian = Hamiltonian(factorized_hamiltonian)
-    return SOSSAQubitMapper().run(hamiltonian, MajoranaMapping.jordan_wigner(num_modes))
+    return SOSQubitMapper().run(hamiltonian, MajoranaMapping.jordan_wigner(num_modes))
 
 
 def _build_sossa_unitary(
@@ -359,7 +359,7 @@ class TestSOSSAMapper:
         mapper = _make_sossa_mapper()
         circuit = mapper.run(unitary)
 
-        num_system_qubits = 2 * container.num_orbitals
+        num_system_qubits = 2 * container.metadata.num_spatial_orbitals
         num_gradient = circuit.metadata.num_phase_gradient_ancillas
         assert num_gradient == mapper.num_phase_gradient_qubits
         assert circuit.num_qubits == num_system_qubits + mapper.num_ancilla_qubits(container)

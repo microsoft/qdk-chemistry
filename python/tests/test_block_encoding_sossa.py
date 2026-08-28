@@ -6,7 +6,6 @@
 # --------------------------------------------------------------------------------------------
 
 import tempfile
-from dataclasses import replace
 from pathlib import Path
 
 import h5py
@@ -15,7 +14,7 @@ import pytest
 import qdk
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
-from qdk_chemistry.algorithms.qubit_mapper.sossa import SOSSAQubitMapper
+from qdk_chemistry.algorithms.qubit_mapper.sos import SOSQubitMapper
 from qdk_chemistry.data import (
     Configuration,
     Hamiltonian,
@@ -23,6 +22,7 @@ from qdk_chemistry.data import (
     StateVectorContainer,
     Wavefunction,
 )
+from qdk_chemistry.data.qubit_operator.containers.sossa import FactorizedHamiltonianMetadata
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.sossa import (
     SOSSAInnerPrepare,
@@ -52,7 +52,7 @@ def qdk_ctx() -> qdk.Context:
 
 def _to_sossa_operator(factorized_hamiltonian):
     hamiltonian = Hamiltonian(factorized_hamiltonian)
-    return SOSSAQubitMapper().run(hamiltonian, None)
+    return SOSQubitMapper().run(hamiltonian, None)
 
 
 def _make_sossa_unitary_representation():
@@ -84,7 +84,6 @@ def _make_sossa_unitary_representation():
 
     _reg_bits = sossa_register_bits(num_orbitals, num_ranks, num_bases, num_copies)
     num_outer_qubits = _reg_bits["xo_bits"]
-    num_inner_qubits = _reg_bits["b_bits"]
 
     # Build outer prepare Wavefunction
     coeffs_list = []
@@ -97,17 +96,12 @@ def _make_sossa_unitary_representation():
     orbitals = ModelOrbitals(num_outer_qubits)
     sv_container = StateVectorContainer(np.array(coeffs_list), dets, orbitals)
     outer_prepare = Wavefunction(sv_container)
-    squared = np.array(coeffs_list) ** 2
-    squared /= np.linalg.norm(squared)
-    outer_prepare_probabilities = Wavefunction(StateVectorContainer(squared, dets, orbitals))
     inner_prepare = SOSSAInnerPrepare(
         conditional_coefficients=inner_coefficients,
-        num_inner_qubits=num_inner_qubits,
     )
     select = SOSSASelect(
         one_body_rotation_angles=dq_rotation_angles,
         two_body_rotation_angles=sf_rotation_angles,
-        num_positive_one_body_terms=num_d1,
     )
 
     # Compute normalization
@@ -117,14 +111,17 @@ def _make_sossa_unitary_representation():
 
     container = SOSSAWalkContainer(
         outer_prepare=outer_prepare,
-        outer_prepare_probabilities=outer_prepare_probabilities,
         inner_prepare=inner_prepare,
         select=select,
-        num_orbitals=num_orbitals,
-        num_ranks=num_ranks,
-        num_bases=num_bases,
-        num_copies=num_copies,
-        normalization=normalization,
+        metadata=FactorizedHamiltonianMetadata(
+            num_spatial_orbitals=num_orbitals,
+            num_ranks=num_ranks,
+            num_bases=num_bases,
+            num_copies=num_copies,
+            num_positive_one_body_terms=num_d1,
+            energy_shift=0.0,
+            normalization=normalization,
+        ),
         power=1,
     )
 
@@ -156,11 +153,6 @@ class TestSOSSAWalkContainer:
             atol=float_comparison_absolute_tolerance,
         )
         assert np.allclose(
-            restored.outer_prepare_probabilities.get_coefficients(),
-            container.outer_prepare_probabilities.get_coefficients(),
-            atol=float_comparison_absolute_tolerance,
-        )
-        assert np.allclose(
             restored.inner_prepare.conditional_coefficients,
             container.inner_prepare.conditional_coefficients,
             atol=float_comparison_absolute_tolerance,
@@ -187,10 +179,6 @@ class TestSOSSAWalkContainer:
         assert restored.power == container.power
         assert np.isclose(restored.normalization, container.normalization)
         assert np.allclose(restored.outer_prepare.get_coefficients(), container.outer_prepare.get_coefficients())
-        assert np.allclose(
-            restored.outer_prepare_probabilities.get_coefficients(),
-            container.outer_prepare_probabilities.get_coefficients(),
-        )
         assert np.allclose(restored.select.two_body_rotation_angles, container.select.two_body_rotation_angles)
 
     def test_unitary_representation_json_dispatch(self):
@@ -214,50 +202,13 @@ class TestSOSSAWalkContainer:
         ever stop cancelling, the fallback silently returns a wrong allocation size.
         """
         container = _make_sossa_unitary_representation().get_container()
-        reg_bits = sossa_register_bits(
-            container.num_orbitals, container.num_ranks, container.num_bases, container.num_copies
-        )
+        meta = container.metadata
+        reg_bits = sossa_register_bits(meta.num_spatial_orbitals, meta.num_ranks, meta.num_bases, meta.num_copies)
 
-        num_system = 2 * container.num_orbitals
+        num_system = 2 * meta.num_spatial_orbitals
         expected_ancilla = reg_bits["xo_bits"] + reg_bits["b_bits"] + reg_bits["num_free_rider_bits"] + 2
 
         assert container.num_qubits - num_system == expected_ancilla
-
-    def test_diverging_stored_inner_width_is_rejected(self):
-        """A stored inner width that disagrees with (N, R, B, C) must fail loudly.
-
-        ``num_inner_qubits`` is persisted on the inner PREPARE *and* derivable from
-        ``sossa_register_bits``. Nothing forces a deserialized value to agree with the
-        formula, so version skew could reintroduce a divergence that would otherwise
-        corrupt ``num_qubits`` silently.
-        """
-        container = _make_sossa_unitary_representation().get_container()
-        skewed = replace(
-            container.inner_prepare,
-            num_inner_qubits=container.inner_prepare.num_inner_qubits + 1,
-        )
-
-        with pytest.raises(ValueError, match="num_inner_qubits"):
-            SOSSAWalkContainer(
-                outer_prepare=container.outer_prepare,
-                outer_prepare_probabilities=container.outer_prepare_probabilities,
-                inner_prepare=skewed,
-                select=container.select,
-                num_orbitals=container.num_orbitals,
-                num_ranks=container.num_ranks,
-                num_bases=container.num_bases,
-                num_copies=container.num_copies,
-                normalization=container.normalization,
-            )
-
-    def test_deserializing_a_skewed_inner_width_is_rejected(self):
-        """The same guard must hold on the JSON reload path, not just construction."""
-        container = _make_sossa_unitary_representation().get_container()
-        json_data = container.to_json()
-        json_data["inner_prepare"]["num_inner_qubits"] += 1
-
-        with pytest.raises(ValueError, match="num_inner_qubits"):
-            SOSSAWalkContainer.from_json(json_data)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -301,17 +252,16 @@ class TestSOSSABuilder:
         [(2, 1, 1, 1), (3, 2, 2, 1)],
         ids=["N2R1B1C1", "N3R2B2C1"],
     )
-    def test_outer_prepare_probabilities_are_the_squared_amplitudes(
+    def test_outer_prepare_amplitudes_encode_the_generator_one_norms(
         self, num_orbitals, num_ranks, num_bases, num_copies
     ):
-        r"""Verify the builder emits both conventions of the outer PREPARE distribution.
+        r"""The outer PREPARE holds :math:`c/\|c\|`, with the scale carried by :math:`\Lambda`.
 
-        The SOS block encoding needs the outer PREPARE to produce amplitudes
-        proportional to the generator one-norms :math:`c_{x_o}` (Eqs. (7) and (9) of Low et
-        al. 2025), so ``outer_prepare`` holds :math:`c/\|c\|`. Backends that
-        discretize their input as a probability distribution have to be handed
-        :math:`c^2` instead, which is what ``outer_prepare_probabilities`` holds.
-        Also check the normalization identity :math:`\sum_{x_o} c_{x_o}^2 = 2\Lambda`.
+        The SOS block encoding needs amplitudes proportional to the generator one-norms
+        :math:`c_{x_o}` (Eqs. (7) and (9) of Low et al. 2025), and every state-preparation
+        backend squares its own input. The stored wavefunction is normalized, so
+        :math:`\|c\|` survives only in :math:`\Lambda = \frac{1}{2}\sum_{x_o} c_{x_o}^2` --
+        which is why the container carries that separately from the amplitudes.
         """
         fh = create_random_factorized_hamiltonian(
             num_orbitals=num_orbitals,
@@ -322,15 +272,9 @@ class TestSOSSABuilder:
         container = SOSSABuilder().run(_to_sossa_operator(fh)).get_container()
 
         amplitudes = np.asarray(container.outer_prepare.get_coefficients(), dtype=float)
-        probabilities = np.asarray(container.outer_prepare_probabilities.get_coefficients(), dtype=float)
 
         assert np.isclose(np.linalg.norm(amplitudes), 1.0)
-        assert np.isclose(np.linalg.norm(probabilities), 1.0)
         assert np.all(amplitudes >= 0.0)
-
-        expected = amplitudes**2
-        expected /= np.linalg.norm(expected)
-        np.testing.assert_allclose(probabilities, expected, atol=float_comparison_absolute_tolerance)
 
         # sum_xo c_xo^2 = 2 Lambda, so the unnormalized coefficients are recovered
         # from the stored amplitudes by scaling with sqrt(2 Lambda).

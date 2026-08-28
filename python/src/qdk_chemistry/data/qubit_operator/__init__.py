@@ -16,11 +16,10 @@ from qdk_chemistry.data._hashing import _hash_str
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorContainer
 from qdk_chemistry.data.qubit_operator.containers.pauli_lcu import PauliLCUContainer
-from qdk_chemistry.data.qubit_operator.containers.sossa import SOSSAContainer
+from qdk_chemistry.data.qubit_operator.containers.sossa import SOSContainer
 
 if TYPE_CHECKING:
     import h5py
-    import scipy
 
     from qdk_chemistry._core.data import TaperingSpecification
     from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
@@ -100,96 +99,53 @@ class QubitOperator(DataClass):
         _hash_str(h, "qubit_operator")
         _hash_str(h, self._container.content_hash())
 
-    @property
-    def num_qubits(self) -> int:
-        """Return the number of qubits."""
-        return self._container.num_qubits
+    def __getattr__(self, name: str) -> Any:
+        """Forward attribute access to the wrapped container.
 
-    @property
-    def encoding(self) -> str | None:
-        """Return the fermion-to-qubit encoding."""
-        return self._container.encoding
+        Args:
+            name (str): Attribute name
 
-    @property
-    def fermion_mode_order(self) -> FermionModeOrder | None:
-        """Return the fermion mode ordering."""
-        return self._container.fermion_mode_order
+        Returns:
+            Any: The corresponding attribute of the wrapped container
 
-    def _get_pauli_lcu_container(self, member: str) -> PauliLCUContainer:
-        """Return the Pauli-LCU container required by a compatibility member."""
-        if not isinstance(self._container, PauliLCUContainer):
-            raise TypeError(
-                f"{member} is only available for Pauli-LCU operators; "
-                f"this operator uses the {self._container.type!r} representation."
-            )
-        return self._container
+        Raises:
+            AttributeError: If the wrapped representation does not provide the attribute
 
-    @property
-    def pauli_strings(self) -> list[str]:
-        """Return the Pauli strings for a Pauli-LCU operator."""
-        return self._get_pauli_lcu_container("pauli_strings").pauli_strings
-
-    @property
-    def coefficients(self) -> np.ndarray:
-        """Return the coefficients for a Pauli-LCU operator."""
-        return self._get_pauli_lcu_container("coefficients").coefficients
-
-    @property
-    def term_partition(self) -> TermPartition | None:
-        """Return the term partition for a Pauli-LCU operator."""
-        return self._get_pauli_lcu_container("term_partition").term_partition
-
-    @property
-    def tapering(self) -> TaperingSpecification | None:
-        """Return the tapering metadata for a Pauli-LCU operator."""
-        return self._get_pauli_lcu_container("tapering").tapering
-
-    @property
-    def schatten_norm(self) -> float:
-        """Return the coefficient one-norm for a Pauli-LCU operator."""
-        return self._get_pauli_lcu_container("schatten_norm").schatten_norm
-
-    def to_matrix(self, sparse: bool = False) -> np.ndarray | scipy.sparse.spmatrix:
-        """Convert a Pauli-LCU operator to its matrix representation."""
-        return self._get_pauli_lcu_container("to_matrix()").to_matrix(sparse=sparse)
+        """
+        # Underscored names must not forward: DataClass.__setattr__ probes `_initialized`,
+        # which the container already has, and would then reject `self._container = ...`.
+        if name.startswith("_"):
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+        container = self.__dict__.get("_container")
+        if container is None:
+            return super().__getattr__(name)
+        try:
+            return getattr(container, name)
+        except AttributeError:
+            raise AttributeError(
+                f"'{name}' is not available on this qubit operator; "
+                f"the {container.type!r} representation does not provide it."
+            ) from None
 
     def equiv(self, other: QubitOperator, atol: float = 1e-12) -> bool:
         """Check mathematical equivalence with another Pauli-LCU operator."""
         if not isinstance(other, QubitOperator):
             return False
-        container = self._get_pauli_lcu_container("equiv()")
-        other_container = other._get_pauli_lcu_container("equiv()")
-        return container.equiv(other_container, atol=atol)
-
-    def is_hermitian(self, tolerance: float = 1e-12) -> bool:
-        """Return whether a Pauli-LCU operator is Hermitian."""
-        return self._get_pauli_lcu_container("is_hermitian()").is_hermitian(tolerance=tolerance)
-
-    def get_real_coefficients(
-        self, tolerance: float = 1e-12, sort_by_magnitude: bool = False
-    ) -> list[tuple[str, float]]:
-        """Return real Pauli coefficients above the requested tolerance."""
-        return self._get_pauli_lcu_container("get_real_coefficients()").get_real_coefficients(
-            tolerance=tolerance, sort_by_magnitude=sort_by_magnitude
-        )
+        return self._container.equiv(other._container, atol=atol)
 
     def to_interleaved(self, n_spatial: int) -> QubitOperator:
         """Convert a Pauli-LCU operator from blocked to interleaved ordering."""
-        container = self._get_pauli_lcu_container("to_interleaved()")
-        return QubitOperator(container.to_interleaved(n_spatial))
+        return QubitOperator(self._container.to_interleaved(n_spatial))
 
     def __add__(self, other: QubitOperator) -> QubitOperator:
         """Add two Pauli-LCU operators."""
         if not isinstance(other, QubitOperator):
             return NotImplemented
-        container = self._get_pauli_lcu_container("addition")
-        other_container = other._get_pauli_lcu_container("addition")
-        return QubitOperator(container + other_container)
+        return QubitOperator(self._container + other._container)
 
     def __mul__(self, scalar: Any) -> QubitOperator:
         """Scale a Pauli-LCU operator."""
-        container = self._get_pauli_lcu_container("multiplication")
-        result = container * scalar
+        result = self._container * scalar
         if result is NotImplemented:
             return NotImplemented
         return QubitOperator(result)
@@ -231,7 +187,7 @@ class QubitOperator(DataClass):
         if container_type == "pauli_lcu":
             container = PauliLCUContainer.from_json(json_data)
         elif container_type == "sossa":
-            container = SOSSAContainer.from_json(json_data)
+            container = SOSContainer.from_json(json_data)
         else:
             raise ValueError(f"Unsupported qubit operator container type: {container_type}")
         return cls(container)
@@ -247,7 +203,7 @@ class QubitOperator(DataClass):
         if container_type == "pauli_lcu":
             container = PauliLCUContainer.from_hdf5(group)
         elif container_type == "sossa":
-            container = SOSSAContainer.from_hdf5(group)
+            container = SOSContainer.from_hdf5(group)
         else:
             raise ValueError(f"Unsupported qubit operator container type: {container_type}")
         return cls(container)

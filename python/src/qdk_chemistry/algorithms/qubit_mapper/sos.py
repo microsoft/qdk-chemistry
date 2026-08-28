@@ -10,13 +10,17 @@ import numpy as np
 from qdk_chemistry._core.data import sparse_pauli_word_to_label
 from qdk_chemistry.algorithms.qubit_mapper.qubit_mapper import QubitMapper
 from qdk_chemistry.data import FactorizedHamiltonianContainer, Hamiltonian, MajoranaMapping, QubitOperator
-from qdk_chemistry.data.qubit_operator.containers.sossa import RotatedPaulis, SOSSAContainer
+from qdk_chemistry.data.qubit_operator.containers.sossa import (
+    FactorizedHamiltonianMetadata,
+    RotatedPaulis,
+    SOSContainer,
+)
 from qdk_chemistry.utils import Logger
 
-__all__ = ["SOSSAQubitMapper"]
+__all__ = ["SOSQubitMapper"]
 
 
-class SOSSAQubitMapper(QubitMapper):
+class SOSQubitMapper(QubitMapper):
     """Map a factorized Hamiltonian to a SOSSA qubit operator."""
 
     def name(self) -> str:
@@ -26,13 +30,13 @@ class SOSSAQubitMapper(QubitMapper):
     def _run_impl(self, hamiltonian: Hamiltonian, _mapping: MajoranaMapping) -> QubitOperator:
         """Convert a factorized Hamiltonian to a structured SOS qubit operator."""
         if not isinstance(hamiltonian, Hamiltonian):
-            raise TypeError("SOSSAQubitMapper requires a Hamiltonian")
+            raise TypeError("SOSQubitMapper requires a Hamiltonian")
 
         container = hamiltonian.get_container()
         if not isinstance(container, FactorizedHamiltonianContainer):
-            raise TypeError("SOSSAQubitMapper requires a Hamiltonian backed by FactorizedHamiltonianContainer")
+            raise TypeError("SOSQubitMapper requires a Hamiltonian backed by FactorizedHamiltonianContainer")
 
-        Logger.warn("SOSSAQubitMapper ignores the provided mapping and uses a single-mode Jordan-Wigner encoding")
+        Logger.warn("SOSQubitMapper ignores the provided mapping and uses a single-mode Jordan-Wigner encoding")
         return self._map_factorized_container(container, MajoranaMapping.jordan_wigner(1))
 
     @classmethod
@@ -44,7 +48,7 @@ class SOSSAQubitMapper(QubitMapper):
         """Map a validated factorized container to a SOSSA qubit operator."""
         if np.any(np.asarray(container.get_signs(), dtype=float) < 0.0):
             raise ValueError(
-                "SOSSAQubitMapper requires a positive semi-definite factorization: the container "
+                "SOSQubitMapper requires a positive semi-definite factorization: the container "
                 "has negative per-rank signs, so it is not a sum of squares"
             )
 
@@ -99,17 +103,19 @@ class SOSSAQubitMapper(QubitMapper):
         energy_shift = container.get_core_energy() - 2.0 * negative_sum - 0.5 * w0_square_sum
 
         return QubitOperator(
-            SOSSAContainer(
-                num_orbitals,
-                energy_shift,
-                num_ranks,
-                num_bases,
-                num_copies,
+            SOSContainer(
                 RotatedPaulis(one_body_angles, one_body_coeffs, (x_pauli, y_pauli)),
-                num_positive,
                 RotatedPaulis(two_body_angles, two_body_coeffs, (sf_pauli,)),
                 mapping.name,
                 "blocked",
+                FactorizedHamiltonianMetadata(
+                    num_spatial_orbitals=num_orbitals,
+                    num_ranks=num_ranks,
+                    num_bases=num_bases,
+                    num_copies=num_copies,
+                    num_positive_one_body_terms=num_positive,
+                    energy_shift=energy_shift,
+                ),
             )
         )
 

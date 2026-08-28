@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from math import isfinite
 from typing import TYPE_CHECKING, Any
 
@@ -20,7 +20,7 @@ from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorConta
 if TYPE_CHECKING:
     import h5py
 
-__all__ = ["RotatedPaulis", "SOSSAContainer"]
+__all__ = ["FactorizedHamiltonianMetadata", "RotatedPaulis", "SOSContainer"]
 
 
 def _complex_block_to_json(coeffs: np.ndarray) -> dict[str, Any]:
@@ -49,17 +49,56 @@ class RotatedPaulis:
         object.__setattr__(self, "paulis", tuple(self.paulis))
 
 
-class SOSSAContainer(QubitOperatorContainer):
+@dataclass(frozen=True)
+class FactorizedHamiltonianMetadata:
+    r"""Dimensions and scalar constants of a factorized Hamiltonian's sum-of-squares form.
+
+    Attributes:
+        num_spatial_orbitals: Number of spatial orbitals :math:`N`.
+        num_ranks: Number of DFTHC ranks :math:`R`.
+        num_bases: Number of bases :math:`B` (``B + 1`` inner entries including the identity).
+        num_copies: Number of copies :math:`C`.
+        num_positive_one_body_terms: Number of D1 (particle) one-body generators.
+        energy_shift: Constant offset :math:`E_{\text{SOS}} + E_{\text{nuc}}`.
+        normalization: Block-encoding normalization :math:`\Lambda`, or ``None`` before it is built.
+
+    """
+
+    num_spatial_orbitals: int
+    num_ranks: int
+    num_bases: int
+    num_copies: int
+    num_positive_one_body_terms: int
+    energy_shift: float
+    normalization: float | None = None
+
+    def __post_init__(self) -> None:
+        """Coerce the shift and reject dimensions no register width can be built from."""
+        object.__setattr__(self, "energy_shift", float(self.energy_shift))
+        if self.num_spatial_orbitals <= 0 or not isfinite(self.energy_shift):
+            raise ValueError("invalid sum-of-squares metadata")
+
+    def to_json(self) -> dict[str, Any]:
+        """Convert the metadata to a JSON dictionary."""
+        return asdict(self)
+
+    @classmethod
+    def from_json(cls, data: dict[str, Any]) -> FactorizedHamiltonianMetadata:
+        """Create metadata from a JSON dictionary."""
+        return cls(**data)
+
+
+class SOSContainer(QubitOperatorContainer):
     """Container for a sum-of-squares qubit operator.
 
     The one-body and two-body generators are each a
     :class:`~qdk_chemistry.data.qubit_operator.containers.sossa.RotatedPaulis` block
     (``angles``, ``coeffs``, ``paulis``). ``one_body`` uses ``(X +/- iY) / 2``
-    with the first ``num_positive_one_body_terms`` rows the D1 (particle)
+    with the first ``metadata.num_positive_one_body_terms`` rows the D1 (particle)
     generators and the rest Q1 (hole); ``two_body`` uses ``Z`` with one
     ``[R * C, B + 1]`` coefficient row per ``(rank, copy)`` (columns ``0..B-1``
-    rotated-``Z``, column ``B`` identity). ``energy_shift`` is the constant
-    offset; the builder derives the inner-PREPARE distribution, outer
+    rotated-``Z``, column ``B`` identity). Dimensions and scalar constants live in
+    :class:`FactorizedHamiltonianMetadata`; the builder derives the inner-PREPARE distribution, outer
     coefficients, and normalization from these blocks.
     """
 
@@ -73,33 +112,22 @@ class SOSSAContainer(QubitOperatorContainer):
 
     def __init__(
         self,
-        num_spatial_orbitals: int,
-        energy_shift: float,
-        num_ranks: int,
-        num_bases: int,
-        num_copies: int,
         one_body: RotatedPaulis,
-        num_positive_one_body_terms: int,
         two_body: RotatedPaulis,
         encoding: str | None,
         fermion_mode_order: str | None,
+        metadata: FactorizedHamiltonianMetadata,
     ) -> None:
         """Initialize a sum-of-squares container."""
-        self.num_spatial_orbitals = num_spatial_orbitals
-        self.energy_shift = float(energy_shift)
-        self.num_ranks = num_ranks
-        self.num_bases = num_bases
-        self.num_copies = num_copies
         self.one_body = one_body
-        self.num_positive_one_body_terms = num_positive_one_body_terms
         self.two_body = two_body
-        if num_spatial_orbitals <= 0 or not isfinite(self.energy_shift):
-            raise ValueError("invalid sum-of-squares container")
+        self.metadata = metadata
         if len(self.one_body.angles) != len(self.one_body.coeffs):
             raise ValueError("one-body angles and coefficients must have matching generator counts")
-        if not 0 <= self.num_positive_one_body_terms <= len(self.one_body.angles):
+        if not 0 <= metadata.num_positive_one_body_terms <= len(self.one_body.angles):
             raise ValueError("num_positive_one_body_terms must be between 0 and the one-body generator count")
-        if self.two_body.coeffs.size and self.two_body.coeffs.shape != (num_ranks * num_copies, num_bases + 1):
+        expected_two_body = (metadata.num_ranks * metadata.num_copies, metadata.num_bases + 1)
+        if self.two_body.coeffs.size and self.two_body.coeffs.shape != expected_two_body:
             raise ValueError("two_body_coeffs must have shape [num_ranks * num_copies, num_bases + 1]")
         super().__init__(encoding, fermion_mode_order)
 
@@ -111,7 +139,7 @@ class SOSSAContainer(QubitOperatorContainer):
     @property
     def num_qubits(self) -> int:
         """Return the number of qubits (two spin-orbitals per spatial orbital)."""
-        return 2 * self.num_spatial_orbitals
+        return 2 * self.metadata.num_spatial_orbitals
 
     def _hash_update(self, h) -> None:
         """Feed identifying data into the hasher."""
@@ -123,14 +151,9 @@ class SOSSAContainer(QubitOperatorContainer):
         return self._add_json_version(
             {
                 "container_type": self.type,
-                "num_spatial_orbitals": self.num_spatial_orbitals,
-                "energy_shift": self.energy_shift,
-                "num_ranks": self.num_ranks,
-                "num_bases": self.num_bases,
-                "num_copies": self.num_copies,
+                "metadata": self.metadata.to_json(),
                 "one_body_angles": self.one_body.angles.tolist(),
                 "one_body_coeffs": _complex_block_to_json(self.one_body.coeffs),
-                "num_positive_one_body_terms": self.num_positive_one_body_terms,
                 "one_body_paulis": list(self.one_body.paulis),
                 "two_body_angles": self.two_body.angles.tolist(),
                 "two_body_coeffs": _complex_block_to_json(self.two_body.coeffs),
@@ -147,7 +170,7 @@ class SOSSAContainer(QubitOperatorContainer):
         group.attrs["payload"] = json.dumps(self.to_json())
 
     @classmethod
-    def from_json(cls, json_data: dict[str, Any]) -> SOSSAContainer:
+    def from_json(cls, json_data: dict[str, Any]) -> SOSContainer:
         """Create a sum-of-squares container from JSON."""
         cls._validate_json_version(cls._serialization_version, json_data)
         one_body = RotatedPaulis(
@@ -161,31 +184,25 @@ class SOSSAContainer(QubitOperatorContainer):
             tuple(json_data.get("two_body_paulis", ("Z",))),
         )
         return cls(
-            json_data["num_spatial_orbitals"],
-            json_data["energy_shift"],
-            json_data["num_ranks"],
-            json_data["num_bases"],
-            json_data["num_copies"],
             one_body,
-            json_data["num_positive_one_body_terms"],
             two_body,
             json_data.get("encoding"),
             json_data.get("fermion_mode_order"),
+            FactorizedHamiltonianMetadata.from_json(json_data["metadata"]),
         )
 
     @classmethod
-    def from_hdf5(cls, group: h5py.Group) -> SOSSAContainer:
+    def from_hdf5(cls, group: h5py.Group) -> SOSContainer:
         """Create a sum-of-squares container from HDF5."""
         cls._validate_hdf5_version(cls._serialization_version, group)
         return cls.from_json(json.loads(group.attrs["payload"]))
 
     def get_summary(self) -> str:
         """Return a summary of the sum-of-squares container."""
-        num_d1 = self.num_positive_one_body_terms
+        num_d1 = self.metadata.num_positive_one_body_terms
         num_q1 = len(self.one_body.angles) - num_d1
         num_sf = len(self.two_body.angles)
         return (
             f"SOS Qubit Operator\n  Number of qubits: {self.num_qubits}\n"
-            f"  Number of spatial orbitals: {self.num_spatial_orbitals}\n"
             f"  D1/Q1/SF generators: {num_d1}/{num_q1}/{num_sf}\n"
         )

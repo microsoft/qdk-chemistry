@@ -12,7 +12,11 @@ import pytest
 from qdk_chemistry.data import QubitOperator
 from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorContainer
 from qdk_chemistry.data.qubit_operator.containers.pauli_lcu import PauliLCUContainer
-from qdk_chemistry.data.qubit_operator.containers.sossa import RotatedPaulis, SOSSAContainer
+from qdk_chemistry.data.qubit_operator.containers.sossa import (
+    FactorizedHamiltonianMetadata,
+    RotatedPaulis,
+    SOSContainer,
+)
 
 
 def test_qubit_operator_wraps_pauli_lcu_container() -> None:
@@ -102,17 +106,19 @@ def test_sos_container_json_roundtrip_preserves_complex_coefficients() -> None:
     while flipping particle generators into hole generators.
     """
     one_body_coeffs = np.array([[0.2, 0.2j], [0.3, -0.3j]])
-    container = SOSSAContainer(
-        num_spatial_orbitals=2,
-        energy_shift=-1.5,
-        num_ranks=1,
-        num_bases=1,
-        num_copies=1,
+    container = SOSContainer(
         one_body=RotatedPaulis(np.array([[0.1], [0.2]]), one_body_coeffs, ("X", "Y")),
-        num_positive_one_body_terms=1,
         two_body=RotatedPaulis(np.array([[0.3]]), np.array([[0.3, 0.7]]), ("Z",)),
         encoding="jordan-wigner",
         fermion_mode_order="blocked",
+        metadata=FactorizedHamiltonianMetadata(
+            num_spatial_orbitals=2,
+            num_ranks=1,
+            num_bases=1,
+            num_copies=1,
+            num_positive_one_body_terms=1,
+            energy_shift=-1.5,
+        ),
     )
 
     restored = QubitOperator.from_json(QubitOperator(container).to_json()).get_container()
@@ -121,5 +127,5 @@ def test_sos_container_json_roundtrip_preserves_complex_coefficients() -> None:
     np.testing.assert_allclose(restored.one_body.angles, container.one_body.angles)
     np.testing.assert_allclose(restored.two_body.coeffs, container.two_body.coeffs)
     np.testing.assert_allclose(restored.two_body.angles, container.two_body.angles)
-    assert restored.num_positive_one_body_terms == 1
-    assert restored.energy_shift == pytest.approx(-1.5)
+    assert restored.metadata.num_positive_one_body_terms == 1
+    assert restored.metadata.energy_shift == pytest.approx(-1.5)
