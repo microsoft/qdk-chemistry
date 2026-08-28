@@ -20,6 +20,8 @@ from qdk_chemistry.algorithms import ScfSolver, registry
 from qdk_chemistry.data import DataClass, Structure, register_dataclass
 from qdk_chemistry.data import registry as dataclass_registry
 from qdk_chemistry.plugins import ChemistryPlugin, DuplicateRegistrationError, PluginRegistrar, QdkChemistryPlugin
+from qdk_chemistry.remote.backends import RemoteBackend, get_backend
+from qdk_chemistry.remote.backends import base as remote_backend_registry
 from qdk_chemistry.remote.cache import FolderCache
 
 _BUNDLED_PLUGIN_AUTOLOAD_CASES = (
@@ -185,28 +187,42 @@ def test_duplicate_registration_error_is_public_value_error():
 
 
 def test_plugin_registrar_delegates_to_existing_registries(monkeypatch):
-    """The facade preserves algorithm and DataClass registries as implementation APIs."""
+    """The facade preserves the existing registries as implementation APIs."""
     algorithm_factory = MagicMock()
     algorithm_type_factory = MagicMock()
     dataclass_type = type("PluginData", (), {})
+    remote_backend_type = type("PluginRemote", (), {})
+    cache_backend_type = type("PluginCache", (), {})
     register_algorithm = MagicMock()
     register_algorithm_factory = MagicMock()
     register_dataclass = MagicMock()
     validate_dataclasses = MagicMock(side_effect=tuple)
+    remote_decorator = MagicMock()
+    register_remote_backend = MagicMock(return_value=remote_decorator)
+    cache_decorator = MagicMock()
+    register_cache_backend = MagicMock(return_value=cache_decorator)
     monkeypatch.setattr("qdk_chemistry.algorithms.register", register_algorithm)
     monkeypatch.setattr("qdk_chemistry.algorithms.registry.register_factory", register_algorithm_factory)
     monkeypatch.setattr("qdk_chemistry.data.register_dataclass", register_dataclass)
     monkeypatch.setattr("qdk_chemistry.data.registry._validate_dataclass_registrations", validate_dataclasses)
+    monkeypatch.setattr("qdk_chemistry.remote.backends.register_backend", register_remote_backend)
+    monkeypatch.setattr("qdk_chemistry.remote.cache.register_cache", register_cache_backend)
 
     registrar = PluginRegistrar()
     registrar.register_algorithm_factory(algorithm_type_factory)
     registrar.register_algorithm(algorithm_factory, data_classes=(dataclass_type,))
     registrar.register_dataclass(dataclass_type)
+    registrar.register_remote_backend("plugin-remote", remote_backend_type)
+    registrar.register_cache_backend("plugin-cache", cache_backend_type)
 
     register_algorithm_factory.assert_called_once_with(algorithm_type_factory)
     validate_dataclasses.assert_called_once_with((dataclass_type,))
     register_algorithm.assert_called_once_with(algorithm_factory)
     assert register_dataclass.call_args_list == [call(dataclass_type), call(dataclass_type)]
+    register_remote_backend.assert_called_once_with("plugin-remote")
+    remote_decorator.assert_called_once_with(remote_backend_type)
+    register_cache_backend.assert_called_once_with("plugin-cache")
+    cache_decorator.assert_called_once_with(cache_backend_type)
 
 
 def test_plugin_registrar_validates_dataclasses_before_registering_algorithm(monkeypatch):
@@ -381,3 +397,55 @@ def test_plugin_entry_point_must_resolve_to_plugin_class(monkeypatch):
 
     with pytest.warns(UserWarning, match="QdkChemistryPlugin subclass"):
         plugins._load_plugins()
+
+
+def test_unified_plugin_registers_remote_backend(monkeypatch):
+    """Unified discovery registers a remote backend without importing it explicitly."""
+
+    class PluginRemoteBackend(RemoteBackend):
+        """Remote backend supplied by the test plugin."""
+
+        def connect(self):
+            """Connect to the test backend."""
+
+        def disconnect(self):
+            """Disconnect from the test backend."""
+
+        def upload(self, local_path, remote_path):
+            """Accept an upload for the test backend."""
+
+        def download(self, remote_path, local_path):
+            """Accept a download for the test backend."""
+
+        def _submit(self, payload):
+            """Reject submission because this registration test has no worker."""
+            raise NotImplementedError
+
+        def check(self, backend_state):
+            """Reject status checks because this registration test has no worker."""
+            raise NotImplementedError
+
+        def fetch(self, backend_state, local_dir=None):
+            """Reject result fetching because this registration test has no worker."""
+            raise NotImplementedError
+
+    class RemotePlugin(QdkChemistryPlugin):
+        """Plugin that contributes a remote backend."""
+
+        def register(self, registrar: PluginRegistrar) -> None:
+            """Register the remote backend."""
+            registrar.register_remote_backend("plugin-remote", PluginRemoteBackend)
+
+    def find_entry_points(*, group):
+        """Return the remote plugin through the unified group."""
+        assert group == "qdk_chemistry.plugins"
+        return [_EntryPoint("remote", RemotePlugin)]
+
+    monkeypatch.setattr("importlib.metadata.entry_points", find_entry_points)
+    monkeypatch.setattr(remote_backend_registry, "_BACKENDS", {})
+
+    plugins._load_plugins()
+
+    backend = get_backend("plugin-remote", endpoint="compute.example.com")
+    assert isinstance(backend, PluginRemoteBackend)
+    assert backend._backend_args["endpoint"] == "compute.example.com"
