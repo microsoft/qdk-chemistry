@@ -750,9 +750,8 @@ class TestAlgorithmFunctions:
         assert (project_path / "localized.wavefunction.json").exists()
 
     @pytest.mark.usefixtures("simple_wavefunction")
-    def test_run_stability_checker(self, temp_project_dir):
+    def test_run_stability_checker(self):
         """Test stability checker for h2 in minimal basis."""
-
         result = run_stability_checker(
             project_name="test_project",
             wavefunction_filename="simple.wavefunction.json",

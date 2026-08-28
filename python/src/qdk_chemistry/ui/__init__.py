@@ -13,12 +13,19 @@ __copyright__ = """"""
 
 __all__ = ["app", "cli"]
 
+app: object
+cli: object
+
 
 def __getattr__(name: str):
     """Lazy-load submodules to avoid import-time side effects."""
     if name == "cli":
-        return importlib.import_module(".cli", __name__)
+        module = importlib.import_module(".cli", __name__)
+        globals()[name] = module
+        return module
     if name == "app":
-        return importlib.import_module(".tools", __name__).app
+        application = importlib.import_module(".tools", __name__).app
+        globals()[name] = application
+        return application
     msg = f"module {__name__!r} has no attribute {name!r}"
     raise AttributeError(msg)
