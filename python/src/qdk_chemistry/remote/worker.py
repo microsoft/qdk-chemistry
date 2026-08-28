@@ -148,12 +148,14 @@ def execute_job(input_dir: str | Path, output_dir: str | Path) -> Any:
     """
     from qdk_chemistry.algorithms import create as create_algorithm  # noqa: PLC0415
     from qdk_chemistry.remote.serialization import (  # noqa: PLC0415
+        _load_manifest,
         deserialize_inputs,
         serialize_outputs,
     )
 
     input_path = Path(input_dir)
     output_path = Path(output_dir)
+    cache_transport = _load_manifest(input_path / "manifest.json").get("remote_cache_transport", False)
     cache, run_hash, force_rerun = _load_remote_cache(input_path)
     result = _CACHE_MISS if force_rerun else _get_cached_result(cache, run_hash)
 
@@ -165,6 +167,8 @@ def execute_job(input_dir: str | Path, output_dir: str | Path) -> Any:
         result = algorithm.run(*inputs["args"], **inputs["kwargs"])
         _store_cached_result(cache, run_hash, inputs, result)
 
+    if cache_transport:
+        return result
     serialize_outputs(output_path, result)
     return result
 
