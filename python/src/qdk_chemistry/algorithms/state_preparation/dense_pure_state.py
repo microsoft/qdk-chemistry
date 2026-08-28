@@ -84,4 +84,6 @@ class DensePureStatePreparation(StatePreparation):
             program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
             parameter=vars(state_prep_params),
         )
-        return Circuit(qsharp_op=qsharp_op, qsharp_factory=qsharp_factory, encoding="jordan-wigner")
+        return Circuit(
+            qsharp_op=qsharp_op, qsharp_factory=qsharp_factory, encoding="jordan-wigner", num_qubits=n_qubits
+        )
