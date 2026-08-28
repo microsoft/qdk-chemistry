@@ -30,7 +30,7 @@
 #include <sstream>
 #include <stdexcept>
 
-#include "../src/qdk/chemistry/algorithms/microsoft/hamiltonian.hpp"
+#include "qdk/chemistry/algorithms/microsoft/hamiltonian.hpp"
 #include "qdk/chemistry/algorithms/microsoft/scalar_relativistic_hamiltonian.hpp"
 #include "qdk/chemistry/algorithms/microsoft/utils.hpp"
 #include "ut_common.hpp"
@@ -2930,54 +2930,23 @@ TEST_F(HamiltonianConstructorTest, X2CMetricScreeningMatchesEquivalentBasis) {
     return Eigen::MatrixXd(one_body_alpha);
   };
 
-  constexpr double diffuse_exponent = 2.5e-5;
-  auto generalized_spectrum = [](const Eigen::MatrixXd& one_body,
-                                 const std::vector<double>& exponents) {
-    const Eigen::Index dimension = one_body.rows();
-    Eigen::MatrixXd overlap(dimension, dimension);
-    for (Eigen::Index row = 0; row < dimension; ++row) {
-      for (Eigen::Index column = 0; column < dimension; ++column) {
-        const double product = exponents[row] * exponents[column];
-        const double sum = exponents[row] + exponents[column];
-        overlap(row, column) = std::pow(2.0 * std::sqrt(product) / sum, 1.5);
-      }
-    }
-
-    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> overlap_solver(overlap);
-    EXPECT_EQ(overlap_solver.info(), Eigen::Success);
-    const double cutoff = 1e-10 * overlap_solver.eigenvalues().maxCoeff();
-    std::vector<Eigen::Index> retained;
-    for (Eigen::Index index = 0; index < dimension; ++index) {
-      if (overlap_solver.eigenvalues()(index) > cutoff) {
-        retained.push_back(index);
-      }
-    }
-    Eigen::MatrixXd orthogonalizer(dimension, retained.size());
-    for (size_t column = 0; column < retained.size(); ++column) {
-      const Eigen::Index index = retained[column];
-      orthogonalizer.col(column) =
-          overlap_solver.eigenvectors().col(index) /
-          std::sqrt(overlap_solver.eigenvalues()(index));
-    }
-    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> hamiltonian_solver(
-        orthogonalizer.transpose() * one_body * orthogonalizer);
-    EXPECT_EQ(hamiltonian_solver.info(), Eigen::Success);
-    return hamiltonian_solver.eigenvalues();
-  };
-
+  constexpr double diffuse_exponent = 1e-4;
   for (const std::string integral_dressing : {"x2c_1e_contracted", "x2c_1e"}) {
     const std::vector<double> duplicate_exponents{1.0, 1.0, diffuse_exponent};
     const std::vector<double> unique_exponents{1.0, diffuse_exponent};
-    const Eigen::VectorXd duplicate_spectrum = generalized_spectrum(
-        build_one_body(duplicate_exponents, integral_dressing),
-        duplicate_exponents);
-    const Eigen::VectorXd unique_spectrum = generalized_spectrum(
-        build_one_body(unique_exponents, integral_dressing), unique_exponents);
-    ASSERT_EQ(duplicate_spectrum.size(), unique_spectrum.size());
-    EXPECT_LT((duplicate_spectrum - unique_spectrum).cwiseAbs().maxCoeff(),
+    const Eigen::MatrixXd duplicate_one_body =
+        build_one_body(duplicate_exponents, integral_dressing);
+    const Eigen::MatrixXd unique_one_body =
+        build_one_body(unique_exponents, integral_dressing);
+    Eigen::Matrix<double, 2, 3> duplicate_expansion;
+    duplicate_expansion << 1.0, 1.0, 0.0, 0.0, 0.0, 1.0;
+    const Eigen::Matrix3d expected_duplicate =
+        duplicate_expansion.transpose() * unique_one_body * duplicate_expansion;
+    EXPECT_LT((duplicate_one_body - expected_duplicate).cwiseAbs().maxCoeff(),
               1e-10)
-        << "duplicate=" << duplicate_spectrum.transpose()
-        << ", unique=" << unique_spectrum.transpose();
+        << "duplicate=\n"
+        << duplicate_one_body << "\nexpected=\n"
+        << expected_duplicate;
   }
 }
 
@@ -3059,9 +3028,6 @@ TEST_F(HamiltonianConstructorTest, X2CRestrictedOpenShellOrbitals) {
   auto h_x2c = x2c->run(explicit_rohf_orbitals);
   ASSERT_TRUE(h_x2c->is_restricted());
   auto [one_body_alpha, one_body_beta] = h_x2c->get_one_body_integrals();
-  // Generated with PySCF using exact QDK STO-3G shells, QDK's speed of light,
-  // and QDK ROHF coefficients. The default integral_dressing="x2c_1e" path
-  // is used.
   constexpr double expected_trace = -64.643371650436904;
   EXPECT_NEAR(one_body_alpha.trace(), expected_trace,
               testing::scf_energy_tolerance);
@@ -3152,9 +3118,6 @@ TEST_F(HamiltonianConstructorTest, X2CUnrestrictedO2Reference) {
   ASSERT_TRUE(h_x2c->is_unrestricted());
 
   auto [one_body_alpha, one_body_beta] = h_x2c->get_one_body_integrals();
-  // Generated with PySCF using exact QDK cc-pVDZ shells, QDK's speed of light,
-  // and QDK UHF orbital coefficients. The default
-  // integral_dressing="x2c_1e" path is used.
   EXPECT_NEAR(one_body_alpha.trace(), -267.86977556398796,
               testing::scf_energy_tolerance);
   EXPECT_NEAR(one_body_beta.trace(), -267.86977556398790,

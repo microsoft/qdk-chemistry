@@ -32,22 +32,15 @@ namespace detail {
 
 namespace {
 
-// Relative canonical-orthogonalization cutoff, applied independently to the
-// unscaled overlap and kinetic metric blocks.
-constexpr double metric_relative_linear_dependence_threshold = 1e-9;
+// Canonical-orthogonalization cutoff for the modified Dirac metric.
+constexpr double metric_linear_dependence_threshold = 1e-9;
 // Eigenvalue cutoff for the projected-overlap pseudoinverse.
 constexpr double overlap_linear_dependence_threshold = 1e-14;
-
-struct MetricSubspace {
-  Eigen::MatrixXd eigenvectors;
-  Eigen::VectorXd eigenvalues;
-  std::vector<Eigen::Index> retained_indices;
-};
 
 struct DiracEigensystem {
   Eigen::VectorXd eigenvalues;
   Eigen::MatrixXd eigenvectors;
-  Eigen::Index large_component_rank;
+  Eigen::Index large_component_metric_rank;
 };
 
 /** @brief Validate the dimensions, finiteness, and symmetry of X2C inputs. */
@@ -95,39 +88,6 @@ std::vector<size_t> shell_offsets(const std::vector<qcs::Shell>& shells,
   return offsets;
 }
 
-/** @brief Diagonalize and relatively screen one unscaled metric block. */
-MetricSubspace metric_subspace(const Eigen::MatrixXd& block,
-                               const std::string& context) {
-  MetricSubspace result{block, Eigen::VectorXd(block.rows()), {}};
-  const int64_t info = lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower,
-                                    block.rows(), result.eigenvectors.data(),
-                                    block.rows(), result.eigenvalues.data());
-  if (info != 0) {
-    throw std::runtime_error(
-        "Symmetric eigendecomposition failed for X2C " + context +
-        " metric block (info=" + std::to_string(info) + ")");
-  }
-
-  const double largest_eigenvalue = result.eigenvalues.maxCoeff();
-  if (!std::isfinite(largest_eigenvalue) || largest_eigenvalue <= 0.0) {
-    throw std::runtime_error("X2C " + context +
-                             " metric block has no positive modes");
-  }
-  const double cutoff =
-      metric_relative_linear_dependence_threshold * largest_eigenvalue;
-  for (Eigen::Index index = 0; index < result.eigenvalues.size(); ++index) {
-    if (result.eigenvalues(index) > cutoff) {
-      result.retained_indices.push_back(index);
-    }
-  }
-  if (result.retained_indices.empty()) {
-    throw std::runtime_error("X2C " + context +
-                             " metric block has no linearly independent "
-                             "modes");
-  }
-  return result;
-}
-
 /** @brief Solve the modified Dirac problem in the screened metric space. */
 DiracEigensystem solve_modified_dirac(const Eigen::MatrixXd& overlap,
                                       const Eigen::MatrixXd& kinetic,
@@ -140,20 +100,6 @@ DiracEigensystem solve_modified_dirac(const Eigen::MatrixXd& overlap,
   const double inverse_speed_of_light_squared =
       inverse_speed_of_light * inverse_speed_of_light;
 
-  const auto overlap_subspace = metric_subspace(overlap, "overlap");
-  const auto kinetic_subspace = metric_subspace(kinetic, "kinetic");
-  const Eigen::Index large_component_rank =
-      static_cast<Eigen::Index>(overlap_subspace.retained_indices.size());
-  const Eigen::Index small_component_rank =
-      static_cast<Eigen::Index>(kinetic_subspace.retained_indices.size());
-  if (small_component_rank != large_component_rank) {
-    throw std::runtime_error(
-        "X2C overlap and kinetic metric blocks retained different ranks "
-        "(overlap=" +
-        std::to_string(large_component_rank) +
-        ", kinetic=" + std::to_string(small_component_rank) + ")");
-  }
-
   Eigen::MatrixXd dirac =
       Eigen::MatrixXd::Zero(dirac_dimension, dirac_dimension);
   dirac.topLeftCorner(dimension, dimension) = potential;
@@ -162,43 +108,64 @@ DiracEigensystem solve_modified_dirac(const Eigen::MatrixXd& overlap,
   dirac.bottomRightCorner(dimension, dimension) =
       pvp * (inverse_speed_of_light_squared / 4.0) - kinetic;
 
-  if (large_component_rank == dimension) {
-    Eigen::MatrixXd metric =
-        Eigen::MatrixXd::Zero(dirac_dimension, dirac_dimension);
-    metric.topLeftCorner(dimension, dimension) = overlap;
-    metric.bottomRightCorner(dimension, dimension) =
-        kinetic * (inverse_speed_of_light_squared / 2.0);
+  Eigen::MatrixXd metric =
+      Eigen::MatrixXd::Zero(dirac_dimension, dirac_dimension);
+  metric.topLeftCorner(dimension, dimension) = overlap;
+  metric.bottomRightCorner(dimension, dimension) =
+      kinetic * (inverse_speed_of_light_squared / 2.0);
 
-    Eigen::VectorXd eigenvalues(dirac_dimension);
-    const int64_t info = lapack::sygvd(
-        1, lapack::Job::Vec, lapack::Uplo::Lower, dirac_dimension, dirac.data(),
-        dirac_dimension, metric.data(), dirac_dimension, eigenvalues.data());
-    if (info != 0) {
-      throw std::runtime_error(
-          "X2C generalized eigendecomposition failed after metric screening "
-          "(info=" +
-          std::to_string(info) + ")");
-    }
-    return {std::move(eigenvalues), std::move(dirac), large_component_rank};
+  Eigen::MatrixXd generalized_dirac = dirac;
+  Eigen::MatrixXd generalized_metric = metric;
+  Eigen::VectorXd eigenvalues(dirac_dimension);
+  const int64_t generalized_info = lapack::sygvd(
+      1, lapack::Job::Vec, lapack::Uplo::Lower, dirac_dimension,
+      generalized_dirac.data(), dirac_dimension, generalized_metric.data(),
+      dirac_dimension, eigenvalues.data());
+  if (generalized_info == 0) {
+    return {std::move(eigenvalues), std::move(generalized_dirac), dimension};
   }
+  if (generalized_info <= dirac_dimension) {
+    throw std::runtime_error(
+        "X2C generalized eigendecomposition failed (info=" +
+        std::to_string(generalized_info) + ")");
+  }
+
+  Eigen::VectorXd metric_eigenvalues(dirac_dimension);
+  const int64_t metric_info =
+      lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, dirac_dimension,
+                   metric.data(), dirac_dimension, metric_eigenvalues.data());
+  if (metric_info != 0) {
+    throw std::runtime_error(
+        "Symmetric eigendecomposition failed for X2C Dirac metric (info=" +
+        std::to_string(metric_info) + ")");
+  }
+  std::vector<Eigen::Index> retained_metric_indices;
+  for (Eigen::Index index = 0; index < metric_eigenvalues.size(); ++index) {
+    if (metric_eigenvalues(index) > metric_linear_dependence_threshold) {
+      retained_metric_indices.push_back(index);
+    }
+  }
+  if (retained_metric_indices.empty()) {
+    throw std::runtime_error(
+        "X2C Dirac metric has no linearly independent "
+        "modes");
+  }
+
+  double large_component_metric_rank_trace = 0.0;
+  for (const Eigen::Index index : retained_metric_indices) {
+    large_component_metric_rank_trace +=
+        metric.col(index).head(dimension).squaredNorm();
+  }
+  const Eigen::Index large_component_metric_rank = static_cast<Eigen::Index>(
+      std::llround(large_component_metric_rank_trace));
 
   const Eigen::Index retained_metric_dimension =
-      large_component_rank + small_component_rank;
-  Eigen::MatrixXd orthogonalizer =
-      Eigen::MatrixXd::Zero(dirac_dimension, retained_metric_dimension);
-  for (Eigen::Index column = 0; column < large_component_rank; ++column) {
-    const Eigen::Index index = overlap_subspace.retained_indices[column];
-    orthogonalizer.block(0, column, dimension, 1) =
-        overlap_subspace.eigenvectors.col(index) /
-        std::sqrt(overlap_subspace.eigenvalues(index));
-  }
-  const double small_component_scale = inverse_speed_of_light_squared / 2.0;
-  for (Eigen::Index column = 0; column < small_component_rank; ++column) {
-    const Eigen::Index index = kinetic_subspace.retained_indices[column];
-    orthogonalizer.block(dimension, large_component_rank + column, dimension,
-                         1) =
-        kinetic_subspace.eigenvectors.col(index) /
-        std::sqrt(small_component_scale * kinetic_subspace.eigenvalues(index));
+      static_cast<Eigen::Index>(retained_metric_indices.size());
+  Eigen::MatrixXd orthogonalizer(dirac_dimension, retained_metric_dimension);
+  for (size_t column = 0; column < retained_metric_indices.size(); ++column) {
+    const Eigen::Index index = retained_metric_indices[column];
+    orthogonalizer.col(column) =
+        metric.col(index) / std::sqrt(metric_eigenvalues(index));
   }
 
   Eigen::MatrixXd dirac_times_orthogonalizer(dirac_dimension,
@@ -218,14 +185,15 @@ DiracEigensystem solve_modified_dirac(const Eigen::MatrixXd& overlap,
   orthogonal_dirac =
       0.5 * (orthogonal_dirac + orthogonal_dirac.transpose()).eval();
 
-  Eigen::VectorXd eigenvalues(retained_metric_dimension);
+  eigenvalues.resize(retained_metric_dimension);
   const int64_t info = lapack::syev(
       lapack::Job::Vec, lapack::Uplo::Lower, retained_metric_dimension,
       orthogonal_dirac.data(), retained_metric_dimension, eigenvalues.data());
   if (info != 0) {
     throw std::runtime_error(
         "Symmetric eigendecomposition failed for orthogonalized X2C Dirac "
-        "Hamiltonian (info=" +
+        "Hamiltonian "
+        "(info=" +
         std::to_string(info) + ")");
   }
 
@@ -236,7 +204,7 @@ DiracEigensystem solve_modified_dirac(const Eigen::MatrixXd& overlap,
       1.0, orthogonalizer.data(), dirac_dimension, orthogonal_dirac.data(),
       retained_metric_dimension, 0.0, eigenvectors.data(), dirac_dimension);
   return {std::move(eigenvalues), std::move(eigenvectors),
-          large_component_rank};
+          large_component_metric_rank};
 }
 
 /** @brief Construct the spin-free X2C-1e Hamiltonian from AO integrals. */
@@ -261,11 +229,14 @@ Eigen::MatrixXd compute_x2c_hamiltonian(const Eigen::MatrixXd& overlap,
       electronic_indices.push_back(index);
     }
   }
+  if (electronic_indices.empty()) {
+    throw std::runtime_error("X2C found no positive-energy electronic states");
+  }
   if (static_cast<Eigen::Index>(electronic_indices.size()) !=
-      dirac_eigensystem.large_component_rank) {
+      dirac_eigensystem.large_component_metric_rank) {
     throw std::runtime_error(
-        "X2C selected an unexpected number of electronic states (expected=" +
-        std::to_string(dirac_eigensystem.large_component_rank) +
+        "X2C electronic subspace is incomplete (expected=" +
+        std::to_string(dirac_eigensystem.large_component_metric_rank) +
         ", actual=" + std::to_string(electronic_indices.size()) + ")");
   }
 
