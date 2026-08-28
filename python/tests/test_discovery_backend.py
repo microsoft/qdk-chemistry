@@ -375,9 +375,7 @@ def test_fetch_downloads_nested_output_files(tmp_path, monkeypatch: pytest.Monke
                         "results": [
                             {
                                 "type": "tuple",
-                                "items": [
-                                    {"type": "list", "items": [{"type": "ndarray", "file": "nested.npy"}]}
-                                ],
+                                "items": [{"type": "list", "items": [{"type": "ndarray", "file": "nested.npy"}]}],
                             }
                         ]
                     }
