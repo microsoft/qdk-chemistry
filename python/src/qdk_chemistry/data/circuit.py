@@ -289,11 +289,11 @@ class Circuit(DataClass):
 
         estimated_num_qubits = getattr(result, "logical_counts", {}).get("numQubits")
         if self.num_qubits is not None and estimated_num_qubits is not None and estimated_num_qubits != self.num_qubits:
-            Logger.warn(
+            Logger.info(
                 f"This circuit declares {self.num_qubits} qubits but the resource estimate reports "
-                f"{estimated_num_qubits}; num_qubits is updated to {estimated_num_qubits}."
+                f"{estimated_num_qubits}; there could be ancillary qubits allocated and deallocated "
+                "within the circuit."
             )
-            object.__setattr__(self, "num_qubits", estimated_num_qubits)
         return result
 
     def get_qre_application(self):
