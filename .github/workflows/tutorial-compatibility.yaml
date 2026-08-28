@@ -26,7 +26,7 @@ jobs:
   # generation is published and pinned by the tutorial:
   # - rename this job and its display name back to "published-baseline" and
   #   "Exact published baseline";
-  # - restore the 30-minute timeout and remove CMAKE_BUILD_PARALLEL_LEVEL;
+  # - restore the 30-minute timeout;
   # - remove the source-build prerequisite steps;
   # - replace the current-source installation with the commented published-wheel
   #   installation below; and
@@ -36,10 +36,6 @@ jobs:
     name: Current-source baseline (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 480
-    env:
-      # Public hosted-runner memory varies by platform. Use the memory-aware
-      # fallback of one compile job rather than self-hosted runner values.
-      CMAKE_BUILD_PARALLEL_LEVEL: '1'
     strategy:
       fail-fast: false
       matrix:
