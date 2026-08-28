@@ -140,6 +140,14 @@ Examples:
 
 )");
 
+  factory.def_static(
+      "_create_for_introspection",
+      [](const std::string& name) -> std::unique_ptr<AlgorithmType> {
+        return qdk::chemistry::algorithms::detail::FactoryAccess::create<
+            FactoryType>(name);
+      },
+      py::arg("name") = "");
+
   // Bind available static method
   factory.def_static("available", &FactoryType::available,
                      R"(

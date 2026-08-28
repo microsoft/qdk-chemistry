@@ -498,22 +498,34 @@ def inspect_settings(algorithm_type: str, algorithm_name: str) -> list[tuple[str
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             instance = factory.create(algorithm_name)
-            settings = instance.settings().to_dict()
-            result = []
-            for name, default in settings.items():
-                python_type = instance.settings().get_expected_python_type(name)
-                description = (
-                    instance.settings().get_description(name) if instance.settings().has_description(name) else None
-                )
-                limits = instance.settings().get_limits(name) if instance.settings().has_limits(name) else None
-                result.append((name, python_type, default, description, limits))
-            return result
+            return _inspect_instance_settings(instance)
     available_types = [factory.algorithm_type_name() for factory in __factories]
     raise KeyError(
         f"Algorithm type '{algorithm_type}' is not registered. Available algorithm types: {', '.join(available_types)}"
         "Available algorithm types are influenced by loaded plugins and registered custom algorithms. "
         "Please ensure the relevant plugins are loaded or custom algorithms are registered ahead of calling create()."
     )
+
+
+def _create_for_introspection(algorithm_type: str, algorithm_name: str) -> Algorithm:
+    """Create an unwrapped algorithm without user-facing deprecation warnings."""
+    for factory in __factories:
+        if factory.algorithm_type_name() == algorithm_type:
+            create_internal = getattr(factory, "_create_for_introspection", factory.create)
+            return create_internal(algorithm_name)
+    raise KeyError(f"Algorithm type '{algorithm_type}' is not registered.")
+
+
+def _inspect_instance_settings(instance: Algorithm) -> list[tuple[str, str, Any, str | None, Any | None]]:
+    """Inspect settings for an existing algorithm instance."""
+    settings = instance.settings().to_dict()
+    result = []
+    for name, default in settings.items():
+        python_type = instance.settings().get_expected_python_type(name)
+        description = instance.settings().get_description(name) if instance.settings().has_description(name) else None
+        limits = instance.settings().get_limits(name) if instance.settings().has_limits(name) else None
+        result.append((name, python_type, default, description, limits))
+    return result
 
 
 def register(generator: Callable[[], Algorithm]) -> None:

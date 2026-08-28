@@ -329,8 +329,8 @@ def _generate_registry_stubs() -> None:
         for algorithm_type, algorithm_names in all_algorithms.items():
             for algorithm_name in algorithm_names:
                 try:
-                    settings = reg_module.inspect_settings(algorithm_type, algorithm_name)
-                    instance = reg_module.create(algorithm_type, algorithm_name)
+                    instance = reg_module._create_for_introspection(algorithm_type, algorithm_name)  # noqa: SLF001
+                    settings = reg_module._inspect_instance_settings(instance)  # noqa: SLF001
                     class_type = type(instance)
                     class_name = class_type.__name__
                     class_module = class_type.__module__
