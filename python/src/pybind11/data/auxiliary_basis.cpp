@@ -431,6 +431,14 @@ Type:
     str
 )");
 
+  auxiliary_basis.def_static("data_type_name", &AuxiliaryBasis::data_type_name,
+                             R"(
+Return the wire-format identifier for auxiliary bases.
+
+Returns:
+    str: ``"auxiliary_basis"``
+)");
+
   auxiliary_basis.attr("_data_type_name") =
       DATACLASS_TO_SNAKE_CASE(AuxiliaryBasis);
 
@@ -687,6 +695,14 @@ Raises:
             return *AuxiliaryBasisCollection::from_json(
                 nlohmann::json::parse(json));
           }));
+
+  collection.def_static("data_type_name",
+                        &AuxiliaryBasisCollection::data_type_name, R"(
+Return the wire-format identifier for auxiliary-basis collections.
+
+Returns:
+    str: ``"auxiliary_basis_collection"``
+)");
 
   collection.attr("_data_type_name") =
       DATACLASS_TO_SNAKE_CASE(AuxiliaryBasisCollection);
