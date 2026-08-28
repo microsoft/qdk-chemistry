@@ -34,12 +34,14 @@ class _SharedCache:
         self.data: dict[str, Any] = {}
         self.jobs: dict[str, Any] = {}
 
-    def has_data(self, content_hash: str) -> bool:
+    def has_data(self, content_hash: str, *, shared_only: bool = False) -> bool:
         """Return whether a content hash is stored."""
+        del shared_only
         return content_hash in self.data
 
-    def put_data(self, content_hash: str, value: Any) -> None:
+    def put_data(self, content_hash: str, value: Any, *, shared_only: bool = False) -> None:
         """Store a value by content hash."""
+        del shared_only
         self.data[content_hash] = value
 
     def get_data(self, content_hash: str) -> Any:
@@ -109,7 +111,7 @@ def _payload() -> dict[str, Any]:
         "args": ([1, 2],),
         "kwargs": {},
         "run_hash": "run-hash",
-        "input_hashes": {"arg_0": "input-hash"},
+        "input_hashes": {"args.arg_0": "input-hash"},
     }
 
 
@@ -125,7 +127,7 @@ def test_constructor_arguments_override_qdk_environment(monkeypatch: pytest.Monk
     assert backend.transport == "cache"
     assert backend.cpus == 4
 
-    restored = DiscoveryBackend(**backend.config)
+    restored = DiscoveryBackend(**backend._backend_args)
     assert restored.project_name == "argument-project"
     assert restored.transport == "cache"
     assert restored.remote_workdir == "qdk_chemistry"
@@ -193,6 +195,67 @@ def test_blob_transport_submits_discovery_storage_mounts() -> None:
     assert isinstance(tools.run["output_data"][0], OutputDataMount)
     assert tools.run["input_data"][0].mount_path == "/qdk/input"
     assert tools.run["output_data"][0].mount_path == "/qdk/output"
+
+
+def test_serialization_failure_removes_staging_directory(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A failed serialization does not leave its temporary input directory behind."""
+    staging_dir = tmp_path / "qdk_input_failed"
+    monkeypatch.setattr("qdk_chemistry.plugins.discovery.backend.tempfile.mkdtemp", lambda **_kwargs: str(staging_dir))
+    monkeypatch.setattr(
+        "qdk_chemistry.plugins.discovery.backend.serialize_inputs",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("serialization failed")),
+    )
+
+    with pytest.raises(RuntimeError, match="serialization failed"):
+        _backend()._serialize_job(_payload())
+
+    assert not staging_dir.exists()
+
+
+def test_partial_upload_failure_removes_uploaded_inputs(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A failed input upload rolls back every preceding Blob upload."""
+    container = _Container()
+    backend = _backend()
+    backend._client = SimpleNamespace()
+    backend._container_client = container
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    input_files = [input_dir / "first", input_dir / "second"]
+    for input_file in input_files:
+        input_file.write_text("input")
+    monkeypatch.setattr(backend, "_serialize_job", lambda *_args, **_kwargs: ("job", input_dir, input_files))
+
+    def upload(_local_path: Path, remote_path: str) -> None:
+        if remote_path.endswith("second"):
+            raise RuntimeError("upload failed")
+
+    monkeypatch.setattr(backend, "upload", upload)
+
+    with pytest.raises(RuntimeError, match="upload failed"):
+        backend._prepare_blob_job(_payload())
+
+    assert container.deletions == ["qdk_chemistry/job_job/input/first"]
+    assert not input_dir.exists()
+
+
+def test_submission_failure_removes_uploaded_inputs() -> None:
+    """A failed Discovery submission removes inputs before job state is returned."""
+    container = _Container()
+    backend = _backend(
+        transport="blob",
+        storage_uri="discovery://storageassets/subscriptions/example/storageAssets/data",
+        storage_account_url="https://storage.blob.core.windows.net",
+        storage_container="container",
+    )
+    backend._client = SimpleNamespace(
+        tools=SimpleNamespace(begin_run=lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("submit failed")))
+    )
+    backend._container_client = container
+
+    with pytest.raises(RuntimeError, match="submit failed"):
+        backend._submit(_payload())
+
+    assert container.deletions == container.uploads
 
 
 def test_cleanup_job_removes_only_job_artifacts() -> None:

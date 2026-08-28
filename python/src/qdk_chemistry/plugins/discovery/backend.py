@@ -57,9 +57,6 @@ def _discovery_env_defaults() -> dict[str, Any]:
     for env_name, config_name in mappings.items():
         if value := os.environ.get(env_name):
             defaults[config_name] = value
-
-    use_entire_node = os.environ.get("QDK_DISCOVERY_USE_ENTIRE_NODE", "true").lower()
-    defaults["use_entire_node"] = use_entire_node not in {"false", "0", "no"}
     return defaults
 
 
@@ -87,7 +84,6 @@ class DiscoveryBackend(RemoteBackend):
         cpus: int | str | None = None,
         gpus: int | str | None = None,
         memory: str | None = None,
-        use_entire_node: bool | None = None,
         artifact_retry_attempts: int | None = None,
         artifact_retry_delay: float | None = None,
         poll_interval: float | None = None,
@@ -125,7 +121,6 @@ class DiscoveryBackend(RemoteBackend):
             raise ValueError("artifact_retry_delay cannot be negative")
         self.remote_workdir = self.storage_prefix
 
-        resolved_use_entire_node = bool(resolve("use_entire_node", use_entire_node, True))
         self.cpus = resolve("cpus", cpus)
         self.gpus = resolve("gpus", gpus)
         self.memory = resolve("memory", memory)
@@ -151,7 +146,6 @@ class DiscoveryBackend(RemoteBackend):
             cpus=self.cpus,
             gpus=self.gpus,
             memory=self.memory,
-            use_entire_node=resolved_use_entire_node,
             artifact_retry_attempts=self.artifact_retry_attempts,
             artifact_retry_delay=self.artifact_retry_delay,
         )
@@ -329,19 +323,23 @@ class DiscoveryBackend(RemoteBackend):
         """Serialize one job into a temporary input directory."""
         job_id = uuid.uuid4().hex[:12]
         local_input_dir = Path(tempfile.mkdtemp(prefix="qdk_input_"))
-        input_files = serialize_inputs(
-            local_input_dir,
-            args=payload["args"],
-            kwargs=payload["kwargs"],
-            algorithm_type=payload["algorithm_type"],
-            algorithm_name=payload["algorithm_name"],
-            settings=payload["settings"],
-            run_hash=payload.get("run_hash"),
-            input_hashes=payload.get("input_hashes"),
-            remote_cache=payload.get("remote_cache"),
-            remote_cache_backend=cache,
-            remote_cache_transport=cache_transport,
-        )
+        try:
+            input_files = serialize_inputs(
+                local_input_dir,
+                args=payload["args"],
+                kwargs=payload["kwargs"],
+                algorithm_type=payload["algorithm_type"],
+                algorithm_name=payload["algorithm_name"],
+                settings=payload["settings"],
+                run_hash=payload.get("run_hash"),
+                input_hashes=payload.get("input_hashes"),
+                remote_cache=payload.get("remote_cache"),
+                remote_cache_backend=cache,
+                remote_cache_transport=cache_transport,
+            )
+        except BaseException:
+            shutil.rmtree(local_input_dir, ignore_errors=True)
+            raise
         return job_id, local_input_dir, input_files
 
     def _prepare_blob_job(self, payload: dict[str, Any]) -> tuple[str, dict[str, Any]]:
@@ -358,6 +356,9 @@ class DiscoveryBackend(RemoteBackend):
                 remote_path = f"{input_dir}/{local_file.name}"
                 self.upload(local_file, remote_path)
                 input_paths.append(remote_path)
+        except BaseException:
+            self._delete_remote_files(input_paths)
+            raise
         finally:
             shutil.rmtree(local_input_dir, ignore_errors=True)
 
@@ -466,25 +467,30 @@ class DiscoveryBackend(RemoteBackend):
             ]
         )
         polling = OperationIdPolling()
-        self._client.tools.begin_run(
-            project_name=str(self.project_name),
-            tool_id=str(self.tool_id),
-            node_pool_ids=[str(self.node_pool_id)],
-            command=command,
-            inline_files=inline_files,
-            input_data=input_data,
-            output_data=output_data,
-            infra_overrides=InfraOverrides(
-                image_uri=str(self.image) if self.image else None,
-                cpu=str(self.cpus) if self.cpus is not None else None,
-                gpu=str(self.gpus) if self.gpus is not None else None,
-                ram=str(self.memory) if self.memory is not None else None,
-                replica_count=1,
-            ),
-            polling=polling,
-        )
-        if polling.operation_id is None:
-            raise RuntimeError("Discovery run submission did not expose an operation ID")
+        try:
+            self._client.tools.begin_run(
+                project_name=str(self.project_name),
+                tool_id=str(self.tool_id),
+                node_pool_ids=[str(self.node_pool_id)],
+                command=command,
+                inline_files=inline_files,
+                input_data=input_data,
+                output_data=output_data,
+                infra_overrides=InfraOverrides(
+                    image_uri=str(self.image) if self.image else None,
+                    cpu=str(self.cpus) if self.cpus is not None else None,
+                    gpu=str(self.gpus) if self.gpus is not None else None,
+                    ram=str(self.memory) if self.memory is not None else None,
+                    replica_count=1,
+                ),
+                polling=polling,
+            )
+            if polling.operation_id is None:
+                raise RuntimeError("Discovery run submission did not expose an operation ID")
+        except BaseException:
+            if transport == "blob":
+                self._delete_remote_files(state["input_paths"])
+            raise
         state["operation_id"] = polling.operation_id
         state["project_name"] = self.project_name
         state.pop("inline_manifest", None)
