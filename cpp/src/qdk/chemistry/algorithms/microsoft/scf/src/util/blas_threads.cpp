@@ -4,32 +4,45 @@
 
 #include <qdk/chemistry/scf/util/blas_threads.h>
 
-#include <functional>
 #include <mutex>
 #include <qdk/chemistry/utils/logger.hpp>
 
 // Thread-control API this build links against. The BLAS section of
-// ../CMakeLists.txt defines QDK_CHEMISTRY_BLAS_VENDOR_<BLAS_VENDOR> for the
-// vendors that have one. Link-time binding is the only way to reach the BLAS
-// our own calls go to: a symbol found in the running process may belong to a
-// different BLAS, and a statically linked one exports nothing to find. Vendors
-// without such an API -- Accelerate on macOS, reference BLAS, or whatever a
-// Windows build resolves to -- define none of these and fall through to the
-// no-op path below.
-#if defined(QDK_CHEMISTRY_BLAS_VENDOR_OpenBLAS)
+// ../CMakeLists.txt passes the vendor down as
+// QDK_CHEMISTRY_BLAS_VENDOR=QDK_CHEMISTRY_BLAS_VENDOR_<vendor>, which the IDs
+// below turn into an integer the preprocessor can compare. Binding at link
+// time is what guarantees we reach the BLAS our own calls go to -- a symbol
+// found in the running process may belong to a different one -- and it has to
+// be a compile-time choice: the untaken branches would otherwise reference
+// symbols this build never links. Vendors with no such API (Accelerate on
+// macOS, reference BLAS) leave the macro undefined and take the no-op path.
+#define QDK_CHEMISTRY_BLAS_VENDOR_None 0
+#define QDK_CHEMISTRY_BLAS_VENDOR_OpenBLAS 1
+#define QDK_CHEMISTRY_BLAS_VENDOR_IntelMKL 2
+#define QDK_CHEMISTRY_BLAS_VENDOR_BLIS 3
+
+#if !defined(QDK_CHEMISTRY_BLAS_VENDOR)
+#define QDK_CHEMISTRY_BLAS_VENDOR QDK_CHEMISTRY_BLAS_VENDOR_None
+#elif QDK_CHEMISTRY_BLAS_VENDOR == QDK_CHEMISTRY_BLAS_VENDOR_None
+// An unknown identifier evaluates to 0 in #if, so a vendor with no ID above is
+// indistinguishable from _None. Naming a vendor is a request for its API, so
+// fail rather than silently take the no-op path.
+#error "QDK_CHEMISTRY_BLAS_VENDOR names a BLAS vendor with no ID in blas_threads.cpp"
+#endif
+
+#if QDK_CHEMISTRY_BLAS_VENDOR == QDK_CHEMISTRY_BLAS_VENDOR_OpenBLAS
 extern "C" {
 void openblas_set_num_threads(int);
 int openblas_get_num_threads(void);
 }
-#elif defined(QDK_CHEMISTRY_BLAS_VENDOR_IntelMKL)
+#elif QDK_CHEMISTRY_BLAS_VENDOR == QDK_CHEMISTRY_BLAS_VENDOR_IntelMKL
 extern "C" {
 void MKL_Set_Num_Threads(int);
 int MKL_Get_Max_Threads(void);
 }
-#elif defined(QDK_CHEMISTRY_BLAS_VENDOR_BLIS)
-// The header rather than a hand-written prototype: BLIS types the count as
-// dim_t, which is 32- or 64-bit depending on how BLIS was built, and declaring
-// the wrong width is an ABI mismatch (GCC LTO: -Wlto-type-mismatch).
+#elif QDK_CHEMISTRY_BLAS_VENDOR == QDK_CHEMISTRY_BLAS_VENDOR_BLIS
+// The header rather than a prototype: BLIS types the count as dim_t, whose
+// width is a BLIS build option, and declaring it wrong is an ABI mismatch.
 #if __has_include(<blis/blis.h>)
 #include <blis/blis.h>
 #else
@@ -41,63 +54,47 @@ namespace qdk::chemistry::scf::util {
 
 namespace {
 
-/// @brief Resolved thread-control API of the BLAS backend bound at link time.
-struct BlasThreadApi {
-  BlasVendor vendor = BlasVendor::Unknown;
-  std::function<int()> get_num_threads;
-  std::function<void(int)> set_num_threads;
-
-  bool valid() const {
-    return static_cast<bool>(get_num_threads) &&
-           static_cast<bool>(set_num_threads);
-  }
-};
-
-/// @brief Thread-control API bound at link time, if this build has one.
-BlasThreadApi linked_blas_thread_api() {
-#if defined(QDK_CHEMISTRY_BLAS_VENDOR_OpenBLAS)
-  return {BlasVendor::OpenBLAS, [] { return openblas_get_num_threads(); },
-          [](int n) { openblas_set_num_threads(n); }};
-#elif defined(QDK_CHEMISTRY_BLAS_VENDOR_IntelMKL)
-  // MKL reports the maximum rather than a current count; they agree except
-  // while an MKL_Set_Num_Threads_Local override is in effect, which we do not
-  // use. Narrowing is not a concern: thread counts are small.
-  return {BlasVendor::IntelMKL, [] { return MKL_Get_Max_Threads(); },
-          [](int n) { MKL_Set_Num_Threads(n); }};
-#elif defined(QDK_CHEMISTRY_BLAS_VENDOR_BLIS)
-  return {BlasVendor::BLIS,
-          [] { return static_cast<int>(bli_thread_get_num_threads()); },
-          [](int n) { bli_thread_set_num_threads(static_cast<dim_t>(n)); }};
-#else
-  return {};
+/// @brief Request `n` BLAS threads; a no-op without a thread-control API --
+/// hence [[maybe_unused]], for that empty body under -Wall -Wextra.
+void blas_set_num_threads([[maybe_unused]] int n) {
+#if QDK_CHEMISTRY_BLAS_VENDOR == QDK_CHEMISTRY_BLAS_VENDOR_OpenBLAS
+  openblas_set_num_threads(n);
+#elif QDK_CHEMISTRY_BLAS_VENDOR == QDK_CHEMISTRY_BLAS_VENDOR_IntelMKL
+  MKL_Set_Num_Threads(n);
+#elif QDK_CHEMISTRY_BLAS_VENDOR == QDK_CHEMISTRY_BLAS_VENDOR_BLIS
+  bli_thread_set_num_threads(static_cast<dim_t>(n));
 #endif
 }
 
-const BlasThreadApi& blas_thread_api() {
-  static const BlasThreadApi api = [] {
-    if (BlasThreadApi linked = linked_blas_thread_api(); linked.valid()) {
-      QDK_LOGGER().debug("Using {} BLAS thread control (bound at link time)",
-                         to_string(linked.vendor));
-      return linked;
-    }
-
+/// @brief Whether a thread-control API is bound, warning once if not.
+bool blas_thread_control_available() {
+  static const bool available = [] {
+#if QDK_CHEMISTRY_BLAS_VENDOR == QDK_CHEMISTRY_BLAS_VENDOR_OpenBLAS
+    QDK_LOGGER().debug("Using OpenBLAS thread control (bound at link time)");
+    return true;
+#elif QDK_CHEMISTRY_BLAS_VENDOR == QDK_CHEMISTRY_BLAS_VENDOR_IntelMKL
+    QDK_LOGGER().debug("Using Intel MKL thread control (bound at link time)");
+    return true;
+#elif QDK_CHEMISTRY_BLAS_VENDOR == QDK_CHEMISTRY_BLAS_VENDOR_BLIS
+    QDK_LOGGER().debug("Using BLIS thread control (bound at link time)");
+    return true;
+#else
     QDK_LOGGER().warn(
-        "No BLAS thread-control API is bound into this build. Nested BLAS "
-        "threading cannot be disabled automatically; if you see "
-        "oversubscription or wrong results, restrict your BLAS to a single "
-        "thread via its environment variable (e.g. OPENBLAS_NUM_THREADS, "
-        "MKL_NUM_THREADS, BLIS_NUM_THREADS or VECLIB_MAXIMUM_THREADS), or "
-        "reconfigure with -DBLAS_VENDOR=<OpenBLAS|IntelMKL|BLIS>: supplying "
-        "BLAS_LIBRARIES skips the search that would otherwise detect the "
-        "vendor, so name the vendor of the BLAS this build already links.");
-    return BlasThreadApi{};
+        "No BLAS thread-control API is bound into this build, so nested BLAS "
+        "threading cannot be disabled automatically. Restrict your BLAS to one "
+        "thread via its environment variable (OPENBLAS_NUM_THREADS, "
+        "MKL_NUM_THREADS, BLIS_NUM_THREADS, VECLIB_MAXIMUM_THREADS), or "
+        "reconfigure with -DBLAS_VENDOR=<OpenBLAS|IntelMKL|BLIS> to name the "
+        "vendor of the BLAS this build already links.");
+    return false;
+#endif
   }();
-  return api;
+  return available;
 }
 
-/// @brief Shared state backing ScopedBlasThreads. The BLAS thread count is
-/// process-global, so this is too; `saved` is meaningful only while
-/// `depth > 0`, and both are touched only under `mutex`.
+/// @brief Shared state backing ScopedBlasThreads: the BLAS thread count is
+/// process-global, so this is too. `saved` is meaningful only while
+/// `depth > 0`; both are touched only under `mutex`.
 struct BlasThreadState {
   std::mutex mutex;
   int depth = 0;
@@ -111,39 +108,31 @@ BlasThreadState& blas_thread_state() {
 
 }  // namespace
 
-const char* to_string(BlasVendor vendor) {
-  switch (vendor) {
-    case BlasVendor::OpenBLAS:
-      return "OpenBLAS";
-    case BlasVendor::IntelMKL:
-      return "Intel MKL";
-    case BlasVendor::BLIS:
-      return "BLIS";
-    case BlasVendor::Unknown:
-      break;
-  }
-  return "unknown";
-}
-
-BlasVendor detected_blas_vendor() { return blas_thread_api().vendor; }
-
-int get_blas_num_threads() {
-  const BlasThreadApi& api = blas_thread_api();
-  return api.valid() ? api.get_num_threads() : 0;
+int blas_get_num_threads() {
+#if QDK_CHEMISTRY_BLAS_VENDOR == QDK_CHEMISTRY_BLAS_VENDOR_OpenBLAS
+  return openblas_get_num_threads();
+#elif QDK_CHEMISTRY_BLAS_VENDOR == QDK_CHEMISTRY_BLAS_VENDOR_IntelMKL
+  // MKL reports the maximum rather than a current count; they agree unless an
+  // MKL_Set_Num_Threads_Local override is in effect, which we do not use.
+  return MKL_Get_Max_Threads();
+#elif QDK_CHEMISTRY_BLAS_VENDOR == QDK_CHEMISTRY_BLAS_VENDOR_BLIS
+  return static_cast<int>(bli_thread_get_num_threads());
+#else
+  return 0;
+#endif
 }
 
 ScopedBlasThreads::ScopedBlasThreads() {
-  const BlasThreadApi& api = blas_thread_api();
-  if (!api.valid()) return;
+  if (!blas_thread_control_available()) return;
 
   BlasThreadState& state = blas_thread_state();
   std::lock_guard<std::mutex> lock(state.mutex);
   if (state.depth == 0) {
     // Decline rather than guess: nothing to restore on exit.
-    const int current = api.get_num_threads();
+    const int current = blas_get_num_threads();
     if (current < 1) return;
     state.saved = current;
-    api.set_num_threads(1);
+    blas_set_num_threads(1);
   }
   // After the fallible part, so a declined guard leaves no depth behind.
   ++state.depth;
@@ -156,7 +145,7 @@ ScopedBlasThreads::~ScopedBlasThreads() {
   BlasThreadState& state = blas_thread_state();
   std::lock_guard<std::mutex> lock(state.mutex);
   if (--state.depth == 0) {
-    blas_thread_api().set_num_threads(state.saved);
+    blas_set_num_threads(state.saved);
   }
 }
 

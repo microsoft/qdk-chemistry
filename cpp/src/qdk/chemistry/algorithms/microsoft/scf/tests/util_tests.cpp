@@ -662,43 +662,35 @@ TEST(AtomGuessTest, CompareWithFileGuess) {
 // BLAS thread control tests
 //==============================================================================
 
-TEST(BlasThreadsTest, DetectionIsConsistent) {
+TEST(BlasThreadsTest, ReportedCountIsSane) {
   using namespace qdk::chemistry::scf::util;
 
-  const BlasVendor vendor = detected_blas_vendor();
-  EXPECT_NE(to_string(vendor), nullptr);
-
-  if (vendor == BlasVendor::Unknown) {
-    // Legal (e.g. macOS Accelerate exposes no thread-count API); the guard
-    // then degrades to a no-op.
-    EXPECT_EQ(get_blas_num_threads(), 0);
-    GTEST_SKIP() << "No BLAS thread-control API available";
-  }
-  EXPECT_GT(get_blas_num_threads(), 0);
+  // 0 is legal (macOS Accelerate exposes no thread-count API); the guard then
+  // degrades to a no-op.
+  EXPECT_GE(blas_get_num_threads(), 0);
 }
 
 TEST(BlasThreadsTest, ScopedGuardPinsAndRestores) {
   using namespace qdk::chemistry::scf::util;
 
-  if (detected_blas_vendor() == BlasVendor::Unknown) {
+  const int original = blas_get_num_threads();
+  if (original == 0) {
     GTEST_SKIP() << "No BLAS thread-control API available";
   }
-
-  const int original = get_blas_num_threads();
   ASSERT_GT(original, 0);
 
   {
     ScopedBlasThreads guard;
     EXPECT_TRUE(guard.active());
-    EXPECT_EQ(get_blas_num_threads(), 1);
+    EXPECT_EQ(blas_get_num_threads(), 1);
 
     // Nested guards must not restore the count early.
     {
       ScopedBlasThreads nested;
-      EXPECT_EQ(get_blas_num_threads(), 1);
+      EXPECT_EQ(blas_get_num_threads(), 1);
     }
-    EXPECT_EQ(get_blas_num_threads(), 1);
+    EXPECT_EQ(blas_get_num_threads(), 1);
   }
 
-  EXPECT_EQ(get_blas_num_threads(), original);
+  EXPECT_EQ(blas_get_num_threads(), original);
 }

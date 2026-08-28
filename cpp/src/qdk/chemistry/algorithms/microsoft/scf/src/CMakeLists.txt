@@ -104,17 +104,22 @@ install(
 
 # BLAS thread control (see util/blas_threads.cpp). OpenBLAS, Intel MKL and BLIS
 # each spell the thread-count API differently, so only the vendor is passed
-# down, as QDK_CHEMISTRY_BLAS_VENDOR_<vendor>; blas_threads.cpp names the
-# functions. Any other vendor -- Accelerate on macOS, reference BLAS, or none
-# reported at all -- exposes no such API, and ScopedBlasThreads compiles to a
-# no-op. The match both selects the vendor and keeps the macro name an
-# identifier.
+# down; blas_threads.cpp names the functions. Any other vendor -- Accelerate on
+# macOS, reference BLAS, or none reported at all -- exposes no such API, and
+# ScopedBlasThreads compiles to a no-op.
+#
+# The vendor travels as QDK_CHEMISTRY_BLAS_VENDOR=QDK_CHEMISTRY_BLAS_VENDOR_<vendor>:
+# the value is the *name* of a macro blas_threads.cpp defines as a small
+# integer, since the preprocessor cannot compare strings. The match below keeps
+# the pasted name an identifier; one that slipped through would reach an #error
+# there rather than silently disable thread control.
 #
 # BLAS_VENDOR is the knob for the one case the search cannot answer -- passing
 # BLAS_LIBRARIES directly skips the vendor search (FindBLAS.cmake), leaving
 # BLAS_VENDOR empty, and -DBLAS_VENDOR=<vendor> supplies the missing label.
 if(BLAS_VENDOR MATCHES "^(OpenBLAS|IntelMKL|BLIS)$")
-  target_compile_definitions(chemistry PRIVATE QDK_CHEMISTRY_BLAS_VENDOR_${BLAS_VENDOR})
+  target_compile_definitions(chemistry PRIVATE
+      QDK_CHEMISTRY_BLAS_VENDOR=QDK_CHEMISTRY_BLAS_VENDOR_${BLAS_VENDOR})
   # BLAS is already linked transitively through GauXC; name it here for the
   # vendor symbols we call ourselves. The include directories come with it --
   # the BLIS path needs blis.h for dim_t, whose width is a BLIS build option.

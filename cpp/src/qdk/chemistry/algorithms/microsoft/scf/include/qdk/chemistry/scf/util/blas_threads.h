@@ -6,21 +6,10 @@
 
 namespace qdk::chemistry::scf::util {
 
-/// @brief BLAS backends whose threading this build knows how to control.
-/// Which one (if any) is bound is decided at configure time; see the BLAS
-/// section of scf/src/CMakeLists.txt.
-enum class BlasVendor { Unknown, OpenBLAS, IntelMKL, BLIS };
-
-/// @brief Human readable name of a BLAS vendor.
-const char* to_string(BlasVendor vendor);
-
-/// @brief BLAS backend whose thread count this build controls, bound at link
-/// time by CMake. Unknown means ScopedBlasThreads is a no-op.
-BlasVendor detected_blas_vendor();
-
-/// @brief Current BLAS thread count, or 0 if the backend cannot report it.
-/// For diagnostics and tests; production code should use ScopedBlasThreads.
-int get_blas_num_threads();
+/// @brief Current BLAS thread count, or 0 if this build binds no BLAS
+/// thread-control API (which backend, if any, is a configure-time choice; see
+/// blas_threads.cpp). For diagnostics and tests; prefer ScopedBlasThreads.
+int blas_get_num_threads();
 
 /**
  * @brief RAII guard that pins BLAS to a single thread while active and
@@ -33,10 +22,9 @@ int get_blas_num_threads();
  * The count is process-global, so nesting is tracked by a shared,
  * mutex-protected depth: the first guard pins, the last restores. That is also
  * why the count is not configurable -- a nested guard could not be honored
- * without overriding the count an enclosing one relies on.
- *
- * A no-op if the backend exposes no thread-control API (warned once) or cannot
- * report its current count.
+ * without overriding the count an enclosing one relies on. A no-op if the
+ * backend exposes no thread-control API (warned once) or cannot report its
+ * current count.
  */
 class ScopedBlasThreads {
  public:
