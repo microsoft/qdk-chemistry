@@ -170,7 +170,7 @@ def test_deep_merge():
 def test_create_parser():
     """Test parser creation."""
     parser = create_parser()
-    assert parser.prog == "qc"
+    assert parser.prog == "qdkchem"
     subparsers = next(action for action in parser._actions if isinstance(action, argparse._SubParsersAction))
     assert "setup" not in subparsers.choices
 

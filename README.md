@@ -60,7 +60,7 @@ environment containing QDK Chemistry:
 
 ```bash
 copilot plugin marketplace add https://github.com/microsoft/qdk-chemistry.git
-qdk_chem_cli plugin install qdk-chemistry@qdk-chemistry
+qdkchem plugin install qdk-chemistry@qdk-chemistry
 ```
 
 With no target directory, Copilot installs the plugin for the current user and
@@ -70,8 +70,8 @@ the same Copilot scope before installation. Copilot repository subdirectory
 specs are accepted directly:
 
 ```bash
-qdk_chem_cli plugin install ./copilot-plugins/qdk-chemistry
-qdk_chem_cli plugin install OWNER/REPO:copilot-plugins/qdk-chemistry
+qdkchem plugin install ./copilot-plugins/qdk-chemistry
+qdkchem plugin install OWNER/REPO:copilot-plugins/qdk-chemistry
 ```
 
 To configure one workspace instead, pass its root. QDK Chemistry copies the
@@ -80,7 +80,7 @@ fetched agents and skills into `.github`, merges its MCP server into
 the ignored `.qdk_chem` directory:
 
 ```bash
-qdk_chem_cli plugin install ./copilot-plugins/qdk-chemistry \
+qdkchem plugin install ./copilot-plugins/qdk-chemistry \
     --target-dir /path/to/workspace
 ```
 
@@ -89,9 +89,9 @@ after Copilot refreshes the plugin files. Pass the same `--target-dir` for a
 workspace installation:
 
 ```bash
-qdk_chem_cli plugin update qdk-chemistry
-qdk_chem_cli plugin update --all
-qdk_chem_cli plugin rebind qdk-chemistry
+qdkchem plugin update qdk-chemistry
+qdkchem plugin update --all
+qdkchem plugin rebind qdk-chemistry
 ```
 
 VS Code discovers user plugins installed by Copilot CLI and workspace assets

@@ -17,7 +17,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-_PLUGIN_SERVER_SCRIPTS = {"qdk-chemistry": {"qdk_chemistry": "qdk_chem_mcp"}}
+_PLUGIN_SERVER_SCRIPTS = {"qdk-chemistry": {"qdk_chemistry": "qdkchemmcp"}}
 _MANIFEST_PATHS = (
     Path("plugin.json"),
     Path(".plugin/plugin.json"),
@@ -185,7 +185,7 @@ def _script_path(scripts_dir: Path, script_name: str) -> Path:
 def _commands_for_current_environment(plugin_name: str) -> dict[str, str]:
     if sys.prefix == sys.base_prefix and not hasattr(sys, "real_prefix"):
         raise PluginInstallError(
-            "QDK Chemistry plugin installation requires a virtual environment; run it with .venv/bin/qdk_chem_cli"
+            "QDK Chemistry plugin installation requires a virtual environment; run it with .venv/bin/qdkchem"
         )
     scripts_dir = Path(sysconfig.get_path("scripts"))
     return {
@@ -424,7 +424,24 @@ def _update_spec(source: str, plugin_name: str) -> str:
 
 
 def install_plugin(source: str, *, name: str | None = None, target_dir: str | Path | None = None) -> dict[str, Any]:
-    """Install the QDK Chemistry plugin through Copilot and bind its MCP command."""
+    """Install a QDK Chemistry plugin and bind its MCP command to this environment.
+
+    Args:
+        source: Copilot plugin source, plugin name, or local plugin directory.
+        name: Explicit supported plugin name when it cannot be inferred from
+            ``source``.
+        target_dir: Workspace directory for a workspace-scoped installation.
+            When omitted, installs for the current user.
+
+    Returns:
+        Installation details including the plugin, scope, bound commands, and
+        MCP configuration path.
+
+    Raises:
+        PluginInstallError: If the plugin source, Copilot installation, or MCP
+            command binding is invalid.
+
+    """
     plugin_name = _plugin_name_from_source(source, name)
     commands = _commands_for_current_environment(plugin_name)
     home = _copilot_home(target_dir)
@@ -466,7 +483,22 @@ def install_plugin(source: str, *, name: str | None = None, target_dir: str | Pa
 
 
 def update_plugin(plugin_name: str, *, target_dir: str | Path | None = None) -> dict[str, Any]:
-    """Update the Copilot-managed plugin and restore its recorded venv binding."""
+    """Update a plugin and restore its MCP command binding.
+
+    Args:
+        plugin_name: Name of the supported QDK Chemistry plugin to update.
+        target_dir: Workspace directory for a workspace-scoped installation.
+            When omitted, updates the current user's installation.
+
+    Returns:
+        Update details including the plugin, scope, bound commands, and MCP
+        configuration path.
+
+    Raises:
+        PluginInstallError: If the plugin is unsupported, unbound, or cannot be
+            updated and rebound.
+
+    """
     if plugin_name not in _PLUGIN_SERVER_SCRIPTS:
         raise PluginInstallError(f"unsupported QDK Chemistry plugin: {plugin_name}")
     home = _copilot_home(target_dir)
@@ -504,7 +536,20 @@ def update_plugin(plugin_name: str, *, target_dir: str | Path | None = None) -> 
 
 
 def update_all_plugins(*, target_dir: str | Path | None = None) -> dict[str, Any]:
-    """Update every QDK Chemistry plugin binding without touching unrelated plugins."""
+    """Update every installed QDK Chemistry plugin binding.
+
+    Args:
+        target_dir: Workspace directory for workspace-scoped installations.
+            When omitted, updates the current user's installations.
+
+    Returns:
+        A status mapping with the update result for each bound plugin.
+
+    Raises:
+        PluginInstallError: If no QDK Chemistry plugin bindings are found or an
+            update fails.
+
+    """
     home = _copilot_home(target_dir)
     state = _load_bindings(_state_root(target_dir, home))
     names = sorted(set(state["plugins"]).intersection(_PLUGIN_SERVER_SCRIPTS))
@@ -514,7 +559,22 @@ def update_all_plugins(*, target_dir: str | Path | None = None) -> dict[str, Any
 
 
 def rebind_plugin(plugin_name: str, *, target_dir: str | Path | None = None) -> dict[str, Any]:
-    """Bind an installed QDK Chemistry plugin to this venv's MCP command."""
+    """Bind an installed plugin to the MCP command in the current environment.
+
+    Args:
+        plugin_name: Name of the supported QDK Chemistry plugin to rebind.
+        target_dir: Workspace directory for a workspace-scoped installation.
+            When omitted, rebinds the current user's installation.
+
+    Returns:
+        Rebinding details including the plugin, scope, bound commands, and MCP
+        configuration path.
+
+    Raises:
+        PluginInstallError: If the plugin is unsupported, missing, or the
+            current environment does not provide its MCP command.
+
+    """
     if plugin_name not in _PLUGIN_SERVER_SCRIPTS:
         raise PluginInstallError(f"unsupported QDK Chemistry plugin: {plugin_name}")
     home = _copilot_home(target_dir)

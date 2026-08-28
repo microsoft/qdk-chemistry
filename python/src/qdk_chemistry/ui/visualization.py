@@ -359,15 +359,14 @@ log("message listener registered");
 
 
 def register_visualization_tools(app) -> None:
-    """Register interactive widget-based visualization tools on *app*.
+    """Register interactive widget-based visualization tools on an MCP server.
 
-    Tools are only registered when ``qsharp_widgets`` is installed.
-    If not available, this function is a no-op.
+    Tools are registered only when ``qsharp_widgets`` is installed. Otherwise,
+    this function is a no-op.
 
-    Parameters
-    ----------
-    app : MCPServer
-        The MCPServer application instance from ``tools.py``.
+    Args:
+        app: MCP server application that receives the widget resources and
+            tools.
 
     """
     if not _WIDGETS_AVAILABLE:

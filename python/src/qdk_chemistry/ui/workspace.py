@@ -51,7 +51,20 @@ async def _workspace_from_client(ctx: Context) -> tuple[Path | None, str | None]
 
 
 def configure_workspace(path: Path) -> dict[str, object]:
-    """Bind this process to one workspace for relative file resolution."""
+    """Bind this process to one workspace for relative file resolution.
+
+    Args:
+        path: Absolute path to the workspace directory.
+
+    Returns:
+        A mapping that confirms the binding and gives the resolved workspace
+        root.
+
+    Raises:
+        ValueError: If ``path`` is relative or does not identify a directory.
+        RuntimeError: If this process is already bound to a different workspace.
+
+    """
     if not path.is_absolute():
         raise ValueError("workspace_root must be an absolute path")
     resolved = path.expanduser().resolve()
@@ -73,7 +86,20 @@ def configure_workspace(path: Path) -> dict[str, object]:
 
 
 async def bind_workspace(ctx: Context, workspace_root: str | None = None) -> dict[str, object]:
-    """Bind this MCP process to the active workspace before other QDK tools."""
+    """Bind this MCP process to the active workspace before other QDK tools.
+
+    Args:
+        ctx: MCP request context used to discover the client workspace when
+            ``workspace_root`` is omitted.
+        workspace_root: Absolute workspace directory. When omitted, the client
+            must provide exactly one file URI workspace root.
+
+    Returns:
+        A mapping that reports whether binding succeeded. Successful results
+        include the resolved workspace root and binding source; failed results
+        include an error message.
+
+    """
     source = "argument"
     if workspace_root is None:
         discovered, error = await _workspace_from_client(ctx)
@@ -93,7 +119,20 @@ async def workspace_binding_middleware(
     context: ServerRequestContext[Any, Any],
     call_next: Callable[[ServerRequestContext[Any, Any]], Awaitable[HandlerResult]],
 ) -> HandlerResult:
-    """Prevent plugin tools from resolving paths before workspace binding."""
+    """Require a workspace binding before plugin tools resolve relative paths.
+
+    Args:
+        context: Incoming MCP request context.
+        call_next: Handler that receives the request after binding succeeds.
+
+    Returns:
+        The downstream handler result.
+
+    Raises:
+        RuntimeError: If binding is required but neither an existing binding nor
+            a single client workspace root is available.
+
+    """
     if os.environ.get(_REQUIRE_BINDING_ENV, "").lower() not in {"1", "true", "yes"}:
         return await call_next(context)
     tool_name = (context.params or {}).get("name") if context.method == "tools/call" else None

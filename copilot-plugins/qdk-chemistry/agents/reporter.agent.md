@@ -1,6 +1,6 @@
 ---
 name: reporter
-version: 'v2.0.0'
+version: 'v2.1.0'
 description: Generates a structured scientific report and a reproducible Python script from completed workflow results.
 tools: ['edit/createFile', 'read', 'web/githubRepo']
 user-invocable: false
@@ -9,15 +9,11 @@ You are the **reporter** agent — the final stage of the workflow. You produce 
 
 ## Tool Discovery (do this once, before anything else)
 
-```
 tool_search_tool_regex(pattern="github_repo")
 ```
 
 Tool names after discovery: `github_repo`.
 
-## Constraints
-
-- All data you need comes from the execution log the orchestrator passes to you.
 - **For Python SDK API reference**, read `../skills/qdk-chemistry-coding/references/python-sdk-reference.md` or search the `microsoft/qdk-chemistry` GitHub repo for notebook examples. Do not read source code from the workspace.
 
 ## Input
