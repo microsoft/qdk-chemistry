@@ -172,6 +172,8 @@ def _commit_staged_serialization(
 
 def _jsonable_settings_value(value: Any, setting_type: str | None = None) -> Any:
     """Convert a settings value to the tagged JSON form understood by Settings."""
+    if isinstance(value, os.PathLike):
+        return os.fspath(value)
     if isinstance(value, AlgorithmRef):
         settings = value.settings
         return {
@@ -207,11 +209,15 @@ def _jsonable_settings(settings: Settings) -> dict[str, Any]:
 class FileSerializer:
     """Handles file-based serialization of QDK Chemistry objects for remote transport.
 
-    Each DataClass object is serialized to its own .{type_name}.h5 file, and
-    each NumPy array to its own .ndarray.npy file. Primitives and simple types
-    are stored in a JSON manifest file. Algorithm references embed plain tagged
-    settings dictionaries, recursively preserving further nested algorithm
-    references.
+    Supported values are QDK Chemistry data classes, ``AlgorithmRef`` objects,
+    NumPy arrays and scalars, Python primitives, and lists or tuples recursively
+    containing supported values. Dictionaries are protocol structure rather than
+    serializable values. Nested algorithm references remain supported through
+    their tagged settings representation.
+
+    Each data class is serialized to its own .{type_name}.h5 file, and each
+    NumPy array to its own .ndarray.npy file. Primitives and simple types are
+    stored in a JSON manifest file.
 
     Directory structure for inputs::
 
@@ -409,31 +415,11 @@ class FileSerializer:
                 )
             return {"type": "tuple", "items": items}
 
-        # Handle dicts
         if isinstance(value, dict):
-            entries = []
-            for index, (key, item) in enumerate(value.items()):
-                entries.append(
-                    {
-                        "key": cls.serialize_value(
-                            directory,
-                            f"{name}_entry_{index}_key",
-                            key,
-                            cache=cache,
-                            content_hash=_item_content_hash(key) if cls.is_cacheable(key) else None,
-                            seed_cache=seed_cache,
-                        ),
-                        "value": cls.serialize_value(
-                            directory,
-                            f"{name}_entry_{index}_value",
-                            item,
-                            cache=cache,
-                            content_hash=_item_content_hash(item) if cls.is_cacheable(item) else None,
-                            seed_cache=seed_cache,
-                        ),
-                    }
-                )
-            return {"type": "dict", "entries": entries}
+            raise TypeError(
+                "Dictionary values are not supported by remote serialization; "
+                "use keyword arguments, algorithm settings, or a QDK Chemistry data class"
+            )
 
         raise TypeError(f"Cannot serialize object of type {type(value).__name__}")
 
@@ -518,14 +504,6 @@ class FileSerializer:
         if type_tag == "tuple":
             return tuple(cls.deserialize_value(directory, item, cache=cache) for item in entry["items"])
 
-        if type_tag == "dict":
-            return {
-                cls.deserialize_value(directory, item["key"], cache=cache): cls.deserialize_value(
-                    directory, item["value"], cache=cache
-                )
-                for item in entry["entries"]
-            }
-
         raise TypeError(f"Unknown type tag: {type_tag}")
 
 
@@ -546,14 +524,6 @@ def get_serialized_file_names(entry: dict[str, Any]) -> list[str]:
 
     if type_tag in ("list", "tuple"):
         return [filename for item in entry["items"] for filename in get_serialized_file_names(item)]
-
-    if type_tag == "dict":
-        return [
-            filename
-            for item in entry["entries"]
-            for value in (item["key"], item["value"])
-            for filename in get_serialized_file_names(value)
-        ]
 
     if type_tag in ("none", "algorithm_ref", "cached", "bool", "int", "float", "str"):
         return []
@@ -587,6 +557,7 @@ def serialize_inputs(
     *,
     run_hash: str | None = None,
     input_hashes: dict[str, str] | None = None,
+    force_rerun: bool = False,
     remote_cache: dict[str, Any] | None = None,
     remote_cache_backend: CacheBackend | None = None,
     remote_cache_transport: bool = False,
@@ -602,6 +573,7 @@ def serialize_inputs(
         settings: Algorithm settings dictionary.
         run_hash: Optional pre-computed algorithm run hash.
         input_hashes: Optional dict mapping input names to their content hashes.
+        force_rerun: Whether the compute node must skip its cache lookup.
         remote_cache: Optional coordinates passed to the remote cache factory, ``get_cache()``.
         remote_cache_backend: Shared cache backend; existing cacheable values become ``"cached"`` manifest references.
         remote_cache_transport: Whether to seed shared-cache misses and use the cache as artifact transport.
@@ -626,6 +598,8 @@ def serialize_inputs(
         manifest["run_hash"] = run_hash
     if input_hashes is not None:
         manifest["input_hashes"] = input_hashes
+    if force_rerun:
+        manifest["force_rerun"] = True
     if remote_cache is not None:
         manifest["remote_cache"] = remote_cache
     if remote_cache_transport:
@@ -650,7 +624,7 @@ def serialize_inputs(
             )
 
         for i, arg in enumerate(args):
-            content_hash = input_hashes.get(f"arg_{i}") if input_hashes else None
+            content_hash = input_hashes.get(f"args.arg_{i}") if input_hashes else None
             serialization_name = (
                 f"arg_{i}_{_item_content_hash(arg)}" if FileSerializer.is_cacheable(arg) else f"arg_{i}"
             )
@@ -667,7 +641,7 @@ def serialize_inputs(
             manifest["args"].append(entry)
 
         for index, (key, value) in enumerate(kwargs.items()):
-            content_hash = input_hashes.get(key) if input_hashes else None
+            content_hash = input_hashes.get(f"kwargs.{key}") if input_hashes else None
             serialization_name = (
                 f"kwarg_{index}_{_item_content_hash(value)}" if FileSerializer.is_cacheable(value) else f"kwarg_{index}"
             )
@@ -728,6 +702,7 @@ def deserialize_inputs(directory: str | Path, *, cache: CacheBackend | None = No
         "kwargs": kwargs,
         "run_hash": manifest.get("run_hash"),
         "input_hashes": manifest.get("input_hashes"),
+        "force_rerun": manifest.get("force_rerun", False),
         "remote_cache": manifest.get("remote_cache"),
         "remote_cache_transport": manifest.get("remote_cache_transport", False),
     }

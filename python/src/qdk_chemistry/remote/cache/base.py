@@ -127,3 +127,7 @@ class CacheBackend(ABC):
         dict, which is only valid for backends that need no arguments.
         """
         return {}
+
+    def for_remote(self) -> CacheBackend | None:
+        """Return the cache view reachable from a remote compute node."""
+        return self if self.is_shared else None
