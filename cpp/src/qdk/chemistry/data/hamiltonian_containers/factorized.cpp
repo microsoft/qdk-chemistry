@@ -19,10 +19,8 @@ namespace qdk::chemistry::data {
 
 namespace {
 
-/// Cross-check the rank/basis/copy counts recorded in a serialized payload
-/// against the buffers actually stored alongside them, so a hand-edited or
-/// truncated file fails at load instead of silently reshaping the
-/// factorization. Shared by the JSON and HDF5 readers.
+/// Cross-check the rank/basis/copy recorded in a serialized payload
+/// against the buffers. Shared by the JSON and HDF5 readers.
 void validate_stored_shape(std::size_t num_ranks, std::size_t num_bases,
                            std::size_t num_copies, Eigen::Index u_size,
                            Eigen::Index w_size, const Eigen::MatrixXd& wb) {

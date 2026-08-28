@@ -38,21 +38,17 @@ std::vector<TwoBodyFragment> eigen_decompose_two_body(
   const std::size_t expected = pair_dim * pair_dim;
   if (static_cast<std::size_t>(two_body_integrals.size()) != expected) {
     throw std::invalid_argument(
-        "eigen_decompose_two_body: expected a tensor of norb^4 = " +
-        std::to_string(expected) +
-        " elements for norb = " + std::to_string(norb) + ", got " +
+        "eigen_decompose_two_body: expected a tensor of norb^4 , got " +
         std::to_string(two_body_integrals.size()) + ".");
   }
 
   const Eigen::Index pair_size = static_cast<Eigen::Index>(pair_dim);
   const Eigen::Index orbitals = static_cast<Eigen::Index>(norb);
 
-  // g_pqrs is flattened as (pq)*norb^2 + (rs), which is already the row-major
-  // layout of the (pq),(rs) supermatrix. Symmetrizing out of the mapped input
-  // (rather than in place) both guards against numerical noise in the caller's
-  // tensor and avoids aliasing the destination.
+  // Reshape g_ijkl into the (ij),(kl) supermatrix.
   const Eigen::Map<const RowMajorMatrix> raw_supermatrix(
-      two_body_integrals.data(), pair_size, pair_size);
+    two_body_integrals.data(), pair_size, pair_size);
+  // Defensive symmetrization against numerical noise in the input tensor.
   Eigen::MatrixXd supermatrix =
       0.5 * (raw_supermatrix + raw_supermatrix.transpose());
 
@@ -89,10 +85,11 @@ std::vector<TwoBodyFragment> eigen_decompose_two_body(
       continue;
     }
 
-    // Column n of the eigenvector matrix is contiguous and indexed by p*norb+q,
-    // so it maps directly onto an norb x norb row-major matrix. g_pqrs =
-    // g_qprs makes it symmetric; symmetrize defensively against degenerate
-    // subspaces and numerical noise. syev then overwrites it with U.
+
+    // Reshape the eigenvector into an norb x norb matrix. For a
+    // non-degenerate eigenvalue this matrix is automatically symmetric
+    // because g_ijkl = g_jikl; symmetrize defensively to guard against
+    // degenerate subspaces / numerical noise.
     const Eigen::Map<const RowMajorMatrix> raw_fragment(
         supermatrix_eigenvectors.data() +
             static_cast<Eigen::Index>(n) * pair_size,
@@ -137,13 +134,11 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
   }
   if (!hamiltonian->is_restricted()) {
     throw std::invalid_argument(
-        "DoubleFactorizer currently only supports restricted "
-        "(spin-restricted) Hamiltonians.");
+        "DoubleFactorizer currently only supports restricted Hamiltonians.");
   }
   if (!hamiltonian->has_two_body_integrals()) {
     throw std::invalid_argument(
-        "DoubleFactorizer: the Hamiltonian carries no two-body "
-        "integrals to factorize.");
+        "The Hamiltonian carries no two-body integrals to factorize.");
   }
 
   const double truncation_threshold =
@@ -168,14 +163,10 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
     throw std::invalid_argument(
         "DoubleFactorizer: truncation_threshold=" +
         std::to_string(truncation_threshold) +
-        " discarded every fragment, which would leave the factorized "
-        "Hamiltonian with no two-body term at all. Lower the threshold.");
+        " leave the factorized Hamiltonian with no two-body term at all.");
   }
 
-  // Container layout: one rank per fragment, B = norb bases, a single copy.
-  //   U[r,b,p] = U^r_pb,  W[r,b,0] = eps^r_b
-  // Each rank owns a contiguous slice of both flat buffers, so rank r's U
-  // slice viewed row-major as (B x N) is exactly fragment.U transposed.
+  // R = number of fragments, B = norb bases, C = 1
   const std::size_t num_ranks = fragments.size();
   const std::size_t num_bases = norb;
   const std::size_t num_copies = 1;
@@ -199,8 +190,7 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
                                bases, orbitals) = fragment.U.transpose();
   }
 
-  // WB and the energy gap are block-encoding parameters that a plain
-  // factorization neither reads nor produces.
+  // WB and the energy gap are not produced by the plain factorization.
   const Eigen::MatrixXd wb_matrix =
       Eigen::MatrixXd::Zero(static_cast<Eigen::Index>(num_ranks),
                             static_cast<Eigen::Index>(num_copies));

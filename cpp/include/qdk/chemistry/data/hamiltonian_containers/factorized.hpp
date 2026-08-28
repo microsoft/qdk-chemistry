@@ -17,12 +17,10 @@ namespace qdk::chemistry::data {
 
 /**
  * @class FactorizedHamiltonianContainer
- * @brief Restricted, spin-free double-factorized THC Hamiltonian container
- *        (Low 2025).
+ * @brief Restricted, spin-free double-factorized tensor hypercontraction(DFTHC) 
+ *        Hamiltonian container (Low 2025).
  *
- * @note Consumers that genuinely require a sum of squares -- SOS spectral
- *       amplification above all -- must check get_signs() themselves; this
- *       container deliberately does not enforce it.
+ * @note Consumers that genuinely require a sum of squares must check get_signs().
  */
 class FactorizedHamiltonianContainer : public HamiltonianContainer {
  public:
@@ -169,15 +167,6 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    *                        + Σ_{rc} s_r tr(M^{rc}) M^{rc}_{pq}
    *                        - Σ_{rc} s_r WB^{rc} M^{rc}_{pq}
    *
-   * All three terms come from the same rank-r fragment operator, so negating
-   * the fragment negates all of them together.
-   *
-   * The leading -½ (M M) term has no counterpart in Eq. 37 as printed: the
-   * paper writes the two-body operator as a plain product while this container
-   * stores h2 = (pq|rs) normal-ordered, and unpacking that difference leaves
-   * exactly -½ Σ_s h2_{pssq}. It is required, not optional -- see the
-   * derivation in the implementation.
-   *
    * @return The [N,N] matrix, contracted directly from the factors.
    */
   Eigen::MatrixXd get_h1_majorana() const;
@@ -190,9 +179,7 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    *                          (Σ_{b'} U^t_{b'r} U^t_{b's} W^t_{b'c})
    *
    * Note this is built purely from (U, W) and the per-rank signs: the identity
-   * weight WB is deliberately absent, matching Eq. 25. WB enters only
-   * get_h1_majorana() and get_lambda(), so it is a gauge parameter for the
-   * two-body tensor rather than unused data.
+   * weight WB is deliberately absent, matching Eq. 25.
    *
    * @return A flat N^4 vector in [p,q,r,s] order.
    */

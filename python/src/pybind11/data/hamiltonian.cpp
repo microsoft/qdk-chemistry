@@ -991,25 +991,7 @@ Args:
   py::class_<FactorizedHamiltonianContainer, HamiltonianContainer,
              py::smart_holder>
       factorized_container(data, "FactorizedHamiltonianContainer", R"(
-Represents a molecular Hamiltonian using a double factorization of the two-body integrals.
-
-This class stores the factorized two-body integrals as a *signed* sum of
-low-rank "perfect squares", with ``t`` the rank index (``r`` and ``s`` below
-being orbital indices):
-
-    h2_{pqrs} = sum_{t,c} s_t (sum_b U^t_{bp} U^t_{bq} W^t_{bc})
-                              (sum_b' U^t_{b'r} U^t_{b's} W^t_{b'c})
-
-along with an identity weight matrix WB[R,C]. This container is always
-restricted (uses spin-free integrals).
-
-The per-rank signs ``s_t`` are what allow indefinite two-body tensors to be
-stored: without them the representation is a plain sum of squares and is
-therefore positive semi-definite in the (pq) pair space. Exact electron
-repulsion integrals are positive semi-definite, but symmetry-shifted or
-downfolded tensors need not be. Consumers that require a genuine
-sum-of-squares form (for example a sum-of-squares block encoding) must check
-``get_signs()`` themselves.
+Represents a double factorized tensor hypercontraction hamiltonian.
 
 References:
     :cite:`Low2025`
@@ -1021,7 +1003,7 @@ References:
                const Eigen::MatrixXd&, std::shared_ptr<Orbitals>,
                const Eigen::VectorXd&, double, HamiltonianType>(),
       R"(
-Constructor for a double-factorized Hamiltonian.
+Constructor for a factorized Hamiltonian.
 
 Args:
     core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
@@ -1451,17 +1433,8 @@ Returns:
       R"(
 Get the underlying container.
 
-The returned object is the most derived bound container type, so it can be
-type-checked with ``isinstance`` to reach representation-specific accessors.
-
 Returns:
-    HamiltonianContainer: The container holding this Hamiltonian's data. The
-    returned reference keeps the owning Hamiltonian alive.
-
-Examples:
-    >>> container = hamiltonian.get_container()
-    >>> if isinstance(container, FactorizedHamiltonianContainer):
-    ...     print(container.get_num_ranks())
+    HamiltonianContainer: The container holding this Hamiltonian's data.
 )");
 
   // Summary
