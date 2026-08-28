@@ -222,7 +222,7 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
   /** @brief Reconstruct the shared two-body cache. */
   void _build_two_body_cache() const;
 
-  static constexpr const char* SERIALIZATION_VERSION = "0.2.0";
+  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
 };
 
 }  // namespace qdk::chemistry::data
