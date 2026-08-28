@@ -522,17 +522,17 @@ class TestCircuitEstimate:
         assert result is not None
         assert hasattr(result, "logical_counts")
 
-    def test_estimate_does_not_change_the_declared_width(self, monkeypatch):
-        """``num_qubits`` is the argument register, so internal scratch must not overwrite it."""
-        warnings: list[str] = []
-        monkeypatch.setattr(circuit_module.Logger, "warn", warnings.append)
+    def test_estimate_reports_but_does_not_change_the_declared_width(self, monkeypatch):
+        """``num_qubits`` is the argument register, so internal scratch is reported, not written back."""
+        messages: list[str] = []
+        monkeypatch.setattr(circuit_module.Logger, "info", messages.append)
 
         circuit = Circuit(qasm=self._QASM_WITH_T, num_qubits=5)
         result = circuit.estimate()
 
         assert result.logical_counts["numQubits"] == 2
         assert circuit.num_qubits == 5
-        assert warnings == []
+        assert any("declares 5 qubits" in m for m in messages)
 
     def test_estimate_raises_with_qir_only(self):
         """Test that estimate raises when only QIR representation is available."""

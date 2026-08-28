@@ -287,6 +287,13 @@ class Circuit(DataClass):
         else:
             raise RuntimeError("Cannot estimate resources: no Q# factory data or QASM representation is available.")
 
+        estimated_num_qubits = getattr(result, "logical_counts", {}).get("numQubits")
+        if self.num_qubits is not None and estimated_num_qubits is not None and estimated_num_qubits != self.num_qubits:
+            Logger.info(
+                f"This circuit declares {self.num_qubits} qubits but the resource estimate reports "
+                f"{estimated_num_qubits}; there could be ancillary qubits allocated and deallocated "
+                "within the circuit."
+            )
         return result
 
     def get_qre_application(self):
