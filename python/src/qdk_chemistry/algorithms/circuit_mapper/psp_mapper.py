@@ -142,22 +142,47 @@ class PSPMapper(CircuitMapper):
             "PSPMapper requires LCUContainer or LCUWalkContainer."
         )
 
-    def build_prepare_select_ops(self, container: UnitaryContainer) -> tuple[Any, Any, int]:
-        """Return the PREPARE and SELECT Q# oracles and the system register size.
+    def build_prepare_select_ops(self, container: UnitaryContainer) -> tuple[Any, Any, int, int, int]:
+        """Return the PREPARE and SELECT Q# oracles and the widths of the registers they act on.
 
         Args:
             container: The container held by the unitary representation.
 
         Returns:
-            The PREPARE Q# callable, the SELECT Q# callable, and the system register size.
+            The PREPARE Q# callable, the SELECT Q# callable, the system register width, the index
+            width SELECT controls on, and the total width PREPARE owns.
+
+        Raises:
+            ValueError: If the PREPARE circuit carries no Q# operation, does not declare the
+                width it acts on, or declares one too narrow for the index SELECT controls on.
 
         """
         lcu, _ = self.resolve_lcu(container)
-        if lcu.prepare is not None:
-            prepare_op = self._create_nested("prepare").run(lcu.prepare)._qsharp_op  # noqa: SLF001
-        else:
-            prepare_op = QSHARP_UTILS.PrepSelPrep.NoOpPrepare
-        return prepare_op, self._build_pauli_select_op(lcu.select), lcu.select.num_target_qubits
+        select_op = self._build_pauli_select_op(lcu.select)
+        num_system_qubits = lcu.select.num_target_qubits
+        if lcu.prepare is None:
+            return QSHARP_UTILS.PrepSelPrep.NoOpPrepare, select_op, num_system_qubits, 0, 0
+
+        prepare_circuit = self._create_nested("prepare").run(lcu.prepare)
+        prepare_op = prepare_circuit._qsharp_op  # noqa: SLF001
+        if prepare_op is None:
+            raise ValueError("The PREPARE circuit has no Q# operation to embed in the block encoding.")
+
+        # The declared width is the whole register PREPARE owns; anything past the index is
+        # scratch that PREPARE-dagger uncomputes.
+        num_block_ancillas = prepare_circuit.num_qubits
+        num_select_qubits = lcu.num_prepare_ancillas
+        if num_block_ancillas is None:
+            raise ValueError(
+                "The PREPARE circuit does not declare num_qubits, so the block ancilla register cannot "
+                "be sized. A state preparation used as a PREPARE oracle must report the width it acts on."
+            )
+        if num_block_ancillas < num_select_qubits:
+            raise ValueError(
+                f"The PREPARE circuit acts on {num_block_ancillas} qubits but the LCU decomposition "
+                f"indexes {num_select_qubits} of them. SELECT would control on qubits PREPARE does not own."
+            )
+        return prepare_op, select_op, num_system_qubits, num_select_qubits, num_block_ancillas
 
     def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
         r"""Construct the block-encoding circuit on the flat ``[system | ancilla]`` register.
@@ -172,12 +197,16 @@ class PSPMapper(CircuitMapper):
 
         """
         container = unitary.get_container()
-        lcu, use_quantum_walk = self.resolve_lcu(container)
-        prepare_op, select_op, num_system = self.build_prepare_select_ops(container)
+        _, use_quantum_walk = self.resolve_lcu(container)
+        prepare_op, select_op, num_system_qubits, num_select_qubits, num_block_ancillas = self.build_prepare_select_ops(
+            container
+        )
 
-        qsharp_op = QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepOp(prepare_op, select_op, num_system)
+        qsharp_op = QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepOp(
+            prepare_op, select_op, num_system_qubits, num_select_qubits
+        )
         if use_quantum_walk:
-            reflection_op = QSHARP_UTILS.PrepSelPrep.MakeAncillaReflectionOp(num_system)
+            reflection_op = QSHARP_UTILS.PrepSelPrep.MakeAncillaReflectionOp(num_system_qubits, num_block_ancillas)
             qsharp_op = QSHARP_UTILS.PrepSelPrep.MakeWalkOp(qsharp_op, reflection_op)
 
         if container.power != 1:
@@ -192,8 +221,9 @@ class PSPMapper(CircuitMapper):
             parameter={
                 "prepareOp": prepare_op,
                 "selectOp": select_op,
-                "numSystemQubits": num_system,
-                "numAncillaQubits": lcu.num_prepare_ancillas,
+                "numSystemQubits": num_system_qubits,
+                "numSelectQubits": num_select_qubits,
+                "numBlockAncillaQubits": num_block_ancillas,
                 "power": container.power,
                 "useWalk": use_quantum_walk,
             },
@@ -202,5 +232,5 @@ class PSPMapper(CircuitMapper):
         return Circuit(
             qsharp_factory=qsharp_factory,
             qsharp_op=qsharp_op,
-            num_qubits=num_system + lcu.num_prepare_ancillas,
+            num_qubits=num_system_qubits + num_block_ancillas,
         )
