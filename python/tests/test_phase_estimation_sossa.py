@@ -817,13 +817,15 @@ def _call_within(budget_seconds, description, func):
         A tuple of the call's return value and its elapsed wall-clock seconds.
 
     """
-    outcome: dict[str, object] = {}
+    value: object = None
+    error: BaseException | None = None
 
     def _target():
+        nonlocal value, error
         try:
-            outcome["value"] = func()
+            value = func()
         except BaseException as exc:  # noqa: BLE001
-            outcome["error"] = exc
+            error = exc
 
     thread = threading.Thread(target=_target, daemon=True)
     started = time.monotonic()
@@ -833,9 +835,9 @@ def _call_within(budget_seconds, description, func):
 
     if thread.is_alive():
         pytest.fail(f"{description} did not finish within {budget_seconds:.0f}s.")
-    if "error" in outcome:
-        raise outcome["error"]
-    return outcome["value"], elapsed
+    if error is not None:
+        raise error
+    return value, elapsed
 
 
 def _sossa_unary_qpe_circuit(num_queries, *, num_orbitals, num_ranks, num_bases, num_copies, **mapper_kwargs):
