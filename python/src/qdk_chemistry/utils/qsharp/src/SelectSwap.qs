@@ -125,7 +125,7 @@ namespace QDKChemistry.Utils.SelectSwap {
         if numSwapBits == 0 {
             use output = Qubit[m];
             within {
-                Select(data, address, output);
+                Select(data, addressFitted, output);
             } apply {
                 action(output);
             }
