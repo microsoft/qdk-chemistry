@@ -44,7 +44,7 @@ See Also:
     :class:`qdk_chemistry.data.FactorizedHamiltonianContainer`
 
 References:
-    :cite:`vonBurg2021`, :cite:`Patel2024`
+    :cite:`vonBurg2021`, :cite:`Patel2025`
 )");
 
   double_factorizer.def(py::init<>(), R"(
