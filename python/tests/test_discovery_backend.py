@@ -25,7 +25,6 @@ import qdk_chemistry.algorithms as algorithms_module
 import qdk_chemistry.remote.serialization as serialization_module
 import qdk_chemistry.remote.worker as remote_worker
 from qdk_chemistry.plugins.discovery.backend import DiscoveryBackend
-from qdk_chemistry.remote.serialization import serialize_inputs
 from qdk_chemistry.remote.worker import execute_job
 
 
@@ -353,7 +352,7 @@ def test_cache_transport_fails_after_cache_write_failure(tmp_path, monkeypatch: 
     """Cache transport fails when its only result transport cannot persist output."""
     input_dir = tmp_path / "input"
     output_dir = tmp_path / "output"
-    serialize_inputs(
+    serialization_module.serialize_inputs(
         input_dir,
         args=(),
         kwargs={},

@@ -324,6 +324,8 @@ class FolderCache(CacheBackend):
                 manifest = json.loads(generic_manifest.read_text())
                 self._collect_data_nodes(manifest, child_nodes)
             except (json.JSONDecodeError, OSError, KeyError, TypeError):
+                # Best-effort cleanup: retain any collected child nodes and
+                # continue deleting even when the manifest is corrupt or unreadable.
                 pass
             try:
                 generic_manifest.unlink()
