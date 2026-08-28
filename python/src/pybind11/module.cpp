@@ -35,6 +35,7 @@ void bind_mcscf(py::module& m);
 void bind_hamiltonian_constructor(py::module& m);
 void bind_effective_hamiltonian_constructor(py::module& m);
 void bind_scf(py::module& m);
+void bind_population_analysis(py::module& m);
 void bind_nuclear_derivative(py::module& m);
 void bind_population_analysis(py::module& m);
 void bind_geometry_optimization(py::module& m);
@@ -107,6 +108,7 @@ PYBIND11_MODULE(_core, m) {
   bind_hamiltonian_constructor(algorithms);
   bind_effective_hamiltonian_constructor(algorithms);
   bind_scf(algorithms);
+  bind_population_analysis(algorithms);
   bind_nuclear_derivative(algorithms);
   bind_population_analysis(algorithms);
   bind_geometry_optimization(algorithms);

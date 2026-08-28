@@ -28,5 +28,6 @@ This documentation is organized into the following sections:
    data/index
    algorithms/index
    basis_functionals
+   custom_backends
    model_hamiltonians
    plugins

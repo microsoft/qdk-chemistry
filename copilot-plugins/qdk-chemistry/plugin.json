@@ -1,0 +1,11 @@
+{
+  "name": "qdk-chemistry",
+  "description": "Run QDK Chemistry workflows with specialized agents, skills, and MCP tools.",
+  "version": "2.0.0",
+  "author": {
+    "name": "Microsoft"
+  },
+  "agents": "agents/",
+  "skills": "skills/",
+  "mcpServers": ".mcp.json"
+}

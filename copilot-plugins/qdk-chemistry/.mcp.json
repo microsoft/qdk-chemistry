@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "qdk_chemistry": {
+      "type": "stdio",
+      "command": "qdk_chem_mcp",
+      "timeout": 1814400000,
+      "env": {
+        "QDK_REQUIRE_WORKSPACE_BINDING": "1"
+      }
+    }
+  }
+}

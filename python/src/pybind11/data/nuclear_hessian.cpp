@@ -124,4 +124,6 @@ Returns:
                   py::arg("filename"), R"(Load a Hessian from an HDF5 file.)")
       .def("__repr__",
            [](const NuclearHessian& hessian) { return hessian.get_summary(); });
+
+  m.attr("NuclearHessian").attr("_data_type_name") = "nuclear_hessian";
 }

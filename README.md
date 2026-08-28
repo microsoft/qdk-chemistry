@@ -52,6 +52,65 @@ python3 -m pip install 'qdk-chemistry[all]'
 
 The `[all]` extra pulls in all optional dependencies so that examples and tests work without chasing missing packages. For other installation methods (Dev Container, building from source) and platform-specific notes, see [INSTALL.md](./INSTALL.md).
 
+## Agent Integration Files
+
+QDK Chemistry publishes a Copilot agent plugin from this repository. Register
+the repository marketplace, then run the plugin installer from the virtual
+environment containing QDK Chemistry:
+
+```bash
+copilot plugin marketplace add https://github.com/microsoft/qdk-chemistry.git
+qdk_chem_cli plugin install qdk-chemistry@qdk-chemistry
+```
+
+With no target directory, Copilot installs the plugin for the current user and
+QDK Chemistry pins its MCP command to that virtual environment. A local plugin
+directory is also accepted; QDK Chemistry registers its ancestor marketplace in
+the same Copilot scope before installation. Copilot repository subdirectory
+specs are accepted directly:
+
+```bash
+qdk_chem_cli plugin install ./copilot-plugins/qdk-chemistry
+qdk_chem_cli plugin install OWNER/REPO:copilot-plugins/qdk-chemistry
+```
+
+To configure one workspace instead, pass its root. QDK Chemistry copies the
+fetched agents and skills into `.github`, merges its MCP server into
+`.vscode/mcp.json` and `.github/mcp.json`, and keeps fetch/update state beneath
+the ignored `.qdk_chem` directory:
+
+```bash
+qdk_chem_cli plugin install ./copilot-plugins/qdk-chemistry \
+    --target-dir /path/to/workspace
+```
+
+Update through the same CLI so the virtual-environment binding is restored
+after Copilot refreshes the plugin files. Pass the same `--target-dir` for a
+workspace installation:
+
+```bash
+qdk_chem_cli plugin update qdk-chemistry
+qdk_chem_cli plugin update --all
+qdk_chem_cli plugin rebind qdk-chemistry
+```
+
+VS Code discovers user plugins installed by Copilot CLI and workspace assets
+written by `--target-dir`. The plugin supplies:
+
+- the `quantum-agent`, `chemist`, `researcher`, `reviewer`, and `reporter` agents;
+- QDK Chemistry overview, MCP, coding, and remote-execution skills; and
+- the `qdk_chemistry` MCP server configuration.
+
+Plugin MCP processes start in the installed plugin directory. Call
+`bind_workspace` before any other QDK Chemistry tool. It uses a single
+client-provided file root when available; otherwise pass the active workspace as
+an absolute `workspace_root`. Plugin-launched servers reject other tool calls
+until binding succeeds and cannot be rebound to another workspace.
+
+**Skills** provide tested domain knowledge: tool references, workflow recipes, parameter guidance, and common pitfalls.
+
+**Agents** coordinate multi-step quantum chemistry workflows (research → plan → critique → execute → visualize → report). Use them for complex tasks; use skills directly for simple questions.
+
 ## Telemetry
 
 By default, this library collects anonymous usage and performance data to help improve the user experience and product quality. The telemetry implementation can be found in [telemetry.py](./python/src/qdk_chemistry/utils/telemetry.py) and all telemetry events are defined in [telemetry_events.py](./python/src/qdk_chemistry/utils/telemetry_events.py).

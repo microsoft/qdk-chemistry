@@ -853,7 +853,7 @@ bool Orbitals::is_restricted() const {
 bool Orbitals::has_active_space() const {
   QDK_LOG_TRACE_ENTERING();
   return !_active_space_indices.first.empty() ||
-         !_active_space_indices.second.empty();
+         !_active_space_indices.second.empty() || has_inactive_space();
 }
 
 bool Orbitals::has_inactive_space() const {

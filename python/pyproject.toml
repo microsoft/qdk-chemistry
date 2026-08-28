@@ -34,6 +34,7 @@ dependencies = [
   "numpy>=2.0.0,<2.4.0",
   "scipy>=1.7.0",
   "matplotlib>=3.10.0",
+  "mcp>=2,<3",
   "ruamel-yaml>=0.18.10",
   "qdk[jupyter]>=1.30.0",
   "pybind11-stubgen>=2.5.1",
@@ -45,6 +46,11 @@ dynamic = ["version"]
 name = "qdk-chemistry"
 readme = "README.md"
 requires-python = ">=3.10"
+
+[project.scripts]
+qdk_chem_cli = "qdk_chemistry.ui.cli:main"
+qc = "qdk_chemistry.ui.cli:main"
+qdk_chem_mcp = "qdk_chemistry.ui.mcp:main"
 
 [project.optional-dependencies]
 all = [

@@ -18,6 +18,7 @@ import qdk_chemistry.remote.cache as cache_module
 from qdk_chemistry.data import EnergyExpectationResult, MeasurementData, Orbitals, QubitOperator
 from qdk_chemistry.data._spin_channels import spin_channel_matrix
 from qdk_chemistry.data.symmetry import axes
+from qdk_chemistry.plugins import DuplicateRegistrationError
 from qdk_chemistry.remote.cache import (
     _CACHES,
     CacheBackend,
@@ -475,6 +476,28 @@ class TestCacheRegistry:
         """get_cache with an unknown name raises ValueError."""
         with pytest.raises(ValueError, match="No cache registered"):
             get_cache("does_not_exist")
+
+    def test_register_duplicate_cache_name_raises(self, monkeypatch):
+        """Two cache backends cannot silently claim the same name."""
+
+        class FirstCache(CacheBackend):
+            """First cache backend claiming the test name."""
+
+        class SecondCache(CacheBackend):
+            """Second cache backend claiming the test name."""
+
+        monkeypatch.setattr(cache_module, "_CACHES", {})
+        register_cache("duplicate-cache")(FirstCache)
+
+        with pytest.raises(DuplicateRegistrationError, match="already registered"):
+            register_cache("duplicate-cache")(SecondCache)
+
+        with pytest.raises(DuplicateRegistrationError, match="already registered.*duplicate-cache"):
+            register_cache("cache-alias")(FirstCache)
+
+        assert cache_module._CACHES["duplicate-cache"] is FirstCache
+        assert "cache-alias" not in cache_module._CACHES
+        assert FirstCache.name == "duplicate-cache"
 
     def test_tiered_shared_operations_ignore_local_only_tiers(self, tmp_path, sample_orbitals):
         """Transport checks and writes operate only on shared tiers."""
