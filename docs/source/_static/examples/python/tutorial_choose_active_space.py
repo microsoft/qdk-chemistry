@@ -476,7 +476,9 @@ def generate_basis_function_cube_data(
         angular_momentum = shell.get_angular_momentum()
         if angular_momentum not in component_labels:
             raise ValueError(
-                "Basis-function labels support only spherical s, p, and d shells."
+                f"Basis set {basis_name!r} contains unsupported shell angular momentum "
+                f"l={angular_momentum}; basis-function labels support only spherical "
+                "s, p, and d shells."
             )
         shell_key = (atom_index, angular_momentum)
         shell_counts[shell_key] = shell_counts.get(shell_key, 0) + 1
