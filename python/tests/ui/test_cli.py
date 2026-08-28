@@ -170,7 +170,7 @@ def test_deep_merge():
 def test_create_parser():
     """Test parser creation."""
     parser = create_parser()
-    assert parser.prog == "qdkchem"
+    assert parser.prog == "qc"
     subparsers = next(action for action in parser._actions if isinstance(action, argparse._SubParsersAction))
     assert "setup" not in subparsers.choices
 
@@ -185,7 +185,7 @@ def test_create_parser():
 
 def test_cli_algorithm_defaults(capsys):
     """Test algorithm defaults command."""
-    sys.argv = ["qdk_chem_cli", "defaults", "--algorithm-type", "scf_solver"]
+    sys.argv = ["qc", "defaults", "--algorithm-type", "scf_solver"]
 
     with contextlib.suppress(SystemExit):
         main()
@@ -198,7 +198,7 @@ def test_cli_algorithm_defaults(capsys):
 
 def test_cli_algorithm_defaults_settings(capsys):
     """Test algorithm defaults with settings."""
-    sys.argv = ["qdk_chem_cli", "defaults", "--algorithm-type", "scf_solver"]
+    sys.argv = ["qc", "defaults", "--algorithm-type", "scf_solver"]
 
     with contextlib.suppress(SystemExit):
         main()
@@ -210,7 +210,7 @@ def test_cli_algorithm_defaults_settings(capsys):
 
 def test_cli_algorithm_defaults_config_template(capsys):
     """Test generating a config template for compound algorithms."""
-    sys.argv = ["qdk_chem_cli", "defaults", "--type", "mcscf"]
+    sys.argv = ["qc", "defaults", "--type", "mcscf"]
 
     with contextlib.suppress(SystemExit):
         main()
@@ -226,7 +226,7 @@ def test_cli_algorithm_defaults_config_template(capsys):
 
 def test_cli_algorithm_list(capsys):
     """Test algorithm list command."""
-    sys.argv = ["qdk_chem_cli", "list-algorithms"]
+    sys.argv = ["qc", "list-algorithms"]
 
     with contextlib.suppress(SystemExit):
         main()
@@ -244,7 +244,7 @@ def test_cli_data_create_structure(temp_project_dir, capsys):
     coords_json = "[[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]]"
 
     sys.argv = [
-        "qdk_chem_cli",
+        "qc",
         "upload-structure",
         "--project-name",
         "test_project",
@@ -271,7 +271,7 @@ def test_cli_data_create_structure(temp_project_dir, capsys):
 def test_cli_algorithm_scf(temp_project_dir, h2_structure_file, capsys):
     """Test algorithm scf command."""
     sys.argv = [
-        "qdk_chem_cli",
+        "qc",
         "run-scf",
         "--project-name",
         "test_project",
@@ -312,7 +312,7 @@ def test_cli_algorithm_hamiltonian(temp_project_dir, h2_wavefunction_file, capsy
     orbitals.to_json_file(str(orbitals_file))
 
     sys.argv = [
-        "qdk_chem_cli",
+        "qc",
         "run-hamiltonian",
         "--project-name",
         "test_project",
@@ -336,7 +336,7 @@ def test_cli_algorithm_hamiltonian(temp_project_dir, h2_wavefunction_file, capsy
 def test_cli_algorithm_active_space(temp_project_dir, h2_wavefunction_file, capsys):
     """Test algorithm active-space command."""
     sys.argv = [
-        "qdk_chem_cli",
+        "qc",
         "run-active-space",
         "--project-name",
         "test_project",
@@ -365,7 +365,7 @@ def test_cli_algorithm_active_space(temp_project_dir, h2_wavefunction_file, caps
 def test_cli_data_get_orbitals(temp_project_dir, h2_wavefunction_file, capsys):
     """Test data get-orbitals command."""
     sys.argv = [
-        "qdk_chem_cli",
+        "qc",
         "get-orbitals",
         "--project-name",
         "test_project",
@@ -400,7 +400,7 @@ def test_cli_data_get_ansatz(temp_project_dir, h2_wavefunction_file, capsys):
     hamiltonian.to_json_file(str(ham_file))
 
     sys.argv = [
-        "qdk_chem_cli",
+        "qc",
         "get-ansatz",
         "--project-name",
         "test_project",
@@ -429,7 +429,7 @@ def test_cli_algorithm_scf_with_settings(h2_structure_file, capsys):
     settings_json = '{"max_iterations": 100, "convergence_threshold": 1e-8}'
 
     sys.argv = [
-        "qdk_chem_cli",
+        "qc",
         "run-scf",
         "--project-name",
         "test_project",
@@ -459,7 +459,7 @@ def test_cli_algorithm_scf_with_settings(h2_structure_file, capsys):
 def test_cli_algorithm_error_handling(capsys):
     """Test error handling for invalid inputs."""
     sys.argv = [
-        "qdk_chem_cli",
+        "qc",
         "run-scf",
         "--project-name",
         "test_project",
@@ -486,7 +486,7 @@ def test_cli_algorithm_error_handling(capsys):
 
 def test_cli_no_command(capsys):
     """Test CLI with no command shows help."""
-    sys.argv = ["qdk_chem_cli"]
+    sys.argv = ["qc"]
 
     with pytest.raises(SystemExit):
         main()
@@ -539,7 +539,7 @@ def test_cli_module_invocation():
 def test_cli_algorithm_defaults_orbital_localizer(capsys):
     """Test algorithm defaults for orbital_localizer."""
     sys.argv = [
-        "qdk_chem_cli",
+        "qc",
         "defaults",
         "--algorithm-type",
         "orbital_localizer",
@@ -855,7 +855,7 @@ def test_cli_utils_list_projects(temp_project_dir, capsys):
     (temp_project_dir / "proj_a").mkdir()
     (temp_project_dir / "proj_b").mkdir()
 
-    sys.argv = ["qdk_chem_cli", "list-projects"]
+    sys.argv = ["qc", "list-projects"]
 
     with contextlib.suppress(SystemExit):
         main()
@@ -869,7 +869,7 @@ def test_cli_utils_list_projects(temp_project_dir, capsys):
 
 def test_cli_utils_create_project(temp_project_dir, capsys):
     """Test utils create-project command."""
-    sys.argv = ["qdk_chem_cli", "create-project", "--project-name", "new_project"]
+    sys.argv = ["qc", "create-project", "--project-name", "new_project"]
 
     with contextlib.suppress(SystemExit):
         main()
@@ -883,7 +883,7 @@ def test_cli_utils_create_project(temp_project_dir, capsys):
 @pytest.mark.usefixtures("temp_project_dir", "h2_structure_file")
 def test_cli_utils_list_files(capsys):
     """Test utils list-files command."""
-    sys.argv = ["qdk_chem_cli", "list-files", "--project-name", "test_project"]
+    sys.argv = ["qc", "list-files", "--project-name", "test_project"]
 
     with contextlib.suppress(SystemExit):
         main()
@@ -898,7 +898,7 @@ def test_cli_utils_list_files(capsys):
 def test_cli_utils_convert_energy(capsys):
     """Test utils convert-energy command."""
     sys.argv = [
-        "qdk_chem_cli",
+        "qc",
         "convert-energy",
         "--value",
         "1.0",
@@ -921,7 +921,7 @@ def test_cli_utils_convert_energy(capsys):
 def test_cli_utils_convert_coordinates(capsys):
     """Test utils convert-coordinates command."""
     sys.argv = [
-        "qdk_chem_cli",
+        "qc",
         "convert-coordinates",
         "--coordinates",
         "[[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]",
@@ -944,7 +944,7 @@ def test_cli_utils_convert_coordinates(capsys):
 def test_cli_data_summary(h2_structure_file, capsys):
     """Test data summary command."""
     sys.argv = [
-        "qdk_chem_cli",
+        "qc",
         "summary",
         "--project-name",
         "test_project",
@@ -965,7 +965,7 @@ def test_cli_data_summary(h2_structure_file, capsys):
 def test_cli_data_get_energy(h2_wavefunction_file, capsys):
     """Test data get-energy command."""
     sys.argv = [
-        "qdk_chem_cli",
+        "qc",
         "get-energy",
         "--project-name",
         "test_project",
@@ -986,7 +986,7 @@ def test_cli_data_get_energy(h2_wavefunction_file, capsys):
 def test_cli_data_get_structure_xyz(h2_structure_file, capsys):
     """Test data get-structure-xyz command."""
     sys.argv = [
-        "qdk_chem_cli",
+        "qc",
         "get-structure-xyz",
         "--project-name",
         "test_project",

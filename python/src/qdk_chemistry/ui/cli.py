@@ -5,16 +5,16 @@ commands use a ``run-`` prefix.
 
 Usage::
 
-    qdk_chem_cli run-scf --project-name myproj ...
-    qdk_chem_cli summary --project-name myproj --filename wf.wavefunction.json
-    qdk_chem_cli list-projects
-    qdk_chem_cli workflow --config pipeline.json --project-name myproj
+    qc run-scf --project-name myproj ...
+    qc summary --project-name myproj --filename wf.wavefunction.json
+    qc list-projects
+    qc workflow --config pipeline.json --project-name myproj
 
 Compound algorithms (run-mcscf, run-qpe, run-energy) accept a ``--config``
 JSON file for nested algorithm settings, with optional ``--set key=value``
 overrides.  Generate a default config template with::
 
-    qdk_chem_cli defaults --type mcscf
+    qc defaults --type mcscf
 
 Use ``--dry-run`` before any command to preview parameters without executing.
 """
@@ -2254,8 +2254,8 @@ def _create_describe_parser(subparsers):
             "types, defaults, and input/output roles.  Useful for agents\n"
             "and programmatic tool discovery.\n\n"
             "Examples:\n"
-            "  qdk_chem_cli describe run-scf\n"
-            "  qdk_chem_cli describe workflow\n"
+            "  qc describe run-scf\n"
+            "  qc describe workflow\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )

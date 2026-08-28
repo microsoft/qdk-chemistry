@@ -21,14 +21,15 @@ Getting started
 
    .. code-block:: bash
 
-      # For VS Code / GitHub Copilot Chat
-      qdk_chem_cli setup-agents --target-dir . --flavor vscode
+      # Install the QDK/Chemistry plugin and deploy its agents and skills.
+      qc plugin install qdk-chemistry@qdk-chemistry --target-dir .
 
-      # For Claude Code
-      qdk_chem_cli setup-agents --target-dir . --flavor claude
+      # Or install from a local QDK/Chemistry checkout.
+      qc plugin install ./copilot-plugins/qdk-chemistry --target-dir .
 
    This creates skills, agent definitions, and an MCP server config
-   (``mcp.json``) — everything an agent needs to start working.
+   (``.vscode/mcp.json`` and ``.github/mcp.json``) — everything an agent
+   needs to start working.
 
 3. **Open the project** in VS Code (or your agent platform). The MCP
    server starts automatically when the agent makes its first tool call.
@@ -49,14 +50,12 @@ What gets deployed
      - Purpose
    * - ``.vscode/mcp.json``
      - Tells VS Code where to find the MCP server
+    * - ``.github/mcp.json``
+       - Tells GitHub Copilot where to find the MCP server
    * - ``.github/skills/``
      - Domain knowledge: tool reference, workflow patterns, pitfalls, worked examples
    * - ``.github/agents/``
-     - Multi-agent definitions (orchestrator, researcher, reviewer, chemist, reporter)
-   * - ``.github/copilot-instructions.md``
-     - Top-level instructions for the agent platform
-   * - ``CLAUDE.md`` (Claude flavor)
-     - Equivalent instructions for Claude Code
+       - Multi-agent definitions (quantum-agent, researcher, reviewer, chemist, reporter)
 
 Customizing agent behavior
 --------------------------
@@ -95,20 +94,11 @@ Each ``.agent.md`` file specifies:
 For simple tasks, agents use skills directly — the full multi-agent
 pipeline is only invoked for complex, multi-step workflows.
 
-Editing instructions
-~~~~~~~~~~~~~~~~~~~~
-
-The top-level instructions (``.github/copilot-instructions.md`` or
-``CLAUDE.md``) set global conventions: coordinate units, stability
-checks, file naming, when to use which skill. Edit these to change
-the agent's default behavior.
-
-
 MCP server
 ----------
 
 The MCP server is the interface between the agent and QDK/Chemistry. It
-exposes ~40 tools organized into categories that the agent discovers via
+exposes ~50 tools organized into categories that the agent discovers via
 ``list_tools``.
 
 Every tool returns a structured JSON envelope with ``status`` (``"ok"``,
@@ -120,8 +110,8 @@ Start the server manually if needed:
 
 .. code-block:: bash
 
-   qdk_chem_mcp                                    # stdio (default)
-   qdk_chem_mcp --transport streamable-http --port 8081  # HTTP
+   qcmcp                                    # stdio (default)
+   qcmcp --transport streamable-http --port 8081  # HTTP
 
 
 CLI

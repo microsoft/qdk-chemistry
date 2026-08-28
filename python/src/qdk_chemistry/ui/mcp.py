@@ -2,10 +2,10 @@
 
 Launch the MCP server with::
 
-    qdkchemmcp                          # stdio (default)
-    qdkchemmcp --transport sse          # Server-Sent Events
-    qdkchemmcp --transport streamable-http --port 8081
-    qdkchemmcp --transport streamable-http --stateless-http --json-response
+    qcmcp                          # stdio (default)
+    qcmcp --transport sse          # Server-Sent Events
+    qcmcp --transport streamable-http --port 8081
+    qcmcp --transport streamable-http --stateless-http --json-response
         # sessionless JSON-RPC-over-HTTP (no Mcp-Session-Id required)
 """
 
@@ -65,7 +65,7 @@ def _install_output_schema_stripper() -> None:
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     """Parse MCP server flags (--transport, --host, --port, --verbose)."""
     p = argparse.ArgumentParser(
-        prog="qdkchemmcp",
+        prog="qcmcp",
         description="QDK/Chemistry MCP server",
     )
     p.add_argument(

@@ -23,7 +23,10 @@ _EXPECTED_SKILLS = {
 
 def test_marketplace_lists_qdk_chemistry_plugin() -> None:
     marketplace = json.loads((_ROOT / ".github" / "plugin" / "marketplace.json").read_text(encoding="utf-8"))
+    plugin = json.loads((_PLUGIN / "plugin.json").read_text(encoding="utf-8"))
     assert marketplace["plugins"][0]["source"] == "copilot-plugins/qdk-chemistry"
+    assert marketplace["metadata"]["version"] == plugin["version"]
+    assert marketplace["plugins"][0]["version"] == plugin["version"]
 
 
 def test_plugin_owns_complete_agent_and_skill_catalog() -> None:

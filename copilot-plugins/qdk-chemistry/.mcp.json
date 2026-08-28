@@ -2,7 +2,7 @@
   "mcpServers": {
     "qdk_chemistry": {
       "type": "stdio",
-      "command": "qdkchemmcp",
+      "command": "qcmcp",
       "timeout": 1814400000,
       "env": {
         "QDK_REQUIRE_WORKSPACE_BINDING": "1"

@@ -49,8 +49,8 @@ readme = "README.md"
 requires-python = ">=3.10"
 
 [project.scripts]
-qdkchem = "qdk_chemistry.ui.cli:main"
-qdkchemmcp = "qdk_chemistry.ui.mcp:main"
+qc = "qdk_chemistry.ui.cli:main"
+qcmcp = "qdk_chemistry.ui.mcp:main"
 
 [project.optional-dependencies]
 all = [

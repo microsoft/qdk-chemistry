@@ -128,7 +128,9 @@ repos:
       (?x)^(
         python/CMakeLists\.txt|
         cpp/CMakeLists\.txt|
-        docs/source/conf\.py
+        docs/source/conf\.py|
+        copilot-plugins/qdk-chemistry/plugin\.json|
+        \.github/plugin/marketplace\.json
       )$
 
   - id: check-pyi-stubs

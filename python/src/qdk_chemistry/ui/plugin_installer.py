@@ -17,7 +17,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-_PLUGIN_SERVER_SCRIPTS = {"qdk-chemistry": {"qdk_chemistry": "qdkchemmcp"}}
+_PLUGIN_SERVER_SCRIPTS = {"qdk-chemistry": {"qdk_chemistry": "qcmcp"}}
 _MANIFEST_PATHS = (
     Path("plugin.json"),
     Path(".plugin/plugin.json"),
@@ -185,7 +185,7 @@ def _script_path(scripts_dir: Path, script_name: str) -> Path:
 def _commands_for_current_environment(plugin_name: str) -> dict[str, str]:
     if sys.prefix == sys.base_prefix and not hasattr(sys, "real_prefix"):
         raise PluginInstallError(
-            "QDK Chemistry plugin installation requires a virtual environment; run it with .venv/bin/qdkchem"
+            "QDK Chemistry plugin installation requires a virtual environment; run it with .venv/bin/qc"
         )
     scripts_dir = Path(sysconfig.get_path("scripts"))
     return {

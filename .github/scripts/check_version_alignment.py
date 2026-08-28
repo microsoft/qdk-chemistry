@@ -22,6 +22,7 @@ Exit codes:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
 import re
 import sys
 from pathlib import Path
@@ -150,6 +151,27 @@ def check_versions() -> int:
     else:
         errors.append("docs/source/changelog.rst: file not found")
 
+    # Check 7: plugin marketplace entries match the plugin manifest version
+    plugin_manifest = repo_root / "copilot-plugins/qdk-chemistry/plugin.json"
+    marketplace_manifest = repo_root / ".github/plugin/marketplace.json"
+    try:
+        plugin_version = json.loads(plugin_manifest.read_text())["version"]
+        marketplace = json.loads(marketplace_manifest.read_text())
+        marketplace_versions = {
+            "metadata.version": marketplace["metadata"]["version"],
+            "plugins[0].version": marketplace["plugins"][0]["version"],
+        }
+        for field, marketplace_version in marketplace_versions.items():
+            if marketplace_version != plugin_version:
+                errors.append(
+                    f".github/plugin/marketplace.json: {field} is "
+                    f"'{marketplace_version}', expected '{plugin_version}' from plugin.json"
+                )
+    except (FileNotFoundError, IndexError, KeyError, json.JSONDecodeError) as exception:
+        errors.append(
+            f"plugin version manifests: invalid or missing data ({exception})"
+        )
+
     # Report results
     if errors:
         print("FAIL: Version check failed:", file=sys.stderr)
@@ -174,6 +196,8 @@ def check_versions() -> int:
     print("    - python/src/qdk_chemistry/utils/telemetry.py")
     print("    - docs/source/conf.py")
     print("    - docs/source/changelog.rst")
+    print("    - copilot-plugins/qdk-chemistry/plugin.json")
+    print("    - .github/plugin/marketplace.json")
     return 0
 
 

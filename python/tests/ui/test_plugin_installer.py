@@ -32,7 +32,7 @@ def _write_plugin(home: Path) -> Path:
                 "mcpServers": {
                     "qdk_chemistry": {
                         "type": "stdio",
-                        "command": "qdkchemmcp",
+                        "command": "qcmcp",
                         "timeout": 21 * 24 * 60 * 60 * 1000,
                         "env": {"QDK_REQUIRE_WORKSPACE_BINDING": "1"},
                     }
@@ -56,7 +56,7 @@ def test_workspace_install_delegates_fetch_and_writes_cross_client_files(
 ) -> None:
     copilot_home = tmp_path / ".qdk_chem" / "copilot"
     plugin_dir = _write_plugin(copilot_home)
-    command = "/project/.venv/bin/qdkchemmcp"
+    command = "/project/.venv/bin/qcmcp"
     calls: list[tuple[list[str], Path]] = []
     monkeypatch.setattr(
         plugin_installer,
@@ -112,7 +112,7 @@ def test_local_install_registers_ancestor_marketplace(
     monkeypatch.setattr(
         plugin_installer,
         "_commands_for_current_environment",
-        lambda _name: {"qdk_chemistry": "/project/.venv/bin/qdkchemmcp"},
+        lambda _name: {"qdk_chemistry": "/project/.venv/bin/qcmcp"},
     )
 
     def fake_copilot(arguments: list[str], *, home: Path) -> str:
@@ -165,7 +165,7 @@ def test_workspace_install_preserves_existing_jsonc_mcp_server(
     monkeypatch.setattr(
         plugin_installer,
         "_commands_for_current_environment",
-        lambda _name: {"qdk_chemistry": "/project/.venv/bin/qdkchemmcp"},
+        lambda _name: {"qdk_chemistry": "/project/.venv/bin/qcmcp"},
     )
     monkeypatch.setattr(plugin_installer, "_run_copilot", lambda _arguments, **_kwargs: None)
 
@@ -182,7 +182,7 @@ def test_update_reapplies_recorded_command(
 ) -> None:
     copilot_home = tmp_path / ".qdk_chem" / "copilot"
     plugin_dir = _write_plugin(copilot_home)
-    command = tmp_path / ".venv" / "bin" / "qdkchemmcp"
+    command = tmp_path / ".venv" / "bin" / "qcmcp"
     command.parent.mkdir(parents=True)
     command.touch()
     plugin_installer._write_binding(
@@ -200,7 +200,7 @@ def test_update_reapplies_recorded_command(
         assert arguments == ["plugin", "update", "qdk-chemistry@qdk-chemistry"]
         assert home == copilot_home
         config = json.loads((plugin_dir / ".mcp.json").read_text(encoding="utf-8"))
-        config["mcpServers"]["qdk_chemistry"]["command"] = "qdkchemmcp"
+        config["mcpServers"]["qdk_chemistry"]["command"] = "qcmcp"
         (plugin_dir / ".mcp.json").write_text(json.dumps(config), encoding="utf-8")
 
     monkeypatch.setattr(plugin_installer, "_run_copilot", fake_update)
