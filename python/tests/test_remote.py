@@ -584,6 +584,7 @@ def test_worker_cache_hit_skips_input_deserialization(tmp_path, monkeypatch):
         pytest.param((42,), True, id="singleton-tuple"),
         pytest.param((), True, id="empty-tuple"),
         pytest.param((None,), True, id="singleton-none-tuple"),
+        pytest.param((1, (2, 3)), True, id="nested-tuple"),
     ],
 )
 def test_worker_cache_preserves_result_shape(tmp_path, result, output_is_tuple):

@@ -147,11 +147,10 @@ def _load_bundled_plugin(plugin_name: str, disable_env_var: str) -> None:
 # Defer plugin imports until after module initialization
 def _import_plugins() -> None:
     """Import pre-packaged plugins after module initialization."""
+    import qdk_chemistry.remote.cache  # noqa: PLC0415
     from qdk_chemistry.plugins import _load_plugins  # noqa: PLC0415
-    from qdk_chemistry.remote.cache import _load_plugin_caches  # noqa: PLC0415
 
     _load_plugins()
-    _load_plugin_caches()
     for plugin_name, disable_env_var in _BUNDLED_PLUGIN_AUTOLOAD:
         _load_bundled_plugin(plugin_name, disable_env_var)
 

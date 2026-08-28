@@ -163,7 +163,7 @@ class FolderCache(CacheBackend):
         self._validate_key(content_hash, "content_hash")
         if not is_cacheable(data):
             raise TypeError(f"FolderCache does not support caching values of type {type(data).__name__}")
-        if isinstance(data, list):
+        if isinstance(data, list | tuple):
             return self._put_data_list(content_hash, data)
         if isinstance(data, np.ndarray):
             filepath = self._root / f"{content_hash}.ndarray.npy"
@@ -180,8 +180,8 @@ class FolderCache(CacheBackend):
         self._atomic_write_hdf5(filepath, data)
         return None
 
-    def _put_data_list(self, content_hash: str, data_list: list) -> None:
-        """Store a list of DataClass objects as individual files."""
+    def _put_data_list(self, content_hash: str, data_list: list | tuple) -> None:
+        """Store a sequence of DataClass objects as individual files."""
         if not self._is_homogeneous_dataclass_list(data_list):
             return self._put_generic_data_list(content_hash, data_list)
 
@@ -198,7 +198,7 @@ class FolderCache(CacheBackend):
         self._atomic_write_text(manifest_path, json.dumps({"type": type_name, "items": item_hashes}))
         return None
 
-    def _put_generic_data_list(self, content_hash: str, data_list: list) -> None:
+    def _put_generic_data_list(self, content_hash: str, data_list: list | tuple) -> None:
         """Store a list containing nested tuples/lists, DataClass objects, and primitives."""
         manifest_path = self._root / f"{content_hash}.list.json"
         if manifest_path.exists():
@@ -208,7 +208,7 @@ class FolderCache(CacheBackend):
         self._atomic_write_text(manifest_path, json.dumps(manifest))
 
     @staticmethod
-    def _is_homogeneous_dataclass_list(data_list: list) -> bool:
+    def _is_homogeneous_dataclass_list(data_list: list | tuple) -> bool:
         """Return whether *data_list* can use the legacy homogeneous-list manifest."""
         if not data_list:
             return False
