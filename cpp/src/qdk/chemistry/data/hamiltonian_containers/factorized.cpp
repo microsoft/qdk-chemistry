@@ -28,10 +28,10 @@ void validate_stored_shape(std::size_t num_ranks, std::size_t num_bases,
                            Eigen::Index w_size, const Eigen::MatrixXd& wb) {
   const auto mismatch = [](const std::string& what, std::size_t expected,
                            std::size_t found) {
-    throw std::invalid_argument(
-        "FactorizedHamiltonianContainer: serialized " + what + " is " +
-        std::to_string(found) + " but the stored buffers imply " +
-        std::to_string(expected) + ".");
+    throw std::invalid_argument("FactorizedHamiltonianContainer: serialized " +
+                                what + " is " + std::to_string(found) +
+                                " but the stored buffers imply " +
+                                std::to_string(expected) + ".");
   };
 
   if (static_cast<std::size_t>(wb.rows()) != num_ranks) {
@@ -47,8 +47,7 @@ void validate_stored_shape(std::size_t num_ranks, std::size_t num_bases,
   }
   const std::size_t expected_w = num_ranks * num_bases * num_copies;
   if (static_cast<std::size_t>(w_size) != expected_w) {
-    mismatch("w_matrices length", expected_w,
-             static_cast<std::size_t>(w_size));
+    mismatch("w_matrices length", expected_w, static_cast<std::size_t>(w_size));
   }
   if (static_cast<std::size_t>(u_size) % (num_ranks * num_bases) != 0) {
     throw std::invalid_argument(
