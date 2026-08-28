@@ -191,6 +191,7 @@ def test_cache_transport_fetches_result_without_blob(monkeypatch: pytest.MonkeyP
     cache.data["output-hash"] = [1, 2]
     cache.jobs["run-hash"] = SimpleNamespace(
         output_hashes=[{"value": -1.5}, {"hash": "output-hash"}],
+        output_is_tuple=True,
     )
     monkeypatch.setattr("qdk_chemistry.remote.cache.get_cache", lambda _name, **_config: cache)
     backend = _backend()
@@ -204,6 +205,39 @@ def test_cache_transport_fetches_result_without_blob(monkeypatch: pytest.MonkeyP
     )
 
     assert result == (-1.5, [1, 2])
+
+
+@pytest.mark.parametrize(
+    ("output_hashes", "output_is_tuple", "expected"),
+    [
+        ([{"value": 42}], False, 42),
+        ([{"value": 42}], True, (42,)),
+        ([], True, ()),
+    ],
+)
+def test_cache_transport_preserves_result_shape(
+    monkeypatch: pytest.MonkeyPatch,
+    output_hashes: list[dict[str, Any]],
+    output_is_tuple: bool,
+    expected: Any,
+) -> None:
+    """Cache transport uses the persisted result shape."""
+    cache = _SharedCache()
+    cache.jobs["run-hash"] = SimpleNamespace(
+        output_hashes=output_hashes,
+        output_is_tuple=output_is_tuple,
+    )
+    monkeypatch.setattr("qdk_chemistry.remote.cache.get_cache", lambda _name, **_config: cache)
+
+    result = _backend().fetch(
+        {
+            "transport": "cache",
+            "remote_cache": {"name": cache.name},
+            "run_hash": "run-hash",
+        }
+    )
+
+    assert result == expected
 
 
 def test_fetch_rejects_output_file_outside_destination(tmp_path) -> None:

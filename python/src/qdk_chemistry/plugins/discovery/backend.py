@@ -570,7 +570,7 @@ class DiscoveryBackend(RemoteBackend):
         cache = cls._shared_cache({"remote_cache": backend_state["remote_cache"]})
         run_hash = backend_state["run_hash"]
         job = cache.get_job(run_hash)
-        if job is None or not job.output_hashes:
+        if job is None or job.output_hashes is None or job.output_is_tuple is None:
             raise LookupError(f"Shared cache has no completed result for run {run_hash}")
         results: list[Any] = []
         for entry in job.output_hashes:
@@ -581,4 +581,8 @@ class DiscoveryBackend(RemoteBackend):
             if value is None:
                 raise LookupError(f"Shared cache is missing output {entry['hash']} for run {run_hash}")
             results.append(value)
-        return results[0] if len(results) == 1 else tuple(results)
+        if job.output_is_tuple:
+            return tuple(results)
+        if len(results) == 1:
+            return results[0]
+        raise LookupError(f"Shared cache has invalid result shape for run {run_hash}")
