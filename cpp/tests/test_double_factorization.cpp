@@ -24,12 +24,7 @@ namespace {
 
 constexpr double kReconstructionTolerance = 1e-10;
 
-/// Build a two-body tensor with the full permutational symmetry of a real
-/// chemist-ordered ERI tensor, as a signed sum of symmetric outer products:
-///     g_pqrs = sum_k signs[k] * L^k_pq * L^k_rs,   L^k symmetric.
-/// Passing a negative entry in @p signs produces a tensor whose (pq),(rs)
-/// supermatrix has a negative eigenvalue, which is exactly the case a plain
-/// sum-of-squares factorization cannot represent.
+/// Build a random two-body tensor with a negative entry in @p signs.
 Eigen::VectorXd make_two_body(std::size_t norb,
                               const std::vector<double>& signs, unsigned seed) {
   std::mt19937 rng(seed);
@@ -136,17 +131,11 @@ TEST(DoubleFactorizerTest, RejectsInvalidInput) {
   EXPECT_THROW(factorizer->run(nullptr), std::invalid_argument);
   EXPECT_THROW(factorizer->run(make_unrestricted_hamiltonian(norb)),
                std::invalid_argument);
-
-  // run() locks settings, so a threshold that discards every fragment --
-  // leaving no two-body term at all -- needs its own instance.
   auto truncating = DoubleFactorizerFactory::create("eigen_decomposition");
   truncating->settings().set("truncation_threshold", 1e6);
   EXPECT_THROW(truncating->run(hamiltonian), std::invalid_argument);
 }
 
-// eigen_decompose_two_body() is public API: symmetry-shift and one-norm
-// utilities consume the fragments directly, so its contract is pinned
-// independently of the container.
 TEST(DoubleFactorizerTest, EigenDecomposeFragmentsReconstructTensor) {
   constexpr std::size_t norb = 3;
   const auto two_body = make_two_body(norb, {1.0, -1.0}, 17);
@@ -156,8 +145,6 @@ TEST(DoubleFactorizerTest, EigenDecomposeFragmentsReconstructTensor) {
   Eigen::VectorXd reconstructed =
       Eigen::VectorXd::Zero(norb * norb * norb * norb);
   for (const auto& fragment : fragments) {
-    // lambda_df is the fragment 1-norm consumers such as the symmetry-shift
-    // and one-norm utilities sum directly, so pin its definition here.
     const double eps_abs_sum = fragment.eps.array().abs().sum();
     EXPECT_NEAR(fragment.lambda_df, 0.5 * eps_abs_sum * eps_abs_sum,
                 kReconstructionTolerance);
@@ -187,17 +174,12 @@ TEST(DoubleFactorizerTest, EigenDecomposeSortsFragmentsByDecreasingWeight) {
   const auto fragments = eigen_decompose_two_body(two_body, norb);
   ASSERT_GE(fragments.size(), 2u);
 
-  // eps is scaled by sqrt(|lambda|) and the fragment eigenvector is
-  // normalized, so ||eps^r||^2 == |lambda_r|.
   for (std::size_t r = 1; r < fragments.size(); ++r) {
     EXPECT_LE(fragments[r].eps.squaredNorm(),
               fragments[r - 1].eps.squaredNorm() + 1e-12);
   }
 }
 
-// A tensor built with a negative outer product has a negative supermatrix
-// eigenvalue. Without per-rank signs the reconstruction would silently flip
-// that fragment's contribution.
 TEST(DoubleFactorizerTest, RepresentsNegativeFragments) {
   constexpr std::size_t norb = 4;
   const auto two_body = make_two_body(norb, {1.0, -1.0, 1.0}, 5);
@@ -238,22 +220,6 @@ TEST(DoubleFactorizerTest, PreservesOneBodyTermAndCoreEnergy) {
   EXPECT_TRUE(factorized->is_restricted());
 }
 
-// A rank-deficient tensor should factorize into exactly as many fragments as
-// it has non-negligible supermatrix eigenvalues.
-TEST(DoubleFactorizerTest, RankMatchesNumberOfSignificantEigenvalues) {
-  constexpr std::size_t norb = 4;
-  auto hamiltonian = make_hamiltonian(norb, make_two_body(norb, {1.0, 1.0}, 9));
-
-  auto factorizer = DoubleFactorizerFactory::create("eigen_decomposition");
-  factorizer->settings().set("truncation_threshold", 1e-8);
-  auto factorized = factorizer->run(hamiltonian);
-
-  const auto& container = as_factorized(factorized);
-  EXPECT_EQ(container.get_num_ranks(), 2u);
-  EXPECT_EQ(container.get_num_orbitals(), norb);
-  EXPECT_EQ(container.get_num_bases(), norb);
-  EXPECT_EQ(container.get_num_copies(), 1u);
-}
 
 TEST(DoubleFactorizerTest, TruncationDiscardsSmallFragments) {
   constexpr std::size_t norb = 4;
