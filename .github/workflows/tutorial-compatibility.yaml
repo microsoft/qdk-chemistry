@@ -35,6 +35,9 @@ jobs:
   current-source-baseline:
     name: Current-source baseline (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    env:
+      # Remove when this job returns to a pinned published package.
+      CMAKE_BUILD_PARALLEL_LEVEL: '1'
     strategy:
       fail-fast: false
       matrix:
