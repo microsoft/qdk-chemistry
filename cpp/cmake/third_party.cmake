@@ -60,16 +60,20 @@ handle_dependency(libint2
   ${_libint2_patch_args}
   REQUIRED
 )
-foreach(_libint2_cxx_target libint2_cxx Libint2::libint2_cxx)
+# libint2's cxxapi.h requires MSVC to report C++11 via /Zc:__cplusplus, plus
+# /Zc:preprocessor (Boost.Preprocessor). Apply to whichever libint2 C++ target
+# qdk-chemistry links: the FetchContent target (libint2_cxx) or the installed
+# imported target (Libint2::cxx). Skip ALIAS targets, which reject compile
+# options. clang-cl reports C++11 correctly and rejects /Zc:preprocessor.
+foreach(_libint2_cxx_target libint2_cxx Libint2::libint2_cxx Libint2::cxx)
   if(MSVC AND TARGET ${_libint2_cxx_target})
-    # libint2 needs /Zc:__cplusplus (C++11 detection) and /Zc:preprocessor
-    # (Boost.Preprocessor). Apply to both the FetchContent target (libint2_cxx)
-    # and the installed imported target (Libint2::libint2_cxx).
-    # clang-cl rejects /Zc:preprocessor; omit it there.
-    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
-      target_compile_options(${_libint2_cxx_target} INTERFACE /Zc:__cplusplus)
-    else()
-      target_compile_options(${_libint2_cxx_target} INTERFACE /Zc:__cplusplus /Zc:preprocessor)
+    get_target_property(_libint2_cxx_alias ${_libint2_cxx_target} ALIASED_TARGET)
+    if(NOT _libint2_cxx_alias)
+      if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
+        target_compile_options(${_libint2_cxx_target} INTERFACE /Zc:__cplusplus)
+      else()
+        target_compile_options(${_libint2_cxx_target} INTERFACE /Zc:__cplusplus /Zc:preprocessor)
+      endif()
     endif()
   endif()
 endforeach()
