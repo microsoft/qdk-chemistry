@@ -91,7 +91,7 @@ def ensure_filename_format(filename: str, data_type: str) -> str:
     raise FilenameFormatError(f"Unrecognized file extension for '{filename}'. Must end with .json, .hdf5, or .h5")
 
 
-def validate_project(func: F) -> str | F:
+def validate_project(func: F) -> F:
     """Decorator to validate project before executing the function.
 
     Validates that a project exists, is properly structured, and is the
