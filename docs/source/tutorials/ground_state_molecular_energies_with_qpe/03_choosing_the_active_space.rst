@@ -235,7 +235,7 @@ The asterisks in the script output identify the selected orbitals.
 The selected high-entropy group determines the refined active space.
 Equal natural-orbital occupations can leave the corresponding orbital vectors free to rotate within a degenerate subspace.
 The script passes the complete autoCAS-selected blocks to the native :ref:`qdk_gauge_fixing localizer <localizer-qdk-gauge-fixing>`.
-This localizer first anchors each selected block to the atomic-orbital basis and then coordinate-minimizes the mapped Hamiltonian coefficient norm :math:`\lambda=\sum_\ell\lvert h_\ell\rvert`, without changing the orbital subspace or its exact :term:`CASCI` energy.
+This localizer first anchors each selected block to the atomic-orbital basis and then rotates those blocks to minimize the valence-space mapped Hamiltonian coefficient norm :math:`\lambda=\sum_\ell\lvert h_\ell\rvert`, without changing the orbital subspace or its exact :term:`CASCI` energy.
 Gauge fixing uses the correlated natural-orbital wavefunction because its one-particle :term:`RDM` defines the occupation-degenerate blocks.
 The script then applies the refined autoCAS partition to the gauge-fixed orbitals before constructing the final selected-space Hamiltonian.
 Among the unselected orbitals, those below the occupied--virtual boundary of the reference determinant become inactive, while those above the boundary become virtual.
