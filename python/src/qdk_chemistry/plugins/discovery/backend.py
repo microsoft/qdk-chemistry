@@ -26,7 +26,12 @@ from qdk_chemistry.plugins.discovery._sdk import (
     response_mapping,
 )
 from qdk_chemistry.remote.backends.base import JobStatus, RemoteBackend
-from qdk_chemistry.remote.serialization import _manifest_file_path, deserialize_outputs, serialize_inputs
+from qdk_chemistry.remote.serialization import (
+    _manifest_file_path,
+    deserialize_outputs,
+    get_serialized_file_names,
+    serialize_inputs,
+)
 
 
 def _discovery_env_defaults() -> dict[str, Any]:
@@ -557,7 +562,7 @@ class DiscoveryBackend(RemoteBackend):
             self.download(manifest_path, manifest_local)
             manifest = json.loads(manifest_local.read_text(encoding="utf-8"))
             for entry in manifest.get("results", []):
-                if filename := entry.get("file"):
+                for filename in get_serialized_file_names(entry):
                     remote_path = f"{output_dir}/{filename}"
                     self.download(remote_path, _manifest_file_path(resolved_dir, filename))
             return deserialize_outputs(resolved_dir)

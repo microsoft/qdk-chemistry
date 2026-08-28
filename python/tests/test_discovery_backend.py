@@ -360,6 +360,42 @@ def test_fetch_rejects_output_file_outside_destination(tmp_path) -> None:
     assert downloads == [("qdk_chemistry/job/output/manifest.json", tmp_path / "outputs" / "manifest.json")]
 
 
+def test_fetch_downloads_nested_output_files(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fetch downloads files recursively referenced by list and tuple results."""
+    backend = _backend()
+    downloads: list[str] = []
+
+    def download(remote_path: str, local_path: Any) -> None:
+        downloads.append(remote_path)
+        Path(local_path).parent.mkdir(parents=True, exist_ok=True)
+        if remote_path.endswith("manifest.json"):
+            Path(local_path).write_text(
+                json.dumps(
+                    {
+                        "results": [
+                            {
+                                "type": "tuple",
+                                "items": [
+                                    {"type": "list", "items": [{"type": "ndarray", "file": "nested.npy"}]}
+                                ],
+                            }
+                        ]
+                    }
+                )
+            )
+        else:
+            Path(local_path).write_bytes(b"not read")
+
+    backend.download = download
+    monkeypatch.setattr("qdk_chemistry.plugins.discovery.backend.deserialize_outputs", lambda _directory: "result")
+    assert backend.fetch({"output_dir": "qdk_chemistry/job/output"}, tmp_path / "outputs") == "result"
+
+    assert downloads == [
+        "qdk_chemistry/job/output/manifest.json",
+        "qdk_chemistry/job/output/nested.npy",
+    ]
+
+
 def test_auto_transport_requires_cache_or_blob() -> None:
     """Auto mode rejects submissions with no usable artifact transport."""
     backend = _backend()

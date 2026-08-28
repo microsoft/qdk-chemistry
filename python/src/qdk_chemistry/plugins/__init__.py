@@ -75,12 +75,6 @@ def _distribution_name(entry_point: EntryPoint) -> str | None:
     return name.lower() if isinstance(name, str) else None
 
 
-def _legacy_cache_entry_point_enabled(entry_point: EntryPoint) -> bool:
-    """Return whether a legacy cache entry point should load for its distribution."""
-    distribution_name = _distribution_name(entry_point)
-    return distribution_name is None or distribution_name not in _UNIFIED_PLUGIN_DISTRIBUTIONS
-
-
 def _load_plugins() -> None:
     """Load plugins advertised through the unified entry-point group."""
     from importlib.metadata import entry_points  # noqa: PLC0415
