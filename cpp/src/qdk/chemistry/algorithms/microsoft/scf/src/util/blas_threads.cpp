@@ -27,7 +27,8 @@
 // An unknown identifier evaluates to 0 in #if, so a vendor with no ID above is
 // indistinguishable from _None. Naming a vendor is a request for its API, so
 // fail rather than silently take the no-op path.
-#error "QDK_CHEMISTRY_BLAS_VENDOR names a BLAS vendor with no ID in blas_threads.cpp"
+#error \
+    "QDK_CHEMISTRY_BLAS_VENDOR names a BLAS vendor with no ID in blas_threads.cpp"
 #endif
 
 #if QDK_CHEMISTRY_BLAS_VENDOR == QDK_CHEMISTRY_BLAS_VENDOR_OpenBLAS
