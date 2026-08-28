@@ -75,6 +75,7 @@ You can discover available implementations programmatically:
       :start-after: # start-cell-list-implementations
       :end-before: # end-cell-list-implementations
 
+.. _sparse-isometry:
 .. _sparse-isometry-gf2x:
 
 Sparse Isometry
