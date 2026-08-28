@@ -50,12 +50,12 @@ What gets deployed
      - Purpose
    * - ``.vscode/mcp.json``
      - Tells VS Code where to find the MCP server
-    * - ``.github/mcp.json``
-       - Tells GitHub Copilot where to find the MCP server
+   * - ``.github/mcp.json``
+     - Tells GitHub Copilot where to find the MCP server
    * - ``.github/skills/``
      - Domain knowledge: tool reference, workflow patterns, pitfalls, worked examples
    * - ``.github/agents/``
-       - Multi-agent definitions (quantum-agent, researcher, reviewer, chemist, reporter)
+     - Multi-agent definitions (quantum-agent, researcher, reviewer, chemist, reporter)
 
 Customizing agent behavior
 --------------------------
