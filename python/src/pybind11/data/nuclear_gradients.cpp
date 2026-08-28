@@ -129,6 +129,4 @@ Returns:
       .def("__repr__", [](const NuclearGradients& gradients) {
         return gradients.get_summary();
       });
-
-  m.attr("NuclearGradients").attr("_data_type_name") = "nuclear_gradients";
 }

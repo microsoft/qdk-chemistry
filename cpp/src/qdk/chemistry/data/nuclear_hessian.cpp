@@ -190,13 +190,6 @@ bool NuclearHessian::_is_valid() const {
   return matrix_.rows() == expected && matrix_.cols() == expected;
 }
 
-void NuclearHessian::hash_update(
-    qdk::chemistry::utils::HashContext& ctx) const {
-  hash_value(ctx, get_data_type_name());
-  hash_value(ctx, get_structure()->content_hash());
-  hash_value(ctx, matrix_);
-}
-
 void NuclearHessian::_to_json_file(const std::string& filename) const {
   std::ofstream file(filename);
   if (!file.is_open()) {
@@ -229,6 +222,13 @@ std::shared_ptr<NuclearHessian> NuclearHessian::_from_hdf5_file(
   }
   H5::H5File file(filename, H5F_ACC_RDONLY);
   return from_hdf5(file);
+}
+
+void NuclearHessian::hash_update(
+    qdk::chemistry::utils::HashContext& ctx) const {
+  hash_value(ctx, get_data_type_name());
+  hash_value(ctx, get_structure()->content_hash());
+  hash_value(ctx, matrix_);
 }
 
 }  // namespace qdk::chemistry::data

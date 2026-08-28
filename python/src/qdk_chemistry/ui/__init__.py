@@ -7,9 +7,9 @@
 
 import importlib
 
-__copyright__ = """"""
+from qdk_chemistry import __version__
 
-__version__ = "1.0.0"
+__copyright__ = """"""
 
 __all__ = ["app", "cli"]
 

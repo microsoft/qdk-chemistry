@@ -133,12 +133,6 @@ class NuclearGradients : public DataClass,
    */
   static std::shared_ptr<NuclearGradients> from_hdf5(H5::Group& group);
 
- protected:
-  /**
-   * @brief Feed gradient content into a deterministic hash context.
-   */
-  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
-
  private:
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
 
@@ -149,6 +143,7 @@ class NuclearGradients : public DataClass,
       const std::string& filename);
   static std::shared_ptr<NuclearGradients> _from_hdf5_file(
       const std::string& filename);
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
 
   std::shared_ptr<Structure> structure_;
   Eigen::VectorXd values_;

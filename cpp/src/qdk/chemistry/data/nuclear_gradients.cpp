@@ -194,13 +194,6 @@ bool NuclearGradients::_is_valid() const {
              static_cast<Eigen::Index>(3 * structure_->get_num_atoms());
 }
 
-void NuclearGradients::hash_update(
-    qdk::chemistry::utils::HashContext& ctx) const {
-  hash_value(ctx, get_data_type_name());
-  hash_value(ctx, get_structure()->content_hash());
-  hash_value(ctx, values_);
-}
-
 void NuclearGradients::_to_json_file(const std::string& filename) const {
   std::ofstream file(filename);
   if (!file.is_open()) {
@@ -233,6 +226,13 @@ std::shared_ptr<NuclearGradients> NuclearGradients::_from_hdf5_file(
   }
   H5::H5File file(filename, H5F_ACC_RDONLY);
   return from_hdf5(file);
+}
+
+void NuclearGradients::hash_update(
+    qdk::chemistry::utils::HashContext& ctx) const {
+  hash_value(ctx, get_data_type_name());
+  hash_value(ctx, get_structure()->content_hash());
+  hash_value(ctx, values_);
 }
 
 }  // namespace qdk::chemistry::data

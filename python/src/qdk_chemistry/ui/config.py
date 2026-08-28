@@ -8,6 +8,8 @@
 import os
 from pathlib import Path
 
+from qdk_chemistry import __version__
+
 
 class QDKMCPConfig:
     """Configuration class for QDK/Chemistry MCP Server.
@@ -56,7 +58,7 @@ class QDKMCPConfig:
 
         # Server settings
         self.server_name = "qdk-chem-mcp"
-        self.server_version = "1.0.0"
+        self.server_version = __version__
 
         try:
             self._setup_directories()
