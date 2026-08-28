@@ -7,6 +7,7 @@
 
 import numpy as np
 
+from qdk_chemistry.algorithms.qubit_mapper.sos import SOSQubitMapper
 from qdk_chemistry.data import (
     Ansatz,
     BasisSet,
@@ -14,6 +15,7 @@ from qdk_chemistry.data import (
     Configuration,
     FactorizedHamiltonianContainer,
     Hamiltonian,
+    MajoranaMapping,
     Orbitals,
     OrbitalType,
     Shell,
@@ -304,6 +306,25 @@ def create_random_factorized_hamiltonian(
         inactive_fock,
         orbitals,
     )
+
+
+def to_sossa_operator(factorized_hamiltonian):
+    """Map a factorized Hamiltonian to the SOSSA QubitOperator the SOSSA builder expects.
+
+    Wrapping the container in a :class:`Hamiltonian` transfers ownership to C++ and
+    disowns the Python handle, so callers must not touch ``factorized_hamiltonian``
+    afterwards.
+
+    Args:
+        factorized_hamiltonian: The FactorizedHamiltonianContainer to map.
+
+    Returns:
+        The SOSSA QubitOperator.
+
+    """
+    num_modes = 2 * factorized_hamiltonian.get_num_orbitals()
+    hamiltonian = Hamiltonian(factorized_hamiltonian)
+    return SOSQubitMapper().run(hamiltonian, MajoranaMapping.jordan_wigner(num_modes))
 
 
 def create_random_bitstring_matrix(

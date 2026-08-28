@@ -25,7 +25,6 @@ from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.circuit_mapper.sossa_mapper import SOSSAMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import UnaryPhaseEstimation
-from qdk_chemistry.algorithms.qubit_mapper.sos import SOSQubitMapper
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
@@ -40,14 +39,7 @@ from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSAWalkContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .test_helpers import create_random_factorized_hamiltonian, create_test_orbitals
-
-
-def _to_sossa_operator(factorized_hamiltonian):
-    num_modes = 2 * factorized_hamiltonian.get_num_orbitals()
-    hamiltonian = Hamiltonian(factorized_hamiltonian)
-    return SOSQubitMapper().run(hamiltonian, MajoranaMapping.jordan_wigner(num_modes))
-
+from .test_helpers import create_random_factorized_hamiltonian, create_test_orbitals, to_sossa_operator
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Test Hamiltonian construction (small DFTHC-like H2 data)
@@ -419,7 +411,7 @@ def _build_h2_sossa_problem():
         np.zeros((n_orb, n_orb)),
         create_test_orbitals(n_orb),
     )
-    sossa_op = _to_sossa_operator(fh)
+    sossa_op = to_sossa_operator(fh)
     container = SOSSABuilder().run(sossa_op).get_container()
 
     num_system_qubits = 2 * n_orb
@@ -585,7 +577,7 @@ class TestSOSSAQPEIntegration:
 
         # Step 1: SOSSABuilder → UnitaryRepresentation
         builder = SOSSABuilder()
-        unitary_rep = builder.run(_to_sossa_operator(fh))
+        unitary_rep = builder.run(to_sossa_operator(fh))
         container = unitary_rep.get_container()
         assert isinstance(container, SOSSAWalkContainer)
 
@@ -639,7 +631,7 @@ class TestSOSSAQPEIntegration:
         )
 
         builder = SOSSABuilder()
-        unitary_rep = builder.run(_to_sossa_operator(fh))
+        unitary_rep = builder.run(to_sossa_operator(fh))
         container = unitary_rep.get_container()
         lambda_sos = container.metadata.normalization
 
@@ -731,10 +723,10 @@ class TestSOSSAQPEIntegration:
             np.zeros((n_orb, n_orb)),
             orbitals,
         )
-        # ``_to_sossa_operator`` transfers ownership of the C++ container, so read the
+        # ``to_sossa_operator`` transfers ownership of the C++ container, so read the
         # scalar offset off ``fh`` before it is consumed.
         core_energy = fh.get_core_energy()
-        container = _to_sossa_operator(fh).get_container()
+        container = to_sossa_operator(fh).get_container()
 
         expected = core_energy + _sos_energy_shift(
             data["h1"],
@@ -767,7 +759,7 @@ class TestSOSSAQPEIntegration:
             np.zeros((n_orb, n_orb)),
             orbitals,
         )
-        container = SOSSABuilder().run(_to_sossa_operator(fh)).get_container()
+        container = SOSSABuilder().run(to_sossa_operator(fh)).get_container()
 
         h_gap = _build_dfthc_hamiltonian_matrix(
             data["h1"],
@@ -862,11 +854,16 @@ def _sossa_unary_qpe_circuit(num_queries, *, num_orbitals, num_ranks, num_bases,
         num_orbitals=num_orbitals, num_ranks=num_ranks, num_bases=num_bases, num_copies=num_copies
     )
     num_modes = 2 * num_orbitals
+    # Wrapping the container in a Hamiltonian hands ownership to C++ and disowns the
+    # Python handle, so the orbitals have to be built independently rather than read back
+    # off ``factorized``. ``create_random_factorized_hamiltonian`` builds its own the same
+    # way, so these are the container's orbitals.
+    orbitals = create_test_orbitals(num_orbitals)
     operator = create("qubit_mapper", "sossa").run(Hamiltonian(factorized), MajoranaMapping.jordan_wigner(num_modes))
 
     num_electrons = max(1, num_orbitals // 2)
     hf_config = Configuration.canonical_hf_configuration(num_electrons, num_electrons, num_orbitals)
-    reference = Wavefunction(StateVectorContainer(hf_config, factorized.get_orbitals()))
+    reference = Wavefunction(StateVectorContainer(hf_config, orbitals))
     state_prep = create("state_prep", "sparse_isometry").run(reference)
 
     builder = create(

@@ -14,10 +14,8 @@ import pytest
 import qdk
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
-from qdk_chemistry.algorithms.qubit_mapper.sos import SOSQubitMapper
 from qdk_chemistry.data import (
     Configuration,
-    Hamiltonian,
     ModelOrbitals,
     StateVectorContainer,
     Wavefunction,
@@ -32,7 +30,7 @@ from qdk_chemistry.data.unitary_representation.containers.sossa import (
 from qdk_chemistry.utils.qsharp import create_qsharp_context
 
 from .reference_tolerances import float_comparison_absolute_tolerance
-from .test_helpers import create_random_factorized_hamiltonian
+from .test_helpers import create_random_factorized_hamiltonian, to_sossa_operator
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Test helpers
@@ -47,11 +45,6 @@ def qdk_ctx() -> qdk.Context:
     ``dump_machine`` reports every qubit currently allocated in the context.
     """
     return create_qsharp_context()
-
-
-def _to_sossa_operator(factorized_hamiltonian):
-    hamiltonian = Hamiltonian(factorized_hamiltonian)
-    return SOSQubitMapper().run(hamiltonian, None)
 
 
 def _make_sossa_unitary_representation():
@@ -243,7 +236,7 @@ class TestSOSSABuilder:
             num_copies=num_copies,
         )
         builder = SOSSABuilder()
-        result = builder.run(_to_sossa_operator(fh))
+        result = builder.run(to_sossa_operator(fh))
         container = result.get_container()
 
         assert isinstance(container, SOSSAWalkContainer)
@@ -274,7 +267,7 @@ class TestSOSSABuilder:
             num_bases=num_bases,
             num_copies=num_copies,
         )
-        container = SOSSABuilder().run(_to_sossa_operator(fh)).get_container()
+        container = SOSSABuilder().run(to_sossa_operator(fh)).get_container()
 
         amplitudes = np.asarray(container.outer_prepare.get_coefficients(), dtype=float)
 
