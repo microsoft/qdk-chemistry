@@ -182,6 +182,8 @@ class FolderCache(CacheBackend):
 
     def _put_data_list(self, content_hash: str, data_list: list | tuple) -> None:
         """Store a sequence of DataClass objects as individual files."""
+        if isinstance(data_list, tuple):
+            return self._put_generic_data_list(content_hash, data_list)
         if not self._is_homogeneous_dataclass_list(data_list):
             return self._put_generic_data_list(content_hash, data_list)
 
@@ -312,17 +314,16 @@ class FolderCache(CacheBackend):
     def delete_data(self, content_hash: str) -> bool:
         """Remove a DataClass blob (or list manifest and its items) by content hash."""
         self._validate_key(content_hash, "content_hash")
-        import json as _json  # noqa: PLC0415
-
         deleted = False
+        child_nodes: set[tuple[str, str]] = set()
 
         # Remove list manifests and their per-item blobs
         generic_manifest = self._root / f"{content_hash}.list.json"
         if generic_manifest.exists():
             try:
-                manifest = _json.loads(generic_manifest.read_text())
-                self._delete_data_nodes(manifest)
-            except (_json.JSONDecodeError, OSError, KeyError, TypeError):
+                manifest = json.loads(generic_manifest.read_text())
+                self._collect_data_nodes(manifest, child_nodes)
+            except (json.JSONDecodeError, OSError, KeyError, TypeError):
                 pass
             try:
                 generic_manifest.unlink()
@@ -333,8 +334,8 @@ class FolderCache(CacheBackend):
         list_matches = list(self._root.glob(f"{content_hash}.list[[]*].json"))
         for manifest_path in list_matches:
             try:
-                manifest = _json.loads(manifest_path.read_text())
-            except (_json.JSONDecodeError, OSError):
+                manifest = json.loads(manifest_path.read_text())
+            except (json.JSONDecodeError, OSError):
                 try:
                     manifest_path.unlink()
                     deleted = True
@@ -343,13 +344,21 @@ class FolderCache(CacheBackend):
                 continue
 
             for item_hash in manifest.get("items", []):
-                for f in self._root.glob(f"{item_hash}.*.h5"):
-                    deleted = self._unlink_existing(f) or deleted
+                child_nodes.add(("dataclass", item_hash))
             try:
                 manifest_path.unlink()
                 deleted = True
             except OSError:
                 pass
+
+        if child_nodes:
+            referenced_nodes = self._referenced_data_nodes()
+            for kind, item_hash in child_nodes - referenced_nodes:
+                if kind == "dataclass":
+                    for f in self._root.glob(f"{item_hash}.*.h5"):
+                        deleted = self._unlink_existing(f) or deleted
+                elif kind == "ndarray":
+                    deleted = self._unlink_existing(self._root / f"{item_hash}.ndarray.npy") or deleted
 
         # Remove single-object blobs
         for f in self._root.glob(f"{content_hash}.*.h5"):
@@ -371,19 +380,36 @@ class FolderCache(CacheBackend):
         except OSError:
             return False
 
-    def _delete_data_nodes(self, node: dict[str, Any]) -> None:
-        """Delete data blobs referenced by a generic manifest node."""
+    @staticmethod
+    def _collect_data_nodes(node: dict[str, Any], nodes: set[tuple[str, str]]) -> None:
+        """Collect data blobs referenced by a generic manifest node."""
         kind = node.get("kind")
         if kind == "dataclass":
-            for f in self._root.glob(f"{node['hash']}.*.h5"):
-                self._unlink_existing(f)
+            nodes.add((kind, node["hash"]))
             return
         if kind == "ndarray":
-            self._unlink_existing(self._root / f"{node['hash']}.ndarray.npy")
+            nodes.add((kind, node["hash"]))
             return
         if kind == "sequence":
             for item in node.get("items", []):
-                self._delete_data_nodes(item)
+                FolderCache._collect_data_nodes(item, nodes)
+
+    def _referenced_data_nodes(self) -> set[tuple[str, str]]:
+        """Return data blobs referenced by sequence manifests in the cache."""
+        nodes: set[tuple[str, str]] = set()
+        for manifest_path in self._root.glob("*.list.json"):
+            try:
+                manifest = json.loads(manifest_path.read_text())
+                self._collect_data_nodes(manifest, nodes)
+            except (json.JSONDecodeError, OSError, KeyError, TypeError):
+                continue
+        for manifest_path in self._root.glob("*.list[[]*].json"):
+            try:
+                manifest = json.loads(manifest_path.read_text())
+                nodes.update(("dataclass", item_hash) for item_hash in manifest["items"])
+            except (json.JSONDecodeError, OSError, KeyError, TypeError):
+                continue
+        return nodes
 
     def clear(self) -> None:
         """Remove all cached jobs and data blobs."""

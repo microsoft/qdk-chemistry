@@ -527,34 +527,6 @@ def test_worker_cache_transport_skips_output_serialization(tmp_path, monkeypatch
     assert not output_dir.exists()
 
 
-def test_worker_cache_transport_serializes_after_cache_write_failure(tmp_path, monkeypatch):
-    """Cache transport retains outputs when its cache write fails."""
-    input_dir = tmp_path / "input"
-    output_dir = tmp_path / "output"
-    serialize_inputs(
-        input_dir,
-        args=(),
-        kwargs={},
-        algorithm_type="test_algorithm",
-        algorithm_name="plugin",
-        settings={},
-        run_hash="testhash",
-        remote_cache={"name": "shared"},
-        remote_cache_transport=True,
-    )
-    algorithm = MagicMock()
-    algorithm.run.return_value = 6
-    monkeypatch.setattr(remote_worker, "_load_remote_cache", MagicMock(return_value=(MagicMock(), "testhash", False)))
-    monkeypatch.setattr(remote_worker, "_get_cached_result", MagicMock(return_value=remote_worker._CACHE_MISS))
-    monkeypatch.setattr(remote_worker, "_store_cached_result", MagicMock(return_value=False))
-    monkeypatch.setattr(algorithms_module, "create", MagicMock(return_value=algorithm))
-    serialize = MagicMock()
-    monkeypatch.setattr(serialization_module, "serialize_outputs", serialize)
-
-    assert execute_job(input_dir, output_dir) == 6
-    serialize.assert_called_once_with(output_dir, 6)
-
-
 def test_worker_logs_remote_cache_load_failure(tmp_path, monkeypatch, caplog):
     input_dir = tmp_path / "input"
     input_dir.mkdir()

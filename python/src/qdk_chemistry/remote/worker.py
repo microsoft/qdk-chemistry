@@ -173,7 +173,9 @@ def execute_job(input_dir: str | Path, output_dir: str | Path) -> Any:
         result = algorithm.run(*inputs["args"], **inputs["kwargs"])
         cached_result = _store_cached_result(cache, run_hash, inputs, result)
 
-    if cache_transport and cached_result:
+    if cache_transport:
+        if not cached_result:
+            raise RuntimeError("remote_cache_transport could not persist the completed result")
         return result
     serialize_outputs(output_path, result)
     return result

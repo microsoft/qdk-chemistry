@@ -20,7 +20,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from qdk_chemistry.plugins.discovery._sdk import (
-    OperationIdPolling,
+    _OperationIdPolling,
     create_credential,
     create_workspace_client,
     response_mapping,
@@ -471,7 +471,7 @@ class DiscoveryBackend(RemoteBackend):
                 output_dir,
             ]
         )
-        polling = OperationIdPolling()
+        polling = _OperationIdPolling()
         try:
             self._client.tools.begin_run(
                 project_name=str(self.project_name),

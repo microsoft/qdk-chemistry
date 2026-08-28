@@ -37,7 +37,7 @@ def create_workspace_client(endpoint: str, credential: Any) -> Any:
     )
 
 
-class OperationIdPolling(NoPolling):
+class _OperationIdPolling(NoPolling):
     """Capture a submitted run ID without polling the operation."""
 
     operation_id: str | None = None

@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -20,7 +21,12 @@ pytest.importorskip("azure.ai.discovery", reason="azure-ai-discovery is not inst
 
 from azure.ai.discovery.models import InputDataMount, OutputDataMount
 
+import qdk_chemistry.algorithms as algorithms_module
+import qdk_chemistry.remote.serialization as serialization_module
+import qdk_chemistry.remote.worker as remote_worker
 from qdk_chemistry.plugins.discovery.backend import DiscoveryBackend
+from qdk_chemistry.remote.serialization import serialize_inputs
+from qdk_chemistry.remote.worker import execute_job
 
 
 class _SharedCache:
@@ -341,6 +347,35 @@ def test_cache_transport_preserves_result_shape(
     )
 
     assert result == expected
+
+
+def test_cache_transport_fails_after_cache_write_failure(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Cache transport fails when its only result transport cannot persist output."""
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    serialize_inputs(
+        input_dir,
+        args=(),
+        kwargs={},
+        algorithm_type="test_algorithm",
+        algorithm_name="plugin",
+        settings={},
+        run_hash="testhash",
+        remote_cache={"name": "shared"},
+        remote_cache_transport=True,
+    )
+    algorithm = MagicMock()
+    algorithm.run.return_value = 6
+    monkeypatch.setattr(remote_worker, "_load_remote_cache", MagicMock(return_value=(MagicMock(), "testhash", False)))
+    monkeypatch.setattr(remote_worker, "_get_cached_result", MagicMock(return_value=remote_worker._CACHE_MISS))
+    monkeypatch.setattr(remote_worker, "_store_cached_result", MagicMock(return_value=False))
+    monkeypatch.setattr(algorithms_module, "create", MagicMock(return_value=algorithm))
+    serialize = MagicMock()
+    monkeypatch.setattr(serialization_module, "serialize_outputs", serialize)
+
+    with pytest.raises(RuntimeError, match="remote_cache_transport"):
+        execute_job(input_dir, output_dir)
+    serialize.assert_not_called()
 
 
 def test_fetch_rejects_output_file_outside_destination(tmp_path) -> None:
