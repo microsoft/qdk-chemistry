@@ -778,7 +778,7 @@ jobs:
       CMAKE_POLICY_VERSION_MINIMUM: '3.5'
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         submodules: recursive
 
@@ -793,7 +793,7 @@ jobs:
         "cxx-path=$env:CXX_PATH"    >> $env:GITHUB_OUTPUT
 
     - name: Set up Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
       with:
         python-version: '3.13'
         architecture: arm64
@@ -844,7 +844,7 @@ jobs:
     - name: Restore vcpkg cache
       id: cache-vcpkg
       if: ${{ !inputs.rebuild_dep_cache }}
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: vcpkg_installed
         key: windows-vcpkg-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
@@ -852,7 +852,7 @@ jobs:
     - name: Restore deps-install cache
       id: cache-deps
       if: ${{ !inputs.rebuild_dep_cache }}
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: deps-install-${{ matrix.compiler }}
         key: >-
@@ -872,14 +872,14 @@ jobs:
 
     - name: Save vcpkg cache
       if: steps.cache-vcpkg.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v5
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: vcpkg_installed
         key: windows-vcpkg-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
 
     - name: Save deps-install cache
       if: steps.cache-deps.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v5
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: deps-install-${{ matrix.compiler }}
         key: >-
