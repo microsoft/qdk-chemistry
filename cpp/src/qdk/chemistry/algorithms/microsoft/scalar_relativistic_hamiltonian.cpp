@@ -14,15 +14,12 @@
 #include <lapack.hh>
 #include <map>
 #include <qdk/chemistry/constants.hpp>
-#include <qdk/chemistry/utils/logger.hpp>
 #include <set>
 #include <stdexcept>
 #include <string>
 #include <tuple>
 #include <utility>
 #include <vector>
-
-#include "utils.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
 
@@ -34,7 +31,7 @@ namespace {
 
 // Canonical-orthogonalization cutoff for the modified Dirac metric.
 constexpr double metric_linear_dependence_threshold = 1e-9;
-// Eigenvalue cutoff for the projected-overlap pseudoinverse.
+// Eigenvalue cutoff for the projected-overlap inverse square root.
 constexpr double overlap_linear_dependence_threshold = 1e-14;
 
 struct DiracEigensystem {
@@ -42,32 +39,6 @@ struct DiracEigensystem {
   Eigen::MatrixXd eigenvectors;
   Eigen::Index large_component_metric_rank;
 };
-
-/** @brief Validate the dimensions, finiteness, and symmetry of X2C inputs. */
-void validate_x2c_inputs(const Eigen::MatrixXd& overlap,
-                         const Eigen::MatrixXd& kinetic,
-                         const Eigen::MatrixXd& potential,
-                         const Eigen::MatrixXd& pvp) {
-  const Eigen::Index dimension = overlap.rows();
-  if (dimension == 0 || overlap.cols() != dimension ||
-      kinetic.rows() != dimension || kinetic.cols() != dimension ||
-      potential.rows() != dimension || potential.cols() != dimension ||
-      pvp.rows() != dimension || pvp.cols() != dimension) {
-    throw std::invalid_argument(
-        "X2C input matrices must be non-empty square matrices of equal size");
-  }
-  if (!overlap.allFinite() || !kinetic.allFinite() || !potential.allFinite() ||
-      !pvp.allFinite()) {
-    throw std::invalid_argument(
-        "X2C input matrices must contain finite values");
-  }
-  if (!overlap.isApprox(overlap.transpose(), 1e-10) ||
-      !kinetic.isApprox(kinetic.transpose(), 1e-10) ||
-      !potential.isApprox(potential.transpose(), 1e-10) ||
-      !pvp.isApprox(pvp.transpose(), 1e-10)) {
-    throw std::invalid_argument("X2C input matrices must be symmetric");
-  }
-}
 
 /** @brief Return the number of AO components represented by a shell. */
 size_t shell_size(const qcs::Shell& shell, bool pure) {
@@ -88,7 +59,7 @@ std::vector<size_t> shell_offsets(const std::vector<qcs::Shell>& shells,
   return offsets;
 }
 
-/** @brief Solve the modified Dirac problem in the screened metric space. */
+/** @brief Solve the modified Dirac problem with a screened-metric fallback. */
 DiracEigensystem solve_modified_dirac(const Eigen::MatrixXd& overlap,
                                       const Eigen::MatrixXd& kinetic,
                                       const Eigen::MatrixXd& potential,
@@ -151,6 +122,8 @@ DiracEigensystem solve_modified_dirac(const Eigen::MatrixXd& overlap,
         "modes");
   }
 
+  // The retained metric projector is block diagonal, so the trace of its
+  // large-component block is the retained overlap rank.
   double large_component_metric_rank_trace = 0.0;
   for (const Eigen::Index index : retained_metric_indices) {
     large_component_metric_rank_trace +=
@@ -212,7 +185,11 @@ Eigen::MatrixXd compute_x2c_hamiltonian(const Eigen::MatrixXd& overlap,
                                         const Eigen::MatrixXd& kinetic,
                                         const Eigen::MatrixXd& potential,
                                         const Eigen::MatrixXd& pvp) {
-  validate_x2c_inputs(overlap, kinetic, potential, pvp);
+  if (!overlap.allFinite() || !kinetic.allFinite() || !potential.allFinite() ||
+      !pvp.allFinite()) {
+    throw std::invalid_argument(
+        "X2C input matrices must contain finite values");
+  }
 
   const Eigen::Index dimension = overlap.rows();
   const double inverse_speed_of_light =
@@ -276,24 +253,20 @@ Eigen::MatrixXd compute_x2c_hamiltonian(const Eigen::MatrixXd& overlap,
         "overlap (info=" +
         std::to_string(projected_overlap_info) + ")");
   }
-  std::vector<Eigen::Index> retained_overlap_indices;
-  for (Eigen::Index index = 0; index < projected_overlap_eigenvalues.size();
-       ++index) {
-    if (projected_overlap_eigenvalues(index) >
-        overlap_linear_dependence_threshold) {
-      retained_overlap_indices.push_back(index);
-    }
-  }
-  if (retained_overlap_indices.size() != electronic_indices.size()) {
+  const Eigen::Index retained_overlap_dimension =
+      (projected_overlap_eigenvalues.array() >
+       overlap_linear_dependence_threshold)
+          .count();
+  if (retained_overlap_dimension != electronic_dimension) {
     throw std::runtime_error(
         "X2C projected electronic overlap lost rank (expected=" +
-        std::to_string(electronic_indices.size()) +
-        ", actual=" + std::to_string(retained_overlap_indices.size()) + ")");
+        std::to_string(electronic_dimension) +
+        ", actual=" + std::to_string(retained_overlap_dimension) + ")");
   }
 
   Eigen::MatrixXd projected_overlap_inverse_sqrt =
       Eigen::MatrixXd::Zero(electronic_dimension, electronic_dimension);
-  for (const Eigen::Index index : retained_overlap_indices) {
+  for (Eigen::Index index = 0; index < electronic_dimension; ++index) {
     projected_overlap_inverse_sqrt.noalias() +=
         projected_overlap.col(index) *
         projected_overlap.col(index).transpose() /
@@ -320,9 +293,6 @@ Eigen::MatrixXd compute_x2c_hamiltonian(const Eigen::MatrixXd& overlap,
              weighted_back_transform.data(), electronic_dimension, 0.0,
              hamiltonian.data(), dimension);
   hamiltonian = 0.5 * (hamiltonian + hamiltonian.transpose()).eval();
-  if (!hamiltonian.allFinite()) {
-    throw std::runtime_error("X2C produced non-finite one-electron integrals");
-  }
   return hamiltonian;
 }
 
@@ -402,12 +372,8 @@ DecontractedBasis decontract_basis(
   return {std::move(uncontracted_basis), std::move(contraction)};
 }
 
-namespace {
-
-/** @brief Compute X2C-1e integrals, optionally in a decontracted basis. */
-Eigen::MatrixXd compute_x2c_one_electron(
-    const std::shared_ptr<qcs::BasisSet>& internal_basis_set,
-    const qcs::ParallelConfig& mpi, bool decontract) {
+Eigen::MatrixXd build_x2c_one_body_ao(
+    const std::shared_ptr<qcs::BasisSet>& internal_basis_set, bool decontract) {
   if (!internal_basis_set->ecp_shells.empty() ||
       internal_basis_set->get_n_ecp_electrons() != 0) {
     throw std::invalid_argument(
@@ -424,6 +390,7 @@ Eigen::MatrixXd compute_x2c_one_electron(
   }
 
   const size_t dimension = working_basis->num_atomic_orbitals;
+  const auto mpi = qcs::mpi_default_input();
   auto int1e = std::make_unique<qcs::OneBodyIntegral>(
       working_basis.get(), working_basis->mol.get(), mpi);
   Eigen::MatrixXd overlap(dimension, dimension);
@@ -461,14 +428,6 @@ Eigen::MatrixXd compute_x2c_one_electron(
     throw std::runtime_error("X2C produced non-finite one-electron integrals");
   }
   return hamiltonian;
-}
-
-}  // namespace
-
-Eigen::MatrixXd build_x2c_one_body_ao(
-    const std::shared_ptr<qcs::BasisSet>& internal_basis_set, bool decontract) {
-  return compute_x2c_one_electron(internal_basis_set, qcs::mpi_default_input(),
-                                  decontract);
 }
 
 }  // namespace detail

@@ -1203,7 +1203,8 @@ def x2c_hamiltonian():
 @pytest.fixture(scope="module")
 def x2c_unrestricted_hamiltonian():
     """Run QDK UHF and decontracted X2C-1e for triplet O2."""
-    molecule = Structure(["O", "O"], np.array([[0.0, 0.0, 0.0], [2.3, 0.0, 0.0]]))
+    bond_length_bohr = 2.3
+    molecule = Structure(["O", "O"], np.array([[0.0, 0.0, 0.0], [bond_length_bohr, 0.0, 0.0]]))
     scf_solver = algorithms.create("scf_solver", "qdk")
     scf_solver.settings().set("method", "hf")
     scf_solver.settings().set("scf_type", "unrestricted")

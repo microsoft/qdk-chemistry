@@ -4,10 +4,14 @@
 
 #pragma once
 
+#include <Eigen/Core>
 #include <cstddef>
+#include <memory>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/settings.hpp>
+#include <string>
+#include <utility>
 #include <vector>
 
 namespace qdk::chemistry::scf {

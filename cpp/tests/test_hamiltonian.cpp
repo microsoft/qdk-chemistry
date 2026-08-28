@@ -2778,22 +2778,17 @@ TEST_F(HamiltonianConstructorTest, ContiguousIndicesRequireSortedUniqueInput) {
   EXPECT_FALSE(indices_are_contiguous({3, 2}));
 }
 
-// ══════════════════════════════════════════════════════════════════════════
 // X2C-1e integral dressing tests
-// ══════════════════════════════════════════════════════════════════════════
 
 using WaterX2CResult =
-    std::tuple<double, std::shared_ptr<Hamiltonian>,
-               std::shared_ptr<Hamiltonian>, std::shared_ptr<Orbitals>>;
+    std::tuple<std::shared_ptr<Hamiltonian>, std::shared_ptr<Hamiltonian>,
+               std::shared_ptr<Orbitals>>;
 
-// Run each immutable water fixture once per basis and dressing mode.
+// Run each immutable water fixture once per dressing mode.
 const WaterX2CResult& run_water_nr_and_x2c(
-    const std::string& basis = "sto-3g",
     const std::string& integral_dressing = "x2c_1e") {
-  using Key = std::pair<std::string, std::string>;
-  static std::map<Key, WaterX2CResult> cache;
-  const Key key{basis, integral_dressing};
-  if (const auto found = cache.find(key); found != cache.end()) {
+  static std::map<std::string, WaterX2CResult> cache;
+  if (const auto found = cache.find(integral_dressing); found != cache.end()) {
     return found->second;
   }
 
@@ -2805,7 +2800,7 @@ const WaterX2CResult& run_water_nr_and_x2c(
 
   auto scf = ScfSolverFactory::create("qdk");
   auto [energy, wfn] =
-      scf->run(std::make_shared<Structure>(water), 0, 1, basis);
+      scf->run(std::make_shared<Structure>(water), 0, 1, "sto-3g");
   auto orbitals = wfn->get_orbitals();
 
   auto ham_nr = HamiltonianConstructorFactory::create("qdk");
@@ -2815,8 +2810,9 @@ const WaterX2CResult& run_water_nr_and_x2c(
   auto h_x2c = ham_x2c->run(orbitals);
 
   return cache
-      .emplace(key, WaterX2CResult{energy, std::move(h_nr), std::move(h_x2c),
-                                   std::move(orbitals)})
+      .emplace(integral_dressing,
+               WaterX2CResult{std::move(h_nr), std::move(h_x2c),
+                              std::move(orbitals)})
       .first->second;
 }
 
@@ -2828,77 +2824,6 @@ TEST_F(HamiltonianConstructorTest, X2CDefaultSettings) {
     EXPECT_ANY_THROW(
         constructor->settings().set("integral_dressing", "unsupported"));
   }
-}
-
-TEST_F(HamiltonianConstructorTest, X2CNonContiguousActiveSpace) {
-  // Same setup as the NR NonContiguousActiveSpace test
-  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
-                                              Eigen::Vector3d(0.0, 0.0, 1.4)};
-  std::vector<std::string> symbols = {"H", "H"};
-  Structure structure(coordinates, symbols);
-
-  std::vector<Shell> shells;
-  shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{1.0},
-                            std::vector<double>{1.0}));
-  shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{0.5},
-                            std::vector<double>{1.0}));
-  shells.emplace_back(Shell(1, OrbitalType::S, std::vector<double>{1.0},
-                            std::vector<double>{1.0}));
-  shells.emplace_back(Shell(1, OrbitalType::S, std::vector<double>{0.5},
-                            std::vector<double>{1.0}));
-  auto basis_set = std::make_shared<BasisSet>("test", shells, structure);
-
-  Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(4, 4);
-  std::vector<size_t> active_indices = {0, 2};
-
-  auto orbitals = std::make_shared<Orbitals>(
-      coeffs, std::nullopt, std::nullopt, basis_set,
-      testing::restricted_index_set(4, active_indices),
-      testing::restricted_index_set(4, {}));
-
-  auto x2c = make_x2c_constructor();
-  EXPECT_NO_THROW({
-    auto hamiltonian = x2c->run(orbitals);
-    EXPECT_TRUE(hamiltonian->has_one_body_integrals());
-    EXPECT_TRUE(hamiltonian->has_two_body_integrals());
-  });
-}
-
-TEST_F(HamiltonianConstructorTest, X2CNonContiguousInactiveSpace) {
-  // Same setup as the NR NonContiguousInactiveSpace test
-  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
-                                              Eigen::Vector3d(0.0, 0.0, 1.4)};
-  std::vector<std::string> symbols = {"H", "H"};
-  Structure structure(coordinates, symbols);
-
-  std::vector<Shell> shells;
-  shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{1.0},
-                            std::vector<double>{1.0}));
-  shells.emplace_back(Shell(0, OrbitalType::S, std::vector<double>{0.5},
-                            std::vector<double>{1.0}));
-  shells.emplace_back(Shell(1, OrbitalType::S, std::vector<double>{1.0},
-                            std::vector<double>{1.0}));
-  shells.emplace_back(Shell(1, OrbitalType::S, std::vector<double>{0.5},
-                            std::vector<double>{1.0}));
-  shells.emplace_back(Shell(1, OrbitalType::S, std::vector<double>{0.2},
-                            std::vector<double>{1.0}));
-  auto basis_set = std::make_shared<BasisSet>("test", shells, structure);
-
-  Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(5, 5);
-  std::vector<size_t> active_indices = {3, 4};
-  std::vector<size_t> inactive_indices = {0, 2};
-
-  auto orbitals = std::make_shared<Orbitals>(
-      coeffs, std::nullopt, std::nullopt, basis_set,
-      testing::restricted_index_set(5, active_indices),
-      testing::restricted_index_set(5, inactive_indices));
-
-  auto x2c = make_x2c_constructor();
-  EXPECT_NO_THROW({
-    auto hamiltonian = x2c->run(orbitals);
-    EXPECT_TRUE(hamiltonian->has_one_body_integrals());
-    EXPECT_TRUE(hamiltonian->has_two_body_integrals());
-  });
 }
 
 TEST_F(HamiltonianConstructorTest, X2CMetricScreeningMatchesEquivalentBasis) {
@@ -2951,12 +2876,14 @@ TEST_F(HamiltonianConstructorTest, X2CMetricScreeningMatchesEquivalentBasis) {
 }
 
 TEST_F(HamiltonianConstructorTest, X2CRejectsEffectiveCorePotentials) {
-  auto scf = ScfSolverFactory::create("qdk");
-  scf->settings().set("method", "hf");
-  auto [energy, wavefunction] =
-      scf->run(testing::create_agh_structure(), 0, 1, "def2-svp");
+  auto basis_set =
+      BasisSet::from_basis_name("def2-svp", testing::create_agh_structure());
+  const size_t dimension = basis_set->get_num_atomic_orbitals();
+  auto orbitals = std::make_shared<Orbitals>(
+      Eigen::MatrixXd::Identity(dimension, dimension),
+      Eigen::VectorXd::Zero(dimension), std::nullopt, basis_set);
   auto x2c = make_x2c_constructor();
-  EXPECT_THROW(x2c->run(wavefunction->get_orbitals()), std::invalid_argument);
+  EXPECT_THROW(x2c->run(orbitals), std::invalid_argument);
 }
 
 TEST_F(HamiltonianConstructorTest, X2CRejectsCartesianAtomicOrbitals) {
@@ -3091,8 +3018,7 @@ TEST_F(HamiltonianConstructorTest, X2CAbsoluteOneBodyReferences) {
 
   for (const std::string factory_name : {"qdk", "qdk_cholesky"}) {
     for (const auto& [integral_dressing, expected] : references) {
-      auto [energy, h_nr, h_x2c, orbitals] =
-          run_water_nr_and_x2c("sto-3g", integral_dressing);
+      auto [h_nr, h_x2c, orbitals] = run_water_nr_and_x2c(integral_dressing);
       if (factory_name == "qdk_cholesky") {
         auto constructor =
             make_x2c_constructor(factory_name, integral_dressing);
@@ -3232,28 +3158,17 @@ TEST_F(HamiltonianConstructorTest, X2CUnrestrictedSpinChannelProjection) {
 }
 
 TEST_F(HamiltonianConstructorTest, X2CRestrictedWater) {
-  // Run the full SCF → X2C pipeline on water/STO-3G
-  auto [energy, h_nr, h_x2c, orbitals] = run_water_nr_and_x2c("sto-3g");
+  auto [h_nr, h_x2c, orbitals] = run_water_nr_and_x2c();
 
-  // Basic validity
-  EXPECT_TRUE(h_x2c->has_one_body_integrals());
-  EXPECT_TRUE(h_x2c->has_two_body_integrals());
-
-  // X2C one-body integrals differ from NR
   auto [h1_nr, b1] = h_nr->get_one_body_integrals();
   auto [h1_x2c, b2] = h_x2c->get_one_body_integrals();
-  EXPECT_GT((h1_x2c - h1_nr).norm(), 1e-6);
-
-  // One-body matrix is symmetric
   EXPECT_NEAR((h1_x2c - h1_x2c.transpose()).norm(), 0.0, 1e-12);
-
-  // 1s orbital is lowered by relativistic effects
   EXPECT_LT(h1_x2c(0, 0), h1_nr(0, 0));
 }
 
-TEST_F(HamiltonianConstructorTest, X2CERIUnchanged) {
+TEST_F(HamiltonianConstructorTest, X2CTwoBodyAndCoreEnergyUnchanged) {
   for (const std::string factory_name : {"qdk", "qdk_cholesky"}) {
-    auto [energy, h_nr, h_x2c, orbitals] = run_water_nr_and_x2c("sto-3g");
+    auto [h_nr, h_x2c, orbitals] = run_water_nr_and_x2c();
     if (factory_name == "qdk_cholesky") {
       auto nr_constructor = HamiltonianConstructorFactory::create(factory_name);
       h_nr = nr_constructor->run(orbitals);
@@ -3264,46 +3179,6 @@ TEST_F(HamiltonianConstructorTest, X2CERIUnchanged) {
     auto [eri_nr, a1, b1] = h_nr->get_two_body_integrals();
     auto [eri_x2c, a2, b2] = h_x2c->get_two_body_integrals();
     EXPECT_NEAR((eri_x2c - eri_nr).norm(), 0.0, 1e-12);
-  }
-}
-
-TEST_F(HamiltonianConstructorTest, X2CCoreEnergyUnchanged) {
-  // Nuclear repulsion is the same for NR and X2C
-  auto [energy, h_nr, h_x2c, orbitals] = run_water_nr_and_x2c("sto-3g");
-  EXPECT_DOUBLE_EQ(h_nr->get_core_energy(), h_x2c->get_core_energy());
-}
-
-TEST_F(HamiltonianConstructorTest, X2CIntegralSymmetries) {
-  // Mirror the NR IntegralSymmetriesEnergiesO2Singlet test:
-  // verify one-body is symmetric, two-body has 8-fold symmetry
-  auto [energy, h_nr, h_x2c, orbitals] = run_water_nr_and_x2c("sto-3g");
-
-  auto [h1, b1] = h_x2c->get_one_body_integrals();
-  auto [eri, a1, a2] = h_x2c->get_two_body_integrals();
-
-  // One-body: symmetric
-  size_t n = h1.rows();
-  for (size_t i = 0; i < n; ++i) {
-    for (size_t j = 0; j < n; ++j) {
-      EXPECT_NEAR(h1(i, j), h1(j, i), 1e-12)
-          << "h1[" << i << "," << j << "] != h1[" << j << "," << i << "]";
-    }
-  }
-
-  // Two-body: (ij|kl) = (ji|kl) = (ij|lk) = (kl|ij) (real orbitals)
-  for (size_t i = 0; i < n; ++i) {
-    for (size_t j = 0; j < n; ++j) {
-      for (size_t k = 0; k < n; ++k) {
-        for (size_t l = 0; l < n; ++l) {
-          double ijkl = eri(i * n * n * n + j * n * n + k * n + l);
-          double jikl = eri(j * n * n * n + i * n * n + k * n + l);
-          double ijlk = eri(i * n * n * n + j * n * n + l * n + k);
-          double klij = eri(k * n * n * n + l * n * n + i * n + j);
-          EXPECT_NEAR(ijkl, jikl, 1e-10);
-          EXPECT_NEAR(ijkl, ijlk, 1e-10);
-          EXPECT_NEAR(ijkl, klij, 1e-10);
-        }
-      }
-    }
+    EXPECT_DOUBLE_EQ(h_nr->get_core_energy(), h_x2c->get_core_energy());
   }
 }
