@@ -310,6 +310,34 @@ TEST_F(FactorizedHamiltonianTest, HDF5RoundTrip) {
   }
 }
 
+TEST_F(FactorizedHamiltonianTest, NonHermitianTypeSurvivesSerialization) {
+  auto non_hermitian = std::make_unique<FactorizedHamiltonianContainer>(
+      core_energy, u, w, wb, one_body, inactive_fock, orbitals, signs,
+      energy_gap, HamiltonianType::NonHermitian);
+  ASSERT_EQ(non_hermitian->get_type(), HamiltonianType::NonHermitian);
+
+  // Negative control: the type defaults to Hermitian, so a round-trip that
+  // dropped it would still satisfy every other assertion in this file.
+  ASSERT_EQ(make_container()->get_type(), HamiltonianType::Hermitian);
+
+  auto from_json_container =
+      FactorizedHamiltonianContainer::from_json(non_hermitian->to_json());
+  EXPECT_EQ(from_json_container->get_type(), HamiltonianType::NonHermitian);
+
+  std::string filename = "test_factorized.hamiltonian.h5";
+  {
+    H5::H5File file(filename, H5F_ACC_TRUNC);
+    H5::Group group = file.createGroup("container");
+    non_hermitian->to_hdf5(group);
+  }
+  {
+    H5::H5File file(filename, H5F_ACC_RDONLY);
+    H5::Group group = file.openGroup("container");
+    auto loaded = FactorizedHamiltonianContainer::from_hdf5(group);
+    EXPECT_EQ(loaded->get_type(), HamiltonianType::NonHermitian);
+  }
+}
+
 TEST_F(FactorizedHamiltonianTest, HDF5FileRoundTripViaHamiltonian) {
   Hamiltonian h(make_container());
 
