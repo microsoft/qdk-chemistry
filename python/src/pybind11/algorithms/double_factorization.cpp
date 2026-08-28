@@ -36,8 +36,10 @@ currently supported.
 
 Settings:
     truncation_threshold (float): Drop fragments whose supermatrix eigenvalue
-        magnitude is below this threshold. Must be non-negative; 0.0 (the
-        default) performs no truncation, so the factorization is exact.
+        magnitude is below this threshold. Must be non-negative; the default
+        of 1e-12 discards only the numerically null fragments, keeping the
+        factorization exact to well within chemical accuracy. Pass 0.0 to
+        retain every fragment.
 
 Typical usage:
 
