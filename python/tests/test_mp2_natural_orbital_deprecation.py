@@ -29,10 +29,16 @@ def test_package_import_does_not_warn_about_mp2_natural_orbital_localizer():
 def test_explicit_mp2_natural_orbital_localizer_creation_warns_once(capfd):
     """Explicit registry creation retains its user-facing deprecation warning."""
     from qdk_chemistry.algorithms import create  # noqa: PLC0415
+    from qdk_chemistry.utils import Logger  # noqa: PLC0415
 
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        localizer = create("orbital_localizer", "qdk_mp2_natural_orbitals")
+    previous_level = Logger.get_global_level()
+    try:
+        Logger.set_global_level("warn")
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            localizer = create("orbital_localizer", "qdk_mp2_natural_orbitals")
+    finally:
+        Logger.set_global_level(previous_level)
 
     matching_warnings = [warning for warning in caught if DEPRECATION_MESSAGE in str(warning.message)]
     captured = capfd.readouterr()
