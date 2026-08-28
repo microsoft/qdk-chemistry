@@ -994,15 +994,16 @@ Args:
 Represents a molecular Hamiltonian using a double factorization of the two-body integrals.
 
 This class stores the factorized two-body integrals as a *signed* sum of
-low-rank "perfect squares":
+low-rank "perfect squares", with ``t`` the rank index (``r`` and ``s`` below
+being orbital indices):
 
-    h2_{pqrs} = sum_{r,c} s_r (sum_b U^r_{bp} U^r_{bq} W^r_{bc})
-                              (sum_b' U^r_{b'r} U^r_{b's} W^r_{b'c})
+    h2_{pqrs} = sum_{t,c} s_t (sum_b U^t_{bp} U^t_{bq} W^t_{bc})
+                              (sum_b' U^t_{b'r} U^t_{b's} W^t_{b'c})
 
 along with an identity weight matrix WB[R,C]. This container is always
 restricted (uses spin-free integrals).
 
-The per-rank signs ``s_r`` are what allow indefinite two-body tensors to be
+The per-rank signs ``s_t`` are what allow indefinite two-body tensors to be
 stored: without them the representation is a plain sum of squares and is
 therefore positive semi-definite in the (pq) pair space. Exact electron
 repulsion integrals are positive semi-definite, but symmetry-shifted or
@@ -1036,7 +1037,7 @@ Args:
     type (HamiltonianType, optional): Hamiltonian type (Hermitian by default)
 
 Raises:
-    RuntimeError: If ``signs`` is neither empty nor of length R, or contains a
+    ValueError: If ``signs`` is neither empty nor of length R, or contains a
         value other than +1 or -1.
 )",
       py::arg("core_energy"), py::arg("u_matrices"), py::arg("w_matrices"),

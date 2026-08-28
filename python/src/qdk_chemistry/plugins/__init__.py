@@ -1,11 +1,13 @@
 """Plugin registration and discovery for QDK/Chemistry extensions.
 
 Plugins connect QDK/Chemistry to optional chemistry packages, quantum software,
-and other extensions while preserving the library's common interfaces. An
+and execution services while preserving the library's common interfaces. An
 extension can contribute:
 
 * implementations of existing algorithm types or entirely new algorithm types;
-* data classes used by algorithm inputs and outputs.
+* data classes used by algorithm inputs and outputs;
+* remote execution backends; and
+* cache backends.
 
 External plugins
 ----------------
@@ -29,6 +31,7 @@ requiring application code to import the plugin package directly.
     class CustomPlugin(QdkChemistryPlugin):
          def register(self, registrar: PluginRegistrar) -> None:
               registrar.register_algorithm(lambda: CustomAlgorithm())
+              registrar.register_remote_backend("custom", CustomRemoteBackend)
 
 Bundled integrations
 --------------------

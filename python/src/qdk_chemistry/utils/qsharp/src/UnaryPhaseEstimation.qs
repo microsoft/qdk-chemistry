@@ -92,7 +92,13 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
                 blockEncodingUsesShared
                 ? (register) => applyBlockEncoding(register + sharedQubits)
                 | applyBlockEncoding;
-            ApplySignedPowerSchedule(blockEncoding, applyReflection, numQueries, Reversed(phaseQubits), allTargets);
+            ApplySignedPowerSchedule(
+                blockEncoding,
+                applyReflection,
+                numQueries,
+                Reversed(phaseQubits),
+                allTargets
+            );
         }
 
         Adjoint ApplyQFT(phaseQubits);

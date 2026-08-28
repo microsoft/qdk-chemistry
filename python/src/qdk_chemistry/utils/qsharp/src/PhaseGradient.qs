@@ -16,6 +16,7 @@ namespace QDKChemistry.Utils.PhaseGradient {
     import Std.Canon.ApplyQFT;
     import Std.Canon.ApplyXorInPlace;
     import Std.Core.Length;
+    import Std.Diagnostics.Fact;
 
     /// Prepares the phase gradient state |φ⟩ = (1/√2^n) Σ_k exp(-2πi·k/2^n) |k⟩_LE.
     ///
@@ -23,6 +24,7 @@ namespace QDKChemistry.Utils.PhaseGradient {
     /// Ideally this is prepared at the beginning of a circuit and reused throughout.
     operation PreparePhaseGradientState(phaseGradient : Qubit[]) : Unit is Adj + Ctl {
         let n = Length(phaseGradient);
+        Fact(n > 0, "phase gradient register cannot be empty");
         X(phaseGradient[n - 1]);
         Adjoint ApplyQFT(phaseGradient);
     }

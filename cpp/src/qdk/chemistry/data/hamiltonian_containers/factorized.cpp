@@ -4,16 +4,59 @@
 
 #include <Eigen/Dense>
 #include <cmath>
+#include <cstddef>
 #include <memory>
 #include <qdk/chemistry/data/hamiltonian_containers/factorized.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
+#include <string>
 
 #include "../hdf5_serialization.hpp"
 #include "../json_serialization.hpp"
 
 namespace qdk::chemistry::data {
+
+namespace {
+
+/// Cross-check the rank/basis/copy counts recorded in a serialized payload
+/// against the buffers actually stored alongside them, so a hand-edited or
+/// truncated file fails at load instead of silently reshaping the
+/// factorization. Shared by the JSON and HDF5 readers.
+void validate_stored_shape(std::size_t num_ranks, std::size_t num_bases,
+                           std::size_t num_copies, Eigen::Index u_size,
+                           Eigen::Index w_size, const Eigen::MatrixXd& wb) {
+  const auto mismatch = [](const std::string& what, std::size_t expected,
+                           std::size_t found) {
+    throw std::invalid_argument("FactorizedHamiltonianContainer: serialized " +
+                                what + " is " + std::to_string(found) +
+                                " but the stored buffers imply " +
+                                std::to_string(expected) + ".");
+  };
+
+  if (static_cast<std::size_t>(wb.rows()) != num_ranks) {
+    mismatch("num_ranks", static_cast<std::size_t>(wb.rows()), num_ranks);
+  }
+  if (static_cast<std::size_t>(wb.cols()) != num_copies) {
+    mismatch("num_copies", static_cast<std::size_t>(wb.cols()), num_copies);
+  }
+  if (num_ranks == 0 || num_bases == 0) {
+    throw std::invalid_argument(
+        "FactorizedHamiltonianContainer: serialized num_ranks and num_bases "
+        "must both be non-zero.");
+  }
+  const std::size_t expected_w = num_ranks * num_bases * num_copies;
+  if (static_cast<std::size_t>(w_size) != expected_w) {
+    mismatch("w_matrices length", expected_w, static_cast<std::size_t>(w_size));
+  }
+  if (static_cast<std::size_t>(u_size) % (num_ranks * num_bases) != 0) {
+    throw std::invalid_argument(
+        "FactorizedHamiltonianContainer: serialized u_matrices length " +
+        std::to_string(u_size) + " is not a multiple of num_ranks*num_bases.");
+  }
+}
+
+}  // namespace
 
 FactorizedHamiltonianContainer::FactorizedHamiltonianContainer(
     double core_energy, const Eigen::VectorXd& u_matrices,
@@ -111,6 +154,7 @@ bool FactorizedHamiltonianContainer::is_restricted() const {
 bool FactorizedHamiltonianContainer::is_valid() const {
   QDK_LOG_TRACE_ENTERING();
   if (!has_one_body_integrals()) return false;
+  if (!has_two_body_integrals()) return false;
   if (!has_orbitals()) return false;
   size_t norb = get_num_orbitals();
   size_t R = get_num_ranks();
@@ -221,6 +265,11 @@ double FactorizedHamiltonianContainer::get_lambda() const {
   // through get_h1_majorana().
   Eigen::MatrixXd h1m = get_h1_majorana();
   Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(h1m);
+  if (solver.info() != Eigen::Success) {
+    throw std::runtime_error(
+        "FactorizedHamiltonianContainer::get_lambda: failed to diagonalize the "
+        "Majorana one-body matrix.");
+  }
   double one_body_norm = solver.eigenvalues().array().abs().sum();
 
   size_t R = get_num_ranks();
@@ -343,9 +392,9 @@ nlohmann::json FactorizedHamiltonianContainer::to_json() const {
   j["core_energy"] = _core_energy;
   j["energy_gap"] = _energy_gap;
 
-  if (has_orbitals()) {
-    j["orbitals"] = _orbitals->to_json();
-  }
+  // Orbitals are guaranteed non-null by the base container constructor, so
+  // this is unconditional and from_json() can read it back the same way.
+  j["orbitals"] = _orbitals->to_json();
 
   if (has_inactive_fock_matrix()) {
     auto [fock_a, fock_b] = get_inactive_fock_matrix();
@@ -358,25 +407,30 @@ nlohmann::json FactorizedHamiltonianContainer::to_json() const {
 std::unique_ptr<FactorizedHamiltonianContainer>
 FactorizedHamiltonianContainer::from_json(const nlohmann::json& j) {
   QDK_LOG_TRACE_ENTERING();
-  validate_serialization_version(SERIALIZATION_VERSION, j["version"]);
+  validate_serialization_version(SERIALIZATION_VERSION, j.at("version"));
 
-  auto h1 = json_to_matrix(j["one_body_integrals"]);
-  auto u = json_to_vector(j["u_matrices"]);
-  auto w = json_to_vector(j["w_matrices"]);
-  auto wb = json_to_matrix(j["wb_matrix"]);
+  auto h1 = json_to_matrix(j.at("one_body_integrals"));
+  auto u = json_to_vector(j.at("u_matrices"));
+  auto w = json_to_vector(j.at("w_matrices"));
+  auto wb = json_to_matrix(j.at("wb_matrix"));
   // Optional: an absent sign vector means an all-positive factorization.
   Eigen::VectorXd signs;
   if (j.contains("signs")) {
     signs = json_to_vector(j.at("signs"));
   }
-  double core_energy = j["core_energy"];
+  double core_energy = j.at("core_energy");
   double energy_gap = j.at("energy_gap");
 
-  auto orbitals = Orbitals::from_json(j["orbitals"]);
+  validate_stored_shape(j.at("num_ranks").get<std::size_t>(),
+                        j.at("num_bases").get<std::size_t>(),
+                        j.at("num_copies").get<std::size_t>(), u.size(),
+                        w.size(), wb);
+
+  auto orbitals = Orbitals::from_json(j.at("orbitals"));
 
   Eigen::MatrixXd fock = Eigen::MatrixXd::Zero(0, 0);
   if (j.contains("inactive_fock_matrix")) {
-    fock = json_to_matrix(j["inactive_fock_matrix"]);
+    fock = json_to_matrix(j.at("inactive_fock_matrix"));
   }
 
   return std::make_unique<FactorizedHamiltonianContainer>(
@@ -397,61 +451,49 @@ void FactorizedHamiltonianContainer::to_hdf5(H5::Group& group) const {
   std::string ct("factorized");
   ct_attr.write(string_type, ct);
 
-  group
+  // Scalars live in a "metadata" subgroup, matching the other Hamiltonian
+  // containers (cholesky.cpp, canonical_four_center.cpp, sparse.cpp) and the
+  // layout the Python readers expect.
+  H5::Group metadata_group = group.createGroup("metadata");
+  metadata_group
       .createAttribute("core_energy", H5::PredType::NATIVE_DOUBLE,
                        H5::DataSpace(H5S_SCALAR))
       .write(H5::PredType::NATIVE_DOUBLE, &_core_energy);
-  group
+  metadata_group
       .createAttribute("energy_gap", H5::PredType::NATIVE_DOUBLE,
                        H5::DataSpace(H5S_SCALAR))
       .write(H5::PredType::NATIVE_DOUBLE, &_energy_gap);
 
   hsize_t r_val = get_num_ranks(), b_val = get_num_bases(),
           c_val = get_num_copies();
-  group
+  metadata_group
       .createAttribute("num_ranks", H5::PredType::NATIVE_HSIZE,
                        H5::DataSpace(H5S_SCALAR))
       .write(H5::PredType::NATIVE_HSIZE, &r_val);
-  group
+  metadata_group
       .createAttribute("num_bases", H5::PredType::NATIVE_HSIZE,
                        H5::DataSpace(H5S_SCALAR))
       .write(H5::PredType::NATIVE_HSIZE, &b_val);
-  group
+  metadata_group
       .createAttribute("num_copies", H5::PredType::NATIVE_HSIZE,
                        H5::DataSpace(H5S_SCALAR))
       .write(H5::PredType::NATIVE_HSIZE, &c_val);
 
-  auto write_vector = [&](const std::string& name, const Eigen::VectorXd& vec) {
-    hsize_t dims = vec.size();
-    H5::DataSpace space(1, &dims);
-    auto ds = group.createDataSet(name, H5::PredType::NATIVE_DOUBLE, space);
-    ds.write(vec.data(), H5::PredType::NATIVE_DOUBLE);
-  };
-
-  auto write_matrix = [&](const std::string& name, const Eigen::MatrixXd& mat) {
-    hsize_t dims[2] = {static_cast<hsize_t>(mat.rows()),
-                       static_cast<hsize_t>(mat.cols())};
-    H5::DataSpace space(2, dims);
-    auto ds = group.createDataSet(name, H5::PredType::NATIVE_DOUBLE, space);
-    ds.write(mat.data(), H5::PredType::NATIVE_DOUBLE);
-  };
-
   auto [h1_alpha, h1_beta] = get_one_body_integrals();
-  write_matrix("one_body_integrals", h1_alpha);
-  write_vector("u_matrices", _u);
-  write_vector("w_matrices", _w);
-  write_matrix("wb_matrix", _wb);
-  write_vector("signs", _signs);
+  save_matrix_to_group(group, "one_body_integrals", h1_alpha);
+  save_vector_to_group(group, "u_matrices", _u);
+  save_vector_to_group(group, "w_matrices", _w);
+  save_matrix_to_group(group, "wb_matrix", _wb);
+  save_vector_to_group(group, "signs", _signs);
 
   if (has_inactive_fock_matrix()) {
     auto [fock_a, fock_b] = get_inactive_fock_matrix();
-    write_matrix("inactive_fock_matrix", fock_a);
+    save_matrix_to_group(group, "inactive_fock_matrix", fock_a);
   }
 
-  if (has_orbitals()) {
-    H5::Group orb_group = group.createGroup("orbitals");
-    _orbitals->to_hdf5(orb_group);
-  }
+  // Orbitals are guaranteed non-null by the base container constructor.
+  H5::Group orb_group = group.createGroup("orbitals");
+  _orbitals->to_hdf5(orb_group);
 }
 
 std::unique_ptr<FactorizedHamiltonianContainer>
@@ -465,50 +507,39 @@ FactorizedHamiltonianContainer::from_hdf5(H5::Group& group) {
   validate_serialization_version(SERIALIZATION_VERSION, version);
 
   double core_energy, energy_gap;
-  group.openAttribute("core_energy")
+  H5::Group metadata_group = group.openGroup("metadata");
+  metadata_group.openAttribute("core_energy")
       .read(H5::PredType::NATIVE_DOUBLE, &core_energy);
-  group.openAttribute("energy_gap")
+  metadata_group.openAttribute("energy_gap")
       .read(H5::PredType::NATIVE_DOUBLE, &energy_gap);
 
-  auto read_vector = [&](const std::string& name) -> Eigen::VectorXd {
-    auto ds = group.openDataSet(name);
-    auto space = ds.getSpace();
-    hsize_t dims;
-    space.getSimpleExtentDims(&dims);
-    Eigen::VectorXd vec(dims);
-    ds.read(vec.data(), H5::PredType::NATIVE_DOUBLE);
-    return vec;
-  };
+  hsize_t num_ranks, num_bases, num_copies;
+  metadata_group.openAttribute("num_ranks")
+      .read(H5::PredType::NATIVE_HSIZE, &num_ranks);
+  metadata_group.openAttribute("num_bases")
+      .read(H5::PredType::NATIVE_HSIZE, &num_bases);
+  metadata_group.openAttribute("num_copies")
+      .read(H5::PredType::NATIVE_HSIZE, &num_copies);
 
-  auto read_matrix = [&](const std::string& name) -> Eigen::MatrixXd {
-    auto ds = group.openDataSet(name);
-    auto space = ds.getSpace();
-    hsize_t dims[2];
-    space.getSimpleExtentDims(dims);
-    Eigen::MatrixXd mat(dims[0], dims[1]);
-    ds.read(mat.data(), H5::PredType::NATIVE_DOUBLE);
-    return mat;
-  };
-
-  auto h1 = read_matrix("one_body_integrals");
-  auto u = read_vector("u_matrices");
-  auto w = read_vector("w_matrices");
-  auto wb = read_matrix("wb_matrix");
+  auto h1 = load_matrix_from_group(group, "one_body_integrals");
+  auto u = load_vector_from_group(group, "u_matrices");
+  auto w = load_vector_from_group(group, "w_matrices");
+  auto wb = load_matrix_from_group(group, "wb_matrix");
   // Optional: an absent sign vector means an all-positive factorization.
   Eigen::VectorXd signs;
   if (group.nameExists("signs")) {
-    signs = read_vector("signs");
+    signs = load_vector_from_group(group, "signs");
   }
 
-  std::shared_ptr<Orbitals> orbitals;
-  if (group.nameExists("orbitals")) {
-    H5::Group orb_group = group.openGroup("orbitals");
-    orbitals = Orbitals::from_hdf5(orb_group);
-  }
+  validate_stored_shape(num_ranks, num_bases, num_copies, u.size(), w.size(),
+                        wb);
+
+  H5::Group orb_group = group.openGroup("orbitals");
+  std::shared_ptr<Orbitals> orbitals = Orbitals::from_hdf5(orb_group);
 
   Eigen::MatrixXd fock = Eigen::MatrixXd::Zero(0, 0);
   if (group.nameExists("inactive_fock_matrix")) {
-    fock = read_matrix("inactive_fock_matrix");
+    fock = load_matrix_from_group(group, "inactive_fock_matrix");
   }
 
   return std::make_unique<FactorizedHamiltonianContainer>(

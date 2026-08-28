@@ -184,8 +184,10 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
 
   /**
    * @brief Reconstruct the approximate two-body integrals.
-   * h2_{pqrs} = Σ_{r,c} s_r (Σ_b U^r_{bp} U^r_{bq} W^r_{bc})
-   *                          (Σ_{b'} U^r_{b'r} U^r_{b's} W^r_{b'c})
+   *
+   * With t the rank index (r and s here are orbital indices):
+   * h2_{pqrs} = Σ_{t,c} s_t (Σ_b U^t_{bp} U^t_{bq} W^t_{bc})
+   *                          (Σ_{b'} U^t_{b'r} U^t_{b's} W^t_{b'c})
    *
    * Note this is built purely from (U, W) and the per-rank signs: the identity
    * weight WB is deliberately absent, matching Eq. 25. WB enters only

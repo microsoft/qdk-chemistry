@@ -216,6 +216,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         if state_prep_op is None:
             raise RuntimeError("State preparation has no Q# operation.")
+        self._validate_state_prep_width(state_preparation, num_system_qubits + state_prep_shared)
 
         phase_prep_params = QSHARP_UTILS.StatePreparation.StatePreparationParams(
             rowMap=list(range(num_phase_qubits - 1, -1, -1)),

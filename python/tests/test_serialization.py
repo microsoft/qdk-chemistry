@@ -66,19 +66,24 @@ def test_primitive_round_trip(tmp_path, value, type_tag):
     [
         [1, 2.5, "three"],
         (10, "abc"),
-        {"a": 1, "b": 2.0},
-        [{"x": [1, 2]}, (True, None)],
-        {1: "integer", "1": "string", (2, "two"): "tuple"},
+        [[1, 2], (True, None)],
     ],
 )
 def test_container_round_trip(tmp_path, value):
-    """Round-trip nested list, tuple, and dictionary values."""
+    """Round-trip nested list and tuple values."""
     entry = FileSerializer.serialize_value(tmp_path, "value", value)
 
     result = FileSerializer.deserialize_value(tmp_path, entry)
 
     assert result == value
     assert type(result) is type(value)
+
+
+@pytest.mark.parametrize("value", [{"x": 1}, [{"x": 1}], ({"x": 1},)])
+def test_dictionary_values_are_not_supported(tmp_path, value):
+    """Reject dictionaries used directly or within supported containers."""
+    with pytest.raises(TypeError, match="Dictionary values are not supported"):
+        FileSerializer.serialize_value(tmp_path, "value", value)
 
 
 @pytest.mark.parametrize(
@@ -194,9 +199,9 @@ def test_nested_dataclass_filenames_are_unique(tmp_path, h2_structure):
     """Give distinct nested DataClass values distinct content-addressed files."""
     helium = Structure(["He"], np.array([[1.0, 0.0, 0.0]]))
 
-    entry = FileSerializer.serialize_value(tmp_path, "structures", {"/": h2_structure, "_": helium})
+    entry = FileSerializer.serialize_value(tmp_path, "structures", [h2_structure, helium])
 
-    filenames = [item["value"]["file"] for item in entry["entries"]]
+    filenames = [item["file"] for item in entry["items"]]
     assert set(filenames) == {
         f"{h2_structure.content_hash()}.structure.h5",
         f"{helium.content_hash()}.structure.h5",
@@ -254,7 +259,7 @@ def test_input_round_trip(tmp_path, h2_structure):
         algorithm_name="qdk",
         settings={"max_iterations": 100},
         run_hash="run-hash",
-        input_hashes={"arg_0": "structure-hash"},
+        input_hashes={"args.arg_0": "structure-hash"},
         remote_cache={"name": "shared"},
     )
 
@@ -267,7 +272,7 @@ def test_input_round_trip(tmp_path, h2_structure):
     assert restored["kwargs"] == {"basis": "cc-pvdz"}
     assert restored["settings"] == {"max_iterations": 100}
     assert restored["run_hash"] == "run-hash"
-    assert restored["input_hashes"] == {"arg_0": "structure-hash"}
+    assert restored["input_hashes"] == {"args.arg_0": "structure-hash"}
     assert restored["remote_cache"] == {"name": "shared"}
     assert restored["remote_cache_transport"] is False
 
@@ -409,17 +414,16 @@ def test_numpy_array_output_uses_shared_cache_transport(tmp_path):
     assert restored.dtype == value.dtype
 
 
-def test_unsupported_cache_value_graph_uses_manifest_transport(tmp_path):
-    """Serialize unsupported cache graphs without attempting a cache write."""
+def test_dictionary_output_is_rejected_before_cache_write(tmp_path):
+    """Reject dictionary outputs without attempting a cache write."""
     source = tmp_path / "source"
     cache_path = tmp_path / "shared"
     cache = FolderCache(path=cache_path, is_shared=True)
     value = [{"x": 1}]
 
-    files = serialize_outputs(source, value, cache=cache, cache_transport=True)
+    with pytest.raises(TypeError, match="Dictionary values are not supported"):
+        serialize_outputs(source, value, cache=cache, cache_transport=True)
 
-    assert files == [source / "manifest.json"]
-    assert deserialize_outputs(source) == value
     assert not cache_path.exists()
 
 
@@ -438,7 +442,7 @@ def test_input_round_trip_uses_shared_cache_transport(tmp_path, h2_structure):
         algorithm_type="test_algorithm",
         algorithm_name="plugin",
         settings={},
-        input_hashes={"arg_0": content_hash},
+        input_hashes={"args.arg_0": content_hash},
         remote_cache={"name": "shared"},
         remote_cache_backend=cache,
         remote_cache_transport=True,
@@ -473,23 +477,21 @@ def test_nested_output_values_use_shared_cache(tmp_path, sample_orbitals):
     assert restored == [sample_orbitals, sample_orbitals]
 
 
-@pytest.mark.parametrize("container_type", ["list", "tuple", "dict"])
+@pytest.mark.parametrize("container_type", ["list", "tuple"])
 def test_nested_containers_propagate_shared_cache(tmp_path, sample_orbitals, container_type):
-    """Propagate cache access through lists, tuples, and dictionaries."""
+    """Propagate cache access through lists and tuples."""
     cache = SharedCache()
     cache.put_data(sample_orbitals.content_hash(), sample_orbitals)
     value = {
         "list": [sample_orbitals],
         "tuple": (sample_orbitals,),
-        "dict": {"orbitals": sample_orbitals},
     }[container_type]
 
     entry = FileSerializer.serialize_value(tmp_path, "value", value, cache=cache)
     restored = FileSerializer.deserialize_value(tmp_path, entry, cache=cache)
-    restored_orbitals = restored["orbitals"] if container_type == "dict" else restored[0]
 
     assert not list(tmp_path.glob("*.h5"))
-    assert restored_orbitals is sample_orbitals
+    assert restored[0] is sample_orbitals
 
 
 def test_tiered_local_cache_hit_does_not_replace_output_file(tmp_path, sample_orbitals):

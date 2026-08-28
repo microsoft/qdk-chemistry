@@ -282,6 +282,12 @@ class TestMisconfigurationIsSurfaced:
         with pytest.raises(RuntimeError, match="State preparation has no Q# operation"):
             _run_builder(_make_builder(), state_preparation=Circuit(qasm="OPENQASM 3.0;\n"))
 
+    def test_a_state_preparation_wider_than_the_register_it_gets_is_rejected(self):
+        """A PREPARE oracle keeps ancilla past its index, so it cannot stand in as an initial state."""
+        wide = Circuit(qasm="OPENQASM 3.0;\n", qsharp_op=QSHARP_UTILS.PrepSelPrep.NoOpPrepare, num_qubits=3)
+        with pytest.raises(ValueError, match="acts on 3 qubits"):
+            _run_builder(_make_builder(), state_preparation=wide)
+
     @pytest.mark.parametrize(
         ("setting", "algorithm", "message"),
         [

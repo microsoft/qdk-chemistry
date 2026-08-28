@@ -49,14 +49,14 @@ namespace QDKChemistry.Utils.SelectSwap {
         let (n, nRequired) = DimensionsForSelect(data, address);
         let addressFitted = address[...nRequired - 1];
 
-        let numSwapBits = numSwapBits == -1 ? ComputeOptimalLambda1D(Length(data), Length(data[0])) | numSwapBits;
+        let swapBits = numSwapBits == -1 ? ComputeOptimalLambda1D(Length(data), Length(data[0])) | numSwapBits;
 
-        Fact(numSwapBits <= nRequired, "Too many bits for SWAP network");
+        Fact(swapBits <= nRequired, "Too many bits for SWAP network");
 
-        if numSwapBits == 0 {
+        if swapBits == 0 {
             Select(data, addressFitted, output);
         } else {
-            WithSelectSwap(numSwapBits, data, address, intermediate => ApplyToEachCA(CNOT, Zipped(intermediate, output)));
+            WithSelectSwap(swapBits, data, address, intermediate => ApplyToEachCA(CNOT, Zipped(intermediate, output)));
         }
     }
 
@@ -65,6 +65,7 @@ namespace QDKChemistry.Utils.SelectSwap {
     /// a select-swap lookup over the inner one. The adjoint is compiler-generated: it has to
     /// undo the swap network as well as the lookup, which is easy to get wrong by hand.
     operation Select2DLoad(data : Bool[][][], outerAddress : Qubit[], innerAddress : Qubit[], numSwapBits : Int, target : Qubit[]) : Unit is Adj {
+        Fact(not IsEmpty(data), "data cannot be empty");
         if numSwapBits == 0 {
             UnaryIteration(outerAddress, Length(data), (index) => {
                 Select(data[index], innerAddress, target);
@@ -124,7 +125,7 @@ namespace QDKChemistry.Utils.SelectSwap {
         if numSwapBits == 0 {
             use output = Qubit[m];
             within {
-                Select(data, address, output);
+                Select(data, addressFitted, output);
             } apply {
                 action(output);
             }
