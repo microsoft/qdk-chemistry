@@ -60,12 +60,6 @@ def _discovery_env_defaults() -> dict[str, Any]:
 
     use_entire_node = os.environ.get("QDK_DISCOVERY_USE_ENTIRE_NODE", "true").lower()
     defaults["use_entire_node"] = use_entire_node not in {"false", "0", "no"}
-    for env_name, config_name in {
-        "QDK_DISCOVERY_CLEANUP": "cleanup",
-        "QDK_DISCOVERY_CLEANUP_ON_FAILURE": "cleanup_on_failure",
-    }.items():
-        if (value := os.environ.get(env_name)) is not None:
-            defaults[config_name] = value.lower() not in {"false", "0", "no"}
     return defaults
 
 
@@ -96,8 +90,6 @@ class DiscoveryBackend(RemoteBackend):
         use_entire_node: bool | None = None,
         artifact_retry_attempts: int | None = None,
         artifact_retry_delay: float | None = None,
-        cleanup: bool | None = None,
-        cleanup_on_failure: bool | None = None,
         poll_interval: float | None = None,
         timeout: float | None = None,
     ):
@@ -131,8 +123,6 @@ class DiscoveryBackend(RemoteBackend):
             raise ValueError("artifact_retry_attempts must be at least 1")
         if self.artifact_retry_delay < 0:
             raise ValueError("artifact_retry_delay cannot be negative")
-        self.cleanup = bool(resolve("cleanup", cleanup, False))
-        self.cleanup_on_failure = bool(resolve("cleanup_on_failure", cleanup_on_failure, False))
         self.remote_workdir = self.storage_prefix
 
         resolved_use_entire_node = bool(resolve("use_entire_node", use_entire_node, True))
@@ -164,8 +154,6 @@ class DiscoveryBackend(RemoteBackend):
             use_entire_node=resolved_use_entire_node,
             artifact_retry_attempts=self.artifact_retry_attempts,
             artifact_retry_delay=self.artifact_retry_delay,
-            cleanup=self.cleanup,
-            cleanup_on_failure=self.cleanup_on_failure,
         )
         self.remote_workdir = self.storage_prefix
 
@@ -293,7 +281,7 @@ class DiscoveryBackend(RemoteBackend):
             time.sleep(self.artifact_retry_delay * (2**attempt))
 
     def _delete_remote_files(self, remote_paths: list[str]) -> None:
-        """Best-effort delete remote job artifacts."""
+        """Delete remote job artifacts, ignoring paths already removed."""
         from azure.core.exceptions import ResourceNotFoundError  # noqa: PLC0415
 
         for remote_path in remote_paths:
@@ -301,6 +289,21 @@ class DiscoveryBackend(RemoteBackend):
                 self._container_client.delete_blob(self._blob_path(remote_path))
             except ResourceNotFoundError:
                 continue
+
+    def cleanup_job(self, backend_state: dict[str, Any]) -> None:
+        """Remove Blob artifacts for one completed Discovery job."""
+        if backend_state.get("transport") == "cache":
+            return
+        self._require_connection(storage=True)
+        input_paths = backend_state.get("input_paths", [])
+        output_dir = backend_state.get("output_dir")
+        if not isinstance(input_paths, list) or not isinstance(output_dir, str):
+            raise ValueError("Discovery job state is missing artifact paths")
+        output_prefix = f"{self._blob_path(output_dir).rstrip('/')}/"
+        output_paths = [blob.name for blob in self._container_client.list_blobs(name_starts_with=output_prefix)]
+        self._delete_remote_files(input_paths)
+        for blob_path in output_paths:
+            self._container_client.delete_blob(blob_path)
 
     @staticmethod
     def _shared_cache(payload: dict[str, Any]) -> Any:
@@ -542,27 +545,19 @@ class DiscoveryBackend(RemoteBackend):
         own_tmp = local_dir is None
         resolved_dir = Path(tempfile.mkdtemp(prefix="qdk_fetch_") if local_dir is None else local_dir)
         resolved_dir.mkdir(parents=True, exist_ok=True)
-        output_paths: list[str] = []
-        succeeded = False
         try:
             manifest_path = f"{output_dir}/manifest.json"
             manifest_local = resolved_dir / "manifest.json"
             self.download(manifest_path, manifest_local)
-            output_paths.append(manifest_path)
             manifest = json.loads(manifest_local.read_text(encoding="utf-8"))
             for entry in manifest.get("results", []):
                 if filename := entry.get("file"):
                     remote_path = f"{output_dir}/{filename}"
                     self.download(remote_path, _manifest_file_path(resolved_dir, filename))
-                    output_paths.append(remote_path)
-            result = deserialize_outputs(resolved_dir)
-            succeeded = True
-            return result
+            return deserialize_outputs(resolved_dir)
         finally:
             if own_tmp:
                 shutil.rmtree(resolved_dir, ignore_errors=True)
-            if self.cleanup and (succeeded or self.cleanup_on_failure):
-                self._delete_remote_files([*backend_state.get("input_paths", []), *output_paths])
 
     @classmethod
     def _fetch_cached_result(cls, backend_state: dict[str, Any]) -> Any:

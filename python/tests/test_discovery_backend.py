@@ -65,17 +65,27 @@ class _Tools:
 
 
 class _Container:
-    """Capture Blob Storage uploads."""
+    """Capture Blob Storage operations."""
 
     def __init__(self) -> None:
-        """Initialize an empty upload list."""
+        """Initialize empty Blob Storage operation lists."""
         self.uploads: list[str] = []
+        self.blobs: list[str] = []
+        self.deletions: list[str] = []
 
     def upload_blob(self, *, name: str, data: Any, overwrite: bool) -> None:
         """Record one non-empty overwrite upload."""
         assert data.read()
         assert overwrite
         self.uploads.append(name)
+
+    def list_blobs(self, *, name_starts_with: str) -> list[SimpleNamespace]:
+        """Return captured blobs matching a prefix."""
+        return [SimpleNamespace(name=name) for name in self.blobs if name.startswith(name_starts_with)]
+
+    def delete_blob(self, name: str) -> None:
+        """Record one deleted blob."""
+        self.deletions.append(name)
 
 
 def _backend(**kwargs: Any) -> DiscoveryBackend:
@@ -183,6 +193,36 @@ def test_blob_transport_submits_discovery_storage_mounts() -> None:
     assert isinstance(tools.run["output_data"][0], OutputDataMount)
     assert tools.run["input_data"][0].mount_path == "/qdk/input"
     assert tools.run["output_data"][0].mount_path == "/qdk/output"
+
+
+def test_cleanup_job_removes_only_job_artifacts() -> None:
+    """Cleanup removes known inputs and only the submitted job's outputs."""
+    container = _Container()
+    container.blobs = [
+        "qdk_chemistry/job/output/manifest.json",
+        "qdk_chemistry/job/output/result.npy",
+        "qdk_chemistry/other/output/manifest.json",
+    ]
+    backend = _backend()
+    backend._client = SimpleNamespace()
+    backend._container_client = container
+    state = {
+        "transport": "blob",
+        "input_paths": ["qdk_chemistry/job/input/manifest.json"],
+        "output_dir": "qdk_chemistry/job/output",
+    }
+
+    backend.cleanup_job(state)
+    backend.cleanup_job(state)
+
+    assert container.deletions == [
+        "qdk_chemistry/job/input/manifest.json",
+        "qdk_chemistry/job/output/manifest.json",
+        "qdk_chemistry/job/output/result.npy",
+        "qdk_chemistry/job/input/manifest.json",
+        "qdk_chemistry/job/output/manifest.json",
+        "qdk_chemistry/job/output/result.npy",
+    ]
 
 
 def test_cache_transport_fetches_result_without_blob(monkeypatch: pytest.MonkeyPatch) -> None:
