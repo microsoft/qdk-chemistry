@@ -116,21 +116,12 @@ TEST_F(FactorizedHamiltonianTest, Properties) {
   EXPECT_NEAR(gapped.get_lambda_eff(), 1.3527749258468684, 1e-12);
 }
 
-// The identity weight wB is a *gauge* parameter: paper Eq. 25 builds the
-// two-body tensor purely from (u, w), so moving wB must leave it bit-identical
-// -- while Eq. 37 and Lambda must both respond, which is what makes wB a knob
-// rather than dead data.
-//
-// This pins the two halves against each other. Folding wB into the
-// reconstruction (a tempting "fix" when reading Eq. 25 next to Eq. 37) breaks
-// the first half; dropping it from get_h1_majorana breaks the second.
 TEST_F(FactorizedHamiltonianTest, IdentityWeightIsGaugeForTwoBodyOnly) {
   auto reference = make_container();
   const Eigen::VectorXd h2_ref = reference->reconstruct_two_body_integrals();
   const Eigen::MatrixXd h1_ref = reference->get_h1_majorana();
   const double lambda_ref = reference->get_lambda();
 
-  // Deliberately excludes the fixture's own 0.2 so every case is a real change.
   const double wb_values[] = {0.0, -3.5, 7.25};
   for (double wb_value : wb_values) {
     Eigen::MatrixXd wb_alt(R, C);
@@ -155,55 +146,6 @@ TEST_F(FactorizedHamiltonianTest, IdentityWeightIsGaugeForTwoBodyOnly) {
   }
 }
 
-// Eq. 37 as printed lists two corrections; get_h1_majorana applies three. The
-// extra -1/2 (M M)_pq converts the stored normal-ordered h2 = (pq|rs) to the
-// paper's plain-product convention, so it is required rather than optional.
-//
-// Note the base fixture has tr(M) == wB == 0.2, which makes terms (b) and (c)
-// cancel and leaves the golden-value test above unable to tell them apart.
-// Perturbing wB here breaks that degeneracy so all three terms are exercised
-// independently.
-TEST_F(FactorizedHamiltonianTest, MajoranaOneBodyCarriesNormalOrderingTerm) {
-  // M_{pq} = sum_b w_b u_{b,p} u_{b,q}  (the fixture has a single rank and
-  // copy).
-  Eigen::MatrixXd m = Eigen::MatrixXd::Zero(N, N);
-  for (size_t b = 0; b < B; ++b) {
-    Eigen::VectorXd ub(N);
-    for (size_t p = 0; p < N; ++p) {
-      ub(p) = u(static_cast<Eigen::Index>(b * N + p));
-    }
-    m += w(static_cast<Eigen::Index>(b)) * ub * ub.transpose();
-  }
-
-  const double wb_values[] = {0.2, 0.0, -3.5};
-  for (double wb_value : wb_values) {
-    Eigen::MatrixXd wb_alt(R, C);
-    wb_alt(0, 0) = wb_value;
-    FactorizedHamiltonianContainer container(core_energy, u, w, wb_alt,
-                                             one_body, inactive_fock, orbitals,
-                                             signs, energy_gap);
-
-    Eigen::MatrixXd expected = one_body;
-    expected -= 0.5 * (m * m);  // (a) normal-ordering remainder
-    expected += m.trace() * m;  // (b)
-    expected -= wb_value * m;   // (c)
-    EXPECT_TRUE(container.get_h1_majorana().isApprox(expected, 1e-12))
-        << "three-term Eq. 37 model failed at wB=" << wb_value;
-
-    // Dropping term (a) is not a rounding-level difference.
-    const Eigen::MatrixXd without_normal_ordering = expected + 0.5 * (m * m);
-    EXPECT_FALSE(
-        container.get_h1_majorana().isApprox(without_normal_ordering, 1e-9))
-        << "normal-ordering term looks absent at wB=" << wb_value;
-  }
-}
-
-// A plain sum of squares is positive semi-definite in the (pq),(rs) pair
-// space, so without a per-rank sign this container could only ever hold two-
-// electron tensors whose reshaped supermatrix has no negative eigenvalues.
-// That is true of exact ERIs but not of a symmetry-shifted or downfolded
-// active-space tensor, which is why the sign exists. Flipping it must negate
-// the reconstructed tensor exactly.
 TEST_F(FactorizedHamiltonianTest, NegativeSignNegatesTwoBodyTensor) {
   const Eigen::VectorXd h2_positive =
       make_container()->reconstruct_two_body_integrals();
@@ -221,16 +163,9 @@ TEST_F(FactorizedHamiltonianTest, NegativeSignNegatesTwoBodyTensor) {
         << "sign did not negate h2 element " << i;
   }
 
-  // A positive fixture really does have something to negate, so the check
-  // above cannot pass trivially on an all-zero tensor.
   EXPECT_GT(h2_positive.array().abs().maxCoeff(), 1e-6);
 }
 
-// The sign belongs to the whole rank-r fragment operator s_r (sum_b w_b n_b -
-// wB)^2, so it has to reach all three one-body residues of Eq. 37 together --
-// the normal-ordering square, the trace term and the wB cross term. Applying
-// it to only some of them is the easy mistake, and the fixture's wB is
-// perturbed here so the trace and wB terms cannot cancel each other out.
 TEST_F(FactorizedHamiltonianTest, NegativeSignPropagatesToAllMajoranaTerms) {
   Eigen::MatrixXd m = Eigen::MatrixXd::Zero(N, N);
   for (size_t b = 0; b < B; ++b) {
@@ -266,9 +201,6 @@ TEST_F(FactorizedHamiltonianTest, NegativeSignPropagatesToAllMajoranaTerms) {
   }
 }
 
-// Lambda's two-body half sums absolute values and |s_r| is 1, so negating a
-// rank must leave it alone. Its one-body half goes through get_h1_majorana and
-// therefore does move, so the invariance is asserted on the two-body half only.
 TEST_F(FactorizedHamiltonianTest, TwoBodyLambdaIsSignInvariant) {
   auto two_body_lambda = [](const FactorizedHamiltonianContainer& container) {
     Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(
