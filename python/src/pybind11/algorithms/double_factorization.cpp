@@ -37,38 +37,22 @@ currently supported.
 Settings:
     truncation_threshold (float): Drop fragments whose supermatrix eigenvalue
         magnitude is below this threshold. Must be non-negative; the default
-        of 1e-12 discards only the numerically null fragments, keeping the
-        factorization exact to well within chemical accuracy. Pass 0.0 to
+        of 1e-12 discards only the numerically null fragments. Pass 0.0 to
         retain every fragment.
-
-Typical usage:
-
-.. code-block:: python
-
-    import qdk_chemistry.algorithms as algorithms
-
-    factorizer = algorithms.create("double_factorizer")
-    factorizer.settings().set("truncation_threshold", 1e-8)
-    factorized = factorizer.run(hamiltonian)
 
 See Also:
     :class:`qdk_chemistry.data.FactorizedHamiltonianContainer`
 
 References:
-    :cite:`vonBurg2021`, :cite:`Patel2024`
+    :cite:`vonBurg2021`, :cite:`Patel2025`
 )");
 
   double_factorizer.def(py::init<>(), R"(
 Create a DoubleFactorizer instance.
-
-Initializes a new double factorizer with default settings.
-Configuration options can be modified through the ``settings()`` method.
 )");
 
   double_factorizer.def("run", &DoubleFactorizer::run, R"(
 Double-factorize the given Hamiltonian.
-
-This method automatically locks settings before execution.
 
 Args:
     hamiltonian (qdk_chemistry.data.Hamiltonian): The Hamiltonian to factorize.
