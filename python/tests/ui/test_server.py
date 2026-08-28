@@ -752,7 +752,6 @@ class TestAlgorithmFunctions:
     @pytest.mark.usefixtures("simple_wavefunction")
     def test_run_stability_checker(self, temp_project_dir):
         """Test stability checker for h2 in minimal basis."""
-        _project_path = temp_project_dir / "test_project"
 
         result = run_stability_checker(
             project_name="test_project",
