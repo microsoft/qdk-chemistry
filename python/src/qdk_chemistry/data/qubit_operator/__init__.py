@@ -37,6 +37,17 @@ class QubitOperator(DataClass):
     For backward compatibility, Pauli-LCU operators may also be initialized
     directly from Pauli strings and coefficients.
 
+    Attribute access is forwarded to the wrapped container by :meth:`__getattr__`, so the
+    available attributes depend on the representation. The two below are documented here
+    because they are part of the long-standing public surface; they resolve only when the
+    operator wraps a :class:`~qdk_chemistry.data.qubit_operator.containers.pauli_lcu.PauliLCUContainer`,
+    and raise :exc:`AttributeError` otherwise.
+
+    Attributes:
+        pauli_strings (list[str]): List of Pauli strings representing the ``QubitOperator``.
+        term_partition (TermPartition | None): Optional index-based partition of
+            :attr:`pauli_strings` into algorithm-relevant groups.
+
     """
 
     _data_type_name = "qubit_hamiltonian"
