@@ -23,7 +23,7 @@ from typing import cast
 
 import numpy as np
 from qdk_chemistry.algorithms import QpeCircuitBuilder, create
-from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
+from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator, Settings
 from qdk_chemistry.utils import Logger
 from tutorial_map_n2_to_qubits import QubitMappingResult, run_qubit_mapping_workflow
 from tutorial_prepare_trial_state import TrialStateResult, run_trial_state_workflow
@@ -218,10 +218,11 @@ def prepare_iqpe_problem(
     circuit_builder = create_iqpe_circuit_builder(
         evolution_time.time_hartree_inverse, num_phase_bits=num_phase_bits
     )
+    circuit_builder_settings = Settings.from_json(circuit_builder.settings().to_json())
     circuit_builder_ref = AlgorithmRef(
         "qpe_circuit_builder",
         "qdk_iterative",
-        circuit_builder.settings(),
+        circuit_builder_settings,
     )
     iteration_circuits = cast(
         list[Circuit],
