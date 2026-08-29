@@ -114,6 +114,7 @@ test = [
   "nbclient",
   "nbformat",
   "pennylane",
+  "pytest-env",
   "rdkit",
   "requests>=2.33.0",
   "setuptools>=64",
