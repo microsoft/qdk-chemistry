@@ -285,8 +285,11 @@ if (-not $SkipCpp) {
         Write-Host "=== Step 1: Configure C++ build ===" -ForegroundColor Yellow
         # QDK_UARCH is omitted entirely (rather than passed empty) when unset above:
         # cmake -DQDK_UARCH="" still counts as user-defined and bypasses auto-detection
-        # in qdk-uarch.cmake, producing an empty and invalid /arch: flag.
-        $uarchArgs = if ($QDK_UARCH) { @("-DQDK_UARCH=$QDK_UARCH") } else { @() }
+        # in qdk-uarch.cmake, producing an empty and invalid /arch: flag. The outer @(...)
+        # is required: without it, "if (cond) { @(1-item-array) }" unwraps to a plain
+        # string, and splatting a string with @ iterates its characters instead of
+        # passing it as a single argument.
+        $uarchArgs = @(if ($QDK_UARCH) { "-DQDK_UARCH=$QDK_UARCH" })
         cmake -S cpp -B "$BuildDir" `
             -GNinja `
             @uarchArgs `

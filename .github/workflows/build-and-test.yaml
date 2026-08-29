@@ -639,7 +639,7 @@ jobs:
         # Libint2Config.cmake pointing at a path that does not exist on this machine,
         # failing CMake configure with "includes non-existent path".
         key: >-
-          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ github.workspace }}-${{ steps.deps-fp.outputs.fingerprint }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/toolchains/windows.cmake') }}
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ github.workspace }}-${{ steps.deps-fp.outputs.fingerprint }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/toolchains/windows.cmake', 'vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
 
     - name: Install C++ dependencies
       if: steps.cache-vcpkg.outputs.cache-hit != 'true' || steps.cache-deps.outputs.cache-hit != 'true'
@@ -665,7 +665,7 @@ jobs:
       with:
         path: deps-install-${{ matrix.compiler }}
         key: >-
-          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ github.workspace }}-${{ steps.deps-fp.outputs.fingerprint }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/toolchains/windows.cmake') }}
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ github.workspace }}-${{ steps.deps-fp.outputs.fingerprint }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/toolchains/windows.cmake', 'vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
 
     - name: Configure CMake
       shell: pwsh
@@ -866,7 +866,7 @@ jobs:
         # Libint2Config.cmake pointing at a path that does not exist on this machine,
         # failing CMake configure with "includes non-existent path".
         key: >-
-          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ github.workspace }}-${{ steps.deps-fp.outputs.fingerprint }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/toolchains/windows.cmake') }}
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ github.workspace }}-${{ steps.deps-fp.outputs.fingerprint }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/toolchains/windows.cmake', 'vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
 
     - name: Install C++ dependencies
       if: steps.cache-vcpkg.outputs.cache-hit != 'true' || steps.cache-deps.outputs.cache-hit != 'true'
@@ -893,7 +893,7 @@ jobs:
       with:
         path: deps-install-${{ matrix.compiler }}
         key: >-
-          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ github.workspace }}-${{ steps.deps-fp.outputs.fingerprint }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/toolchains/windows.cmake') }}
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ github.workspace }}-${{ steps.deps-fp.outputs.fingerprint }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/toolchains/windows.cmake', 'vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
 
     - name: Configure CMake
       shell: pwsh

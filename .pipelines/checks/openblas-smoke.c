@@ -21,8 +21,8 @@
  */
 #include <stdio.h>
 
-extern char *openblas_get_config(void);
-extern char *openblas_get_corename(void);
+extern const char *openblas_get_config(void);
+extern const char *openblas_get_corename(void);
 extern int openblas_get_num_procs(void);
 extern int openblas_get_num_threads(void);
 
