@@ -37,7 +37,7 @@ class QubitOperator(DataClass):
     For backward compatibility, Pauli-LCU operators may also be initialized
     directly from Pauli strings and coefficients.
 
-    Attribute access is forwarded to the wrapped container by :meth:`__getattr__`, so the
+    Attribute access is forwarded to the wrapped container by ``__getattr__``, so the
     available attributes depend on the representation. The two below are documented here
     because they are part of the long-standing public surface; they resolve only when the
     operator wraps a :class:`~qdk_chemistry.data.qubit_operator.containers.pauli_lcu.PauliLCUContainer`,
