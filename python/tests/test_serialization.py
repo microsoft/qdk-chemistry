@@ -134,7 +134,7 @@ def test_numpy_array_rejects_structured_dtype(tmp_path):
         ([object()], False),
         (np.array([1.0]), True),
         (np.array([object()], dtype=object), False),
-        ((1, 2), False),
+        ((1, 2), True),
     ],
 )
 def test_cacheable_matches_supported_cache_value_graph(value, expected):

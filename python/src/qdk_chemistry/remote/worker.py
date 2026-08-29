@@ -91,7 +91,7 @@ def _get_cached_result(cache: Any, run_hash: str | None) -> Any:
         return _CACHE_MISS
 
 
-def _store_cached_result(cache: Any, run_hash: str | None, inputs: dict[str, Any], result: Any) -> None:
+def _store_cached_result(cache: Any, run_hash: str | None, inputs: dict[str, Any], result: Any) -> bool:
     """Persist a completed result to the compute node's cache when configured.
 
     Args:
@@ -100,9 +100,12 @@ def _store_cached_result(cache: Any, run_hash: str | None, inputs: dict[str, Any
         inputs: Deserialized algorithm metadata and arguments.
         result: Completed algorithm result to persist.
 
+    Returns:
+        Whether the completed result was successfully persisted in the cache.
+
     """
     if cache is None or run_hash is None:
-        return
+        return False
 
     try:
         from qdk_chemistry.data._hashing import collect_content_hashes  # noqa: PLC0415
@@ -134,8 +137,10 @@ def _store_cached_result(cache: Any, run_hash: str | None, inputs: dict[str, Any
                 output_is_tuple=output_is_tuple,
             ),
         )
+        return True
     except Exception:  # noqa: BLE001
         logger.warning("Failed to store cached result for run %s", run_hash, exc_info=True)
+        return False
 
 
 def execute_job(input_dir: str | Path, output_dir: str | Path) -> Any:
@@ -148,14 +153,17 @@ def execute_job(input_dir: str | Path, output_dir: str | Path) -> Any:
     """
     from qdk_chemistry.algorithms import create as create_algorithm  # noqa: PLC0415
     from qdk_chemistry.remote.serialization import (  # noqa: PLC0415
+        _load_manifest,
         deserialize_inputs,
         serialize_outputs,
     )
 
     input_path = Path(input_dir)
     output_path = Path(output_dir)
+    cache_transport = _load_manifest(input_path / "manifest.json").get("remote_cache_transport", False)
     cache, run_hash, force_rerun = _load_remote_cache(input_path)
     result = _CACHE_MISS if force_rerun else _get_cached_result(cache, run_hash)
+    cached_result = result is not _CACHE_MISS
 
     if result is _CACHE_MISS:
         inputs = deserialize_inputs(input_path, cache=cache)
@@ -163,8 +171,12 @@ def execute_job(input_dir: str | Path, output_dir: str | Path) -> Any:
         for key, value in inputs["settings"].items():
             algorithm.settings().set(key, value)
         result = algorithm.run(*inputs["args"], **inputs["kwargs"])
-        _store_cached_result(cache, run_hash, inputs, result)
+        cached_result = _store_cached_result(cache, run_hash, inputs, result)
 
+    if cache_transport:
+        if not cached_result:
+            raise RuntimeError("remote_cache_transport could not persist the completed result")
+        return result
     serialize_outputs(output_path, result)
     return result
 
