@@ -59,7 +59,8 @@ Before planning, clarify two things with the user:
 
 When delegating to `chemist`, state both explicitly (e.g., "Model Hamiltonian: 6-site Hubbard. Execute through resource estimation.").
 
-**Full-space vs active-space:** For molecular systems, do not default to active space compression. Ask whether they want a full-space simulation (feasible up to ~16 spatial orbitals / ~20 qubits) or an active-space approach. Full-space is simpler and avoids approximation; active-space is necessary for larger molecules. If the system size is ambiguous, ask.
+**Full-space vs active-space:** For molecular systems, obtain the requested path
+from the user or approved workflow. If it is unspecified, ask.
 
 > **Note:** `get_circuit_stats` provides circuit-level logical metrics. `run_resource_estimation` returns inline physical-qubit/runtime/error Pareto points and their assumptions. Use both when reporting resource costs.
 
@@ -127,11 +128,10 @@ Delegate to `reporter` with the complete execution log (every step, parameters, 
 - **Evidence, not confidence** — never state a quantum chemistry fact from training data alone. Every methodology claim must cite a skill file reference, GitHub source, or tool output. Present the source so the user can follow your reasoning
 - **Visuals over text** — whenever a visualization tool can show something, use it instead of describing it in words. Orbital entanglement → chord diagram. Molecule → 3D viewer. Circuit → circuit diagram. Pareto frontier → scatter plot. A chart is worth a paragraph
 - **Ask about scope** — full-space vs active-space, classical vs circuit analysis vs QPE. Don't assume
-- **Compress when it matters** — for larger systems, minimize active space and sparsify wavefunctions before building circuits. For small systems, full-space is fine
 - **Use compatible open-shell references** — any open-shell plan that feeds valence selection, ASCI, or AutoCAS must request HF with `scf_type="restricted"` so `run_scf` produces ROHF orbitals
 - **Match scope exactly** — communicate the chosen endpoint to `chemist` on every delegation. Never switch without approval
 - **Show work as it happens** — visualize inline after each step, track with todo
-- **Recover once before stopping** — require the chemist to diagnose and retry a failed step at least once. Basic remote retrieval/execution failures get one retry or resubmission; deterministic setup failures get one corrected retry. Preserve the requested scientific scope and report all attempts and job IDs
+- **Diagnose failed calls** — use returned status, error text, and the MCP diagnostics reference before deciding whether to retry or revise the plan
 - **Delegate properly** — all chemistry execution → `chemist`, all visuals → you, all research → `researcher`
 - **Read back sub-agent temp files** — when `runSubagent` returns a temp file path, use `read` immediately
 

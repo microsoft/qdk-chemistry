@@ -7,9 +7,9 @@ QDK Chemistry workflows have two entry points and three endpoints.
 For real molecules, every workflow begins with these steps:
 
 1. **Upload structure** — `create_structure` (coordinates in Bohr)
-2. **SCF** — `run_scf` (HF or DFT, specify basis set, charge, spin multiplicity). If an open-shell wavefunction will feed valence selection, ASCI, or AutoCAS, use HF with `scf_type="restricted"` to produce ROHF orbitals
-3. **Stability check** — `run_stability_checker` (verify SCF found the true minimum, not a saddle point)
-4. **Active space analysis** — For systems with >16 spatial orbitals or strong correlation, run SCI + AutoCAS (`qdk_autocas_eos`) to identify and compress the active space (see active-space-guide.md). For small systems (≤16 spatial orbitals), full-space simulation is often tractable — ask the user or assess system size before defaulting to active space compression. For large systems, use valence selection as a pre-filter before SCI
+2. **SCF** — `run_scf` with the requested method, basis, charge, and spin multiplicity. An open-shell wavefunction sent to valence selection, ASCI, or AutoCAS needs HF with `scf_type="restricted"`.
+3. **Stability check** — `run_stability_checker` when requested by the workflow
+4. **Active space analysis** — `run_active_space_selector` when the requested workflow uses an active space. Entropy-based selection needs RDM output from a preceding multi-configuration calculation.
 5. **Get orbitals** — `get_orbitals_from_input`
 6. **Build Hamiltonian** — `run_hamiltonian_constructor`
 
@@ -29,7 +29,7 @@ For lattice models (Hubbard, Hückel, PPP, Ising, Heisenberg), skip SCF and acti
 1. `create_spin_model_hamiltonian` — produces a qubit Hamiltonian directly (no qubit mapping needed)
 2. Continue with the chosen endpoint below
 
-The agent must determine appropriate model parameters (coupling constants, lattice size, boundary conditions) from the user's description of the physical system — do not ask the user for parameter values that can be inferred from the physics.
+The creation-tool schema identifies the required model parameters.
 
 ## Endpoint 1: "What would it cost to run this on quantum hardware?"
 
@@ -59,9 +59,10 @@ Continue from the common stem:
 9. **State preparation** — `run_state_preparation`
 10. **Run phase estimation** — `run_phase_estimation` with sub-algorithm overrides in `settings`
 
-**Critical:** `run_phase_estimation` has intentionally invalid defaults under `settings.qpe_circuit_builder`: `num_bits=-1` and `unitary_builder.time=0.0`. You MUST override these in nested settings. Unless the user supplies a different QPE policy, use the default 0.5 kcal/mol policy from the MCP QPE guide: derive an energy window, set `evolution_time = 2π / energy_window`, set `num_bits = ceil(log2(energy_window / 0.000797)) + 1`, and use the scheduled powers `1, 2, 4, ..., 2^(num_bits - 1)`.
-
-**Multi-trial strategy (from the real examples):** Run 20 trials with different random seeds, then use majority voting on the energy results. This is more robust than a single high-precision run.
+`run_phase_estimation` has intentionally invalid defaults under
+`settings.qpe_circuit_builder`: `num_bits=-1` and `unitary_builder.time=0.0`.
+Supply both explicit nested values. See the MCP QPE reference for the settings
+shape and runtime discovery calls.
 
 **If QPE fails:** Report the error. Don't switch to resource analysis — they answer different questions.
 

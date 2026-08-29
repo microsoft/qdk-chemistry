@@ -16,12 +16,10 @@ Tool names after discovery: `github_repo`.
 
    - `../skills/qdk-chemistry-mcp/SKILL.md` — MCP tool reference, workflow patterns
    - `../skills/qdk-chemistry-mcp/references/things-that-go-wrong.md` — failure modes and fixes
-   - `../skills/qdk-chemistry-mcp/references/active-space-guide.md` — active space strategies
+   - `../skills/qdk-chemistry-mcp/references/active-space-guide.md` — active-space tool inputs and outputs
    - `../skills/qdk-chemistry-mcp/references/qpe-and-state-prep.md` — QPE configuration
-   - `../skills/qdk-chemistry-mcp/references/quantum-resource-compression.md` — compression strategies
+   - `../skills/qdk-chemistry-mcp/references/quantum-resource-compression.md` — resource artifact relationships
    - `../skills/qdk-chemistry-coding/references/python-sdk-reference.md` — Python API reference
-   - `../skills/qdk-chemistry-coding/references/example-n2-stretched.md` — worked N₂ example
-   - `../skills/qdk-chemistry-coding/references/example-benzene-state-prep.md` — worked benzene example
 2. **GitHub repos** (`microsoft/qdk-chemistry`, `microsoft/qdk`) — source code, tests, notebooks (fallback if skill files don't cover the question)
 
 > **Note:** QDK Chemistry provides circuit-level logical metrics via `get_circuit_stats` and inline physical-qubit/runtime/error Pareto points via `run_resource_estimation`. When answering questions about hardware feasibility, distinguish these sources and report unavailable fields as unavailable.
@@ -37,11 +35,10 @@ Tool names after discovery: `github_repo`.
 
 - **Skills first, training data second** — always check local skill files before answering from your own knowledge. Your training data has biases (e.g., defaulting to CASSCF, assuming specific basis sets, prescribing CAS sizes). The skills reflect what this toolkit actually supports.
 - **Cite every claim** — every factual statement about quantum chemistry methods, algorithms, or parameters must reference its source: a skill file path, tool docstring, or GitHub source. Format: "(source: skills/qdk-chemistry-mcp/references/active-space-guide.md)". If you can't cite it, say so explicitly: "(from training data, not verified)"
-- **Automate decisions** — when QDK Chemistry provides an automated tool (e.g., AutoCAS for orbital selection), recommend it over manual choices. Don't push expert parameter choices to the user
-- **Don't assume active space** — for small systems (up to ~16 spatial orbitals), the full orbital space may be tractable. Mention this option. Active space compression is a choice, not a requirement
-- **Skills own workflow context** — MCP descriptions are compact summaries. Use
-   the MCP skill and references for prerequisites and sequencing, then use tool
-   schemas and algorithm discovery for runtime call syntax and defaults
+- **Separate contracts from policy** — use MCP skills for prerequisites and
+   sequencing, and use tool schemas and algorithm discovery for runtime call
+   syntax and defaults. Mark scientific choices not supplied by the user as
+   unresolved rather than inventing a default.
 
 ## Constraints
 

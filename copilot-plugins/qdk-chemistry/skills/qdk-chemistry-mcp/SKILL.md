@@ -24,13 +24,13 @@ active workspace as an absolute `workspace_root`.
 ## Tool Catalog And Guidance
 
 The MCP catalog intentionally exposes only a short summary for each tool so the
-model context remains usable. Input schemas define call syntax; they do not
-carry workflow policy. This skill and its references own prerequisites,
-sequencing, parameter-selection policy, recovery rules, and worked examples.
+model context remains usable. Input schemas define call syntax. This skill and
+its references document tool dependencies, artifact handoff, and interface
+constraints; scientific method and parameter choices remain caller supplied.
 
 Load this skill before planning or executing a multi-step MCP workflow. Load
 the relevant reference when the task involves active-space selection, QPE,
-state preparation, resource compression, or failure recovery. Use
+state preparation, resource reporting, or failure diagnostics. Use
 `list_algorithms`, `describe_algorithm`, and the default-setting tools for the
 runtime implementations and settings available in the active installation.
 The full Python docstrings remain developer reference material and can be
@@ -82,15 +82,15 @@ parameter reference:
 | Cached or asynchronous execution | `remote_execution` |
 | Interactive VS Code output | `visualization` |
 
-Descriptions carry the blocking call invariants. The policies below and the
-linked references determine which valid call is scientifically appropriate.
+Descriptions carry the blocking call invariants. Use input schemas and runtime
+discovery to determine the supported call shape.
 
 ### Algorithm Configuration Policy
 
 - Call `list_algorithms` before choosing an implementation, then call
   `describe_algorithm` to discover its accepted settings and method values.
 - Start from the selected algorithm's defaults and override only settings needed
-  to express the requested scientific method or execution policy.
+  for the requested call.
 - Apply each override to the deepest nested algorithm that owns that behavior.
   Do not replace an algorithm implementation merely to reach one of its child
   settings, and preserve unspecified nested defaults.
@@ -98,14 +98,8 @@ linked references determine which valid call is scientifically appropriate.
   (normally `geometric`). Select the energy and gradient implementation through
   `settings["derivative_calculator"]` while retaining the requested optimization
   driver.
-- Select implementations by capability and total computational cost. Prefer
-  native or analytical operations, then hybrid or seminumerical methods built
-  from them, and use fully numerical approximations only when the configured
-  method lacks a stronger supported path.
-- Treat nested algorithm settings recursively. A requested output or recovery
-  attempt does not by itself justify switching implementations; make such a
-  switch only for a verified capability requirement and preserve scientific
-  intent.
+- Treat nested algorithm settings recursively and preserve unspecified nested
+  defaults.
 
 ### Model Hamiltonians (no molecular structure needed)
 
@@ -114,7 +108,9 @@ linked references determine which valid call is scientifically appropriate.
 | `create_model_hamiltonian` | Fermionic lattice Hamiltonian (Hückel, Hubbard, PPP) | `project_name`, `model`, `out_hamiltonian_filename`, `lattice_type`, `lattice_params`, `epsilon?`, `t?`, `U?`, `V?` |
 | `create_spin_model_hamiltonian` | Qubit spin Hamiltonian (Heisenberg, Ising) | `project_name`, `model`, `out_qubit_hamiltonian_filename`, `lattice_type`, `lattice_params`, `jx?`, `jy?`, `jz?`, `j?`, `h?` |
 
-These bypass the molecular workflow. Fermionic models produce a `Hamiltonian` (needs `create_majorana_mapping` then `run_qubit_mapper`). Spin models produce a `QubitHamiltonian` directly. The agent must determine model parameters from the user's description.
+These bypass the molecular workflow. Fermionic models produce a `Hamiltonian`
+(then `create_majorana_mapping` and `run_qubit_mapper`). Spin models produce a
+`QubitHamiltonian` directly. The input schema identifies the model parameters.
 
 ### Quantum Preparation
 
@@ -157,19 +153,17 @@ Build and inspect QPE circuit components for resource estimates. No energy compu
 
 **Mode A ≠ Mode B.** Never switch without explicit user approval.
 
-### QPE Policy
+### QPE Settings
 
 Before selecting QPE settings or building resource circuits, load
-[QPE and State Preparation](./references/qpe-and-state-prep.md). It owns the
-precision, energy-window, evolution-time, phase-bit, controlled-power,
-state-preparation, and multi-trial policies. Load
-[Quantum Resource Compression](./references/quantum-resource-compression.md)
-when the task requires active-space or determinant compression.
+[QPE and State Preparation](./references/qpe-and-state-prep.md) for the nested
+settings shape and required explicit values. Load
+[Quantum Resource Inputs](./references/quantum-resource-compression.md) for
+artifact relationships and reporting boundaries.
 
-Never call `run_phase_estimation` with its invalid sentinel defaults for phase
-bits or evolution time. In Mode A, configure powered evolution upstream and
-keep `run_controlled_evolution_circuit_mapper(power=1)`. Do not switch between
-Mode A resource analysis and Mode B eigenvalue execution without approval.
+`run_phase_estimation` rejects its invalid sentinel defaults for phase bits and
+evolution time. In Mode A, configure powered evolution in the time-evolution
+builder before mapping the resulting circuit.
 
 ### Remote / Async Job Execution
 
@@ -203,15 +197,14 @@ Load only the reference required by the claimed endpoint:
 - [Workflow Patterns](../qdk-chemistry-overview/references/workflow-patterns.md)
   for molecular versus model-Hamiltonian entry points and classical, resource,
   or eigenvalue endpoints.
-- [Active Space Guide](./references/active-space-guide.md) for restricted
-  references, valence pre-filtering, SCI/RDM preparation, AutoCAS, empty
-  selections, and absolute orbital-index handling.
+- [Active Space Tool Reference](./references/active-space-guide.md) for input
+  dependencies and orbital-index handoff.
 - [QPE and State Preparation](./references/qpe-and-state-prep.md) for state
-  preparation, Mode A/Mode B settings, and QPE execution.
-- [Quantum Resource Compression](./references/quantum-resource-compression.md)
-  for reducing active spaces, determinant counts, and circuit cost.
-- [Things That Go Wrong](./references/things-that-go-wrong.md) after a failure
-  or when validating a recovery.
+  preparation and QPE settings shape.
+- [Quantum Resource Inputs](./references/quantum-resource-compression.md) for
+  circuit artifacts and resource-reporting boundaries.
+- [MCP Diagnostics Reference](./references/things-that-go-wrong.md) after a
+  failed call.
 - The separate `remote-execution` skill for asynchronous backend operation.
 
 Use one `project_name` throughout a workflow and pass actual returned filenames
@@ -234,37 +227,21 @@ Workflow: **Research → Plan → Critique → Present → Validate → Execute 
 
 ## Reference Documents
 
-These files contain domain-specific guidance for MCP-driven workflows. Load them when you need deeper knowledge:
+These files contain mechanical guidance for MCP-driven workflows. Load them as needed:
 
-- [Active Space Guide](./references/active-space-guide.md) — AutoCAS, valence selection, SCI pre-filtering, orbital localization, visualization
-- [QPE and State Preparation](./references/qpe-and-state-prep.md) — sparse isometry, wavefunction truncation, evolution time, multi-trial strategies
-- [Quantum Resource Compression](./references/quantum-resource-compression.md) — strategies for minimizing qubits, depth, and gate count
-- [Things That Go Wrong](./references/things-that-go-wrong.md) — real failure modes with symptoms, causes, and fixes
+- [Active Space Tool Reference](./references/active-space-guide.md) — selector inputs and output handoff
+- [QPE and State Preparation](./references/qpe-and-state-prep.md) — required nested settings and endpoint calls
+- [Quantum Resource Inputs](./references/quantum-resource-compression.md) — circuit artifacts and estimate types
+- [MCP Diagnostics Reference](./references/things-that-go-wrong.md) — interface constraints and error routing
 
 ## Critical Rules
 
 1. **Coordinates in Bohr** for `create_structure`
-2. **Always run `run_stability_checker`** after SCF
-3. **Check `status` field** in every response
-4. **Query defaults** with `get_algorithm_default_settings` before overriding
-5. **Pass actual output filenames** between steps — don't assume
-6. **Recover once before stopping** — diagnose every failure and make at least
-  one corrected retry; for a basic remote failure, re-check and retry
-  retrieval or resubmit once before declaring the result inconclusive
-7. **Preserve scientific intent during retries** — do not silently change charge,
-  multiplicity, basis, active space, or endpoint; record attempts and job IDs
-8. **Open-shell MR uses ROHF orbitals** — set `method="hf"` and
-  `scf_type="restricted"` before valence selection, ASCI, or AutoCAS
-9. **Autocas needs RDMs** — cannot run directly on SCF wavefunction
-10. **Use the correct evidence source** — use `get_circuit_stats` for logical
-  circuit metrics and `run_resource_estimation` for the physical Pareto frontier
-11. **Never make up resource numbers** — every quantitative estimate must come
-   directly from a successful QDK Chemistry result for the exact circuit
-12. **Validate estimator semantics** — inspect the returned assumptions and
-  Pareto points; report fields absent from the response as unavailable
-13. **Keep evidence classes separate** — mapping qubits/Pauli terms, logical
-  circuit stats, state-preparation estimates, and QPE physical estimates are
-  not interchangeable
-14. **Report missing estimates as missing** — on failure or invalid output,
-  preserve the QDK error and provenance; do not infer, extrapolate, proxy, or
-  fill absent fields
+2. **Check `status`** before using a result
+3. **Query defaults and schemas** before sending algorithm overrides
+4. **Pass returned filenames** to dependent calls
+5. **Use restricted HF inputs** for active-space paths that require shared
+   spatial orbitals
+6. **Supply RDM outputs** before entropy-based AutoCAS selection
+7. **Keep artifact evidence distinct**: mapping data, logical circuit metrics,
+   and physical resource estimates come from different tools

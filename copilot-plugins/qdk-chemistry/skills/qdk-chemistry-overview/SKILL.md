@@ -56,8 +56,8 @@ Regardless of interface, all workflows follow the same conceptual pipeline:
 *Molecular systems:*
 1. Define molecular structure (geometry + elements, coordinates in Bohr)
 2. Run SCF (Hartree-Fock or DFT)
-3. Check wavefunction stability (never skip)
-4. Select active space (valence, AutoCAS, or combined)
+3. Optionally run `run_stability_checker`
+4. Optionally select an active space
 5. Extract orbitals → build Hamiltonian
 6. Optional: dynamical correlation (MP2, CCSD, CCSD(T))
 
@@ -66,12 +66,12 @@ Regardless of interface, all workflows follow the same conceptual pipeline:
    OR `create_spin_model_hamiltonian` (Heisenberg, Ising) → qubit Hamiltonian directly
 2. Skip to Stage 2 (fermionic models need qubit mapping; spin models skip it too)
 
-The agent must determine model parameters from the user's description of the physical system.
+Supply model parameters through the creation tool's input schema.
 
 **Stage 2 — Quantum Mapping & State Preparation**
 7. Create a fermion-to-qubit mapping file — skip for spin models
 8. Map fermions to qubits with the mapping file — skip for spin models
-9. Prepare quantum state from classical wavefunction (sparse isometry)
+9. Optionally prepare a quantum state from a classical wavefunction
 
 **Stage 3 — Quantum Circuit & Execution** (three distinct endpoints)
 - **Classical energy only** → stop after Stage 1
@@ -80,12 +80,10 @@ The agent must determine model parameters from the user's description of the phy
 
 ## Key Principles
 
-- **Coordinates in Bohr** — always convert from Ångströms before uploading structures
-- **Always check SCF stability** — unstable solutions produce wrong downstream results
-- **AutoCAS requires RDMs** — run SCI with `calculate_one_rdm=True`, `calculate_two_rdm=True`, and `calculate_mutual_information=True` first
-- **Compress first, compute second** — minimize active space before building quantum circuits
+- **Coordinates in Bohr** — `create_structure` input units
+- **AutoCAS requires RDMs** — entropy-based selection consumes RDM output from a multi-configuration calculation
 - **Logical + physical resources** — `get_circuit_stats` provides circuit-level logical metrics; `run_resource_estimation` returns inline physical-qubit/runtime/error Pareto points
-- **Mode A ≠ Mode B** — circuit resource analysis and QPE eigenvalue answer different questions; never switch without approval
+- **Mode A and Mode B** — circuit resource analysis and QPE eigenvalue use different calls and return different artifacts
 - **QDK results are the only source of QRE numbers** — never infer, extrapolate,
   or proxy quantitative resource estimates; report unavailable fields as
   unavailable

@@ -30,7 +30,7 @@ When asked to **validate** a plan (not execute):
 
 When asked to **execute** a validated plan:
 
-- **Verify before you act** — before each methodology choice (algorithm, encoding, parameters), check the relevant skill files and tool defaults for what this toolkit supports and recommends
+- **Verify before you act** — before each methodology choice, check the input schema, algorithm catalog, and tool defaults for supported values
 - **Cite your sources** — when choosing a method or parameter, state where the recommendation comes from (skill file, tool output, or GitHub source). Don't present training-data opinions as facts
 - **Follow the plan exactly** — one scope-preserving recovery attempt is authorized; changes to charge, multiplicity, basis, active space, method family, or endpoint still require approval unless the approved plan already specifies them
 - **Use MCP tools, not code** — the tools provide a complete no-code pipeline
@@ -42,29 +42,28 @@ When asked to **execute** a validated plan:
 ### Workflow Stages
 
 MCP tool descriptions are intentionally compact. Load the `qdk-chemistry-mcp`
-skill and its relevant references for prerequisites, sequencing, parameter
-policy, recovery, and worked examples. Use the active input schemas and
-algorithm-discovery tools for call syntax and runtime defaults.
+skill and relevant references for prerequisites, sequencing, and artifact
+handoff. Use active input schemas and algorithm-discovery tools for call syntax
+and runtime defaults.
 
 **Stage 1 — Classical Preparation**
 
 Goal: produce a Hamiltonian suitable for qubit encoding. The path depends on the system:
 
-- *Model Hamiltonians* — `create_model_hamiltonian` or `create_spin_model_hamiltonian`. Skip directly to Stage 2. Infer model parameters from the physics — don't push expert choices to the user.
-- *Molecular systems (full-space)* — SCF → Hamiltonian construction. No active space selection. Suitable for small molecules (up to ~16 spatial orbitals / ~20 qubits). Simpler, no approximation.
-- *Molecular systems (active-space)* — SCF → active space analysis → Hamiltonian construction. Needed for larger molecules. Read `../skills/qdk-chemistry-mcp/references/active-space-guide.md` for the decision logic.
+- *Model Hamiltonians* — `create_model_hamiltonian` or `create_spin_model_hamiltonian`. Skip directly to Stage 2.
+- *Molecular systems (full-space)* — SCF → Hamiltonian construction.
+- *Molecular systems (active-space)* — SCF → active-space selection → Hamiltonian construction. Read `../skills/qdk-chemistry-mcp/references/active-space-guide.md` for input dependencies.
 
 **Do not default to active-space compression.** The orchestrator will specify which path to use. If not specified, ask.
 
-Key principles:
-- Open-shell valence/ASCI/AutoCAS workflows require a restricted HF reference. For `spin_multiplicity > 1`, call `run_scf` with `settings={"method": "hf", "scf_type": "restricted"}` to produce ROHF orbitals. Reject plans that pass default-auto UHF or unrestricted DFT orbitals into this path
-- Every SCI/CASCI run MUST include `calculate_one_rdm=True`, `calculate_two_rdm=True`, and `calculate_mutual_information=True` (required for downstream visualizations)
-- After AutoCAS, report the selected absolute orbital indices explicitly
-- Let AutoCAS pick orbitals — don't ask the user to choose
+Key prerequisites:
+- Active-space tools that require shared spatial orbitals need a restricted HF reference. For `spin_multiplicity > 1`, call `run_scf` with `settings={"method": "hf", "scf_type": "restricted"}` before the selector.
+- Entropy-based selection needs one- and two-RDM outputs. Mutual-information visualization additionally needs `calculate_mutual_information=True`.
+- After AutoCAS, report selected absolute orbital indices for downstream calls.
 
 **Stage 2 — Qubit Mapping & State Preparation**
 
-Create a fermion-to-qubit mapping file (`create_majorana_mapping`), encode the Hamiltonian as a qubit Hamiltonian (`run_qubit_mapper` with `mapping_filename`), then optionally prepare a trial state (`run_state_preparation`). Sparsifying the wavefunction before state prep reduces circuit depth — see `../skills/qdk-chemistry-mcp/references/quantum-resource-compression.md`.
+Create a fermion-to-qubit mapping file (`create_majorana_mapping`), encode the Hamiltonian as a qubit Hamiltonian (`run_qubit_mapper` with `mapping_filename`), then optionally prepare a trial state (`run_state_preparation`). See `../skills/qdk-chemistry-mcp/references/quantum-resource-compression.md` for artifact relationships.
 
 After any circuit-producing step, call `get_circuit_stats` and report the results.
 
@@ -73,11 +72,11 @@ After any circuit-producing step, call `get_circuit_stats` and report the result
 The orchestrator specifies the endpoint. Follow it exactly.
 
 - **Circuit analysis / resource estimation** — build the time evolution and controlled-U circuits, call `get_circuit_stats` and `run_resource_estimation` on each. Report logical circuit metrics and physical Pareto points. Do NOT fall back to computing an energy.
-- **QPE eigenvalue** — run `run_phase_estimation` with appropriate sub-algorithm settings. Read `../skills/qdk-chemistry-mcp/references/qpe-and-state-prep.md` for parameter guidance.
+- **QPE eigenvalue** — run `run_phase_estimation` with nested sub-algorithm settings. Read `../skills/qdk-chemistry-mcp/references/qpe-and-state-prep.md` for required values and shape.
 
 > `get_circuit_stats` gives circuit-level logical metrics. `run_resource_estimation` returns inline physical-qubit/runtime/error Pareto points and their assumptions. Use both when available; do not infer fields absent from either response.
 
 ## Research Resources
 
-- **Local skill files** in `../skills/` — workflow recipes, worked examples, pitfalls, Python reference, parameter guidance
+- **Local skill files** in `../skills/` — tool prerequisites, artifact relationships, diagnostics, and Python reference
 - GitHub repos: `microsoft/qdk-chemistry`, `microsoft/qdk` (fallback)

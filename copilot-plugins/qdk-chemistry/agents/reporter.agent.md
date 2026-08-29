@@ -51,28 +51,10 @@ For **each** circuit produced (state preparation, time evolution unitary, contro
 | Achieved error | Estimated error for each Pareto point (from resource estimation) |
 | QRE assumptions | Architecture, physical error rate, QEC scheme, factory model, and maximum error |
 
-Then provide a **"How this circuit is used in QPE"** subsection explaining:
-
-1. **State preparation |ψ⟩** — prepares the trial state. Run once at the start of QPE. Circuit cost is paid once per QPE run.
-
-2. **Time evolution U = exp(−iHt)** — the Trotterized Hamiltonian simulation unitary. The key parameters are:
-   - `evolution_time` t — determines eigenvalue-to-phase mapping. Computed from the Hamiltonian's spectral properties (t = π / ‖H‖)
-   - `num_trotter_steps` — more steps reduce Trotter error but multiply circuit depth linearly
-   - `order` — higher-order Trotter formulas (2nd, 4th) reduce error per step at cost of more gates
-
-3. **Controlled-U^(2^k)** — the core of QPE. In iterative QPE (1 ancilla qubit), the circuit is run repeatedly with increasing powers:
-   - Iteration 0: controlled-U^1 (1× the base circuit)
-   - Iteration 1: controlled-U^2 (2× the base circuit depth)
-   - Iteration k: controlled-U^(2^k) (2^k × the base circuit depth)
-   - For `num_bits` = B bits of precision, there are B iterations, and the **total cost** scales as U^(2^B − 1)
-   - Report how depth/gate count scale with the number of precision bits
-
-4. **Total QPE cost estimate** — combine the above:
-   - Total depth ≈ state_prep_depth + Σ(k=0..B−1) controlled_U_depth × 2^k
-   - Total controlled-U invocations ≈ 2^B − 1
-   - Example: "At 10 bits of precision, the controlled-U circuit (depth D) would be invoked 1,023 times, giving total circuit depth ≈ 1,023 × D + state_prep_depth"
-
-If the workflow stopped at circuit analysis (no QPE executed), clearly state the circuits are ready for QPE but no eigenvalue was computed, and give the projected resource cost for a hypothetical QPE run at a few precision levels (e.g., 5, 10, 15 bits).
+State which produced artifact each metrics table describes and include only
+measurements returned for that artifact. If the workflow stopped at circuit
+analysis, state that no QPE eigenvalue was computed; do not project costs for
+unexecuted precision settings.
 
 ## Deliverable 2: Reproducible Python Script
 
