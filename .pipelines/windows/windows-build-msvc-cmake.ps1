@@ -53,7 +53,12 @@ if ($DynamicDeps) {
     $VcpkgTriplet = "x64-windows-static-md"
 }
 $QDK_UARCH = "x86-64-v3"
-$NCPUS = [Math]::Max(1, [System.Environment]::ProcessorCount - 2)
+# qdk TUs including libint2 engine.impl.h peak at several GB under MSVC; cap
+# concurrency by available RAM (~8 GB/job) to avoid C1060 (compiler out of heap
+# space), not just CPU count.
+$cpu = [Math]::Max(1, [System.Environment]::ProcessorCount - 2)
+$ramGB = [math]::Floor((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
+$NCPUS = [Math]::Min($cpu, [Math]::Max(1, [math]::Floor($ramGB / 8)))
 
 $linkMode = if ($DynamicDeps) { "dynamic" } else { "static" }
 Write-Host "============================================" -ForegroundColor Cyan
