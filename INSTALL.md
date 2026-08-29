@@ -80,6 +80,7 @@ If you chose the minimal `pip install qdk-chemistry` above, you can add specific
 
 | Extra | Description | Included Packages |
 |-------|-------------|-------------------|
+| `coverage` | Coverage reporting tools | coverage, pytest, pytest-cov, gcovr |
 | `jupyter` | Jupyter notebook support | ipykernel, pandas |
 | `plugins` | Third-party quantum chemistry backends | PySCF |
 | `qiskit-extras` | Qiskit ecosystem packages | qiskit, qiskit-aer, qiskit-nature |
@@ -89,10 +90,13 @@ If you chose the minimal `pip install qdk-chemistry` above, you can add specific
 | `qre` | Quantum Resource Estimator support | qdk[qre,jupyter]>=1.30.0 |
 | `dev` | Development and testing tools | pytest, ruff, mypy, and related tooling |
 | `test` | Testing tools and optional runtime dependencies; does not include `docs` | qdk-chemistry[coverage,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre], nbclient, nbformat, pennylane, rdkit, requests>=2.33.0 |
-| `all` | **All of the above** | All optional dependencies |
+| `all` | Union of all defined extras | coverage, dev, docs, jupyter, networkx-extras, openfermion-extras, plugins, qiskit-extras, qre, test |
 
-Building the documentation also requires the system packages Doxygen and
-Graphviz. See the [documentation build instructions](docs/README.md).
+To build the documentation, install the `docs` extra (for example,
+`python3 -m pip install 'qdk-chemistry[docs]'`), install the Doxygen system
+binary and Graphviz (for example, `sudo apt install doxygen graphviz` on
+Ubuntu), then run `cd docs && make all`. See the
+[documentation build instructions](docs/README.md) for more details.
 
 Install one or more extras with:
 
