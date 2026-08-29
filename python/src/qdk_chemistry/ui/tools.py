@@ -27,7 +27,7 @@ from qdk_chemistry.data import AlgorithmRef
 
 # Remote execution support — optional; the MCP server works without it.
 try:
-    from qdk_chemistry.remote.backends.base import available_backends
+    from qdk_chemistry.remote.backends.base import available_backends, get_mcp_safe_config_options
     from qdk_chemistry.remote.cache import available_caches, resolve_cache
     from qdk_chemistry.remote.cache.folder import FolderCache
     from qdk_chemistry.remote.proxy import run as _remote_run
@@ -51,6 +51,7 @@ from .io import (
 from .validation import (
     FilenameFormatError,
     ensure_filename_format,
+    resolve_project_path,
     validate_project,
 )
 
@@ -202,6 +203,18 @@ def _structured(func):
 # =========================
 # Helpers
 # =========================
+
+
+def _validate_mcp_remote_config(name: str, remote_config: dict[str, Any]) -> None:
+    """Reject backend constructor options that MCP clients may not control."""
+    allowed = get_mcp_safe_config_options(name)
+    unsupported = remote_config.keys() - allowed
+    if unsupported:
+        allowed_message = ", ".join(sorted(allowed)) or "none"
+        raise ValueError(
+            f"remote_config contains options that MCP clients cannot control for backend '{name}': "
+            f"{', '.join(sorted(unsupported))}. Allowed options: {allowed_message}."
+        )
 
 
 def _strip(filename: str) -> str:
@@ -438,12 +451,13 @@ def _run_algorithm(
         return algorithm.run(*args, **kwargs)
 
     # If remote is a name string and remote_config is provided,
-    # create a pre-configured backend instance so the SDK receives
-    # the full configuration.
+    # create a pre-configured backend instance using only options that
+    # are safe for untrusted MCP clients to control.
     resolved_remote = remote
     if isinstance(remote, str) and remote_config:
         from qdk_chemistry.remote.backends import get_backend  # noqa: PLC0415
 
+        _validate_mcp_remote_config(remote, remote_config)
         resolved_remote = get_backend(remote, **remote_config)
         resolved_remote.connect()
 
@@ -720,7 +734,9 @@ def create_project(project_name: str) -> dict | str:
     """
     if not project_name or not project_name.strip():
         return "ERROR: project_name must be a non-empty string."
-    project_dir = config.projects_dir / project_name
+    project_dir, error = resolve_project_path(project_name, config.projects_dir)
+    if project_dir is None:
+        return f"ERROR: {error}"
     try:
         project_dir.mkdir(parents=True, exist_ok=True)
     except (PermissionError, OSError) as e:
@@ -744,7 +760,9 @@ def list_project_files(project_name: str) -> dict | str:
         str: Error message if the project does not exist.
 
     """
-    project_dir = config.projects_dir / project_name
+    project_dir, error = resolve_project_path(project_name, config.projects_dir)
+    if project_dir is None:
+        return f"ERROR: {error}"
     if not project_dir.exists():
         return f"ERROR: Project '{project_name}' not found."
 
@@ -1062,8 +1080,9 @@ def convert_energy(
 def describe_backend(backend_type: str, name: str) -> dict | str:
     """Describe the configuration parameters for a cache or remote backend.
 
-    Returns the ``__init__`` parameter names, types, and defaults so an
-    agent can construct a valid ``remote_config`` or ``cache_config`` dict.
+    Returns the configurable parameter names, types, and defaults so an agent
+    can construct a valid ``remote_config`` or ``cache_config`` dict. Remote
+    backend parameters are limited to options safe for MCP clients to control.
 
     Args:
         backend_type: Either ``"cache"`` or ``"remote"``.
@@ -1095,9 +1114,12 @@ def describe_backend(backend_type: str, name: str) -> dict | str:
 
     cls = registry[name]
     sig = _inspect.signature(cls.__init__)
+    safe_remote_options = get_mcp_safe_config_options(name) if backend_type == "remote" else frozenset()
     params = []
     for pname, param in sig.parameters.items():
         if pname == "self":
+            continue
+        if backend_type == "remote" and pname not in safe_remote_options:
             continue
         info: dict[str, Any] = {"name": pname}
         if param.annotation is not _inspect.Parameter.empty:
@@ -3209,7 +3231,15 @@ def run_controlled_evolution_circuit_mapper(
     circuit_mapper.settings().set("control_indices", control_indices)
 
     try:
-        circuit = circuit_mapper.run(time_evolution_unitary)
+        circuit = _run_algorithm(
+            circuit_mapper,
+            time_evolution_unitary,
+            cache=cache,
+            remote=remote,
+            remote_config=remote_config,
+            remote_timeout=remote_timeout,
+            overwrite=overwrite,
+        )
     except (RuntimeError, ValueError) as e:
         return f"Controlled evolution circuit mapping failed: {e!s}"
 
@@ -3410,36 +3440,34 @@ def run_phase_estimation(
     - Traditional QPE (`algorithm_name="qiskit_standard"`) uses QFT
       and measures all phase bits in parallel but requires more
       qubits (equal to num_bits).
-                - The state preparation circuit should prepare a state with good
-                    overlap with the target eigenstate.
-                - The three dependency algorithms (time evolution builder, controlled
-                    evolution circuit mapper, circuit executor) are configured inline
-                    via the nested ``settings`` dict.
+        - The state preparation circuit should prepare a state with good
+            overlap with the target eigenstate.
+        - The three dependency algorithms (time evolution builder, controlled
+            evolution circuit mapper, circuit executor) are configured inline
+            via the nested ``settings`` dict.
 
     Guidelines on settings:
 
     - The current set of default settings can be obtained by using
       the function and MCP tool `get_algorithm_default_settings`.
-    - Key settings include:
-
-                - `qpe_circuit_builder.num_bits` (int): Number of phase estimation bits
-           (precision). Default: -1. IMPORTANT: this default value
-           is not a valid setting - you need to pass a valid value
-           for the number of bits.
-                - `qpe_circuit_builder.unitary_builder.time` (float): Time parameter t for
-           U = exp(-iHt). Default: 0.0. IMPORTANT: this default
-           value is not a valid setting - you need to adjust based
-           on the eigenvalue range - use smaller times for larger
-           energy differences.
+        - `qpe_circuit_builder.num_bits` (int): Number of phase estimation bits
+            (precision). Default: -1. IMPORTANT: this default value
+            is not a valid setting - you need to pass a valid value
+            for the number of bits.
+        - `qpe_circuit_builder.unitary_builder.time` (float): Time parameter t for
+            U = exp(-iHt). Default: 0.0. IMPORTANT: this default
+            value is not a valid setting - you need to adjust based
+            on the eigenvalue range - use smaller times for larger
+            energy differences.
         - `shots_per_bit` (int, iterative only): Measurement shots per bit iteration. Default: 3.
         - `shots` (int, traditional only): Total measurement shots. Default: 3.
-                - `qpe_circuit_builder.unitary_builder` (dict, optional): Override the
-                    time-evolution builder, e.g.
-                    ``{"algorithm_name": "trotter", "order": 2}``.
-                - `qpe_circuit_builder.controlled_circuit_mapper` (dict, optional):
-                    Override the controlled-evolution circuit mapper.
+        - `qpe_circuit_builder.unitary_builder` (dict, optional): Override the
+            time-evolution builder, e.g.
+            ``{"algorithm_name": "trotter", "order": 2}``.
+        - `qpe_circuit_builder.controlled_circuit_mapper` (dict, optional):
+            Override the controlled-evolution circuit mapper.
         - `circuit_executor` (dict, optional): Override the circuit executor,
-           e.g. ``{"algorithm_name": "qdk_full_state_simulator", "seed": 123}``.
+            e.g. ``{"algorithm_name": "qdk_full_state_simulator", "seed": 123}``.
     - If calculations are taking too long, consider reducing the parameter defaults.
 
     Args:

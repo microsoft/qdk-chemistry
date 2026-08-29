@@ -69,6 +69,9 @@ class DiscoveryBackend(RemoteBackend):
     """Run QDK/Chemistry jobs through the Azure AI Discovery SDK."""
 
     name = "discovery"
+    mcp_safe_config_options = frozenset(
+        {"artifact_retry_attempts", "artifact_retry_delay", "poll_interval", "timeout"}
+    )
 
     def __init__(
         self,

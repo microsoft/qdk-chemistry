@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import ast
 import errno
 import os
 import tempfile
@@ -17,6 +18,8 @@ import numpy as np
 import pytest
 
 from qdk_chemistry import data
+from qdk_chemistry.remote.backends import base as remote_backend_registry
+from qdk_chemistry.remote.backends.base import RemoteBackend, get_mcp_safe_config_options, register_backend
 from qdk_chemistry.remote.job import Job
 from qdk_chemistry.ui import tools as srv
 from qdk_chemistry.ui.config import QDKMCPConfig, config
@@ -90,6 +93,38 @@ def test_list_project_files(h2_proj):
 @pytest.mark.usefixtures("_dirs")
 def test_list_project_files_nonexistent():
     assert srv.list_project_files(project_name="nope")["status"] == "error"
+
+
+@pytest.mark.usefixtures("_dirs")
+@pytest.mark.parametrize("tool", [srv.create_project, srv.list_project_files])
+@pytest.mark.parametrize("project_name", ["../outside", "nested/project", r"..\outside"])
+def test_project_management_rejects_non_component_names(tool, project_name):
+    result = tool(project_name=project_name)
+
+    assert result["status"] == "error"
+    assert "single path component" in result["message"]
+
+
+@pytest.mark.usefixtures("_dirs")
+@pytest.mark.parametrize("tool", [srv.create_project, srv.list_project_files])
+def test_project_management_rejects_absolute_name(tool):
+    result = tool(project_name=str(config.projects_dir.parent / "outside"))
+
+    assert result["status"] == "error"
+    assert "single path component" in result["message"]
+
+
+@pytest.mark.usefixtures("_dirs")
+@pytest.mark.parametrize("tool", [srv.create_project, srv.list_project_files])
+def test_project_management_rejects_symlink_escape(tool):
+    outside = config.projects_dir.parent / "outside"
+    outside.mkdir()
+    (config.projects_dir / "escape").symlink_to(outside, target_is_directory=True)
+
+    result = tool(project_name="escape")
+
+    assert result["status"] == "error"
+    assert "outside projects directory" in result["message"]
 
 
 # ── list_tools ───────────────────────────────────────────────────────────
@@ -190,6 +225,109 @@ def test_run_algorithm_remote_auto_cache():
     assert mock_run.call_args.kwargs["remote"] == "disc"
 
 
+def test_run_algorithm_allows_safe_remote_config():
+    """Safe MCP backend options are forwarded to the constructor."""
+    algorithm = MagicMock()
+    backend = MagicMock()
+    with (
+        patch("qdk_chemistry.remote.backends.get_backend", return_value=backend) as get_backend,
+        patch("qdk_chemistry.ui.tools._remote_run", return_value="ok") as remote_run,
+    ):
+        result = srv._run_algorithm(
+            algorithm,
+            remote="local",
+            remote_config={"poll_interval": 2.0, "timeout": 30.0},
+            remote_timeout=None,
+        )
+
+    assert result == "ok"
+    get_backend.assert_called_once_with("local", poll_interval=2.0, timeout=30.0)
+    backend.connect.assert_called_once_with()
+    assert remote_run.call_args.kwargs["remote"] is backend
+
+
+@pytest.mark.parametrize(
+    ("remote", "remote_config"),
+    [
+        ("local", {"python_path": "/workspace/evil"}),
+        ("discovery", {"image": "untrusted-image"}),
+        ("plugin-remote", {"endpoint": "untrusted.example.com"}),
+    ],
+)
+def test_run_algorithm_rejects_unsafe_remote_config(remote, remote_config):
+    """MCP backend options that can redirect execution are rejected."""
+    algorithm = MagicMock()
+    with (
+        patch("qdk_chemistry.remote.backends.get_backend") as get_backend,
+        patch("qdk_chemistry.ui.tools._remote_run") as remote_run,
+        pytest.raises(ValueError, match="cannot control"),
+    ):
+        srv._run_algorithm(
+            algorithm,
+            remote=remote,
+            remote_config=remote_config,
+            remote_timeout=None,
+        )
+
+    get_backend.assert_not_called()
+    remote_run.assert_not_called()
+
+
+def test_describe_remote_backend_only_lists_safe_mcp_config():
+    """Backend discovery advertises only MCP-safe remote options."""
+    result = srv.describe_backend(backend_type="remote", name="local")
+
+    assert result["status"] == "ok"
+    parameter_names = {parameter["name"] for parameter in result["result"]["parameters"]}
+    assert parameter_names == {"poll_interval", "timeout"}
+
+
+def test_plugin_backend_declares_safe_mcp_config(monkeypatch):
+    """A registered plugin class controls which of its constructor options MCP may set."""
+
+    class PluginBackend(RemoteBackend):
+        mcp_safe_config_options = frozenset({"poll_interval"})
+
+        def __init__(self, *, endpoint=None, poll_interval=5.0):
+            super().__init__(endpoint=endpoint, poll_interval=poll_interval)
+
+    backend = MagicMock()
+    monkeypatch.setattr(remote_backend_registry, "_BACKENDS", {})
+    register_backend("plugin-remote")(PluginBackend)
+
+    with (
+        patch("qdk_chemistry.remote.backends.get_backend", return_value=backend) as get_backend,
+        patch("qdk_chemistry.ui.tools._remote_run", return_value="ok"),
+    ):
+        result = srv._run_algorithm(
+            MagicMock(),
+            remote="plugin-remote",
+            remote_config={"poll_interval": 2.0},
+            remote_timeout=None,
+        )
+
+    assert result == "ok"
+    get_backend.assert_called_once_with("plugin-remote", poll_interval=2.0)
+
+    description = srv.describe_backend(backend_type="remote", name="plugin-remote")
+    assert description["status"] == "ok"
+    assert {parameter["name"] for parameter in description["result"]["parameters"]} == {"poll_interval"}
+
+
+def test_undeclared_backend_cannot_spoof_safe_options_by_registry_name(monkeypatch):
+    """An undeclared class remains deny-all even under a built-in registry name."""
+
+    class SpoofedLocalBackend(RemoteBackend):
+        def __init__(self, *, poll_interval=5.0):
+            super().__init__(poll_interval=poll_interval)
+
+    monkeypatch.setattr(remote_backend_registry, "_BACKENDS", {"local": SpoofedLocalBackend})
+
+    assert get_mcp_safe_config_options("local") == frozenset()
+    with pytest.raises(ValueError, match="cannot control"):
+        srv._validate_mcp_remote_config("local", {"poll_interval": 2.0})
+
+
 def test_timed_remote_run_rejects_missing_hash_before_submission():
     algorithm = MagicMock()
     algorithm.hash.side_effect = AttributeError("hash is not bound")
@@ -272,6 +410,65 @@ def test_run_population_analysis_tool(h2_proj):
     assert run_algorithm.call_args.args[1:] == (ANY, 0, 1, 2)
     assert run_algorithm.call_args.kwargs["cache"] == "folder"
     assert run_algorithm.call_args.kwargs["remote"] == "local"
+
+
+def test_controlled_evolution_mapper_uses_common_execution_path(h2_proj):
+    algorithm = MagicMock()
+    unitary = MagicMock()
+    circuit = MagicMock()
+
+    with (
+        patch("qdk_chemistry.ui.tools.algorithms.create", return_value=algorithm),
+        patch("qdk_chemistry.ui.tools.ensure_filename_format", return_value="controlled.circuit.json"),
+        patch("qdk_chemistry.ui.tools.load_data_object", return_value=unitary),
+        patch("qdk_chemistry.ui.tools.save_data_object") as save_data_object,
+        patch("qdk_chemistry.ui.tools._run_algorithm", return_value=circuit) as run_algorithm,
+    ):
+        result = srv.run_controlled_evolution_circuit_mapper(
+            project_name=h2_proj,
+            time_evolution_unitary_filename="evolution.unitary.json",
+            out_circuit_filename="controlled.circuit.json",
+            cache="folder",
+            remote="local",
+            remote_config={"keep_workdir": True},
+            remote_timeout=30,
+            overwrite=True,
+        )
+
+    assert result["status"] == "ok", result
+    assert run_algorithm.call_args.args == (algorithm, unitary)
+    assert run_algorithm.call_args.kwargs == {
+        "cache": "folder",
+        "remote": "local",
+        "remote_config": {"keep_workdir": True},
+        "remote_timeout": 30,
+        "overwrite": True,
+    }
+    save_data_object.assert_called_once_with(circuit, "controlled.circuit.json")
+
+
+def test_algorithm_runs_are_centralized():
+    source = Path(srv.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    parents: dict[ast.AST, ast.AST] = {}
+    for parent in ast.walk(tree):
+        for child in ast.iter_child_nodes(parent):
+            parents[child] = parent
+
+    direct_runs = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute) or node.func.attr != "run":
+            continue
+        containing_node = parents.get(node)
+        while containing_node is not None and not isinstance(containing_node, ast.FunctionDef | ast.AsyncFunctionDef):
+            containing_node = parents.get(containing_node)
+        function_name = (
+            containing_node.name if isinstance(containing_node, ast.FunctionDef | ast.AsyncFunctionDef) else None
+        )
+        direct_runs.append((function_name, node.lineno))
+
+    assert len(direct_runs) == 1
+    assert direct_runs[0][0] == "_run_algorithm"
 
 
 # ── _JobSubmittedError ───────────────────────────────────────────────────

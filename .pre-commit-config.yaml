@@ -49,7 +49,7 @@ repos:
   rev: 1.7.0
   hooks:
   - id: interrogate
-    args: [--fail-under=0, --verbose, --ignore-init-method]
+    args: [--fail-under=80, --verbose, --ignore-init-method]
     files: *linted_files
     exclude: docs/
 

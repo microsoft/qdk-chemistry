@@ -177,6 +177,8 @@ class LocalBackend(RemoteBackend):
 
     """
 
+    mcp_safe_config_options = frozenset({"poll_interval", "timeout"})
+
     def __init__(
         self,
         *,

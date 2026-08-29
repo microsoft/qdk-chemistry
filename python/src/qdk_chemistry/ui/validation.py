@@ -7,9 +7,10 @@
 
 import inspect
 import os
+import threading
 from collections.abc import Callable
 from functools import wraps
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, TypeVar, cast
 
 from qdk_chemistry import data
@@ -19,9 +20,47 @@ from .config import config
 F = TypeVar("F", bound=Callable[..., Any])
 T = TypeVar("T")
 
+_PROJECT_CWD_LOCK = threading.RLock()
+
 
 class FilenameFormatError(Exception):
     """Raised when a filename has an invalid format for the expected data type."""
+
+
+def resolve_project_path(project_name: str, projects_dir: str | Path) -> tuple[Path | None, str]:
+    """Resolve a single-component project name beneath the projects directory.
+
+    Args:
+        project_name: Name of the project directory.
+        projects_dir: Root directory containing projects.
+
+    Returns:
+        The resolved project path and an empty error message, or ``None`` and
+        an explanation when the path is invalid.
+
+    """
+    if isinstance(projects_dir, str):
+        projects_dir = Path(projects_dir)
+    elif not isinstance(projects_dir, Path):
+        return None, f"Projects dir should be a Path or string but it's {type(projects_dir)}"
+
+    if not isinstance(project_name, str) or not project_name.strip():
+        return None, "Project name must be a non-empty string"
+
+    path_flavors = (PurePosixPath(project_name), PureWindowsPath(project_name))
+    if any(path.is_absolute() or path.parts != (project_name,) or project_name in {".", ".."} for path in path_flavors):
+        return None, "Project name must be a single path component"
+
+    try:
+        projects_root = projects_dir.resolve()
+        project_path = (projects_root / project_name).resolve()
+    except (OSError, RuntimeError) as e:
+        return None, f"Cannot resolve project directory: {e}"
+
+    if not project_path.is_relative_to(projects_root):
+        return None, f"Project path {project_path} is outside projects directory {projects_root}"
+
+    return project_path, ""
 
 
 def _build_data_type_markers() -> dict[str, str]:
@@ -131,12 +170,21 @@ def validate_project(func: F) -> F:
             returns the result of the decorated function
 
         """
-        is_valid, message = is_project_valid(project_name, config.projects_dir)
-        if not is_valid:
-            return f"Project validation failed: {message} for project_name: {project_name}"
+        with _PROJECT_CWD_LOCK:
+            try:
+                original_cwd = Path.cwd()
+            except FileNotFoundError:
+                original_cwd = config.projects_dir
 
-        #  proceed with original function
-        return func(project_name, *args, **kwargs)
+            try:
+                is_valid, message = is_project_valid(project_name, config.projects_dir)
+                if not is_valid:
+                    return f"Project validation failed: {message} for project_name: {project_name}"
+
+                #  proceed with original function
+                return func(project_name, *args, **kwargs)
+            finally:
+                os.chdir(original_cwd)
 
     return cast("F", wrapper)
 
@@ -156,19 +204,14 @@ def is_project_valid(  # noqa: PLR0911
         Tuple[bool, str] that states whether the project is valid, and if not, an explanation
 
     """
-    # Convert projects_dir to Path if it's a string
-    if isinstance(projects_dir, str):
-        projects_dir = Path(projects_dir)
-    elif not isinstance(projects_dir, Path):
-        return False, f"Projects dir should be a Path or string but it's {type(projects_dir)}"
-
-    # Check if project exists
-    project_path = projects_dir / project_name
+    project_path, error = resolve_project_path(project_name, projects_dir)
+    if project_path is None:
+        return False, error
 
     try:
         project_exists = project_path.exists()
     except PermissionError:
-        return False, f"No read permissions to access {projects_dir}"
+        return False, f"No read permissions to access {project_path.parent}"
     except OSError as e:
         return False, f"Cannot access project directory {project_path}: {e}"
 

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from qdk_chemistry.ui.validation import FilenameFormatError, ensure_filename_format, is_project_valid
+from qdk_chemistry.ui.validation import FilenameFormatError, ensure_filename_format, is_project_valid, validate_project
 
 
 class TestProjectValidation:
@@ -27,6 +27,69 @@ class TestProjectValidation:
 
         assert is_valid is False
         assert "Path or string" in message
+
+    @pytest.mark.parametrize("project_name", ["../outside", "nested/project", r"..\outside"])
+    def test_is_project_valid_rejects_non_component_names(self, tmp_path: Path, project_name: str):
+        is_valid, message = is_project_valid(project_name, tmp_path / "projects")
+
+        assert is_valid is False
+        assert "single path component" in message
+
+    def test_is_project_valid_rejects_absolute_name(self, tmp_path: Path):
+        is_valid, message = is_project_valid(str(tmp_path / "outside"), tmp_path / "projects")
+
+        assert is_valid is False
+        assert "single path component" in message
+
+    def test_is_project_valid_rejects_symlink_escape(self, tmp_path: Path):
+        projects_dir = tmp_path / "projects"
+        outside = tmp_path / "outside"
+        projects_dir.mkdir()
+        outside.mkdir()
+        (projects_dir / "escape").symlink_to(outside, target_is_directory=True)
+
+        is_valid, message = is_project_valid("escape", projects_dir)
+
+        assert is_valid is False
+        assert "outside projects directory" in message
+
+    def test_validate_project_restores_working_directory(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The decorated tool restores the caller's working directory."""
+        original_cwd = tmp_path / "original"
+        projects_dir = tmp_path / "projects"
+        original_cwd.mkdir()
+        monkeypatch.chdir(original_cwd)
+        monkeypatch.setattr("qdk_chemistry.ui.validation.config.projects_dir", projects_dir)
+
+        @validate_project
+        def tool(project_name: str) -> Path:
+            """Return the working directory used while the tool runs."""
+            del project_name
+            return Path.cwd()
+
+        assert tool("test_project") == projects_dir / "test_project"
+        assert Path.cwd() == original_cwd
+
+    def test_validate_project_restores_working_directory_after_error(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The decorated tool restores the caller's directory after an error."""
+        original_cwd = tmp_path / "original"
+        projects_dir = tmp_path / "projects"
+        original_cwd.mkdir()
+        monkeypatch.chdir(original_cwd)
+        monkeypatch.setattr("qdk_chemistry.ui.validation.config.projects_dir", projects_dir)
+
+        @validate_project
+        def tool(project_name: str) -> None:
+            """Raise an error while running in the project directory."""
+            del project_name
+            raise RuntimeError("tool failed")
+
+        with pytest.raises(RuntimeError, match="tool failed"):
+            tool("test_project")
+
+        assert Path.cwd() == original_cwd
 
 
 class TestFilenameFormat:

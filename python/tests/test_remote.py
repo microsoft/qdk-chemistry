@@ -1036,7 +1036,7 @@ class TestBackendRegistry:
         with pytest.raises(DuplicateRegistrationError, match="already registered"):
             register_backend("duplicate-backend")(SecondBackend)
 
-        with pytest.raises(DuplicateRegistrationError, match="already registered.*duplicate-backend"):
+        with pytest.raises(DuplicateRegistrationError, match=r"already registered.*duplicate-backend"):
             register_backend("backend-alias")(FirstBackend)
 
         assert remote_backend_registry._BACKENDS["duplicate-backend"] is FirstBackend
@@ -1072,6 +1072,43 @@ class TestBackendRegistry:
 
         assert "_test_stub" in available_backends()
         assert isinstance(get_backend("_test_stub"), StubBackend)
+
+    @pytest.mark.parametrize(
+        ("declaration", "match"),
+        [
+            (["endpoint"], "frozenset"),
+            (frozenset({""}), "non-empty strings"),
+            (frozenset({"missing"}), "not named constructor parameters"),
+        ],
+    )
+    def test_register_backend_validates_mcp_safe_config_options(self, monkeypatch, declaration, match):
+        class InvalidBackend(RemoteBackend):
+            mcp_safe_config_options = declaration
+
+            def __init__(self, *, endpoint=None):
+                super().__init__(endpoint=endpoint)
+
+        monkeypatch.setattr(remote_backend_registry, "_BACKENDS", {})
+
+        with pytest.raises(TypeError, match=rf"{match}"):
+            register_backend("invalid-mcp-config")(InvalidBackend)
+
+        assert remote_backend_registry._BACKENDS == {}
+
+    def test_registered_backend_does_not_inherit_mcp_safe_config(self, monkeypatch):
+        class ParentBackend(RemoteBackend):
+            mcp_safe_config_options = frozenset({"endpoint"})
+
+            def __init__(self, *, endpoint=None):
+                super().__init__(endpoint=endpoint)
+
+        class ChildBackend(ParentBackend):
+            pass
+
+        monkeypatch.setattr(remote_backend_registry, "_BACKENDS", {})
+        register_backend("child-backend")(ChildBackend)
+
+        assert "mcp_safe_config_options" not in ChildBackend.__dict__
 
 
 @pytest.fixture(params=["local"])
