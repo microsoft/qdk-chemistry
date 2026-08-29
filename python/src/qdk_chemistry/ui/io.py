@@ -79,7 +79,7 @@ def check_output_exists(filename: str, data_class: type | None = None) -> str | 
         Optional[str]: A message if the file exists with valid content, None otherwise
 
     """
-    filename = filename.rsplit("/", maxsplit=1)[-1]  # Strip path if provided
+    filename = os.path.basename(filename)  # Strip path if provided
     return check_output_path_exists(filename, data_class)
 
 
@@ -97,7 +97,7 @@ def load_data_object(filename: str, data_class):
         ValueError: If file extension is not supported
 
     """
-    filename = filename.rsplit("/", maxsplit=1)[-1]  # Strip path if provided
+    filename = os.path.basename(filename)  # Strip path if provided
 
     return _load_data_object_from_path(filename, data_class)
 
@@ -116,7 +116,7 @@ def save_data_object(data_obj, filename: str):
         ValueError: If file extension is not supported
 
     """
-    filename = filename.rsplit("/", maxsplit=1)[-1]  # Strip path if provided
+    filename = os.path.basename(filename)  # Strip path if provided
 
     if filename.endswith(".json"):
         data_obj.to_json_file(filename)

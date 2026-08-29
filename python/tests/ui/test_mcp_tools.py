@@ -206,6 +206,22 @@ def test_list_algorithms_filters_by_type():
     assert "qdk" in algorithm_types["nuclear_derivative_calculator"]["implementations"]
 
 
+def test_list_algorithms_includes_all_registered_types():
+    result = srv.list_algorithms()
+
+    assert result["status"] == "ok"
+    algorithm_types = result["result"]["algorithm_types"]
+    assert set(algorithm_types) == set(srv.algorithms.available())
+
+
+def test_describe_algorithm_handles_all_registered_types():
+    for algorithm_type in srv.algorithms.available():
+        result = srv.describe_algorithm(algorithm_type=algorithm_type)
+
+        assert result["status"] == "ok", algorithm_type
+        assert result["result"]["algorithm_type"] == algorithm_type
+
+
 def test_describe_algorithm_returns_settings_schema():
     result = srv.describe_algorithm(algorithm_type="nuclear_derivative_calculator", algorithm_name="qdk")
 
@@ -218,6 +234,16 @@ def test_describe_algorithm_returns_settings_schema():
     settings = {setting["name"]: setting for setting in description["settings"]}
     assert settings["compute_hessian"]["type"] == "bool"
     assert settings["compute_hessian"]["default"] is False
+
+
+def test_describe_algorithm_handles_interface_only_type():
+    result = srv.describe_algorithm(algorithm_type="effective_hamiltonian_constructor")
+
+    assert result["status"] == "ok"
+    description = result["result"]
+    assert description["name"] is None
+    assert description["interface_only"] is True
+    assert description["settings"] == []
 
 
 def test_list_algorithms_rejects_unknown_type():

@@ -12,6 +12,8 @@ import sys
 from contextlib import suppress
 from pathlib import Path
 
+from sphinx import version_info as sphinx_version_info
+
 # -----------------------------------------------------------------------------
 # Project information
 # -----------------------------------------------------------------------------
@@ -232,6 +234,8 @@ nitpick_ignore_regex = [
     (r"py:class", r"^SumPauliOperatorExpression$"),
     (r"py:class", r"qsharp\..*"),  # qsharp has no intersphinx inventory
     (r"py:class", r"qdk\..*"),  # qdk has no intersphinx inventory
+    (r"py:class", r"mcp\..*"),  # MCP has no intersphinx inventory
+    (r"py:class", r"pydantic\..*"),  # Pydantic has no intersphinx inventory
     (r"py:class", r"azure\.core\.polling\._poller\.(_SansIONoPolling|PollingMethod)"),
     (r"py:obj", r"azure\.core\.polling\._poller\.PollingReturnType_co"),
     (r"py:class", r"^QdkCircuitType$"),  # internal type alias for qsharp circuit
@@ -276,26 +280,8 @@ def autodoc_skip_imports(app, what, name, obj, skip, options):
         ):
             return True
 
-        # Skip standard library modules (pathlib, typing, etc.)
-        if module and any(
-            module.startswith(prefix)
-            for prefix in [
-                "pathlib",
-                "typing",
-                "collections",
-                "abc",
-                "enum",
-                "numpy",
-                "pydantic_settings",
-                "qiskit",
-                "qiskit_aer",
-                "ruamel",
-                "dataclasses",
-                "pybind11_builtins",
-                "qiskit_nature",
-                "h5py",
-            ]
-        ):
+        # Skip standard-library and third-party re-exports.
+        if module and not module.startswith("qdk_chemistry"):
             return True
     return skip
 
@@ -350,8 +336,13 @@ def normalize_autodoc_docstring(app, what, name, obj, options, lines):
         rewritten = re.sub(r"(?<![\\*])\*args", r"\\*args", rewritten)
         if rewritten != line:
             lines[idx] = rewritten
-    if options is not None and "._core." in name:
-        options["noindex"] = True
+    owner = name.rsplit(".", 1)[0]
+    module = getattr(obj, "__module__", "")
+    if options is not None and module and module != owner:
+        if sphinx_version_info >= (9, 0):
+            options.no_index = True
+        else:
+            options["noindex"] = True
 
 
 def on_builder_inited(app):

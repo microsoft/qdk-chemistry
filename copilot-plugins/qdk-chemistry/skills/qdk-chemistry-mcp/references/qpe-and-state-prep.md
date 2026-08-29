@@ -14,6 +14,13 @@ generated circuit can be interpreted later.
 
 `run_energy_estimator` accepts a circuit and qubit-Hamiltonian filenames. It
 performs its own commuting-term grouping; callers do not supply a grouping.
+Use `run_term_grouper` only when a grouped QubitOperator is needed as a
+separate artifact.
+
+`run_amplitude_amplification` builds a Circuit from saved state-preparation and
+good-state oracle Circuits. It is a separate circuit-construction operation;
+the oracle algorithm used internally by amplitude amplification is configured
+through its nested settings rather than a distinct MCP call.
 
 ## QPE Settings
 
@@ -61,6 +68,9 @@ Circuit resource analysis and phase estimation are different calls:
 | Circuit construction | `run_time_evolution_builder` then `run_controlled_evolution_circuit_mapper` |
 | Circuit execution | `run_circuit_executor` |
 | Phase estimation | `run_phase_estimation` with nested sub-algorithm settings |
+| Driven evolution circuit | `run_evolution_circuit_builder` |
+| Driven evolution and measurement | `run_hamiltonian_simulation` |
+| Hadamard-test measurement | `run_hadamard_test` |
 
 `run_time_evolution_builder` builds $U = \exp(-iHt)$. For a powered circuit,
 pass the chosen `power` in that builder's `settings`. The controlled-evolution

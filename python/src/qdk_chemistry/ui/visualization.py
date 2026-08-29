@@ -890,9 +890,6 @@ def register_visualization_tools(app) -> None:
         pw = w - ml - mr
         ph = h - mt - mb
 
-        def tx(v: float) -> float:
-            return ml + (v - x_min) / (x_max - x_min) * pw
-
         colors = ["#89b4fa", "#f38ba8", "#a6e3a1", "#fab387", "#cba6f7", "#94e2d5", "#f9e2af", "#74c7ec"]
 
         def _nice_ticks(lo: float, hi: float, n: int = 5) -> list[float]:

@@ -15,16 +15,18 @@
 import functools
 import hashlib
 import inspect
+import itertools
 import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
 import numpy as np
-from mcp.server.mcpserver import Context, MCPServer
+from mcp.server.mcpserver import Context as _Context
+from mcp.server.mcpserver import MCPServer
 
 from qdk_chemistry import __version__, algorithms, constants, data
-from qdk_chemistry.data import AlgorithmRef
+from qdk_chemistry.data import AlgorithmRef as _AlgorithmRef
 
 # Remote execution support — optional; the MCP server works without it.
 try:
@@ -36,8 +38,8 @@ try:
     _REMOTE_AVAILABLE = True
 except Exception:  # noqa: BLE001  # ImportError, ModuleNotFoundError, or build issues
     _REMOTE_AVAILABLE = False
-from qdk_chemistry.data.circuit_executor_data import CircuitExecutorData
-from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
+from qdk_chemistry.data.circuit_executor_data import CircuitExecutorData as _CircuitExecutorData
+from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation as _UnitaryRepresentation
 from qdk_chemistry.remote.job import Job
 from qdk_chemistry.utils import (
     compute_valence_space_parameters,
@@ -85,7 +87,7 @@ app.middleware.append(workspace_binding_middleware)
 
 
 @app.tool()
-async def bind_workspace(ctx: Context, workspace_root: str | None = None) -> dict[str, object]:
+async def bind_workspace(ctx: _Context, workspace_root: str | None = None) -> dict[str, object]:
     """Bind this MCP process to the active workspace before using relative paths."""
     return await _bind_workspace(ctx, workspace_root)
 
@@ -260,6 +262,36 @@ def _load_or_error(filename: str, data_class, label: str = ""):
         return None, f"Failed to load {what} from {filename}: {e!s}"
 
 
+def _load_driven_hamiltonian(
+    base_hamiltonian_filename: str,
+    drive_hamiltonian_filename: str,
+    drive_times: list[float],
+    drive_values: list[float],
+):
+    """Build a driven Hamiltonian from two operators and a linear schedule."""
+    base_hamiltonian, error = _load_or_error(base_hamiltonian_filename, data.QubitOperator, "base Hamiltonian")
+    if error:
+        return None, error
+    drive_hamiltonian, error = _load_or_error(drive_hamiltonian_filename, data.QubitOperator, "drive Hamiltonian")
+    if error:
+        return None, error
+    if len(drive_times) != len(drive_values) or not drive_times:
+        return None, "drive_times and drive_values must be non-empty lists of equal length."
+    if any(right <= left for left, right in itertools.pairwise(drive_times)):
+        return None, "drive_times must be strictly increasing."
+
+    times = np.asarray(drive_times, dtype=float)
+    values = np.asarray(drive_values, dtype=float)
+
+    def drive(time: float) -> float:
+        return float(np.interp(time, times, values))
+
+    try:
+        return data.DrivenQubitHamiltonian(base_hamiltonian, drive_hamiltonian, drive=drive), None
+    except (TypeError, ValueError) as error:
+        return None, f"Failed to construct driven Hamiltonian: {error!s}"
+
+
 def _evaluate_circuit_qre(
     circuit: data.Circuit,
     *,
@@ -350,7 +382,7 @@ def _dict_to_algorithm_ref(existing_ref, override_dict: dict):
             raise TypeError("Nested algorithm 'settings' must be a dictionary.")
         d = {**nested_settings, **d}
     algorithm_name = d.pop("algorithm_name", None) or existing_ref.algorithm_name
-    ref = AlgorithmRef(existing_ref.algorithm_type, algorithm_name)
+    ref = _AlgorithmRef(existing_ref.algorithm_type, algorithm_name)
     try:
         default_settings = algorithms.create(existing_ref.algorithm_type, algorithm_name).settings()
     except Exception:  # noqa: BLE001
@@ -362,7 +394,7 @@ def _dict_to_algorithm_ref(existing_ref, override_dict: dict):
                 nested_ref = default_settings.get(k)
             except (KeyError, RuntimeError):
                 nested_ref = None
-            if isinstance(nested_ref, AlgorithmRef):
+            if isinstance(nested_ref, _AlgorithmRef):
                 value_to_set = _dict_to_algorithm_ref(nested_ref, override_value)
         ref.settings.set(k, value_to_set)
     return ref
@@ -387,7 +419,7 @@ def _apply_settings(algorithm, settings: dict | None) -> None:
     for key, value in (settings or {}).items():
         if isinstance(value, dict):
             existing = algorithm.settings().get(key)
-            if isinstance(existing, AlgorithmRef):
+            if isinstance(existing, _AlgorithmRef):
                 algorithm.settings().set(key, _dict_to_algorithm_ref(existing, value))
                 continue
         algorithm.settings().set(key, value)
@@ -395,7 +427,7 @@ def _apply_settings(algorithm, settings: dict | None) -> None:
 
 def _jsonable_settings_value(value: Any) -> Any:
     """Convert settings values into MCP/JSON-friendly data."""
-    if isinstance(value, AlgorithmRef):
+    if isinstance(value, _AlgorithmRef):
         serialized: dict[str, Any] = {
             "__type__": "algorithm_ref",
             "algorithm_type": value.algorithm_type,
@@ -628,6 +660,21 @@ def describe_algorithm(algorithm_type: str, algorithm_name: str | None = None) -
         and setting descriptions and constraints.
 
     """
+    available_names = algorithms.available(algorithm_type)
+    if not available_names:
+        if algorithm_name is not None:
+            raise ValueError(f"Algorithm type {algorithm_type!r} has no registered implementations.")
+        return {
+            "algorithm_type": algorithm_type,
+            "requested_name": None,
+            "name": None,
+            "aliases": [],
+            "is_default": False,
+            "interface_only": True,
+            "default_settings": {},
+            "settings": [],
+        }
+
     instance = algorithms.create(algorithm_type, algorithm_name)
     canonical_name = instance.name()
     selected_name = algorithm_name or canonical_name
@@ -660,6 +707,7 @@ def describe_algorithm(algorithm_type: str, algorithm_name: str | None = None) -
         "name": canonical_name,
         "aliases": sorted(aliases),
         "is_default": canonical_name == default_name,
+        "interface_only": False,
         "default_settings": _jsonable_settings_dict(instance.settings().to_dict()),
         "settings": setting_schema,
     }
@@ -900,14 +948,19 @@ _TOOL_CATEGORIES: dict[str, list[str]] = {
         "create_majorana_mapping",
         "run_qubit_mapper",
         "run_state_preparation",
+        "run_amplitude_amplification",
+        "run_term_grouper",
         "run_qubit_hamiltonian_solver",
         "run_energy_estimator",
         "run_resource_estimation",
     ],
     "qpe": [
         "run_time_evolution_builder",
+        "run_evolution_circuit_builder",
+        "run_hamiltonian_simulation",
         "run_controlled_evolution_circuit_mapper",
         "run_circuit_executor",
+        "run_hadamard_test",
         "run_phase_estimation",
     ],
     "visualization": [
@@ -1792,6 +1845,7 @@ def run_hamiltonian_constructor(
     Two paths depending on system size:
 
     **Full-space path** (small systems, up to ~16 spatial orbitals / ~20 qubits):
+
     1. Run `run_scf` to get an initial wavefunction
     2. Extract orbitals from the SCF wavefunction via `get_orbitals_from_input`
     3. (THIS TOOL) Run `run_hamiltonian_constructor` on the full SCF orbitals
@@ -2418,6 +2472,299 @@ def run_stability_checker(
 @app.tool()
 @_structured
 @validate_project
+def run_term_grouper(
+    project_name: str,
+    qubit_hamiltonian_filename: str,
+    out_qubit_hamiltonian_filename: str,
+    algorithm_name: str | None = None,
+    settings: dict | None = None,
+    cache: str | None = None,
+    remote: str | None = None,
+    remote_config: dict | None = None,
+    remote_timeout: int = 120,
+    overwrite: bool = False,
+) -> str:
+    """Partition a saved QubitOperator's Pauli terms and save the grouped operator."""
+    out_qubit_hamiltonian_filename, error = _prepare_output(
+        out_qubit_hamiltonian_filename,
+        "QubitOperator",
+        data.QubitOperator,
+        overwrite=overwrite,
+    )
+    if error:
+        return error
+    qubit_hamiltonian, error = _load_or_error(qubit_hamiltonian_filename, data.QubitOperator, "qubit Hamiltonian")
+    if error:
+        return error
+
+    term_grouper = algorithms.create("term_grouper", algorithm_name)
+    _apply_settings(term_grouper, settings)
+    grouped_hamiltonian = _run_algorithm(
+        term_grouper,
+        qubit_hamiltonian,
+        cache=cache,
+        remote=remote,
+        remote_config=remote_config,
+        remote_timeout=remote_timeout,
+        overwrite=overwrite,
+    )
+    save_data_object(grouped_hamiltonian, out_qubit_hamiltonian_filename)
+    return out_qubit_hamiltonian_filename
+
+
+@app.tool()
+@_structured
+@validate_project
+def run_amplitude_amplification(
+    project_name: str,
+    state_prep_oracle_filename: str,
+    good_state_oracle_filename: str,
+    out_circuit_filename: str,
+    algorithm_name: str | None = None,
+    settings: dict | None = None,
+    cache: str | None = None,
+    remote: str | None = None,
+    remote_config: dict | None = None,
+    remote_timeout: int = 120,
+    overwrite: bool = False,
+) -> str:
+    """Build and save an amplitude-amplified Circuit from state-preparation and good-state oracle Circuits."""
+    out_circuit_filename, error = _prepare_output(out_circuit_filename, "Circuit", data.Circuit, overwrite=overwrite)
+    if error:
+        return error
+    state_prep_oracle, error = _load_or_error(state_prep_oracle_filename, data.Circuit, "state-preparation oracle")
+    if error:
+        return error
+    good_state_oracle, error = _load_or_error(good_state_oracle_filename, data.Circuit, "good-state oracle")
+    if error:
+        return error
+
+    amplitude_amplification = algorithms.create("amplitude_amplification", algorithm_name)
+    _apply_settings(amplitude_amplification, settings)
+    circuit = _run_algorithm(
+        amplitude_amplification,
+        state_prep_oracle,
+        good_state_oracle,
+        cache=cache,
+        remote=remote,
+        remote_config=remote_config,
+        remote_timeout=remote_timeout,
+        overwrite=overwrite,
+    )
+    save_data_object(circuit, out_circuit_filename)
+    return out_circuit_filename
+
+
+@app.tool()
+@_structured
+@validate_project
+def run_hadamard_test(
+    project_name: str,
+    state_preparation_circuit_filename: str,
+    unitary_filename: str,
+    out_executor_data_filename: str,
+    shots: int,
+    algorithm_name: str | None = None,
+    settings: dict | None = None,
+    cache: str | None = None,
+    remote: str | None = None,
+    remote_config: dict | None = None,
+    remote_timeout: int = 120,
+    overwrite: bool = False,
+) -> str:
+    """Run a Hadamard test for a saved state-preparation Circuit and UnitaryRepresentation."""
+    out_executor_data_filename, error = _prepare_output(
+        out_executor_data_filename,
+        "CircuitExecutorData",
+        data.CircuitExecutorData,
+        overwrite=overwrite,
+    )
+    if error:
+        return error
+    state_preparation_circuit, error = _load_or_error(
+        state_preparation_circuit_filename, data.Circuit, "state-preparation circuit"
+    )
+    if error:
+        return error
+    unitary, error = _load_or_error(unitary_filename, _UnitaryRepresentation, "unitary representation")
+    if error:
+        return error
+
+    hadamard_test = algorithms.create("hadamard_test", algorithm_name)
+    _apply_settings(hadamard_test, settings)
+    executor_data = _run_algorithm(
+        hadamard_test,
+        state_preparation_circuit,
+        unitary,
+        shots,
+        cache=cache,
+        remote=remote,
+        remote_config=remote_config,
+        remote_timeout=remote_timeout,
+        overwrite=overwrite,
+    )
+    save_data_object(executor_data, out_executor_data_filename)
+    return out_executor_data_filename
+
+
+@app.tool()
+@_structured
+@validate_project
+def run_evolution_circuit_builder(
+    project_name: str,
+    base_hamiltonian_filename: str,
+    drive_hamiltonian_filename: str,
+    drive_times: list[float],
+    drive_values: list[float],
+    state_preparation_circuit_filename: str,
+    out_circuit_filename: str,
+    algorithm_name: str | None = None,
+    settings: dict | None = None,
+    cache: str | None = None,
+    remote: str | None = None,
+    remote_config: dict | None = None,
+    remote_timeout: int = 120,
+    overwrite: bool = False,
+) -> str:
+    """Build a Circuit for H(t)=H0+f(t)H1 using a piecewise-linear drive schedule."""
+    out_circuit_filename, error = _prepare_output(out_circuit_filename, "Circuit", data.Circuit, overwrite=overwrite)
+    if error:
+        return error
+    hamiltonian, error = _load_driven_hamiltonian(
+        base_hamiltonian_filename,
+        drive_hamiltonian_filename,
+        drive_times,
+        drive_values,
+    )
+    if error:
+        return error
+    state_preparation_circuit, error = _load_or_error(
+        state_preparation_circuit_filename, data.Circuit, "state-preparation circuit"
+    )
+    if error:
+        return error
+
+    circuit_builder = algorithms.create("evolution_circuit_builder", algorithm_name)
+    _apply_settings(circuit_builder, settings)
+    circuit = _run_algorithm(
+        circuit_builder,
+        hamiltonian,
+        state_preparation_circuit,
+        cache=cache,
+        remote=remote,
+        remote_config=remote_config,
+        remote_timeout=remote_timeout,
+        overwrite=overwrite,
+    )
+    save_data_object(circuit, out_circuit_filename)
+    return out_circuit_filename
+
+
+@app.tool()
+@_structured
+@validate_project
+def run_hamiltonian_simulation(
+    project_name: str,
+    base_hamiltonian_filename: str,
+    drive_hamiltonian_filename: str,
+    drive_times: list[float],
+    drive_values: list[float],
+    observable_filenames: list[str],
+    state_preparation_circuit_filename: str,
+    out_energy_result_filenames: list[str],
+    out_measurement_data_filenames: list[str],
+    shots: int = 1000,
+    noise_model: Any | None = None,
+    algorithm_name: str | None = None,
+    settings: dict | None = None,
+    cache: str | None = None,
+    remote: str | None = None,
+    remote_config: dict | None = None,
+    remote_timeout: int = 120,
+    overwrite: bool = False,
+) -> list[dict[str, str]] | str:
+    """Evolve H(t)=H0+f(t)H1, measure observables, and save each result pair."""
+    result_count = len(observable_filenames)
+    if result_count == 0:
+        return "observable_filenames must contain at least one observable."
+    if len(out_energy_result_filenames) != result_count or len(out_measurement_data_filenames) != result_count:
+        return "Each observable requires one energy-result filename and one measurement-data filename."
+
+    energy_filenames: list[str] = []
+    measurement_filenames: list[str] = []
+    for requested_energy_filename, requested_measurement_filename in zip(
+        out_energy_result_filenames, out_measurement_data_filenames, strict=True
+    ):
+        energy_filename, error = _prepare_output(
+            requested_energy_filename,
+            "EnergyExpectationResult",
+            data.EnergyExpectationResult,
+            overwrite=overwrite,
+        )
+        if error:
+            return error
+        measurement_filename, error = _prepare_output(
+            requested_measurement_filename,
+            "MeasurementData",
+            data.MeasurementData,
+            overwrite=overwrite,
+        )
+        if error:
+            return error
+        energy_filenames.append(energy_filename)
+        measurement_filenames.append(measurement_filename)
+
+    hamiltonian, error = _load_driven_hamiltonian(
+        base_hamiltonian_filename,
+        drive_hamiltonian_filename,
+        drive_times,
+        drive_values,
+    )
+    if error:
+        return error
+    observables = []
+    for observable_filename in observable_filenames:
+        observable, error = _load_or_error(observable_filename, data.QubitOperator, "observable")
+        if error:
+            return error
+        observables.append(observable)
+    state_preparation_circuit, error = _load_or_error(
+        state_preparation_circuit_filename, data.Circuit, "state-preparation circuit"
+    )
+    if error:
+        return error
+
+    simulation = algorithms.create("hamiltonian_simulation", algorithm_name)
+    _apply_settings(simulation, settings)
+    results = _run_algorithm(
+        simulation,
+        hamiltonian,
+        observables,
+        state_preparation_circuit,
+        shots,
+        noise=noise_model,
+        cache=cache,
+        remote=remote,
+        remote_config=remote_config,
+        remote_timeout=remote_timeout,
+        overwrite=overwrite,
+    )
+    if len(results) != result_count:
+        return f"Hamiltonian simulation returned {len(results)} results for {result_count} observables."
+
+    outputs = []
+    for (energy_result, measurement_data), energy_filename, measurement_filename in zip(
+        results, energy_filenames, measurement_filenames, strict=True
+    ):
+        save_data_object(energy_result, energy_filename)
+        save_data_object(measurement_data, measurement_filename)
+        outputs.append({"energy_result": energy_filename, "measurement_data": measurement_filename})
+    return outputs
+
+
+@app.tool()
+@_structured
+@validate_project
 def run_qubit_hamiltonian_solver(
     project_name: str,
     qubit_hamiltonian_filename: str,
@@ -2741,6 +3088,7 @@ def run_qubit_mapper(
     5. Proceed to state preparation / QPE / resource estimation
 
     **Active-space path** (larger systems):
+
     1. Run `run_scf` → active space analysis (SCI + AutoCAS) → compress orbital space
     2. (Optional) `run_multi_configuration_calculation` for classical reference energy
     3. (Optional) Sparsify wavefunction via `run_projected_multi_configuration_calculation`
@@ -2771,8 +3119,8 @@ def run_qubit_mapper(
     - The current set of default settings can be obtained by using
       the function and MCP tool
       `get_algorithm_default_settings`.
-        - The fermion-to-qubit encoding is not a mapper setting. It is carried by the `MajoranaMapping` file passed via
-            `mapping_filename`.
+        - The fermion-to-qubit encoding is not a mapper setting. It is carried by
+            the `MajoranaMapping` file passed via `mapping_filename`.
 
     Args:
         project_name (str): Name of the current qdk/chemistry project
@@ -3109,7 +3457,7 @@ def run_time_evolution_builder(
         return f"Invalid output filename: {e!s}"
 
     if not overwrite:
-        existing_check = check_output_exists(out_time_evolution_unitary_filename, UnitaryRepresentation)
+        existing_check = check_output_exists(out_time_evolution_unitary_filename, _UnitaryRepresentation)
         if existing_check:
             return existing_check
 
@@ -3181,7 +3529,7 @@ def run_controlled_evolution_circuit_mapper(
     3. (Optional) Execute the circuit: `run_circuit_executor`
     4. (Optional) Run the full QPE for an eigenvalue estimate: `run_phase_estimation`
 
-    Usage guidelines:
+        Usage guidelines:
 
         - The default circuit mapper can be queried using
             `get_algorithm_default_type("controlled_circuit_mapper")`.
@@ -3191,7 +3539,7 @@ def run_controlled_evolution_circuit_mapper(
             `run_time_evolution_builder` via its `settings` dict before mapping the
             resulting unitary. In QPE, different iterations use powers of 2
             (e.g., U^1, U^2, U^4, ...).
-    - The output circuit can be visualized using `visualize_circuit`.
+        - The output circuit can be visualized using `visualize_circuit`.
 
     Args:
         project_name (str): Name of the current qdk/chemistry project
@@ -3229,7 +3577,7 @@ def run_controlled_evolution_circuit_mapper(
             return existing_check
 
     try:
-        time_evolution_unitary = load_data_object(time_evolution_unitary_filename, UnitaryRepresentation)
+        time_evolution_unitary = load_data_object(time_evolution_unitary_filename, _UnitaryRepresentation)
     except (RuntimeError, ValueError) as e:
         return f"Failed to load time evolution unitary from {time_evolution_unitary_filename}: {e!s}"
 
@@ -3336,7 +3684,7 @@ def run_circuit_executor(
         return f"Invalid output filename: {e!s}"
 
     if not overwrite:
-        existing_check = check_output_exists(out_executor_data_filename, CircuitExecutorData)
+        existing_check = check_output_exists(out_executor_data_filename, _CircuitExecutorData)
         if existing_check:
             return existing_check
 
@@ -3429,11 +3777,13 @@ def run_phase_estimation(
     Two paths depending on system size:
 
     **Full-space path** (small systems, up to ~16 spatial orbitals / ~20 qubits):
+
     1. Run `run_scf` → extract orbitals → `run_hamiltonian_constructor` → `create_majorana_mapping` → `run_qubit_mapper`
     2. `run_state_preparation` from the SCF wavefunction
     3. (THIS TOOL) `run_phase_estimation` with sub-algorithm overrides in ``settings``
 
     **Active-space path** (larger systems):
+
     1. Run `run_scf` → active space analysis (SCI + AutoCAS) → compress orbital space
     2. (Optional) Sparsify wavefunction → `run_hamiltonian_constructor` → `create_majorana_mapping` → `run_qubit_mapper`
     3. `run_state_preparation` from the (sparse) multi-configurational wavefunction
@@ -3454,34 +3804,32 @@ def run_phase_estimation(
     - Traditional QPE (`algorithm_name="qiskit_standard"`) uses QFT
       and measures all phase bits in parallel but requires more
       qubits (equal to num_bits).
-        - The state preparation circuit should prepare a state with good
-            overlap with the target eigenstate.
+        - The state preparation circuit should prepare a state with good overlap
+            with the target eigenstate.
         - The three dependency algorithms (time evolution builder, controlled
-            evolution circuit mapper, circuit executor) are configured inline
-            via the nested ``settings`` dict.
+            evolution circuit mapper, circuit executor) are configured inline via
+            the nested ``settings`` dict.
 
     Guidelines on settings:
 
-    - The current set of default settings can be obtained by using
-      the function and MCP tool `get_algorithm_default_settings`.
+        - The current set of default settings can be obtained by using
+            the function and MCP tool `get_algorithm_default_settings`.
         - `qpe_circuit_builder.num_bits` (int): Number of phase estimation bits
-            (precision). Default: -1. IMPORTANT: this default value
-            is not a valid setting - you need to pass a valid value
-            for the number of bits.
+            (precision). Default: -1. IMPORTANT: this default value is not a valid
+            setting - you need to pass a valid value for the number of bits.
         - `qpe_circuit_builder.unitary_builder.time` (float): Time parameter t for
-            U = exp(-iHt). Default: 0.0. IMPORTANT: this default
-            value is not a valid setting - you need to adjust based
-            on the eigenvalue range - use smaller times for larger
-            energy differences.
-        - `shots_per_bit` (int, iterative only): Measurement shots per bit iteration. Default: 3.
+            U = exp(-iHt). Default: 0.0. IMPORTANT: this default value is not a
+            valid setting - you need to adjust based on the eigenvalue range - use
+            smaller times for larger energy differences.
+        - `shots_per_bit` (int, iterative only): Measurement shots per bit iteration.
+            Default: 3.
         - `shots` (int, traditional only): Total measurement shots. Default: 3.
         - `qpe_circuit_builder.unitary_builder` (dict, optional): Override the
-            time-evolution builder, e.g.
-            ``{"algorithm_name": "trotter", "order": 2}``.
+            time-evolution builder, e.g. ``{"algorithm_name": "trotter", "order": 2}``.
         - `qpe_circuit_builder.controlled_circuit_mapper` (dict, optional):
             Override the controlled-evolution circuit mapper.
-        - `circuit_executor` (dict, optional): Override the circuit executor,
-            e.g. ``{"algorithm_name": "qdk_full_state_simulator", "seed": 123}``.
+        - `circuit_executor` (dict, optional): Override the circuit executor, e.g.
+            ``{"algorithm_name": "qdk_full_state_simulator", "seed": 123}``.
     - If calculations are taking too long, consider reducing the parameter defaults.
 
     Args:

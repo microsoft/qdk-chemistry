@@ -94,6 +94,9 @@ discovery to determine the supported call shape.
 - Apply each override to the deepest nested algorithm that owns that behavior.
   Do not replace an algorithm implementation merely to reach one of its child
   settings, and preserve unspecified nested defaults.
+- A direct ``run_*`` tool and a nested algorithm setting are independent
+  access paths. The same algorithm type can be used both ways; use the tool
+  schema for direct execution and ``describe_algorithm`` for nested settings.
 - For geometry optimization, `algorithm_name` selects the optimization driver
   (normally `geometric`). Select the energy and gradient implementation through
   `settings["derivative_calculator"]` while retaining the requested optimization
@@ -119,6 +122,8 @@ These bypass the molecular workflow. Fermionic models produce a `Hamiltonian`
 | `create_majorana_mapping` | Create fermion-to-qubit mapping file | `project_name`, `out_mapping_filename`, `encoding?`, `num_modes?`, `hamiltonian_filename?` |
 | `run_qubit_mapper` | Apply mapping file to fermionic Hamiltonian | `project_name`, `hamiltonian_filename`, `mapping_filename`, `out_qubit_hamiltonian_filename` |
 | `run_state_preparation` | Build state-prep circuit | `project_name`, `wavefunction_filename`, `out_circuit_filename` |
+| `run_amplitude_amplification` | Build an amplified circuit from state-preparation and good-state oracle circuits | `project_name`, `state_prep_oracle_filename`, `good_state_oracle_filename`, `out_circuit_filename` |
+| `run_term_grouper` | Group the Pauli terms of a qubit operator | `project_name`, `qubit_hamiltonian_filename`, `out_qubit_hamiltonian_filename` |
 | `run_qubit_hamiltonian_solver` | Exact diagonalization | `project_name`, `qubit_hamiltonian_filename` |
 | `run_energy_estimator` | Shot-based energy | `project_name`, `circuit_filename`, `qubit_hamiltonian_filenames`, `total_shots` |
 | `run_resource_estimation` | QDK QRE physical-qubit/runtime Pareto frontier | `project_name`, `circuit_filename`, `architecture?`, `physical_error_rate?`, `max_error?`, `gate_time_ns?`, `measurement_time_ns?`, `use_graph?` |
@@ -144,6 +149,9 @@ Build and inspect QPE circuit components for resource estimates. No energy compu
 | `run_time_evolution_builder` | Build U = exp(-iHt) |
 | `run_controlled_evolution_circuit_mapper` | Map to controlled-U circuit |
 | `run_circuit_executor` | Execute circuit with shots |
+| `run_evolution_circuit_builder` | Build a circuit for a driven Hamiltonian |
+| `run_hamiltonian_simulation` | Evolve a driven Hamiltonian and measure observables |
+| `run_hadamard_test` | Measure a unitary with a state-preparation circuit |
 
 ### QPE — Mode B: Full Eigenvalue
 

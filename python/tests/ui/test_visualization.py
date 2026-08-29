@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from typing import Any
+
 from qdk_chemistry.ui import visualization
 
 
@@ -56,8 +58,8 @@ def test_widget_bridge_discards_expired_payloads(monkeypatch):
 
 class _App:
     def __init__(self) -> None:
-        self.resources = {}
-        self.tools = {}
+        self.resources: dict[str, Any] = {}
+        self.tools: dict[str, Any] = {}
 
     def resource(self, uri: str, **_kwargs):
         def register(function):

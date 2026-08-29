@@ -185,7 +185,8 @@ def _script_path(scripts_dir: Path, script_name: str) -> Path:
 def _commands_for_current_environment(plugin_name: str) -> dict[str, str]:
     if sys.prefix == sys.base_prefix and not hasattr(sys, "real_prefix"):
         raise PluginInstallError(
-            "QDK Chemistry plugin installation requires a virtual environment; run it with .venv/bin/qc"
+            "QDK Chemistry plugin installation requires a virtual environment; "
+            "activate the venv and rerun with the 'qc' command from that environment"
         )
     scripts_dir = Path(sysconfig.get_path("scripts"))
     return {
