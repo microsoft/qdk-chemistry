@@ -98,6 +98,50 @@ def test_get_summary_loads_registered_data_class(h2_proj):
 
 
 @pytest.mark.usefixtures("_dirs")
+def test_create_structure_rejects_output_paths_outside_project():
+    coordinates = "[[0.0, 0.0, 0.0], [1.4, 0.0, 0.0]]"
+    outside_paths = [
+        "../victim.structure.json",
+        str(config.projects_dir.parent / "victim.structure.json"),
+    ]
+
+    for filename in outside_paths:
+        result = srv.create_structure(
+            project_name="safe",
+            coordinates_json=coordinates,
+            symbols=["H", "H"],
+            filename_to_save=filename,
+        )
+
+        assert result["status"] == "error"
+        assert "outside project directory" in result["message"]
+
+    assert not (config.projects_dir / "victim.structure.json").exists()
+    assert not (config.projects_dir.parent / "victim.structure.json").exists()
+
+
+@pytest.mark.usefixtures("_dirs")
+def test_create_structure_checks_exact_nested_output_path():
+    project_dir = config.projects_dir / "safe"
+    nested_dir = project_dir / "nested"
+    nested_dir.mkdir(parents=True)
+    existing = data.Structure(coordinates=np.array([[0, 0, 0], [0, 0, 1.4]]), symbols=["H", "H"])
+    existing.to_json_file(str(nested_dir / "victim.structure.json"))
+
+    result = srv.create_structure(
+        project_name="safe",
+        coordinates_json="[[0.0, 0.0, 0.0]]",
+        symbols=["He"],
+        filename_to_save="nested/victim.structure.json",
+    )
+
+    assert result["status"] == "exists"
+    assert "already exists with valid data" in result["message"]
+    unchanged = data.Structure.from_json_file(str(nested_dir / "victim.structure.json"))
+    assert unchanged.get_atomic_symbols() == ["H", "H"]
+
+
+@pytest.mark.usefixtures("_dirs")
 def test_list_project_files_nonexistent():
     assert srv.list_project_files(project_name="nope")["status"] == "error"
 
@@ -212,7 +256,8 @@ def test_run_algorithm_local():
     with patch("qdk_chemistry.ui.tools._remote_run", return_value="ok") as mock_run:
         assert srv._run_algorithm(m, "a") == "ok"
     assert mock_run.call_args.args[:2] == (m, "a")
-    assert mock_run.call_args.kwargs["local_cache"] is not None
+    assert mock_run.call_args.kwargs["cache"] is not None
+    assert "local_cache" not in mock_run.call_args.kwargs
     assert mock_run.call_args.kwargs["remote"] is None
 
 
@@ -228,7 +273,8 @@ def test_run_algorithm_remote_auto_cache():
         assert srv._run_algorithm(m, cache=None, remote="disc", remote_timeout=None) == "ok"
     mock_fc.assert_called_once_with(path=config.cache_dir)
     assert mock_run.call_args.args[:2] == (m,)
-    assert mock_run.call_args.kwargs["local_cache"] is cache
+    assert mock_run.call_args.kwargs["cache"] is cache
+    assert "local_cache" not in mock_run.call_args.kwargs
     assert mock_run.call_args.kwargs["remote"] == "disc"
 
 
@@ -250,7 +296,30 @@ def test_run_algorithm_allows_safe_remote_config():
     assert result == "ok"
     get_backend.assert_called_once_with("local", poll_interval=2.0, timeout=30.0)
     backend.connect.assert_called_once_with()
+    backend.disconnect.assert_called_once_with()
     assert remote_run.call_args.kwargs["remote"] is backend
+
+
+def test_timed_remote_run_disconnects_configured_backend():
+    """MCP-owned configured backends are cleaned up by the worker thread."""
+    algorithm = MagicMock()
+    algorithm.hash.return_value = "run-hash"
+    backend = MagicMock()
+
+    with (
+        patch("qdk_chemistry.remote.backends.get_backend", return_value=backend),
+        patch("qdk_chemistry.ui.tools._remote_run", return_value="ok"),
+    ):
+        result = srv._run_algorithm(
+            algorithm,
+            remote="local",
+            remote_config={"poll_interval": 2.0},
+            remote_timeout=120,
+        )
+
+    assert result == "ok"
+    backend.connect.assert_called_once_with()
+    backend.disconnect.assert_called_once_with()
 
 
 @pytest.mark.parametrize(

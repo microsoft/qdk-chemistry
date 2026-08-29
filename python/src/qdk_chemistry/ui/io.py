@@ -8,6 +8,65 @@
 import os
 
 
+def _load_data_object_from_path(filename: str | os.PathLike[str], data_class):
+    """Load a data object from an exact filesystem path.
+
+    Args:
+        filename: Exact path to a JSON or HDF5 data file.
+        data_class: Data class used to deserialize the file.
+
+    Returns:
+        The deserialized data object.
+
+    Raises:
+        ValueError: If the file extension is unsupported.
+
+    """
+    filename = os.fspath(filename)
+    if filename.endswith(".json"):
+        return data_class.from_json_file(filename)
+    if filename.endswith((".hdf5", ".h5")):
+        return data_class.from_hdf5_file(filename)
+    raise ValueError(f"Unsupported file extension for {filename}. Must be .json, .hdf5, or .h5")
+
+
+def check_output_path_exists(filename: str | os.PathLike[str], data_class: type | None = None) -> str | None:
+    """Check whether an exact output path already exists with valid content.
+
+    Args:
+        filename: Exact output path to inspect.
+        data_class: Optional data class used to validate existing content.
+
+    Returns:
+        A message when valid output exists, otherwise ``None``.
+
+    """
+    filename = os.fspath(filename)
+
+    if not os.path.exists(filename):
+        return None
+
+    if data_class is not None:
+        try:
+            existing_obj = _load_data_object_from_path(filename, data_class)
+            if existing_obj is not None:
+                return (
+                    f"EXISTS: Output file '{filename}' already exists with valid data. "
+                    "Do you want to run again and overwrite it? If this was an expensive "
+                    "calculation and you trust the contents of the older file, you should use the older file."
+                )
+        except (RuntimeError, ValueError, FileNotFoundError, OSError):
+            return None
+    else:
+        return (
+            f"EXISTS: Output file '{filename}' already exists. "
+            "Do you want to run again and overwrite it? If this was an expensive "
+            "calculation and you trust the contents of the older file, you should use the older file."
+        )
+
+    return None
+
+
 def check_output_exists(filename: str, data_class: type | None = None) -> str | None:
     """Check if an output file already exists with valid content.
 
@@ -21,29 +80,7 @@ def check_output_exists(filename: str, data_class: type | None = None) -> str | 
 
     """
     filename = filename.rsplit("/", maxsplit=1)[-1]  # Strip path if provided
-
-    if not os.path.exists(filename):
-        return None
-
-    if data_class is not None:
-        try:
-            existing_obj = load_data_object(filename, data_class)
-            if existing_obj is not None:
-                return (
-                    f"EXISTS: Output file '{filename}' already exists with valid data. "
-                    "Do you want to run again and overwrite it? If this was an expensive "
-                    "calculation and you trust the contents of the older file, you should use the older file."
-                )
-        except (RuntimeError, ValueError, FileNotFoundError, OSError):
-            return None  # File exists but is invalid, proceed with calculation
-    else:
-        return (
-            f"EXISTS: Output file '{filename}' already exists. "
-            "Do you want to run again and overwrite it? If this was an expensive "
-            "calculation and you trust the contents of the older file, you should use the older file."
-        )
-
-    return None
+    return check_output_path_exists(filename, data_class)
 
 
 def load_data_object(filename: str, data_class):
@@ -62,11 +99,7 @@ def load_data_object(filename: str, data_class):
     """
     filename = filename.rsplit("/", maxsplit=1)[-1]  # Strip path if provided
 
-    if filename.endswith(".json"):
-        return data_class.from_json_file(filename)
-    if filename.endswith((".hdf5", ".h5")):
-        return data_class.from_hdf5_file(filename)
-    raise ValueError(f"Unsupported file extension for {filename}. Must be .json, .hdf5, or .h5")
+    return _load_data_object_from_path(filename, data_class)
 
 
 def save_data_object(data_obj, filename: str):

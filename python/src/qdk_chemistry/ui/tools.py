@@ -46,6 +46,7 @@ from qdk_chemistry.utils import (
 from .config import config
 from .io import (
     check_output_exists,
+    check_output_path_exists,
     load_data_object,
     save_data_object,
 )
@@ -455,14 +456,16 @@ def _run_algorithm(
 
     # If remote is a name string and remote_config is provided,
     # create a pre-configured backend instance using only options that
-    # are safe for untrusted MCP clients to control.
+    # are safe for untrusted MCP clients to control. This layer owns its
+    # lifecycle because the remote proxy treats backend instances as caller-owned.
     resolved_remote = remote
+    owns_resolved_remote = False
     if isinstance(remote, str) and remote_config:
         from qdk_chemistry.remote.backends import get_backend  # noqa: PLC0415
 
         _validate_mcp_remote_config(remote, remote_config)
         resolved_remote = get_backend(remote, **remote_config)
-        resolved_remote.connect()
+        owns_resolved_remote = True
 
     sdk_kwargs: dict[str, Any] = {
         "remote": resolved_remote,
@@ -477,10 +480,16 @@ def _run_algorithm(
             "project_name": project_name,
         }
         sdk_kwargs["_owner"] = owner
-    if cache is not None:
-        sdk_kwargs["cache"] = resolved_cache
-    else:
-        sdk_kwargs["local_cache"] = resolved_cache
+    sdk_kwargs["cache"] = resolved_cache
+
+    def run_remote() -> Any:
+        if owns_resolved_remote:
+            resolved_remote.connect()
+        try:
+            return _remote_run(algorithm, *args, **sdk_kwargs, **kwargs)
+        finally:
+            if owns_resolved_remote:
+                resolved_remote.disconnect()
 
     # For remote jobs with a timeout, run in a thread so we can return
     # early if the job is still running. The timeout starts only after
@@ -511,14 +520,8 @@ def _run_algorithm(
                 submitted.set_result(job)
 
         pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        future = pool.submit(
-            _remote_run,
-            algorithm,
-            *args,
-            _on_job_submitted=on_job_submitted,
-            **sdk_kwargs,
-            **kwargs,
-        )
+        sdk_kwargs["_on_job_submitted"] = on_job_submitted
+        future = pool.submit(run_remote)
         try:
             completed, _ = concurrent.futures.wait(
                 (future, submitted),
@@ -541,7 +544,7 @@ def _run_algorithm(
             return result
 
     # No timeout (cache-only, or blocking remote) — call directly
-    return _remote_run(algorithm, *args, **sdk_kwargs, **kwargs)
+    return run_remote()
 
 
 def _resolve_seed_or_basis(seed_or_basis: str):
@@ -1228,9 +1231,21 @@ def create_structure(
             f"must match number of atoms ({len(coordinates)})."
         )
 
+    project_dir, project_error = resolve_project_path(project_name, config.projects_dir)
+    if project_dir is None:
+        return f"ERROR: Cannot resolve project directory: {project_error}"
+
+    try:
+        save_path = (project_dir / filename_to_save).resolve()
+    except (OSError, RuntimeError) as e:
+        return f"ERROR: Cannot resolve output filename '{filename_to_save}': {e}"
+
+    if not save_path.is_relative_to(project_dir):
+        return f"ERROR: Output filename '{filename_to_save}' resolves outside project directory '{project_dir}'"
+
     # Check if output file already exists
     if not overwrite:
-        existing_check = check_output_exists(filename_to_save, data.Structure)
+        existing_check = check_output_path_exists(save_path, data.Structure)
         if existing_check:
             return existing_check
 
@@ -1248,8 +1263,6 @@ def create_structure(
             structure = data.Structure(coordinates=coordinates, symbols=symbols)
     except RuntimeError as e:
         return f"There was a problem creating a qdk/chemistry Structure objects from input: {e}"
-
-    save_path = config.projects_dir / project_name / filename_to_save
 
     # Upload to directory - support both json and hdf5
     try:
@@ -4055,7 +4068,7 @@ def run_geometry_optimization(
     if isinstance(result, str):
         return result
 
-    energy, optimized_structure, wavefunction, hessian = result
+    energy, optimized_structure, hessian, wavefunction = result
     save_data_object(optimized_structure, out_structure_filename)
 
     outputs: dict[str, Any] = {"energy": energy, "structure_filename": out_structure_filename}
