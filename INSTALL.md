@@ -428,18 +428,23 @@ Useful switches:
 
 | Switch | Effect |
 |--------|--------|
+| `-Arch` | Target architecture: `x64` (default) or `arm64`. `windows-build-clang-cl-cmake.ps1` only supports building natively (host and target arch must match); `windows-build-msvc-cmake.ps1` also supports cross-compiling arm64 from an x64 host. |
 | `-SkipPrereqs` | Reuse the existing toolchain and vcpkg installation |
 | `-SkipConfigure` | Incremental build; skip the CMake configure step |
 | `-SkipCpp` / `-SkipPython` | Build only one half of the project |
 | `-SkipTests` | Skip the `ctest` and `pytest` runs |
 | `-BuildType` | `Release` (default), `RelWithDebInfo`, or `Debug` |
-| `-DynamicDeps` | Link dependencies dynamically (`x64-windows`) instead of statically (`x64-windows-static-md`) |
+| `-DynamicDeps` | Link dependencies dynamically (`$Arch-windows`) instead of statically (`$Arch-windows-static-md`) |
 
-The default `x64-windows-static-md` triplet links the vcpkg dependencies statically while keeping
-the dynamic CRT, so no dependency DLLs need to sit alongside the Python extension. `-DynamicDeps`
-switches to `x64-windows`, whose DLLs must be discoverable at import time.
+The default `$Arch-windows-static-md` triplet (e.g. `x64-windows-static-md`, `arm64-windows-static-md`)
+links the vcpkg dependencies statically while keeping the dynamic CRT, so no dependency DLLs need to
+sit alongside the Python extension. `-DynamicDeps` switches to `$Arch-windows`, whose DLLs must be
+discoverable at import time.
 
-Windows builds are pinned to `QDK_UARCH=x86-64-v3`. The
+Windows builds are pinned to a microarchitecture level via `QDK_UARCH`: `x86-64-v3` on x64, and
+`armv8-a` on arm64 for clang-cl. Native MSVC `cl.exe` has no equivalent generic arm64 `/arch:` value,
+so `QDK_UARCH` is left unset there and the compiler's default ISA is used instead (see
+[`cpp/cmake/qdk-uarch.cmake`](cpp/cmake/qdk-uarch.cmake)). The
 [`.pipelines/toolchains/windows.cmake`](.pipelines/toolchains/windows.cmake) toolchain file is
 chainloaded after the vcpkg toolchain to force the dynamic CRT (`/MD`) across subprojects.
 
@@ -572,7 +577,7 @@ Where possible, the official CMake documentation is linked for further informati
 |[`CMAKE_PREFIX_PATH`](https://cmake.org/cmake/help/latest/variable/CMAKE_PREFIX_PATH.html)| Location of installed dependencies | [List](#note-on-cmake-lists-from-the-command-line) | N/A | User defined |
 |[`CMAKE_CXX_FLAGS`](https://cmake.org/cmake/help/latest/variable/CMAKE_LANG_FLAGS.html#variable:CMAKE_%3CLANG%3E_FLAGS) | Space-delimited set of C++ compilation flags to append to the C++ compilation | String | N/A | User defined |
 |[`CMAKE_TOOLCHAIN_FILE`](https://cmake.org/cmake/help/latest/variable/CMAKE_TOOLCHAIN_FILE.html) | Toolchain file. On Windows, set to the vcpkg toolchain | String | N/A | User defined |
-|[`VCPKG_TARGET_TRIPLET`](https://learn.microsoft.com/vcpkg/users/triplets) | Windows only. vcpkg triplet selecting the dependency link mode | String | N/A | `x64-windows-static-md`, `x64-windows` |
+|[`VCPKG_TARGET_TRIPLET`](https://learn.microsoft.com/vcpkg/users/triplets) | Windows only. vcpkg triplet selecting the target architecture and dependency link mode | String | N/A | `x64-windows-static-md`, `x64-windows`, `arm64-windows-static-md`, `arm64-windows` |
 |[`BUILD_TESTING`](https://cmake.org/cmake/help/latest/variable/BUILD_TESTING.html) | Whether to build unit and integration tests | Bool | `True` | `False` |
 |`QDK_UARCH`| The instruction set architecture (ISA) to compile for. This is not a mandatory setting, but it is strongly encouraged for good performance | String | N/A | [See below](#note-on-qdk_uarch-specification) |
 |`QDK_CHEMISTRY_ENABLE_COVERAGE` | Enable coverage reports. Requires a `Debug` or `RelWithDebInfo` build and a GNU/Clang compiler; under MSVC the build warns and continues without coverage instrumentation | Bool | `False` | `True` |

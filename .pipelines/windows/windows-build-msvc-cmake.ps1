@@ -10,6 +10,9 @@
 # and finally build and test the Python package. By default, it uses static linking for dependencies (no DLLs).
 #
 # Optional switches:
+#   -Arch           # Target architecture: x64 (default) or arm64. Cross-compiling from an x64
+#                   # host to arm64 uses vcvarsall's x64_arm64 pair; running natively on an
+#                   # arm64 host targets arm64 directly.
 #   -DynamicDeps    # Use dynamic linking for dependencies (DLLs) instead of static.
 #                   # This requires copying DLLs to the Python package folder.
 #   -SkipPrereqs    # Skip prerequisite installation (VS Build tools, vcpkg, etc)
@@ -21,6 +24,8 @@
 #                   # Debug build skips the Python build (not usable for the Python extension).
 
 param(
+    [ValidateSet("x64", "arm64")]
+    [string]$Arch = "x64",
     [switch]$DynamicDeps,
     [switch]$SkipPrereqs,
     [switch]$SkipCpp,
@@ -48,11 +53,22 @@ $VcpkgInstalledDir = "$RepoRoot\vcpkg_installed"
 # installation folder. Else, Windows won't find them at runtime and the Python package will fail to import.
 # This is because Windows does not have a system-wide DLL search path configuration like Linux's ldconfig.
 if ($DynamicDeps) {
-    $VcpkgTriplet = "x64-windows"
+    $VcpkgTriplet = "$Arch-windows"
 } else {
-    $VcpkgTriplet = "x64-windows-static-md"
+    $VcpkgTriplet = "$Arch-windows-static-md"
 }
-$QDK_UARCH = "x86-64-v3"
+# Native MSVC cl.exe has no generic ARM64 baseline /arch: value, so QDK_UARCH is
+# left unset there and qdk-uarch.cmake falls back to the compiler's default ISA
+# (see cpp/cmake/qdk-uarch.cmake). x86-64-v3 is a valid /arch: value on x64.
+$QDK_UARCH = if ($Arch -eq "arm64") { "" } else { "x86-64-v3" }
+
+# vcvarsall takes "<host>_<target>", or just "<target>" when host and target match.
+# PROCESSOR_ARCHITEW6432 reports the real machine architecture when the current
+# process is running under emulation (e.g. an x64 process on an arm64 host);
+# PROCESSOR_ARCHITECTURE alone would misreport that case as the emulated arch.
+$hostArchRaw = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
+$HostArch = if ($hostArchRaw -eq "ARM64") { "arm64" } else { "x64" }
+$VcvarsArg = if ($HostArch -eq $Arch) { $Arch } else { "${HostArch}_${Arch}" }
 $NCPUS = [Math]::Max(1, [System.Environment]::ProcessorCount - 2)
 
 $linkMode = if ($DynamicDeps) { "dynamic" } else { "static" }
@@ -61,6 +77,7 @@ Write-Host "  QDK Chemistry - Windows Build (MSVC cl)   " -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "Repo root:  $RepoRoot"
 Write-Host "Build type: $BuildType"
+Write-Host "Target arch: $Arch (host: $HostArch, vcvarsall: $VcvarsArg)"
 Write-Host "Triplet:    $VcpkgTriplet ($linkMode)"
 Write-Host ""
 
@@ -132,7 +149,7 @@ if (-not $SkipPrereqs) {
     Get-ChildItem env: | ForEach-Object { $envBefore[$_.Name] = $_.Value }
 
     $tempFile = [System.IO.Path]::GetTempFileName()
-    cmd /c "`"$vcvarsall`" x64 && set > `"$tempFile`""
+    cmd /c "`"$vcvarsall`" $VcvarsArg && set > `"$tempFile`""
     Get-Content $tempFile | ForEach-Object {
         if ($_ -match "^([^=]+)=(.*)$") {
             $name = $matches[1]
@@ -215,7 +232,7 @@ if (-not $SkipPrereqs) {
     $vcvarsall = "$vsPath\VC\Auxiliary\Build\vcvarsall.bat"
     if (Test-Path $vcvarsall) {
         $tempFile = [System.IO.Path]::GetTempFileName()
-        cmd /c "`"$vcvarsall`" x64 && set > `"$tempFile`""
+        cmd /c "`"$vcvarsall`" $VcvarsArg && set > `"$tempFile`""
         Get-Content $tempFile | ForEach-Object {
             if ($_ -match "^([^=]+)=(.*)$") {
                 [System.Environment]::SetEnvironmentVariable($matches[1], $matches[2], "Process")
@@ -266,9 +283,13 @@ Write-Host ""
 if (-not $SkipCpp) {
     if (-not $SkipConfigure) {
         Write-Host "=== Step 1: Configure C++ build ===" -ForegroundColor Yellow
+        # QDK_UARCH is omitted entirely (rather than passed empty) when unset above:
+        # cmake -DQDK_UARCH="" still counts as user-defined and bypasses auto-detection
+        # in qdk-uarch.cmake, producing an empty and invalid /arch: flag.
+        $uarchArgs = if ($QDK_UARCH) { @("-DQDK_UARCH=$QDK_UARCH") } else { @() }
         cmake -S cpp -B "$BuildDir" `
             -GNinja `
-            -DQDK_UARCH="$QDK_UARCH" `
+            @uarchArgs `
             -DQDK_CHEMISTRY_ENABLE_COVERAGE=OFF `
             -DQDK_CHEMISTRY_ENABLE_MPI=OFF `
             -DMACIS_ENABLE_TESTS=ON `
