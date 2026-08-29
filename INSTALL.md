@@ -87,7 +87,7 @@ python3 -m pip install qdk-chemistry
 
 > **NOTE:** On Python 3.14, `qiskit-aer` is omitted from the `qiskit-extras` and `all` extras on Linux ARM64 (aarch64), because Qiskit does not yet publish a Python 3.14 wheel for that platform. See the [Optional Extras](#optional-extras) table below for details.
 >
-> **NOTE:** On Windows, PySCF is skipped from the `plugins` extra because it publishes no Windows wheels; on Windows arm64 the Qiskit stack, PennyLane and RDKit are skipped as well. See [Notes for Windows users](#notes-for-windows-users).
+> **NOTE:** On Windows, PySCF is skipped from the `plugins` extra because it publishes no Windows wheels; on Windows arm64 the Qiskit stack, PennyLane, RDKit and the Discovery backend are skipped as well. See [Notes for Windows users](#notes-for-windows-users).
 
 ### Step 3: Verify the installation
 
@@ -168,7 +168,7 @@ to native Windows installs; none of them apply under
 | Topic | Detail |
 |-------|--------|
 | PySCF plugin | PySCF publishes no Windows wheels, so the `plugins` extra installs no PySCF and the PySCF plugin is unavailable. The native implementations are unaffected. |
-| arm64 extras | Qiskit (and Qiskit Aer, Nature, IBM Runtime), PennyLane and RDKit are skipped on arm64: they require `rustworkx`, which publishes no win-arm64 wheels. The features that depend on them are unavailable; everything else is unaffected. |
+| arm64 extras | Qiskit (and Qiskit Aer, Nature, IBM Runtime), PennyLane and RDKit are skipped on arm64: they require `rustworkx`, which publishes no win-arm64 wheels. The Discovery backend (`azure-ai-discovery`, `azure-identity`, `azure-storage-blob`) is skipped as well: it requires `cryptography`, which publishes no win-arm64 wheel and needs a Rust toolchain plus OpenSSL to build from source. The features that depend on them are unavailable; everything else is unaffected. |
 | OpenMP | Shared-memory threading via OpenMP is disabled on Windows. |
 
 ---

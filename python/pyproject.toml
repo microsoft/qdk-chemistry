@@ -60,9 +60,13 @@ coverage = [
   "gcovr"
 ]
 discovery = [
-  "azure-ai-discovery==1.0.0",
-  "azure-identity>=1.19.0,<2",
-  "azure-storage-blob>=12.25.0,<13"
+  # azure-identity (via msal) and azure-storage-blob both pull in cryptography,
+  # which publishes no win-arm64 wheel and needs a Rust toolchain plus OpenSSL
+  # dev headers to build from source -- neither is provisioned on the ARM64
+  # runners. Skip discovery there, matching the qiskit-extras/plugins pattern.
+  "azure-ai-discovery==1.0.0; sys_platform != 'win32' or platform_machine != 'ARM64'",
+  "azure-identity>=1.19.0,<2; sys_platform != 'win32' or platform_machine != 'ARM64'",
+  "azure-storage-blob>=12.25.0,<13; sys_platform != 'win32' or platform_machine != 'ARM64'"
 ]
 dev = [
   "coverage",
