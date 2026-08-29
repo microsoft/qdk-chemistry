@@ -26,6 +26,7 @@ from qdk_chemistry.data import (
     Settings,
     SettingTypeMismatch,
 )
+from qdk_chemistry.data._type_name import class_data_type_name
 
 
 class _TestSettingsContainer(Settings):
@@ -1334,9 +1335,8 @@ class TestSettingsCustomClass:
 
 
 def test_settings_data_type_name():
-    """Test that Settings has the correct _data_type_name class attribute."""
-    assert hasattr(Settings, "_data_type_name")
-    assert Settings._data_type_name == "settings"
+    """Test that Settings exposes its static wire-format identifier."""
+    assert class_data_type_name(Settings) == "settings"
 
 
 # ---------------------------------------------------------------------------

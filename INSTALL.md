@@ -51,7 +51,7 @@ If you prefer a minimal install (core library only, no optional backends):
 python3 -m pip install qdk-chemistry
 ```
 
-> **NOTE:** The `all` and `qiskit-extras` extras are not supported on Python 3.14 because Qiskit does not yet publish Python 3.14 wheels. See the [Optional Extras](#optional-extras) table below for details and alternative install targets.
+> **NOTE:** On Python 3.14, `qiskit-aer` is omitted from the `qiskit-extras` and `all` extras on Linux ARM64 (aarch64), because Qiskit does not yet publish a Python 3.14 wheel for that platform. All other platforms (Linux x86_64, macOS, Windows) install the full set. See the [Optional Extras](#optional-extras) table below for details.
 
 ### Step 3: Verify the installation
 
@@ -80,14 +80,23 @@ If you chose the minimal `pip install qdk-chemistry` above, you can add specific
 
 | Extra | Description | Included Packages |
 |-------|-------------|-------------------|
+| `coverage` | Coverage reporting tools | coverage, pytest, pytest-cov, gcovr |
 | `jupyter` | Jupyter notebook support | ipykernel, pandas |
 | `plugins` | Third-party quantum chemistry backends | PySCF |
 | `qiskit-extras` | Qiskit ecosystem packages | qiskit, qiskit-aer, qiskit-nature |
 | `openfermion-extras` | OpenFermion ecosystem packages | openfermion |
 | `networkx-extras` | NetworkX ecosystem packages | networkx |
+| `docs` | [Sphinx documentation build tools](docs/README.md) | sphinx, sphinx-rtd-theme, myst-parser, breathe, sphinx-autodoc-typehints, sphinx-inline-tabs, sphinxcontrib-napoleon, sphinxcontrib-bibtex, sphinx_copybutton |
+| `qre` | Quantum Resource Estimator support | qdk[qre,jupyter]>=1.30.0 |
 | `dev` | Development and testing tools | pytest, ruff, mypy, and related tooling |
-| `test` | Testing tools and optional dependencies | pytest, ipykernel, networkx, openfermion, pennylane, pyscf, qiskit, rdkit |
-| `all` | **All of the above** | All optional dependencies |
+| `test` | Testing tools and optional runtime dependencies; does not include `docs` | qdk-chemistry[coverage,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre], nbclient, nbformat, pennylane, rdkit, requests>=2.33.0 |
+| `all` | Union of all defined extras | coverage, dev, docs, jupyter, networkx-extras, openfermion-extras, plugins, qiskit-extras, qre, test |
+
+To build the documentation, install the `docs` extra (for example,
+`python3 -m pip install 'qdk-chemistry[docs]'`), install the Doxygen system
+binary and Graphviz (for example, `sudo apt install doxygen graphviz` on
+Ubuntu), then run `cd docs && make all`. See the
+[documentation build instructions](docs/README.md) for more details.
 
 Install one or more extras with:
 
@@ -124,6 +133,31 @@ Alternatively, click the green button in the bottom-left corner of VS Code and s
 ### Step 3: Restart VS Code
 
 After the initial build, restart VS Code and reopen in the container to ensure the Python virtual environment is properly loaded.
+
+### Step 4: Develop
+
+The dev container installs the Python package in editable mode, so changes to pure Python files are available immediately. After changing pybind11 sources, rebuild the Python package:
+
+```bash
+python -m pip install --no-build-isolation --check-build-dependencies --no-deps \
+  -C build-dir="build/{wheel_tag}" -e ./python
+```
+
+After changing the C++ library, build and install it before rebuilding the Python bindings:
+
+```bash
+cmake --build cpp/build --target chemistry
+cmake --install cpp/build
+python -m pip install --no-build-isolation --check-build-dependencies --no-deps \
+  -C build-dir="build/{wheel_tag}" -e ./python
+```
+
+Build only the relevant C++ test target during development, then run its tests from the directory where CTest registers them. For example:
+
+```bash
+cmake --build cpp/build --target test_algorithm_hash
+ctest --test-dir cpp/build/tests --output-on-failure -R AlgorithmHash
+```
 
 **NOTE:**
 

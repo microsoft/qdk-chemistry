@@ -7,11 +7,14 @@
 
 from __future__ import annotations
 
+import importlib.metadata
 import json
+import logging
 
 import numpy as np
 import pytest
 
+import qdk_chemistry.remote.cache as cache_module
 from qdk_chemistry.data import EnergyExpectationResult, MeasurementData, Orbitals, QubitOperator
 from qdk_chemistry.data._spin_channels import spin_channel_matrix
 from qdk_chemistry.data.symmetry import axes
@@ -19,6 +22,7 @@ from qdk_chemistry.remote.cache import (
     _CACHES,
     CacheBackend,
     FolderCache,
+    TieredCache,
     get_cache,
     register_cache,
     resolve_cache,
@@ -53,7 +57,7 @@ def sample_job():
         algorithm_info={"type": "scf_solver", "name": "qdk"},
         status="retrieved",
         run_hash="abc123def456",
-        input_hashes={"arg_0": "hash_structure"},
+        input_hashes={"args.arg_0": "hash_structure"},
         output_hashes=[
             {"hash": "hash_float_result", "type": "float", "value": -75.5},
             {"hash": "hash_wfn_result", "type": "wavefunction"},
@@ -65,6 +69,25 @@ def sample_job():
 def sample_orbitals():
     """Return a small test Orbitals DataClass."""
     return create_test_orbitals(3)
+
+
+def test_plugin_cache_load_failure_is_logged(monkeypatch, caplog):
+    """Plugin discovery remains non-fatal but reports the failure."""
+
+    def fail_entry_points(**_kwargs):
+        raise RuntimeError("plugin discovery failed")
+
+    monkeypatch.setattr(importlib.metadata, "entry_points", fail_entry_points)
+
+    with caplog.at_level(logging.WARNING, logger=cache_module.__name__):
+        cache_module._load_plugin_caches()
+
+    matching = [r for r in caplog.records if r.name == cache_module.__name__]
+    assert matching, f"Expected a warning log from {cache_module.__name__}"
+    record = matching[0]
+    assert record.levelno == logging.WARNING
+    assert record.exc_info is not None
+    assert "Failed to load cache plugins" in record.getMessage()
 
 
 # ── FolderCache: Job metadata ────────────────────────────────────────────────
@@ -184,6 +207,89 @@ class TestFolderCacheData:
             spin_channel_matrix(coefficients, axes.beta()),
             spin_channel_matrix(sample_coefficients, axes.beta()),
         )
+
+    def test_put_and_get_numpy_array(self, folder_cache):
+        """Round-trip a standalone NumPy array through the cache."""
+        value = np.array([[1, 2], [3, 4]], dtype=np.int32)
+
+        folder_cache.put_data("array_hash", value)
+        loaded = folder_cache.get_data("array_hash")
+
+        np.testing.assert_array_equal(loaded, value)
+        assert loaded.dtype == value.dtype
+        assert folder_cache.has_data("array_hash")
+
+    def test_delete_numpy_array(self, folder_cache):
+        """Delete a standalone NumPy array from the cache."""
+        folder_cache.put_data("array_hash", np.array([1.0, 2.0]))
+
+        assert folder_cache.delete_data("array_hash")
+        assert folder_cache.get_data("array_hash") is None
+
+    def test_put_and_get_list_containing_numpy_values(self, folder_cache):
+        """Round-trip NumPy values nested in a cacheable list."""
+        value = [np.array([1.0, 2.0]), (np.int64(3), np.float32(4.0))]
+
+        folder_cache.put_data("numpy_list_hash", value)
+        loaded = folder_cache.get_data("numpy_list_hash")
+
+        np.testing.assert_array_equal(loaded[0], value[0])
+        assert loaded[1] == (3, 4.0)
+
+    def test_put_and_get_tuple(self, folder_cache):
+        """Round-trip a generic tuple through the cache."""
+        value = ("result", (1, 2))
+
+        folder_cache.put_data("tuple_hash", value)
+        loaded = folder_cache.get_data("tuple_hash")
+
+        assert loaded == value
+        assert isinstance(loaded, tuple)
+
+    def test_put_and_get_homogeneous_dataclass_tuple(self, folder_cache, sample_orbitals):
+        """Round-trip a homogeneous DataClass tuple without converting it to a list."""
+        value = (sample_orbitals, sample_orbitals)
+
+        folder_cache.put_data("tuple_hash", value)
+        loaded = folder_cache.get_data("tuple_hash")
+
+        assert isinstance(loaded, tuple)
+        assert all(isinstance(item, Orbitals) for item in loaded)
+
+    def test_delete_list_removes_nested_numpy_arrays(self, folder_cache, cache_dir):
+        """Delete array blobs referenced by a cached list manifest."""
+        folder_cache.put_data("numpy_list_hash", [np.array([1.0, 2.0])])
+        array_path = next(cache_dir.glob("*.ndarray.npy"))
+
+        assert folder_cache.delete_data("numpy_list_hash")
+        assert not array_path.exists()
+
+    def test_delete_tuple_preserves_shared_children(self, folder_cache, cache_dir):
+        """Delete only tuple children that no other manifest references."""
+        shared = np.array([1.0, 2.0])
+        unique = np.array([3.0, 4.0])
+        folder_cache.put_data("first_tuple", (shared, unique))
+        folder_cache.put_data("second_tuple", (shared,))
+
+        assert len(list(cache_dir.glob("*.ndarray.npy"))) == 2
+        assert folder_cache.delete_data("first_tuple")
+
+        assert not folder_cache.has_data("first_tuple")
+        assert folder_cache.has_data("second_tuple")
+        loaded = folder_cache.get_data("second_tuple")
+        assert isinstance(loaded, tuple)
+        np.testing.assert_array_equal(loaded[0], shared)
+        assert len(list(cache_dir.glob("*.ndarray.npy"))) == 1
+
+        assert folder_cache.delete_data("second_tuple")
+        assert not list(cache_dir.glob("*.ndarray.npy"))
+
+    def test_put_data_rejects_unsupported_value_graph(self, folder_cache):
+        """Reject a list containing values outside the cache backend contract."""
+        with pytest.raises(TypeError, match="does not support"):
+            folder_cache.put_data("unsupported_hash", [{"x": 1}])
+
+        assert not folder_cache.has_data("unsupported_hash")
 
     def test_put_data_skips_if_exists(self, folder_cache, sample_orbitals, cache_dir):
         """Second put with same hash is a no-op (doesn't overwrite)."""
@@ -410,6 +516,22 @@ class TestCacheRegistry:
         with pytest.raises(ValueError, match="No cache registered"):
             get_cache("does_not_exist")
 
+    def test_tiered_shared_operations_ignore_local_only_tiers(self, tmp_path, sample_orbitals):
+        """Transport checks and writes operate only on shared tiers."""
+        local = FolderCache(path=tmp_path / "local")
+        shared = FolderCache(path=tmp_path / "shared", is_shared=True)
+        cache = TieredCache([local, shared])
+        local.put_data("orbitals-hash", sample_orbitals)
+
+        assert cache.is_shared
+        assert cache.has_data("orbitals-hash")
+        assert not cache.has_data("orbitals-hash", shared_only=True)
+
+        cache.put_data("orbitals-hash", sample_orbitals, shared_only=True)
+
+        assert cache.has_data("orbitals-hash", shared_only=True)
+        assert shared.has_data("orbitals-hash")
+
     @pytest.mark.usefixtures("tmp_path")
     def test_register_custom_cache(self):
         """A custom cache class can be registered and retrieved."""
@@ -426,7 +548,7 @@ class TestCacheRegistry:
             def get_data(self, _h):
                 return None
 
-            def put_data(self, _h, d):
+            def put_data(self, _h, d, *, shared_only=False):
                 pass
 
             def delete_job(self, _h):

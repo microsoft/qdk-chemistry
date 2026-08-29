@@ -17,17 +17,20 @@ QDK/Chemistry supports two types of unitaries for QPE:
 
 The QPE algorithm itself is agnostic to how the unitary is constructed — the choice of unitary builder determines the phase-to-energy mapping used in post-processing.
 
-QDK/Chemistry provides two :term:`QPE` approaches, each suited to different hardware constraints:
+QDK/Chemistry provides three :term:`QPE` approaches, each suited to different hardware constraints:
 
 Iterative Quantum Phase Estimation (:term:`IQPE`)
-   Kitaev's single-ancilla algorithm :cite:`Kitaev1995` that extracts phase bits one at a time, from most significant to least significant, using adaptive feedback corrections between iterations.
+   Kitaev's single-ancilla algorithm :cite:`Kitaev1995` that extracts phase bits one at a time, from least significant to most significant, using adaptive feedback corrections between iterations.
    This approach minimizes ancilla requirements and is particularly suited to near-term hardware.
 
 Standard QFT-based Quantum Phase Estimation
    The textbook multi-ancilla approach :cite:`Nielsen-Chuang2010-QPE` that uses a register of :math:`n` ancilla qubits and an inverse Quantum Fourier Transform to extract all phase bits simultaneously.
    This approach achieves all precision bits in a single circuit execution but requires more ancilla qubits and longer circuit depth.
 
-Both implementations share the same interface and produce :class:`~qdk_chemistry.data.QpeResult` objects with automatic phase-wrapping, energy alias detection, and full :doc:`serialization <../data/serialization>` support.
+Unary-iteration Quantum Phase Estimation
+   A qubitization-only approach :cite:`Lee2021` that allows any positive number of queries instead of rounding up to the next power of two.
+
+All three implementations share the same interface and produce :class:`~qdk_chemistry.data.QpeResult` objects with automatic phase-wrapping, energy alias detection, and full :doc:`serialization <../data/serialization>` support.
 See :doc:`../data/qpe_result` for details on the result data class.
 
 .. _qpe-workflow:
@@ -145,21 +148,22 @@ Iterative phase estimation (IQPE)
 
 .. rubric:: Factory name: ``"qdk_iterative"``
 
-Kitaev's iterative algorithm :cite:`Kitaev1995` uses a single ancilla qubit to extract phase bits sequentially, from the most significant bit (MSB) to the least significant bit (LSB).
+Kitaev's iterative algorithm :cite:`Kitaev1995` uses a single ancilla qubit to extract phase bits sequentially, from the least significant bit (LSB) to the most significant bit (MSB).
 At each iteration :math:`k` (from :math:`0` to :math:`n-1`, where :math:`n` is the total number of bits):
 
 1. Prepare the ancilla in :math:`|+\rangle`
 2. Apply the controlled evolution :math:`C\text{-}U^{2^{n-k-1}}` between the ancilla and the system register
 3. Apply a phase correction :math:`R_z(-\Phi_k)` based on previously measured bits
-4. Measure the ancilla to determine bit :math:`k`
+4. Measure the ancilla to determine bit :math:`b_k`
 
-The phase feedback is updated using Kitaev's recursion:
+The phase feedback is updated using Kitaev's recursion, starting from :math:`\Phi_0 = 0`:
 
 .. math::
 
-   \Phi_{k} = \frac{\Phi_{k+1}}{2} + \frac{\pi \cdot b_k}{2}
+   \Phi_{k+1} = \frac{\Phi_{k}}{2} + \frac{\pi \cdot b_k}{2}
 
-where :math:`b_k` is the measured bit.
+where :math:`b_k` is the bit measured at iteration :math:`k`.
+
 Each bit is determined by a majority vote over multiple circuit executions (controlled by ``shots_per_bit``).
 
 .. rubric:: Settings
@@ -228,6 +232,57 @@ See :doc:`qpe_circuit_builder` for configuring:
 - ``unitary_builder`` → ``quantum_walk`` — Enable walk operator for qubitization (LCU)
 - ``qft_do_swaps`` — Whether to include swap gates in the inverse QFT (Qiskit only)
 - ``controlled_circuit_mapper`` — Circuit synthesis strategy
+
+
+.. _unary-qpe-algorithm:
+
+Unary-iteration phase estimation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"qdk_unary"``
+
+Standard QPE spends :math:`2^n - 1` queries.
+The circuit structure consists of :cite:`Babbush2018` :cite:`Lee2021`:
+
+1. Prepare the phase register in a cosine window :math:`\sin\!\left(\frac{\pi (a+1)}{p+2}\right)`, which suppresses the spectral leakage a uniform superposition would incur :cite:`Babbush2018`
+2. Apply the :math:`p`-query chain, omitting the reflection the phase register selects
+3. Apply an inverse Quantum Fourier Transform (iQFT) to the phase register
+4. Measure all phase qubits
+
+The walk's spectrum is :math:`e^{\pm i \arccos(E/\lambda)}`, so a measured bin cannot distinguish the two signs: ``resolve_positive_branch`` picks which one is reported, and both are always returned in the result's ``branching`` tuple.
+
+.. rubric:: Settings
+
+Direct settings on :class:`~qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation.UnaryPhaseEstimation`:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``shots``
+     - int
+     - Total measurement shots for the full circuit. Default is 3.
+   * - ``resolve_positive_branch``
+     - bool
+     - Which branch of the walk's conjugate eigenphase pair to report as the resolved energy. Default is ``False``.
+
+Nested algorithm configuration (via ``qpe_circuit_builder``):
+
+See :doc:`qpe_circuit_builder` for configuring:
+
+- ``num_queries`` — Number of walk queries :math:`p`; need not be a power of two
+- ``unitary_builder`` → ``quantum_walk`` — Required; the unary path has no Trotter equivalent
+- ``circuit_mapper`` — Circuit synthesis strategy, which must expose the block encoding's ancilla reflection
+
+.. tab:: Python API (Unary-iteration configuration)
+
+   .. literalinclude:: ../../../_static/examples/python/phase_estimation.py
+      :language: python
+      :start-after: # start-cell-configure-unary
+      :end-before: # end-cell-configure-unary
 
 
 Phase-to-energy extraction

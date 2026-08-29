@@ -38,23 +38,16 @@ except _PackageNotFoundError:
         # VERSION file not reachable or unreadable (e.g. vendored copy without repo root)
         __version__ = "0.0.0+local"
 
-import contextlib
+import importlib
 import os
 import shutil
 import subprocess
 import sys
 import warnings
 
-from qdk import TargetProfile
-from qdk import init as qdk_init
-
-try:
-    from qdk._interpreter import get_config as get_qdk_profile_config
-except ImportError:
-    from qsharp._qsharp import get_config as get_qdk_profile_config
-
 # Import some tools for convenience
 import qdk_chemistry.constants
+from qdk_chemistry._core import DuplicateRegistrationError as _DuplicateRegistrationError
 from qdk_chemistry._core import QDKChemistryConfig
 from qdk_chemistry.utils import Logger, telemetry_events
 from qdk_chemistry.utils.telemetry import TELEMETRY_ENABLED
@@ -63,19 +56,16 @@ if TELEMETRY_ENABLED:
     telemetry_events.on_qdk_chemistry_import()
 
 _DOCS_MODE = os.getenv("QDK_CHEMISTRY_DOCS", "0") == "1"
-
-# Initialize Q# interpreter
-qdk_config = get_qdk_profile_config()
-_QDK_INTERPRETER_PROFILE = qdk_config.get_target_profile()
-if _QDK_INTERPRETER_PROFILE == "unrestricted":  # Default by Q# if not set
-    qdk_init(target_profile=TargetProfile.Base)
-    new_config = get_qdk_profile_config()
-    _QDK_INTERPRETER_PROFILE = new_config.get_target_profile()
-    Logger.debug(
-        f"QDK interpreter profile initialized to '{_QDK_INTERPRETER_PROFILE}'. "
-        "If you imported Q# code before this module was loaded, please re-import it, "
-        "or set your target profile before importing qdk_chemistry."
-    )
+_TRUE_ENV_VALUES = frozenset({"1", "true", "yes", "on"})
+_BUNDLED_PLUGIN_AUTOLOAD = (
+    ("discovery", "QDK_CHEMISTRY_DISABLE_DISCOVERY_AUTOLOAD"),
+    ("pyscf", "QDK_CHEMISTRY_DISABLE_PYSCF_AUTOLOAD"),
+    ("qiskit", "QDK_CHEMISTRY_DISABLE_QISKIT_AUTOLOAD"),
+    ("openfermion", "QDK_CHEMISTRY_DISABLE_OPENFERMION_AUTOLOAD"),
+    ("networkx", "QDK_CHEMISTRY_DISABLE_NETWORKX_AUTOLOAD"),
+    ("geometric", "QDK_CHEMISTRY_DISABLE_GEOMETRIC_AUTOLOAD"),
+)
+_STUBGEN_BLOCK_MARKER = Path(__file__).parent / "_core" / ".no-stubgen"
 
 
 def _setup_resources() -> None:
@@ -134,29 +124,35 @@ def _setup_resources() -> None:
 _setup_resources()
 
 
+def _load_bundled_plugin(plugin_name: str, disable_env_var: str) -> None:
+    """Load a bundled plugin unless its automatic loading is disabled."""
+    if os.getenv(disable_env_var, "").strip().lower() in _TRUE_ENV_VALUES:
+        return
+
+    try:
+        plugin = importlib.import_module(f"qdk_chemistry.plugins.{plugin_name}")
+        plugin.load()
+    except ImportError:
+        return
+    except _DuplicateRegistrationError as exc:
+        warnings.warn(
+            f"Automatic loading of bundled plugin {plugin_name!r} failed due to a duplicate registration: {exc}. "
+            f"Set {disable_env_var}=1 before importing qdk_chemistry to disable automatic loading of this plugin.",
+            UserWarning,
+            stacklevel=2,
+        )
+        raise
+
+
 # Defer plugin imports until after module initialization
 def _import_plugins() -> None:
     """Import pre-packaged plugins after module initialization."""
-    with contextlib.suppress(ImportError):
-        import qdk_chemistry.plugins.pyscf as pyscf_plugin  # noqa: PLC0415
+    import qdk_chemistry.remote.cache  # noqa: PLC0415
+    from qdk_chemistry.plugins import _load_plugins  # noqa: PLC0415
 
-        pyscf_plugin.load()
-    with contextlib.suppress(ImportError):
-        import qdk_chemistry.plugins.qiskit as qiskit_plugin  # noqa: PLC0415
-
-        qiskit_plugin.load()
-    with contextlib.suppress(ImportError):
-        import qdk_chemistry.plugins.openfermion as openfermion_plugin  # noqa: PLC0415
-
-        openfermion_plugin.load()
-    with contextlib.suppress(ImportError):
-        import qdk_chemistry.plugins.networkx as networkx_plugin  # noqa: PLC0415
-
-        networkx_plugin.load()
-    with contextlib.suppress(ImportError):
-        import qdk_chemistry.plugins.geometric as geometric_plugin  # noqa: PLC0415
-
-        geometric_plugin.load()
+    _load_plugins()
+    for plugin_name, disable_env_var in _BUNDLED_PLUGIN_AUTOLOAD:
+        _load_bundled_plugin(plugin_name, disable_env_var)
 
 
 def _is_placeholder_stub(stub_file: Path) -> bool:
@@ -233,16 +229,28 @@ def _update_stub_references(stub_file: Path) -> None:
         pass  # Skip files that can't be read/written
 
 
+def __getattr__(name: str):
+    """Load compatibility exports on first access."""
+    if name == "DuplicateRegistrationError":
+        from qdk_chemistry.plugins import DuplicateRegistrationError  # noqa: PLC0415
+
+        return DuplicateRegistrationError
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 def _generate_stubs_on_first_import() -> None:
     """Generate type stubs on first import (inline to avoid circular imports)."""
     # Check if stub files need to be generated by scanning the entire _core directory
     chemistry_dir = Path(__file__).parent
     qdk_dir = chemistry_dir.parent
+    core_dir = chemistry_dir / "_core"
+
+    if _STUBGEN_BLOCK_MARKER.is_file():
+        return
 
     # Scan for all .pyi files in _core directory and its subdirectories
     stub_files: list[Path] = []
     # Recursively find all .pyi files in _core directory
-    core_dir = chemistry_dir / "_core"
     if core_dir.exists():
         stub_files.extend(core_dir.rglob("*.pyi"))
 
@@ -298,6 +306,9 @@ def _generate_stubs_on_first_import() -> None:
 
 def _generate_registry_stubs() -> None:
     """Generate registry.pyi with typed overloads for all algorithms."""
+    if _STUBGEN_BLOCK_MARKER.is_file():
+        return
+
     try:
         # Import registry module - at this point all imports should be complete
         from qdk_chemistry.algorithms import registry as reg_module  # noqa: PLC0415

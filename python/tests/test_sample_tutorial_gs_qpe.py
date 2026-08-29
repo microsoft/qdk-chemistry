@@ -1,0 +1,628 @@
+"""Compatibility and regression tests for the ground-state QPE tutorial.
+
+To run the slow tests (including notebook e2e tests), set the environment variable:
+    QDK_CHEMISTRY_RUN_SLOW_TESTS=1 pytest
+
+To validate exact version-pinned tutorial snapshots in the controlled reference environment, set:
+    QDK_CHEMISTRY_RUN_TUTORIAL_SNAPSHOTS=1 pytest -m tutorial_baseline
+
+"""
+
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
+import ast
+import importlib.metadata
+import os
+import runpy
+import sys
+from contextlib import suppress
+from importlib.util import module_from_spec, spec_from_file_location
+from math import comb, log
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+with suppress(ImportError):
+    import nbformat
+
+from qdk_chemistry.data import PauliProductFormulaContainer
+from qdk_chemistry.utils import Logger
+
+from .test_sample_workflow_utils import (
+    _HAS_JUPYTER_KERNEL,
+    _execute_notebook_skip_visualizations,
+    _requires_notebook_deps,
+)
+
+# Environment variable to enable slow tests (including notebook e2e tests)
+_RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
+_RUN_TUTORIAL_SNAPSHOTS = os.getenv("QDK_CHEMISTRY_RUN_TUTORIAL_SNAPSHOTS", "").lower() in {
+    "1",
+    "true",
+    "yes",
+}
+
+
+DOCS_PYTHON_EXAMPLES_DIR = Path(__file__).parent.parent.parent / "docs" / "source" / "_static" / "examples" / "python"
+COMPLETED_LAB_NOTEBOOK = (
+    Path(__file__).parent.parent.parent
+    / "docs"
+    / "source"
+    / "_static"
+    / "examples"
+    / "ground_state_qpe_lab_notebook_completed.md"
+)
+TUTORIAL_VERSIONS_FILE = Path(__file__).parent.parent.parent / "docs" / "source" / "tutorials" / "_versions.py"
+GROUND_STATE_TUTORIAL_VERSION = str(runpy.run_path(str(TUTORIAL_VERSIONS_FILE))["GROUND_STATE_TUTORIAL_VERSION"])
+
+
+def _assert_notebook_library_logs_suppressed(notebook) -> None:
+    """Check that executed notebook output excludes QDK/Chemistry library logs."""
+    stream_text = "\n".join(
+        str(output.get("text", ""))
+        for cell in notebook.cells
+        for output in cell.get("outputs", [])
+        if output.get("output_type") == "stream"
+    )
+    for log_level in ("trace", "debug", "info", "warning", "error", "critical"):
+        assert f"[{log_level}]" not in stream_text
+
+
+def _require_snapshot_version(
+    installed_version: str,
+    required_version: str = GROUND_STATE_TUTORIAL_VERSION,
+) -> None:
+    """Require exact snapshots to use the tutorial's pinned public version."""
+    installed_public_version = installed_version.partition("+")[0]
+    if installed_public_version != required_version:
+        raise pytest.UsageError(
+            f"Exact tutorial snapshots require qdk-chemistry=={required_version}; installed {installed_version}."
+        )
+
+
+if _RUN_TUTORIAL_SNAPSHOTS:
+    _require_snapshot_version(importlib.metadata.version("qdk-chemistry"))
+
+
+def test_completed_lab_notebook_uses_tutorial_version():
+    """Keep completed lab-notebook provenance aligned with the tutorial pin."""
+    completed_notebook = COMPLETED_LAB_NOTEBOOK.read_text(encoding="utf-8")
+    assert f"documented QDK/Chemistry {GROUND_STATE_TUTORIAL_VERSION} workflow" in completed_notebook
+    assert f"QDK/Chemistry version: {GROUND_STATE_TUTORIAL_VERSION}" in completed_notebook
+
+
+def _load_tutorial_module(module_name: str):
+    """Load a course script whose neighboring scripts may be imported."""
+    script_path = DOCS_PYTHON_EXAMPLES_DIR / f"{module_name}.py"
+    module_spec = spec_from_file_location(module_name, script_path)
+    assert module_spec is not None
+    assert module_spec.loader is not None
+    tutorial_module = module_from_spec(module_spec)
+    sys.modules[module_spec.name] = tutorial_module
+    sys.path.insert(0, str(DOCS_PYTHON_EXAMPLES_DIR))
+    try:
+        module_spec.loader.exec_module(tutorial_module)
+    except BaseException:
+        sys.modules.pop(module_spec.name, None)
+        raise
+    finally:
+        sys.path.pop(0)
+    return tutorial_module
+
+
+@pytest.mark.tutorial_baseline
+def test_tutorial_load_module_removes_failed_import(tmp_path, monkeypatch):
+    """Do not cache a partially initialized tutorial module after import failure."""
+    module_name = "tutorial_failing_import"
+    (tmp_path / f"{module_name}.py").write_text("raise RuntimeError('failed import')\n")
+    monkeypatch.setattr(sys.modules[__name__], "DOCS_PYTHON_EXAMPLES_DIR", tmp_path)
+
+    with pytest.raises(RuntimeError, match="failed import"):
+        _load_tutorial_module(module_name)
+
+    assert module_name not in sys.modules
+
+
+@pytest.mark.tutorial_baseline
+def test_tutorial_snapshot_version_accepts_local_build_metadata():
+    """Ignore local metadata when enforcing the exact-snapshot version."""
+    setup_script = DOCS_PYTHON_EXAMPLES_DIR / "tutorial_qpe_setup.py"
+    setup_globals = runpy.run_path(str(setup_script))
+    public_version = setup_globals["public_version"]
+    sample_release = "release"
+    sample_local_build = "release+local"
+    other_local_build = "other-release+local"
+
+    assert public_version(sample_local_build) == sample_release
+    assert public_version(other_local_build) == "other-release"
+    _require_snapshot_version(sample_release, sample_release)
+    _require_snapshot_version(sample_local_build, sample_release)
+    with pytest.raises(pytest.UsageError, match="Exact tutorial snapshots require"):
+        _require_snapshot_version(other_local_build, sample_release)
+
+
+@pytest.mark.tutorial_baseline
+def test_tutorial_scripts_do_not_define_nested_functions():
+    """Keep downloadable tutorial control flow at module and class scope."""
+    for script_path in DOCS_PYTHON_EXAMPLES_DIR.glob("tutorial_*.py"):
+        syntax_tree = ast.parse(script_path.read_text(encoding="utf-8"))
+        for node in ast.walk(syntax_tree):
+            if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+                continue
+            nested_functions = [
+                child for child in node.body if isinstance(child, ast.FunctionDef | ast.AsyncFunctionDef)
+            ]
+            assert not nested_functions, f"{script_path.name}:{node.lineno} defines nested function(s): " + ", ".join(
+                child.name for child in nested_functions
+            )
+
+
+@pytest.mark.tutorial_baseline
+def test_tutorial_module_imports_preserve_global_logging():
+    """Reusable tutorial imports must not change process-wide logging."""
+    previous_level = Logger.get_global_level()
+    Logger.set_global_level(Logger.LogLevel.warn)
+    try:
+        for module_name in (
+            "tutorial_choose_active_space",
+            "tutorial_map_n2_to_qubits",
+            "tutorial_prepare_trial_state",
+        ):
+            _load_tutorial_module(module_name)
+        assert Logger.get_global_level() == "warn"
+    finally:
+        Logger.set_global_level(previous_level)
+
+
+@pytest.mark.tutorial_baseline
+def test_tutorial_executable_scripts_expose_logging_control():
+    """Keep calculation scripts quiet by default with a documented log opt-in."""
+    for script_name in (
+        "tutorial_describe_n2.py",
+        "tutorial_choose_active_space.py",
+        "tutorial_map_n2_to_qubits.py",
+        "tutorial_prepare_trial_state.py",
+        "tutorial_run_iqpe.py",
+    ):
+        script_text = (DOCS_PYTHON_EXAMPLES_DIR / script_name).read_text(encoding="utf-8")
+        assert "Logger.set_global_level(Logger.LogLevel.off)" in script_text
+        assert ("Change ``off`` to ``info`` to see detailed QDK/Chemistry calculation logs.") in script_text
+
+
+@pytest.mark.tutorial_baseline
+def test_tutorial_choose_active_space_results(tmp_path: Path):
+    """Check portable active-space invariants and optional reference snapshots."""
+    tutorial_module = _load_tutorial_module("tutorial_choose_active_space")
+
+    result = tutorial_module.run_active_space_workflow()
+    assert abs(result.hartree_fock_energy - (-108.418633697214)) < 1e-8
+    assert abs(result.valence_energy - (-108.778369520882)) < 1e-8
+    assert abs(result.natural_orbital_energy - result.valence_energy) < 1e-10
+    assert abs(result.refined_energy - (-108.771051792909)) < 1e-8
+    assert result.valence_indices == list(range(2, 10))
+    assert result.num_valence_determinants == comb(8, 5) ** 2 == 3136
+    assert result.inactive_indices == list(range(4))
+    assert result.refined_indices == list(range(4, 10))
+    assert result.num_refined_electrons == 6
+    assert result.num_virtual_orbitals == 18
+    assert result.num_refined_determinants == comb(6, 3) ** 2 == 400
+    assert result.natural_orbital_casci_wavefunction.get_orbitals().get_basis_set().get_name() == "cc-pvdz"
+    assert len(result.orbital_entropies) == 8
+    assert all(0.0 <= entropy <= log(4.0) for entropy in result.orbital_entropies)
+    assert sum(entropy >= 0.5 for entropy in result.orbital_entropies) == 6
+    assert result.valence_energy < result.refined_energy < result.hartree_fock_energy
+    entropy_figure = tutorial_module.plot_orbital_entropy_selection(result)
+    entropy_axis = entropy_figure.axes[0]
+    expected_order = [
+        str(orbital_index)
+        for orbital_index, _ in sorted(
+            zip(result.valence_indices, result.orbital_entropies, strict=True),
+            key=lambda item: item[1],
+            reverse=True,
+        )
+    ]
+    assert [label.get_text() for label in entropy_axis.get_xticklabels()] == expected_order
+    expected_cut = len(result.refined_indices) - 0.5
+    assert any(
+        len(line.get_xdata()) == 2 and np.allclose(line.get_xdata(), [expected_cut, expected_cut])
+        for line in entropy_axis.lines
+    )
+    entropy_figure.savefig(tmp_path / "orbital_entropy.png")
+    assert (tmp_path / "orbital_entropy.png").stat().st_size > 0
+
+    if _RUN_TUTORIAL_SNAPSHOTS:
+        assert result.orbital_entropies == pytest.approx(
+            [
+                0.021695655,
+                0.029962803,
+                0.547855061,
+                0.963884097,
+                0.963884097,
+                0.966011090,
+                0.966011090,
+                0.554008809,
+            ],
+            abs=1e-6,
+        )
+
+    structure = tutorial_module.create_stretched_n2_structure()
+    basis_function_cube_data = tutorial_module.generate_basis_function_cube_data(
+        structure,
+        "cc-pvdz",
+        grid_size=(8, 8, 8),
+        margin=3.0,
+    )
+    function_types = [
+        "1s",
+        "2s",
+        "3s",
+        "2px",
+        "2py",
+        "2pz",
+        "3px",
+        "3py",
+        "3pz",
+        "3dxy",
+        "3dyz",
+        "3dz^2",
+        "3dxz",
+        "3dx2-y2",
+    ]
+    expected_basis_functions = [
+        (f"N{atom_index}", function_type) for atom_index in (1, 2) for function_type in function_types
+    ]
+    assert len(expected_basis_functions) == 28
+    assert list(basis_function_cube_data) == [
+        f"Basis function {index}: {center} {function_type}"
+        for index, (center, function_type) in enumerate(expected_basis_functions)
+    ]
+    assert all(basis_function["data"] for basis_function in basis_function_cube_data.values())
+    assert [basis_function["info"] for basis_function in basis_function_cube_data.values()] == [
+        {
+            "Representation": "Basis function",
+            "Function index": str(index),
+            "Center": center,
+            "Function type": function_type,
+        }
+        for index, (center, function_type) in enumerate(expected_basis_functions)
+    ]
+
+    cube_data = tutorial_module.generate_active_orbital_cube_data(
+        result,
+        grid_size=(8, 8, 8),
+        margin=4.0,
+    )
+    assert len(cube_data) == 8
+    assert sum(orbital["info"]["Selected by autoCAS"] == "yes" for orbital in cube_data.values()) == 6
+    assert all(
+        set(orbital["info"]) == {"Occupation", "Entropy", "Selected by autoCAS"} for orbital in cube_data.values()
+    )
+
+
+@pytest.mark.tutorial_baseline
+def test_tutorial_map_n2_to_qubits_results():
+    """Check portable mapping invariants and optional reference snapshots."""
+    _load_tutorial_module("tutorial_choose_active_space")
+    tutorial_module = _load_tutorial_module("tutorial_map_n2_to_qubits")
+
+    result = tutorial_module.run_qubit_mapping_workflow()
+    assert result.active_space_result.refined_indices == list(range(4, 10))
+    assert result.num_active_spatial_orbitals == 6
+    assert result.num_active_spin_orbitals == 12
+    assert result.num_compute_qubits == 12
+    assert result.num_pauli_terms == len(result.qubit_hamiltonian.pauli_strings) > 0
+    assert result.qubit_hamiltonian.encoding == "jordan-wigner"
+    assert result.qubit_hamiltonian.fermion_mode_order.value == "blocked"
+    assert result.num_fixed_electron_states == 400
+    assert abs(result.mapped_total_energy - result.active_space_result.refined_energy) < 1e-10
+    assert abs(result.mapping_energy_difference) < 1e-10
+
+    if _RUN_TUTORIAL_SNAPSHOTS:
+        assert result.num_pauli_terms == 247
+        assert abs(result.core_energy - (-99.117775726922)) < 1e-7
+        assert abs(result.mapped_active_energy - (-9.653276065987)) < 1e-7
+
+    preview_terms = tutorial_module.representative_pauli_terms(result.qubit_hamiltonian)
+    assert len(preview_terms) == 8
+    assert preview_terms[0][0] == "I" * result.num_compute_qubits
+    assert all(set(pauli_string).issubset({"I", "Z"}) for pauli_string, _ in preview_terms[1:4])
+    assert all("X" in pauli_string or "Y" in pauli_string for pauli_string, _ in preview_terms[4:])
+    assert tutorial_module.format_pauli_string("IXYI") == "Y(qubit 1) X(qubit 2)"
+
+
+@pytest.mark.tutorial_baseline
+def test_tutorial_prepare_trial_state_results():
+    """Check portable trial-state invariants and optional reference snapshots."""
+    _load_tutorial_module("tutorial_choose_active_space")
+    tutorial_module = _load_tutorial_module("tutorial_prepare_trial_state")
+
+    result = tutorial_module.run_trial_state_workflow()
+    with pytest.raises(ValueError, match="max_determinants must be positive"):
+        tutorial_module.leading_determinants(
+            result.active_space_result.refined_casci_wavefunction,
+            0,
+        )
+    with pytest.raises(ValueError, match="requested 401 determinants"):
+        tutorial_module.leading_determinants(
+            result.active_space_result.refined_casci_wavefunction,
+            401,
+        )
+    assert result.active_space_result.num_refined_determinants == 400
+    assert len(result.reference_determinants) == 8
+    assert all(len(item.occupation) == 6 for item in result.reference_determinants)
+    assert all(item.weight > 0.0 for item in result.reference_determinants)
+    assert all(
+        round(larger.weight, 12) >= round(smaller.weight, 12)
+        for larger, smaller in zip(result.reference_determinants, result.reference_determinants[1:], strict=False)
+    )
+    assert all(
+        larger.cumulative_weight < smaller.cumulative_weight
+        for larger, smaller in zip(result.reference_determinants, result.reference_determinants[1:], strict=False)
+    )
+    assert result.reference_determinants[-1].cumulative_weight <= 1.0
+    assert len(result.trial_states) == 3
+
+    one_determinant, two_determinants, four_determinants = result.trial_states
+    assert [state.num_determinants for state in result.trial_states] == [1, 2, 4]
+    assert all(state.num_compute_qubits == 12 for state in result.trial_states)
+    assert 0.0 < one_determinant.fidelity < two_determinants.fidelity < four_determinants.fidelity < 1.0
+    assert one_determinant.num_logical_gates < two_determinants.num_logical_gates < four_determinants.num_logical_gates
+    assert all(sum(state.logical_gate_counts.values()) == state.num_logical_gates for state in result.trial_states)
+
+    if _RUN_TUTORIAL_SNAPSHOTS:
+        assert result.reference_determinants[0].occupation == "222000"
+        assert abs(result.reference_determinants[0].amplitude - 0.694657453275) < 1e-8
+        assert abs(result.reference_determinants[0].weight - 0.482548977390) < 1e-8
+        assert result.reference_determinants[1].occupation == "202200"
+        assert result.reference_determinants[2].occupation == "220020"
+        assert abs(result.reference_determinants[2].cumulative_weight - 0.704609624656) < 1e-8
+        assert abs(one_determinant.fidelity - 0.482548977390) < 1e-8
+        assert one_determinant.num_logical_gates == 6
+        assert one_determinant.logical_gate_counts == {"X": 6}
+        assert abs(two_determinants.fidelity - 0.586414650360) < 1e-8
+        assert two_determinants.num_logical_gates == 14
+        assert two_determinants.logical_gate_counts == {"CNOT": 6, "H": 2, "Rz": 2, "S": 2, "X": 2}
+        assert abs(four_determinants.fidelity - 0.732385025483) < 1e-8
+        assert four_determinants.num_logical_gates == 30
+        assert four_determinants.logical_gate_counts == {"CNOT": 16, "H": 4, "Rz": 4, "S": 4, "X": 2}
+
+
+@pytest.mark.tutorial_baseline
+def test_tutorial_run_iqpe_configuration(capsys):
+    """Check portable IQPE invariants and optional reference snapshots."""
+    _load_tutorial_module("tutorial_choose_active_space")
+    _load_tutorial_module("tutorial_map_n2_to_qubits")
+    _load_tutorial_module("tutorial_prepare_trial_state")
+    tutorial_module = _load_tutorial_module("tutorial_run_iqpe")
+
+    problem = tutorial_module.prepare_iqpe_problem()
+    with pytest.raises(ValueError, match="zero-angle phase-grid point"):
+        tutorial_module.choose_reference_guided_evolution_time(
+            problem.mapping.qubit_hamiltonian,
+            0.0,
+        )
+    assert problem.mapping.num_compute_qubits == 12
+    assert problem.trial_state.num_determinants == 4
+    assert 0.0 < problem.trial_state.fidelity < 1.0
+    assert problem.num_phase_bits == 6
+    assert problem.shots_per_bit == 3
+    assert len(problem.iteration_circuits) == 6
+    assert problem.mapping.qubit_hamiltonian.schatten_norm > 0.0
+    assert len(problem.evolution_time.grid_bitstring) == problem.num_phase_bits
+    assert set(problem.evolution_time.grid_bitstring).issubset({"0", "1"})
+    assert problem.evolution_time.grid_phase_fraction == int(problem.evolution_time.grid_bitstring, 2) / (
+        2**problem.num_phase_bits
+    )
+    assert problem.evolution_time.bound_time_hartree_inverse > 0.0
+    assert problem.evolution_time.time_hartree_inverse > 0.0
+    assert 0.0 <= problem.evolution_time.bound_reference_phase_fraction < 1.0
+    assert 0.0 <= problem.evolution_time.reference_phase_fraction < 1.0
+    assert abs(problem.evolution_time.grid_active_energy_hartree - problem.mapping.mapped_active_energy - 1e-3) < 1e-12
+    phase_converter = PauliProductFormulaContainer(
+        step_terms=[],
+        step_reps=1,
+        num_qubits=problem.mapping.num_compute_qubits,
+        scale=problem.evolution_time.time_hartree_inverse,
+    )
+    assert (
+        abs(
+            phase_converter.eigenvalue_from_phase(problem.evolution_time.grid_phase_fraction)
+            - problem.evolution_time.grid_active_energy_hartree
+        )
+        < 1e-12
+    )
+    assert abs(phase_converter.eigenvalue_from_phase(0.5) + np.pi / phase_converter.scale) < 1e-12
+
+    if _RUN_TUTORIAL_SNAPSHOTS:
+        assert abs(problem.trial_state.fidelity - 0.732385025483) < 1e-8
+        assert abs(problem.mapping.qubit_hamiltonian.schatten_norm - 19.610172748837) < 1e-7
+        assert problem.evolution_time.grid_bitstring == "010000"
+        assert abs(problem.evolution_time.bound_time_hartree_inverse - 0.160202191680) < 1e-9
+        assert abs(problem.evolution_time.bound_reference_phase_fraction - 0.246129297014) < 1e-8
+        assert abs(problem.evolution_time.time_hartree_inverse - 0.162738437655) < 1e-8
+        assert abs(problem.evolution_time.reference_phase_fraction - 0.250025900627) < 1e-8
+
+    first_run = tutorial_module.IqpeRun(
+        seed=1,
+        bitstring="010000",
+        phase_fraction=16 / 64,
+        active_energy_hartree=-9.652276065987,
+        total_energy_hartree=-108.770051792909,
+        error_hartree=1e-3,
+        runtime_seconds=1.0,
+    )
+    neighboring_run = tutorial_module.IqpeRun(
+        seed=2,
+        bitstring="001111",
+        phase_fraction=15 / 64,
+        active_energy_hartree=-9.049008811871,
+        total_energy_hartree=-108.166784538793,
+        error_hartree=0.604267254116,
+        runtime_seconds=1.0,
+    )
+    counts, mode = tutorial_module.select_unique_mode([first_run, neighboring_run, first_run])
+    assert counts == {"001111": 1, "010000": 2}
+    assert mode is first_run
+    with pytest.raises(RuntimeError, match="no unique mode"):
+        tutorial_module.select_unique_mode([first_run, neighboring_run])
+
+    tutorial_module.print_iqpe_settings(
+        problem,
+        num_complete_runs=20,
+        first_seed=42,
+    )
+    settings_output = capsys.readouterr().out
+    for expected_text in (
+        "Trial determinants: 4",
+        "Readout ancillas: 1",
+        "Phase bits: 6",
+        "Shots per bit: 3",
+        "Complete runs: 20",
+        "Simulator seeds: 42-61",
+        "first-order Trotter product formula",
+        "Trotter divisions: 1",
+        "repeated approximate base unitary",
+    ):
+        assert expected_text in settings_output
+
+
+@pytest.mark.slow
+@pytest.mark.tutorial_baseline
+@pytest.mark.skipif(
+    not _RUN_SLOW_TESTS,
+    reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
+)
+def test_tutorial_run_iqpe_simulation():
+    """Check one seeded IQPE run against its configured phase-grid target."""
+    _load_tutorial_module("tutorial_choose_active_space")
+    _load_tutorial_module("tutorial_map_n2_to_qubits")
+    _load_tutorial_module("tutorial_prepare_trial_state")
+    tutorial_module = _load_tutorial_module("tutorial_run_iqpe")
+
+    problem = tutorial_module.prepare_iqpe_problem()
+    run = tutorial_module.run_complete_iqpe(problem, seed=42)
+    assert run.bitstring == problem.evolution_time.grid_bitstring
+    assert abs(run.error_hartree - 1e-3) < 1e-10
+
+
+@_requires_notebook_deps
+@pytest.mark.tutorial_baseline
+@pytest.mark.skipif(
+    not _HAS_JUPYTER_KERNEL,
+    reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
+)
+def test_tutorial_choose_active_space_notebook():
+    """Test the Chapter 3 notebook chemistry and visualization-data cells."""
+    notebook_path = DOCS_PYTHON_EXAMPLES_DIR / "tutorial_choose_active_space.ipynb"
+    assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
+    with open(notebook_path, encoding="utf-8") as notebook_file:
+        notebook = nbformat.read(notebook_file, as_version=4)
+    nbformat.validate(notebook)
+
+    notebook_text = notebook_path.read_text(encoding="utf-8")
+    assert "/Users/" not in notebook_text
+    assert "\\Users\\" not in notebook_text
+    assert "kernelspec" not in notebook.metadata
+    assert notebook.metadata.get("language_info", {}) == {"name": "python"}
+    assert "Logger.set_global_level(Logger.LogLevel.off)" in notebook_text
+    assert "Logger.LogLevel.info" in notebook_text
+    basis_viewer_cell = next(
+        index
+        for index, cell in enumerate(notebook.cells)
+        if "generate_basis_function_cube_data" in cell.source and "basis_function_cube_data =" in cell.source
+    )
+    active_space_cell = next(
+        index for index, cell in enumerate(notebook.cells) if "result = run_active_space_workflow()" in cell.source
+    )
+    assert basis_viewer_cell < active_space_cell
+    assert '"cc-pvdz"' in notebook.cells[basis_viewer_cell].source
+    assert "margin=3.0" in notebook.cells[basis_viewer_cell].source
+    for cell in notebook.cells:
+        expected_language = "python" if cell.cell_type == "code" else "markdown"
+        assert cell.metadata.get("language") == expected_language
+        if cell.cell_type == "code":
+            assert cell.execution_count is None
+            assert not cell.outputs
+
+    executed_notebook = _execute_notebook_skip_visualizations(
+        notebook_path,
+        timeout=360,
+        cell_patches={
+            3: {
+                "grid_size=(30, 30, 30)": "grid_size=(8, 8, 8)",
+            },
+            9: {
+                "grid_size=(30, 30, 30)": "grid_size=(8, 8, 8)",
+            },
+        },
+    )
+    _assert_notebook_library_logs_suppressed(executed_notebook)
+
+
+@_requires_notebook_deps
+@pytest.mark.tutorial_baseline
+@pytest.mark.skipif(
+    not _HAS_JUPYTER_KERNEL,
+    reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
+)
+def test_tutorial_prepare_trial_state_notebook():
+    """Test the Chapter 5 notebook circuit data and validation cells."""
+    notebook_path = DOCS_PYTHON_EXAMPLES_DIR / "tutorial_prepare_trial_state.ipynb"
+    assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
+    with open(notebook_path, encoding="utf-8") as notebook_file:
+        notebook = nbformat.read(notebook_file, as_version=4)
+    nbformat.validate(notebook)
+
+    notebook_text = notebook_path.read_text(encoding="utf-8")
+    assert "/Users/" not in notebook_text
+    assert "\\Users\\" not in notebook_text
+    assert "kernelspec" not in notebook.metadata
+    assert notebook.metadata.get("language_info", {}) == {"name": "python"}
+    assert "Logger.set_global_level(Logger.LogLevel.off)" in notebook_text
+    assert "Logger.LogLevel.info" in notebook_text
+    for cell in notebook.cells:
+        expected_language = "python" if cell.cell_type == "code" else "markdown"
+        assert cell.metadata.get("language") == expected_language
+        if cell.cell_type == "code":
+            assert cell.execution_count is None
+            assert not cell.outputs
+
+    executed_notebook = _execute_notebook_skip_visualizations(notebook_path, timeout=360)
+    _assert_notebook_library_logs_suppressed(executed_notebook)
+
+
+@_requires_notebook_deps
+@pytest.mark.tutorial_baseline
+@pytest.mark.skipif(
+    not _HAS_JUPYTER_KERNEL,
+    reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
+)
+def test_tutorial_visualize_iqpe_circuit_notebook():
+    """Test the Chapter 6 notebook circuit construction and validation cells."""
+    notebook_path = DOCS_PYTHON_EXAMPLES_DIR / "tutorial_visualize_iqpe_circuit.ipynb"
+    assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
+    with open(notebook_path, encoding="utf-8") as notebook_file:
+        notebook = nbformat.read(notebook_file, as_version=4)
+    nbformat.validate(notebook)
+
+    notebook_text = notebook_path.read_text(encoding="utf-8")
+    assert "/Users/" not in notebook_text
+    assert "\\Users\\" not in notebook_text
+    assert "kernelspec" not in notebook.metadata
+    assert notebook.metadata.get("language_info", {}) == {"name": "python"}
+    assert "Logger.set_global_level(Logger.LogLevel.off)" in notebook_text
+    assert "Logger.LogLevel.info" in notebook_text
+    for cell in notebook.cells:
+        expected_language = "python" if cell.cell_type == "code" else "markdown"
+        assert cell.metadata.get("id") == cell.id
+        assert cell.metadata.get("language") == expected_language
+        if cell.cell_type == "code":
+            assert cell.execution_count is None
+            assert not cell.outputs
+
+    executed_notebook = _execute_notebook_skip_visualizations(notebook_path, timeout=360)
+    _assert_notebook_library_logs_suppressed(executed_notebook)
