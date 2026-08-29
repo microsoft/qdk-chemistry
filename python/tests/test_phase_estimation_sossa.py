@@ -13,6 +13,7 @@ Reference: Low et al., Phys. Rev. X 15 (2025), :cite:`Low2025`
 # --------------------------------------------------------------------------------------------
 
 import math
+import os
 import threading
 import time
 from math import sqrt
@@ -41,6 +42,8 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .reference_tolerances import ci_energy_tolerance
 from .test_helpers import create_random_factorized_hamiltonian, create_test_orbitals, to_sossa_operator
+
+_RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Test Hamiltonian construction (small DFTHC-like H2 data)
@@ -389,7 +392,8 @@ def _build_h2_sossa_problem():
 
     Returns:
         The SOSSA qubit operator, the SOSSA walk container, a state preparation circuit
-        holding the exact ground state of the gap Hamiltonian, and that state's energy.
+        holding the exact ground state of the gap Hamiltonian, that state's energy, and
+        the corresponding *physical* ground-state energy.
 
     """
     data = _build_h2_dfthc_data()
@@ -402,6 +406,17 @@ def _build_h2_sossa_problem():
         data["identity_weight"],
     )
     gs_energy, gs_vec = _get_ground_state_and_energy(h_matrix, n_orb, nalpha=1, nbeta=1)
+
+    # The same state measured against the physical Hamiltonian, built straight from h1 and
+    # the DFTHC factors. It never references the SOS identity weight, so it is an oracle
+    # for the decoded energy that is independent of the container's ``energy_shift`` --
+    # unlike ``gs_energy``, which is the quantity ``energy_shift`` is defined to offset.
+    physical_energy, _ = _get_ground_state_and_energy(
+        _build_physical_hamiltonian_matrix(data["h1"], data["basis_vectors"], data["two_body_weights"]),
+        n_orb,
+        nalpha=1,
+        nbeta=1,
+    )
 
     fh = FactorizedHamiltonianContainer(
         0.0,
@@ -429,7 +444,7 @@ def _build_h2_sossa_problem():
         ),
         qsharp_op=QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params),
     )
-    return sossa_op, container, state_prep, gs_energy
+    return sossa_op, container, state_prep, gs_energy, physical_energy
 
 
 def _run_sossa_unary_qpe(num_queries, mapper_kwargs=None, shots=100, seed=20250815):
@@ -452,14 +467,15 @@ def _run_sossa_unary_qpe(num_queries, mapper_kwargs=None, shots=100, seed=202508
         seed: Simulator seed, fixed so the measured bin is reproducible.
 
     Returns:
-        The QPE result, the exact ground-state energy of the gap Hamiltonian, and the
-        SOSSA walk container, so a caller can also assert on the decoded energy.
+        The QPE result, the exact ground-state energy of the gap Hamiltonian, the exact
+        physical ground-state energy, and the SOSSA walk container, so a caller can also
+        assert on the decoded energy.
 
     """
     num_bins = num_queries + 1
     assert num_bins & (num_bins - 1) == 0, "num_queries must be one less than a power of two"
 
-    sossa_op, container, state_prep, gs_energy = _build_h2_sossa_problem()
+    sossa_op, container, state_prep, gs_energy, physical_energy = _build_h2_sossa_problem()
 
     qpe = UnaryPhaseEstimation(shots=shots)
     qpe.settings().set(
@@ -479,7 +495,7 @@ def _run_sossa_unary_qpe(num_queries, mapper_kwargs=None, shots=100, seed=202508
         f"Measured 2*phi={result.phase_fraction:.6f} is {bin_error:.2f} bins away from the "
         f"exact {exact_doubled_phase:.6f} (num_bins={num_bins})."
     )
-    return result, gs_energy, container
+    return result, gs_energy, physical_energy, container
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -496,7 +512,7 @@ class TestSOSSAQPEIntegration:
         Exercises the full production path: SOSSABuilder -> SOSSAMapper ->
         ``MakeUnaryQPECircuit`` -> sparse simulator -> bitstring decoding.
 
-        Two independent facts are asserted:
+        Two facts are asserted, and they fail for different reasons:
 
         1. The measured phase register lands on the bin predicted by the exact
            eigenvalue. That check lives in :func:`_run_sossa_unary_qpe`, which states it
@@ -504,17 +520,17 @@ class TestSOSSAQPEIntegration:
            It is the prefactor-sensitive check: the predicted bin comes from the exact
            energy through :func:`_energy_to_qpe_phase`, so a block encoding that
            normalized differently would land elsewhere.
-        2. The recovered energy matches exact diagonalization to within the energy that
-           one-bin phase window actually spans, evaluated through the container's own
-           decode at the exact phase. Anchoring the window at the true phase rather than
-           expanding about ``phi = 1/2`` matters because ``dE/dphi`` vanishes there, so a
-           tolerance written at that point is far looser than the measurement warrants.
+        2. The decoded energy matches the ground state of the *physical* Hamiltonian,
+           diagonalized independently. ``raw_energy`` is ``eigenvalue_from_phase``, which
+           adds ``energy_shift`` back, so comparing against a physical-Hamiltonian oracle
+           exercises that shift. Subtracting ``energy_shift`` off and comparing against
+           the gap energy instead would cancel it exactly, and would additionally be
+           implied by assertion 1: the tolerance below spans the same phase window that
+           assertion already bounds, and ``E(phi)`` is monotone across it.
 
         """
         num_queries = 31
-        result, gs_energy, container = _run_sossa_unary_qpe(num_queries)
-
-        measured_e_gap = result.raw_energy - container.metadata.energy_shift
+        result, gs_energy, physical_energy, container = _run_sossa_unary_qpe(num_queries)
 
         # _run_sossa_unary_qpe bounds the *doubled* phase to one bin, and raw_energy is
         # decoded from the canonical phase, which is half of it -- so the canonical phase
@@ -526,8 +542,8 @@ class TestSOSSAQPEIntegration:
         edges = [min(0.5, max(0.0, exact_phase + sign * half_bin)) for sign in (-1.0, 1.0)]
         tol = max(abs(container.eigenvalue_from_phase(p) - container.metadata.energy_shift - gs_energy) for p in edges)
 
-        assert abs(measured_e_gap - gs_energy) <= tol, (
-            f"Energy mismatch: measured E_gap={measured_e_gap:.6f}, expected={gs_energy:.6f}, tol={tol:.6f}"
+        assert abs(result.raw_energy - physical_energy) <= tol, (
+            f"Energy mismatch: measured={result.raw_energy:.6f}, expected={physical_energy:.6f}, tol={tol:.6f}"
         )
 
     @pytest.mark.parametrize("num_queries", [7, 31])
@@ -595,7 +611,10 @@ class TestSOSSAQPEIntegration:
         assert circuit.num_qubits == 2 * n_orb + mapper._num_ancilla_qubits(container)
         assert circuit.metadata.num_phase_gradient_ancillas == 0
 
-        # Step 3: Verify normalization is accessible
+        # Step 3: Verify the normalization is accessible and numerically right.
+        # Lambda cancels on both sides of every phase/energy comparison in this file, so a
+        # self-consistent scale error is invisible to them; pin the number itself against
+        # an oracle that never sees the container's own normalization.
         lambda_sos = container.metadata.normalization
         assert lambda_sos > 0
 
@@ -609,6 +628,20 @@ class TestSOSSAQPEIntegration:
         eigenvalues = np.linalg.eigvalsh(h_matrix)
         # H_gap should be positive semi-definite
         assert eigenvalues[0] >= -1e-10, f"H_gap has negative eigenvalue: {eigenvalues[0]}"
+        # The walk can only encode energies in [0, 2*Lambda], so an independently
+        # diagonalized H_gap has to fit inside that band -- and, because the SOS
+        # generators very nearly saturate it, has to fill most of it. Together these
+        # bracket Lambda from both sides against an oracle that never sees the
+        # container's normalization, so a rescaled Lambda can no longer cancel itself
+        # out of the walk. (Measured ratio for this fixture: 0.991.)
+        two_lambda = 2.0 * lambda_sos
+        assert eigenvalues[-1] <= two_lambda + 1e-10, (
+            f"H_gap spectrum reaches {eigenvalues[-1]}, outside the block-encoding band [0, {two_lambda}]."
+        )
+        assert eigenvalues[-1] >= 0.5 * two_lambda, (
+            f"H_gap spectrum tops out at {eigenvalues[-1]}, less than half the block-encoding "
+            f"band [0, {two_lambda}]; Lambda looks inflated."
+        )
 
     def test_sos_decomposition_is_positive_semidefinite(self):
         """H_gap = Σ_G G†G must be PSD, since it is a sum of operator squares.
@@ -676,6 +709,7 @@ class TestSOSSAQPEIntegration:
         np.testing.assert_allclose(
             np.linalg.eigvalsh(h_gap) + energy_shift,
             np.linalg.eigvalsh(h_physical),
+            rtol=0.0,
             atol=1e-10,
         )
 
@@ -869,6 +903,7 @@ class TestSOSSAResourceEstimation:
     _PROBLEM: ClassVar[dict[str, int]] = {"num_orbitals": 2, "num_ranks": 1, "num_bases": 1, "num_copies": 1}
 
     @pytest.mark.slow
+    @pytest.mark.skipif(not _RUN_SLOW_TESTS, reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.")
     def test_unary_qpe_circuit_estimates_within_a_time_budget(self):
         """The QPE circuit is estimable, in bounded time, and is not trivially Clifford.
 
@@ -895,6 +930,7 @@ class TestSOSSAResourceEstimation:
         assert logical_counts["tCount"] + logical_counts["ccixCount"] > 0
 
     @pytest.mark.slow
+    @pytest.mark.skipif(not _RUN_SLOW_TESTS, reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.")
     def test_the_query_schedule_only_widens_the_phase_register(self):
         """The block encoding is reused across slots, so only the phase register grows.
 
