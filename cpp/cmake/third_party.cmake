@@ -60,25 +60,9 @@ handle_dependency(libint2
   ${_libint2_patch_args}
   REQUIRED
 )
-# libint2's cxxapi.h requires MSVC to report C++11 via /Zc:__cplusplus, plus
-# /Zc:preprocessor (Boost.Preprocessor). Apply to whichever libint2 C++ target
-# qdk-chemistry links: the FetchContent target (libint2_cxx) or the installed
-# imported target (Libint2::cxx). Skip ALIAS targets, which reject compile
-# options. clang-cl reports C++11 correctly and rejects /Zc:preprocessor.
-foreach(_libint2_cxx_target libint2_cxx Libint2::libint2_cxx Libint2::cxx)
-  if(MSVC AND TARGET ${_libint2_cxx_target})
-    get_target_property(_libint2_cxx_alias ${_libint2_cxx_target} ALIASED_TARGET)
-    if(NOT _libint2_cxx_alias)
-      if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
-        target_compile_options(${_libint2_cxx_target} INTERFACE /Zc:__cplusplus)
-      else()
-        target_compile_options(${_libint2_cxx_target} INTERFACE /Zc:__cplusplus /Zc:preprocessor)
-      endif()
-    endif()
-  endif()
-endforeach()
-# eritest-libint2 links only to libint2-static (C library), so it misses the
-# INTERFACE flags from libint2_cxx but still needs C++11 detection.
+# eritest-libint2 links only to libint2-static (C library) but includes headers
+# that require MSVC to report C++11 via /Zc:__cplusplus. The chemistry target
+# gets this flag directly in cpp/CMakeLists.txt. clang-cl rejects /Zc:preprocessor.
 if(MSVC AND TARGET eritest-libint2)
   if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
     target_compile_options(eritest-libint2 PRIVATE /Zc:__cplusplus)
