@@ -21,7 +21,7 @@ data object, and return either an error string or a list of
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-# ruff: noqa: ARG001
+# ruff: noqa: ARG001, E501
 # MCP tool functions accept ``project_name`` consumed by the
 # ``@validate_project`` decorator.
 
@@ -30,7 +30,9 @@ from __future__ import annotations
 import json
 import pathlib
 import re
+import secrets
 import threading
+import time
 
 from mcp.types import CallToolResult, TextContent
 
@@ -64,6 +66,14 @@ def _widgets_static_dir() -> pathlib.Path:
     return _WIDGETS_CACHE["static"]
 
 
+def _json_script(identifier: str, value: object) -> str:
+    """Return *value* as an inert, HTML-safe JSON script element."""
+    serialized = (
+        json.dumps(value, ensure_ascii=True).replace("<", r"\u003c").replace(">", r"\u003e").replace("&", r"\u0026")
+    )
+    return f'<script id="{identifier}" type="application/json">{serialized}</script>'
+
+
 # ---------------------------------------------------------------------------
 # HTML builder (uses MCP Apps SDK + patched widget bundle)
 # ---------------------------------------------------------------------------
@@ -74,7 +84,7 @@ def _build_html(
     title: str,
     component_name: str,
     app_name: str,
-    embedded_data_json: str | None = None,
+    embedded_data: dict | None = None,
     min_height: int = 500,
 ) -> str:
     """Build a self-contained HTML page for a qsharp-widgets component.
@@ -111,7 +121,7 @@ def _build_html(
         "<head>\n"
         '<meta charset="utf-8" />\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1" />\n'
-        "<title>" + title + "</title>\n"
+        "<title></title>\n"
         "<style>\n"
         "  :root { color-scheme: light dark; }\n"
         "  html, body {\n"
@@ -135,6 +145,8 @@ def _build_html(
         "  <!-- Render widget with embedded data -->\n"
         '  <script type="module">\n'
         "    try {\n"
+        '    const config = JSON.parse(document.getElementById("widget-config").textContent);\n'
+        "    document.title = config.title;\n"
         "    async function waitForWidget(ms = 5000) {\n"
         "      const t0 = Date.now();\n"
         "      while (!window.__qdk_widget && Date.now() - t0 < ms)\n"
@@ -149,7 +161,7 @@ def _build_html(
         "    }\n"
         "\n"
         "    function renderToolData(data) {\n"
-        '      const widgetType = data.__widget_type || "' + component_name + '";\n'
+        "      const widgetType = data.__widget_type || config.componentName;\n"
         "      let stateKeys;\n"
         '      if (widgetType === "MoleculeViewer") {\n'
         "        stateKeys = {\n"
@@ -187,20 +199,28 @@ def _build_html(
         "    }\n"
         "\n"
         + (
-            # Embedded data: render immediately without host messages
-            "    renderToolData(" + embedded_data_json + ");\n"
-            if embedded_data_json is not None
-            # Fallback: no embedded data
+            "    renderToolData(config.embeddedData);\n"
+            if embedded_data is not None
             else '    document.getElementById("loading")?.remove();\n'
         )
         + "    } catch(e) {\n"
         '      const el = document.getElementById("loading") || document.getElementById("widget-root");\n'
-        "      if (el) { el.innerHTML = "
-        "'<div class=\"widget-error\">Error: ' + e.message + '\\n\\n' + e.stack + '</div>'; }\n"
+        "      if (el) {\n"
+        '        const error = document.createElement("div");\n'
+        '        error.className = "widget-error";\n'
+        '        error.textContent = "Error: " + e.message + "\\n\\n" + e.stack;\n'
+        "        el.replaceChildren(error);\n"
+        "      }\n"
         "    }\n"
         "  </script>\n"
         "</body>\n"
-        "</html>"
+        "</html>".replace(
+            "</body>",
+            _json_script(
+                "widget-config", {"title": title, "componentName": component_name, "embeddedData": embedded_data}
+            )
+            + "\n</body>",
+        )
     )
 
 
@@ -210,47 +230,82 @@ def _build_html(
 
 
 class _WidgetBridge:
-    """Synchronise data between a tool call and its ``ui://`` resource.
+    """Store tool payloads for unique, single-use ``ui://`` resources.
 
-    The tool stores its payload via :meth:`send`, which wakes the
-    resource handler.  The resource handler calls :meth:`receive` to
-    block until data is available and returns HTML with the data
-    embedded.
+    Each call to :meth:`send` receives an unguessable resource URI. The
+    matching resource handler removes the payload before rendering it, so
+    concurrent clients cannot overwrite or retrieve each other's data.
     """
 
     def __init__(
-        self, *, component_name: str, app_name: str, title: str, timeout: float = 15, min_height: int = 500
+        self,
+        *,
+        resource_uri: str,
+        component_name: str,
+        app_name: str,
+        title: str,
+        min_height: int = 500,
+        payload_ttl: float = 300,
     ) -> None:
+        self.resource_uri_template = f"{resource_uri}/{{token}}"
+        self._resource_uri = resource_uri
         self._component_name = component_name
         self._app_name = app_name
         self._title = title
-        self._timeout = timeout
         self._min_height = min_height
-        self._data: dict = {}
-        self._ready = threading.Event()
+        self._payload_ttl = payload_ttl
+        self._payloads: dict[str, tuple[float, dict]] = {}
+        self._lock = threading.Lock()
+
+    def _discard_expired(self, now: float) -> None:
+        expired = [token for token, (created, _) in self._payloads.items() if now - created >= self._payload_ttl]
+        for token in expired:
+            del self._payloads[token]
 
     # Called by the tool
     def send(self, payload: dict) -> CallToolResult:
-        """Store *payload*, wake the resource, and return a ``CallToolResult``."""
-        self._data = dict(payload)
-        self._ready.set()
+        """Store *payload* and return its unique resource URI."""
+        token = secrets.token_urlsafe(32)
+        now = time.monotonic()
+        with self._lock:
+            self._discard_expired(now)
+            self._payloads[token] = (now, dict(payload))
+        resource_uri = f"{self._resource_uri}/{token}"
         return CallToolResult(
             content=[TextContent(type="text", text=json.dumps(payload))],
             structuredContent=payload,
+            meta={
+                "ui": {"resourceUri": resource_uri},
+                "ui/resourceUri": resource_uri,
+            },
         )
 
+    def receive(self, token: str) -> dict | None:
+        """Remove and return the payload for *token*, if it is still valid."""
+        now = time.monotonic()
+        with self._lock:
+            self._discard_expired(now)
+            entry = self._payloads.pop(token, None)
+        return entry[1] if entry is not None else None
+
     # Called by the resource handler
-    def receive_html(self) -> str:
-        """Block until data arrives, then return self-contained HTML."""
-        self._ready.wait(timeout=self._timeout)
-        self._ready.clear()
+    def receive_html(self, token: str) -> str:
+        """Consume *token* and return self-contained HTML for its payload."""
+        payload = self.receive(token)
+        if payload is None:
+            return _expired_visualization_html()
         return _build_html(
             title=self._title,
             component_name=self._component_name,
             app_name=self._app_name,
-            embedded_data_json=json.dumps(self._data) if self._data else None,
+            embedded_data=payload,
             min_height=self._min_height,
         )
+
+
+def _expired_visualization_html() -> str:
+    """Return a non-sensitive response for an expired or consumed URI."""
+    return "<html><body><p>This visualization has expired or was already opened.</p></body></html>"
 
 
 # ---------------------------------------------------------------------------
@@ -404,6 +459,7 @@ def register_visualization_tools(app) -> None:
 
     # ── Circuit viewer ────────────────────────────────────────────
     _circuit_bridge = _WidgetBridge(
+        resource_uri="ui://qdk-chem-mcp/circuit-viewer",
         component_name="Circuit",
         app_name="qdk-circuit-viewer",
         title="Circuit Viewer",
@@ -411,18 +467,18 @@ def register_visualization_tools(app) -> None:
     )
 
     @app.resource(
-        "ui://qdk-chem-mcp/circuit-viewer",
+        _circuit_bridge.resource_uri_template,
         name="circuit_viewer",
         description="Interactive quantum-circuit diagram (qsharp-widgets Circuit component)",
         mime_type="text/html;profile=mcp-app",
     )
-    def circuit_viewer_resource() -> str:
-        return _circuit_bridge.receive_html()
+    def circuit_viewer_resource(token: str) -> str:
+        return _circuit_bridge.receive_html(token)
 
     @app.tool(
         meta={
-            "ui": {"resourceUri": "ui://qdk-chem-mcp/circuit-viewer"},
-            "ui/resourceUri": "ui://qdk-chem-mcp/circuit-viewer",
+            "ui": {"resourceUri": _circuit_bridge.resource_uri_template},
+            "ui/resourceUri": _circuit_bridge.resource_uri_template,
         },
         structured_output=False,
     )
@@ -482,6 +538,7 @@ def register_visualization_tools(app) -> None:
 
     # ── Orbital-entanglement chord diagram ────────────────────────
     _entanglement_bridge = _WidgetBridge(
+        resource_uri="ui://qdk-chem-mcp/orbital-entanglement",
         component_name="Entanglement",
         app_name="qdk-orbital-entanglement",
         title="Orbital Entanglement",
@@ -489,18 +546,18 @@ def register_visualization_tools(app) -> None:
     )
 
     @app.resource(
-        "ui://qdk-chem-mcp/orbital-entanglement",
+        _entanglement_bridge.resource_uri_template,
         name="orbital_entanglement",
         description="Interactive orbital-entanglement chord diagram (qsharp-widgets Entanglement component)",
         mime_type="text/html;profile=mcp-app",
     )
-    def orbital_entanglement_resource() -> str:
-        return _entanglement_bridge.receive_html()
+    def orbital_entanglement_resource(token: str) -> str:
+        return _entanglement_bridge.receive_html(token)
 
     @app.tool(
         meta={
-            "ui": {"resourceUri": "ui://qdk-chem-mcp/orbital-entanglement"},
-            "ui/resourceUri": "ui://qdk-chem-mcp/orbital-entanglement",
+            "ui": {"resourceUri": _entanglement_bridge.resource_uri_template},
+            "ui/resourceUri": _entanglement_bridge.resource_uri_template,
         },
         structured_output=False,
     )
@@ -645,26 +702,26 @@ def register_visualization_tools(app) -> None:
     # ── Molecule viewer ───────────────────────────────────────────
     molecule_viewer_uri = "ui://qdk-chem-mcp/molecule-viewer"
     _molecule_bridge = _WidgetBridge(
+        resource_uri=molecule_viewer_uri,
         component_name="MoleculeViewer",
         app_name="qdk-molecule-viewer",
         title="Molecule Viewer",
-        timeout=30,
         min_height=550,
     )
 
     @app.resource(
-        molecule_viewer_uri,
+        _molecule_bridge.resource_uri_template,
         name="molecule_viewer",
         description="Interactive 3D molecule viewer (qsharp-widgets MoleculeViewer component)",
         mime_type="text/html;profile=mcp-app",
     )
-    def molecule_viewer_resource() -> str:
-        return _molecule_bridge.receive_html()
+    def molecule_viewer_resource(token: str) -> str:
+        return _molecule_bridge.receive_html(token)
 
     @app.tool(
         meta={
-            "ui": {"resourceUri": molecule_viewer_uri},
-            "ui/resourceUri": molecule_viewer_uri,
+            "ui": {"resourceUri": _molecule_bridge.resource_uri_template},
+            "ui/resourceUri": _molecule_bridge.resource_uri_template,
         },
         structured_output=False,
     )
@@ -709,8 +766,8 @@ def register_visualization_tools(app) -> None:
     # ── Orbital viewer (molecule + orbital isosurfaces) ───────────
     @app.tool(
         meta={
-            "ui": {"resourceUri": molecule_viewer_uri},
-            "ui/resourceUri": molecule_viewer_uri,
+            "ui": {"resourceUri": _molecule_bridge.resource_uri_template},
+            "ui/resourceUri": _molecule_bridge.resource_uri_template,
         },
         structured_output=False,
     )
@@ -862,151 +919,20 @@ def register_visualization_tools(app) -> None:
         x_ticks = _nice_ticks(x_min, x_max)
         y_ticks = _nice_ticks(y_min, y_max)
 
-        svg_parts = [
-            f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" '
-            f'preserveAspectRatio="xMidYMid meet" '
-            f'style="font-family:system-ui,sans-serif">\n',
-            f'<rect width="{w}" height="{h}" fill="#1e1e2e"/>\n',
-            # plot area background
-            f'<rect x="{ml}" y="{mt}" width="{pw}" height="{ph}" fill="#181825" stroke="#45475a" stroke-width="1"/>\n',
-        ]
-
-        # Grid lines + tick labels
-        for xv in x_ticks:
-            px = tx(xv)
-            if ml <= px <= ml + pw:
-                label = f"{10**xv:.0f}" if log_x else f"{xv:g}"
-                svg_parts.append(
-                    f'<line x1="{px}" y1="{mt}" x2="{px}" y2="{mt + ph}" stroke="#313244" stroke-width="0.5"/>\n'
-                )
-                svg_parts.append(
-                    f'<text x="{px}" y="{mt + ph + 16}" text-anchor="middle" '
-                    f'fill="#a6adc8" font-size="11">{label}</text>\n'
-                )
-
-        for yv in y_ticks:
-            py = ty(yv)
-            if mt <= py <= mt + ph:
-                label = f"{10**yv:.1e}" if log_y else f"{yv:g}"
-                svg_parts.append(
-                    f'<line x1="{ml}" y1="{py}" x2="{ml + pw}" y2="{py}" stroke="#313244" stroke-width="0.5"/>\n'
-                )
-                svg_parts.append(
-                    f'<text x="{ml - 8}" y="{py + 4}" text-anchor="end" fill="#a6adc8" font-size="11">{label}</text>\n'
-                )
-
-        # Title
-        svg_parts.append(
-            f'<text x="{w / 2}" y="28" text-anchor="middle" fill="#cdd6f4" '
-            f'font-size="15" font-weight="600">{title}</text>\n'
-        )
-        # Axis labels
-        svg_parts.append(
-            f'<text x="{ml + pw / 2}" y="{h - 8}" text-anchor="middle" fill="#a6adc8" font-size="12">{x_label}</text>\n'
-        )
-        svg_parts.append(
-            f'<text x="16" y="{mt + ph / 2}" text-anchor="middle" '
-            f'fill="#a6adc8" font-size="12" '
-            f'transform="rotate(-90,16,{mt + ph / 2})">{y_label}</text>\n'
-        )
-
-        # Plot data series
-        for si, s in enumerate(series_list):
-            color = colors[si % len(colors)]
-            xs = s.get("x", [])
-            ys = s.get("y", [])
-            texts = s.get("text", [])
-            mode = s.get("mode", "markers")
-            ms = s.get("marker_size", 8)
-
-            pts = []
-            for i, (xv, yv) in enumerate(zip(xs, ys, strict=False)):
-                px_val = math.log10(xv) if log_x and xv > 0 else xv
-                py_val = math.log10(yv) if log_y and yv > 0 else yv
-                pts.append((tx(px_val), ty(py_val), xv, yv, texts[i] if i < len(texts) else ""))
-
-            # Lines
-            if "lines" in mode and len(pts) > 1:
-                path_d = " ".join(f"{'M' if j == 0 else 'L'}{p[0]:.1f},{p[1]:.1f}" for j, p in enumerate(pts))
-                svg_parts.append(f'<path d="{path_d}" fill="none" stroke="{color}" stroke-width="2" opacity="0.7"/>\n')
-
-            # Markers with hover
-            if "markers" in mode:
-                for _pi, (px, py, raw_x, raw_y, text) in enumerate(pts):
-                    hover = text or f"{raw_x:g}, {raw_y:g}"
-                    svg_parts.append(
-                        f'<circle class="pt" cx="{px:.1f}" cy="{py:.1f}" r="{ms / 2}" '
-                        f'fill="{color}" opacity="0.9" '
-                        f'data-x="{raw_x}" data-y="{raw_y}" data-label="{hover}" '
-                        f'data-series="{si}"/>\n'
-                    )
-
-        # Legend
-        if len(series_list) > 1 or (series_list and series_list[0].get("name")):
-            ly = mt + 12
-            for si, s in enumerate(series_list):
-                color = colors[si % len(colors)]
-                name = s.get("name", f"Series {si + 1}")
-                svg_parts.append(f'<rect x="{ml + pw - 140}" y="{ly}" width="10" height="10" fill="{color}" rx="2"/>\n')
-                svg_parts.append(
-                    f'<text x="{ml + pw - 125}" y="{ly + 9}" fill="#cdd6f4" font-size="11">{name}</text>\n'
-                )
-                ly += 18
-
-        # Crosshair lines (hidden by default)
-        svg_parts.append(
-            f'<line id="xhair-h" x1="{ml}" y1="0" x2="{ml + pw}" y2="0" '
-            f'stroke="#585b70" stroke-width="0.5" stroke-dasharray="4,3" visibility="hidden"/>\n'
-        )
-        svg_parts.append(
-            f'<line id="xhair-v" x1="0" y1="{mt}" x2="0" y2="{mt + ph}" '
-            f'stroke="#585b70" stroke-width="0.5" stroke-dasharray="4,3" visibility="hidden"/>\n'
-        )
-
-        svg_parts.append("</svg>")
-        svg_content = "".join(svg_parts)
-
-        # Interactive JS for hover tooltip, crosshairs, point highlight
-        js = (
-            "<script>\n"
-            "const svg=document.querySelector('svg');\n"
-            "const tip=document.getElementById('tooltip');\n"
-            "const xH=document.getElementById('xhair-h');\n"
-            "const xV=document.getElementById('xhair-v');\n"
-            "const pts=document.querySelectorAll('.pt');\n"
-            "let activePt=null;\n"
-            "pts.forEach(c=>{\n"
-            "  c.style.cursor='pointer';\n"
-            "  c.addEventListener('mouseenter',function(ev){\n"
-            "    if(activePt) activePt.setAttribute('r',activePt.dataset.origR);\n"
-            "    activePt=c;\n"
-            "    c.dataset.origR=c.getAttribute('r');\n"
-            "    c.setAttribute('r',parseFloat(c.getAttribute('r'))*1.8);\n"
-            "    c.setAttribute('opacity','1');\n"
-            "    const lbl=c.dataset.label;\n"
-            "    const x=c.dataset.x, y=c.dataset.y;\n"
-            "    tip.innerHTML='<b>'+lbl+'</b><br/>'+'" + x_label + ": '+x+'<br/>'+'" + y_label + ": '+y;\n"
-            "    tip.style.display='block';\n"
-            "    const cx=parseFloat(c.getAttribute('cx'));\n"
-            "    const cy=parseFloat(c.getAttribute('cy'));\n"
-            "    xH.setAttribute('y1',cy); xH.setAttribute('y2',cy); xH.setAttribute('visibility','visible');\n"
-            "    xV.setAttribute('x1',cx); xV.setAttribute('x2',cx); xV.setAttribute('visibility','visible');\n"
-            "  });\n"
-            "  c.addEventListener('mousemove',function(ev){\n"
-            "    tip.style.left=(ev.clientX+16)+'px';\n"
-            "    tip.style.top=(ev.clientY-12)+'px';\n"
-            "  });\n"
-            "  c.addEventListener('mouseleave',function(){\n"
-            "    c.setAttribute('r',c.dataset.origR);\n"
-            "    c.setAttribute('opacity','0.9');\n"
-            "    tip.style.display='none';\n"
-            "    xH.setAttribute('visibility','hidden');\n"
-            "    xV.setAttribute('visibility','hidden');\n"
-            "    activePt=null;\n"
-            "  });\n"
-            "});\n"
-            "</script>\n"
-        )
+        chart = {
+            "title": title,
+            "xLabel": x_label,
+            "yLabel": y_label,
+            "logX": log_x,
+            "logY": log_y,
+            "series": series_list,
+            "layout": {"width": w, "height": h, "marginLeft": ml, "marginTop": mt, "plotWidth": pw, "plotHeight": ph},
+            "xRange": [x_min, x_max],
+            "yRange": [y_min, y_max],
+            "xTicks": x_ticks,
+            "yTicks": y_ticks,
+            "colors": colors,
+        }
 
         return (
             "<!DOCTYPE html>\n"
@@ -1014,7 +940,7 @@ def register_visualization_tools(app) -> None:
             "<head>\n"
             '<meta charset="utf-8"/>\n'
             '<meta name="viewport" content="width=device-width,initial-scale=1"/>\n'
-            f"<title>{title}</title>\n"
+            "<title></title>\n"
             "<style>\n"
             "  html, body { margin:0; padding:0; background:#1e1e2e;\n"
             "    width:100%; height:100%; overflow:hidden; }\n"
@@ -1027,31 +953,54 @@ def register_visualization_tools(app) -> None:
             "</style>\n"
             "</head>\n"
             "<body>\n"
-            f"{svg_content}\n"
-            '<div id="tooltip"></div>\n'
-            f"{js}"
+            '<div id="tooltip"></div>\n' + _json_script("scatter-plot-data", chart) + "\n<script>\n"
+            "const chart=JSON.parse(document.getElementById('scatter-plot-data').textContent);\n"
+            "document.title=chart.title;\n"
+            "const svgNs='http://www.w3.org/2000/svg', svg=document.createElementNS(svgNs,'svg');\n"
+            "const tip=document.getElementById('tooltip');\n"
+            "const {width:w,height:h,marginLeft:ml,marginTop:mt,plotWidth:pw,plotHeight:ph}=chart.layout;\n"
+            "const [xMin,xMax]=chart.xRange,[yMin,yMax]=chart.yRange;\n"
+            "svg.setAttribute('viewBox',`0 0 ${w} ${h}`); svg.setAttribute('preserveAspectRatio','xMidYMid meet');\n"
+            "function node(name,attrs={},text){const el=document.createElementNS(svgNs,name);for(const [key,value] of Object.entries(attrs))el.setAttribute(key,String(value));if(text!==undefined)el.textContent=text;svg.append(el);return el;}\n"
+            "function tx(value){return ml+(value-xMin)/(xMax-xMin)*pw;} function ty(value){return mt+ph-(value-yMin)/(yMax-yMin)*ph;}\n"
+            "function xText(value){return chart.logX ? (10**value).toFixed(0) : String(value);} function yText(value){return chart.logY ? (10**value).toExponential(1) : String(value);}\n"
+            "node('rect',{width:w,height:h,fill:'#1e1e2e'}); node('rect',{x:ml,y:mt,width:pw,height:ph,fill:'#181825',stroke:'#45475a','stroke-width':1});\n"
+            "for(const value of chart.xTicks){const x=tx(value);if(x>=ml&&x<=ml+pw){node('line',{x1:x,y1:mt,x2:x,y2:mt+ph,stroke:'#313244','stroke-width':.5});node('text',{x,y:mt+ph+16,'text-anchor':'middle',fill:'#a6adc8','font-size':11},xText(value));}}\n"
+            "for(const value of chart.yTicks){const y=ty(value);if(y>=mt&&y<=mt+ph){node('line',{x1:ml,y1:y,x2:ml+pw,y2:y,stroke:'#313244','stroke-width':.5});node('text',{x:ml-8,y:y+4,'text-anchor':'end',fill:'#a6adc8','font-size':11},yText(value));}}\n"
+            "node('text',{x:w/2,y:28,'text-anchor':'middle',fill:'#cdd6f4','font-size':15,'font-weight':600},chart.title);\n"
+            "node('text',{x:ml+pw/2,y:h-8,'text-anchor':'middle',fill:'#a6adc8','font-size':12},chart.xLabel);\n"
+            "node('text',{x:16,y:mt+ph/2,'text-anchor':'middle',fill:'#a6adc8','font-size':12,transform:`rotate(-90,16,${mt+ph/2})`},chart.yLabel);\n"
+            "let activePt; const xH=node('line',{x1:ml,y1:0,x2:ml+pw,y2:0,stroke:'#585b70','stroke-width':.5,'stroke-dasharray':'4,3',visibility:'hidden'}),xV=node('line',{x1:0,y1:mt,x2:0,y2:mt+ph,stroke:'#585b70','stroke-width':.5,'stroke-dasharray':'4,3',visibility:'hidden'});\n"
+            "function tooltip(point){tip.replaceChildren();const label=document.createElement('b');label.textContent=point.label;tip.append(label,document.createElement('br'),document.createTextNode(`${chart.xLabel}: ${point.x}`),document.createElement('br'),document.createTextNode(`${chart.yLabel}: ${point.y}`));}\n"
+            "for(const [index,series] of chart.series.entries()){const color=chart.colors[index%chart.colors.length],points=[];for(let i=0;i<Math.min(series.x.length,series.y.length);i++){const x=series.x[i],y=series.y[i],px=tx(chart.logX&&x>0?Math.log10(x):x),py=ty(chart.logY&&y>0?Math.log10(y):y);points.push({x,y,px,py,label:series.text?.[i]||`${x}, ${y}`});}if(series.mode?.includes('lines')&&points.length>1)node('path',{d:points.map((point,i)=>`${i?'L':'M'}${point.px.toFixed(1)},${point.py.toFixed(1)}`).join(' '),fill:'none',stroke:color,'stroke-width':2,opacity:.7});if(series.mode?.includes('markers')??true)for(const point of points){const circle=node('circle',{cx:point.px.toFixed(1),cy:point.py.toFixed(1),r:(series.marker_size??8)/2,fill:color,opacity:.9});circle.style.cursor='pointer';circle.addEventListener('mouseenter',()=>{if(activePt)activePt.setAttribute('r',activePt.dataset.origR);activePt=circle;circle.dataset.origR=circle.getAttribute('r');circle.setAttribute('r',String(Number(circle.dataset.origR)*1.8));circle.setAttribute('opacity','1');tooltip(point);tip.style.display='block';xH.setAttribute('y1',String(point.py));xH.setAttribute('y2',String(point.py));xH.setAttribute('visibility','visible');xV.setAttribute('x1',String(point.px));xV.setAttribute('x2',String(point.px));xV.setAttribute('visibility','visible');});circle.addEventListener('mousemove',event=>{tip.style.left=`${event.clientX+16}px`;tip.style.top=`${event.clientY-12}px`;});circle.addEventListener('mouseleave',()=>{circle.setAttribute('r',circle.dataset.origR);circle.setAttribute('opacity','.9');tip.style.display='none';xH.setAttribute('visibility','hidden');xV.setAttribute('visibility','hidden');activePt=null;});}}\n"
+            "if(chart.series.length>1||chart.series[0]?.name){let y=mt+12;for(const [index,series] of chart.series.entries()){const color=chart.colors[index%chart.colors.length];node('rect',{x:ml+pw-140,y,width:10,height:10,fill:color,rx:2});node('text',{x:ml+pw-125,y:y+9,fill:'#cdd6f4','font-size':11},series.name||`Series ${index+1}`);y+=18;}}\n"
+            "document.body.prepend(svg);\n"
+            "</script>\n"
             "</body>\n"
             "</html>"
         )
 
-    _scatter_bridge_data: dict = {}
-    _scatter_bridge_event = threading.Event()
+    _scatter_bridge = _WidgetBridge(
+        resource_uri="ui://qdk-chem-mcp/scatter-plot",
+        component_name="ScatterPlot",
+        app_name="qdk-scatter-plot",
+        title="Scatter Plot",
+    )
 
     @app.resource(
-        "ui://qdk-chem-mcp/scatter-plot",
+        _scatter_bridge.resource_uri_template,
         name="scatter_plot",
         description="Interactive Plotly scatter plot with optional log axes and multiple series",
         mime_type="text/html;profile=mcp-app",
     )
-    def scatter_plot_resource() -> str:
-        _scatter_bridge_event.wait(timeout=15)
-        _scatter_bridge_event.clear()
-        return _build_plotly_html(_scatter_bridge_data)
+    def scatter_plot_resource(token: str) -> str:
+        payload = _scatter_bridge.receive(token)
+        return _build_plotly_html(payload) if payload is not None else _expired_visualization_html()
 
     @app.tool(
         meta={
-            "ui": {"resourceUri": "ui://qdk-chem-mcp/scatter-plot"},
-            "ui/resourceUri": "ui://qdk-chem-mcp/scatter-plot",
+            "ui": {"resourceUri": _scatter_bridge.resource_uri_template},
+            "ui/resourceUri": _scatter_bridge.resource_uri_template,
         },
         structured_output=False,
     )
@@ -1090,7 +1039,6 @@ def register_visualization_tools(app) -> None:
             Interactive Plotly scatter plot rendered in the MCP Apps viewer.
 
         """
-        nonlocal _scatter_bridge_data
         payload = {
             "title": title,
             "x_label": x_label,
@@ -1099,9 +1047,4 @@ def register_visualization_tools(app) -> None:
             "log_y": log_y,
             "series": series,
         }
-        _scatter_bridge_data = payload
-        _scatter_bridge_event.set()
-        return CallToolResult(
-            content=[TextContent(type="text", text=json.dumps(payload))],
-            structuredContent=payload,
-        )
+        return _scatter_bridge.send(payload)

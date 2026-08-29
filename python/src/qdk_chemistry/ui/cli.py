@@ -97,27 +97,6 @@ def parse_json_arg(value: str) -> Any:
         raise argparse.ArgumentTypeError(f"Invalid JSON: {e}") from e
 
 
-def energy_from_phase(phase_fraction: float, *, evolution_time: float) -> float:
-    """Convert a measured QPE phase fraction to an energy."""
-    if evolution_time == 0:
-        raise ValueError("evolution_time must be nonzero")
-
-    phase_angle = (float(phase_fraction) % 1.0) * (2.0 * math.pi)
-    if phase_angle > math.pi:
-        phase_angle -= 2.0 * math.pi
-    return phase_angle / float(evolution_time)
-
-
-def resolve_energy_aliases(raw_energy: float, *, evolution_time: float, reference_energy: float) -> float:
-    """Resolve periodic QPE energy aliases against a reference energy."""
-    if evolution_time == 0:
-        raise ValueError("evolution_time must be nonzero")
-
-    period = 2.0 * math.pi / abs(float(evolution_time))
-    alias_index = round((float(reference_energy) - float(raw_energy)) / period)
-    return float(raw_energy) + alias_index * period
-
-
 def format_output(result: Any) -> str:  # noqa: PLR0911
     """Format the output result as JSON for display."""
     # Handle structured envelope from @_structured decorator
@@ -1169,20 +1148,31 @@ def cmd_utils_compute_valence_params(args):
 
 
 def cmd_utils_resolve_phase_energy(args):
-    """Resolve QPE phase to energy with alias handling."""
-    raw_energy = energy_from_phase(args.phase_fraction, evolution_time=args.evolution_time)
-    resolved = resolve_energy_aliases(
-        raw_energy,
-        evolution_time=args.evolution_time,
-        reference_energy=args.reference_energy,
-    )
+    """Resolve QPE phase to energy using the unitary's phase mapping."""
+    filename = args.unitary_representation_filename.split("/")[-1]
+    project_dir = config.projects_dir / args.project_name
+    os.chdir(project_dir)
+
+    unitary = load_data_object(filename, qdk_data.UnitaryRepresentation)
+    container = unitary.get_container()
+    raw_energy = container.eigenvalue_from_phase(args.phase_fraction)
+    resolved_energy = raw_energy
+
+    if container.type == "pauli_product_formula":
+        if container.scale == 0:
+            raise ValueError("The unitary representation has a zero evolution-time scale")
+        period = 2.0 * math.pi / abs(float(container.scale))
+        alias_index = round((float(args.reference_energy) - raw_energy) / period)
+        resolved_energy = raw_energy + alias_index * period
+
     print(
         json.dumps(
             {
                 "success": True,
                 "phase_fraction": args.phase_fraction,
+                "container_type": container.type,
                 "raw_energy": raw_energy,
-                "resolved_energy": resolved,
+                "resolved_energy": resolved_energy,
             },
             indent=2,
         )
@@ -1822,11 +1812,16 @@ def _create_utils_parsers(subparsers):
     # resolve-phase-energy
     p = subparsers.add_parser(
         "resolve-phase-energy",
-        help="Resolve QPE phase to energy with alias handling",
-        description="Convert a measured phase fraction to energy, resolving 2pi aliases.",
+        help="Resolve QPE phase to energy using a unitary representation",
+        description="Use a unitary container's canonical phase inversion and representation-specific alias handling.",
+    )
+    p.add_argument("--project-name", required=True, help="Project name")
+    p.add_argument(
+        "--unitary-representation-filename",
+        required=True,
+        help="Unitary representation filename",
     )
     p.add_argument("--phase-fraction", type=float, required=True, help="Measured phase fraction from QPE")
-    p.add_argument("--evolution-time", type=float, required=True, help="Evolution time used in QPE")
     p.add_argument("--reference-energy", type=float, required=True, help="Reference energy for alias resolution")
     p.set_defaults(func=cmd_utils_resolve_phase_energy)
 

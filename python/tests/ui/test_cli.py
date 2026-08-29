@@ -8,12 +8,21 @@
 import argparse
 import contextlib
 import json
+import os
 import subprocess
 import sys
+from pathlib import Path
 
+import numpy as np
 import pytest
 
 from qdk_chemistry import algorithms, data
+from qdk_chemistry.data.unitary_representation.containers.block_encoding import LCUContainer
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
+    ExponentiatedPauliTerm,
+    PauliProductFormulaContainer,
+)
+from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 
 # Import CLI functions for direct testing
 from qdk_chemistry.ui.cli import (
@@ -33,9 +42,13 @@ from qdk_chemistry.ui.config import config
 def temp_project_dir(tmp_path):
     """Create a temporary project directory."""
     original_projects_dir = config.projects_dir
+    original_cwd = Path.cwd()
     config.projects_dir = tmp_path
-    yield tmp_path
-    config.projects_dir = original_projects_dir
+    try:
+        yield tmp_path
+    finally:
+        config.projects_dir = original_projects_dir
+        os.chdir(original_cwd)
 
 
 @pytest.fixture
@@ -178,6 +191,111 @@ def test_create_parser():
     assert args.command == "config"
     assert args.subcommand == "defaults"
     assert args.algorithm_type == "scf_solver"
+
+
+def test_resolve_phase_energy_uses_product_formula_mapping(temp_project_dir, capsys, monkeypatch):
+    """Resolve aliases using the sign and scale stored by a product-formula unitary."""
+    project_path = temp_project_dir / "test_project"
+    project_path.mkdir()
+    unitary = data.UnitaryRepresentation(
+        PauliProductFormulaContainer(
+            step_terms=[ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.5)],
+            step_reps=1,
+            num_qubits=1,
+            scale=2.0,
+        )
+    )
+    filename = "evolution.unitary_representation.json"
+    unitary.to_json_file(str(project_path / filename))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "qc",
+            "util",
+            "resolve-phase-energy",
+            "--project-name",
+            "test_project",
+            "--unitary-representation-filename",
+            filename,
+            "--phase-fraction",
+            "0.25",
+            "--reference-energy",
+            str(3.0 * np.pi / 4.0),
+        ],
+    )
+
+    main()
+
+    result = json.loads(capsys.readouterr().out)
+    assert result["container_type"] == "pauli_product_formula"
+    assert result["raw_energy"] == pytest.approx(-np.pi / 4.0)
+    assert result["resolved_energy"] == pytest.approx(3.0 * np.pi / 4.0)
+
+
+def test_resolve_phase_energy_uses_quantum_walk_mapping(temp_project_dir, capsys, monkeypatch):
+    """Use the cosine inversion supplied by a quantum-walk container without periodic energy aliases."""
+    project_path = temp_project_dir / "test_project"
+    project_path.mkdir()
+    unitary = data.UnitaryRepresentation(LCUWalkContainer(block_encoding=None, scale=4.0))
+    monkeypatch.setattr("qdk_chemistry.ui.cli.load_data_object", lambda *_args: unitary)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "qc",
+            "util",
+            "resolve-phase-energy",
+            "--project-name",
+            "test_project",
+            "--unitary-representation-filename",
+            "walk.unitary_representation.json",
+            "--phase-fraction",
+            "0.25",
+            "--reference-energy",
+            "3.0",
+        ],
+    )
+
+    main()
+
+    result = json.loads(capsys.readouterr().out)
+    assert result["container_type"] == "lcu_walk"
+    assert result["raw_energy"] == pytest.approx(0.0, abs=1e-12)
+    assert result["resolved_energy"] == pytest.approx(0.0, abs=1e-12)
+
+
+def test_resolve_phase_energy_rejects_raw_block_encoding(temp_project_dir, capsys, monkeypatch):
+    """Preserve the container's refusal to infer a phase mapping for a raw block encoding."""
+    project_path = temp_project_dir / "test_project"
+    project_path.mkdir()
+    unitary = data.UnitaryRepresentation(LCUContainer(prepare=None, select=None))
+    monkeypatch.setattr("qdk_chemistry.ui.cli.load_data_object", lambda *_args: unitary)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "qc",
+            "util",
+            "resolve-phase-energy",
+            "--project-name",
+            "test_project",
+            "--unitary-representation-filename",
+            "block.unitary_representation.json",
+            "--phase-fraction",
+            "0.25",
+            "--reference-energy",
+            "0.0",
+        ],
+    )
+
+    with pytest.raises(SystemExit, match="1"):
+        main()
+
+    result = json.loads(capsys.readouterr().out)
+    assert result["success"] is False
+    assert result["type"] == "NotImplementedError"
+    assert "Wrap it in an LCUWalkContainer" in result["error"]
 
 
 # ==================== Algorithm Group Tests ====================
