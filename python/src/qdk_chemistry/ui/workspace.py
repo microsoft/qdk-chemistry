@@ -28,6 +28,11 @@ _WORKSPACE_ROOT: Path | None = None
 _REQUIRE_BINDING_ENV = "QDK_REQUIRE_WORKSPACE_BINDING"
 
 
+def current_workspace_root() -> Path | None:
+    """Return the immutable workspace binding for this MCP process."""
+    return _WORKSPACE_ROOT
+
+
 def _file_uri_path(uri: str) -> Path | None:
     parsed = urlparse(uri)
     if parsed.scheme != "file":

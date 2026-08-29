@@ -691,6 +691,7 @@ class TestJob:
             status="submitted",
             run_hash="aaaa",
             input_hashes={"args.arg_0": "hash0"},
+            owner={"workspace_root": "/workspace", "project_name": "project-a"},
         )
         loaded = Job.load(job.save(tmp_path / "job_j1.json"))
         assert loaded.job_id == "j1"
@@ -699,6 +700,17 @@ class TestJob:
         assert loaded.backend_state == {"pid": 1234}
         assert loaded.run_hash == "aaaa"
         assert loaded.input_hashes == {"args.arg_0": "hash0"}
+        assert loaded.owner == {"workspace_root": "/workspace", "project_name": "project-a"}
+
+    def test_load_legacy_job_without_owner(self, tmp_path):
+        job = Job(job_id="j1", backend="local", backend_config={}, backend_state={})
+        data = job.to_dict()
+        data["version"] = 2
+        data.pop("owner", None)
+        path = tmp_path / "job_j1.json"
+        path.write_text(json.dumps(data))
+
+        assert Job.load(path).owner is None
 
     def test_load_requires_status(self, tmp_path):
         path = tmp_path / "job_j1.json"
@@ -1152,6 +1164,7 @@ class TestBackendContract:
                 "algorithm_type": "test_algorithm",
                 "algorithm_name": "plugin",
                 "settings": {"energy_calculator": energy_calculator},
+                "owner": {"workspace_root": "/workspace", "project_name": "project-a"},
             },
             job_dir=tmp_path,
         )
@@ -1160,6 +1173,7 @@ class TestBackendContract:
         assert loaded.backend_config == {"workdir": str(tmp_path)}
         assert loaded.backend_state == {"output_dir": str(tmp_path / "output")}
         assert loaded.algorithm_info["settings"]["energy_calculator"]["__type__"] == "algorithm_ref"
+        assert loaded.owner == {"workspace_root": "/workspace", "project_name": "project-a"}
         assert job.to_dict() == loaded.to_dict()
         backend._submit.assert_called_once()
 
@@ -1707,6 +1721,40 @@ class TestRunWithCache:
         backend.submit.assert_not_called()
         sleep.assert_not_called()
         cleanup.assert_not_called()
+
+    def test_foreign_inflight_cache_job_is_not_resumed(self, tmp_path):
+        cache = FolderCache(path=tmp_path / "cache")
+        algo = self._mock_algorithm()
+        foreign_job = Job(
+            job_id="foreign-job",
+            backend="test",
+            backend_config={},
+            backend_state={},
+            status="running",
+            run_hash="testhash1234abcd",
+            owner={"workspace_root": "/workspace", "project_name": "project-a"},
+        )
+        foreign_job.wait = MagicMock()
+        cache.put_job("testhash1234abcd", foreign_job)
+        submitted_job = Job(
+            job_id="current-job",
+            backend="test",
+            backend_config={},
+            backend_state={},
+            status="succeeded",
+        )
+        submitted_job.wait = MagicMock(return_value=JobStatus(job_id="current-job", status="succeeded"))
+        submitted_job.fetch = MagicMock(return_value=-75.5)
+        backend = MagicMock()
+        backend.submit.return_value = submitted_job
+        owner = {"workspace_root": "/workspace", "project_name": "project-b"}
+
+        assert run(algo, cache=cache, remote=backend, _owner=owner) == -75.5
+
+        foreign_job.wait.assert_not_called()
+        backend.submit.assert_called_once()
+        assert backend.submit.call_args.args[0]["owner"] == owner
+        assert submitted_job.owner == owner
 
     def test_cached_success_without_outputs_retries_fetch(self, tmp_path, monkeypatch):
         """A persisted success is fetched again instead of being resubmitted."""

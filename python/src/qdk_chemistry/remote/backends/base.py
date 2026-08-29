@@ -318,6 +318,7 @@ class RemoteBackend(ABC):
         )
         run_hash = _prepare_persisted_value(payload.get("run_hash"), "run_hash")
         input_hashes = _prepare_persisted_value(payload.get("input_hashes"), "input_hashes")
+        owner = _prepare_persisted_value(payload.get("owner"), "owner")
 
         job_id, backend_state = self._submit(payload)
         try:
@@ -344,6 +345,7 @@ class RemoteBackend(ABC):
             algorithm_info=algorithm_info,
             run_hash=run_hash,
             input_hashes=input_hashes,
+            owner=owner,
         )
         job.attach_backend(self)
 

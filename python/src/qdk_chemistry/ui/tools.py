@@ -13,6 +13,7 @@
 # which legitimately requires many return statements.
 
 import functools
+import hashlib
 import inspect
 import json
 from datetime import datetime, timezone
@@ -50,10 +51,12 @@ from .io import (
 )
 from .validation import (
     FilenameFormatError,
+    current_project_name,
     ensure_filename_format,
     resolve_project_path,
     validate_project,
 )
+from .workspace import current_workspace_root
 
 # Initialize MCP server app
 app = MCPServer(
@@ -465,6 +468,15 @@ def _run_algorithm(
         "remote": resolved_remote,
         "force_rerun": overwrite,
     }
+    project_name = current_project_name()
+    owner = None
+    if project_name is not None:
+        workspace_root = current_workspace_root()
+        owner = {
+            "workspace_root": str(workspace_root) if workspace_root is not None else None,
+            "project_name": project_name,
+        }
+        sdk_kwargs["_owner"] = owner
     if cache is not None:
         sdk_kwargs["cache"] = resolved_cache
     else:
@@ -495,7 +507,7 @@ def _run_algorithm(
 
         def on_job_submitted(job: Job) -> None:
             if not submitted.done():
-                job.save(config.jobs_dir / f"{run_hash}.job.json")
+                job.save(_job_record_path(job, run_hash))
                 submitted.set_result(job)
 
         pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
@@ -789,22 +801,11 @@ def list_project_files(project_name: str) -> dict | str:
 def _get_loadable_data_classes() -> list[type]:
     """Auto-discover serializable data classes from ``qdk_chemistry.data``.
 
-    Returns classes that have a ``_data_type_name`` and ``from_json_file``
-    — i.e., those that can be loaded from project files.
+    Returns registered classes that provide ``from_json_file`` and can therefore
+    be loaded from project files.
 
     """
-    classes = []
-    for name in data.__all__:
-        cls = getattr(data, name, None)
-        type_name = getattr(cls, "_data_type_name", None) if cls is not None else None
-        if (
-            cls is not None
-            and inspect.isclass(cls)
-            and (type_name is not None or name == "MajoranaMapping")
-            and hasattr(cls, "from_json_file")
-        ):
-            classes.append(cls)
-    return classes
+    return [cls for cls in data.available_dataclasses().values() if callable(getattr(cls, "from_json_file", None))]
 
 
 @app.tool()
@@ -4732,10 +4733,28 @@ def _get_default_cache() -> FolderCache:
     return FolderCache(path=config.cache_dir)
 
 
-def _discover_cached_jobs() -> list[Job]:
-    """Discover job files in the jobs directory with cache fallback."""
+def _current_job_owner(project_name: str) -> dict[str, str | None]:
+    """Return the workspace and project owner for a job-management request."""
+    workspace_root = current_workspace_root()
+    return {
+        "workspace_root": str(workspace_root) if workspace_root is not None else None,
+        "project_name": project_name,
+    }
+
+
+def _job_record_path(job: Job, run_hash: str) -> Path:
+    """Return an owner-scoped path for a durable MCP job record."""
+    if job.owner is None:
+        return config.jobs_dir / f"{run_hash}.job.json"
+    owner_json = json.dumps(job.owner, sort_keys=True, separators=(",", ":"))
+    owner_digest = hashlib.sha256(owner_json.encode()).hexdigest()[:16]
+    return config.jobs_dir / f"{owner_digest}.{run_hash}.job.json"
+
+
+def _discover_cached_jobs(owner: dict[str, str | None]) -> list[Job]:
+    """Discover only job files owned by the requesting workspace and project."""
     jobs = []
-    seen: set[str] = set()
+    seen: set[tuple[str, str | None]] = set()
     for jobs_dir in (config.jobs_dir, config.cache_dir):
         if not jobs_dir.exists():
             continue
@@ -4744,14 +4763,17 @@ def _discover_cached_jobs() -> list[Job]:
                 job = Job.load(p)
             except (json.JSONDecodeError, KeyError, OSError, ValueError):
                 continue
-            if job.job_id in seen:
+            if job.owner != owner:
                 continue
-            seen.add(job.job_id)
+            identity = (job.job_id, job.run_hash)
+            if identity in seen:
+                continue
+            seen.add(identity)
             jobs.append(job)
     return jobs
 
 
-def _load_remote_job(job_id: str):
+def _load_remote_job(job_id: str, owner: dict[str, str | None]):
     """Load a Job by its job_id from the configured job directories.
 
     Scans all discovered job files to find the one matching the given job_id.
@@ -4760,9 +4782,11 @@ def _load_remote_job(job_id: str):
         (Job, None) on success, or (None, error_string) on failure.
 
     """
-    for job in _discover_cached_jobs():
-        if job.job_id == job_id:
-            return job, None
+    matches = [job for job in _discover_cached_jobs(owner) if job.job_id == job_id]
+    if len(matches) == 1:
+        return matches[0], None
+    if len(matches) > 1:
+        return None, f"Multiple remote jobs found with id '{job_id}' for this project."
     return None, f"No remote job found with id '{job_id}' in {config.cache_dir} or {config.jobs_dir}."
 
 
@@ -4791,7 +4815,7 @@ def check_remote_job(
     if err:
         return err
 
-    job, load_err = _load_remote_job(job_id)
+    job, load_err = _load_remote_job(job_id, _current_job_owner(project_name))
     if load_err:
         return load_err
 
@@ -4860,7 +4884,7 @@ def retrieve_remote_results(
     if err:
         return err
 
-    job, load_err = _load_remote_job(job_id)
+    job, load_err = _load_remote_job(job_id, _current_job_owner(project_name))
     if load_err:
         return load_err
 
@@ -4930,7 +4954,7 @@ def list_remote_jobs(
     if err:
         return err
 
-    all_jobs = _discover_cached_jobs()
+    all_jobs = _discover_cached_jobs(_current_job_owner(project_name))
 
     jobs = []
     for j in all_jobs:
@@ -4974,7 +4998,7 @@ def cancel_remote_job(
     if err:
         return err
 
-    job, load_err = _load_remote_job(job_id)
+    job, load_err = _load_remote_job(job_id, _current_job_owner(project_name))
     if load_err:
         return load_err
 

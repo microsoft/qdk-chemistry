@@ -190,6 +190,7 @@ def run(
     remote: Any = None,
     force_rerun: bool = False,
     _on_job_submitted: Callable[[Job], None] | None = None,
+    _owner: dict[str, str | None] | None = None,
     **kwargs: Any,
 ) -> Any:
     """Execute any algorithm with optional caching and remote backend.
@@ -217,6 +218,7 @@ def run(
             overwriting any previously cached result.
         _on_job_submitted: Internal callback invoked after a remote job handle
             is persisted to the local cache.
+        _owner: Internal workspace and project ownership for MCP-managed jobs.
         **kwargs: Keyword arguments for ``algorithm.run()``.
 
     Returns:
@@ -246,6 +248,8 @@ def run(
         return _run_uncached(algorithm, remote, args, kwargs)
 
     payload = _build_payload_for(algorithm, args, kwargs)
+    if _owner is not None:
+        payload["owner"] = _owner
     run_hash = payload.get("run_hash")
     if run_hash is None:
         return _run_uncached(algorithm, remote, args, kwargs)
@@ -255,7 +259,8 @@ def run(
         job = resolved_cache.get_job(run_hash)
 
         if job is not None:
-            if remote is not None and not isinstance(remote, str):
+            owner_matches = _owner is None or job.owner == _owner
+            if owner_matches and remote is not None and not isinstance(remote, str):
                 job.attach_backend(remote)
 
             # 1a) Completed with outputs → reconstruct
@@ -265,13 +270,13 @@ def run(
                     return result
 
             # 1b) Still in-flight → resume polling
-            if not job.is_terminal:
+            if not job.is_terminal and owner_matches:
                 if _on_job_submitted is not None:
                     _on_job_submitted(job)
                 job.wait()
 
             # 1c) Execution finished but cached outputs are unavailable → fetch again
-            if job.is_successful:
+            if job.is_successful and owner_matches:
                 result = job.fetch()
                 _store_result(resolved_cache, run_hash, job, result)
                 return result
@@ -307,6 +312,7 @@ def run(
                 payload["force_rerun"] = True
 
             job = backend.submit(payload)
+            job.owner = _owner
             job.attach_backend(backend)
             job.run_hash = run_hash
             resolved_cache.put_job(run_hash, job)
@@ -359,6 +365,7 @@ def run(
             status="retrieved",
             run_hash=run_hash,
             input_hashes=payload.get("input_hashes"),
+            owner=_owner,
         )
 
     _store_result(resolved_cache, run_hash, job, result)

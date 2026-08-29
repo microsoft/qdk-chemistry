@@ -5,15 +5,16 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import inspect
 import os
 import threading
 from collections.abc import Callable
+from contextvars import ContextVar
 from functools import wraps
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, TypeVar, cast
 
 from qdk_chemistry import data
+from qdk_chemistry.data._type_name import class_data_type_name
 
 from .config import config
 
@@ -21,6 +22,12 @@ F = TypeVar("F", bound=Callable[..., Any])
 T = TypeVar("T")
 
 _PROJECT_CWD_LOCK = threading.RLock()
+_CURRENT_PROJECT_NAME: ContextVar[str | None] = ContextVar("qdk_current_project_name", default=None)
+
+
+def current_project_name() -> str | None:
+    """Return the project currently validated for this execution context."""
+    return _CURRENT_PROJECT_NAME.get()
 
 
 class FilenameFormatError(Exception):
@@ -66,25 +73,22 @@ def resolve_project_path(project_name: str, projects_dir: str | Path) -> tuple[P
 def _build_data_type_markers() -> dict[str, str]:
     """Build the data type to filename marker mapping from qdk_chemistry.data classes.
 
-    This function discovers all data classes that have a `_data_type_name` attribute
-    and builds a mapping from class name to the filename marker (e.g., ".structure.").
+    This function discovers public names for registered data classes and builds a
+    mapping from class name to the filename marker (e.g., ".structure.").
 
     Returns:
         dict[str, str]: Mapping from class name to filename marker
 
     """
+    registered_classes = set(data.available_dataclasses().values())
     markers = {}
     for name in data.__all__:
         obj = getattr(data, name, None)
-        if obj is None or not inspect.isclass(obj):
+        if not isinstance(obj, type) or obj not in registered_classes:
             continue
 
-        # Get _data_type_name if it exists and is not None
-        type_name = getattr(obj, "_data_type_name", None)
-        if type_name is None and name == "MajoranaMapping":
-            type_name = "majorana_mapping"
-        if type_name is not None:
-            markers[name] = f".{type_name}."
+        type_name = class_data_type_name(obj)
+        markers[name] = f".{type_name}."
 
     return markers
 
@@ -181,8 +185,11 @@ def validate_project(func: F) -> F:
                 if not is_valid:
                     return f"Project validation failed: {message} for project_name: {project_name}"
 
-                #  proceed with original function
-                return func(project_name, *args, **kwargs)
+                token = _CURRENT_PROJECT_NAME.set(project_name)
+                try:
+                    return func(project_name, *args, **kwargs)
+                finally:
+                    _CURRENT_PROJECT_NAME.reset(token)
             finally:
                 os.chdir(original_cwd)
 

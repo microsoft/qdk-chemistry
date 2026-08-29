@@ -374,7 +374,7 @@ TEST_F(ModelOrbitalsTest, SimpleRestrictedJSONRoundTrip) {
 TEST_F(ModelOrbitalsTest, EmptyActiveSpaceHDF5RoundTrip) {
   const size_t basis_size = 3;
   const std::vector<size_t> inactive_indices = {0, 1};
-    const std::string filename = "test_model.orbitals.h5";
+  const std::string filename = "test_model.orbitals.h5";
   ModelOrbitals original(trivial_iset(basis_size, {}),
                          trivial_iset(basis_size, inactive_indices));
 

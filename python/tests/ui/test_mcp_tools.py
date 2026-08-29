@@ -90,6 +90,13 @@ def test_list_project_files(h2_proj):
     assert "h2.structure.json" in names
 
 
+def test_get_summary_loads_registered_data_class(h2_proj):
+    result = srv.get_summary(project_name=h2_proj, filename="h2.structure.json")
+
+    assert result["status"] == "ok"
+    assert result["result"]["data_type"] == "Structure"
+
+
 @pytest.mark.usefixtures("_dirs")
 def test_list_project_files_nonexistent():
     assert srv.list_project_files(project_name="nope")["status"] == "error"
@@ -412,6 +419,28 @@ def test_run_population_analysis_tool(h2_proj):
     assert run_algorithm.call_args.kwargs["remote"] == "local"
 
 
+def test_run_scf_accepts_wavefunction_output(h2_proj):
+    algorithm = MagicMock()
+    wavefunction = MagicMock()
+    with (
+        patch("qdk_chemistry.ui.tools.algorithms.create", return_value=algorithm),
+        patch("qdk_chemistry.ui.tools._run_algorithm", return_value=(-1.0, wavefunction)) as run_algorithm,
+        patch("qdk_chemistry.ui.tools.save_data_object") as save_data_object,
+    ):
+        result = srv.run_scf(
+            project_name=h2_proj,
+            structure_filename="h2.structure.json",
+            out_wavefunction_filename="result.json",
+            charge=0,
+            spin_multiplicity=1,
+            basis_set="sto-3g",
+        )
+
+    assert result == {"status": "ok", "result": [-1.0, "result.wavefunction.json"]}
+    run_algorithm.assert_called_once()
+    save_data_object.assert_called_once_with(wavefunction, "result.wavefunction.json")
+
+
 def test_controlled_evolution_mapper_uses_common_execution_path(h2_proj):
     algorithm = MagicMock()
     unitary = MagicMock()
@@ -491,36 +520,166 @@ def test_structured_catches_job_submitted():
 
 @pytest.mark.usefixtures("_dirs")
 def test_discover_and_load_job():
-    j = Job(job_id="abc", backend="local", backend_config={}, backend_state={}, run_hash="h1")
+    owner = srv._current_job_owner("project-a")
+    j = Job(job_id="abc", backend="local", backend_config={}, backend_state={}, run_hash="h1", owner=owner)
     j.save(config.jobs_dir / "h1.job.json")
 
-    found = srv._discover_cached_jobs()
+    found = srv._discover_cached_jobs(owner)
     assert any(x.job_id == "abc" for x in found)
 
-    loaded, err = srv._load_remote_job("abc")
+    loaded, err = srv._load_remote_job("abc", owner)
     assert err is None
     assert loaded.job_id == "abc"
 
-    _, err2 = srv._load_remote_job("missing")
+    _, err2 = srv._load_remote_job("missing", owner)
     assert err2 is not None
 
 
 @pytest.mark.usefixtures("_dirs")
 def test_discover_prefers_jobs_dir_over_cache_copy():
-    Job(job_id="abc", backend="local", backend_config={}, backend_state={}, status="running").save(
+    owner = srv._current_job_owner("project-a")
+    Job(job_id="abc", backend="local", backend_config={}, backend_state={}, status="running", owner=owner).save(
         config.cache_dir / "h1.job.json"
     )
-    Job(job_id="abc", backend="local", backend_config={}, backend_state={}, status="Succeeded").save(
+    Job(job_id="abc", backend="local", backend_config={}, backend_state={}, status="Succeeded", owner=owner).save(
         config.jobs_dir / "h1.job.json"
     )
 
-    found = [job for job in srv._discover_cached_jobs() if job.job_id == "abc"]
-    loaded, err = srv._load_remote_job("abc")
+    found = [job for job in srv._discover_cached_jobs(owner) if job.job_id == "abc"]
+    loaded, err = srv._load_remote_job("abc", owner)
 
     assert len(found) == 1
     assert found[0].status == "Succeeded"
     assert err is None
     assert loaded.file_path.parent == config.jobs_dir
+
+
+@pytest.mark.usefixtures("_dirs")
+def test_job_record_paths_are_scoped_by_owner():
+    first = Job(
+        job_id="first",
+        backend="local",
+        backend_config={},
+        backend_state={},
+        owner=srv._current_job_owner("project-a"),
+    )
+    second = Job(
+        job_id="second",
+        backend="local",
+        backend_config={},
+        backend_state={},
+        owner=srv._current_job_owner("project-b"),
+    )
+
+    assert srv._job_record_path(first, "same-run") != srv._job_record_path(second, "same-run")
+
+
+@pytest.mark.usefixtures("_dirs")
+def test_list_remote_jobs_only_returns_current_project_jobs():
+    current_owner = srv._current_job_owner("project-a")
+    other_owner = srv._current_job_owner("project-b")
+    Job(job_id="current", backend="local", backend_config={}, backend_state={}, owner=current_owner).save(
+        config.jobs_dir / "current.job.json"
+    )
+    Job(job_id="other", backend="local", backend_config={}, backend_state={}, owner=other_owner).save(
+        config.jobs_dir / "other.job.json"
+    )
+    Job(job_id="legacy", backend="local", backend_config={}, backend_state={}).save(config.jobs_dir / "legacy.job.json")
+
+    result = srv.list_remote_jobs(project_name="project-a")
+
+    assert result["status"] == "ok"
+    assert [job["job_id"] for job in result["result"]["jobs"]] == ["current"]
+
+
+@pytest.mark.usefixtures("_dirs")
+@pytest.mark.parametrize(
+    ("tool", "operation"),
+    [
+        (srv.check_remote_job, "check"),
+        (srv.retrieve_remote_results, "fetch"),
+        (srv.cancel_remote_job, "cancel"),
+    ],
+)
+def test_remote_job_operations_hide_jobs_owned_by_other_projects(tool, operation):
+    Job(
+        job_id="other",
+        backend="local",
+        backend_config={},
+        backend_state={},
+        owner=srv._current_job_owner("project-b"),
+    ).save(config.jobs_dir / "other.job.json")
+
+    with patch.object(Job, operation) as backend_operation:
+        result = tool(project_name="project-a", job_id="other")
+
+    assert result["status"] == "error"
+    assert "No remote job found" in result["message"]
+    backend_operation.assert_not_called()
+
+
+@pytest.mark.usefixtures("_dirs")
+@pytest.mark.parametrize(
+    ("tool", "operation"),
+    [
+        (srv.check_remote_job, "check"),
+        (srv.retrieve_remote_results, "fetch"),
+        (srv.cancel_remote_job, "cancel"),
+    ],
+)
+def test_remote_job_operations_hide_ownerless_jobs(tool, operation):
+    Job(job_id="legacy", backend="local", backend_config={}, backend_state={}).save(config.jobs_dir / "legacy.job.json")
+
+    with patch.object(Job, operation) as backend_operation:
+        result = tool(project_name="project-a", job_id="legacy")
+
+    assert result["status"] == "error"
+    assert "No remote job found" in result["message"]
+    backend_operation.assert_not_called()
+
+
+@pytest.mark.usefixtures("_dirs")
+def test_remote_job_lookup_filters_owner_before_duplicate_job_ids():
+    current_owner = srv._current_job_owner("project-a")
+    Job(
+        job_id="shared-id",
+        backend="local",
+        backend_config={},
+        backend_state={"operation": "foreign"},
+        run_hash="foreign-run",
+        owner=srv._current_job_owner("project-b"),
+    ).save(config.jobs_dir / "foreign.job.json")
+    Job(
+        job_id="shared-id",
+        backend="local",
+        backend_config={},
+        backend_state={"operation": "current"},
+        run_hash="current-run",
+        owner=current_owner,
+    ).save(config.cache_dir / "current.job.json")
+
+    job, error = srv._load_remote_job("shared-id", current_owner)
+
+    assert error is None
+    assert job.backend_state == {"operation": "current"}
+
+
+@pytest.mark.usefixtures("_dirs")
+def test_remote_job_operations_hide_jobs_owned_by_other_workspaces():
+    owner = {"workspace_root": "/workspace-a", "project_name": "project-a"}
+    Job(job_id="other", backend="local", backend_config={}, backend_state={}, owner=owner).save(
+        config.jobs_dir / "other.job.json"
+    )
+
+    with (
+        patch.object(srv, "current_workspace_root", return_value=Path("/workspace-b")),
+        patch.object(Job, "cancel") as cancel,
+    ):
+        result = srv.cancel_remote_job(project_name="project-a", job_id="other")
+
+    assert result["status"] == "error"
+    assert "No remote job found" in result["message"]
+    cancel.assert_not_called()
 
 
 # ── Config ───────────────────────────────────────────────────────────────

@@ -95,6 +95,9 @@ class TestProjectValidation:
 class TestFilenameFormat:
     """Test invalid filename format handling."""
 
+    def test_accepts_known_data_type(self):
+        assert ensure_filename_format("wavefunction.json", "Wavefunction") == "wavefunction.wavefunction.json"
+
     def test_rejects_unknown_data_type(self):
-        with pytest.raises(FilenameFormatError, match="Unrecognized data type 'Wavefunction'"):
-            ensure_filename_format("wavefunction.json", "Wavefunction")
+        with pytest.raises(FilenameFormatError, match="Unrecognized data type 'UnknownDataType'"):
+            ensure_filename_format("output.json", "UnknownDataType")
