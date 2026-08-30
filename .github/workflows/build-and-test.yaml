@@ -630,14 +630,10 @@ jobs:
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: deps-install-${{ matrix.compiler }}
-        # github.workspace is part of the key, not just the fingerprint: libint2 (and
-        # other FetchContent deps built by install-cpp-deps-windows.ps1) bake their
-        # install prefix as an absolute path into their exported CMake package config,
-        # since they are not relocatable installs. Runners in the same self-hosted pool
-        # can map the workspace to different drives (observed: C:\a\_work vs N:\_work),
-        # so a cache saved on one and restored on the other leaves
-        # Libint2Config.cmake pointing at a path that does not exist on this machine,
-        # failing CMake configure with "includes non-existent path".
+        # libint2's CMakeLists.txt bakes the absolute CMAKE_INSTALL_PREFIX into its
+        # exported target (INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/include, not the
+        # relocatable ${_IMPORT_PREFIX} form), so runners on this pool that mount the
+        # workspace under different drives cannot share a deps-install cache entry.
         key: >-
           windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ github.workspace }}-${{ steps.deps-fp.outputs.fingerprint }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/toolchains/windows.cmake', 'vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
 
@@ -857,14 +853,10 @@ jobs:
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: deps-install-${{ matrix.compiler }}
-        # github.workspace is part of the key, not just the fingerprint: libint2 (and
-        # other FetchContent deps built by install-cpp-deps-windows.ps1) bake their
-        # install prefix as an absolute path into their exported CMake package config,
-        # since they are not relocatable installs. Runners in the same self-hosted pool
-        # can map the workspace to different drives (observed: C:\a\_work vs N:\_work),
-        # so a cache saved on one and restored on the other leaves
-        # Libint2Config.cmake pointing at a path that does not exist on this machine,
-        # failing CMake configure with "includes non-existent path".
+        # libint2's CMakeLists.txt bakes the absolute CMAKE_INSTALL_PREFIX into its
+        # exported target (INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/include, not the
+        # relocatable ${_IMPORT_PREFIX} form), so runners on this pool that mount the
+        # workspace under different drives cannot share a deps-install cache entry.
         key: >-
           windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ github.workspace }}-${{ steps.deps-fp.outputs.fingerprint }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/toolchains/windows.cmake', 'vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
 

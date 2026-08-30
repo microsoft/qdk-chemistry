@@ -60,10 +60,7 @@ coverage = [
   "gcovr"
 ]
 discovery = [
-  # azure-identity (via msal) and azure-storage-blob both pull in cryptography,
-  # which publishes no win-arm64 wheel and needs a Rust toolchain plus OpenSSL
-  # dev headers to build from source -- neither is provisioned on the ARM64
-  # runners. Skip discovery there, matching the qiskit-extras/plugins pattern.
+  # azure-identity (via msal) and azure-storage-blob both pull in cryptography, which publishes no win-arm64 wheel
   "azure-ai-discovery==1.0.0; sys_platform != 'win32' or platform_machine != 'ARM64'",
   "azure-identity>=1.19.0,<2; sys_platform != 'win32' or platform_machine != 'ARM64'",
   "azure-storage-blob>=12.25.0,<13; sys_platform != 'win32' or platform_machine != 'ARM64'"
@@ -105,9 +102,7 @@ plugins = [
   "pyscf>=2.9.0,<2.12.1; sys_platform != 'win32'"
 ]
 qiskit-extras = [
-  # The qiskit stack and pennylane both require rustworkx, which publishes no
-  # win-arm64 wheels and whose sdist needs a Rust toolchain, so the whole stack
-  # is unavailable on Windows ARM64. QDK_CHEMISTRY_HAS_QISKIT* guard its use.
+  # The qiskit stack and pennylane both require rustworkx, which publishes no win-arm64 wheels
   "qiskit[qasm3-import]>=2.2.0; sys_platform != 'win32' or platform_machine != 'ARM64'",
   # cp314 manylinux aarch64 wheel not available
   "qiskit-aer; (python_version < '3.14' or platform_machine != 'aarch64' or sys_platform != 'linux') and (sys_platform != 'win32' or platform_machine != 'ARM64')",
@@ -124,8 +119,7 @@ test = [
   "qdk-chemistry[coverage,discovery,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre]",
   "nbclient",
   "nbformat",
-  # pennylane also requires rustworkx (see qiskit-extras); the sample test skips
-  # when it is absent.
+  # pennylane also requires rustworkx (see qiskit-extras); the sample test skips when it is absent.
   "pennylane; sys_platform != 'win32' or platform_machine != 'ARM64'",
   # rdkit publishes no win-arm64 wheels; the sample test skips when it is absent.
   "rdkit; sys_platform != 'win32' or platform_machine != 'ARM64'",

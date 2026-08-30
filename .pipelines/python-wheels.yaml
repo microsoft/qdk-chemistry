@@ -134,9 +134,8 @@ extends:
           parameters:
             march: x86-64-v3
 
-      # Same rationale for Windows ARM64, on the 1ES ARM64 pool.
-      # hostArchitecture is required: the 1ES template otherwise defaults it to
-      # amd64, which provisions an x64-emulated agent on the ARM64 image.
+      # Same rationale for Windows ARM64, on the 1ES ARM64 pool. hostArchitecture
+      # avoids the 1ES template defaulting to an x64-emulated agent.
       - job: Build_windows_aarch64_deps
         pool:
           name: aqe-1es-Dpds_v6-arm-pool

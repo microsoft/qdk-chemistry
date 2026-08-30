@@ -38,8 +38,8 @@ elseif(CMAKE_C_COMPILER_ID STREQUAL "MSVC" AND
     # hangs inside dgetrf above the getf2 crossover -- so it must not be allowed
     # to happen by accident. The portfile selects clang-cl for this target.
     message(FATAL_ERROR
-        "OpenBLAS for Windows ARM64 must be built with clang-cl: MSVC cannot "
-        "assemble the ARM64 kernels, and the GENERIC fallback hangs in getrf.")
+        "OpenBLAS for Windows ARM must be built with clang-cl: MSVC cannot "
+        "assemble the ARM kernels, and the GENERIC fallback hangs in getrf.")
 else()
     message(STATUS "TARGET: <native> (OpenBLAS getarch/getarch_2nd)")
 endif()
