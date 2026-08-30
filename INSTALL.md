@@ -86,7 +86,7 @@ If you chose the minimal `pip install qdk-chemistry` above, you can add specific
 | `openfermion-extras` | OpenFermion ecosystem packages | openfermion |
 | `networkx-extras` | NetworkX ecosystem packages | networkx |
 | `docs` | [Sphinx documentation build tools](docs/README.md) | sphinx, sphinx-rtd-theme, myst-parser, breathe, sphinx-autodoc-typehints, sphinx-inline-tabs, sphinxcontrib-napoleon, sphinxcontrib-bibtex, sphinx_copybutton |
-| `qre` | Quantum Resource Estimator support | qdk[qre,jupyter]>=1.30.0 |
+| `qre` | Quantum Resource Estimator support | qdk[qre,jupyter]>=1.31.0 |
 | `dev` | Development and testing tools | pytest, ruff, mypy, and related tooling |
 | `test` | Testing tools and optional runtime dependencies; does not include `docs` | qdk-chemistry[coverage,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre], nbclient, nbformat, pennylane, rdkit, requests>=2.33.0 |
 | `all` | **All of the above** | All optional dependencies |
