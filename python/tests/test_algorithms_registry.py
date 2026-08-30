@@ -606,6 +606,25 @@ _REGISTERED_PAIRS = _all_registered_pairs()
     _REGISTERED_PAIRS,
     ids=[f"{t}/{n}" for t, n in _REGISTERED_PAIRS],
 )
+def test_all_registered_algorithms_expose_aliases(algorithm_type: str, algorithm_name: str):
+    """Every registered algorithm exposes aliases through the Python API."""
+    try:
+        algorithm = registry.create(algorithm_type, algorithm_name)
+    except (ImportError, RuntimeError) as exc:
+        pytest.skip(f"cannot instantiate {algorithm_type}/{algorithm_name}: {exc}")
+
+    aliases = algorithm.aliases()
+
+    assert isinstance(aliases, list)
+    assert algorithm.name() in aliases
+    assert algorithm_name in aliases
+
+
+@pytest.mark.parametrize(
+    ("algorithm_type", "algorithm_name"),
+    _REGISTERED_PAIRS,
+    ids=[f"{t}/{n}" for t, n in _REGISTERED_PAIRS],
+)
 class TestStringSettingsHaveGuidance:
     """Every string-typed setting must expose a description or an allowed-values list."""
 

@@ -155,6 +155,16 @@ Returns:
 
 )");
 
+  pmc_calculator.def("aliases",
+                     &ProjectedMultiConfigurationCalculator::aliases,
+                     R"(
+The algorithm's aliases.
+
+Returns:
+    list[str]: All registered names for the algorithm
+
+)");
+
   pmc_calculator.def("type_name",
                      &ProjectedMultiConfigurationCalculator::type_name,
                      R"(

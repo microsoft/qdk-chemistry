@@ -80,6 +80,8 @@ Returns:
       R"(Internal settings replacement hook for Python subclasses.)");
   analyzer.def("name", &PopulationAnalyzer::name,
                R"(Return the implementation name.)");
+  analyzer.def("aliases", &PopulationAnalyzer::aliases,
+               R"(Return all registered names for the implementation.)");
   analyzer.def("type_name", &PopulationAnalyzer::type_name,
                R"(Return the algorithm type name.)");
   analyzer.def("__repr__", [](const PopulationAnalyzer& self) {

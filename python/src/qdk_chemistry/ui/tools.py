@@ -678,15 +678,7 @@ def describe_algorithm(algorithm_type: str, algorithm_name: str | None = None) -
     instance = algorithms.create(algorithm_type, algorithm_name)
     canonical_name = instance.name()
     selected_name = algorithm_name or canonical_name
-    aliases_method = getattr(instance, "aliases", None)
-    if callable(aliases_method):
-        aliases = set(aliases_method())
-    else:
-        aliases = {
-            name
-            for name in algorithms.available(algorithm_type)
-            if algorithms.create(algorithm_type, name).name() == canonical_name
-        }
+    aliases = set(instance.aliases())
     aliases.add(canonical_name)
     setting_schema = []
     for name, python_type, default, description, limits in algorithms.inspect_settings(algorithm_type, selected_name):
