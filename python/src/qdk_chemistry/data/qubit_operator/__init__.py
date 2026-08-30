@@ -45,7 +45,7 @@ class QubitOperator(DataClass):
 
     Attributes:
         pauli_strings (list[str]): List of Pauli strings representing the ``QubitOperator``.
-        term_partition (TermPartition | None): Optional index-based partition of
+        term_partition (~qdk_chemistry.data.term_partition.TermPartition | None): Optional index-based partition of
             :attr:`pauli_strings` into algorithm-relevant groups.
 
     """

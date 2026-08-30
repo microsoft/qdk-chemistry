@@ -68,10 +68,12 @@ class PauliLCUContainer(QubitOperatorContainer):
         coefficients (numpy.ndarray): Array of coefficients corresponding to each Pauli string.
         encoding (str | None): The fermion-to-qubit encoding used to create this operator
             (e.g., "jordan-wigner", "bravyi-kitaev", "parity"). If None, encoding is not specified.
-        fermion_mode_order (FermionModeOrder | None): The fermion mode ordering convention used
+        fermion_mode_order (~qdk_chemistry.data.enums.fermion_mode_order.FermionModeOrder | None):
+            The fermion mode ordering convention used
             when mapping fermionic modes to qubits (``"blocked"`` or ``"interleaved"``). If None,
             the ordering is unspecified or not applicable.
-        term_partition (TermPartition | None): Optional index-based partition of
+        term_partition (~qdk_chemistry.data.term_partition.TermPartition | None):
+            Optional index-based partition of
             :attr:`pauli_strings` into algorithm-relevant groups (and, for layered
             partitions, into parallelisable layers within each group).  Set by
             geometry-aware constructors and by ``term_grouper`` algorithms; reset
