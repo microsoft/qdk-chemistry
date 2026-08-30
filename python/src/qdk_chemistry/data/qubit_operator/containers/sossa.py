@@ -51,26 +51,28 @@ class RotatedPaulis:
 
 @dataclass(frozen=True)
 class FactorizedHamiltonianMetadata:
-    r"""Dimensions and scalar constants of a factorized Hamiltonian's sum-of-squares form.
-
-    Attributes:
-        num_spatial_orbitals: Number of spatial orbitals :math:`N`.
-        num_ranks: Number of DFTHC ranks :math:`R`.
-        num_bases: Number of bases :math:`B` (``B + 1`` inner entries including the identity).
-        num_copies: Number of copies :math:`C`.
-        num_positive_one_body_terms: Number of D1 (particle) one-body generators.
-        energy_shift: Constant offset :math:`E_{\text{SOS}} + E_{\text{nuc}}`.
-        normalization: Block-encoding normalization :math:`\Lambda`, or ``None`` before it is built.
-
-    """
+    r"""Dimensions and scalar constants of a factorized Hamiltonian's sum-of-squares form."""
 
     num_spatial_orbitals: int
+    r"""Number of spatial orbitals :math:`N`."""
+
     num_ranks: int
+    r"""Number of DFTHC ranks :math:`R`."""
+
     num_bases: int
+    r"""Number of bases :math:`B` (``B + 1`` inner entries including the identity)."""
+
     num_copies: int
+    r"""Number of copies :math:`C`."""
+
     num_positive_one_body_terms: int
+    """Number of D1 (particle) one-body generators."""
+
     energy_shift: float
+    r"""Constant offset :math:`E_{\text{SOS}} + E_{\text{nuc}}`."""
+
     normalization: float | None = None
+    r"""Block-encoding normalization :math:`\Lambda`, or ``None`` before it is built."""
 
     def __post_init__(self) -> None:
         """Coerce the shift and reject dimensions no register width can be built from."""

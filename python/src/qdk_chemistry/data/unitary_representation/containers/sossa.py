@@ -32,20 +32,19 @@ __all__ = ["SOSSAInnerPrepare", "SOSSARegisterLayout", "SOSSASelect", "SOSSAWalk
 
 @dataclass(frozen=True)
 class SOSSARegisterLayout:
-    r"""Structural register layout of a SOSSA block encoding.
-
-    Attributes:
-        outer_prep_bits: Width of the outer index register :math:`x_o`.
-        inner_prep_bits: Width of the inner index register :math:`b`.
-        rank_bits: Width of the rank index carried in the free-rider register.
-        num_free_rider_bits: ``2 + rank_bits``, for ``isSF``, ``dvsq`` and the rank.
-
-    """
+    r"""Structural register layout of a SOSSA block encoding."""
 
     outer_prep_bits: int
+    r"""Width of the outer index register :math:`x_o`."""
+
     inner_prep_bits: int
+    r"""Width of the inner index register :math:`b`."""
+
     rank_bits: int
+    """Width of the rank index carried in the free-rider register."""
+
     num_free_rider_bits: int
+    """``2 + rank_bits``, for ``isSF``, ``dvsq`` and the rank."""
 
     def to_json(self) -> dict[str, Any]:
         """Convert the layout to a JSON dictionary."""
