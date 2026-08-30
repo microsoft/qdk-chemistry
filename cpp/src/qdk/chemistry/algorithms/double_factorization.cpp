@@ -34,6 +34,20 @@ std::vector<TwoBodyFragment> eigen_decompose_two_body(
     double truncation_threshold) {
   QDK_LOG_TRACE_ENTERING();
 
+  if (norb == 0) {
+    throw std::invalid_argument(
+        "eigen_decompose_two_body: norb must be greater than zero.");
+  }
+  // Written as a negated non-negative test so NaN is rejected too; a NaN
+  // threshold would compare false against every eigenvalue and silently
+  // retain the whole decomposition.
+  if (!(truncation_threshold >= 0.0)) {
+    throw std::invalid_argument(
+        "eigen_decompose_two_body: truncation_threshold must be "
+        "non-negative, got " +
+        std::to_string(truncation_threshold) + ".");
+  }
+
   const std::size_t pair_dim = norb * norb;
   const std::size_t expected = pair_dim * pair_dim;
   if (static_cast<std::size_t>(two_body_integrals.size()) != expected) {
@@ -164,7 +178,7 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
     throw std::invalid_argument(
         "DoubleFactorizer: truncation_threshold=" +
         std::to_string(truncation_threshold) +
-        " leave the factorized Hamiltonian with no two-body term at all.");
+        " leaves the factorized Hamiltonian with no two-body term at all.");
   }
 
   // R = number of fragments, B = norb bases, C = 1

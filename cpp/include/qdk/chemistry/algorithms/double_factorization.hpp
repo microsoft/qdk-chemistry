@@ -43,11 +43,13 @@ struct TwoBodyFragment {
 /// p*norb^3 + q*norb^2 + r*norb + s, into low-rank fragments.
 ///
 /// @param two_body_integrals Flattened two-electron tensor, size norb^4.
-/// @param norb Number of (spatial) orbitals.
+/// @param norb Number of (spatial) orbitals. Must be greater than zero.
 /// @param truncation_threshold Fragments whose supermatrix eigenvalue
-///        magnitude falls below this threshold are dropped.
+///        magnitude falls below this threshold are dropped. Must be
+///        non-negative; 0.0 retains every fragment.
 /// @return The retained fragments, sorted by decreasing eigenvalue magnitude.
-/// @throws std::invalid_argument if `two_body_integrals` is not norb^4 long.
+/// @throws std::invalid_argument if `norb` is zero, if `truncation_threshold`
+///         is negative or NaN, or if `two_body_integrals` is not norb^4 long.
 /// @throws std::runtime_error if a LAPACK diagonalization fails.
 std::vector<TwoBodyFragment> eigen_decompose_two_body(
     const Eigen::VectorXd& two_body_integrals, std::size_t norb,
