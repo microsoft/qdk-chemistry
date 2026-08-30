@@ -89,14 +89,11 @@ def _compact_catalog():
         app.list_tools = list_tools
 
 
-def test_mcp_tool_descriptions_are_compact_by_default(monkeypatch):
-    monkeypatch.delenv("QDK_CHEM_MCP_COMPACT_TOOL_DESCRIPTIONS", raising=False)
+def test_mcp_tool_descriptions_are_always_compact(monkeypatch):
     monkeypatch.delenv("QDK_CHEM_MCP_STRIP_OUTPUT_SCHEMA", raising=False)
 
     defaults = _parse_args([])
-    assert defaults.compact_tool_descriptions is True
     assert defaults.strip_output_schema is False
-    assert _parse_args(["--no-compact-tool-descriptions"]).compact_tool_descriptions is False
     assert _parse_args(["--strip-output-schema"]).strip_output_schema is True
 
 
@@ -127,23 +124,23 @@ def test_live_mcp_catalog_has_compact_descriptions():
     descriptions = [tool.description or "" for tool in tools]
     assert "qdk-chemistry-mcp" in (app.instructions or "")
     assert _REVIEWED_TOOL_NAMES - _OPTIONAL_VISUALIZATION_TOOLS <= tool_names <= _REVIEWED_TOOL_NAMES
-    assert all("\n\n" not in description for description in descriptions)
+    assert all(description and "\n" not in description and len(description) <= 120 for description in descriptions)
     assert sum(len(description.encode()) for description in descriptions) < 16_000
 
 
-def test_compact_descriptions_retain_calling_invariants():
+def test_compact_descriptions_identify_tool_operations():
     descriptions = {tool.name: (tool.description or "").lower() for tool in _compact_catalog()}
     required_terms = {
         "create_structure": ("bohr", "convert_coordinates"),
-        "run_active_space_selector": ("charge", "autocas", "restricted", "rdm/mi"),
-        "run_multi_configuration_calculation": ("casci/sci", "rdm/mi", "autocas"),
-        "run_phase_estimation": ("full eigenvalue qpe", "phase bits", "evolution time", "invalid sentinels"),
-        "run_resource_estimation": ("exact circuit", "inline", "physical-qubit", "no result file"),
-        "get_circuit_stats": ("logical-qubit", "physical resources"),
-        "run_state_preparation": ("wavefunction", "saved circuit", "symmetric active spaces"),
-        "run_controlled_evolution_circuit_mapper": ("controlled circuit", "power=1", "upstream"),
-        "run_time_evolution_builder": ("exp(-iht)", "does not execute qpe"),
-        "run_scf": ("hf or dft", "wavefunction", "restricted hf"),
+        "run_active_space_selector": ("active-space selector", "wavefunction"),
+        "run_multi_configuration_calculation": ("multi-configuration calculation", "wavefunction"),
+        "run_phase_estimation": ("phase estimation", "qperesult"),
+        "run_resource_estimation": ("qdk qre", "pareto points"),
+        "get_circuit_stats": ("logical-qubit", "gate-count", "depth"),
+        "run_state_preparation": ("wavefunction", "circuit"),
+        "run_controlled_evolution_circuit_mapper": ("timeevolutionunitary", "controlled circuit"),
+        "run_time_evolution_builder": ("exp(-iht)", "timeevolutionunitary"),
+        "run_scf": ("hf or dft", "wavefunction"),
     }
     for tool_name, terms in required_terms.items():
         assert all(term in descriptions[tool_name] for term in terms), tool_name

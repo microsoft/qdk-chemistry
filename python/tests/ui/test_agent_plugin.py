@@ -12,12 +12,12 @@ from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[3]
 _PLUGIN = _ROOT / "copilot-plugins" / "qdk-chemistry"
-_EXPECTED_AGENTS = {"chemist", "quantum-agent", "reporter", "researcher", "reviewer"}
 _EXPECTED_SKILLS = {
     "qdk-chemistry-coding",
     "qdk-chemistry-mcp",
     "qdk-chemistry-overview",
     "remote-execution",
+    "visualization",
 }
 
 
@@ -29,11 +29,9 @@ def test_marketplace_lists_qdk_chemistry_plugin() -> None:
     assert marketplace["plugins"][0]["version"] == plugin["version"]
 
 
-def test_plugin_owns_complete_agent_and_skill_catalog() -> None:
-    agents = {path.name.removesuffix(".agent.md") for path in (_PLUGIN / "agents").glob("*.agent.md")}
+def test_plugin_owns_complete_skill_catalog() -> None:
     skills = {path.parent.name for path in (_PLUGIN / "skills").glob("*/SKILL.md")}
 
-    assert agents == _EXPECTED_AGENTS
     assert skills == _EXPECTED_SKILLS
     assert "{{QDK_CHEMISTRY_VERSION}}" not in "".join(
         path.read_text(encoding="utf-8") for path in _PLUGIN.rglob("*") if path.is_file()

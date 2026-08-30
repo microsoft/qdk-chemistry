@@ -156,6 +156,15 @@ Returns:
 
 )");
 
+  selector.def("aliases", &ActiveSpaceSelector::aliases,
+               R"(
+The algorithm's aliases.
+
+Returns:
+    list[str]: All registered names for the algorithm
+
+)");
+
   selector.def("type_name", &ActiveSpaceSelector::type_name,
                R"(
 The algorithm's type name.

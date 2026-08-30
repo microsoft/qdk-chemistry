@@ -108,16 +108,6 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         ),
     )
     p.add_argument(
-        "--compact-tool-descriptions",
-        action=argparse.BooleanOptionalAction,
-        default=os.environ.get("QDK_CHEM_MCP_COMPACT_TOOL_DESCRIPTIONS", "1").lower() in ("1", "true", "yes", "on"),
-        help=(
-            "Expose only each tool's summary paragraph in tools/list responses "
-            "(default; disable with --no-compact-tool-descriptions or "
-            "QDK_CHEM_MCP_COMPACT_TOOL_DESCRIPTIONS=0)"
-        ),
-    )
-    p.add_argument(
         "--stateless-http",
         action="store_true",
         default=os.environ.get("QDK_CHEM_MCP_STATELESS_HTTP", "").lower() in ("1", "true", "yes"),
@@ -201,11 +191,10 @@ def main() -> None:
     for name in ("qdk_chemistry", "qsharp", "pyscf", "mcp", "mcp.server"):
         logging.getLogger(name).setLevel(level)
 
-    if args.compact_tool_descriptions:
-        _install_tool_description_compactor()
-        logging.getLogger("qdk_chemistry").info(
-            "tools/list: descriptions will contain summary paragraphs only",
-        )
+    _install_tool_description_compactor()
+    logging.getLogger("qdk_chemistry").info(
+        "tools/list: descriptions contain summary paragraphs only",
+    )
 
     if args.strip_output_schema:
         _install_output_schema_stripper()

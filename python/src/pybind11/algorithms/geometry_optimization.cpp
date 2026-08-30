@@ -95,6 +95,8 @@ Returns:
       R"(Internal settings replacement hook for Python subclasses.)");
   optimizer.def("name", &GeometryOptimizer::name,
                 R"(Return the implementation name.)");
+  optimizer.def("aliases", &GeometryOptimizer::aliases,
+                R"(Return all registered names for the algorithm.)");
   optimizer.def("type_name", &GeometryOptimizer::type_name,
                 R"(Return the algorithm type name.)");
   optimizer.def("__repr__", [](const GeometryOptimizer& self) {

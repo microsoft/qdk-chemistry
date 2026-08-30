@@ -438,6 +438,7 @@ def register_visualization_tools(app) -> None:
         return _MINIMAL_TEST_HTML
 
     @app.tool(
+        description="Render a test square in VS Code MCP Apps.",
         meta={"ui": {"resourceUri": "ui://qdk-chem-mcp/test-square"}},
         structured_output=False,
     )
@@ -445,13 +446,7 @@ def register_visualization_tools(app) -> None:
         color: str = "#0078d4",
         label: str = "Hello MCP!",
     ) -> CallToolResult:
-        """Render a colored square in a VS Code MCP Apps host to test widget delivery.
-
-        Args:
-            color: CSS color for the square (default: blue)
-            label: Text to show inside the square
-
-        """
+        """Render a colored test square in VS Code MCP Apps."""
         return CallToolResult(
             content=[TextContent(type="text", text=f"Test square: {label} ({color})")],
             structuredContent={"color": color, "label": label},
@@ -476,6 +471,7 @@ def register_visualization_tools(app) -> None:
         return _circuit_bridge.receive_html(token)
 
     @app.tool(
+        description="Render a saved Circuit in VS Code MCP Apps.",
         meta={
             "ui": {"resourceUri": _circuit_bridge.resource_uri_template},
             "ui/resourceUri": _circuit_bridge.resource_uri_template,
@@ -487,26 +483,7 @@ def register_visualization_tools(app) -> None:
         project_name: str,
         circuit_filename: str,
     ) -> str | list:
-        """Render a saved Circuit in an interactive diagram; requires a VS Code MCP Apps host.
-
-        Loads a serialised ``data.Circuit`` from the project directory and renders it
-        using the ``qsharp_widgets.Circuit`` widget component via MCP Apps.
-
-        Typical workflow context:
-
-        1. Run ``run_scf`` to get an initial wavefunction
-        2. Run ``run_state_preparation`` to generate a circuit from the wavefunction
-        3. (THIS TOOL) Run ``visualize_circuit`` to inspect the quantum circuit
-
-        Args:
-            project_name (str): Name of the current qdk/chemistry project
-            circuit_filename (str): Filename of the saved circuit (e.g. "h2.circuit.json")
-
-        Returns:
-            list[TextContent]: containing the circuit JSON for the interactive viewer
-            str: containing an error message if the circuit could not be loaded
-
-        """
+        """Render a saved Circuit in VS Code MCP Apps."""
         circuit_filename = circuit_filename.rsplit("/", maxsplit=1)[-1]
 
         try:
@@ -555,6 +532,7 @@ def register_visualization_tools(app) -> None:
         return _entanglement_bridge.receive_html(token)
 
     @app.tool(
+        description="Render RDM/MI orbital entanglement with absolute indices in VS Code MCP Apps.",
         meta={
             "ui": {"resourceUri": _entanglement_bridge.resource_uri_template},
             "ui/resourceUri": _entanglement_bridge.resource_uri_template,
@@ -569,45 +547,7 @@ def register_visualization_tools(app) -> None:
         group_selected: bool = False,
         mi_threshold: float | None = None,
     ) -> str | list:
-        """Render orbital entanglement in VS Code MCP Apps; requires RDM/MI data and absolute selected indices.
-
-        The wavefunction must contain single-orbital entropies and mutual information, which requires
-        a multi-configurational calculation with RDM and mutual-information calculation enabled
-        (``calculate_one_rdm=True``, ``calculate_two_rdm=True``, ``calculate_mutual_information=True``).
-
-        Typical workflow context:
-
-        This is a visualisation tool that can be used after running a multi-configurational calculation:
-
-        1. Run ``run_scf`` to get an initial wavefunction
-        2. Run ``run_active_space_selector`` to define active orbitals
-        3. Run ``run_multi_configuration_calculation`` with ``calculate_one_rdm=True``,
-           ``calculate_two_rdm=True``, and ``calculate_mutual_information=True``
-        4. (THIS TOOL) Run ``visualize_orbital_entanglement`` to inspect orbital correlations
-
-        The chord diagram shows single-orbital entropies on the arcs and mutual information on the
-        chords connecting orbital pairs. This is useful for identifying strongly correlated orbitals
-        and refining active space selections.
-
-        **Index convention:** ``selected_indices`` accepts **absolute orbital indices** — the same
-        indices shown as labels on the diagram arcs.  For example, if the active space starts at
-        orbital 6 and you want to highlight orbitals 8, 9, 10, pass ``selected_indices=[8, 9, 10]``.
-        The conversion to diagram-relative positions is handled automatically.
-
-        Args:
-            project_name (str): Name of the current qdk/chemistry project
-            wavefunction_filename (str): Filename of the saved wavefunction (e.g. "h2.wavefunction.json")
-            selected_indices (List[int], optional): **Absolute** orbital indices to highlight in the
-                diagram (matching the arc labels).  The tool converts these to diagram-relative
-                positions automatically.
-            group_selected (bool): When True, reorder arcs so highlighted orbitals sit adjacent. Default: False
-            mi_threshold (float, optional): Minimum mutual-information value to draw a chord
-
-        Returns:
-            list[TextContent]: containing the entanglement data JSON for the interactive viewer
-            str: containing an error message if there was a problem in the workflow
-
-        """
+        """Render RDM/MI orbital entanglement with absolute indices in VS Code MCP Apps."""
         wavefunction_filename = wavefunction_filename.rsplit("/", maxsplit=1)[-1]
 
         try:
@@ -719,6 +659,7 @@ def register_visualization_tools(app) -> None:
         return _molecule_bridge.receive_html(token)
 
     @app.tool(
+        description="Render a saved Structure in VS Code MCP Apps.",
         meta={
             "ui": {"resourceUri": _molecule_bridge.resource_uri_template},
             "ui/resourceUri": _molecule_bridge.resource_uri_template,
@@ -730,21 +671,7 @@ def register_visualization_tools(app) -> None:
         project_name: str,
         structure_filename: str,
     ) -> str | list:
-        """Render a saved Structure in an interactive 3D viewer; requires a VS Code MCP Apps host.
-
-        Loads a saved Structure from the project directory and renders it
-        in a 3D viewer where you can rotate, zoom, and switch between
-        Sphere, Stick, and Line visualisation styles.
-
-        Args:
-            project_name (str): Name of the current qdk/chemistry project
-            structure_filename (str): Filename of the saved structure (e.g. "h2.structure.json")
-
-        Returns:
-            list[TextContent]: containing the molecule data JSON for the interactive viewer
-            str: containing an error message if the structure could not be loaded
-
-        """
+        """Render a saved Structure in VS Code MCP Apps."""
         structure_filename = structure_filename.rsplit("/", maxsplit=1)[-1]
 
         try:
@@ -765,6 +692,7 @@ def register_visualization_tools(app) -> None:
 
     # ── Orbital viewer (molecule + orbital isosurfaces) ───────────
     @app.tool(
+        description="Render saved Wavefunction orbitals in VS Code MCP Apps.",
         meta={
             "ui": {"resourceUri": _molecule_bridge.resource_uri_template},
             "ui/resourceUri": _molecule_bridge.resource_uri_template,
@@ -779,31 +707,7 @@ def register_visualization_tools(app) -> None:
         isoval: float = 0.02,
         grid_size: int = 40,
     ) -> str | list:
-        """Render saved Wavefunction orbitals as 3D isosurfaces; requires a VS Code MCP Apps host.
-
-        Loads a Wavefunction, extracts the orbitals and molecular structure,
-        generates volumetric cube data for each orbital, and renders
-        them in an interactive 3D viewer with positive/negative isosurface
-        lobes.  Use the isovalue slider and style controls to explore.
-
-        Typical workflow context:
-
-        1. Run ``run_scf`` to get an initial wavefunction
-        2. (optional) Run ``run_active_space_selector`` / ``run_orbital_localization``
-        3. (THIS TOOL) Run ``visualize_orbitals`` to inspect molecular orbitals
-
-        Args:
-            project_name (str): Name of the current qdk/chemistry project
-            wavefunction_filename (str): Filename of the saved wavefunction (e.g. "h2.wavefunction.json")
-            orbital_indices (List[int], optional): Orbital indices to render. If None, all orbitals are rendered.
-            isoval (float): Isovalue for the orbital surfaces. Default: 0.02
-            grid_size (int): Number of grid points per dimension for cube generation. Default: 40
-
-        Returns:
-            list[TextContent]: containing the molecule + cube data JSON for the interactive viewer
-            str: containing an error message if there was a problem
-
-        """
+        """Render saved Wavefunction orbitals in VS Code MCP Apps."""
         wavefunction_filename = wavefunction_filename.rsplit("/", maxsplit=1)[-1]
 
         try:
@@ -992,6 +896,7 @@ def register_visualization_tools(app) -> None:
         return _build_plotly_html(payload) if payload is not None else _expired_visualization_html()
 
     @app.tool(
+        description="Render numeric series as an SVG scatter plot in VS Code MCP Apps.",
         meta={
             "ui": {"resourceUri": _scatter_bridge.resource_uri_template},
             "ui/resourceUri": _scatter_bridge.resource_uri_template,
@@ -1006,33 +911,7 @@ def register_visualization_tools(app) -> None:
         log_x: bool = False,
         log_y: bool = False,
     ) -> CallToolResult:
-        """Render an interactive SVG scatter plot with optional log axes; requires a VS Code MCP Apps host.
-
-        Supports multiple data series, optional logarithmic axes, and
-        configurable marker styles. Use this to visualize any tabular
-        x/y data — Pareto frontiers, convergence curves, energy surfaces, etc.
-
-        Each entry in ``series`` is a dict with:
-          - ``x`` (list[float]): X-axis values
-          - ``y`` (list[float]): Y-axis values
-          - ``name`` (str, optional): Legend label for this series
-          - ``mode`` (str, optional): Plotly trace mode — ``"markers"``,
-            ``"lines"``, ``"lines+markers"`` (default: ``"markers"``)
-          - ``marker_size`` (int, optional): Marker size in px
-          - ``text`` (list[str], optional): Hover text per point
-
-        Args:
-            series: List of data series dicts (see above).
-            title: Chart title.
-            x_label: X-axis label.
-            y_label: Y-axis label.
-            log_x: If True, use logarithmic X axis.
-            log_y: If True, use logarithmic Y axis.
-
-        Returns:
-            Interactive Plotly scatter plot rendered in the MCP Apps viewer.
-
-        """
+        """Render numeric series as an SVG scatter plot in VS Code MCP Apps."""
         payload = {
             "title": title,
             "x_label": x_label,

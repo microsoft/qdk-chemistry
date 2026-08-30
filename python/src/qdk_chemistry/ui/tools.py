@@ -88,7 +88,7 @@ app.middleware.append(workspace_binding_middleware)
 
 @app.tool()
 async def bind_workspace(ctx: _Context, workspace_root: str | None = None) -> dict[str, object]:
-    """Bind this MCP process to the active workspace before using relative paths."""
+    """Bind this MCP process to a workspace root."""
     return await _bind_workspace(ctx, workspace_root)
 
 
@@ -184,6 +184,11 @@ def _structured(func):
         except Exception as e:  # noqa: BLE001
             return {"status": "error", "message": str(e), "error_type": type(e).__name__}
         return _wrap_result(result)
+
+    # FastMCP reads the wrapper docstring when the tool is registered. Keep the
+    # published description to the mechanical summary; detailed interface
+    # information lives in the qdk-chemistry-mcp skill.
+    wrapper.__doc__ = (func.__doc__ or "").strip().split("\n\n", maxsplit=1)[0]
 
     # Preserve the original function's parameter signature so that
     # MCPServer (which calls inspect.signature()) can build a correct
@@ -604,22 +609,7 @@ def _resolve_seed_or_basis(seed_or_basis: str):
 @app.tool()
 @_structured
 def list_algorithms(algorithm_type: str | None = None) -> dict:
-    """List algorithm implementations registered in the current MCP process.
-
-    Installed algorithm plugins are included after their registration hooks
-    have loaded. Implementation lists include every registered alias that can
-    be passed as an ``algorithm_name``.
-
-    Args:
-        algorithm_type: Optional algorithm type to return, such as
-            ``"nuclear_derivative_calculator"``. If omitted, returns every
-            registered type.
-
-    Returns:
-        Dict mapping algorithm types to their default and registered
-        implementations.
-
-    """
+    """List registered algorithm implementations and defaults."""
     registered = algorithms.available()
     defaults = algorithms.show_default()
     if algorithm_type is not None:
@@ -643,23 +633,7 @@ def list_algorithms(algorithm_type: str | None = None) -> dict:
 @app.tool()
 @_structured
 def describe_algorithm(algorithm_type: str, algorithm_name: str | None = None) -> dict:
-    """Describe one registered algorithm implementation and its settings.
-
-    Use :func:`list_algorithms` first to discover valid types and implementation
-    names. If ``algorithm_name`` is omitted, this describes the default
-    implementation for the requested type.
-
-    Args:
-        algorithm_type: Registered algorithm type, such as
-            ``"nuclear_derivative_calculator"``.
-        algorithm_name: Registered implementation name or alias. If omitted,
-            uses the type's default implementation.
-
-    Returns:
-        Dict containing the canonical name, aliases, reusable default settings,
-        and setting descriptions and constraints.
-
-    """
+    """Describe a registered algorithm implementation and its settings."""
     available_names = algorithms.available(algorithm_type)
     if not available_names:
         if algorithm_name is not None:
@@ -708,20 +682,7 @@ def describe_algorithm(algorithm_type: str, algorithm_name: str | None = None) -
 @app.tool()
 @_structured
 def list_cache_backends() -> dict:
-    """List the registered cache backend names.
-
-    Returns the names of all cache backends that are currently installed
-    and available.  Use a name with the ``cache`` parameter of any
-    ``run_*`` tool to enable result caching.
-
-    Built-in backends include ``"folder"`` (local directory) and
-    ``"tiered"`` (layered local + remote).  Additional backends
-    (e.g. ``"cosmosdb"``) are available as plugins.
-
-    Returns:
-        Dict with ``backends`` list of registered cache backend names.
-
-    """
+    """List registered cache backend names."""
     if not _REMOTE_AVAILABLE:
         return {"backends": [], "note": "Remote/cache module not available."}
     return {"backends": available_caches()}
@@ -730,18 +691,7 @@ def list_cache_backends() -> dict:
 @app.tool()
 @_structured
 def list_remote_backends() -> dict:
-    """List the registered remote execution backend names.
-
-    Returns the names of all remote execution backends that are currently
-    installed and available.  Use a name with the ``remote`` parameter of
-    any ``run_*`` tool to execute the algorithm on a remote backend.
-
-    Built-in backends include ``"local"`` and ``"ssh"``.
-
-    Returns:
-        Dict with ``backends`` list of registered remote backend names.
-
-    """
+    """List registered remote execution backend names."""
     if not _REMOTE_AVAILABLE:
         return {"backends": [], "note": "Remote/cache module not available."}
     return {"backends": available_backends()}
@@ -755,15 +705,7 @@ def list_remote_backends() -> dict:
 @app.tool()
 @_structured
 def list_projects() -> dict:
-    """List all projects in the workspace.
-
-    Returns the names of all project directories.  Each name can be passed
-    as ``project_name`` to any other tool.
-
-    Returns:
-        Dict with ``projects`` list of project name strings.
-
-    """
+    """List project directories in the workspace."""
     projects_dir = config.projects_dir
     if not projects_dir.exists():
         return {"projects": []}
@@ -774,19 +716,7 @@ def list_projects() -> dict:
 @app.tool()
 @_structured
 def create_project(project_name: str) -> dict | str:
-    """Create a new project directory.
-
-    If the project already exists this is a no-op and returns the existing
-    path.  Use this before ``create_structure`` or any ``run_*`` tool to
-    ensure the project directory is ready.
-
-    Args:
-        project_name (str): Name for the new project.
-
-    Returns:
-        Dict with ``project_name`` and ``path``.
-
-    """
+    """Create a project directory and return its metadata."""
     if not project_name or not project_name.strip():
         return "ERROR: project_name must be a non-empty string."
     project_dir, error = resolve_project_path(project_name, config.projects_dir)
@@ -802,19 +732,7 @@ def create_project(project_name: str) -> dict | str:
 @app.tool()
 @_structured
 def list_project_files(project_name: str) -> dict | str:
-    """List all data files in a project directory with inferred types.
-
-    Returns filenames, sizes, and auto-detected data types based on the
-    file naming convention (e.g. ``h2.wavefunction.json`` → type ``wavefunction``).
-
-    Args:
-        project_name (str): Name of the project to inspect.
-
-    Returns:
-        Dict with ``project_name`` and ``files`` list.
-        str: Error message if the project does not exist.
-
-    """
+    """List project files with sizes and inferred data types."""
     project_dir, error = resolve_project_path(project_name, config.projects_dir)
     if project_dir is None:
         return f"ERROR: {error}"
@@ -858,25 +776,7 @@ def get_summary(
     project_name: str,
     filename: str,
 ) -> dict | str:
-    """Get a human-readable summary of any QDK Chemistry data file.
-
-    Automatically detects the data type from the file and returns a structured
-    summary.  Works with all serialised data types: structures, wavefunctions,
-    Hamiltonians, orbitals, circuits, ansätze, qubit Hamiltonians, QPE results,
-    stability results, energy results, and measurement data.
-
-    This is useful for inspecting intermediate results, verifying that a
-    calculation completed correctly, or recovering context after a handoff.
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project.
-        filename (str): Filename to inspect (e.g. ``"h2.wavefunction.json"``).
-
-    Returns:
-        Dict with ``data_type`` and ``summary``.
-        str: Error message if the file could not be loaded.
-
-    """
+    """Load a supported data file and return its summary."""
     filename = _strip(filename)
 
     for cls in _get_loadable_data_classes():
@@ -977,24 +877,7 @@ _TOOL_CATEGORIES: dict[str, list[str]] = {
 @app.tool()
 @_structured
 def list_tools(category: str | None = None) -> dict:
-    """List available MCP tools, optionally filtered by category.
-
-    Returns tool names grouped by functional category.  Use this to
-    discover what tools are available without loading all tool schemas.
-
-    Categories: ``project``, ``data_inspection``, ``utility``,
-    ``input_construction``, ``classical_calculation``,
-    ``quantum_preparation``, ``qpe``, ``visualization``,
-    ``remote_execution``.
-
-    Args:
-        category (str, optional): Filter to a single category.
-            If omitted, returns all categories.
-
-    Returns:
-        Dict with ``categories`` mapping category names to tool name lists.
-
-    """
+    """List MCP tool names by functional category."""
     if category:
         category = category.lower().strip()
         if category not in _TOOL_CATEGORIES:
@@ -1017,33 +900,7 @@ def convert_coordinates(
     coordinates_json: str,
     to_unit: str,
 ) -> dict | str:
-    """Convert atomic coordinates between Bohr and Angstrom.
-
-    All QDK Chemistry tools expect coordinates in **Bohr**.  Use this tool
-    to convert from Angstrom (the most common unit in chemical databases
-    like PubChem or PDB) to Bohr before calling ``create_structure``.
-
-    Args:
-        coordinates_json (str): A JSON string containing a 2D array of atomic coordinates.
-            Must be a nested array with shape (N_atoms, 3) where each inner array is [x, y, z].
-            Example: ``'[[0.0, 0.0, 0.0], [0.74, 0.0, 0.0]]'``
-        to_unit (str): Target unit — either ``"bohr"`` or ``"angstrom"``.
-            Use ``"bohr"`` to convert Angstrom → Bohr (most common).
-            Use ``"angstrom"`` to convert Bohr → Angstrom.
-
-    Returns:
-        Dict with ``coordinates`` (converted 2D array) and ``unit``.
-        str: Error message if input is invalid.
-
-    Examples:
-        Convert water geometry from Angstrom to Bohr::
-
-            convert_coordinates(
-                coordinates_json='[[0.0, 0.0, 0.0], [0.757, 0.586, 0.0], [-0.757, 0.586, 0.0]]',
-                to_unit="bohr"
-            )
-
-    """
+    """Convert Cartesian coordinates between Bohr and Angstrom."""
     try:
         coordinates = json.loads(coordinates_json)
     except json.JSONDecodeError as e:
@@ -1075,25 +932,7 @@ def convert_energy(
     from_unit: str,
     to_unit: str,
 ) -> dict | str:
-    """Convert an energy value between common quantum chemistry units.
-
-    Supported units: ``hartree``, ``ev``, ``kcal/mol``, ``kj/mol``.
-
-    Args:
-        value (float): The energy value to convert.
-        from_unit (str): Source unit (``hartree``, ``ev``, ``kcal/mol``, ``kj/mol``).
-        to_unit (str): Target unit (``hartree``, ``ev``, ``kcal/mol``, ``kj/mol``).
-
-    Returns:
-        Dict with ``input`` (value + unit), ``output`` (converted value + unit).
-        str: Error message if units are invalid.
-
-    Examples:
-        Convert Hartree to eV::
-
-            convert_energy(value=-1.137, from_unit="hartree", to_unit="ev")
-
-    """
+    """Convert an energy value between supported units."""
     _to_hartree = {
         "hartree": 1.0,
         "ev": constants.EV_TO_HARTREE,
@@ -1127,21 +966,7 @@ def convert_energy(
 @app.tool()
 @_structured
 def describe_backend(backend_type: str, name: str) -> dict | str:
-    """Describe the configuration parameters for a cache or remote backend.
-
-    Returns the configurable parameter names, types, and defaults so an agent
-    can construct a valid ``remote_config`` or ``cache_config`` dict. Remote
-    backend parameters are limited to options safe for MCP clients to control.
-
-    Args:
-        backend_type: Either ``"cache"`` or ``"remote"``.
-        name: The registered backend name (e.g. ``"folder"``, ``"ssh"``).
-
-    Returns:
-        Dict with ``name``, ``parameters`` list describing each
-        constructor kwarg, and ``docstring``.
-
-    """
+    """Describe accepted configuration fields for a cache or remote backend."""
     if not _REMOTE_AVAILABLE:
         return "Remote/cache module not available."
 
@@ -1201,35 +1026,7 @@ def create_structure(
     filename_to_save: str = "structure.structure.json",
     overwrite: bool = False,
 ) -> Path | str:
-    """Create and save a molecular Structure from coordinates in Bohr; use ``convert_coordinates`` for Angstrom input.
-
-    Note that the passed coordinates should be in Bohr.
-
-    Args:
-        project_name (str): Name of the project to store the structure in
-        coordinates_json (str): A JSON string containing a 2D array of atomic coordinates.
-            Must be a nested array with shape (N_atoms, 3) where each inner array is [x, y, z].
-            Example for H2: '[[0.0, 0.0, 0.0], [1.4, 0.0, 0.0]]'
-            Example for water: '[[0.0, 0.0, 0.0], [1.43, 1.1, 0.0], [-1.43, 1.1, 0.0]]'
-        symbols (List[str]): Element symbols for each atom (e.g., ["H", "H"] or ["O", "H", "H"])
-        nuclear_charges (Optional[List[float]]): Optionally specify nuclear charges for each atom
-        masses (Optional[List[float]]): Optionally specify masses for each atom
-        filename_to_save (str): Filename to store the structure as. Must include '.structure.' before
-                 the file extension (e.g. 'water.structure.json', 'molecule.structure.h5')
-        overwrite (bool): If ``True``, overwrite existing output files
-            without prompting. Default ``False``.
-
-    Returns:
-        Path: The path where the json file was saved to
-        str: A string containing an error message, if there was a problem with the workflow.
-
-    Examples:
-        >>> create_structure("my_project",
-                             coordinates_json='[[0.0, 0.0, 0.0], [1.4, 0.0, 0.0]]',
-                             symbols=["H", "H"],
-                             filename_to_save="h2.structure.json")
-
-    """
+    """Create and save a Structure from Bohr coordinates; use convert_coordinates for Angstrom input."""
     # Parse coordinates from JSON string
     try:
         coordinates = json.loads(coordinates_json)
@@ -1326,17 +1123,7 @@ def create_structure(
 @app.tool()
 @_structured
 def get_algorithm_default_type(algorithm_type: str) -> str:
-    """Return the registered name of the default implementation for an algorithm type.
-
-    This shows which algorithm type was used to create a factory instance, if done with the default.
-
-    Args:
-        algorithm_type (str): Algorithm type passed to `create` method
-
-    Returns:
-        str: The algorithm name that corresponds to the default instance of an algorithm type
-
-    """
+    """Return the default implementation name for an algorithm type."""
     created_algorithm = algorithms.create(algorithm_type)
     return created_algorithm.name()
 
@@ -1344,19 +1131,7 @@ def get_algorithm_default_type(algorithm_type: str) -> str:
 @app.tool()
 @_structured
 def get_algorithm_default_settings(algorithm_type: str, algorithm_name: str | None = None) -> dict:
-    """Return a copy of the algorithm's default settings.
-
-    If algorithm_name is provided, that algorithm_name is used as input to algorithm_type.
-    Else, the default implementation is assumed.
-
-    Args:
-        algorithm_type (str): Algorithm type passed to `create` method
-        algorithm_name (str, optional): Algorithm name corresponding to algorithm_type
-
-    Returns:
-        Dict: A copy of the default settings associated with the algorithm instance
-
-    """
+    """Return default settings for an algorithm implementation."""
     created_algorithm = algorithms.create(algorithm_type, algorithm_name)
 
     return _jsonable_settings_dict(created_algorithm.settings().to_dict())
@@ -1368,22 +1143,7 @@ def get_algorithm_default_settings(algorithm_type: str, algorithm_name: str | No
 def get_orbitals_from_input(
     project_name: str, input_filename: str, out_orbitals_filename: str, overwrite: bool = False
 ) -> str:
-    """Extract and save Orbitals from a serialized Wavefunction, Hamiltonian, ConfigurationSet, or Ansatz.
-
-    The serialized object must have the `get_orbitals()`
-    method, like `Wavefunction`, `Hamiltonian`, `ConfigurationSet` or `Ansatz`
-
-    Args:
-        project_name: working project directory
-        input_filename: file to load wavefunction from
-        out_orbitals_filename: name to save orbitals object to
-        overwrite (bool): If ``True``, overwrite existing output files
-            without prompting. Default ``False``.
-
-    Returns:
-        str: Repeat out filename of orbitals object
-
-    """
+    """Extract and save Orbitals from a supported electronic-structure object."""
     input_filename = _strip(input_filename)
     out_orbitals_filename = _strip(out_orbitals_filename)
 
@@ -1425,26 +1185,7 @@ def get_active_space_indices(
     project_name: str,
     input_filename: str,
 ) -> str | dict:
-    """Get the active, inactive, and virtual orbital space indices from a serialized object.
-
-    The input object must have orbitals with a defined active space (i.e., it must have been
-    processed by `run_active_space_selector`). Accepted input types are Wavefunction, Ansatz,
-    Hamiltonian, and ConfigurationSet.
-
-    This is useful for understanding the partitioning of the orbital space after active space
-    selection, and for providing orbital indices to tools like `run_orbital_localization`.
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project
-        input_filename (str): Filename of the serialized object containing orbital information
-
-    Returns:
-        Dict: A dictionary with keys 'active', 'inactive', and 'virtual', each mapping to
-            a dict with 'alpha' and 'beta' index lists.
-
-        str: An error message if the object could not be loaded or has no active space defined.
-
-    """
+    """Return active, inactive, and virtual orbital indices from a supported object."""
     input_filename = _strip(input_filename)
 
     # Try loading from supported input types
@@ -1495,20 +1236,7 @@ def get_ansatz(
     out_ansatz_filename: str,
     overwrite: bool = False,
 ) -> str:
-    """Combine a saved Hamiltonian and Wavefunction into an Ansatz and persist it in the project.
-
-    Args:
-        project_name (str): Working project directory
-        wavefunction_filename(str): Filename to load wavefunction from
-        hamiltonian_filename(str): Filename to load hamiltonian from
-        out_ansatz_filename (str): Filename to save ansatz to
-        overwrite (bool): If ``True``, overwrite existing output files
-            without prompting. Default ``False``.
-
-    Returns:
-        str: Filename of where ansatz was saved to
-
-    """
+    """Combine a saved Hamiltonian and Wavefunction into a saved Ansatz."""
     wavefunction_filename = _strip(wavefunction_filename)
     hamiltonian_filename = _strip(hamiltonian_filename)
     out_ansatz_filename = _strip(out_ansatz_filename)
@@ -1553,109 +1281,7 @@ def run_active_space_selector(
     remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str:
-    """Select and save active orbitals; valence needs charge, while AutoCAS needs restricted orbitals and RDM/MI.
-
-    The new wavefunction object has active-space data populated.
-    Active space selection is the process of selecting which molecular orbitals are relevant to the system of study.
-    This is a key step for multi-reference and particularly quantum
-    simulation calculations, where active space selection dramatically
-    reduces computational cost by identifying chemically relevant orbitals.
-
-    Available algorithms:
-
-    - ``qdk_valence``: Selects the valence orbitals based on atomic composition and charge. Useful as a
-      starting point or pre-filter for larger systems. Requires ``charge``.
-    - ``qdk_autocas`` / ``qdk_autocas_eos``: Analyzes single-orbital entropies from a prior multi-configurational
-      calculation (SCI/CASCI with ``calculate_one_rdm=True``, ``calculate_two_rdm=True``, and
-      ``calculate_mutual_information=True``) and **automatically determines which orbitals are strongly
-      correlated**. The orbital entanglement analysis decides the active space — no manual orbital
-      selection is needed. This is the recommended approach for determining the final active space.
-    - ``qdk_occupation``: Selects based on orbital occupation numbers.
-
-    Typical workflow context:
-
-    A full quantum simulation workflow starting from a structure object is:
-
-    1. Run ``run_scf`` to get an initial wavefunction (HF for multi-reference work). For an
-       open-shell state, set ``settings={"method": "hf", "scf_type": "restricted"}`` to
-       produce the ROHF orbitals required by valence selection and the downstream ASCI/AutoCAS path
-    2. (THIS TOOL) Run ``run_active_space_selector`` with ``qdk_valence`` to get an initial active space
-    3. Run ``run_multi_configuration_calculation`` (SCI) with ``calculate_one_rdm=True``,
-       ``calculate_two_rdm=True``, and ``calculate_mutual_information=True`` to get orbital entropies
-       and entanglement data
-    4. (THIS TOOL) Run ``run_active_space_selector`` again with ``qdk_autocas_eos`` — this reads the
-       orbital entropies from step 3 and automatically identifies the strongly correlated subset
-    5. (Optional) Sparsify the wavefunction using ``run_projected_multi_configuration_calculation`` with only the
-       top determinants (by CI coefficient magnitude) to reduce circuit depth
-    6. Run ``run_hamiltonian_constructor`` to build the fermionic Hamiltonian from active-space orbitals
-    7. Run ``create_majorana_mapping`` to write a mapping file for that Hamiltonian
-    8. Run ``run_qubit_mapper`` with the mapping file to convert the fermionic Hamiltonian to qubits
-    9. Run ``run_state_preparation`` to prepare a quantum circuit from the (sparse) multi-configurational wavefunction
-    10. Run ``run_phase_estimation`` for quantum phase estimation
-
-    Note that the particular workflow for a particular calculation may
-    vary depending on the starting point of the calculation - for
-    example, if starting from a Hamiltonian rather than a structure,
-    we might skip some of the above steps.
-
-    Recommended usage:
-
-    - For an initial broad active space, use ``qdk_valence`` with the system ``charge``.
-    - To determine the final active space automatically, run SCI with RDMs first, then use
-      ``qdk_autocas_eos``. The algorithm analyzes orbital entanglement entropies and selects
-      the orbitals that are strongly correlated — you do not need to specify which orbitals to include.
-    - If you are unsure of what to use, please leave the default settings as-is.
-    - The default method can be extracted using the function and MCP tool ``get_algorithm_default_type``.
-
-    Pitfalls to avoid:
-
-    The default active space selection method is an autocas variant,
-    these use orbital entropies to select the active space.
-    This is a good general-purpose method, but it relies on having
-    RDMs from a multi-configurational wavefunction.
-    Make sure they exist or change the algorithm if you are starting
-    from a SCF wavefunction without RDMs, as the default will not
-    work in that case.
-
-    The valence and ASCI/AutoCAS workflow also requires restricted
-    spatial orbitals. If an open-shell input came from the default
-    ``run_scf`` setting ``scf_type="auto"``, rerun SCF with HF and
-    ``scf_type="restricted"`` before retrying this tool.
-
-    Guidelines on settings:
-
-    - The current set of default settings can be obtained by using
-      the function and MCP tool ``get_algorithm_default_settings``.
-    - In most cases, the default settings should not be modified.
-    - If using the ``qdk_autocas`` active space selector, the
-      ``entropy_threshold`` can be modified and we can also set
-      ``normalize_entropies`` to false if desired
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project
-        wavefunction_filename (str): Name of the file of the input wavefunction in the current directory
-        out_wavefunction_filename (str): Name of the file where the
-            output wavefunction is saved in the current directory
-        charge (int, optional): System charge, required for
-            qdk_valence active space selector
-        algorithm_name (str, optional): a specific algorithm string
-            to override the default
-        settings (Dict, optional): A dictionary of key, value pairs
-            specifying which settings keys to replace with specific
-            values (overrides defaults)
-        cache (str, optional): Cache backend identifier for result caching
-        remote (str, optional): Remote backend identifier for remote execution
-        remote_config (dict, optional): Configuration options for the remote backend
-        remote_timeout (int): Maximum seconds to wait for a remote job
-            to complete before returning a job handle. Default ``120``.
-        overwrite (bool): If ``True``, overwrite existing output files
-            without prompting. Default ``False``.
-
-    Returns:
-        str: containing the name of the output wavefunction filename, if the function executed successfully, or
-        string containing the error message if any problems are encountered during function execution.
-
-    """
+    """Run an active-space selector on a Wavefunction and save the resulting Wavefunction."""
     # we should be in working directory so strip filenames in case a full path is passed
     wavefunction_filename = _strip(wavefunction_filename)
     out_wavefunction_filename = _strip(out_wavefunction_filename)
@@ -1711,66 +1337,7 @@ def run_dynamical_correlation_calculator(
     remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str | tuple[float, str]:
-    """Add dynamical correlation to an Ansatz, returning the corrected total energy and saved Wavefunction filename.
-
-    This calculation adds dynamical correlation to the starting Ansatz.
-    Dynamical correlation calculators return the new total energy, and save the updated wavefunction to file.
-
-    Typical workflow context:
-
-    Dynamical correlation is used to improve single-reference (HF)
-    energies. A typical workflow starting from a structure is:
-
-    1. Run `run_scf` to get a Hartree-Fock wavefunction
-    2. Build a Hamiltonian from the SCF orbitals using `run_hamiltonian_constructor`
-    3. Create an Ansatz object from the Hamiltonian and wavefunction, save to file
-    4. (THIS TOOL) Run `run_dynamical_correlation_calculator` to add correlation corrections
-
-    This is recommended for single-reference systems (closed-shell molecules at equilibrium).
-    For multi-reference systems (bond breaking, open-shell, etc.), use `run_multi_configuration_calculation` instead.
-
-    Usage guidelines:
-
-    - The default dynamical correlation calculator method can be
-      extracted using the function and MCP tool
-      `get_algorithm_default_type`.
-    - In general the hierarchy of dynamical correlation methods is MP2 -> CCSD -> CCSD(T), in terms of accuracy and
-      computational cost. Therefore depending on the size of the system, MP2 or CCSD might be more appropriate.
-
-    Guidelines on settings:
-
-    - The current set of default settings can be obtained by using
-      the function and MCP tool `get_algorithm_default_settings`.
-    - You most likely only want to provide settings if performing
-      coupled cluster calculations.
-    - If you are only interested in the total energy, no need to modify the settings dictionary.
-    - If amplitudes will be used later on, these can be stored by setting the key `store_amplitudes` to `True`
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project
-        ansatz_filename (str): Name of the file containing the input ansatz in the current directory
-        out_wavefunction_filename (str): Name of the file where the output wavefunction will be saved
-        algorithm_name (str, optional): Algorithm name for the
-            dynamical correlation calculator, to override the default
-        settings (Dict, optional): A dictionary of key, value pairs
-            specifying which settings keys to replace with specific
-            values (overrides defaults)
-        cache (str, optional): Cache backend identifier for result caching
-        remote (str, optional): Remote backend identifier for remote execution
-        remote_config (dict, optional): Configuration options for the remote backend
-        remote_timeout (int): Maximum seconds to wait for a remote job
-            to complete before returning a job handle. Default ``120``.
-        overwrite (bool): If ``True``, overwrite existing output files
-            without prompting. Default ``False``.
-
-    Returns:
-        Tuple[float, str]: The new total energy including dynamical
-            correlation contributions, and the filename where
-            wavefunction was saved
-
-        str: containing error message, if there was a problem in the workflow
-
-    """
+    """Run dynamical correlation for an Ansatz and save the resulting Wavefunction."""
     # Strip filenames in case full path is passed
     ansatz_filename = _strip(ansatz_filename)
     out_wavefunction_filename = _strip(out_wavefunction_filename)
@@ -1821,59 +1388,7 @@ def run_hamiltonian_constructor(
     remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str:
-    """Build and save a fermionic Hamiltonian from molecular Orbitals, including one- and two-electron integrals.
-
-    The Hamiltonian constructor builds a fermionic Hamiltonian object from molecular orbitals.
-    The Hamiltonian contains:
-
-    - One-electron integrals (kinetic + nuclear attraction in active space)
-    - Two-electron integrals (electron-electron repulsion in active space)
-    - Core energy (frozen core contribution + nuclear repulsion)
-
-    This is a key step in multi-reference and quantum simulation workflows.
-
-    Typical workflow context:
-
-    Two paths depending on system size:
-
-    **Full-space path** (small systems, up to ~16 spatial orbitals / ~20 qubits):
-
-    1. Run `run_scf` to get an initial wavefunction
-    2. Extract orbitals from the SCF wavefunction via `get_orbitals_from_input`
-    3. (THIS TOOL) Run `run_hamiltonian_constructor` on the full SCF orbitals
-    4. Proceed to `create_majorana_mapping` → `run_qubit_mapper` → quantum steps
-
-    **Active-space path** (larger systems):
-    1. Run `run_scf` → active space analysis (SCI + AutoCAS) to compress the orbital space
-    2. Extract orbitals from the active-space wavefunction
-    3. (THIS TOOL) Run `run_hamiltonian_constructor` on the active-space orbitals
-    4. Proceed to `create_majorana_mapping` → `run_qubit_mapper` → quantum steps
-
-    For `run_multi_configuration_scf`, you can pass orbitals directly — it builds the Hamiltonian internally.
-
-    **When to choose which path:** Ask the user whether they want the full orbital space or a
-    compressed active space. For small molecules or model Hamiltonians where the full space
-    is tractable, skipping active space selection is simpler and avoids approximation.
-    For larger systems, active space compression is necessary to keep the quantum computation feasible.
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project
-        orbitals_filename (str): Name of the file containing the input orbitals in the current directory.
-            Can come from a full SCF wavefunction (small systems) or an active-space wavefunction (larger systems).
-        out_hamiltonian_filename (str): Name of the file where the output hamiltonian will be saved
-        cache (str, optional): Cache backend identifier for result caching
-        remote (str, optional): Remote backend identifier for remote execution
-        remote_config (dict, optional): Configuration options for the remote backend
-        remote_timeout (int): Maximum seconds to wait for a remote job
-            to complete before returning a job handle. Default ``120``.
-        overwrite (bool): If ``True``, overwrite existing output files
-            without prompting. Default ``False``.
-
-    Returns:
-        str: Filename where hamiltonian was saved
-        OR error message if there was a problem in the workflow
-
-    """
+    """Build and save a fermionic Hamiltonian from molecular Orbitals."""
     out_hamiltonian_filename, err = _prepare_output(
         out_hamiltonian_filename, "Hamiltonian", data.Hamiltonian, overwrite=overwrite
     )
@@ -2008,72 +1523,7 @@ def create_model_hamiltonian(
     potential_params: dict | None = None,
     overwrite: bool = False,
 ) -> str:
-    """Create a model Hamiltonian on a lattice and save to file.
-
-    Builds a fermionic Hamiltonian for common lattice models without requiring molecular
-    structure input, SCF, or active-space selection.  The output is a standard ``Hamiltonian``
-    object that plugs directly into ``run_qubit_mapper``, ``run_multi_configuration_calculation``,
-    and all downstream quantum tools.
-
-    Supported models:
-
-    - ``huckel`` — tight-binding with on-site energies and hopping.
-    - ``hubbard`` — Hückel + on-site Coulomb repulsion *U*.
-    - ``ppp`` — Hubbard + long-range intersite Coulomb *V* (Pariser-Parr-Pople).
-
-    Lattice types: ``chain``, ``square``, ``triangular``, ``honeycomb``, ``kagome``, ``custom``.
-
-    Lattice params (JSON dict):
-
-    - **chain:** ``{"n": <int>, "periodic": <bool>}``
-    - **square / triangular / honeycomb / kagome:**
-      ``{"nx": <int>, "ny": <int>, "periodic_x": <bool>, "periodic_y": <bool>}``
-    - **custom:** ``{"edges": [[i, j, weight], ...], "num_sites": <int>}``
-
-    All lattice factories accept an optional ``"t"`` key for the default edge weight (default 1.0).
-
-    Parameter broadcasting:
-
-    - *Scalar* values are broadcast to all sites/pairs.
-    - *Per-site* parameters (``epsilon``, ``u_coulomb``, ``z``) accept a 1-D list of length *n*.
-    - *Per-pair* parameters (``t``, ``v_coulomb``) accept a 2-D list of shape *n x n*.
-
-    For the PPP model, the intersite Coulomb matrix ``V`` can be:
-
-    1. Provided directly as a 2-D list.
-    2. Computed automatically by setting ``potential`` to ``"ohno"`` or ``"mataga_nishimoto"``
-       and providing ``potential_params`` with ``{"R": <float or 2-D list>, "epsilon_r": <float>}``.
-
-    Typical workflow:
-
-    1. (THIS TOOL) ``create_model_hamiltonian`` → ``hamiltonian.json``
-    2. ``create_majorana_mapping`` → ``majorana_mapping.json``
-    3. ``run_qubit_mapper`` → ``qubit_hamiltonian.json``
-    4. ``run_multi_configuration_calculation`` → wavefunction + energies
-    5. ``run_state_preparation`` → circuit
-    6. ``run_phase_estimation`` / ``run_energy_estimator``
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project
-        model (str): Model type: ``"huckel"``, ``"hubbard"``, or ``"ppp"``
-        out_hamiltonian_filename (str): Output filename for the Hamiltonian
-        lattice_type (str): Lattice geometry (see above)
-        lattice_params (dict): Parameters for the lattice factory (see above)
-        epsilon (float or list[float]): On-site energy. Default 0.0
-        t (float or list[list[float]]): Hopping integral. Default 1.0
-        u_coulomb (float or list[float]): On-site Coulomb repulsion *U* (Hubbard/PPP). Default 0.0
-        v_coulomb (float or list[list[float]], optional): Intersite Coulomb matrix *V* (PPP).
-            Required for PPP unless ``potential`` is set.
-        z (float or list[float]): Effective core charges (PPP). Default 1.0
-        potential (str, optional): Auto-compute V using ``"ohno"`` or ``"mataga_nishimoto"``
-        potential_params (dict, optional): Parameters for the potential function:
-            ``{"R": <distance>, "epsilon_r": <float>}``
-        overwrite (bool): Overwrite existing output. Default False.
-
-    Returns:
-        str: Filename where Hamiltonian was saved, or error message.
-
-    """
+    """Construct and save a fermionic lattice-model Hamiltonian."""
     from qdk_chemistry.utils.model_hamiltonians import (  # noqa: PLC0415
         create_hubbard_hamiltonian,
         create_huckel_hamiltonian,
@@ -2157,53 +1607,7 @@ def create_spin_model_hamiltonian(
     h: float | list[float] | None = None,
     overwrite: bool = False,
 ) -> str:
-    """Create a spin model Hamiltonian on a lattice and save to file.
-
-    Builds a qubit Hamiltonian directly (no qubit mapping needed) for spin lattice models.
-    The output plugs directly into ``run_qubit_hamiltonian_solver``, ``run_energy_estimator``,
-    or ``run_phase_estimation``.
-
-    Supported models:
-
-    - ``heisenberg`` — anisotropic Heisenberg: ``Jx XX + Jy YY + Jz ZZ`` couplings + external fields.
-      Special cases: XXX (Jx=Jy=Jz), XXZ (Jx=Jy≠Jz), XY (Jz=0).
-    - ``ising`` — transverse-field Ising: ``J ZZ`` coupling + transverse field ``h X``.
-      Shorthand for Heisenberg with Jx=Jy=0.
-
-    Lattice types and params: same as ``create_model_hamiltonian``.
-
-    Parameter broadcasting:
-
-    - *Scalar* coupling constants are broadcast to all pairs/sites.
-    - *Per-pair* parameters (``jx``, ``jy``, ``jz``, ``j``) accept a 2-D list of shape *n x n*.
-    - *Per-site* field parameters (``hx``, ``hy``, ``hz``, ``h``) accept a 1-D list of length *n*.
-
-    Typical workflow:
-
-    1. (THIS TOOL) ``create_spin_model_hamiltonian`` → ``qubit_hamiltonian.json``
-    2. ``run_qubit_hamiltonian_solver`` (exact diag for small systems)
-    3. Or: ``run_phase_estimation`` / ``run_energy_estimator`` (quantum algorithms)
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project
-        model (str): Model type: ``"heisenberg"`` or ``"ising"``
-        out_qubit_hamiltonian_filename (str): Output filename for the QubitHamiltonian
-        lattice_type (str): Lattice geometry
-        lattice_params (dict): Parameters for the lattice factory
-        jx (float or list[list[float]]): XX coupling (Heisenberg). Default 0.0
-        jy (float or list[list[float]]): YY coupling (Heisenberg). Default 0.0
-        jz (float or list[list[float]]): ZZ coupling (Heisenberg). Default 0.0
-        hx (float or list[float]): External field X (Heisenberg). Default 0.0
-        hy (float or list[float]): External field Y (Heisenberg). Default 0.0
-        hz (float or list[float]): External field Z (Heisenberg). Default 0.0
-        j (float or list[list[float]], optional): ZZ coupling (Ising shorthand)
-        h (float or list[float], optional): Transverse field X (Ising shorthand)
-        overwrite (bool): Overwrite existing output. Default False.
-
-    Returns:
-        str: Filename where QubitHamiltonian was saved, or error message.
-
-    """
+    """Construct and save an Ising or Heisenberg QubitHamiltonian."""
     from qdk_chemistry.utils.model_hamiltonians import (  # noqa: PLC0415
         create_heisenberg_hamiltonian,
         create_ising_hamiltonian,
@@ -2261,61 +1665,7 @@ def run_orbital_localization(
     remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str:
-    """Localize the orbitals of an input wavefunction and save to file.
-
-    For restricted calculations (closed-shell systems),
-    loc_indices_alpha must be provided as a sorted list or numpy
-    array, to specify which orbitals to localize.
-    For unrestricted calculations (open-shell systems),
-    loc_indices_beta also need to be provided as a sorted list or
-    numpy array, to specify which beta orbitals should be localized.
-
-    Usage guidelines:
-
-    - The default orbital localization method can be extracted using
-      the function and MCP tool `get_algorithm_default_type`.
-    - Unless specific justification is provided, the default method should be sufficient.
-
-    Guidelines on settings:
-
-    - The current set of default settings can be obtained by using
-      the function and MCP tool `get_algorithm_default_settings`.
-    - The orbital localization classes have variable settings
-      depending on the specific localizer implementation.
-    - To view a copy of the default settings for `algorithm_name`,
-      use the function and MCP tool
-      `get_algorithm_default_settings`.
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project
-        wavefunction_filename (str): Name of the file containing the input wavefunction in the current directory
-        out_wavefunction_filename (str): Name of the file where the output wavefunction will be saved
-        loc_indices_alpha (List or numpy.ndarray): A sorted list or
-            1d array of indices, specifying which (alpha) orbitals
-            should be localized
-        loc_indices_beta (List or numpy.ndarray, optional): A sorted
-            list or 1d array of indices, specifying which beta
-            orbitals should be localized. This is only needed for
-            unrestricted calculations (for open-shell systems).
-        algorithm_name (str, optional): The name of the orbital
-            localization algorithm to use, which overrides the
-            default
-        settings (Dict, optional): A dictionary of key, value pairs
-            specifying which settings keys to replace with specific
-            values (overrides defaults)
-        cache (str, optional): Cache backend identifier for result caching
-        remote (str, optional): Remote backend identifier for remote execution
-        remote_config (dict, optional): Configuration options for the remote backend
-        remote_timeout (int): Maximum seconds to wait for a remote job
-            to complete before returning a job handle. Default ``120``.
-        overwrite (bool): If ``True``, overwrite existing output files
-            without prompting. Default ``False``.
-
-    Returns:
-        str: Filename where localized wavefunction was saved
-        OR error message if there was a problem in the workflow.
-
-    """
+    """Localize selected Wavefunction orbitals and save the resulting Wavefunction."""
     # Strip filenames in case full path is passed
     wavefunction_filename = _strip(wavefunction_filename)
     out_wavefunction_filename = _strip(out_wavefunction_filename)
@@ -2378,52 +1728,7 @@ def run_stability_checker(
     remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str | tuple[bool, str]:
-    """Check the stability of the given wavefunction with respect to orbital rotation.
-
-    This method performs stability analysis on the input wavefunction by examining the eigenvalues
-    of the electronic Hessian matrix. A stable wavefunction should have all non-negative eigenvalues.
-    Near-zero eigenvalues may indicate orbital degeneracy.
-
-    Usage guidelines:
-
-    - If the SCF wavefunction is unstable, we can transform the SCF wavefunction to generate initial guess orbitals.
-      These can be used to make a density matrix and fed into a new SCF iteration.
-    - Therefore the stability checker gives an indication of a successful SCF procedure.
-
-    Guidelines on settings:
-
-    - The current set of default settings can be obtained by using
-      the function and MCP tool `get_algorithm_default_settings`.
-    - The key settings are the keys `internal` and/or `external`,
-      which specify whether to perform an internal or external
-      stability check. `internal` means to check within the
-      restricted Hartree Fock (RHF) space. 'external' means to
-      check RHF -> UHF and real -> complex.
-      In most cases the default, i.e. `internal` only, is
-      sufficient.
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project
-        wavefunction_filename (str): Name of the file containing the input wavefunction in the current directory
-        out_stability_result_filename (str): Name of the file where the stability result will be saved
-        settings (Dict, optional): A dictionary of key, value pairs
-            specifying which settings keys to replace with specific
-            values (overrides defaults)
-        cache (str, optional): Cache backend identifier for result caching
-        remote (str, optional): Remote backend identifier for remote execution
-        remote_config (dict, optional): Configuration options for the remote backend
-        remote_timeout (int): Maximum seconds to wait for a remote job
-            to complete before returning a job handle. Default ``120``.
-        overwrite (bool): If ``True``, overwrite existing output files
-            without prompting. Default ``False``.
-
-    Returns:
-        Tuple[bool, str]: Overall stability status as a bool and the
-            filename where detailed stability information was saved
-
-        str: Containing error message, if there is a problem with the workflow
-
-    """
+    """Evaluate orbital-rotation stability and save the StabilityResult."""
     # Strip filenames in case full path is passed
     wavefunction_filename = _strip(wavefunction_filename)
     out_stability_result_filename = _strip(out_stability_result_filename)
@@ -2766,48 +2071,7 @@ def run_qubit_hamiltonian_solver(
     remote: str | None = None,
     remote_config: dict | None = None,
 ) -> str | tuple[float, list]:
-    """Exactly diagonalize a QubitHamiltonian; return ground-state energy and an inline eigenstate vector.
-
-    This method computes the ground state energy and corresponding eigenstate of a qubit Hamiltonian
-    by constructing and diagonalizing its matrix representation.
-
-    Usage guidelines:
-
-    - The default qubit Hamiltonian solver can be extracted using
-      the function and MCP tool `get_algorithm_default_type`.
-    - The sparse matrix solver (default) is recommended for most cases as it is more memory-efficient and faster
-      for large systems.
-    - The dense matrix solver can be used for small systems where you need the full spectrum or when the Hamiltonian
-      is already dense.
-    - Choose the sparse solver for systems with more than ~10-12 qubits to avoid memory issues.
-
-    Guidelines on settings:
-
-    - The current set of default settings can be obtained by using
-      the function and MCP tool `get_algorithm_default_settings`.
-    - The dense solver has no configurable settings
-    - The sparse solver (default) `qdk_sparse_matrix_solver` has
-      settings `tol`, `max_m` to set the convergence tolerance for
-      the Davidson solver
-    - In most cases, the default settings should not be modified
-      unless you need higher precision or are experiencing
-      convergence issues.
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project
-        qubit_hamiltonian_filename (str): Name of the file containing the qubit Hamiltonian in the current directory
-        algorithm_name (str, optional): Algorithm name to override the default solver
-        settings (Dict, optional): A dictionary of key-value pairs specifying which settings keys
-            to replace with specific values (overrides defaults)
-        cache (str, optional): Cache backend identifier for result caching
-        remote (str, optional): Remote backend identifier for remote execution
-        remote_config (dict, optional): Configuration options for the remote backend
-
-    Returns:
-        Tuple[float, List]: The ground state energy and corresponding eigenstate (statevector) as a list
-        str: Containing the error message, if there was a problem with the workflow
-
-    """
+    """Diagonalize a QubitHamiltonian and return its ground-state energy and eigenstate."""
     # Strip filename in case full path is passed
     qubit_hamiltonian_filename = _strip(qubit_hamiltonian_filename)
 
@@ -2850,65 +2114,7 @@ def run_energy_estimator(
     remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str | tuple[str, str]:
-    """Estimate the expectation value and variance of a Hamiltonian from a quantum circuit.
-
-    The energy estimator evaluates the expectation value of a qubit Hamiltonian with respect to
-    a quantum circuit that prepares a quantum state. It automatically groups commuting Pauli terms,
-    generates measurement circuits, executes them on a simulator backend, and calculates energy
-    expectation values from bitstring statistics.
-
-    Usage guidelines:
-
-    - The default energy estimator can be extracted using the function and MCP tool `get_algorithm_default_type`.
-    - The QDK base simulator (default) is recommended for most cases and supports various noise models.
-    - The Qiskit Aer simulator can be used when you need custom Qiskit noise models.
-    - The circuit and Hamiltonian must be compatible—using the same
-      qubit encoding and derived from the same molecular system.
-    - More shots reduce statistical uncertainty but increase computational cost.
-    - Commuting grouping of Pauli terms is performed internally by the energy estimator.
-
-    Guidelines on settings:
-
-    - The current set of default settings can be obtained by using
-      the function and MCP tool `get_algorithm_default_settings`.
-    - For the base simulator (default), the `qubit_loss` argument
-      can be set, as well as a different `seed`
-    - In most cases, the default settings should not be modified
-      unless you need specific reproducibility or noise simulation.
-    - The circuit executor used internally can be overridden via the
-      ``circuit_executor`` settings key::
-
-          settings={"circuit_executor": {"algorithm_name": "qdk_full_state_simulator", "seed": 123}}
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project
-        circuit_filename (str): Name of the file containing the input circuit in the current directory
-        qubit_hamiltonian_filename (str): Filename of the QubitHamiltonian to estimate
-        out_energy_result_filename (str): Name of the file where energy result will be saved
-        out_measurement_data_filename (str): Name of the file where measurement data will be saved
-        total_shots (int): Total number of shots to allocate across the observable terms
-        noise_model (Optional[Any]): Optional noise model to simulate noise in the quantum circuit.
-            For QDK simulator: use Q# noise models. For Qiskit simulator: use Qiskit noise models.
-        algorithm_name (str, optional): The name of the energy estimator algorithm to use, if overriding the default
-        settings (Dict, optional): A dictionary of key, value pairs
-            specifying which settings keys to replace with specific
-            values (overrides defaults)
-        cache (str, optional): Cache backend identifier for result caching
-        remote (str, optional): Remote backend identifier for remote execution
-        remote_config (dict, optional): Configuration options for the remote backend
-        remote_timeout (int): Maximum seconds to wait for a remote job
-            to complete before returning a job handle. Default ``120``.
-        overwrite (bool): If ``True``, overwrite existing output files
-            without prompting. Default ``False``.
-
-    Returns:
-        Tuple[str, str]:
-            - Filename where EnergyExpectationResult was saved
-            - Filename where MeasurementData was saved
-
-        str: Containing error message, if there was a problem with the workflow
-
-    """
+    """Estimate a Hamiltonian expectation value and variance from a Circuit."""
     # Strip filenames in case full path is passed
     circuit_filename = _strip(circuit_filename)
     qubit_hamiltonian_filename = _strip(qubit_hamiltonian_filename)
@@ -2976,33 +2182,7 @@ def create_majorana_mapping(
     hamiltonian_filename: str | None = None,
     overwrite: bool = False,
 ) -> str:
-    """Create a MajoranaMapping data file for fermion-to-qubit mapping.
-
-    The qubit mapper algorithm expects an explicit
-    :class:`~qdk_chemistry.data.MajoranaMapping` object. This tool creates
-    that object as a project file so it can be passed to `run_qubit_mapper`.
-
-    Provide either `num_modes` directly or a `hamiltonian_filename` from which
-    the number of spin-orbital modes is derived as twice the number of spatial
-    orbitals. If both are provided, they must agree.
-
-    Supported encodings: `"jordan-wigner"`, `"bravyi-kitaev"`,
-    `"bravyi-kitaev-tree"`, and `"parity"`.
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project
-        out_mapping_filename (str): Name of the file where the mapping will be saved
-        encoding (str): Fermion-to-qubit mapping factory to use
-        num_modes (int, optional): Number of fermionic spin-orbital modes
-        hamiltonian_filename (str, optional): Hamiltonian file used to derive `num_modes`
-        overwrite (bool): If ``True``, overwrite existing output files
-            without prompting. Default ``False``.
-
-    Returns:
-        str: Filename where the MajoranaMapping was saved
-        OR error message if there was a problem in the workflow.
-
-    """
+    """Create and save a MajoranaMapping for a mode count or Hamiltonian."""
     out_mapping_filename = _strip(out_mapping_filename)
     out_mapping_filename, _err = _prepare_output(
         out_mapping_filename, "MajoranaMapping", data.MajoranaMapping, overwrite=overwrite
@@ -3063,78 +2243,7 @@ def run_qubit_mapper(
     remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str:
-    """Map a fermionic Hamiltonian with an explicit MajoranaMapping and save the resulting QubitHamiltonian.
-
-    This method transforms a fermionic Hamiltonian (expressed in terms of fermionic creation/annihilation operators)
-    into a qubit Hamiltonian (expressed as a weighted sum of Pauli strings) using an explicit MajoranaMapping file.
-
-    Typical workflow context:
-
-    Two typical workflows, depending on system size:
-
-    **Full-space path** (small systems, up to ~16 spatial orbitals / ~20 qubits):
-    1. Run `run_scf` to get an initial wavefunction
-    2. Extract orbitals → `run_hamiltonian_constructor` on full SCF orbitals
-    3. Run `create_majorana_mapping` using the Hamiltonian to create the mapping file
-    4. (THIS TOOL) `run_qubit_mapper` to convert to qubits
-    5. Proceed to state preparation / QPE / resource estimation
-
-    **Active-space path** (larger systems):
-
-    1. Run `run_scf` → active space analysis (SCI + AutoCAS) → compress orbital space
-    2. (Optional) `run_multi_configuration_calculation` for classical reference energy
-    3. (Optional) Sparsify wavefunction via `run_projected_multi_configuration_calculation`
-    4. Extract orbitals → `run_hamiltonian_constructor` on active-space orbitals
-    5. Run `create_majorana_mapping` using the Hamiltonian to create the mapping file
-    6. (THIS TOOL) `run_qubit_mapper` to convert to qubits
-    7. Proceed to state preparation / QPE / resource estimation
-
-    Ask the user which approach they prefer if it's not clear from the system size.
-
-    Note that this workflow may vary, depending on the starting point (e.g., starting from a custom Hamiltonian rather
-    than structure object).
-
-    The qubit Hamiltonian output file is used by:
-
-    - `run_phase_estimation` for quantum phase estimation
-    - `run_energy_estimator` for shot-based energy estimation
-    - `run_qubit_hamiltonian_solver` for exact classical diagonalization
-
-    Usage guidelines:
-
-    - Create the mapping explicitly with `create_majorana_mapping` before using this tool.
-    - The default qubit mapper can be extracted using the function and MCP tool `get_algorithm_default_type`.
-    - The qubit Hamiltonian output is compatible with energy estimation and quantum circuit algorithms.
-
-    Guidelines on settings:
-
-    - The current set of default settings can be obtained by using
-      the function and MCP tool
-      `get_algorithm_default_settings`.
-        - The fermion-to-qubit encoding is not a mapper setting. It is carried by
-            the `MajoranaMapping` file passed via `mapping_filename`.
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project
-        hamiltonian_filename (str): Name of the file containing the fermionic Hamiltonian in the current directory
-        mapping_filename (str): Name of the MajoranaMapping file to use for fermion-to-qubit mapping
-        out_qubit_hamiltonian_filename (str): Name of the file where the output qubit Hamiltonian will be saved
-        algorithm_name (str, optional): The name of the qubit mapper algorithm to use, if overriding the default
-        settings (Dict, optional): A dictionary of key, value pairs specifying which settings keys to replace
-            with specific values (overrides defaults)
-        cache (str, optional): Cache backend identifier for result caching
-        remote (str, optional): Remote backend identifier for remote execution
-        remote_config (dict, optional): Configuration options for the remote backend
-        remote_timeout (int): Maximum seconds to wait for a remote job
-            to complete before returning a job handle. Default ``120``.
-        overwrite (bool): If ``True``, overwrite existing output files
-            without prompting. Default ``False``.
-
-    Returns:
-        str: Filename where qubit Hamiltonian was saved
-        OR error message if there was a problem in the workflow.
-
-    """
+    """Map a fermionic Hamiltonian and MajoranaMapping to a saved QubitHamiltonian."""
     # Strip filenames in case full path is passed
     hamiltonian_filename = _strip(hamiltonian_filename)
     mapping_filename = _strip(mapping_filename)
@@ -3190,77 +2299,7 @@ def run_state_preparation(
     remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str:
-    """Compile a Wavefunction into a saved Circuit; multiconfigurational inputs require symmetric active spaces.
-
-    This method transforms a multi-configurational wavefunction into a quantum circuit that prepares
-    the corresponding quantum state on a quantum computer. State preparation is a critical step for
-    quantum algorithms like Quantum Phase Estimation (QPE) and serves as a practical benchmark for
-    quantum hardware fidelity.
-
-    Typical workflow context:
-
-    Two paths depending on system size:
-
-    **Full-space path** (small systems, up to ~16 spatial orbitals / ~20 qubits):
-    1. Run `run_scf` → extract orbitals → `run_hamiltonian_constructor` on full SCF orbitals
-    2. `create_majorana_mapping` → `run_qubit_mapper` → qubit Hamiltonian
-    3. (THIS TOOL) `run_state_preparation` from the SCF wavefunction
-    4. `run_phase_estimation` or `run_resource_estimation`
-
-    **Active-space path** (larger systems):
-    1. Run `run_scf` → active space analysis (SCI + AutoCAS)
-    2. (Optional) Sparsify wavefunction via `run_projected_multi_configuration_calculation`
-    3. Extract orbitals → `run_hamiltonian_constructor` → `create_majorana_mapping` → `run_qubit_mapper`
-    4. (THIS TOOL) `run_state_preparation` from the (sparse) multi-configurational wavefunction
-    5. `run_phase_estimation` or `run_resource_estimation`
-
-    Ask the user which approach they prefer if it's not clear from the system size.
-
-    Usage guidelines:
-
-    - The default state preparation method can be extracted using
-      the function and MCP tool `get_algorithm_default_type`.
-    - The sparse isometry method is recommended for
-      multi-configurational wavefunctions as it exploits sparsity in
-      the wavefunction to produce more efficient circuits. Regular
-      isometry generates deeper circuits and therefore is in most
-      cases not computationally feasible.
-    - The wavefunction must have symmetric active spaces (same number of alpha and beta orbitals).
-    - The trade-off is between circuit depth and overlap with the true ground state
-
-    Guidelines on settings:
-
-    - The current set of default settings can be obtained by using
-      the function and MCP tool
-      `get_algorithm_default_settings`.
-    - Key settings include `basis_gates`, `transpile` and `transpile_optimization_level`.
-      For example, to use a custom gate set::
-
-          settings = {"basis_gates": ["h", "cx", "rz"], "transpile_optimization_level": 1}
-
-    - In most cases, the default settings are sufficient and should not be modified unless you have
-      specific hardware constraints or optimization requirements.
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project
-        wavefunction_filename (str): Name of the file containing the target wavefunction in the current directory
-        out_circuit_filename (str): Name of the file where the output circuit will be saved
-        algorithm_name (str, optional): The name of the state preparation algorithm to use, if overriding the default
-        settings (Dict, optional): A dictionary of key, value pairs specifying which settings keys to replace
-            with specific values (overrides defaults)
-        cache (str, optional): Cache backend identifier for result caching
-        remote (str, optional): Remote backend identifier for remote execution
-        remote_config (dict, optional): Configuration options for the remote backend
-        remote_timeout (int): Maximum seconds to wait for a remote job
-            to complete before returning a job handle. Default ``120``.
-        overwrite (bool): If ``True``, overwrite existing output files
-            without prompting. Default ``False``.
-
-    Returns:
-        str: Filename where circuit was saved
-        OR error message if there was a problem in the workflow.
-
-    """
+    """Compile a Wavefunction into a saved Circuit."""
     # Strip filenames in case full path is passed
     wavefunction_filename = _strip(wavefunction_filename)
     out_circuit_filename = _strip(out_circuit_filename)
@@ -3306,32 +2345,7 @@ def run_resource_estimation(
     measurement_time_ns: int = 100,
     use_graph: bool = True,
 ) -> dict | str:
-    """Return inline QRE physical-qubit/runtime Pareto points for the exact Circuit; no result file is written.
-
-    This tool directly calls the QDK QRE Pareto-front API on any QDK Chemistry
-    circuit. It does not create a QDK Chemistry algorithm or persist a separate
-    result data object.
-
-    ``majorana`` uses the ThreeAux QEC scheme. ``gate_based`` uses surface code.
-    Both use round-based magic-state factories. The returned points contain the
-    physical-qubit count, runtime in nanoseconds, and achieved error.
-
-    Args:
-        project_name: Name of the current QDK Chemistry project.
-        circuit_filename: Name of the input circuit file.
-        architecture: Physical-qubit architecture profile.
-        physical_error_rate: Physical operation error rate. Defaults to ``1e-5``
-            for Majorana and ``1e-4`` for gate-based qubits.
-        max_error: Maximum total error probability for an estimate.
-        gate_time_ns: Single-qubit gate time for the gate-based architecture.
-        measurement_time_ns: Measurement time for the gate-based architecture.
-        use_graph: Whether QRE uses graph-based pruning.
-
-    Returns:
-        Structured estimation assumptions and Pareto-front points, or an error
-        message if the circuit cannot be loaded.
-
-    """
+    """Evaluate a Circuit with QDK QRE and return physical-resource Pareto points."""
     circuit_filename = _strip(circuit_filename)
     circuit, _err = _load_or_error(circuit_filename, data.Circuit, "circuit")
     if _err:
@@ -3389,56 +2403,7 @@ def run_time_evolution_builder(
     remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str:
-    """Save U = exp(-iHt) for stepwise QPE circuit analysis from a QubitHamiltonian; this does not execute QPE.
-
-    This tool runs the time evolution builder algorithm to construct the unitary operator
-    that evolves a quantum state under the given Hamiltonian for a specified time. The resulting
-    `TimeEvolutionUnitary` data object can then be passed to `run_controlled_evolution_circuit_mapper`
-    to build the controlled circuit needed for QPE.
-
-    IMPORTANT: This is an individual algorithm step in the QPE pipeline.
-
-    Use these individual run tools to build up the QPE circuit step by step without executing the
-    full phase estimation. This lets you inspect intermediate results at each stage.
-
-    Typical workflow context:
-
-    The QPE circuit construction pipeline is:
-
-    1. (THIS TOOL) Build time evolution unitary: `run_time_evolution_builder`
-    2. Build controlled evolution circuit: `run_controlled_evolution_circuit_mapper`
-    3. (Optional) Execute the circuit: `run_circuit_executor`
-    4. (Optional) Run the full QPE for an eigenvalue estimate: `run_phase_estimation`
-
-    Usage guidelines:
-
-        - The default time evolution builder can be queried using
-            `get_algorithm_default_type("hamiltonian_unitary_builder")`.
-        - The default settings can be queried using
-            `get_algorithm_default_settings("hamiltonian_unitary_builder")`.
-        - Key Trotter settings include `time`, `power`, `power_strategy`,
-            `target_accuracy`, `num_divisions`, `error_bound`, and `order`.
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project
-        qubit_hamiltonian_filename (str): Name of the file containing the qubit Hamiltonian
-        evolution_time (float): Time parameter t for U = exp(-iHt)
-        out_time_evolution_unitary_filename (str): Name of the file where the time evolution unitary will be saved
-        algorithm_name (str, optional): The name of the time evolution builder algorithm to use
-        settings (Dict, optional): Settings overrides for the time evolution builder
-        cache (str, optional): Cache backend identifier for result caching
-        remote (str, optional): Remote backend identifier for remote execution
-        remote_config (dict, optional): Configuration options for the remote backend
-        remote_timeout (int): Maximum seconds to wait for a remote job
-            to complete before returning a job handle. Default ``120``.
-        overwrite (bool): If ``True``, overwrite existing output files
-            without prompting. Default ``False``.
-
-    Returns:
-        str: Filename where time evolution unitary was saved
-        OR error message if there was a problem
-
-    """
+    """Build exp(-iHt) from a QubitHamiltonian and save the TimeEvolutionUnitary."""
     qubit_hamiltonian_filename = _strip(qubit_hamiltonian_filename)
     out_time_evolution_unitary_filename = _strip(out_time_evolution_unitary_filename)
     try:
@@ -3501,60 +2466,7 @@ def run_controlled_evolution_circuit_mapper(
     remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str:
-    """Map a saved time-evolution unitary to a controlled Circuit; keep ``power=1`` and configure powers upstream.
-
-    This tool takes a `TimeEvolutionUnitary` (from `run_time_evolution_builder`) and produces
-    a quantum `Circuit` implementing the controlled unitary represented by that input. This is
-    the controlled circuit that forms the core of QPE iterations.
-
-    IMPORTANT: This is an individual algorithm step in the QPE pipeline.
-
-    Use these individual run tools to build up the QPE circuit step by step without executing the
-    full phase estimation. This lets you inspect intermediate results at each stage.
-
-    Typical workflow context:
-
-    The QPE circuit construction pipeline is:
-
-    1. Build time evolution unitary: `run_time_evolution_builder`
-    2. (THIS TOOL) Build controlled evolution circuit: `run_controlled_evolution_circuit_mapper`
-    3. (Optional) Execute the circuit: `run_circuit_executor`
-    4. (Optional) Run the full QPE for an eigenvalue estimate: `run_phase_estimation`
-
-        Usage guidelines:
-
-        - The default circuit mapper can be queried using
-            `get_algorithm_default_type("controlled_circuit_mapper")`.
-        - The default settings can be queried using
-            `get_algorithm_default_settings("controlled_circuit_mapper")`.
-        - For powered QPE circuits, set `power` and `power_strategy` on
-            `run_time_evolution_builder` via its `settings` dict before mapping the
-            resulting unitary. In QPE, different iterations use powers of 2
-            (e.g., U^1, U^2, U^4, ...).
-        - The output circuit can be visualized using `visualize_circuit`.
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project
-        time_evolution_unitary_filename (str): Name of the file containing the time evolution unitary
-            from `run_time_evolution_builder`
-        out_circuit_filename (str): Name of the file where the controlled circuit will be saved
-        control_indices (List[int]): Indices of the control qubits (default: [0])
-        power (int): Compatibility parameter. Keep this at 1; set powers on the time-evolution builder settings.
-        algorithm_name (str, optional): The name of the circuit mapper algorithm to use
-        settings (Dict, optional): Settings overrides for the circuit mapper
-        cache (str, optional): Cache backend identifier for result caching
-        remote (str, optional): Remote backend identifier for remote execution
-        remote_config (dict, optional): Configuration options for the remote backend
-        remote_timeout (int): Maximum seconds to wait for a remote job
-            to complete before returning a job handle. Default ``120``.
-        overwrite (bool): If ``True``, overwrite existing output files
-            without prompting. Default ``False``.
-
-    Returns:
-        str: Filename where the controlled evolution circuit was saved
-        OR error message if there was a problem
-
-    """
+    """Map a TimeEvolutionUnitary to a saved controlled Circuit."""
     control_indices = control_indices or [0]
     time_evolution_unitary_filename = _strip(time_evolution_unitary_filename)
     out_circuit_filename = _strip(out_circuit_filename)
@@ -3621,53 +2533,7 @@ def run_circuit_executor(
     remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str:
-    """Execute a quantum circuit on a simulator or hardware backend.
-
-    This tool runs a quantum circuit for a given number of shots and saves the execution results
-    (measurement statistics) to a file.
-
-    IMPORTANT: This is an individual algorithm step in the QPE pipeline.
-
-    Use these individual run tools to build up the QPE circuit step by step without executing the
-    full phase estimation. This lets you inspect intermediate results at each stage.
-
-    Typical workflow context:
-
-    The QPE circuit construction pipeline is:
-
-    1. Build time evolution unitary: `run_time_evolution_builder`
-    2. Build controlled evolution circuit: `run_controlled_evolution_circuit_mapper`
-    3. (THIS TOOL) Execute the circuit: `run_circuit_executor`
-    4. (Optional) Run the full QPE for an eigenvalue estimate: `run_phase_estimation`
-
-    Usage guidelines:
-
-    - The default circuit executor can be queried using `get_algorithm_default_type("circuit_executor")`.
-    - The default settings can be queried using `get_algorithm_default_settings("circuit_executor")`.
-    - More shots yield better measurement statistics but increase simulation time.
-    - The input circuit can be any quantum circuit (e.g., from `run_state_preparation`,
-      `run_controlled_evolution_circuit_mapper`, or any other circuit source).
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project
-        circuit_filename (str): Name of the file containing the quantum circuit to execute
-        shots (int): Number of measurement shots to execute
-        out_executor_data_filename (str): Name of the file where execution results will be saved
-        algorithm_name (str, optional): The name of the circuit executor algorithm to use
-        settings (Dict, optional): Settings overrides for the circuit executor
-        cache (str, optional): Cache backend identifier for result caching
-        remote (str, optional): Remote backend identifier for remote execution
-        remote_config (dict, optional): Configuration options for the remote backend
-        remote_timeout (int): Maximum seconds to wait for a remote job
-            to complete before returning a job handle. Default ``120``.
-        overwrite (bool): If ``True``, overwrite existing output files
-            without prompting. Default ``False``.
-
-    Returns:
-        str: Filename where circuit execution data was saved
-        OR error message if there was a problem
-
-    """
+    """Execute a Circuit and save its CircuitExecutorData."""
     circuit_filename = _strip(circuit_filename)
     out_executor_data_filename = _strip(out_executor_data_filename)
     try:
@@ -3726,131 +2592,7 @@ def run_phase_estimation(
     remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str:
-    """Run full eigenvalue QPE and save QpeResult; phase bits and evolution time must replace invalid sentinels.
-
-    This method executes either iterative QPE (IQPE) or traditional QFT-based QPE on a given
-    state preparation circuit and qubit Hamiltonian.
-
-    IMPORTANT: Only use this tool if you actually need the QPE eigenvalue result.
-
-    For step-by-step inspection of the QPE pipeline, use the individual ``run_*`` tools
-    (``run_time_evolution_builder``, ``run_controlled_evolution_circuit_mapper``,
-    ``run_circuit_executor``) instead. This tool combines all three into a single execution.
-
-    QPE settings use the same nested algorithm-reference shape as the underlying
-    phase-estimation algorithm. Configure phase bits and controlled-evolution construction
-    on ``qpe_circuit_builder``; configure execution on ``circuit_executor``::
-
-        settings={
-            "qpe_circuit_builder": {
-                "algorithm_name": "qdk_iterative",
-                "num_bits": 10,
-                "unitary_builder": {"algorithm_name": "trotter", "time": 1.0, "order": 1},
-                "controlled_circuit_mapper": {"algorithm_name": "pauli_sequence"},
-            },
-            "circuit_executor": {"algorithm_name": "qdk_sparse_state_simulator", "seed": 42},
-        }
-
-    Each dict accepts ``algorithm_name`` (optional, defaults to the built-in default) plus
-    any setting keys supported by that algorithm.  When omitted, the QPE algorithm uses its
-    built-in defaults (Trotter builder, Pauli-sequence mapper, QDK sparse-state simulator).
-
-    Note that the cost of QPE scales with:
-
-    - Number of qubits (determined by active space size via qubit mapping)
-    - Circuit depth (determined by Hamiltonian complexity and state preparation)
-    - Number of phase bits and shots per iteration
-
-    To make QPE tractable, it is wise to use cost-reduction strategies in the preceding steps that generate
-    the qubit hamiltonian.
-
-    Typical workflow context:
-
-    Two paths depending on system size:
-
-    **Full-space path** (small systems, up to ~16 spatial orbitals / ~20 qubits):
-
-    1. Run `run_scf` → extract orbitals → `run_hamiltonian_constructor` → `create_majorana_mapping` → `run_qubit_mapper`
-    2. `run_state_preparation` from the SCF wavefunction
-    3. (THIS TOOL) `run_phase_estimation` with sub-algorithm overrides in ``settings``
-
-    **Active-space path** (larger systems):
-
-    1. Run `run_scf` → active space analysis (SCI + AutoCAS) → compress orbital space
-    2. (Optional) Sparsify wavefunction → `run_hamiltonian_constructor` → `create_majorana_mapping` → `run_qubit_mapper`
-    3. `run_state_preparation` from the (sparse) multi-configurational wavefunction
-    4. (THIS TOOL) `run_phase_estimation` with sub-algorithm overrides in ``settings``
-
-    Ask the user which approach they prefer if it's not clear from the system size.
-
-    Usage guidelines:
-
-    - Prefer using the individual ``run_*`` tools when you want to inspect each QPE component.
-      Only call this tool when you need to execute the full QPE and obtain an eigenvalue estimate.
-    - The default phase estimation algorithm can be extracted using
-      the function and MCP tool `get_algorithm_default_type`.
-    - Iterative QPE (default, `algorithm_name="iterative"`) is
-      recommended for near-term quantum hardware as it uses only
-      1 ancilla qubit and processes phase bits sequentially with
-      feedback.
-    - Traditional QPE (`algorithm_name="qiskit_standard"`) uses QFT
-      and measures all phase bits in parallel but requires more
-      qubits (equal to num_bits).
-        - The state preparation circuit should prepare a state with good overlap
-            with the target eigenstate.
-        - The three dependency algorithms (time evolution builder, controlled
-            evolution circuit mapper, circuit executor) are configured inline via
-            the nested ``settings`` dict.
-
-    Guidelines on settings:
-
-        - The current set of default settings can be obtained by using
-            the function and MCP tool `get_algorithm_default_settings`.
-        - `qpe_circuit_builder.num_bits` (int): Number of phase estimation bits
-            (precision). Default: -1. IMPORTANT: this default value is not a valid
-            setting - you need to pass a valid value for the number of bits.
-        - `qpe_circuit_builder.unitary_builder.time` (float): Time parameter t for
-            U = exp(-iHt). Default: 0.0. IMPORTANT: this default value is not a
-            valid setting - you need to adjust based on the eigenvalue range - use
-            smaller times for larger energy differences.
-        - `shots_per_bit` (int, iterative only): Measurement shots per bit iteration.
-            Default: 3.
-        - `shots` (int, traditional only): Total measurement shots. Default: 3.
-        - `qpe_circuit_builder.unitary_builder` (dict, optional): Override the
-            time-evolution builder, e.g. ``{"algorithm_name": "trotter", "order": 2}``.
-        - `qpe_circuit_builder.controlled_circuit_mapper` (dict, optional):
-            Override the controlled-evolution circuit mapper.
-        - `circuit_executor` (dict, optional): Override the circuit executor, e.g.
-            ``{"algorithm_name": "qdk_full_state_simulator", "seed": 123}``.
-    - If calculations are taking too long, consider reducing the parameter defaults.
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project
-        state_prep_circuit_filename (str): Name of the file
-            containing the circuit that prepares the trial quantum
-            state ``|ψ⟩``
-        qubit_hamiltonian_filename (str): Name of the file containing
-            the qubit Hamiltonian whose eigenvalues to estimate
-        out_qpe_result_filename (str): Name of the file where the QPE result will be saved
-        algorithm_name (str, optional): The name of the phase estimation algorithm to use, if overriding the default
-            (options: "iterative", "qiskit_standard")
-        settings (Dict, optional): A dictionary of key, value pairs specifying which settings keys to replace
-            with specific values (overrides defaults). Must include `qpe_circuit_builder.num_bits` and
-            `qpe_circuit_builder.unitary_builder.time`. Nested algorithm overrides can be specified as
-            dicts — see the docstring above for the format.
-        cache (str, optional): Cache backend identifier for result caching
-        remote (str, optional): Remote backend identifier for remote execution
-        remote_config (dict, optional): Configuration options for the remote backend
-        remote_timeout (int): Maximum seconds to wait for a remote job
-            to complete before returning a job handle. Default ``120``.
-        overwrite (bool): If ``True``, overwrite existing output files
-            without prompting. Default ``False``.
-
-    Returns:
-        str: Filename where QPE result was saved
-        OR error message if there was a problem in the workflow
-
-    """
+    """Run phase estimation for a Circuit and QubitHamiltonian and save the QpeResult."""
     # Strip filenames in case full path is passed
     state_prep_circuit_filename = _strip(state_prep_circuit_filename)
     qubit_hamiltonian_filename = _strip(qubit_hamiltonian_filename)
@@ -3951,87 +2693,7 @@ def run_scf(
     remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str | tuple[float, str]:
-    """Run HF or DFT SCF and save its Wavefunction; active-space-bound open shells require restricted HF.
-
-    The self-consistent field procedure is used to minimize the total energy of a system in a given basis set.
-    This method is used for Hartree Fock (HF) and Density Functional Theory (DFT) calculations, where the
-    wavefunction is defined using a single Slater determinant of molecular orbitals.
-
-    Typical workflow context:
-
-    This is typically the first step (or only step) in a quantum chemistry workflow starting from a structure.
-
-    For single-reference calculations (closed-shell molecules at equilibrium):
-
-    1. (THIS TOOL) Run `run_scf`
-    2. Optionally add dynamical correlation with `run_dynamical_correlation_calculator`
-
-    For multi-reference calculations (bond breaking, open-shell, transition metals, excited states):
-
-    1. (THIS TOOL) Run `run_scf` with HF (default method) to get initial orbitals
-    2. Run `run_active_space_selector` to define the active space
-    3. Build Hamiltonian with `run_hamiltonian_constructor` from the active-space orbitals
-    4. Run `run_multi_configuration_calculation` or `run_multi_configuration_scf`
-
-    For quantum simulation (QPE):
-
-    - Follow the multi-reference workflow above
-    - Possible additional sparsification steps - please refer to docs of `run_phase_estimation` for example
-    - Continue with `run_qubit_mapper`, `run_state_preparation`, and `run_phase_estimation`
-
-    Usage guidelines:
-
-    - The default SCF solver can be extracted using the function and MCP tool `get_algorithm_default_type`.
-    - For closed-shell molecules at equilibrium geometries, Hartree-Fock (HF) is a reasonable starting point.
-    - For multi-reference workflows, always start with HF (not DFT) to get clean canonical orbitals.
-    - For an open-shell workflow that will use valence selection, ASCI, or AutoCAS, set
-      ``settings={"method": "hf", "scf_type": "restricted"}``. This produces ROHF orbitals.
-      The default ``scf_type="auto"`` produces UHF orbitals for an open-shell state, which are
-      incompatible with this restricted-orbital workflow.
-    - For better accuracy in single-reference energy predictions, consider using DFT with an appropriate functional.
-    - The spin multiplicity should be set correctly: 1 for singlet (closed-shell), 2 for doublet, 3 for triplet, etc.
-    - Common basis sets include: "sto-3g" (minimal, fast), "def2-svp" (balanced), "cc-pvdz" or "cc-pvtz" (accurate).
-
-    Guidelines on settings:
-
-    - The current set of default settings can be obtained by using
-      the function and MCP tool `get_algorithm_default_settings`.
-    - The most important setting is `method`: the default is HF, but
-      DFT functionals can be specified (e.g., "b3lyp", "pbe",
-      "m06-2x").
-    - ``scf_type="restricted"`` selects RHF for closed-shell HF and ROHF
-      for open-shell HF. Use it whenever the output will feed valence
-      selection, ASCI, or AutoCAS.
-    - Other useful settings include `max_iterations` for convergence
-      control and `convergence_threshold` for energy tolerance.
-    - For difficult convergence cases, consider adjusting `damping` or `level_shift` settings if available.
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project
-        structure_filename (str): Name of the file containing the input structure in the current directory
-        out_wavefunction_filename (str): Name of the file where the output wavefunction will be saved
-        charge (int): Total charge of the system
-        spin_multiplicity (int): Spin multiplicity of the system
-        basis_set (str): Basis set to use in the calculation
-        algorithm_name (str, optional): The name of the scf solver method to use, if overriding the default
-        settings (Dict, optional): A dictionary of key, value pairs
-            specifying which settings keys to replace with specific
-            values (overrides defaults).
-        cache (str, optional): Cache backend identifier for result caching
-        remote (str, optional): Remote backend identifier for remote execution
-        remote_config (dict, optional): Configuration options for the remote backend
-        remote_timeout (int): Maximum seconds to wait for a remote job
-            to complete before returning a job handle. Default ``120``.
-        overwrite (bool): If ``True``, overwrite existing output files
-            without prompting. Default ``False``.
-
-    Returns:
-        Tuple[float, str]: The total energy returned by the SCF
-            procedure and the filename where wavefunction was saved
-
-        str: Containing error message, if there was a problem in the workflow
-
-    """
+    """Run an HF or DFT self-consistent-field calculation and save its Wavefunction."""
     # Strip filenames in case full path is passed
     structure_filename = _strip(structure_filename)
     out_wavefunction_filename = _strip(out_wavefunction_filename)
@@ -4091,26 +2753,7 @@ def run_population_analysis(
     remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> dict | str:
-    """Compute per-center populations from a structure or wavefunction.
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project.
-        input_filename (str): Structure or wavefunction file to analyze.
-        charge (int): Total molecular charge.
-        spin_multiplicity (int): Spin multiplicity of the molecular system.
-        n_inactive_orbitals (int): Number of doubly occupied orbitals excluded from active-space treatments.
-        algorithm_name (str, optional): Population analyzer algorithm name, such as ``qdk`` or ``xtb``.
-        settings (dict, optional): Settings overrides.
-        cache (str, optional): Cache backend identifier for result caching.
-        remote (str, optional): Remote backend identifier for remote execution.
-        remote_config (dict, optional): Configuration options for the remote backend.
-        remote_timeout (int): Maximum seconds to wait for a remote job before returning a handle.
-        overwrite (bool): If ``True``, overwrite cached entries where supported.
-
-    Returns:
-        Dict with ``populations`` in center order and their sum, or an error string.
-
-    """
+    """Compute and return per-center populations from a Structure or Wavefunction."""
     input_filename = _strip(input_filename)
 
     input_object = None
@@ -4172,40 +2815,7 @@ def run_nuclear_derivative_calculator(
     remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> dict | str:
-    """Compute nuclear gradients for a structure and save derivative outputs.
-
-    The default ``qdk`` implementation uses analytical internal-SCF gradients
-    for QDK HF and DFT. With ``settings={"compute_hessian": True}``, it computes
-    the Hessian by central differences of those analytical gradients. Select
-    ``qdk_finite_difference`` only for an energy method without analytical
-    gradients, such as a configured multi-reference energy path; it computes
-    both gradients and Hessians from energy differences.
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project.
-        structure_filename (str): Structure file to evaluate.
-        out_gradients_filename (str): Filename for the saved nuclear gradients.
-        charge (int): Total charge of the system.
-        spin_multiplicity (int): Spin multiplicity of the system.
-        seed_or_basis (str): Basis-set name such as ``"sto-3g"`` or a saved
-            wavefunction, orbitals, or basis set filename.
-        n_inactive_orbitals (int): Number of doubly occupied orbitals excluded from the active space.
-        out_wavefunction_filename (str, optional): Save the returned wavefunction if one is produced.
-        out_hessian_filename (str, optional): Save the returned Hessian if one is produced.
-        algorithm_name (str, optional): Nuclear derivative algorithm name. Keep
-            the default ``qdk`` for QDK HF or DFT analytical gradients.
-        settings (dict, optional): Settings overrides, including nested
-            ``energy_calculator`` settings.
-        cache (str, optional): Cache backend identifier for result caching.
-        remote (str, optional): Remote backend identifier for remote execution.
-        remote_config (dict, optional): Configuration options for the remote backend.
-        remote_timeout (int): Maximum seconds to wait for a remote job before returning a handle.
-        overwrite (bool): If ``True``, overwrite existing output files.
-
-    Returns:
-        Dict with energy and saved output filenames, or an error string.
-
-    """
+    """Compute nuclear derivatives for a Structure and save requested outputs."""
     structure_filename = _strip(structure_filename)
     out_gradients_filename, err = _prepare_output(
         out_gradients_filename, "NuclearGradients", data.NuclearGradients, overwrite=overwrite
@@ -4294,61 +2904,7 @@ def run_geometry_optimization(
     remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> dict | str:
-    """Optimize molecular geometry and save the optimized structure.
-
-    The optimizer defaults to the ``qdk`` nuclear derivative calculator, which
-    uses analytical internal-SCF gradients for QDK HF and DFT. Configure the
-    electronic method inside the nested calculator without replacing that
-    analytical derivative implementation, for example::
-
-        settings={
-            "derivative_calculator": {
-                "algorithm_name": "qdk",
-                "energy_calculator": {
-                    "algorithm_name": "qdk",
-                    "method": "b3lyp",
-                    "scf_type": "auto",
-                },
-            }
-        }
-
-    The top-level ``algorithm_name`` selects the geometry optimizer, normally
-    ``"geometric"``. It does not select the energy or gradient implementation.
-    Configure a different implementation through the nested
-    ``settings["derivative_calculator"]`` algorithm reference while retaining
-    the selected optimizer.
-
-    With top-level ``compute_hessian=True``, the final Hessian is computed by
-    central differences of analytical gradients. ``qdk_finite_difference`` is
-    reserved for configured energy methods that do not provide analytical
-    gradients; requesting a Hessian is not a reason to select it.
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project.
-        structure_filename (str): Initial structure file.
-        out_structure_filename (str): Filename for the optimized structure.
-        charge (int): Total charge of the system.
-        spin_multiplicity (int): Spin multiplicity of the system.
-        seed_or_basis (str): Basis-set name such as ``"sto-3g"`` or a saved
-            wavefunction, orbitals, or basis set filename.
-        n_inactive_orbitals (int): Number of doubly occupied orbitals excluded from the active space.
-        out_wavefunction_filename (str, optional): Save the final wavefunction if one is produced.
-        out_hessian_filename (str, optional): Save the final Hessian if one is produced.
-        algorithm_name (str, optional): Geometry optimizer implementation, such
-            as ``"geometric"``. Energy and gradient implementations belong
-            under ``settings["derivative_calculator"]``.
-        settings (dict, optional): Settings overrides. Nested algorithm dicts
-            may contain further nested algorithm settings at arbitrary depth.
-        cache (str, optional): Cache backend identifier for result caching.
-        remote (str, optional): Remote backend identifier for remote execution.
-        remote_config (dict, optional): Configuration options for the remote backend.
-        remote_timeout (int): Maximum seconds to wait for a remote job before returning a handle.
-        overwrite (bool): If ``True``, overwrite existing output files.
-
-    Returns:
-        Dict with energy and saved output filenames, or an error string.
-
-    """
+    """Optimize molecular geometry and save the resulting Structure."""
     structure_filename = _strip(structure_filename)
     out_structure_filename, err = _prepare_output(
         out_structure_filename, "Structure", data.Structure, overwrite=overwrite
@@ -4444,87 +3000,7 @@ def run_multi_configuration_calculation(
     remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str | tuple[float, str]:
-    """Run CASCI/SCI and save its Wavefunction; request RDM/MI data for downstream AutoCAS or entanglement.
-
-    Multi-configuration methods provide an improvement to the
-    single-determinant Hartree-Fock (HF) method by defining the
-    wavefunction as a linear combination of multiple determinants.
-    They are also more expensive than single-determinant
-    (single-reference) methods, but necessary for an accurate
-    treatment of static correlation.
-
-    Classic examples of systems with strong static correlation are:
-
-    (1) Stretched molecules close to their dissociation limit or any systems involving bond-breaking
-    (2) Open shell systems like diradicaloid organic species
-        such as ethylene twisting, trimethylenemethane, or
-        benzynes
-    (3) Long conjugated π-systems: increasing π-conjugation
-        lowers HOMO-LUMO gaps, making multiple determinants
-        nearly degenerate.
-    (4) Transition metal complexes or oxides: due to d-orbital near-degeneracies
-    (5) Excited states: these often yield near-degenerate determinants
-
-    Typical workflow context:
-
-    1. Run `run_scf` with HF (default method) to get initial orbitals
-    2. Run `run_active_space_selector` to define the active space
-    3. Access orbitals from wavefunction or construct Hamiltonian object (depending on step 4)
-    4. (THIS TOOL) Run `run_multi_configuration_calculation` or `run_multi_configuration_scf`
-    5. ... possible next steps for quantum simulation (see docs for `run_phase_estimation` for example)
-
-    The number of active electrons can be obtained from the wavefunction's `get_active_num_electrons()` method,
-    which returns (n_alpha, n_beta). For the valence space selector, this is computed automatically.
-
-    Usage guidelines:
-
-    - The default multi-configuration calculator can be extracted
-      using the function and MCP tool `get_algorithm_default_type`.
-    - The Hamiltonian should be constructed from orbitals with a
-      defined active space (use `run_active_space_selector` first).
-    - For closed-shell systems, `n_active_beta_electrons` can be
-      omitted and will default to the same value as
-      `n_active_alpha_electrons`.
-    - For open-shell systems (radicals, triplets), specify both alpha and beta electron counts explicitly.
-
-    Guidelines on settings:
-
-    - The current set of default settings can be obtained by using
-      the function and MCP tool `get_algorithm_default_settings`.
-    - If you need access to reduced density matrices (RDMs), set
-      `calculate_one_rdm` and/or `calculate_two_rdm` to `True`.
-    - To tighten energy convergence, adjust `ci_residual_tolerance` to a smaller value.
-    - The `davidson_iterations` setting controls the maximum number of Davidson solver iterations.
-    - In most cases, the default settings should be sufficient for standard calculations.
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project
-        hamiltonian_filename (str): Name of the file containing the input Hamiltonian in the current directory
-        out_wavefunction_filename (str): Name of the file where the output wavefunction will be saved
-        n_active_alpha_electrons (int): How many (alpha) electrons are in the active space
-        n_active_beta_electrons (int, optional): For unrestricted/
-            open-shell systems, we can separately specify how many
-            beta electrons are in the opposite spin channel active
-            space
-        algorithm_name (str, optional): If we want to override the
-            default algorithm for the multi configuration
-            calculation, its name is passed here
-        settings (Dict, optional): A dictionary of key, value pairs
-            specifying which settings keys to replace with specific
-            values (overrides defaults)
-        cache (str, optional): Cache backend identifier for result caching
-        remote (str, optional): Remote backend identifier for remote execution
-        remote_config (dict, optional): Configuration options for the remote backend
-        remote_timeout (int): Maximum seconds to wait for a remote job
-            to complete before returning a job handle. Default ``120``.
-        overwrite (bool): If ``True``, overwrite existing output files
-            without prompting. Default ``False``.
-
-    Returns:
-        Tuple[float, str]: The resultant total energy and filename where wavefunction was saved
-        str: Containing error message, if there was a problem in the workflow
-
-    """
+    """Run a multi-configuration calculation and save its Wavefunction."""
     # Strip filenames in case full path is passed
     hamiltonian_filename = _strip(hamiltonian_filename)
     out_wavefunction_filename = _strip(out_wavefunction_filename)
@@ -4599,72 +3075,7 @@ def run_multi_configuration_scf(
     remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str | tuple[float, str]:
-    """Run MCSCF from active-space Orbitals; jointly optimize orbitals and CI coefficients and save the Wavefunction.
-
-    MCSCF methods simultaneously optimize both the molecular orbitals and the CI coefficients,
-    providing a more balanced description of static correlation than CASCI.
-    This is especially important when the initial orbitals are not optimal for the active space problem.
-
-    Typical workflow:
-
-    1. Run `run_scf` with HF (default method) to get initial orbitals
-    2. Run `run_active_space_selector` to define the active space
-    3. Access orbitals from wavefunction or construct Hamiltonian object (depending on step 4)
-    4. (THIS TOOL) Run `run_multi_configuration_calculation` or `run_multi_configuration_scf`
-    5. ... possible next steps for quantum simulation (see docs for `run_phase_estimation` for example)
-
-    Note: Unlike `run_multi_configuration_calculation`, this tool takes orbitals directly (not a Hamiltonian)
-    and builds the Hamiltonian internally during the orbital optimization process.
-
-    Usage guidelines:
-
-    - The default MCSCF solver can be extracted using the function and MCP tool `get_algorithm_default_type`.
-    - The input orbitals should have a defined active space (use `run_active_space_selector` on a wavefunction first).
-    - For closed-shell systems, `n_active_beta_electrons` can be omitted.
-
-    Guidelines on settings:
-
-    - The current set of default settings can be obtained by using
-      the function and MCP tool `get_algorithm_default_settings`.
-    - For the `pyscf` solver (default), key settings include:
-        - `max_cycle_macro`: Maximum number of macro cycles
-        - `max_cycle_micro`: Maximum number of micro (CI) cycles per macro iteration
-        - `conv_tol`: Energy convergence tolerance
-        - `verbose`: Set to higher values (e.g., 4 or 5) for detailed output
-    - The `ham_constructor_settings` and `mc_calculator_settings` allow fine-tuning of the
-      Hamiltonian construction and CI solver components respectively.
-    - In most cases, the default settings provide good convergence behavior.
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project
-        orbitals_filename (str): Name of the file containing the input orbitals in the current directory
-        out_wavefunction_filename (str): Name of the file where the output wavefunction will be saved
-        n_active_alpha_electrons (int): How many (alpha) electrons are in the active space
-        n_active_beta_electrons (int, optional): For unrestricted/
-            open-shell systems, we can separately specify how many
-            beta electrons are in the opposite spin channel active
-            space
-        ham_constructor_algorithm_name (str, optional): Override
-            default Hamiltonian constructor algorithm
-        ham_constructor_settings (Dict, optional): Settings for Hamiltonian constructor
-        mc_calculator_algorithm_name (str, optional): Override default multi-configuration calculator algorithm
-        mc_calculator_settings (Dict, optional): Settings for multi-configuration calculator
-        settings (Dict, optional): A dictionary of key, value pairs
-            specifying which settings keys to replace with specific
-            values for MCSCF (overrides defaults)
-        cache (str, optional): Cache backend identifier for result caching
-        remote (str, optional): Remote backend identifier for remote execution
-        remote_config (dict, optional): Configuration options for the remote backend
-        remote_timeout (int): Maximum seconds to wait for a remote job
-            to complete before returning a job handle. Default ``120``.
-        overwrite (bool): If ``True``, overwrite existing output files
-            without prompting. Default ``False``.
-
-    Returns:
-        Tuple[float, str]: The total energy of the final system and filename where wavefunction was saved
-        str: Containing error message, if there was a problem in the workflow
-
-    """
+    """Run MCSCF from active-space Orbitals and save the resulting Wavefunction."""
     # Strip filenames in case full path is passed
     orbitals_filename = _strip(orbitals_filename)
     out_wavefunction_filename = _strip(out_wavefunction_filename)
@@ -4751,72 +3162,7 @@ def run_projected_multi_configuration_calculation(
     remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str | tuple[float, str]:
-    """Run a projected multi-configuration calculation on a specific set of determinants.
-
-    This tool performs a CI calculation restricted to the determinants specified in the configurations
-    input. It diagonalizes the Hamiltonian in the space spanned by those determinants to obtain
-    optimized CI coefficients and the corresponding energy.
-
-    Typical workflow context:
-
-    This tool is commonly used in quantum simulation workflows to compute the energy of a sparse
-    wavefunction:
-
-    1. Run `run_multi_configuration_calculation` to get the full CASCI wavefunction and energy
-    2. Run `get_top_configurations` to extract the most important configurations (determinants)
-    3. (THIS TOOL) Run `run_projected_multi_configuration_calculation` with those configurations
-       to get the sparse wavefunction with optimized CI coefficients
-    4. Use the sparse wavefunction for `run_state_preparation` to get a shorter quantum circuit
-    5. Continue with `create_majorana_mapping`, `run_qubit_mapper`, and `run_phase_estimation` for quantum phase
-       estimation
-
-    Usage guidelines:
-
-    - The configurations should be provided as a JSON array of configuration strings, where each
-      string represents the occupation pattern of the active orbitals.
-    - Use `get_top_configurations` to extract configurations from a reference wavefunction.
-    - The Hamiltonian must be compatible with the configurations (same active space size).
-    - For quantum simulation, selecting fewer determinants reduces circuit depth but may reduce
-      accuracy. A typical approach is to start with the top 5-20 determinants by CI coefficient.
-
-    Guidelines on settings:
-
-    - The current set of default settings can be obtained by using the function
-      and MCP tool `get_algorithm_default_settings`.
-    - For the `macis_pmc` calculator (default), relevant settings include:
-
-        - `iterative_solver_dimension_cutoff`: Matrix size cutoff for switching to iterative eigensolver
-        - `H_thresh`: Threshold for Hamiltonian element screening
-        - `h_el_tol`: Tolerance for Hamiltonian element evaluation
-        - `davidson_res_tol`: Residual tolerance for Davidson solver convergence
-        - `davidson_max_m`: Maximum subspace dimension for Davidson solver
-    - In most cases, the default settings should be sufficient unless you encounter convergence issues.
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project
-        hamiltonian_filename (str): Name of the file containing the input Hamiltonian in the current directory
-        configurations_json (str): A JSON string containing an array of configuration strings.
-            Each configuration string represents the occupation pattern of active orbitals.
-            Example: '["22000000", "20200000", "20020000"]'
-            Use `get_top_configurations` to obtain these from a reference wavefunction.
-        out_wavefunction_filename (str): Name of the file where the output wavefunction will be saved
-        algorithm_name (str, optional): Algorithm name for the projected multi-configuration calculator,
-            to override the default
-        settings (Dict, optional): A dictionary of key, value pairs specifying which settings keys
-            to replace with specific values (overrides defaults)
-        cache (str, optional): Cache backend identifier for result caching
-        remote (str, optional): Remote backend identifier for remote execution
-        remote_config (dict, optional): Configuration options for the remote backend
-        remote_timeout (int): Maximum seconds to wait for a remote job
-            to complete before returning a job handle. Default ``120``.
-        overwrite (bool): If ``True``, overwrite existing output files
-            without prompting. Default ``False``.
-
-    Returns:
-        Tuple[float, str]: Calculated total energy and filename where wavefunction was saved
-        str: Containing error message, if there was a problem in the workflow
-
-    """
+    """Solve a Hamiltonian in a supplied determinant subspace and save the Wavefunction."""
     # Strip filenames in case full path is passed
     hamiltonian_filename = _strip(hamiltonian_filename)
     out_wavefunction_filename = _strip(out_wavefunction_filename)
@@ -4878,23 +3224,7 @@ def get_top_determinants(
     wavefunction_filename: str,
     max_determinants: int | None = 10,
 ) -> dict | str:
-    """Inspect the leading determinants and CI coefficients in a wavefunction.
-
-    Determinants are ranked by descending coefficient magnitude. Each record
-    includes the occupation string, real and imaginary coefficient components,
-    magnitude, normalized weight, and cumulative normalized weight.
-
-    Args:
-        project_name (str): Name of the current QDK Chemistry project.
-        wavefunction_filename (str): Input wavefunction filename.
-        max_determinants (int, optional): Maximum records to return. Defaults to
-            10. Pass ``None`` to return every determinant.
-
-    Returns:
-        Dict containing wavefunction size, norm, and ranked determinant records,
-        or an error string when the wavefunction cannot be inspected.
-
-    """
+    """Return ranked determinants and CI coefficient data from a Wavefunction."""
     wavefunction_filename = _strip(wavefunction_filename)
     if max_determinants is not None and max_determinants <= 0:
         return "max_determinants must be greater than zero or None"
@@ -4944,42 +3274,7 @@ def get_top_configurations(
     wavefunction_filename: str,
     max_determinants: int | None = None,
 ) -> str:
-    """Get the top configurations (determinants) from a wavefunction ranked by CI coefficient magnitude.
-
-    This tool extracts configuration strings from a multi-configurational wavefunction, ranked by
-    the absolute value of their CI coefficients. This is useful for identifying the most important
-    determinants for sparse CI calculations or quantum simulation.
-
-    Typical workflow context:
-
-    This tool is used to prepare inputs for ``run_projected_multi_configuration_calculation``:
-
-    1. Run ``run_multi_configuration_calculation`` to get the full CASCI wavefunction
-    2. (THIS TOOL) Run ``get_top_configurations`` to extract the most important configurations
-    3. Pass the returned JSON directly to ``run_projected_multi_configuration_calculation``
-    4. Use the resulting sparse wavefunction for ``run_state_preparation``
-
-    Usage guidelines:
-
-    - The returned JSON array contains configurations sorted by CI coefficient magnitude (largest first).
-    - If `max_determinants` is not specified, all determinants in the wavefunction are returned.
-    - The configuration strings represent the occupation pattern of the active orbitals.
-    - For quantum simulation, selecting fewer determinants reduces circuit depth. A typical
-      approach is to use the top 5-20 determinants, which often captures most of the wavefunction.
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project
-        wavefunction_filename (str): Name of the file containing the input wavefunction
-        max_determinants (int, optional): Maximum number of configurations to return.
-            If None, returns all configurations in the wavefunction.
-
-    Returns:
-        str: A JSON array of configuration strings, sorted by CI coefficient magnitude (largest first).
-            This can be passed directly to `run_projected_multi_configuration_calculation`.
-            Example: '["22000000", "20200000", "20020000"]'
-            On error, returns an error message string (not valid JSON).
-
-    """
+    """Return configuration strings ranked by Wavefunction CI coefficient magnitude."""
     # Strip filename in case full path is passed
     wavefunction_filename = _strip(wavefunction_filename)
 
@@ -5007,46 +3302,7 @@ def get_circuit_stats(
     project_name: str,
     circuit_filename: str,
 ) -> dict | str:
-    """Return inline logical-qubit, gate-count, and depth metrics for a saved Circuit; use QRE for physical resources.
-
-    Analyzes a saved Circuit file and returns gate counts, depth, qubit count,
-    and Clifford/non-Clifford gate breakdowns. Use this after any step that
-    produces a circuit (e.g., ``run_state_preparation``,
-    ``run_controlled_evolution_circuit_mapper``) to understand the resource
-    profile before proceeding.
-
-    Typical workflow context:
-
-    Call this tool after building a circuit to inspect its resource cost:
-
-    1. ``run_state_preparation`` → produces state-prep circuit
-    2. (THIS TOOL) ``get_circuit_stats`` → gate counts, depth, qubit count
-    3. ``run_time_evolution_builder`` → produces time-evolution unitary
-    4. ``run_controlled_evolution_circuit_mapper`` → produces controlled-U circuit
-    5. (THIS TOOL) ``get_circuit_stats`` → controlled-U resource profile
-
-    The returned statistics include:
-
-    - ``num_qubits``: Number of qubits in the circuit
-    - ``depth``: Circuit depth (longest path through the circuit)
-    - ``total_gates``: Total number of gates
-    - ``gate_counts``: Breakdown by gate type (e.g., ``{"cx": 12, "rz": 6, "h": 4}``)
-    - ``single_qubit_clifford``: Count of single-qubit Clifford gates (H, S, X, Y, Z, etc.)
-    - ``two_qubit_clifford``: Count of two-qubit Clifford gates (CNOT, CZ, etc.)
-    - ``non_clifford``: Count of non-Clifford gates (T, Rz, etc.) — these dominate fault-tolerant cost
-
-    All metrics are in terms of **logical qubits** — abstract, error-free qubits.
-
-    Args:
-        project_name (str): Name of the current qdk/chemistry project
-        circuit_filename (str): Name of the file containing the circuit
-            (e.g., ``"state_prep.circuit.json"``)
-
-    Returns:
-        Dict: Circuit statistics including qubit count, depth, gate breakdown
-        str: Error message if there was a problem
-
-    """
+    """Return logical-qubit, gate-count, and depth metrics for a saved Circuit."""
     circuit_filename = _strip(circuit_filename)
 
     circuit, _err = _load_or_error(circuit_filename, data.Circuit, "circuit")
@@ -5150,20 +3406,7 @@ def check_remote_job(
     project_name: str,
     job_id: str,
 ) -> str | dict:
-    """Check the status of a previously submitted remote job.
-
-    Reads the job file from the jobs directory, queries the backend, and
-    updates the file with the latest status.
-
-    Args:
-        project_name (str): Working project directory.
-        job_id (str): The job ID (from the ``"submitted"`` status response
-            of any ``run_*`` tool with ``remote`` set, or from ``list_remote_jobs``).
-
-    Returns:
-        Dict with ``status``, ``logs``, ``submitted_at``, ``elapsed``.
-
-    """
+    """Query a remote job and update its persisted status record."""
     err = _require_remote()
     if err:
         return err
@@ -5214,25 +3457,7 @@ def retrieve_remote_results(
     project_name: str,
     job_id: str,
 ) -> str | dict:
-    """Download results from a completed remote job into the project directory.
-
-    Once downloaded, the output files are available to all other qdk-chemistry
-    tools (visualization, further computation, etc.).
-
-    If a completed remote job reports a transient artifact error, call
-    ``check_remote_job`` and retry this tool at least once with the same job ID.
-    If retrieval still fails, resubmit the producing ``run_*`` step once with
-    unchanged scientific settings before declaring the result unavailable.
-
-    Args:
-        project_name (str): Working project directory.
-        job_id (str): The job ID (from the ``"submitted"`` status response
-            of any ``run_*`` tool with ``remote`` set, or from ``list_remote_jobs``).
-
-    Returns:
-        Dict with ``downloaded_files`` list and ``status``.
-
-    """
+    """Download a completed remote job's outputs into its project directory."""
     err = _require_remote()
     if err:
         return err
@@ -5290,19 +3515,7 @@ def list_remote_jobs(
     project_name: str,
     status_filter: str | None = None,
 ) -> str | dict:
-    """List remote jobs, optionally filtered by status.
-
-    Scans the jobs/cache directory for job files.
-
-    Args:
-        project_name (str): Working project directory.
-        status_filter (str, optional): Filter by status (e.g. "submitted",
-            "Succeeded", "Failed", "retrieved").
-
-    Returns:
-        Dict with ``jobs`` list.
-
-    """
+    """List persisted remote jobs with an optional status filter."""
     err = _require_remote()
     if err:
         return err
@@ -5337,16 +3550,7 @@ def cancel_remote_job(
     project_name: str,
     job_id: str,
 ) -> str | dict:
-    """Cancel a running remote job.
-
-    Args:
-        project_name (str): Working project directory.
-        job_id (str): The job ID to cancel.
-
-    Returns:
-        Dict confirming cancellation.
-
-    """
+    """Cancel a running remote job and update its persisted record."""
     err = _require_remote()
     if err:
         return err
