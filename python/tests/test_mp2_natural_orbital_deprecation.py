@@ -12,16 +12,43 @@ import warnings
 DEPRECATION_MESSAGE = "MP2NaturalOrbitalLocalizer is deprecated"
 
 
-def test_package_import_does_not_warn_about_mp2_natural_orbital_localizer():
-    """Importing the package does not report deprecated localizer use."""
+def test_registry_stub_generation_does_not_warn_about_mp2_natural_orbital_localizer(tmp_path):
+    """Registry stub generation does not report deprecated localizer use."""
+    stub_file = tmp_path / "registry.pyi"
+    stub_file.write_text("# placeholder\n", encoding="utf-8")
+
     result = subprocess.run(
-        [sys.executable, "-W", "always", "-c", "import qdk_chemistry"],
+        [
+            sys.executable,
+            "-W",
+            "always",
+            "-c",
+            """\
+import os
+from pathlib import Path
+import sys
+
+os.environ["QDK_CHEMISTRY_DOCS"] = "1"
+
+import qdk_chemistry
+from qdk_chemistry.algorithms import registry
+from qdk_chemistry.utils import Logger
+
+stub_dir = Path(sys.argv[1])
+registry.__file__ = str(stub_dir / "registry.py")
+qdk_chemistry._STUBGEN_BLOCK_MARKER = stub_dir / ".no-stubgen"
+Logger.set_global_level("warn")
+qdk_chemistry._generate_registry_stubs()
+""",
+            str(tmp_path),
+        ],
         capture_output=True,
         check=False,
         text=True,
     )
 
     assert result.returncode == 0, result.stderr
+    assert "Literal['qdk_mp2_natural_orbitals']" in stub_file.read_text(encoding="utf-8")
     assert DEPRECATION_MESSAGE not in result.stdout
     assert DEPRECATION_MESSAGE not in result.stderr
 
