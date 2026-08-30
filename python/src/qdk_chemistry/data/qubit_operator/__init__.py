@@ -72,13 +72,16 @@ class QubitOperator(DataClass):
         """Initialize from a container or directly from Pauli strings and coefficients.
 
         Args:
-            container: A qubit operator container, or legacy positional Pauli strings.
-            coefficients: Coefficients for legacy Pauli-string construction.
-            encoding: Fermion-to-qubit encoding for legacy Pauli-string construction.
-            fermion_mode_order: Fermion mode ordering for legacy Pauli-string construction.
-            term_partition: Term partition for legacy Pauli-string construction.
-            tapering: Tapering metadata for legacy Pauli-string construction.
-            pauli_strings: Pauli strings for legacy keyword construction.
+            container (QubitOperatorContainer | list[str] | None): A qubit operator container, or
+                legacy positional Pauli strings.
+            coefficients (numpy.ndarray | None): Coefficients for legacy Pauli-string construction.
+            encoding (str | None): Fermion-to-qubit encoding for legacy Pauli-string construction.
+            fermion_mode_order (~qdk_chemistry.data.enums.fermion_mode_order.FermionModeOrder | str | None):
+                Fermion mode ordering for legacy Pauli-string construction.
+            term_partition (~qdk_chemistry.data.term_partition.TermPartition | None): Term partition
+                for legacy Pauli-string construction.
+            tapering (TaperingSpecification | None): Tapering metadata for legacy Pauli-string construction.
+            pauli_strings (list[str] | None): Pauli strings for legacy keyword construction.
 
         """
         if isinstance(container, QubitOperatorContainer):
