@@ -6,6 +6,7 @@
 
 #include <Eigen/Dense>
 #include <cstddef>
+#include <limits>
 #include <memory>
 #include <qdk/chemistry/algorithms/double_factorization.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
@@ -128,6 +129,22 @@ TEST(DoubleFactorizerTest, RejectsInvalidInput) {
                std::exception);
   EXPECT_THROW(eigen_decompose_two_body(Eigen::VectorXd::Zero(10), norb),
                std::invalid_argument);
+
+  // The free function is public API and is reachable without the settings
+  // BoundConstraint, so it has to reject these arguments itself.
+  EXPECT_THROW(eigen_decompose_two_body(Eigen::VectorXd(), 0),
+               std::invalid_argument);
+  const Eigen::VectorXd tensor = make_two_body(norb, {1.0}, 31);
+  EXPECT_THROW(eigen_decompose_two_body(tensor, norb, -1.0),
+               std::invalid_argument);
+  EXPECT_THROW(eigen_decompose_two_body(
+                   tensor, norb, std::numeric_limits<double>::quiet_NaN()),
+               std::invalid_argument);
+  // A negative or NaN threshold compares false against every eigenvalue, so
+  // without the guard it would silently retain the whole decomposition
+  // rather than fail.
+  EXPECT_FALSE(eigen_decompose_two_body(tensor, norb, 0.0).empty());
+
   EXPECT_THROW(factorizer->run(nullptr), std::invalid_argument);
   EXPECT_THROW(factorizer->run(make_unrestricted_hamiltonian(norb)),
                std::invalid_argument);
