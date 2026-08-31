@@ -42,7 +42,22 @@ namespace QDKChemistry.Utils.SelectSwap {
     import Std.Math.MinI;
     import Std.Measurement.MResetEachZ;
     import Std.TableLookup.Select;
+    import QDKChemistry.Utils.UnaryIteration.AddressQubits;
     import QDKChemistry.Utils.UnaryIteration.UnaryIteration;
+    import QDKChemistry.Utils.UnaryIteration.UnaryIterationActionIndex;
+
+    /// Zero-pads a lookup table out to the full `2^nRequired` address space.
+    ///
+    /// An unused address then deterministically loads the all-zero word instead of whatever
+    /// entry `Select` would alias it onto. Without this the word loaded for an unused address
+    /// depends on the select/swap split -- the swap path zero-pads through `CreatePaddedData`
+    /// while a plain `Select` aliases -- and since `ComputeOptimalLambda*` derives that split
+    /// from the table shape, the operation's action on those addresses would silently change
+    /// with the data dimensions. Padding is a no-op when the table already fills its address
+    /// space, which is the case for every production caller.
+    internal function PadToAddressSpace(data : Bool[][], nRequired : Int) : Bool[][] {
+        Padded(-2^nRequired, [false, size = Length(data[0])], data)
+    }
 
     //  1D SELECT-SWAP
     operation SelectSwap(numSwapBits : Int, data : Bool[][], address : Qubit[], output : Qubit[]) : Unit is Adj + Ctl {
@@ -53,25 +68,35 @@ namespace QDKChemistry.Utils.SelectSwap {
 
         Fact(swapBits <= nRequired, "Too many bits for SWAP network");
 
+        let padded = PadToAddressSpace(data, nRequired);
         if swapBits == 0 {
-            Select(data, addressFitted, output);
+            Select(padded, addressFitted, output);
         } else {
-            WithSelectSwap(swapBits, data, address, intermediate => ApplyToEachCA(CNOT, Zipped(intermediate, output)));
+            WithSelectSwap(swapBits, padded, address, intermediate => ApplyToEachCA(CNOT, Zipped(intermediate, output)));
         }
     }
 
-    //  2D SELECT-SWAP (unary iteration over outer × SELECT-SWAP over inner)
-    /// Loads `data[outer][inner]` into `target` by unary iteration over the outer index and
-    /// a select-swap lookup over the inner one. The adjoint is compiler-generated: it has to
-    /// undo the swap network as well as the lookup, which is easy to get wrong by hand.
+    //  2D SELECT-SWAP (single select-swap over the combined outer×inner address)
+    /// Loads `data[outer][inner]` into `target` with one select-swap lookup whose address is
+    /// the outer index concatenated with the select part of the inner one. The adjoint is
+    /// compiler-generated: it has to undo the swap network as well as the lookup, which is
+    /// easy to get wrong by hand.
+    ///
+    /// The outer index is folded into the `Select` address rather than driven by an enclosing
+    /// `UnaryIteration`. Both cost the same forwards, but `Adjoint Select` is a
+    /// measurement-based unlookup over the combined address, whereas `Adjoint UnaryIteration`
+    /// re-runs its AND ladder at full price -- so the uncompute would otherwise cost as much
+    /// as the compute. `TestSelect2DLoadPhaseAgreement` cross-checks this path against the
+    /// unary-iteration path in `numSwapBits == 0` over every address state, padded ones
+    /// included, because a mismatched routing shows up only as an address-register phase.
     operation Select2DLoad(data : Bool[][][], outerAddress : Qubit[], innerAddress : Qubit[], numSwapBits : Int, target : Qubit[]) : Unit is Adj {
         Fact(not IsEmpty(data), "data cannot be empty");
+        let (n, nRequired) = DimensionsForSelect(data[0], innerAddress);
         if numSwapBits == 0 {
             UnaryIteration(outerAddress, Length(data), (index) => {
-                Select(data[index], innerAddress, target);
+                Select(PadToAddressSpace(data[index], nRequired), innerAddress[...nRequired - 1], target);
             });
         } else {
-            let (n, nRequired) = DimensionsForSelect(data[0], innerAddress);
             Fact(numSwapBits <= nRequired, "Too many bits for SWAP network");
             let innerAddressFitted = innerAddress[...nRequired - 1];
 
@@ -82,10 +107,11 @@ namespace QDKChemistry.Utils.SelectSwap {
             let innerAddressParts = Partitioned([k, l], innerAddressFitted);
             let chunkedDataRegister = Chunks(m, target);
 
-            UnaryIteration(outerAddress, Length(data), (index) => {
-                let dataArray = CreatePaddedData(data[index], nRequired, m, k);
-                Select(dataArray, innerAddressParts[0], target);
-            });
+            // Row-major over the outer index, so the combined address value is
+            // innerSelect + outer * 2^k with the inner select bits least significant.
+            let flatData = FlattenPaddedData(data, nRequired, m, k);
+            let outerAddressFitted = outerAddress[...AddressQubits(Length(data)) - 1];
+            Select(flatData, innerAddressParts[0] + outerAddressFitted, target);
 
             SwapDataOutputs(innerAddressParts[1], chunkedDataRegister);
         }
@@ -178,21 +204,30 @@ namespace QDKChemistry.Utils.SelectSwap {
         }
     }
 
+    /// Toffoli cost of one `Select2DLoad` *and its uncompute*, for a given swap width.
+    ///
+    /// This mirrors the implementation term by term: a single `Select` over the combined
+    /// `(innerSelect, outer)` address of `combinedBits` qubits, the swap network applied once
+    /// in each direction, and a measurement-based unlookup on the way back. Costing the round
+    /// trip rather than the forward pass is what makes the comparison across `lambda`
+    /// meaningful, because the unlookup and the swap network scale in opposite directions.
+    ///
+    /// `lambda == 0` is the unary-iteration path, whose adjoint re-runs the whole AND ladder
+    /// at full price and so costs the same again.
     internal function SelectSwapCost2D(lambda : Int, numOuterData : Int, numInnerData : Int, numBits : Int) : Int {
         let outerAddressBits = Ceiling(Lg(IntAsDouble(numOuterData)));
         let innerAddressBits = Ceiling(Lg(IntAsDouble(numInnerData)));
-        let split = MinI(Floor(Lg(IntAsDouble(2^lambda * numBits))), (outerAddressBits + innerAddressBits) - 1);
-
-        let unselect_cost = MaxI(0, 2^split - 2) + 2^(outerAddressBits + innerAddressBits - split) - 2;
 
         if lambda == 0 {
-            return (numOuterData - 2) + numOuterData * (numInnerData - 2) + unselect_cost;
-        } else {
-            let select_cost = 2^(innerAddressBits - lambda) - 2;
-            let swap_cost = (2^lambda - 1) * numBits;
-
-            return numOuterData * select_cost + swap_cost + unselect_cost;
+            return 2 * ((numOuterData - 2) + numOuterData * (numInnerData - 2));
         }
+
+        let combinedBits = (outerAddressBits + innerAddressBits) - lambda;
+        let selectCost = 2^combinedBits - 2;
+        let unselectCost = 2^((combinedBits + 1) / 2) + 2^(combinedBits / 2) - (combinedBits + 2);
+        let swapCost = (2^lambda - 1) * numBits;
+
+        return selectCost + unselectCost + 2 * swapCost;
     }
 
     internal function DimensionsForSelect(data : Bool[][], address : Qubit[]) : (Int, Int) {
@@ -209,6 +244,24 @@ namespace QDKChemistry.Utils.SelectSwap {
         let dataPadded = Padded(-2^nRequired, [false, size = m], data);
 
         MappedOverRange(i -> Flattened(dataPadded[i..2^k..2^nRequired - 1]), 0..2^k - 1)
+    }
+
+    /// Concatenates the per-outer-index padded lookup tables into one row-major table, so a
+    /// combined `(innerSelect, outer)` address indexes it directly.
+    ///
+    /// The table covers all `2^AddressQubits(Length(data))` outer address states, not just the
+    /// `Length(data)` valid ones, with each unused state routed to the same entry
+    /// `UnaryIteration` would have selected. That keeps the lookup identical to the
+    /// `numSwapBits == 0` path on every address state and makes the combined table a power of
+    /// two, so `Select` never applies aliasing of its own.
+    internal function FlattenPaddedData(data : Bool[][][], nRequired : Int, m : Int, k : Int) : Bool[][] {
+        let numOuterStates = 1 <<< AddressQubits(Length(data));
+        Flattened(
+            MappedOverRange(
+                state -> CreatePaddedData(data[UnaryIterationActionIndex(Length(data), state)], nRequired, m, k),
+                0..numOuterStates - 1
+            )
+        )
     }
 
     internal operation SwapDataOutputs(address : Qubit[], outputs : Qubit[][]) : Unit is Adj {
@@ -315,6 +368,14 @@ namespace QDKChemistry.Utils.SelectSwap {
     /// Both `within { lookup } apply { Z }` blocks are diagonal ±1 oracles and therefore
     /// self-inverse, so composing the swap path with the no-swap path is the identity
     /// exactly when the two agree, and the address register returns to |0...0>.
+    ///
+    /// The verdict is a single measurement, so it is a *probabilistic* detector: when the two
+    /// paths disagree the address is left in a superposition that still collapses to |0...0>
+    /// a large fraction of the time (~35-50% for the shapes tested here). A `false` is
+    /// therefore conclusive but a `true` is not, and callers must repeat the trial -- see
+    /// `_assert_phase_agreement` in `python/tests/test_utils_select_swap.py`. A deterministic
+    /// `CheckAllZero` verdict is not available: it is rejected under the Adaptive_RIF profile
+    /// these tests run on.
     internal operation TestSelectSwap1DPhaseAgreement(data : Bool[][], numSwapBits : Int) : Bool {
         let m = Length(data[0]);
         let nAddr = Ceiling(Lg(IntAsDouble(Length(data))));
@@ -345,7 +406,8 @@ namespace QDKChemistry.Utils.SelectSwap {
     }
 
     /// Phase-oracle agreement between the 2D swap path and the 2D no-swap path.
-    /// See `TestSelectSwap1DPhaseAgreement` for why a value test cannot replace this.
+    /// See `TestSelectSwap1DPhaseAgreement` for why a value test cannot replace this, and why
+    /// a single `true` verdict proves nothing on its own.
     internal operation TestSelect2DLoadPhaseAgreement(data : Bool[][][], numSwapBits : Int) : Bool {
         let m = Length(data[0][0]);
         let nOuterAddr = Ceiling(Lg(IntAsDouble(Length(data))));

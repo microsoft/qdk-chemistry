@@ -223,29 +223,42 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         use spin = Qubit();
         use bEqBQubit = Qubit();
 
+        // The Majorana operator runs in the Givens-rotated basis, so it is passed into the
+        // rotation step instead of being wrapped around it. That lets the QROM path hold its
+        // angle word live across forward chain -> Majorana -> inverse chain and pay for the
+        // tables once per SELECT rather than twice. The direct-rotation path has no table to
+        // amortize, so it keeps the plain within/apply shape.
+        let majoranaStep : (Unit => Unit is Adj + Ctl) = () => {
+            MajoranaOp(isSF, dvsq, bEqBQubit, spin, sysRegDown[0]);
+            within { X(isSF); } apply {
+                Controlled Z([isSF], spinSF);
+            }
+        };
+
         within {
             SelectSpins(isSF, spinDQ, spinSF, spin, sysRegDown, sysRegUp);
         } apply {
-            within {
-                // Givens rotations: basis change to localize amplitude on qubit 0
-                if usePhaseGradient {
-                    let rBits = if nFR > 2 { innerReg[nInner - nFR + 2..nInner - 1] } else { [] };
-                    ApplyGivensRotationsQROM(
-                        params,
-                        N,
-                        numSF,
-                        numBp1,
-                        numRotAngles,
-                        xoBits,
-                        isSF,
-                        xoReg,
-                        bReg,
-                        rBits,
-                        sysRegDown,
-                        phaseGradientReg,
-                        bEqBQubit
-                    );
-                } else {
+            // Givens rotations: basis change to localize amplitude on qubit 0
+            if usePhaseGradient {
+                let rBits = if nFR > 2 { innerReg[nInner - nFR + 2..nInner - 1] } else { [] };
+                WithGivensRotationsQROM(
+                    params,
+                    N,
+                    numSF,
+                    numBp1,
+                    numRotAngles,
+                    xoBits,
+                    isSF,
+                    xoReg,
+                    bReg,
+                    rBits,
+                    sysRegDown,
+                    phaseGradientReg,
+                    bEqBQubit,
+                    majoranaStep
+                );
+            } else {
+                within {
                     ApplyMultiControlledRotations(
                         params,
                         N,
@@ -259,12 +272,9 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                         sysRegDown,
                         bEqBQubit
                     );
-                }
-            } apply {
-                // Majorana operator (Fig. 4 / Appendix B.6)
-                MajoranaOp(isSF, dvsq, bEqBQubit, spin, sysRegDown[0]);
-                within { X(isSF); } apply {
-                    Controlled Z([isSF], spinSF);
+                } apply {
+                    // Majorana operator (Fig. 4 / Appendix B.6)
+                    majoranaStep();
                 }
             }
         }
@@ -547,23 +557,29 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         ApplyControlledOnInt(params.numBases, q => Controlled X([isSF], q), bReg, bEqBQubit);
     }
 
-    /// Givens rotation chain using split DQ/SF QROM bulk-load + phase gradient rotation.
+    /// Applies the Givens basis change from a QROM-loaded angle word, runs `action` in that
+    /// rotated basis, then undoes the chain and releases the angle word.
     ///
     /// Loads ALL (N-1) rotation angles at once using two Controlled Select calls:
     ///   - DQ: Select(N entries) addressed by xoReg[0..⌈log₂N⌉-1], fires when isSF=0
     ///   - SF: Select(R*2^bBits entries) addressed by bReg++rBits, fires when isSF=1
-    /// Then applies all Givens rotations from the loaded rotTarget register.
     ///
-    /// Cost: N + R*2^bBits (Select) + (N-1) × Adder(bRot) (rotations).
+    /// `action` runs inside the table load rather than around this whole operation, so the
+    /// angle word stays live across the forward chain, `action`, and the inverse chain, and
+    /// the tables are paid for once per SELECT instead of twice. That is sound only because
+    /// `action` leaves the QROM address (`isSF`, `xoReg`, `bReg`, `rBits`) untouched, so the
+    /// unlookup addresses the same entry that was loaded.
     ///
-    /// This is above the paper's N + R*B: the SF Select is addressed by the full
+    /// Cost: N + R*2^bBits (Select) + 2 × (N-1) × Adder(bRot) (rotations).
+    ///
+    /// The Select term is above the paper's N + R*B: the SF Select is addressed by the full
     /// bReg, so its table is padded from B+1 entries up to 2^bBits =
-    /// 2^⌈log₂(B+1)⌉. At FeMoco-54 (N=54, R=10, B=27) that is 374 vs 324
-    /// entries. Collapsing the gap needs a Select that can address a
-    /// non-power-of-two range, not a change here.
+    /// 2^⌈log₂(B+1)⌉. At FeMoco-54 (N=54, R=10, B=27) that is R*2^bBits + N = 374 vs the
+    /// paper's R*(B+1) + N = 334 entries. Collapsing the gap needs a Select that can address
+    /// a non-power-of-two range, not a change here.
     ///
     /// Reference: arXiv:2502.15882v1, Appendix B.5; Babbush et al. (arXiv:1805.03662).
-    operation ApplyGivensRotationsQROM(
+    operation WithGivensRotationsQROM(
         params : SelectParams,
         N : Int,
         numSF : Int,
@@ -577,6 +593,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         sysRegDown : Qubit[],
         phaseGradientReg : Qubit[],
         bEqBQubit : Qubit,
+        action : (Unit => Unit is Adj + Ctl),
     ) : Unit is Adj + Ctl {
         let bRot = params.rotationBitPrecision;
         let bBits = Length(bReg);
@@ -596,8 +613,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
         // The two table loads are conjugated around their consumers so `rotTarget` is
         // uncomputed and released in |0⟩, matching how every other QROM read in this
-        // project is written (QROMStatePrep.qs, SelectSwap.qs). The angles have to stay
-        // live for the whole rotation chain, so the loads cannot be undone any earlier.
+        // project is written (QROMStatePrep.qs, SelectSwap.qs).
         within {
             // DQ load: fires when isSF=0, addressed by first ⌈log₂N⌉ bits of xoReg
             // DQ entries have only rotation bits (no bEqB), so target excludes last qubit.
@@ -608,21 +624,25 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             // SF entries include bEqB flag at position nRotBits.
             Controlled Select([isSF], (sfData, bReg + rBits, rotTarget));
         } apply {
-            // Copy bEqB flag from QROM output to persistent qubit.
-            // Cost: 1 CNOT (vs ⌈log₂(B+1)⌉ Toffoli for ApplyControlledOnInt).
-            CNOT(rotTarget[nRotBits], bEqBQubit);
+            within {
+                // Copy bEqB flag from QROM output to persistent qubit.
+                // Cost: 1 CNOT (vs ⌈log₂(B+1)⌉ Toffoli for ApplyControlledOnInt).
+                CNOT(rotTarget[nRotBits], bEqBQubit);
 
-            // Apply all Givens rotations from the loaded register.
-            // Uses DFTHC-style conjugation: CNOT(j+1→j) + S†H converts Rz→Ry
-            // and conditions on particle-number subspace, all with an uncontrolled
-            // adder (n Toffoli) instead of a controlled adder (2n Toffoli).
-            // Reference: Sanders et al. (arXiv:2007.07391, §IIA1, Figure 4a).
-            for j in 0..numRotAngles - 1 {
-                within {
-                    CNOT(sysRegDown[j + 1], sysRegDown[j]);
-                } apply {
-                    RyViaPhaseGradient(sysRegDown[j], rotTarget[j * bRot..(j + 1) * bRot - 1], phaseGradientReg);
+                // Apply all Givens rotations from the loaded register.
+                // Uses DFTHC-style conjugation: CNOT(j+1→j) + S†H converts Rz→Ry
+                // and conditions on particle-number subspace, all with an uncontrolled
+                // adder (n Toffoli) instead of a controlled adder (2n Toffoli).
+                // Reference: Sanders et al. (arXiv:2007.07391, §IIA1, Figure 4a).
+                for j in 0..numRotAngles - 1 {
+                    within {
+                        CNOT(sysRegDown[j + 1], sysRegDown[j]);
+                    } apply {
+                        RyViaPhaseGradient(sysRegDown[j], rotTarget[j * bRot..(j + 1) * bRot - 1], phaseGradientReg);
+                    }
                 }
+            } apply {
+                action();
             }
         }
     }
