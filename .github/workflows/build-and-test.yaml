@@ -584,11 +584,11 @@ jobs:
       id: env2
       run: |
         # qdk TUs that include libint2 engine.impl.h peak at several GB under MSVC;
-        # cap concurrency by available RAM (~8 GB/job) to avoid C1060 (compiler out
+        # cap concurrency by available RAM (~6 GB/job) to avoid C1060 (compiler out
         # of heap space). Scales up automatically on a larger runner.
         $cpu = [int]$env:NUMBER_OF_PROCESSORS
         $ramGB = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
-        $jobs = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 8)))
+        $jobs = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 6)))
         Write-Host "CPUs=$cpu RAM=${ramGB}GB -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
         "CMAKE_BUILD_PARALLEL_LEVEL=$jobs" >> $env:GITHUB_ENV
 
