@@ -83,10 +83,10 @@ def configure_workspace(path: Path) -> dict[str, object]:
                 f"this QDK Chemistry MCP process is already bound to workspace {str(_WORKSPACE_ROOT)!r}; "
                 "start a separate MCP process for another workspace"
             )
+        os.environ["QDK_WORKSPACE_ROOT"] = str(resolved)
+        os.chdir(resolved)
         _WORKSPACE_ROOT = resolved
 
-    os.environ["QDK_WORKSPACE_ROOT"] = str(resolved)
-    os.chdir(resolved)
     return {"bound": True, "workspace_root": str(resolved)}
 
 
