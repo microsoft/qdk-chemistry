@@ -10,6 +10,10 @@
 # and finally build and test the Python package. By default, it uses static linking for dependencies (no DLLs).
 #
 # Optional switches:
+#   -Arch           # Target architecture: x64 (default) or arm64. Cross-compiling from an x64
+#                   # host to arm64 uses vcvarsall's x64_arm64 pair; running natively on an
+#                   # arm64 host targets arm64 directly. clang-cl itself must run on the host
+#                   # architecture, so cross-compiling clang-cl builds is not supported here.
 #   -DynamicDeps    # Use dynamic linking for dependencies (DLLs) instead of static.
 #                   # This requires copying DLLs to the Python package folder.
 #   -SkipPrereqs    # Skip prerequisite installation (VS Build tools, vcpkg, etc)
@@ -21,6 +25,8 @@
 #                   # Debug build skips the Python build (not usable for the Python extension).
 
 param(
+    [ValidateSet("x64", "arm64")]
+    [string]$Arch = "x64",
     [switch]$DynamicDeps,
     [switch]$SkipPrereqs,
     [switch]$SkipCpp,
@@ -48,11 +54,26 @@ $VcpkgInstalledDir = "$RepoRoot\vcpkg_installed"
 # installation folder. Else, Windows won't find them at runtime and the Python package will fail to import.
 # This is because Windows does not have a system-wide DLL search path configuration like Linux's ldconfig.
 if ($DynamicDeps) {
-    $VcpkgTriplet = "x64-windows"
+    $VcpkgTriplet = "$Arch-windows"
 } else {
-    $VcpkgTriplet = "x64-windows-static-md"
+    $VcpkgTriplet = "$Arch-windows-static-md"
 }
-$QDK_UARCH = "x86-64-v3"
+# clang-cl accepts -march=armv8-a on ARM64, matching CI (see cpp/cmake/qdk-uarch.cmake).
+$QDK_UARCH = if ($Arch -eq "arm64") { "armv8-a" } else { "x86-64-v3" }
+
+# vcvarsall takes "<host>_<target>", or just "<target>" when host and target match.
+# PROCESSOR_ARCHITEW6432 reports the real machine architecture when the current
+# process is running under emulation (e.g. an x64 process on an arm64 host);
+# PROCESSOR_ARCHITECTURE alone would misreport that case as the emulated arch.
+$hostArchRaw = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
+$HostArch = if ($hostArchRaw -eq "ARM64") { "arm64" } else { "x64" }
+if ($HostArch -ne $Arch) {
+    Write-Error "clang-cl cross-compilation ($HostArch host -> $Arch target) is not supported by this script."
+    exit 1
+}
+$VcvarsArg = $Arch
+# clang-cl runs on the host, so its LLVM directory is named after the host arch.
+$LlvmHostDir = if ($HostArch -eq "arm64") { "ARM64" } else { "x64" }
 $NCPUS = [Math]::Max(1, [System.Environment]::ProcessorCount - 2)
 
 $linkMode = if ($DynamicDeps) { "dynamic" } else { "static" }
@@ -61,6 +82,7 @@ Write-Host "  QDK Chemistry - Windows Build (clang-cl)  " -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "Repo root:  $RepoRoot"
 Write-Host "Build type: $BuildType"
+Write-Host "Target arch: $Arch (host: $HostArch)"
 Write-Host "Triplet:    $VcpkgTriplet ($linkMode)"
 Write-Host ""
 
@@ -90,7 +112,7 @@ if (-not $SkipPrereqs) {
         $vsPath = & $vswhere -latest -products * -property installationPath 2>$null
         if ($vsPath) {
             $candidates = @(
-                "$vsPath\VC\Tools\Llvm\x64\bin\clang-cl.exe",
+                "$vsPath\VC\Tools\Llvm\$LlvmHostDir\bin\clang-cl.exe",
                 "$vsPath\VC\Tools\Llvm\bin\clang-cl.exe"
             )
             foreach ($c in $candidates) {
@@ -145,7 +167,7 @@ if (-not $SkipPrereqs) {
         $vsPath = & $vswhere -latest -products * -property installationPath 2>$null
         if ($vsPath) {
             $candidates = @(
-                "$vsPath\VC\Tools\Llvm\x64\bin\clang-cl.exe",
+                "$vsPath\VC\Tools\Llvm\$LlvmHostDir\bin\clang-cl.exe",
                 "$vsPath\VC\Tools\Llvm\bin\clang-cl.exe"
             )
             foreach ($c in $candidates) {
@@ -195,7 +217,7 @@ if (-not $SkipPrereqs) {
     Get-ChildItem env: | ForEach-Object { $envBefore[$_.Name] = $_.Value }
 
     $tempFile = [System.IO.Path]::GetTempFileName()
-    cmd /c "`"$vcvarsall`" x64 && set > `"$tempFile`""
+    cmd /c "`"$vcvarsall`" $VcvarsArg && set > `"$tempFile`""
     Get-Content $tempFile | ForEach-Object {
         if ($_ -match "^([^=]+)=(.*)$") {
             $name = $matches[1]
@@ -273,7 +295,7 @@ if (-not $SkipPrereqs) {
     $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
     $vsPath = & $vswhere -latest -products * -property installationPath 2>$null
     $candidates = @(
-        "$vsPath\VC\Tools\Llvm\x64\bin\clang-cl.exe",
+        "$vsPath\VC\Tools\Llvm\$LlvmHostDir\bin\clang-cl.exe",
         "$vsPath\VC\Tools\Llvm\bin\clang-cl.exe",
         "${env:ProgramFiles}\LLVM\bin\clang-cl.exe",
         "${env:ProgramFiles(x86)}\LLVM\bin\clang-cl.exe",
@@ -291,7 +313,7 @@ if (-not $SkipPrereqs) {
     $vcvarsall = "$vsPath\VC\Auxiliary\Build\vcvarsall.bat"
     if (Test-Path $vcvarsall) {
         $tempFile = [System.IO.Path]::GetTempFileName()
-        cmd /c "`"$vcvarsall`" x64 && set > `"$tempFile`""
+        cmd /c "`"$vcvarsall`" $VcvarsArg && set > `"$tempFile`""
         Get-Content $tempFile | ForEach-Object {
             if ($_ -match "^([^=]+)=(.*)$") {
                 [System.Environment]::SetEnvironmentVariable($matches[1], $matches[2], "Process")
