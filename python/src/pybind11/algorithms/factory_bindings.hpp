@@ -110,15 +110,18 @@ See Also:
   // Bind create static method
   factory.def_static(
       "create",
-      [](const std::string& name) -> std::unique_ptr<AlgorithmType> {
-        auto instance = FactoryType::create(name);
+      [](const std::string& name,
+         bool suppress_warnings) -> std::unique_ptr<AlgorithmType> {
+        auto instance = FactoryType::create(name, suppress_warnings);
         if (!instance) {
           throw std::runtime_error("Factory returned nullptr");
         }
-        warn_if_deprecated_algorithm(*instance);
+        if (!suppress_warnings) {
+          warn_if_deprecated_algorithm(*instance);
+        }
         return instance;
       },
-      py::arg("name") = "", R"(
+      py::arg("name") = "", py::arg("suppress_warnings") = false, R"(
 Create an algorithm instance by name.
 
 If no name is provided or the name is empty, returns the default implementation.
@@ -127,6 +130,8 @@ Args:
     name (str | None): Name identifying which algorithm implementation to create.
 
         If empty string (default), returns the default implementation.
+
+    suppress_warnings (bool): Whether to suppress creation-time warnings.
 
 Returns:
     Algorithm: New instance of the requested algorithm implementation
@@ -139,14 +144,6 @@ Examples:
     >>> default_algo = Factory.create()
 
 )");
-
-  factory.def_static(
-      "_create_for_introspection",
-      [](const std::string& name) -> std::unique_ptr<AlgorithmType> {
-        return qdk::chemistry::algorithms::detail::FactoryAccess::create<
-            FactoryType>(name);
-      },
-      py::arg("name") = "");
 
   // Bind available static method
   factory.def_static("available", &FactoryType::available,

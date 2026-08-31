@@ -23,7 +23,6 @@ namespace qdk::chemistry::algorithms {
 
 namespace detail {
 struct DeprecationAccess;
-struct FactoryAccess;
 }  // namespace detail
 
 /**
@@ -260,10 +259,13 @@ class AlgorithmFactory {
    * @return A unique pointer to the created algorithm instance.
    * @throws std::runtime_error if the name is not found in the registry.
    */
-  static return_type create(const std::string& name = "") {
+  static return_type create(const std::string& name = "",
+                            bool suppress_warnings = false) {
     auto instance = create_impl(name);
-    if (const auto message = detail::DeprecationAccess::message(*instance)) {
-      QDK_LOGGER().warn(*message);
+    if (!suppress_warnings) {
+      if (const auto message = detail::DeprecationAccess::message(*instance)) {
+        QDK_LOGGER().warn(*message);
+      }
     }
     return instance;
   }
@@ -301,8 +303,6 @@ class AlgorithmFactory {
     }
     return instance;
   }
-
-  friend struct detail::FactoryAccess;
 
  public:
   /**
@@ -424,14 +424,5 @@ class AlgorithmFactory {
     return instance;
   }
 };
-
-namespace detail {
-struct FactoryAccess {
-  template <typename FactoryType>
-  static typename FactoryType::return_type create(const std::string& name) {
-    return FactoryType::create_impl(name);
-  }
-};
-}  // namespace detail
 
 }  // namespace qdk::chemistry::algorithms

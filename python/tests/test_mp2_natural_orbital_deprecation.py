@@ -9,6 +9,8 @@ import subprocess
 import sys
 import warnings
 
+import pytest
+
 DEPRECATION_MESSAGE = "MP2NaturalOrbitalLocalizer is deprecated"
 
 
@@ -73,3 +75,16 @@ def test_explicit_mp2_natural_orbital_localizer_creation_warns_once(capfd):
     assert localizer.name() == "qdk_mp2_natural_orbitals"
     assert len(matching_warnings) == 1
     assert (captured.out + captured.err).count(DEPRECATION_MESSAGE) == 1
+
+
+def test_creation_warning_control_is_positional_only():
+    """The warning control cannot collide with an algorithm setting."""
+    from qdk_chemistry.algorithms import create  # noqa: PLC0415
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        localizer = create("orbital_localizer", "qdk_mp2_natural_orbitals", True)
+
+    assert localizer.name() == "qdk_mp2_natural_orbitals"
+    with pytest.raises(TypeError, match="positional-only"):
+        create("orbital_localizer", "qdk_mp2_natural_orbitals", suppress_warnings=True)
