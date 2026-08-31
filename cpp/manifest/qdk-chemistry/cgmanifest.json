@@ -8,7 +8,8 @@
         "other": {
           "name": "Boost",
           "version": "1.86.0",
-          "downloadUrl": "https://archives.boost.io/release/1.86.0/source/boost_1_86_0.tar.bz2"
+          "downloadUrl": "https://archives.boost.io/release/1.86.0/source/boost_1_86_0.tar.bz2",
+          "hash": "fd0d26a7d5eadf454896942124544120e3b7a38f"
         }
       },
       "developmentDependency": false
@@ -193,6 +194,36 @@
         "git": {
           "repositoryUrl": "https://github.com/wavefunction91/gauxc.git",
           "commitHash": "162e4562552323a871af17ae4acd73b71071bd24"
+        }
+      },
+      "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "azure-ai-discovery",
+          "version": "1.0.0"
+        }
+      },
+      "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "azure-identity",
+          "version": "1.19.0"
+        }
+      },
+      "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "azure-storage-blob",
+          "version": "12.25.0"
         }
       },
       "developmentDependency": false
