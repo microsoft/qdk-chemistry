@@ -144,7 +144,7 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
 
   /**
    * @brief Compute the block-encoding normalization (Eq. 34).
-   * Λ = Σ|eig(h1_majorana)| + 1/4 Σ_{rc} (|WB^{rc}| + Σ_b |W^{rc}_b|)²
+   * Λ = Σ|eig(h1_prime)| + 1/4 Σ_{rc} (|WB^{rc}| + Σ_b |W^{rc}_b|)²
    *
    * The per-rank signs do not appear: every two-body term enters through an
    * absolute value, and |sign| is 1.
@@ -159,7 +159,11 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
   double get_lambda_eff() const;
 
   /**
-   * @brief Compute the adjusted Majorana one-body matrix (Eq. 37).
+   * @brief Compute the adjusted one-body matrix h'(1) (Eq. 37).
+   *
+   * Named for the paper's symbol h^(1)'. This matrix is a plain one-body
+   * coefficient tensor; it is not expressed in the Majorana representation,
+   * which the reference introduces separately (Eq. 25) for block-encoding.
    *
    * Writing the rank-r copy-c leaf as
    *   M^{rc}_{pq} = Σ_{b∈[B]} W^{rc}_b U^r_{bp} U^r_{bq},
@@ -170,7 +174,7 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    *
    * @return The [N,N] matrix, contracted directly from the factors.
    */
-  Eigen::MatrixXd get_h1_majorana() const;
+  Eigen::MatrixXd get_h1_prime() const;
 
   /**
    * @brief Reconstruct the approximate two-body integrals.

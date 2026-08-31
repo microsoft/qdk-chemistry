@@ -162,10 +162,6 @@ TEST(DoubleFactorizerTest, EigenDecomposeFragmentsReconstructTensor) {
   Eigen::VectorXd reconstructed =
       Eigen::VectorXd::Zero(norb * norb * norb * norb);
   for (const auto& fragment : fragments) {
-    const double eps_abs_sum = fragment.eps.array().abs().sum();
-    EXPECT_NEAR(fragment.lambda_df, 0.5 * eps_abs_sum * eps_abs_sum,
-                kReconstructionTolerance);
-
     const Eigen::MatrixXd m =
         fragment.U * fragment.eps.asDiagonal() * fragment.U.transpose();
     for (std::size_t p = 0; p < norb; ++p) {
@@ -183,6 +179,37 @@ TEST(DoubleFactorizerTest, EigenDecomposeFragmentsReconstructTensor) {
   for (Eigen::Index i = 0; i < two_body.size(); ++i) {
     EXPECT_NEAR(reconstructed[i], two_body[i], kReconstructionTolerance);
   }
+}
+
+TEST(DoubleFactorizerTest, FragmentLambdaMatchesContainerLambda) {
+  // lambda_df is a per-fragment share of the same block-encoding 1-norm that
+  // get_lambda() reports, so the fragments must sum to the container's
+  // two-body part. Asserting lambda_df against its own defining formula would
+  // only restate the code; this pins the shared 1/4 convention (Eq. 34)
+  // across both call sites.
+  constexpr std::size_t norb = 4;
+  const auto two_body = make_two_body(norb, {1.0, -1.0}, 41);
+  const auto fragments = eigen_decompose_two_body(two_body, norb);
+  ASSERT_FALSE(fragments.empty());
+
+  double fragment_lambda_sum = 0.0;
+  for (const auto& fragment : fragments) {
+    fragment_lambda_sum += fragment.lambda_df;
+  }
+
+  auto factorizer = DoubleFactorizerFactory::create("eigen_decomposition");
+  auto factorized = factorizer->run(make_hamiltonian(norb, two_body));
+  ASSERT_NE(factorized, nullptr);
+  const auto& container = as_factorized(factorized);
+
+  // get_lambda() adds the one-body term, which carries no fragment share.
+  const Eigen::MatrixXd h1p = container.get_h1_prime();
+  Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(h1p);
+  ASSERT_EQ(solver.info(), Eigen::Success);
+  const double one_body_norm = solver.eigenvalues().array().abs().sum();
+
+  EXPECT_NEAR(fragment_lambda_sum, container.get_lambda() - one_body_norm,
+              kReconstructionTolerance);
 }
 
 TEST(DoubleFactorizerTest, EigenDecomposeSortsFragmentsByDecreasingWeight) {

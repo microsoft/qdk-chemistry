@@ -38,10 +38,10 @@ std::vector<TwoBodyFragment> eigen_decompose_two_body(
     throw std::invalid_argument(
         "eigen_decompose_two_body: norb must be greater than zero.");
   }
-  // Written as a negated non-negative test so NaN is rejected too; a NaN
-  // threshold would compare false against every eigenvalue and silently
-  // retain the whole decomposition.
-  if (!(truncation_threshold >= 0.0)) {
+  // NaN is rejected explicitly: it compares false against every eigenvalue
+  // magnitude, so it would silently retain the whole decomposition instead of
+  // truncating.
+  if (truncation_threshold < 0.0 || std::isnan(truncation_threshold)) {
     throw std::invalid_argument(
         "eigen_decompose_two_body: truncation_threshold must be "
         "non-negative, got " +
@@ -59,19 +59,23 @@ std::vector<TwoBodyFragment> eigen_decompose_two_body(
   }
 
   const Eigen::Index pair_size = static_cast<Eigen::Index>(pair_dim);
-  const Eigen::Index orbitals = static_cast<Eigen::Index>(norb);
+  const Eigen::Index num_orbitals = static_cast<Eigen::Index>(norb);
 
-  // Reshape g_ijkl into the (ij),(kl) supermatrix.
+  // Reshape g_ijkl into the (ij),(kl) supermatrix. syev overwrites its input
+  // with the eigenvectors, so the symmetrized copy is built directly in the
+  // output buffer; the symmetrization is defensive against numerical noise in
+  // the input tensor.
   const Eigen::Map<const RowMajorMatrix> raw_supermatrix(
       two_body_integrals.data(), pair_size, pair_size);
-  // Defensive symmetrization against numerical noise in the input tensor.
-  Eigen::MatrixXd supermatrix =
+  Eigen::MatrixXd supermatrix_eigenvectors =
       0.5 * (raw_supermatrix + raw_supermatrix.transpose());
 
-  Eigen::MatrixXd supermatrix_eigenvectors = supermatrix;
   Eigen::VectorXd supermatrix_eigenvalues(pair_dim);
-  // syev overwrites its input with the eigenvectors and reads only the lower
-  // triangle.
+  // Dense diagonalization costs O(norb^6) and materializes all norb^2
+  // eigenpairs. An iterative solver that recovers only a limited number of
+  // leading ranks will be added later, for decomposing large-size
+  // Hamiltonians where the full spectrum is neither affordable nor needed.
+  // syev reads only the lower triangle.
   const int64_t supermatrix_info = lapack::syev(
       lapack::Job::Vec, lapack::Uplo::Lower, static_cast<int64_t>(pair_dim),
       supermatrix_eigenvectors.data(), static_cast<int64_t>(pair_dim),
@@ -108,7 +112,7 @@ std::vector<TwoBodyFragment> eigen_decompose_two_body(
     const Eigen::Map<const RowMajorMatrix> raw_fragment(
         supermatrix_eigenvectors.data() +
             static_cast<Eigen::Index>(n) * pair_size,
-        orbitals, orbitals);
+        num_orbitals, num_orbitals);
     Eigen::MatrixXd fragment_matrix =
         0.5 * (raw_fragment + raw_fragment.transpose());
 
@@ -129,8 +133,13 @@ std::vector<TwoBodyFragment> eigen_decompose_two_body(
     fragment.eps = std::sqrt(std::abs(eigenvalue)) * fragment_eigenvalues;
     fragment.U = std::move(fragment_matrix);
 
+    // Contribution to the block-encoding 1-norm, 1/4 (sum_b |eps_b|)^2,
+    // matching FactorizedHamiltonianContainer::get_lambda() (Eq. 34) and
+    // von Burg 2021 Eq. 16. Patel 2025 Eq. 17 writes the same quantity as
+    // 1/2 (sum_b |eps_b|)^2, but in a convention whose two-body operator
+    // carries no 1/2, so its coefficients are ours scaled by 1/sqrt(2).
     const double eps_abs_sum = fragment.eps.array().abs().sum();
-    fragment.lambda_df = 0.5 * eps_abs_sum * eps_abs_sum;
+    fragment.lambda_df = 0.25 * eps_abs_sum * eps_abs_sum;
 
     fragments.push_back(std::move(fragment));
   }
@@ -197,12 +206,12 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
     const TwoBodyFragment& fragment = fragments[r];
     const Eigen::Index rank = static_cast<Eigen::Index>(r);
     const Eigen::Index bases = static_cast<Eigen::Index>(num_bases);
-    const Eigen::Index orbitals = static_cast<Eigen::Index>(norb);
+    const Eigen::Index num_orbitals = static_cast<Eigen::Index>(norb);
 
     signs(rank) = fragment.sign;
     w_matrices.segment(rank * bases, bases) = fragment.eps;
-    Eigen::Map<RowMajorMatrix>(u_matrices.data() + rank * bases * orbitals,
-                               bases, orbitals) = fragment.U.transpose();
+    Eigen::Map<RowMajorMatrix>(u_matrices.data() + rank * bases * num_orbitals,
+                               bases, num_orbitals) = fragment.U.transpose();
   }
 
   // WB and the energy gap are not produced by the plain factorization.

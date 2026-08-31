@@ -34,8 +34,9 @@ struct TwoBodyFragment {
                         ///< sqrt(|supermatrix eigenvalue|).
   double sign = 1.0;    ///< +1.0 or -1.0.
 
-  /// Fermionic 1-norm, 0.5 * (sum_b |eps_b|)^2 (Patel 2025). Rescale this by
-  /// the square of any factor applied to `eps`.
+  /// Contribution to the block-encoding 1-norm,
+  /// 0.25 * (sum_b |eps_b|)^2 (Low 2025 Eq. 34; von Burg 2021 Eq. 16).
+  /// Rescale this by the square of any factor applied to `eps`.
   double lambda_df = 0.0;
 };
 

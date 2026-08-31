@@ -1111,7 +1111,7 @@ Returns:
                            &FactorizedHamiltonianContainer::get_lambda, R"(
 Block-encoding normalization Lambda.
 
-``Lambda = sum|eig(h1_majorana)| + 0.25 * sum_{rc} (|WB_{rc}| + sum_b |W_{rb,c}|)^2``
+``Lambda = sum|eig(h1_prime)| + 0.25 * sum_{rc} (|WB_{rc}| + sum_b |W_{rb,c}|)^2``
 
 Returns:
     float: The block-encoding normalization factor
@@ -1132,9 +1132,9 @@ Raises:
     RuntimeError: If E_gap is non-positive or >= 2*Lambda
 )");
 
-  factorized_container.def("get_h1_majorana",
-                           &FactorizedHamiltonianContainer::get_h1_majorana, R"(
-Adjusted one-body matrix in Majorana basis.
+  factorized_container.def("get_h1_prime",
+                           &FactorizedHamiltonianContainer::get_h1_prime, R"(
+Adjusted one-body matrix h^(1)'.
 
 ``h'(1)_{pq} = h1_{pq} - 0.5*sum_{rs} h2_{prrs->pq} + sum_{rs} h2_{pqrr} - sum_{rc,b} WB_{rc} W_{rb,c} U_{bp} U_{bq}``
 
