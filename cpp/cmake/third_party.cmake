@@ -37,18 +37,34 @@ handle_dependency(nlohmann_json
 )
 
 # Libint2 for CPU Integral evaluation
-set(_libint2_source_subdir "SOURCE_SUBDIR;libint-2.9.0")
-if(APPLE)
-    set(_libint2_source_subdir "")
+# MSVC x64 doesn't define __SSE__/__SSE2__; patch vector_x86.h to define them.
+set(_libint2_patch_args "")
+if(MSVC AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set(_libint2_patch_args FETCHCONTENT_ARGS
+        PATCH_COMMAND "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_LIST_DIR}/patches/libint2-msvc-sse-macros.cmake"
+    )
 endif()
 handle_dependency(libint2
-  URL https://github.com/evaleev/libint/releases/download/v2.9.0/libint-2.9.0-mpqc4.tgz
+  URL https://github.com/evaleev/libint/releases/download/v2.13.1/libint-2.13.1-mpqc4.tgz
   BUILD_TARGET Libint2::cxx
   INSTALL_TARGET Libint2::cxx
-  ${_libint2_source_subdir}
   ${DEPENDENCY_BUILD_FLAGS}
   REQUIRED
 )
+# eritest-libint2, libint2's own ERI test, links the plain C library
+# (Libint2::int2) and so inherits nothing from the C++ target, yet its sources
+# still need MSVC to report C++11. The chemistry target gets the same flag in
+# cpp/CMakeLists.txt.
+if(MSVC AND TARGET eritest-libint2)
+  target_compile_options(eritest-libint2 PRIVATE /Zc:__cplusplus)
+endif()
+
+# MSVC's /O2 optimizer is pathologically slow on libint2's large CMake Unity
+# translation units (hours vs minutes for clang-cl). Disable Unity for libint2 on
+# MSVC so the small generated TUs compile quickly and parallelize; clang-cl keeps it.
+if(MSVC AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND TARGET libint2_obj)
+  set_target_properties(libint2_obj PROPERTIES UNITY_BUILD OFF)
+endif()
 
 # ecpint for ECP-related integral evaluation
 set(LIBECPINT_BUILD_TESTS OFF CACHE BOOL "Enable ECPINT Tests" FORCE)
