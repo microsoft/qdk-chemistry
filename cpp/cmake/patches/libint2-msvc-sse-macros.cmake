@@ -2,9 +2,23 @@
 # MSVC x64 supports SSE2 but doesn't define __SSE__/__SSE2__, so libint2's
 # vector_x86.h skips the SSE2 section that defines VectorSSEDouble. Patch
 # vector_x86.h to define these macros. Applied via PATCH_COMMAND in FetchContent.
-# Usage: cmake -P libint2-msvc-sse-macros.cmake  (run from libint2 source root)
+# Usage: cmake -P libint2-msvc-sse-macros.cmake
+# Callers disagree on the working directory: FetchContent's PATCH_COMMAND runs in
+# the libint2 source root, install-cpp-deps-windows.ps1 in the parent of the
+# extracted libint-* directory.
 
-set(_file "libint-2.13.1-mpqc4/include/libint2/util/vector_x86.h")
+set(_base ".")
+if(NOT EXISTS "${_base}/include/libint2/util/vector_x86.h")
+    file(GLOB _candidates LIST_DIRECTORIES true "libint-*")
+    foreach(_candidate IN LISTS _candidates)
+        if(EXISTS "${_candidate}/include/libint2/util/vector_x86.h")
+            set(_base "${_candidate}")
+            break()
+        endif()
+    endforeach()
+endif()
+
+set(_file "${_base}/include/libint2/util/vector_x86.h")
 if(NOT EXISTS "${_file}")
     message(WARNING "libint2-msvc-sse-macros: ${_file} not found, skipping patch")
     return()
@@ -51,7 +65,7 @@ message(STATUS "libint2 MSVC SSE macro patching complete.")
 # constructor required by MSVC Debug CRT (_ITERATOR_DEBUG_LEVEL=2).
 # The vector destructor rebinds allocator<T,N> to allocator<_ContainerProxy,N>,
 # which requires a converting constructor that the class lacks (C2440 error).
-set(_alloc_file "libint-2.13.1-mpqc4/include/libint2/util/array_adaptor.h")
+set(_alloc_file "${_base}/include/libint2/util/array_adaptor.h")
 if(NOT EXISTS "${_alloc_file}")
     message(WARNING "libint2-msvc-sse-macros: ${_alloc_file} not found, skipping")
     return()

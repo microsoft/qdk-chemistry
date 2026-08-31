@@ -40,10 +40,6 @@ handle_dependency(nlohmann_json
 )
 
 # Libint2 for CPU Integral evaluation
-set(_libint2_source_subdir "SOURCE_SUBDIR;libint-2.13.1-mpqc4")
-if(APPLE)
-    set(_libint2_source_subdir "")
-endif()
 # MSVC x64 doesn't define __SSE__/__SSE2__; patch vector_x86.h to define them.
 set(_libint2_patch_args "")
 if(MSVC AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -55,20 +51,16 @@ handle_dependency(libint2
   URL https://github.com/evaleev/libint/releases/download/v2.13.1/libint-2.13.1-mpqc4.tgz
   BUILD_TARGET Libint2::cxx
   INSTALL_TARGET Libint2::cxx
-  ${_libint2_source_subdir}
   ${DEPENDENCY_BUILD_FLAGS}
   ${_libint2_patch_args}
   REQUIRED
 )
-# eritest-libint2 links only to libint2-static (C library) but includes headers
-# that require MSVC to report C++11 via /Zc:__cplusplus. The chemistry target
-# gets this flag directly in cpp/CMakeLists.txt. clang-cl rejects /Zc:preprocessor.
+# eritest-libint2, libint2's own ERI test, links the plain C library
+# (Libint2::int2) and so inherits nothing from the C++ target, yet its sources
+# still need MSVC to report C++11. The chemistry target gets the same flag in
+# cpp/CMakeLists.txt.
 if(MSVC AND TARGET eritest-libint2)
-  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
-    target_compile_options(eritest-libint2 PRIVATE /Zc:__cplusplus)
-  else()
-    target_compile_options(eritest-libint2 PRIVATE /Zc:__cplusplus /Zc:preprocessor)
-  endif()
+  target_compile_options(eritest-libint2 PRIVATE /Zc:__cplusplus)
 endif()
 
 # MSVC's /O2 optimizer is pathologically slow on libint2's large CMake Unity
