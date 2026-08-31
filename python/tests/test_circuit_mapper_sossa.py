@@ -400,9 +400,8 @@ def _vector_to_givens_angles(vec: np.ndarray) -> list[float]:
 class TestSelectFullFidelity:
     """Tests for the full SELECT operation fidelity with known rotation angles."""
 
-    @pytest.mark.parametrize("N", [2, 3])
-    def test_select_dq_givens_fidelity(self, N, qdk_ctx):  # noqa: N803
-        """Verify SELECT with a DQ entry produces a non-trivial rotation."""
+    @staticmethod
+    def _select_data(N: int, rotation_bit_precision: int) -> dict:  # noqa: N803
         rng = np.random.default_rng(42 + N)
         dq_angles = []
         for _ in range(N):
@@ -416,7 +415,7 @@ class TestSelectFullFidelity:
             [0.0] * (N - 1) + [1.0],
         ]
 
-        select_data = {
+        return {
             "numOrbitals": N,
             "numRanks": R,
             "numBases": B,
@@ -424,11 +423,28 @@ class TestSelectFullFidelity:
             "numPositiveOneBody": N,
             "OneBodyRotationAngles": dq_angles,
             "TwoBodyRotationAngles": sf_angles,
-            "rotationBitPrecision": 10,
+            "rotationBitPrecision": rotation_bit_precision,
             "numFreeRiderBits": 2,
         }
 
-        qdk_ctx.code.QDKChemistry.Utils.SOSSAWalk.TestSelectDQ(select_data, 0)
+    @staticmethod
+    def _run_select(select_data: dict, use_phase_gradient: bool) -> np.ndarray:
+        """Run TestSelectDQ in its own context and return the resulting state vector.
+
+        A fresh context per run is required: ``TestSelectDQ`` allocates through the QIR
+        runtime without releasing, so a second run in the same context would report both
+        runs' qubits.
+        """
+        ctx = create_qsharp_context()
+        ctx.code.QDKChemistry.Utils.SOSSAWalk.TestSelectDQ(select_data, 0, use_phase_gradient)
+        return np.array(ctx.dump_machine().as_dense_state())
+
+    @pytest.mark.parametrize("N", [2, 3])
+    def test_select_dq_givens_fidelity(self, N, qdk_ctx):  # noqa: N803
+        """Verify SELECT with a DQ entry produces a non-trivial rotation."""
+        select_data = self._select_data(N, rotation_bit_precision=10)
+
+        qdk_ctx.code.QDKChemistry.Utils.SOSSAWalk.TestSelectDQ(select_data, 0, False)
         state = qdk_ctx.dump_machine()
         sv = np.array(state.as_dense_state())
 
@@ -437,6 +453,44 @@ class TestSelectFullFidelity:
         single_qubit_probs = np.abs(sv) ** 2
         assert np.max(single_qubit_probs) < 0.99, (
             "State is too concentrated; Givens rotation may not be applied correctly"
+        )
+
+    @pytest.mark.parametrize("rotation_bit_precision", [8, 12])
+    @pytest.mark.parametrize("N", [2, 3])
+    def test_select_dq_rotation_backends_agree(self, N, rotation_bit_precision):  # noqa: N803
+        """The QROM/phase-gradient rotation path must match the direct-rotation path.
+
+        ``qrom_phase_gradient`` is the mapper's default SELECT backend, but the end-to-end
+        energy tests pin ``select_algorithm="direct"``, so nothing else checks that the
+        production path is correct -- only that it is cheap. This closes that gap: the direct
+        path is the reference (it is what the energy tests validate), and the QROM path
+        implements the same Givens basis change, so agreement here plus those tests covers
+        the production configuration.
+
+        Agreement holds only up to the QROM's angle quantization, hence the tolerance
+        scaling with ``rotation_bit_precision``. That scaling is the point: a structural
+        error shows up as a ``b_rot``-independent floor, which no tolerance here would admit.
+        """
+        select_data = self._select_data(N, rotation_bit_precision)
+
+        direct = self._run_select(select_data, use_phase_gradient=False)
+        qrom = self._run_select(select_data, use_phase_gradient=True)
+
+        # The QROM path additionally allocates the phase gradient register, which is
+        # conjugated back to |0...0>. Those qubits are allocated last and so are the least
+        # significant index bits, making the gradient=|0...0> subspace every stride-th entry.
+        stride = len(qrom) // len(direct)
+        subspace = qrom[::stride]
+        leaked = 1.0 - float(np.vdot(subspace, subspace).real)
+        assert abs(leaked) < 1e-9, f"phase gradient register did not return to |0...0> (leaked {leaked:.3e})"
+
+        # Compare up to an irrelevant global phase.
+        overlap = abs(complex(np.vdot(direct, subspace)))
+        # Angle quantization error is O(2^-b) per rotation, and infidelity is quadratic in it.
+        tolerance = 40 * (N - 1) * (2.0**-rotation_bit_precision) ** 2
+        assert 1.0 - overlap < tolerance, (
+            f"rotation backends disagree for N={N}, b_rot={rotation_bit_precision}: "
+            f"infidelity {1.0 - overlap:.3e} exceeds {tolerance:.3e}"
         )
 
 

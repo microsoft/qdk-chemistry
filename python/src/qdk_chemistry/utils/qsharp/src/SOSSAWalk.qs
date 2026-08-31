@@ -630,13 +630,21 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                 CNOT(rotTarget[nRotBits], bEqBQubit);
 
                 // Apply all Givens rotations from the loaded register.
-                // Uses DFTHC-style conjugation: CNOT(j+1→j) + S†H converts Rz→Ry
+                // Uses DFTHC-style conjugation: CNOT(j→j+1) + S†H converts Rz→Ry
                 // and conditions on particle-number subspace, all with an uncontrolled
                 // adder (n Toffoli) instead of a controlled adder (2n Toffoli).
                 // Reference: Sanders et al. (arXiv:2007.07391, §IIA1, Figure 4a).
+                //
+                // The CNOT control must be sysRegDown[j], matching
+                // ApplyMultiControlledRotations: it maps the one-excitation states
+                // |1_j 0_{j+1}⟩ and |0_j 1_{j+1}⟩ onto |11⟩ and |01⟩, which differ only in
+                // qubit j, so the Ry on qubit j rotates between them. Reversing the control
+                // maps them onto |10⟩ and |11⟩, which differ only in qubit j+1, and the Ry
+                // then mixes the one-excitation sector into the zero-excitation sector
+                // instead of performing the Givens rotation.
                 for j in 0..numRotAngles - 1 {
                     within {
-                        CNOT(sysRegDown[j + 1], sysRegDown[j]);
+                        CNOT(sysRegDown[j], sysRegDown[j + 1]);
                     } apply {
                         RyViaPhaseGradient(sysRegDown[j], rotTarget[j * bRot..(j + 1) * bRot - 1], phaseGradientReg);
                     }
@@ -779,9 +787,16 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
 
     /// Test the full SELECT on an entry with known angles.
+    ///
+    /// `usePhaseGradient` selects between the two rotation backends, which must agree: the
+    /// direct multi-controlled rotations and the QROM-plus-phase-gradient chain implement the
+    /// same Givens basis change, the latter to `rotationBitPrecision` accuracy. Running both
+    /// and comparing the resulting states is what makes the QROM path testable, since it has
+    /// no independent reference to be checked against.
     operation TestSelectDQ(
         selectData : SelectParams,
         xoValue : Int,
+        usePhaseGradient : Bool,
     ) : Unit {
         let N = selectData.numOrbitals;
         let numPositiveOneBody = selectData.numPositiveOneBody;
@@ -796,13 +811,18 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         let nInner = bBits + nFR;
         let nSpin = 2;
         let nSystem = 2 * N;
-        let total = nOuter + nInner + nSpin + nSystem;
+        // The gradient register is allocated only on the QROM path. It is conjugated back to
+        // |0...0>, so the direct path's state is recovered from the QROM dump by restricting
+        // to the gradient=|0...0> subspace.
+        let nGradient = if usePhaseGradient { selectData.rotationBitPrecision } else { 0 };
+        let total = nOuter + nInner + nSpin + nSystem + nGradient;
         let qs = QIR.Runtime.AllocateQubitArray(total);
 
         let outerReg = qs[0..nOuter - 1];
         let innerReg = qs[nOuter..nOuter + nInner - 1];
         let spinReg = qs[nOuter + nInner..nOuter + nInner + nSpin - 1];
-        let systemReg = qs[nOuter + nInner + nSpin..total - 1];
+        let systemReg = qs[nOuter + nInner + nSpin..nOuter + nInner + nSpin + nSystem - 1];
+        let gradientReg = qs[total - nGradient...];
 
         let xoReg = outerReg[0..xoBits - 1];
         for bit in 0..xoBits - 1 {
@@ -818,7 +838,17 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
         X(systemReg[0]);
 
-        SelectImpl(selectData, false, outerReg, innerReg, spinReg, systemReg, []);
+        if usePhaseGradient {
+            // Conjugated so the gradient register returns to |0...0> and does not contribute
+            // its own amplitudes to the comparison against the direct path.
+            within {
+                PreparePhaseGradientState(gradientReg);
+            } apply {
+                SelectImpl(selectData, true, outerReg, innerReg, spinReg, systemReg, gradientReg);
+            }
+        } else {
+            SelectImpl(selectData, false, outerReg, innerReg, spinReg, systemReg, []);
+        }
     }
 
 
