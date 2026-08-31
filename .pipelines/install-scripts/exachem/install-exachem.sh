@@ -23,6 +23,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../common.sh"
 CGMANIFEST="$(cd "${SCRIPT_DIR}/../../.." && pwd)/cpp/manifest/qdk-chemistry/cgmanifest.json"
 
 : "${CPP_DEPS_PREFIX:?CPP_DEPS_PREFIX must be set to the cached qdk-chemistry C++ deps prefix (provides LibInt2/GauXC/BLAS++/LAPACK++)}"
@@ -36,38 +37,6 @@ if [ ! -f "${CGMANIFEST}" ]; then
   echo "ERROR: cgmanifest.json not found at ${CGMANIFEST}" >&2
   exit 1
 fi
-
-# Resolve a pinned git dependency's repositoryUrl/commitHash from cgmanifest.json by matching a substring of
-# the registered repositoryUrl -- mirrors install-cpp-deps.sh's own manifest-reading helpers.
-get_repo_url() {
-  local manifest="$1"
-  local repo_pattern="$2"
-  python3 -c "
-import json
-with open('$manifest') as f:
-    data = json.load(f)
-for reg in data['registrations']:
-    comp = reg['component']
-    if comp['type'] == 'git' and '$repo_pattern' in comp['git'].get('repositoryUrl', ''):
-        print(comp['git']['repositoryUrl'])
-        break
-"
-}
-
-get_commit_hash() {
-  local manifest="$1"
-  local repo_pattern="$2"
-  python3 -c "
-import json
-with open('$manifest') as f:
-    data = json.load(f)
-for reg in data['registrations']:
-    comp = reg['component']
-    if comp['type'] == 'git' and '$repo_pattern' in comp['git'].get('repositoryUrl', ''):
-        print(comp['git']['commitHash'].strip())
-        break
-"
-}
 
 # INSTALL_PREFIX: final TAMM + ExaChem install location (this is what CI puts on PATH/LD_LIBRARY_PATH).
 INSTALL_PREFIX="${INSTALL_PREFIX:-/tmp/exachem_install}"
@@ -154,8 +123,7 @@ echo "==> Seeded numactl (numa.h + libnuma.so) into ${INSTALL_PREFIX}"
 # libFLAME instead of GA's bundled ReferenceLAPACK -- see that patch for details.
 # --------------------------------------------------------------------------------------------------------------------
 echo "=== Building GlobalArrays (${GA_COMMIT}) ==="
-git clone "${GA_REPO}" "${BUILD_ROOT}/ga"
-git -C "${BUILD_ROOT}/ga" checkout "${GA_COMMIT}"
+shallow_checkout "${GA_REPO}" "${GA_COMMIT}" "${BUILD_ROOT}/ga"
 git -C "${BUILD_ROOT}/ga" apply --verbose "${SCRIPT_DIR}/patches/globalarrays-fix-linalg-preference.patch"
 
 GA_CMAKE_ARGS=(
@@ -209,11 +177,7 @@ echo "==> HDF5: cflags='${HDF5_CFLAGS}' libs='${HDF5_LIBS}'"
 # reconfigures/rebuilds TAMM. NJSON_ROOT must be >= 3.12.0 (ExaChem uses a private nlohmann_json API only
 # present from that version on).
 CMSB_SRC_DIR="${BUILD_ROOT}/CMakeBuild-patched"
-mkdir -p "${CMSB_SRC_DIR}"
-git -C "${CMSB_SRC_DIR}" init -q
-git -C "${CMSB_SRC_DIR}" remote add origin "${CMSB_REPO}"
-git -C "${CMSB_SRC_DIR}" fetch -q --depth 1 origin "${CMSB_COMMIT}"
-git -C "${CMSB_SRC_DIR}" checkout -q FETCH_HEAD
+shallow_checkout "${CMSB_REPO}" "${CMSB_COMMIT}" "${CMSB_SRC_DIR}"
 git -C "${CMSB_SRC_DIR}" apply --verbose "${SCRIPT_DIR}/patches/cmsb-fix-dependency-reuse.patch"
 
 COMMON_CMAKE_ARGS=(
@@ -256,8 +220,7 @@ fi
 # Step 1: build TAMM (CMSB superbuild). GlobalArrays/Eigen3 are reused, not built here.
 # --------------------------------------------------------------------------------------------------------------------
 echo "=== Building TAMM (${TAMM_COMMIT}) ==="
-git clone "${TAMM_REPO}" "${BUILD_ROOT}/TAMM"
-git -C "${BUILD_ROOT}/TAMM" checkout "${TAMM_COMMIT}"
+shallow_checkout "${TAMM_REPO}" "${TAMM_COMMIT}" "${BUILD_ROOT}/TAMM"
 # Default Unix Makefiles generator, not Ninja: CMSB's nested sub-build needs "make install DESTDIR=...".
 CC=gcc CXX=g++ FC=gfortran cmake -S "${BUILD_ROOT}/TAMM" -B "${BUILD_ROOT}/TAMM/build" \
   -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" \
@@ -278,8 +241,7 @@ fi
 # Step 2: build ExaChem against the just-installed TAMM, patched for the reused (MPI-off) GauXC and LibInt2.
 # --------------------------------------------------------------------------------------------------------------------
 echo "=== Building ExaChem (${EXACHEM_COMMIT}) ==="
-git clone "${EXACHEM_REPO}" "${BUILD_ROOT}/exachem"
-git -C "${BUILD_ROOT}/exachem" checkout "${EXACHEM_COMMIT}"
+shallow_checkout "${EXACHEM_REPO}" "${EXACHEM_COMMIT}" "${BUILD_ROOT}/exachem"
 git -C "${BUILD_ROOT}/exachem" apply --verbose "${SCRIPT_DIR}/patches/exachem-serial-hdf5.patch"
 git -C "${BUILD_ROOT}/exachem" apply --verbose "${SCRIPT_DIR}/patches/exachem-gauxc-mpi.patch"
 git -C "${BUILD_ROOT}/exachem" apply --verbose "${SCRIPT_DIR}/patches/exachem-libint2-deprecated.patch"

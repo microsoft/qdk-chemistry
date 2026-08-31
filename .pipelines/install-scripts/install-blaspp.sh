@@ -22,6 +22,9 @@ BLAS_VENDOR=${3:-openblas}
 MARCH=${4:-x86-64-v3}
 BUILD_SHARED_LIBS=${5:-OFF}
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/common.sh"
+
 BLASPP_REPO="https://github.com/icl-utk-edu/blaspp.git"
 WORKDIR="$(pwd)/blaspp"
 
@@ -29,8 +32,7 @@ echo "Installing BLAS++ (${COMMIT}, vendor=${BLAS_VENDOR}) to ${INSTALL_PREFIX}.
 
 # Clean up any leftover directory from a previous (possibly failed) run.
 rm -rf "${WORKDIR}"
-git clone "${BLASPP_REPO}" "${WORKDIR}"
-git -C "${WORKDIR}" checkout "${COMMIT}"
+shallow_checkout "${BLASPP_REPO}" "${COMMIT}" "${WORKDIR}"
 
 cmake -S "${WORKDIR}" -B "${WORKDIR}/build" -GNinja \
     -DCMAKE_BUILD_TYPE=Release \

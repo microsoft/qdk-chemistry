@@ -31,6 +31,7 @@ MACIS_CGMANIFEST="$2"
 BLAS_VENDOR="${3:-auto}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/common.sh"
 
 if [[ ! -f "$CGMANIFEST" ]]; then
     echo "Error: cgmanifest.json not found at $CGMANIFEST"
@@ -63,54 +64,6 @@ MAC_BUILD="OFF"
 if [[ "$OSTYPE" == "darwin"* ]]; then
     MAC_BUILD="ON"
 fi
-
-# Helper function to extract commit hash from cgmanifest by repository URL pattern
-get_commit_hash() {
-    local manifest="$1"
-    local repo_pattern="$2"
-    python3 -c "
-import json
-with open('$manifest') as f:
-    data = json.load(f)
-for reg in data['registrations']:
-    comp = reg['component']
-    if comp['type'] == 'git' and '$repo_pattern' in comp['git'].get('repositoryUrl', ''):
-        print(comp['git']['commitHash'].strip())
-        break
-"
-}
-
-# Helper function to extract tag from cgmanifest by repository URL pattern
-get_tag() {
-    local manifest="$1"
-    local repo_pattern="$2"
-    python3 -c "
-import json
-with open('$manifest') as f:
-    data = json.load(f)
-for reg in data['registrations']:
-    comp = reg['component']
-    if comp['type'] == 'git' and '$repo_pattern' in comp['git'].get('repositoryUrl', ''):
-        print(comp['git'].get('tag', ''))
-        break
-"
-}
-
-# Helper function to get download URL for "other" type components
-get_download_url() {
-    local manifest="$1"
-    local name="$2"
-    python3 -c "
-import json
-with open('$manifest') as f:
-    data = json.load(f)
-for reg in data['registrations']:
-    comp = reg['component']
-    if comp['type'] == 'other' and comp['other'].get('name') == '$name':
-        print(comp['other']['downloadUrl'])
-        break
-"
-}
 
 # Read versions from cpp cgmanifest
 SPDLOG_COMMIT=$(get_commit_hash "$CGMANIFEST" "gabime/spdlog")
@@ -202,9 +155,8 @@ cd "$BUILD_DIR"
 
 # Install nlohmann_json (header-only: no compilation, just installs headers + CMake config)
 echo "=== Installing nlohmann_json ==="
-git clone https://github.com/nlohmann/json.git nlohmann_json
+shallow_checkout https://github.com/nlohmann/json.git "$NJSON_COMMIT" nlohmann_json
 cd nlohmann_json
-git checkout "$NJSON_COMMIT"
 mkdir -p build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
@@ -216,9 +168,8 @@ rm -rf nlohmann_json
 
 # Install googletest (avoids a redundant per-job FetchContent rebuild; see header).
 echo "=== Installing googletest ==="
-git clone https://github.com/google/googletest.git googletest
+shallow_checkout https://github.com/google/googletest.git "$GTEST_COMMIT" googletest
 cd googletest
-git checkout "$GTEST_COMMIT"
 mkdir -p build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
@@ -233,9 +184,8 @@ rm -rf googletest
 
 # Install Catch2 (same rationale as googletest above).
 echo "=== Installing Catch2 ==="
-git clone https://github.com/catchorg/Catch2.git catch2
+shallow_checkout https://github.com/catchorg/Catch2.git "$CATCH2_COMMIT" catch2
 cd catch2
-git checkout "$CATCH2_COMMIT"
 mkdir -p build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
@@ -251,9 +201,8 @@ rm -rf catch2
 
 # Install spdlog
 echo "=== Installing spdlog ==="
-git clone https://github.com/gabime/spdlog.git spdlog
+shallow_checkout https://github.com/gabime/spdlog.git "$SPDLOG_COMMIT" spdlog
 cd spdlog
-git checkout "$SPDLOG_COMMIT"
 mkdir -p build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
@@ -275,8 +224,7 @@ bash "${SCRIPT_DIR}/install-lapackpp.sh" "$INSTALL_PREFIX" "$LAPACKPP_COMMIT" "$
 
 # Install libint2
 echo "=== Installing libint2 ==="
-LIBINT_TARBALL=$(basename "$LIBINT_URL")
-wget -q "$LIBINT_URL"
+LIBINT_TARBALL=$(download_and_verify "$CGMANIFEST" "Libint") || exit 1
 if [[ "$MAC_BUILD" == "ON" ]]; then
     tar xzf "$LIBINT_TARBALL"
 else
@@ -306,9 +254,8 @@ rm -rf "$LIBINT_DIR" "$LIBINT_TARBALL"
 
 # Install ecpint
 echo "=== Installing ecpint ==="
-git clone https://github.com/robashaw/libecpint ecpint
+shallow_checkout https://github.com/robashaw/libecpint "$LIBECPINT_COMMIT" ecpint
 cd ecpint
-git checkout "$LIBECPINT_COMMIT"
 mkdir -p build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
@@ -325,9 +272,8 @@ rm -rf ecpint
 
 # Install gauxc
 echo "=== Installing gauxc ==="
-git clone https://github.com/wavefunction91/gauxc.git gauxc
+shallow_checkout https://github.com/wavefunction91/gauxc.git "$GAUXC_COMMIT" gauxc
 cd gauxc
-git checkout "$GAUXC_COMMIT"
 mkdir -p build
 cd build
 gauxc_cmake_args=(

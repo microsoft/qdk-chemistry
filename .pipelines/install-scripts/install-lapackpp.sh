@@ -24,6 +24,9 @@ COMMIT=${2:?commit hash is required (resolve it from external/macis/manifest/cgm
 MARCH=${3:-x86-64-v3}
 BUILD_SHARED_LIBS=${4:-OFF}
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/common.sh"
+
 LAPACKPP_REPO="https://github.com/icl-utk-edu/lapackpp.git"
 WORKDIR="$(pwd)/lapackpp"
 
@@ -31,8 +34,7 @@ echo "Installing LAPACK++ (${COMMIT}) to ${INSTALL_PREFIX}..."
 
 # Clean up any leftover directory from a previous (possibly failed) run.
 rm -rf "${WORKDIR}"
-git clone "${LAPACKPP_REPO}" "${WORKDIR}"
-git -C "${WORKDIR}" checkout "${COMMIT}"
+shallow_checkout "${LAPACKPP_REPO}" "${COMMIT}" "${WORKDIR}"
 
 cmake -S "${WORKDIR}" -B "${WORKDIR}/build" -GNinja \
     -DCMAKE_BUILD_TYPE=Release \
