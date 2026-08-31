@@ -23,6 +23,7 @@ namespace QDKChemistry.Utils.SelectSwap {
     import Std.Arrays.Chunks;
     import Std.Arrays.Enumerated;
     import Std.Arrays.Flattened;
+    import Std.Arrays.IndexRange;
     import Std.Arrays.Mapped;
     import Std.Arrays.IsEmpty;
     import Std.Arrays.MappedOverRange;
@@ -41,6 +42,7 @@ namespace QDKChemistry.Utils.SelectSwap {
     import Std.Math.MaxI;
     import Std.Math.MinI;
     import Std.Measurement.MResetEachZ;
+    import Std.ResourceEstimation.IsResourceEstimating;
     import Std.TableLookup.Select;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
     import QDKChemistry.Utils.UnaryIteration.UnaryIteration;
@@ -73,6 +75,26 @@ namespace QDKChemistry.Utils.SelectSwap {
             Select(padded, addressFitted, output);
         } else {
             WithSelectSwap(swapBits, padded, address, intermediate => ApplyToEachCA(CNOT, Zipped(intermediate, output)));
+        }
+    }
+
+    /// Historical lookup model retained only for comparison with pre-cleanup estimates.
+    internal operation LegacySelectSwapResourceEstimate(
+        numSwapBits : Int,
+        data : Bool[][],
+        address : Qubit[],
+        output : Qubit[],
+    ) : Unit is Adj + Ctl {
+        Fact(IsResourceEstimating(), "LegacySelectSwapResourceEstimate is not an executable circuit");
+        let (n, nRequired) = DimensionsForSelect(data, address);
+        let addressFitted = address[...nRequired - 1];
+        let swapBits = numSwapBits == -1 ? ComputeOptimalLambda1D(Length(data), Length(data[0])) | numSwapBits;
+
+        Fact(swapBits <= nRequired, "Too many bits for SWAP network");
+        if swapBits == 0 {
+            Select(data, addressFitted, output);
+        } else {
+            WithSelectSwap(swapBits, data, address, intermediate => ApplyToEachCA(CNOT, Zipped(intermediate, output)));
         }
     }
 
@@ -114,6 +136,48 @@ namespace QDKChemistry.Utils.SelectSwap {
             Select(flatData, innerAddressParts[0] + outerAddressFitted, target);
 
             SwapDataOutputs(innerAddressParts[1], chunkedDataRegister);
+        }
+    }
+
+    /// Historical 2D lookup model retained only for comparison with pre-cleanup estimates.
+    ///
+    /// TODO: Remove this compatibility model after a phase-correct measurement unlookup
+    /// reaches the same cost. Its adjoint does not reconstruct the post-SWAP target over
+    /// the complete padded address space and therefore is not a valid executable circuit.
+    internal operation LegacySelect2DLoadResourceEstimate(
+        data : Bool[][][],
+        outerAddress : Qubit[],
+        innerAddress : Qubit[],
+        numSwapBits : Int,
+        target : Qubit[],
+    ) : Unit is Adj {
+        body (...) {
+            Fact(IsResourceEstimating(), "LegacySelect2DLoadResourceEstimate is not an executable circuit");
+            if numSwapBits == 0 {
+                UnaryIteration(outerAddress, Length(data), (index) => {
+                    Select(data[index], innerAddress, target);
+                });
+            } else {
+                let (n, nRequired) = DimensionsForSelect(data[0], innerAddress);
+                let innerAddressFitted = innerAddress[...nRequired - 1];
+                let m = Length(data[0][0]);
+                let k = nRequired - numSwapBits;
+                let innerAddressParts = Partitioned([k, numSwapBits], innerAddressFitted);
+                let chunkedDataRegister = Chunks(m, target);
+
+                UnaryIteration(outerAddress, Length(data), (index) => {
+                    let dataArray = CreatePaddedData(data[index], nRequired, m, k);
+                    Select(dataArray, innerAddressParts[0], target);
+                });
+                SwapDataOutputs(innerAddressParts[1], chunkedDataRegister);
+            }
+        }
+        adjoint (...) {
+            Fact(IsResourceEstimating(), "LegacySelect2DLoadResourceEstimate is not an executable circuit");
+            let (n, nRequired) = DimensionsForSelect(data[0], innerAddress);
+            let mapOne : (Int -> Bool[][]) = index -> CreatePaddedData(data[index], nRequired, Length(data[index][0]), nRequired - numSwapBits);
+            let flattenedData = Flattened(MappedOverRange(mapOne, IndexRange(data)));
+            Adjoint Select(flattenedData, innerAddress + outerAddress, target);
         }
     }
 
@@ -342,7 +406,12 @@ namespace QDKChemistry.Utils.SelectSwap {
 
                 within {
                     Select2DLoad(
-                        data, outerAddr, innerAddr, numSwapBits, target);
+                        data,
+                        outerAddr,
+                        innerAddr,
+                        numSwapBits,
+                        target
+                    );
                 } apply {
                     ApplyToEachCA(CNOT, Zipped(target[0..m - 1], copy));
                 }

@@ -853,7 +853,16 @@ def _call_within(budget_seconds, description, func):
     return value, elapsed
 
 
-def _sossa_unary_qpe_circuit(num_queries, *, num_orbitals, num_ranks, num_bases, num_copies, **mapper_kwargs):
+def _sossa_unary_qpe_circuit(
+    num_queries,
+    *,
+    num_orbitals,
+    num_ranks,
+    num_bases,
+    num_copies,
+    num_electrons_per_spin=None,
+    **mapper_kwargs,
+):
     """Build the unary-iteration QPE circuit for a synthetic SOSSA problem.
 
     Uses a random factorized Hamiltonian rather than the H2 data because the point is to
@@ -865,6 +874,7 @@ def _sossa_unary_qpe_circuit(num_queries, *, num_orbitals, num_ranks, num_bases,
         num_ranks: Number of ranks (R).
         num_bases: Number of bases (B).
         num_copies: Number of copies (C).
+        num_electrons_per_spin: Alpha and beta electron count; defaults to half filling.
         mapper_kwargs: Overrides for :func:`_sossa_unary_circuit_builder_ref`.
 
     Returns:
@@ -882,7 +892,7 @@ def _sossa_unary_qpe_circuit(num_queries, *, num_orbitals, num_ranks, num_bases,
     orbitals = create_test_orbitals(num_orbitals)
     operator = create("qubit_mapper", "sossa").run(Hamiltonian(factorized), MajoranaMapping.jordan_wigner(num_modes))
 
-    num_electrons = max(1, num_orbitals // 2)
+    num_electrons = num_electrons_per_spin or max(1, num_orbitals // 2)
     hf_config = Configuration.canonical_hf_configuration(num_electrons, num_electrons, num_orbitals)
     reference = Wavefunction(StateVectorContainer(hf_config, orbitals))
     state_prep = create("state_prep", "sparse_isometry").run(reference)
@@ -901,6 +911,27 @@ class TestSOSSAResourceEstimation:
     """Logical-resource estimation of the SOSSA unary-iteration QPE circuit."""
 
     _PROBLEM: ClassVar[dict[str, int]] = {"num_orbitals": 2, "num_ranks": 1, "num_bases": 1, "num_copies": 1}
+
+    def test_fe2s2_matches_archived_resource_estimate(self):
+        """The temporary resource-only PREPARE model must reproduce the archived Fe2S2 headline."""
+        circuit = _sossa_unary_qpe_circuit(
+            10_162,
+            num_orbitals=20,
+            num_ranks=14,
+            num_bases=15,
+            num_copies=5,
+            num_electrons_per_spin=15,
+            outer_prepare_algorithm="alias_sampling",
+            inner_prepare_algorithm="controlled_alias_sampling",
+            select_algorithm="qrom_phase_gradient",
+            coefficient_bit_precision=11,
+            rotation_bit_precision=15,
+        )
+
+        logical_counts = circuit.estimate().logical_counts
+
+        assert logical_counts["cczCount"] + logical_counts["ccixCount"] == 32_457_481
+        assert logical_counts["numQubits"] == 463
 
     @pytest.mark.slow
     @pytest.mark.skipif(not _RUN_SLOW_TESTS, reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.")
