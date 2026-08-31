@@ -114,7 +114,6 @@ TEST(int1e, pvp_integral) {
   Eigen::MatrixXd result(2, 2);
   int1e.pvp_integral(result.data());
 
-  // Reference uses the exact QDK STO-3G shell definitions.
   Eigen::MatrixXd reference(2, 2);
   reference << -2.6937881926330531, -0.55512513393737917, -0.55512513393737917,
       -2.6937881926330531;

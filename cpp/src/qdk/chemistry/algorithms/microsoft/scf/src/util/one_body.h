@@ -4,13 +4,11 @@
 
 #pragma once
 
-#include <qdk/chemistry/scf/core/types.h>
-
+#include <Eigen/Core>
 #include <memory>
 
 namespace qdk::chemistry::scf {
 class BasisSet;
-class OneBodyIntegral;
 struct ParallelConfig;
 
 namespace detail {
@@ -21,32 +19,21 @@ struct DecontractedBasis {
   Eigen::MatrixXd contraction;
 };
 
+/** @brief Decontract a basis, coalescing only exactly repeated primitives. */
 DecontractedBasis decontract_basis(
     const std::shared_ptr<BasisSet>& contracted_basis);
 
 }  // namespace detail
 
 /**
- * @brief Build the nonrelativistic one-electron AO Hamiltonian.
- * @param basis_set Internal AO basis.
- * @param integrals One-electron integral evaluator for the same basis.
- * @return Kinetic, nuclear-attraction, and ECP integrals in the AO basis.
- */
-RowMajorMatrix build_nonrelativistic_one_body_ao(const BasisSet& basis_set,
-                                                 OneBodyIntegral& integrals);
-
-/**
  * @brief Build the spin-free X2C-1e one-electron AO Hamiltonian.
  * @param internal_basis_set Internal spherical all-electron basis.
  * @param mpi Parallel configuration used for integral evaluation.
  * @param decontract Whether to decontract before X2C and recontract afterward.
- * @param contracted_overlap Optional overlap already evaluated in the supplied
- *        contracted basis; ignored when @p decontract is true.
  * @return X2C-1e one-electron matrix in the supplied basis.
  */
-RowMajorMatrix build_x2c_one_body_ao(
+Eigen::MatrixXd build_x2c_one_body_ao(
     const std::shared_ptr<BasisSet>& internal_basis_set,
-    const ParallelConfig& mpi, bool decontract,
-    const RowMajorMatrix* contracted_overlap = nullptr);
+    const ParallelConfig& mpi, bool decontract);
 
 }  // namespace qdk::chemistry::scf

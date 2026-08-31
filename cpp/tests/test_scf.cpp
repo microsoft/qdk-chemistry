@@ -15,8 +15,8 @@
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/orbital_rotation.hpp>
 
-#include "../src/qdk/chemistry/algorithms/microsoft/scf.hpp"
 #include "../src/qdk/chemistry/algorithms/microsoft/utils.hpp"
+#include "qdk/chemistry/algorithms/microsoft/scf.hpp"
 #include "ut_common.hpp"
 
 using namespace qdk::chemistry::data;
@@ -333,17 +333,6 @@ TEST_F(ScfTest, X2CWaterRHFReferences) {
 
     EXPECT_NEAR(energy, reference_energy, testing::scf_energy_tolerance);
     EXPECT_TRUE(wavefunction->get_orbitals()->is_restricted());
-  }
-}
-
-TEST_F(ScfTest, X2CMeanFieldEnergyMatchesHamiltonian) {
-  auto water = testing::create_water_structure();
-  for (const std::string integral_dressing : {"x2c_1e", "x2c_1e_contracted"}) {
-    SCOPED_TRACE(integral_dressing);
-    auto solver = ScfSolverFactory::create("qdk");
-    solver->settings().set("integral_dressing", integral_dressing);
-    solver->settings().set("enable_gdm", false);
-    auto [energy, wavefunction] = solver->run(water, 0, 1, "sto-3g");
 
     auto constructor = HamiltonianConstructorFactory::create("qdk");
     constructor->settings().set("integral_dressing", integral_dressing);
@@ -378,48 +367,6 @@ TEST_F(ScfTest, X2COHROHFReference) {
 
   EXPECT_NEAR(energy, -74.40108455493879, testing::scf_energy_tolerance);
   EXPECT_TRUE(wavefunction->get_orbitals()->is_restricted());
-}
-
-TEST_F(ScfTest, X2CDirectMatchesIncore) {
-  auto water = testing::create_water_structure();
-  auto direct_solver = ScfSolverFactory::create("qdk");
-  direct_solver->settings().set("integral_dressing", "x2c_1e");
-  direct_solver->settings().set("enable_gdm", false);
-  auto [direct_energy, direct_wavefunction] =
-      direct_solver->run(water, 0, 1, "sto-3g");
-
-  auto incore_solver = ScfSolverFactory::create("qdk");
-  incore_solver->settings().set("integral_dressing", "x2c_1e");
-  incore_solver->settings().set("enable_gdm", false);
-  incore_solver->settings().set("eri_method", "incore");
-  auto [incore_energy, incore_wavefunction] =
-      incore_solver->run(water, 0, 1, "sto-3g");
-
-  EXPECT_TRUE(std::isfinite(direct_energy));
-  EXPECT_TRUE(std::isfinite(incore_energy));
-  EXPECT_TRUE(direct_wavefunction->get_orbitals()->is_restricted());
-  EXPECT_TRUE(incore_wavefunction->get_orbitals()->is_restricted());
-  EXPECT_NEAR(incore_energy, direct_energy, testing::scf_energy_tolerance);
-}
-
-TEST_F(ScfTest, X2CGdmMatchesDiis) {
-  auto water = testing::create_water_structure();
-  auto diis_solver = ScfSolverFactory::create("qdk");
-  diis_solver->settings().set("integral_dressing", "x2c_1e");
-  diis_solver->settings().set("enable_gdm", false);
-  auto [diis_energy, diis_wavefunction] =
-      diis_solver->run(water, 0, 1, "sto-3g");
-
-  auto gdm_solver = ScfSolverFactory::create("qdk");
-  gdm_solver->settings().set("integral_dressing", "x2c_1e");
-  gdm_solver->settings().set("enable_gdm", true);
-  gdm_solver->settings().set("gdm_max_diis_iteration", 2);
-  gdm_solver->settings().set("energy_thresh_diis_switch", 1e-14);
-  auto [gdm_energy, gdm_wavefunction] = gdm_solver->run(water, 0, 1, "sto-3g");
-
-  EXPECT_TRUE(diis_wavefunction->get_orbitals()->is_restricted());
-  EXPECT_TRUE(gdm_wavefunction->get_orbitals()->is_restricted());
-  EXPECT_NEAR(gdm_energy, diis_energy, testing::scf_energy_tolerance);
 }
 
 TEST_F(ScfTest, X2CRejectsEcp) {

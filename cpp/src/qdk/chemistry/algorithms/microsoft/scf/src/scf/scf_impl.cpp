@@ -941,18 +941,31 @@ void SCFImpl::build_one_electron_integrals_() {
   }
   RowMajorMatrix one_body_ao;
   switch (ctx_.cfg->integral_dressing) {
-    case IntegralDressing::None:
-      TIMEIT(one_body_ao =
-                 build_nonrelativistic_one_body_ao(*ctx_.basis_set, *int1e_),
-             "SCFImpl::build_one_electron_integrals->nonrelativistic");
+    case IntegralDressing::None: {
+      RowMajorMatrix kinetic =
+          RowMajorMatrix::Zero(num_atomic_orbitals_, num_atomic_orbitals_);
+      RowMajorMatrix potential =
+          RowMajorMatrix::Zero(num_atomic_orbitals_, num_atomic_orbitals_);
+      TIMEIT(int1e_->kinetic_integral(kinetic.data()),
+             "SCFImpl::build_one_electron_integrals->kinetic_integral");
+      TIMEIT(int1e_->nuclear_integral(potential.data()),
+             "SCFImpl::build_one_electron_integrals->nuclear_integral");
+      one_body_ao = kinetic + potential;
+      if (!ctx_.basis_set->ecp_shells.empty()) {
+        RowMajorMatrix ecp =
+            RowMajorMatrix::Zero(num_atomic_orbitals_, num_atomic_orbitals_);
+        TIMEIT(int1e_->ecp_integral(ecp.data()),
+               "SCFImpl::build_one_electron_integrals->ecp_integral");
+        one_body_ao += ecp;
+      }
       break;
+    }
     case IntegralDressing::X2C1e:
     case IntegralDressing::X2C1eContracted:
       const bool decontract =
           ctx_.cfg->integral_dressing == IntegralDressing::X2C1e;
-      TIMEIT(one_body_ao =
-                 build_x2c_one_body_ao(ctx_.basis_set, ctx_.cfg->mpi,
-                                       decontract, decontract ? nullptr : &S_),
+      TIMEIT(one_body_ao = build_x2c_one_body_ao(ctx_.basis_set, ctx_.cfg->mpi,
+                                                 decontract),
              "SCFImpl::build_one_electron_integrals->x2c");
       break;
   }

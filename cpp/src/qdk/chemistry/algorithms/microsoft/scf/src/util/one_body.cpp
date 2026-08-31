@@ -379,8 +379,7 @@ namespace {
 /** @brief Compute X2C-1e integrals, optionally in a decontracted basis. */
 Eigen::MatrixXd compute_x2c_one_electron(
     const std::shared_ptr<qcs::BasisSet>& internal_basis_set,
-  const qcs::ParallelConfig& mpi, bool decontract,
-  const qcs::RowMajorMatrix* contracted_overlap) {
+    const qcs::ParallelConfig& mpi, bool decontract) {
   if (!internal_basis_set->pure) {
     throw std::invalid_argument("X2C-1e currently supports spherical AOs only");
   }
@@ -406,28 +405,18 @@ Eigen::MatrixXd compute_x2c_one_electron(
   Eigen::MatrixXd kinetic(dimension, dimension);
   Eigen::MatrixXd potential(dimension, dimension);
   Eigen::MatrixXd pvp(dimension, dimension);
-  if (!decontract && contracted_overlap != nullptr) {
-    if (contracted_overlap->rows() != static_cast<Eigen::Index>(dimension) ||
-        contracted_overlap->cols() != static_cast<Eigen::Index>(dimension)) {
-      throw std::invalid_argument(
-          "Precomputed X2C overlap dimension does not match the basis");
-    }
-    overlap = *contracted_overlap;
-  } else {
-    int1e->overlap_integral(overlap.data());
-  }
+  int1e->overlap_integral(overlap.data());
   int1e->kinetic_integral(kinetic.data());
   int1e->nuclear_integral(potential.data());
   int1e->pvp_integral(pvp.data());
 
-  Eigen::MatrixXd hamiltonian =
-      Eigen::MatrixXd::Zero(internal_basis_set->num_atomic_orbitals,
-                            internal_basis_set->num_atomic_orbitals);
   if (mpi.world_rank != 0) {
-    return hamiltonian;
+    return Eigen::MatrixXd(internal_basis_set->num_atomic_orbitals,
+                           internal_basis_set->num_atomic_orbitals);
   }
 
-  hamiltonian = compute_x2c_hamiltonian(overlap, kinetic, potential, pvp);
+  Eigen::MatrixXd hamiltonian =
+      compute_x2c_hamiltonian(overlap, kinetic, potential, pvp);
   if (decontract) {
     const Eigen::Index contracted_dimension = contraction.cols();
     Eigen::MatrixXd hamiltonian_times_contraction(hamiltonian.rows(),
@@ -456,56 +445,28 @@ Eigen::MatrixXd compute_x2c_one_electron(
 
 }  // namespace
 
-RowMajorMatrix build_nonrelativistic_one_body_ao(const BasisSet& basis_set,
-                                                 OneBodyIntegral& integrals) {
-  const size_t dimension = basis_set.num_atomic_orbitals;
-  RowMajorMatrix kinetic(dimension, dimension);
-  RowMajorMatrix potential(dimension, dimension);
-  integrals.kinetic_integral(kinetic.data());
-  integrals.nuclear_integral(potential.data());
-  RowMajorMatrix one_body_ao = kinetic + potential;
-
-  if (!basis_set.ecp_shells.empty()) {
-    RowMajorMatrix ecp = RowMajorMatrix::Zero(dimension, dimension);
-    integrals.ecp_integral(ecp.data());
-    one_body_ao += ecp;
-  }
-#ifdef QDK_CHEMISTRY_ENABLE_MPI
-  MPI_Bcast(one_body_ao.data(), static_cast<int>(one_body_ao.size()),
-            MPI_DOUBLE, 0, MPI_COMM_WORLD);
-#endif
-  return one_body_ao;
-}
-
-RowMajorMatrix build_x2c_one_body_ao(
+Eigen::MatrixXd build_x2c_one_body_ao(
     const std::shared_ptr<qcs::BasisSet>& internal_basis_set,
-  const qcs::ParallelConfig& mpi, bool decontract,
-  const qcs::RowMajorMatrix* contracted_overlap) {
+    const qcs::ParallelConfig& mpi, bool decontract) {
   Eigen::MatrixXd hamiltonian;
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
   if (mpi.world_size == 1) {
-    return compute_x2c_one_electron(internal_basis_set, mpi, decontract,
-                                    contracted_overlap);
+    return compute_x2c_one_electron(internal_basis_set, mpi, decontract);
   }
   std::string local_error;
   try {
-    hamiltonian = compute_x2c_one_electron(internal_basis_set, mpi, decontract,
-                                           contracted_overlap);
+    hamiltonian = compute_x2c_one_electron(internal_basis_set, mpi, decontract);
   } catch (const std::exception& error) {
     local_error = error.what();
   } catch (...) {
     local_error = "unknown error";
   }
-  const int local_succeeded = local_error.empty() ? 1 : 0;
-  int succeeded = 0;
-  MPI_Allreduce(&local_succeeded, &succeeded, 1, MPI_INT, MPI_MIN,
+  const int local_failed_rank =
+      local_error.empty() ? mpi.world_size : mpi.world_rank;
+  int failed_rank = mpi.world_size;
+  MPI_Allreduce(&local_failed_rank, &failed_rank, 1, MPI_INT, MPI_MIN,
                 MPI_COMM_WORLD);
-  if (succeeded == 0) {
-    const int local_failed_rank =
-        local_error.empty() ? mpi.world_size : mpi.world_rank;
-    int failed_rank = 0;
-    MPI_Allreduce(&local_failed_rank, &failed_rank, 1, MPI_INT, MPI_MIN,
-                  MPI_COMM_WORLD);
+  if (failed_rank < mpi.world_size) {
     int message_size = mpi.world_rank == failed_rank
                            ? static_cast<int>(local_error.size())
                            : 0;
@@ -521,8 +482,7 @@ RowMajorMatrix build_x2c_one_body_ao(
   MPI_Bcast(hamiltonian.data(), static_cast<int>(hamiltonian.size()),
             MPI_DOUBLE, 0, MPI_COMM_WORLD);
 #else
-  hamiltonian = compute_x2c_one_electron(internal_basis_set, mpi, decontract,
-                                         contracted_overlap);
+  hamiltonian = compute_x2c_one_electron(internal_basis_set, mpi, decontract);
 #endif
   return hamiltonian;
 }

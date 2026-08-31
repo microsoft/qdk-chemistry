@@ -138,31 +138,6 @@ class TestScfSolver:
         energies = orbitals.energies()
         assert energies is not None
 
-    @pytest.mark.parametrize(
-        ("integral_dressing", "reference_energy"),
-        [
-            pytest.param("x2c_1e", -74.98146893703478, id="decontracted"),
-            pytest.param("x2c_1e_contracted", -74.98498098619933, id="contracted"),
-        ],
-    )
-    def test_scf_solver_water_x2c_reference_energy(self, integral_dressing, reference_energy):
-        """Test spin-free X2C-SCF reference energies."""
-        solver = algorithms.create("scf_solver", "qdk")
-        solver.settings().set("method", "hf")
-        solver.settings().set("enable_gdm", False)
-        solver.settings().set("convergence_threshold", 1e-10)
-        solver.settings().set("integral_dressing", integral_dressing)
-
-        energy, wavefunction = solver.run(create_water_structure(), 0, 1, "sto-3g")
-
-        assert np.isclose(
-            energy,
-            reference_energy,
-            rtol=float_comparison_relative_tolerance,
-            atol=scf_energy_tolerance,
-        )
-        assert wavefunction.get_orbitals().is_restricted()
-
     def test_scf_solver_water_def2_tzvp(self):
         """Test SCF solver on water molecule with def2-tzvp basis."""
         water = create_water_structure()

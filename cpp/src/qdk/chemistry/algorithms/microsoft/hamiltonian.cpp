@@ -25,18 +25,9 @@ namespace qcs = qdk::chemistry::scf;
 std::pair<std::shared_ptr<qcs::BasisSet>, Eigen::MatrixXd>
 detail::build_one_body_ao(const data::BasisSet& basis_set,
                           const std::string& integral_dressing) {
-  qcs::IntegralDressing dressing;
-  if (integral_dressing.empty()) {
-    dressing = qcs::IntegralDressing::None;
-  } else if (integral_dressing == "x2c_1e") {
-    dressing = qcs::IntegralDressing::X2C1e;
-  } else if (integral_dressing == "x2c_1e_contracted") {
-    dressing = qcs::IntegralDressing::X2C1eContracted;
-  } else {
-    throw std::invalid_argument("Unsupported integral dressing '" +
-                                integral_dressing + "'");
-  }
-  if (dressing != qcs::IntegralDressing::None &&
+  const bool use_x2c =
+      integral_dressing == "x2c_1e" || integral_dressing == "x2c_1e_contracted";
+  if (use_x2c &&
       basis_set.get_atomic_orbital_type() == data::AOType::Cartesian) {
     throw std::invalid_argument("X2C-1e currently supports spherical AOs only");
   }
@@ -44,15 +35,30 @@ detail::build_one_body_ao(const data::BasisSet& basis_set,
   auto internal_basis_set =
       utils::microsoft::convert_basis_set_from_qdk(basis_set);
   const auto mpi = qcs::mpi_default_input();
-  Eigen::MatrixXd one_body_ao;
-  if (dressing == qcs::IntegralDressing::None) {
-    qcs::OneBodyIntegral integrals(internal_basis_set.get(),
-                                   internal_basis_set->mol.get(), mpi);
-    one_body_ao =
-        qcs::build_nonrelativistic_one_body_ao(*internal_basis_set, integrals);
-  } else {
-    one_body_ao = qcs::build_x2c_one_body_ao(
-        internal_basis_set, mpi, dressing == qcs::IntegralDressing::X2C1e);
+
+  if (use_x2c) {
+    return {internal_basis_set,
+            qcs::build_x2c_one_body_ao(internal_basis_set, mpi,
+                                       integral_dressing == "x2c_1e")};
+  }
+  if (!integral_dressing.empty()) {
+    throw std::invalid_argument("Unsupported integral dressing '" +
+                                integral_dressing + "'");
+  }
+
+  const size_t dimension = basis_set.get_num_atomic_orbitals();
+  auto int1e = std::make_unique<qcs::OneBodyIntegral>(
+      internal_basis_set.get(), internal_basis_set->mol.get(), mpi);
+  Eigen::MatrixXd kinetic(dimension, dimension);
+  Eigen::MatrixXd potential(dimension, dimension);
+  int1e->kinetic_integral(kinetic.data());
+  int1e->nuclear_integral(potential.data());
+  Eigen::MatrixXd one_body_ao = kinetic + potential;
+
+  if (!internal_basis_set->ecp_shells.empty()) {
+    Eigen::MatrixXd ecp = Eigen::MatrixXd::Zero(dimension, dimension);
+    int1e->ecp_integral(ecp.data());
+    one_body_ao += ecp;
   }
   return {std::move(internal_basis_set), std::move(one_body_ao)};
 }

@@ -182,7 +182,7 @@ The native QDK/Chemistry implementation provides high-performance :term:`SCF` ca
 
 - Restricted Hartree-Fock (:term:`RHF`) and Unrestricted Hartree-Fock (:term:`UHF`)
 - Restricted Kohn-Sham (:term:`RKS`) and Unrestricted Kohn-Sham (:term:`UKS`) :term:`DFT`
-- Spin-free one-electron exact-two-component (X2C) integral dressing
+- Spin-free one-electron exact-two-component (X2C-1e) integral dressing
 - Extensive library of :doc:`basis sets <../basis_functionals>` including Pople, Dunning, and Karlsruhe families
 - Full range of :doc:`exchange-correlation functionals <../basis_functionals>` for :term:`DFT`
   - Optimization algorithms including the direct inversion in the iterative subspace (:term:`DIIS`) method :cite:`Pulay1982`, and the geometric direct minimization (:term:`GDM`) method :cite:`VanVoorhis2002`
@@ -283,7 +283,7 @@ This hybrid approach combines the speed of :term:`DIIS` for typical systems with
    * - ``integral_dressing``
      - string
      - ``""``
-     - One-electron integral dressing: ``""`` for nonrelativistic integrals, ``"x2c_1e"`` for spin-free X2C-1e with basis decontraction and exact recontraction, or ``"x2c_1e_contracted"`` for X2C-1e in the supplied contracted basis. X2C requires spherical all-electron basis sets; analytic nuclear gradients and picture-changed properties are unavailable. Use the same value for downstream Hamiltonian construction because :doc:`Orbitals <../data/orbitals>` do not retain integral-dressing provenance.
+     - One-electron integral dressing: ``""`` for nonrelativistic integrals, ``"x2c_1e"`` for spin-free X2C-1e with basis decontraction and exact recontraction, or ``"x2c_1e_contracted"`` for X2C-1e in the supplied contracted basis. X2C-1e requires spherical all-electron basis sets; analytic nuclear gradients and polarizabilities are unavailable. Use the same value for downstream :doc:`Hamiltonian construction <hamiltonian_constructor>` because :doc:`Orbitals <../data/orbitals>` do not retain integral-dressing provenance.
    * - ``fock_reset_steps``
      - int
      - ``1073741824``
