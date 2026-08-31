@@ -236,6 +236,26 @@ class TestFolderCacheData:
         np.testing.assert_array_equal(loaded[0], value[0])
         assert loaded[1] == (3, 4.0)
 
+    def test_put_and_get_tuple(self, folder_cache):
+        """Round-trip a generic tuple through the cache."""
+        value = ("result", (1, 2))
+
+        folder_cache.put_data("tuple_hash", value)
+        loaded = folder_cache.get_data("tuple_hash")
+
+        assert loaded == value
+        assert isinstance(loaded, tuple)
+
+    def test_put_and_get_homogeneous_dataclass_tuple(self, folder_cache, sample_orbitals):
+        """Round-trip a homogeneous DataClass tuple without converting it to a list."""
+        value = (sample_orbitals, sample_orbitals)
+
+        folder_cache.put_data("tuple_hash", value)
+        loaded = folder_cache.get_data("tuple_hash")
+
+        assert isinstance(loaded, tuple)
+        assert all(isinstance(item, Orbitals) for item in loaded)
+
     def test_delete_list_removes_nested_numpy_arrays(self, folder_cache, cache_dir):
         """Delete array blobs referenced by a cached list manifest."""
         folder_cache.put_data("numpy_list_hash", [np.array([1.0, 2.0])])
@@ -243,6 +263,26 @@ class TestFolderCacheData:
 
         assert folder_cache.delete_data("numpy_list_hash")
         assert not array_path.exists()
+
+    def test_delete_tuple_preserves_shared_children(self, folder_cache, cache_dir):
+        """Delete only tuple children that no other manifest references."""
+        shared = np.array([1.0, 2.0])
+        unique = np.array([3.0, 4.0])
+        folder_cache.put_data("first_tuple", (shared, unique))
+        folder_cache.put_data("second_tuple", (shared,))
+
+        assert len(list(cache_dir.glob("*.ndarray.npy"))) == 2
+        assert folder_cache.delete_data("first_tuple")
+
+        assert not folder_cache.has_data("first_tuple")
+        assert folder_cache.has_data("second_tuple")
+        loaded = folder_cache.get_data("second_tuple")
+        assert isinstance(loaded, tuple)
+        np.testing.assert_array_equal(loaded[0], shared)
+        assert len(list(cache_dir.glob("*.ndarray.npy"))) == 1
+
+        assert folder_cache.delete_data("second_tuple")
+        assert not list(cache_dir.glob("*.ndarray.npy"))
 
     def test_put_data_rejects_unsupported_value_graph(self, folder_cache):
         """Reject a list containing values outside the cache backend contract."""

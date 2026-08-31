@@ -196,6 +196,36 @@
         }
       },
       "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "pypi",
+        "pypi": {
+          "name": "azure-ai-discovery",
+          "version": "1.0.0"
+        }
+      },
+      "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "pypi",
+        "pypi": {
+          "name": "azure-identity",
+          "version": "1.19.0"
+        }
+      },
+      "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "pypi",
+        "pypi": {
+          "name": "azure-storage-blob",
+          "version": "12.25.0"
+        }
+      },
+      "developmentDependency": false
     }
   ]
 }

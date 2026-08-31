@@ -48,13 +48,18 @@ requires-python = ">=3.10"
 
 [project.optional-dependencies]
 all = [
-  "qdk-chemistry[coverage,dev,docs,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre,test]"
+  "qdk-chemistry[coverage,dev,discovery,docs,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre,test]"
 ]
 coverage = [
   "coverage",
   "pytest",
   "pytest-cov",
   "gcovr"
+]
+discovery = [
+  "azure-ai-discovery==1.0.0",
+  "azure-identity>=1.19.0,<2",
+  "azure-storage-blob>=12.25.0,<13"
 ]
 dev = [
   "coverage",
@@ -80,7 +85,7 @@ docs = [
 jupyter = [
   "ipykernel>=6.0",
   "pandas>=2.0.0",
-  "qdk-chemistry[plugins]",
+  "qdk[jupyter]>=1.30.0",
 ]
 networkx-extras = [
   "networkx>=3.0; python_full_version != '3.14.1'",  # due to incompatibility with Python 3.14.1
@@ -105,7 +110,7 @@ qre = [
   "qdk[qre,jupyter]>=1.30.0"
 ]
 test = [
-  "qdk-chemistry[coverage,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre]",
+  "qdk-chemistry[coverage,discovery,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre]",
   "nbclient",
   "nbformat",
   "pennylane",
