@@ -110,4 +110,3 @@ class TestSelectSwapPreservesAddressPhases:
     @pytest.mark.parametrize("num_swap_bits", [1, 2])
     def test_2d_swap_path_matches_plain_select_when_outer_length_is_not_a_power_of_two(self, num_swap_bits):
         _assert_phase_agreement("TestSelect2DLoadPhaseAgreement", _DATA_2D_RAGGED_OUTER, num_swap_bits)
-
