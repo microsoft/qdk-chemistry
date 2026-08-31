@@ -25,6 +25,7 @@ from qdk_chemistry.remote.backends import base as remote_backend_registry
 from qdk_chemistry.remote.cache import FolderCache
 
 _BUNDLED_PLUGIN_AUTOLOAD_CASES = (
+    ("discovery", "QDK_CHEMISTRY_DISABLE_DISCOVERY_AUTOLOAD"),
     ("pyscf", "QDK_CHEMISTRY_DISABLE_PYSCF_AUTOLOAD"),
     ("qiskit", "QDK_CHEMISTRY_DISABLE_QISKIT_AUTOLOAD"),
     ("openfermion", "QDK_CHEMISTRY_DISABLE_OPENFERMION_AUTOLOAD"),

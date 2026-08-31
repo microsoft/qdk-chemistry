@@ -171,7 +171,10 @@ def test_matplotlib_sources_generate_accessible_svg_figures():
         svg_id = svg_path.stem.replace("_", "-")
         assert root.attrib["role"] == "img"
         assert root.attrib["aria-labelledby"] == f"{svg_id}-title {svg_id}-desc"
-        assert root.attrib["data-source-sha256"] == source_sha256(*paths)
+        expected_source_hash = source_sha256(*paths)
+        assert root.attrib["data-source-sha256"] == expected_source_hash, (
+            f"{svg_name} has stale source metadata; regenerate it with `python {paths[0].relative_to(REPOSITORY_ROOT)}`"
+        )
         title = root.find(f"{{{SVG_NAMESPACE}}}title")
         description = root.find(f"{{{SVG_NAMESPACE}}}desc")
         assert title is not None
