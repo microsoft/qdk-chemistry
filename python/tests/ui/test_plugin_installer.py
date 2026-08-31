@@ -86,6 +86,20 @@ def test_workspace_install_delegates_fetch_and_writes_cross_client_files(
     assert json.loads((plugin_dir / ".mcp.json").read_text())["mcpServers"]["qdk_chemistry"]["command"] == command
 
 
+def test_component_copy_rejects_symlink_outside_plugin_tree(tmp_path: Path) -> None:
+    source = tmp_path / "plugin" / "skills"
+    source.mkdir(parents=True)
+    outside = tmp_path / "secret.md"
+    outside.write_text("secret\n", encoding="utf-8")
+    (source / "SKILL.md").symlink_to(outside)
+    destination = tmp_path / "workspace" / ".github" / "skills"
+
+    with pytest.raises(plugin_installer.PluginInstallError, match="symlink traversal is not allowed"):
+        plugin_installer._copy_component_directories([source], destination)
+
+    assert not (destination / "SKILL.md").exists()
+
+
 def test_local_install_registers_ancestor_marketplace(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

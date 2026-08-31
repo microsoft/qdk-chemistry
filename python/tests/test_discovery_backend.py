@@ -365,7 +365,11 @@ def test_cache_transport_fails_after_cache_write_failure(tmp_path, monkeypatch: 
     )
     algorithm = MagicMock()
     algorithm.run.return_value = 6
-    monkeypatch.setattr(remote_worker, "_load_remote_cache", MagicMock(return_value=(MagicMock(), "testhash", False)))
+    monkeypatch.setattr(
+        remote_worker,
+        "_load_remote_cache",
+        MagicMock(return_value=(MagicMock(), "testhash", "testhash", False)),
+    )
     monkeypatch.setattr(remote_worker, "_get_cached_result", MagicMock(return_value=remote_worker._CACHE_MISS))
     monkeypatch.setattr(remote_worker, "_store_cached_result", MagicMock(return_value=False))
     monkeypatch.setattr(algorithms_module, "create", MagicMock(return_value=algorithm))

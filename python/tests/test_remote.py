@@ -489,7 +489,11 @@ def test_worker_force_rerun_bypasses_remote_cache(tmp_path, monkeypatch):
         run_hash="testhash",
         force_rerun=True,
     )
-    monkeypatch.setattr(remote_worker, "_load_remote_cache", MagicMock(return_value=(MagicMock(), "testhash", True)))
+    monkeypatch.setattr(
+        remote_worker,
+        "_load_remote_cache",
+        MagicMock(return_value=(MagicMock(), "testhash", "testhash", True)),
+    )
     get_cached_result = MagicMock(return_value=-75.5)
     monkeypatch.setattr(remote_worker, "_get_cached_result", get_cached_result)
     algorithm = MagicMock()
@@ -517,7 +521,11 @@ def test_worker_cache_transport_skips_output_serialization(tmp_path, monkeypatch
         remote_cache_transport=True,
     )
     result = 6
-    monkeypatch.setattr(remote_worker, "_load_remote_cache", MagicMock(return_value=(MagicMock(), "testhash", False)))
+    monkeypatch.setattr(
+        remote_worker,
+        "_load_remote_cache",
+        MagicMock(return_value=(MagicMock(), "testhash", "testhash", False)),
+    )
     monkeypatch.setattr(remote_worker, "_get_cached_result", MagicMock(return_value=result))
     serialize = MagicMock()
     monkeypatch.setattr(serialization_module, "serialize_outputs", serialize)
@@ -536,10 +544,11 @@ def test_worker_logs_remote_cache_load_failure(tmp_path, monkeypatch, caplog):
     monkeypatch.setattr(remote_cache_module, "get_cache", MagicMock(side_effect=RuntimeError("cache unavailable")))
 
     with caplog.at_level(logging.WARNING, logger=remote_worker.__name__):
-        cache, run_hash, force_rerun = remote_worker._load_remote_cache(input_dir)
+        cache, run_hash, job_cache_key, force_rerun = remote_worker._load_remote_cache(input_dir)
 
     assert cache is None
     assert run_hash == "testhash"
+    assert job_cache_key == "testhash"
     assert force_rerun is False
     record = next(record for record in caplog.records if record.name == remote_worker.__name__)
     assert record.levelno == logging.WARNING
@@ -557,10 +566,11 @@ def test_worker_validates_manifest_before_loading_remote_cache(tmp_path, monkeyp
     monkeypatch.setattr(remote_cache_module, "get_cache", get_cache)
 
     with caplog.at_level(logging.WARNING, logger=remote_worker.__name__):
-        cache, run_hash, force_rerun = remote_worker._load_remote_cache(input_dir)
+        cache, run_hash, job_cache_key, force_rerun = remote_worker._load_remote_cache(input_dir)
 
     assert cache is None
     assert run_hash is None
+    assert job_cache_key is None
     assert force_rerun is False
     get_cache.assert_not_called()
     record = next(record for record in caplog.records if record.name == remote_worker.__name__)
@@ -593,7 +603,11 @@ def test_worker_cache_hit_skips_input_deserialization(tmp_path, monkeypatch):
         settings={},
         run_hash="testhash",
     )
-    monkeypatch.setattr(remote_worker, "_load_remote_cache", MagicMock(return_value=(MagicMock(), "testhash", False)))
+    monkeypatch.setattr(
+        remote_worker,
+        "_load_remote_cache",
+        MagicMock(return_value=(MagicMock(), "testhash", "testhash", False)),
+    )
     monkeypatch.setattr(remote_worker, "_get_cached_result", MagicMock(return_value=6))
     deserialize = MagicMock()
     monkeypatch.setattr(serialization_module, "deserialize_inputs", deserialize)
@@ -621,7 +635,7 @@ def test_worker_cache_preserves_result_shape(tmp_path, result, output_is_tuple):
         "settings": {},
     }
 
-    remote_worker._store_cached_result(cache, "testhash", inputs, result)
+    remote_worker._store_cached_result(cache, "testhash", "testhash", inputs, result)
 
     assert remote_worker._get_cached_result(cache, "testhash") == result
     job = cache.get_job("testhash")
@@ -639,7 +653,7 @@ def test_worker_logs_cache_write_failure(caplog):
     }
 
     with caplog.at_level(logging.WARNING, logger=remote_worker.__name__):
-        remote_worker._store_cached_result(cache, "testhash", inputs, 42)
+        remote_worker._store_cached_result(cache, "testhash", "testhash", inputs, 42)
 
     record = next(record for record in caplog.records if record.name == remote_worker.__name__)
     assert record.levelno == logging.WARNING
@@ -1758,7 +1772,9 @@ class TestRunWithCache:
         backend.submit.assert_called_once()
         assert backend.submit.call_args.args[0]["owner"] == owner
         assert submitted_job.owner == owner
-        assert cache.get_job(_job_cache_key("testhash1234abcd", foreign_job.owner)) == foreign_job
+        persisted_foreign_job = cache.get_job(_job_cache_key("testhash1234abcd", foreign_job.owner))
+        assert persisted_foreign_job is not None
+        assert persisted_foreign_job.to_dict() == foreign_job.to_dict()
         assert cache.get_job(_job_cache_key("testhash1234abcd", owner)).owner == owner
 
     def test_cached_success_without_outputs_retries_fetch(self, tmp_path, monkeypatch):

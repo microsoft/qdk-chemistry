@@ -335,10 +335,16 @@ def _component_directories(plugin_dir: Path, manifest: dict[str, Any], field: st
 def _copy_component_directories(sources: list[Path], destination: Path) -> list[str]:
     copied: list[str] = []
     for source in sources:
+        source_root = source.resolve()
         for source_file in sorted(path for path in source.rglob("*") if path.is_file()):
+            if not source_file.resolve().is_relative_to(source_root):
+                raise PluginInstallError(
+                    f"plugin component file {source_file} resolves outside {source_root} "
+                    "(symlink traversal is not allowed)"
+                )
             target = destination / source_file.relative_to(source)
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source_file, target)
+            shutil.copy2(source_file, target, follow_symlinks=False)
             copied.append(str(target))
     return copied
 
