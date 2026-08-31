@@ -36,7 +36,7 @@ from qdk_chemistry.remote.backends.local import LocalBackend
 from qdk_chemistry.remote.cache.folder import FolderCache
 from qdk_chemistry.remote.cache.tiered import TieredCache
 from qdk_chemistry.remote.job import Job
-from qdk_chemistry.remote.proxy import _build_payload_for, run, submit
+from qdk_chemistry.remote.proxy import _build_payload_for, _job_cache_key, run, submit
 from qdk_chemistry.remote.serialization import (
     FileSerializer,
     deserialize_inputs,
@@ -1737,7 +1737,7 @@ class TestRunWithCache:
         foreign_job.output_hashes = [{"value": -71.0}]
         foreign_job.output_is_tuple = False
         foreign_job.wait = MagicMock()
-        cache.put_job("testhash1234abcd", foreign_job)
+        cache.put_job(_job_cache_key("testhash1234abcd", foreign_job.owner), foreign_job)
         submitted_job = Job(
             job_id="current-job",
             backend="test",
@@ -1758,6 +1758,8 @@ class TestRunWithCache:
         backend.submit.assert_called_once()
         assert backend.submit.call_args.args[0]["owner"] == owner
         assert submitted_job.owner == owner
+        assert cache.get_job(_job_cache_key("testhash1234abcd", foreign_job.owner)) == foreign_job
+        assert cache.get_job(_job_cache_key("testhash1234abcd", owner)).owner == owner
 
     def test_cached_success_without_outputs_retries_fetch(self, tmp_path, monkeypatch):
         """A persisted success is fetched again instead of being resubmitted."""

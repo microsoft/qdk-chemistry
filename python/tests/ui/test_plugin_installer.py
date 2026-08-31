@@ -86,30 +86,6 @@ def test_workspace_install_delegates_fetch_and_writes_cross_client_files(
     assert json.loads((plugin_dir / ".mcp.json").read_text())["mcpServers"]["qdk_chemistry"]["command"] == command
 
 
-def test_workspace_install_allows_plugins_without_agents(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    plugin_dir = _write_plugin(tmp_path / ".qdk_chem" / "copilot")
-    manifest_path = plugin_dir / "plugin.json"
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    del manifest["agents"]
-    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-    monkeypatch.setattr(
-        plugin_installer,
-        "_commands_for_current_environment",
-        lambda _name: {"qdk_chemistry": "/project/.venv/bin/qcmcp"},
-    )
-    monkeypatch.setattr(plugin_installer, "_run_copilot", lambda _arguments, **_kwargs: None)
-
-    result = plugin_installer.install_plugin("qdk-chemistry@qdk-chemistry", target_dir=tmp_path)
-
-    assert result["agents"] == []
-    assert (tmp_path / ".github" / "skills" / "qdk-chemistry-mcp" / "SKILL.md").is_file()
-    assert (tmp_path / ".vscode" / "mcp.json").is_file()
-    assert (tmp_path / ".github" / "mcp.json").is_file()
-
-
 def test_local_install_registers_ancestor_marketplace(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

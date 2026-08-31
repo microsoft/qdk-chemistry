@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 _CACHE_MISS = object()
 
 
-def _load_remote_cache(input_dir: Path) -> tuple[Any, str | None, bool]:
+def _load_remote_cache(input_dir: Path) -> tuple[Any, str | None, str | None, bool]:
     """Create the cache described by an input manifest, when available.
 
     Args:
@@ -29,25 +29,27 @@ def _load_remote_cache(input_dir: Path) -> tuple[Any, str | None, bool]:
 
     """
     run_hash = None
+    job_cache_key = None
     force_rerun = False
     try:
         from qdk_chemistry.remote.serialization import _load_manifest  # noqa: PLC0415
 
         manifest = _load_manifest(input_dir / "manifest.json")
         run_hash = manifest.get("run_hash")
+        job_cache_key = manifest.get("job_cache_key", run_hash)
         force_rerun = manifest.get("force_rerun", False)
         cache_info = manifest.get("remote_cache")
         if not cache_info or not cache_info.get("name"):
-            return None, run_hash, force_rerun
+            return None, run_hash, job_cache_key, force_rerun
 
         from qdk_chemistry.remote.cache import get_cache  # noqa: PLC0415
 
         cache_name = cache_info["name"]
         cache_config = {key: value for key, value in cache_info.items() if key != "name"}
-        return get_cache(cache_name, **cache_config), run_hash, force_rerun
+        return get_cache(cache_name, **cache_config), run_hash, job_cache_key, force_rerun
     except Exception:  # noqa: BLE001
         logger.warning("Failed to load remote cache", exc_info=True)
-        return None, run_hash, force_rerun
+        return None, run_hash, job_cache_key, force_rerun
 
 
 def _get_cached_result(cache: Any, run_hash: str | None) -> Any:
@@ -91,12 +93,15 @@ def _get_cached_result(cache: Any, run_hash: str | None) -> Any:
         return _CACHE_MISS
 
 
-def _store_cached_result(cache: Any, run_hash: str | None, inputs: dict[str, Any], result: Any) -> bool:
+def _store_cached_result(
+    cache: Any, run_hash: str | None, job_cache_key: str | None, inputs: dict[str, Any], result: Any
+) -> bool:
     """Persist a completed result to the compute node's cache when configured.
 
     Args:
         cache: Cache backend receiving the completed result.
         run_hash: Deterministic execution hash for the result.
+        job_cache_key: Owner-scoped cache key for the job record.
         inputs: Deserialized algorithm metadata and arguments.
         result: Completed algorithm result to persist.
 
@@ -104,7 +109,7 @@ def _store_cached_result(cache: Any, run_hash: str | None, inputs: dict[str, Any
         Whether the completed result was successfully persisted in the cache.
 
     """
-    if cache is None or run_hash is None:
+    if cache is None or run_hash is None or job_cache_key is None:
         return False
 
     try:
@@ -119,7 +124,7 @@ def _store_cached_result(cache: Any, run_hash: str | None, inputs: dict[str, Any
                 cache.put_data(entry["hash"], item)
 
         cache.put_job(
-            run_hash,
+            job_cache_key,
             Job(
                 job_id=run_hash[:12],
                 backend="remote",
@@ -161,8 +166,8 @@ def execute_job(input_dir: str | Path, output_dir: str | Path) -> Any:
     input_path = Path(input_dir)
     output_path = Path(output_dir)
     cache_transport = _load_manifest(input_path / "manifest.json").get("remote_cache_transport", False)
-    cache, run_hash, force_rerun = _load_remote_cache(input_path)
-    result = _CACHE_MISS if force_rerun else _get_cached_result(cache, run_hash)
+    cache, run_hash, job_cache_key, force_rerun = _load_remote_cache(input_path)
+    result = _CACHE_MISS if force_rerun else _get_cached_result(cache, job_cache_key)
     cached_result = result is not _CACHE_MISS
 
     if result is _CACHE_MISS:
@@ -171,7 +176,7 @@ def execute_job(input_dir: str | Path, output_dir: str | Path) -> Any:
         for key, value in inputs["settings"].items():
             algorithm.settings().set(key, value)
         result = algorithm.run(*inputs["args"], **inputs["kwargs"])
-        cached_result = _store_cached_result(cache, run_hash, inputs, result)
+        cached_result = _store_cached_result(cache, run_hash, job_cache_key, inputs, result)
 
     if cache_transport:
         if not cached_result:

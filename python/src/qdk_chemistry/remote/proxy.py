@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -80,6 +82,16 @@ def _store_result(cache: Any, run_hash: str, job: Any, result: Any) -> None:
             cache.put_data(entry["hash"], item)
 
     cache.put_job(run_hash, job)
+
+
+def _job_cache_key(run_hash: str, owner: dict[str, str | None] | None) -> str:
+    """Return the cache key for a job record without changing run identity."""
+    if owner is None:
+        return run_hash
+
+    owner_json = json.dumps(owner, sort_keys=True, separators=(",", ":"))
+    owner_digest = hashlib.sha256(owner_json.encode()).hexdigest()[:16]
+    return f"{owner_digest}.{run_hash}"
 
 
 def _reconstruct_from_cache(cache: Any, job: Any) -> Any:
@@ -253,10 +265,12 @@ def run(
     run_hash = payload.get("run_hash")
     if run_hash is None:
         return _run_uncached(algorithm, remote, args, kwargs)
+    job_cache_key = _job_cache_key(run_hash, _owner)
+    payload["job_cache_key"] = job_cache_key
 
     # 1) Check the cache (skip on force_rerun)
     if not force_rerun:
-        job = resolved_cache.get_job(run_hash)
+        job = resolved_cache.get_job(job_cache_key)
 
         if job is not None:
             owner_matches = _owner is None or job.owner == _owner
@@ -278,7 +292,7 @@ def run(
             # 1c) Execution finished but cached outputs are unavailable → fetch again
             if job.is_successful and owner_matches:
                 result = job.fetch()
-                _store_result(resolved_cache, run_hash, job, result)
+                _store_result(resolved_cache, job_cache_key, job, result)
                 return result
 
             # 1d) Failed → fall through and re-submit
@@ -315,14 +329,14 @@ def run(
             job.owner = _owner
             job.attach_backend(backend)
             job.run_hash = run_hash
-            resolved_cache.put_job(run_hash, job)
+            resolved_cache.put_job(job_cache_key, job)
             if _on_job_submitted is not None:
                 _on_job_submitted(job)
 
             final_status = job.wait()
 
             if not job.is_successful:
-                resolved_cache.put_job(run_hash, job)
+                resolved_cache.put_job(job_cache_key, job)
                 raise RuntimeError(
                     f"Remote job {job.job_id} ended with status: {final_status.status}\n"
                     f"Error: {final_status.error or 'unknown'}\nLogs:\n{final_status.logs}"
@@ -332,7 +346,7 @@ def run(
             # from there directly — avoiding an expensive fetch/download.
             result = _CACHE_MISS
             if resolved_remote_cache is not None and resolved_remote_cache.is_shared:
-                remote_job = resolved_remote_cache.get_job(run_hash)
+                remote_job = resolved_remote_cache.get_job(job_cache_key)
                 if remote_job is not None and remote_job.output_hashes is not None:
                     result = _reconstruct_from_cache(resolved_remote_cache, remote_job)
                     if result is not _CACHE_MISS:
@@ -368,5 +382,5 @@ def run(
             owner=_owner,
         )
 
-    _store_result(resolved_cache, run_hash, job, result)
+    _store_result(resolved_cache, job_cache_key, job, result)
     return result

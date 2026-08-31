@@ -126,10 +126,13 @@ repos:
     require_serial: true
     files: >
       (?x)^(
+        VERSION|
         python/CMakeLists\.txt|
         cpp/CMakeLists\.txt|
         docs/source/conf\.py|
+        \.github/scripts/check_version_alignment\.py|
         copilot-plugins/qdk-chemistry/plugin\.json|
+        copilot-plugins/qdk-chemistry/skills/[^/]+/SKILL\.md|
         \.github/plugin/marketplace\.json
       )$
 

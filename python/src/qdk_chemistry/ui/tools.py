@@ -651,11 +651,14 @@ def describe_algorithm(algorithm_type: str, algorithm_name: str | None = None) -
 
     default_name = algorithms.show_default(algorithm_type)
     selected_name = algorithm_name
+    using_fallback = selected_name is None and default_name not in available_names
     if selected_name is None:
         selected_name = default_name if default_name in available_names else sorted(available_names)[0]
 
     instance = algorithms.create(algorithm_type, selected_name)
     canonical_name = instance.name()
+    if using_fallback:
+        selected_name = canonical_name
     aliases = set(instance.aliases())
     aliases.add(canonical_name)
     setting_schema = []
