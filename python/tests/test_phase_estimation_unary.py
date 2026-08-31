@@ -67,6 +67,11 @@ def _decode(counts: dict[str, int], num_bits: int, *, resolve_positive_branch: b
 class TestUnaryIterationQsharp:
     """Statevector checks of the unary-iteration primitives against exact references."""
 
+    @pytest.mark.parametrize("num_actions", [2, 3, 5, 6, 7, 9, 10, 13])
+    def test_classical_action_index_matches_every_address(self, num_actions: int) -> None:
+        """The unlookup mirror must include the circuit's routing of padded addresses."""
+        assert QSHARP_UTILS.UnaryIteration.TestUnaryIterationActionIndex(num_actions)
+
     @pytest.mark.parametrize("num_actions", [2, 4, 8])
     def test_superposed_address_stays_coherent(self, num_actions):
         """A superposed address must produce sum_a |a>|onehot(a)> with no ancilla residue."""
@@ -104,6 +109,17 @@ class TestUnaryIterationQsharp:
 
 class TestBlockEncodingAgnosticSchedule:
     """The signed-power schedule must work for any self-inverse block encoding."""
+
+    @pytest.mark.parametrize("num_queries", [1, 2, 3, 5, 7])
+    def test_resource_optimization_preserves_logical_counts(self, num_queries):
+        """Repeating one representative slot must match the literal schedule's costs."""
+        operation = QSHARP_UTILS.UnaryPhaseEstimation.TestSignedPowerScheduleResources
+        context = get_qsharp_context()
+
+        optimized = context.logical_counts(operation, num_queries, True)
+        direct = context.logical_counts(operation, num_queries, False)
+
+        assert optimized == direct
 
     @pytest.mark.parametrize(
         ("num_queries", "address_value"),

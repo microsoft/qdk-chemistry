@@ -21,8 +21,9 @@ _DATA_1D = [
 ]
 
 _DATA_2D = [
-    [[True, False, True], [False, True, True], [True, True, False], [False, False, True]],
-    [[False, True, False], [True, True, True], [False, False, False], [True, False, False]],
+    [[True, False, True], [False, True, True], [True, True, False]],
+    [[False, True, False], [True, True, True], [False, False, False]],
+    [[True, False, False], [False, False, True], [True, True, True]],
 ]
 
 
