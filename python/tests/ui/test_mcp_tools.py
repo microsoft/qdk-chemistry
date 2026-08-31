@@ -222,6 +222,24 @@ def test_describe_algorithm_handles_all_registered_types():
         assert result["result"]["algorithm_type"] == algorithm_type
 
 
+def test_describe_algorithm_falls_back_when_default_is_unavailable(monkeypatch):
+    original_create = srv.algorithms.create
+
+    def create(algorithm_type, algorithm_name=None, **kwargs):
+        assert algorithm_name is not None
+        return original_create(algorithm_type, algorithm_name, **kwargs)
+
+    monkeypatch.setattr(srv.algorithms, "create", create)
+    monkeypatch.setattr(srv.algorithms, "show_default", lambda _: "unavailable_default")
+
+    result = srv.describe_algorithm(algorithm_type="nuclear_derivative_calculator")
+
+    assert result["status"] == "ok"
+    assert result["result"]["name"] == "qdk"
+    assert result["result"]["requested_name"] == "qdk"
+    assert result["result"]["is_default"] is False
+
+
 def test_describe_algorithm_returns_settings_schema():
     result = srv.describe_algorithm(algorithm_type="nuclear_derivative_calculator", algorithm_name="qdk")
 

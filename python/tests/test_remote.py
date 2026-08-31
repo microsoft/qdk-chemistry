@@ -1734,6 +1734,8 @@ class TestRunWithCache:
             run_hash="testhash1234abcd",
             owner={"workspace_root": "/workspace", "project_name": "project-a"},
         )
+        foreign_job.output_hashes = [{"value": -71.0}]
+        foreign_job.output_is_tuple = False
         foreign_job.wait = MagicMock()
         cache.put_job("testhash1234abcd", foreign_job)
         submitted_job = Job(
@@ -1752,6 +1754,7 @@ class TestRunWithCache:
         assert run(algo, cache=cache, remote=backend, _owner=owner) == -75.5
 
         foreign_job.wait.assert_not_called()
+        assert foreign_job.status == "running"
         backend.submit.assert_called_once()
         assert backend.submit.call_args.args[0]["owner"] == owner
         assert submitted_job.owner == owner

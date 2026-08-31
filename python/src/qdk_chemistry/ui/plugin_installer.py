@@ -381,9 +381,11 @@ def _ignore_workspace_state(workspace: Path) -> None:
 def _deploy_workspace(plugin_dir: Path, plugin_name: str, workspace: Path) -> dict[str, Any]:
     manifest = _load_object(_manifest_path(plugin_dir))
     workspace.mkdir(parents=True, exist_ok=True)
-    agents = _copy_component_directories(
-        _component_directories(plugin_dir, manifest, "agents"), workspace / ".github" / "agents"
-    )
+    agents = []
+    if "agents" in manifest:
+        agents = _copy_component_directories(
+            _component_directories(plugin_dir, manifest, "agents"), workspace / ".github" / "agents"
+        )
     skills = _copy_component_directories(
         _component_directories(plugin_dir, manifest, "skills"), workspace / ".github" / "skills"
     )

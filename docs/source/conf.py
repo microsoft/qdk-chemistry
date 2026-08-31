@@ -336,9 +336,8 @@ def normalize_autodoc_docstring(app, what, name, obj, options, lines):
         rewritten = re.sub(r"(?<![\\*])\*args", r"\\*args", rewritten)
         if rewritten != line:
             lines[idx] = rewritten
-    owner = name.rsplit(".", 1)[0]
     module = getattr(obj, "__module__", "")
-    if options is not None and module and module != owner:
+    if options is not None and module and not name.startswith(f"{module}."):
         if sphinx_version_info >= (9, 0):
             options.no_index = True
         else:

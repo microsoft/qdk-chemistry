@@ -100,8 +100,7 @@ qc plugin rebind qdk-chemistry
 VS Code discovers user plugins installed by Copilot CLI and workspace assets
 written by `--target-dir`. The plugin supplies:
 
-- the `quantum-agent`, `chemist`, `researcher`, `reviewer`, and `reporter` agents;
-- QDK Chemistry overview, MCP, coding, and remote-execution skills; and
+- QDK Chemistry overview, MCP, coding, remote-execution, and visualization skills; and
 - the `qdk_chemistry` MCP server configuration.
 
 Plugin MCP processes start in the installed plugin directory. Call

@@ -649,9 +649,13 @@ def describe_algorithm(algorithm_type: str, algorithm_name: str | None = None) -
             "settings": [],
         }
 
-    instance = algorithms.create(algorithm_type, algorithm_name)
+    default_name = algorithms.show_default(algorithm_type)
+    selected_name = algorithm_name
+    if selected_name is None:
+        selected_name = default_name if default_name in available_names else sorted(available_names)[0]
+
+    instance = algorithms.create(algorithm_type, selected_name)
     canonical_name = instance.name()
-    selected_name = algorithm_name or canonical_name
     aliases = set(instance.aliases())
     aliases.add(canonical_name)
     setting_schema = []
@@ -666,7 +670,6 @@ def describe_algorithm(algorithm_type: str, algorithm_name: str | None = None) -
             }
         )
 
-    default_name = algorithms.show_default(algorithm_type)
     return {
         "algorithm_type": algorithm_type,
         "requested_name": selected_name,

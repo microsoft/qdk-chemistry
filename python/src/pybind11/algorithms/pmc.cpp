@@ -155,8 +155,7 @@ Returns:
 
 )");
 
-  pmc_calculator.def("aliases",
-                     &ProjectedMultiConfigurationCalculator::aliases,
+  pmc_calculator.def("aliases", &ProjectedMultiConfigurationCalculator::aliases,
                      R"(
 The algorithm's aliases.
 

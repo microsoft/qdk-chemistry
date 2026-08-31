@@ -264,7 +264,7 @@ def run(
                 job.attach_backend(remote)
 
             # 1a) Completed with outputs → reconstruct
-            if job.output_hashes is not None:
+            if owner_matches and job.output_hashes is not None:
                 result = _reconstruct_from_cache(resolved_cache, job)
                 if result is not _CACHE_MISS:
                     return result

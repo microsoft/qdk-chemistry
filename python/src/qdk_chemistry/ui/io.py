@@ -83,11 +83,11 @@ def check_output_exists(filename: str, data_class: type | None = None) -> str | 
     return check_output_path_exists(filename, data_class)
 
 
-def load_data_object(filename: str, data_class):
+def load_data_object(filename: str | os.PathLike[str], data_class):
     """Load a data object from either json or hdf5 file based on extension.
 
     Args:
-        filename (str): Filename with extension (.json or .hdf5/.h5)
+        filename: Path to a file with extension (.json or .hdf5/.h5).
         data_class: The qdk_chemistry.data class to instantiate
 
     Returns:
@@ -97,17 +97,15 @@ def load_data_object(filename: str, data_class):
         ValueError: If file extension is not supported
 
     """
-    filename = os.path.basename(filename)  # Strip path if provided
-
     return _load_data_object_from_path(filename, data_class)
 
 
-def save_data_object(data_obj, filename: str):
+def save_data_object(data_obj, filename: str | os.PathLike[str]):
     """Save a data object to either json or hdf5 file based on extension.
 
     Args:
         data_obj: The qdk_chemistry data object to save
-        filename (str): Filename with extension (.json or .hdf5/.h5)
+        filename: Path to a file with extension (.json or .hdf5/.h5).
 
     Returns:
         str: The filename where data was saved
@@ -116,7 +114,7 @@ def save_data_object(data_obj, filename: str):
         ValueError: If file extension is not supported
 
     """
-    filename = os.path.basename(filename)  # Strip path if provided
+    filename = os.fspath(filename)
 
     if filename.endswith(".json"):
         data_obj.to_json_file(filename)
