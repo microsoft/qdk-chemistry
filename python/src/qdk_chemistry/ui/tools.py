@@ -659,8 +659,7 @@ def describe_algorithm(algorithm_type: str, algorithm_name: str | None = None) -
     canonical_name = instance.name()
     if using_fallback:
         selected_name = canonical_name
-    aliases = set(instance.aliases())
-    aliases.add(canonical_name)
+    aliases = instance.aliases()
     setting_schema = []
     for name, python_type, default, description, limits in algorithms.inspect_settings(algorithm_type, selected_name):
         setting_schema.append(

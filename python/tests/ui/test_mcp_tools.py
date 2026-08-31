@@ -246,7 +246,7 @@ def test_describe_algorithm_returns_settings_schema():
     assert result["status"] == "ok"
     description = result["result"]
     assert description["name"] == "qdk"
-    assert {"analytical_gradient", "qdk"} <= set(description["aliases"])
+    assert description["aliases"] == ["analytical_gradient", "qdk"]
     assert description["is_default"] is True
     assert description["default_settings"]["compute_hessian"] is False
     settings = {setting["name"]: setting for setting in description["settings"]}

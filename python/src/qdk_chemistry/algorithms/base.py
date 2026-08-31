@@ -391,15 +391,32 @@ class AlgorithmFactory(ABC):
         """
         instance = generator()
         name = instance.name()
-        aliases = set(instance.aliases()) | {name}
+        aliases = instance.aliases()
+        if not isinstance(aliases, list):
+            raise TypeError(f"Algorithm '{name}' aliases must be returned as a list")
+        if not name:
+            raise ValueError("Algorithm name must not be empty")
+        if name not in aliases:
+            raise ValueError(f"Algorithm '{name}' must include its canonical name in aliases")
+        if any(not isinstance(alias, str) or not alias for alias in aliases):
+            raise ValueError(f"Algorithm '{name}' aliases must be non-empty strings")
+        if len(aliases) != len(set(aliases)):
+            raise ValueError(f"Algorithm '{name}' aliases must be unique")
+        if name in self._registry or name in self._aliases:
+            raise _DuplicateRegistrationError(
+                f"Algorithm factory for {self.algorithm_type_name()}: "
+                f"algorithm with name/alias '{name}' already exists in registry"
+            )
         for alias in aliases:
-            if alias in self._aliases:
+            if alias == name:
+                continue
+            if alias in self._registry or alias in self._aliases:
                 raise _DuplicateRegistrationError(
                     f"Algorithm factory for {self.algorithm_type_name()}: "
                     f"algorithm with name/alias '{alias}' already exists in registry"
                 )
         self._registry[name] = generator
-        self._aliases.update(dict.fromkeys(aliases, name))
+        self._aliases.update(dict.fromkeys((alias for alias in aliases if alias != name), name))
 
     def unregister_instance(self, name: str) -> bool:
         """Remove an algorithm implementation from this factory.
@@ -450,7 +467,7 @@ class AlgorithmFactory(ABC):
             ...     scf = factory.create("pyscf")
 
         """
-        return key in self._registry
+        return key in self._registry or key in self._aliases
 
     def clear(self) -> None:
         """Remove all registered algorithms from this factory.

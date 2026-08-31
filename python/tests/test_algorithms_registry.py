@@ -607,7 +607,7 @@ _REGISTERED_PAIRS = _all_registered_pairs()
     ids=[f"{t}/{n}" for t, n in _REGISTERED_PAIRS],
 )
 def test_all_registered_algorithms_expose_aliases(algorithm_type: str, algorithm_name: str):
-    """Every registered algorithm exposes aliases through the Python API."""
+    """Every registered algorithm exposes its canonical name and lookup aliases."""
     try:
         algorithm = registry.create(algorithm_type, algorithm_name)
     except (ImportError, RuntimeError) as exc:
@@ -616,8 +616,12 @@ def test_all_registered_algorithms_expose_aliases(algorithm_type: str, algorithm
     aliases = algorithm.aliases()
 
     assert isinstance(aliases, list)
+    assert algorithm.name() == algorithm_name
     assert algorithm.name() in aliases
-    assert algorithm_name in aliases
+    for alias in aliases:
+        if alias != algorithm.name():
+            assert alias not in registry.available(algorithm_type)
+        assert registry.create(algorithm_type, alias).name() == algorithm.name()
 
 
 @pytest.mark.parametrize(
@@ -789,7 +793,7 @@ class TestRegistryRegisterUnregister:
                 return "duplicate_python_algorithm"
 
             def aliases(self):
-                """Return the shared name as the sole alias."""
+                """Return the canonical name as the sole alias."""
                 return [self.name()]
 
             def settings(self):
@@ -828,7 +832,7 @@ class TestRegistryRegisterUnregister:
                 return "aliased_python_algorithm"
 
             def aliases(self):
-                """Return both test registry names."""
+                """Return the canonical name and additional test alias."""
                 return [self.name(), "python_algorithm_alias"]
 
             def settings(self):
@@ -932,7 +936,7 @@ class TestRegistryRegisterUnregister:
                 return "aliased_python_algorithm"
 
             def aliases(self):
-                """Return the primary name and test alias."""
+                """Return the canonical name and additional test alias."""
                 return [self.name(), "python_algorithm_alias"]
 
             def settings(self):
@@ -947,7 +951,7 @@ class TestRegistryRegisterUnregister:
                 return "conflicting_python_algorithm"
 
             def aliases(self):
-                """Return a fresh primary name and an occupied alias."""
+                """Return a fresh canonical name and occupied alias."""
                 return [self.name(), "python_algorithm_alias"]
 
         registry.register(AliasedAlgorithm)
@@ -958,6 +962,38 @@ class TestRegistryRegisterUnregister:
             assert "conflicting_python_algorithm" not in registry.available("expectation_estimator")
         finally:
             registry.unregister("expectation_estimator", "aliased_python_algorithm")
+
+    def test_python_factory_rejects_missing_canonical_name_alias(self):
+        """Python registration enforces that aliases include the canonical name."""
+
+        class InvalidAliasesAlgorithm:
+            def type_name(self):
+                return "expectation_estimator"
+
+            def name(self):
+                return "invalid_python_aliases"
+
+            def aliases(self):
+                return ["other_name"]
+
+        with pytest.raises(ValueError, match="must include its canonical name"):
+            registry.register(InvalidAliasesAlgorithm)
+
+    def test_cpp_factory_rejects_missing_canonical_name_alias(self):
+        """C++ registration enforces that aliases include the canonical name."""
+
+        class InvalidAliasesScf(ScfSolver):
+            def name(self):
+                return "invalid_cpp_aliases"
+
+            def aliases(self):
+                return ["other_name"]
+
+            def _run_impl(self, structure, charge, spin_multiplicity):
+                pass
+
+        with pytest.raises(ValueError, match="must include its canonical name"):
+            registry.register(InvalidAliasesScf)
 
     def test_unregister_custom_algorithm(self):
         """Test unregistering a custom algorithm."""
