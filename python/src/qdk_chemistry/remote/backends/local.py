@@ -274,6 +274,7 @@ class LocalBackend(RemoteBackend):
             settings=payload["settings"],
             run_hash=payload.get("run_hash"),
             job_cache_key=payload.get("job_cache_key"),
+            owner=payload.get("owner"),
             input_hashes=payload.get("input_hashes"),
             force_rerun=payload.get("force_rerun", False),
             remote_cache=payload.get("remote_cache"),

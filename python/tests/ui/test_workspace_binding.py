@@ -51,10 +51,10 @@ def test_configure_workspace_sets_stable_absolute_root(tmp_path) -> None:
 
 
 def test_configure_workspace_never_changes_cwd(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
-    chdir = pytest.fail
-    monkeypatch.setattr(os, "chdir", chdir)
+    with monkeypatch.context() as context:
+        context.setattr(os, "chdir", pytest.fail)
 
-    assert workspace.configure_workspace(tmp_path)["bound"] is True
+        assert workspace.configure_workspace(tmp_path)["bound"] is True
 
 
 def test_plugin_middleware_rejects_unbound_tool(monkeypatch: pytest.MonkeyPatch) -> None:

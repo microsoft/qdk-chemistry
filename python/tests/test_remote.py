@@ -558,6 +558,7 @@ def test_shared_cache_transport_scopes_worker_and_client_jobs_by_owner(tmp_path,
             settings={},
             run_hash=run_hash,
             job_cache_key=job_cache_key,
+            owner=owner,
             remote_cache={"name": "folder", "path": str(tmp_path / "shared"), "is_shared": True},
             remote_cache_transport=True,
         )

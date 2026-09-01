@@ -557,6 +557,7 @@ def serialize_inputs(
     *,
     run_hash: str | None = None,
     job_cache_key: str | None = None,
+    owner: dict[str, str | None] | None = None,
     input_hashes: dict[str, str] | None = None,
     force_rerun: bool = False,
     remote_cache: dict[str, Any] | None = None,
@@ -574,6 +575,7 @@ def serialize_inputs(
         settings: Algorithm settings dictionary.
         run_hash: Optional pre-computed algorithm run hash.
         job_cache_key: Optional cache key for the remote job record.
+        owner: Optional workspace and project permitted to manage the job.
         input_hashes: Optional dict mapping input names to their content hashes.
         force_rerun: Whether the compute node must skip its cache lookup.
         remote_cache: Optional coordinates passed to the remote cache factory, ``get_cache()``.
@@ -600,6 +602,8 @@ def serialize_inputs(
         manifest["run_hash"] = run_hash
     if job_cache_key is not None:
         manifest["job_cache_key"] = job_cache_key
+    if owner is not None:
+        manifest["owner"] = owner
     if input_hashes is not None:
         manifest["input_hashes"] = input_hashes
     if force_rerun:
@@ -705,6 +709,7 @@ def deserialize_inputs(directory: str | Path, *, cache: CacheBackend | None = No
         "args": args,
         "kwargs": kwargs,
         "run_hash": manifest.get("run_hash"),
+        "owner": manifest.get("owner"),
         "input_hashes": manifest.get("input_hashes"),
         "force_rerun": manifest.get("force_rerun", False),
         "remote_cache": manifest.get("remote_cache"),

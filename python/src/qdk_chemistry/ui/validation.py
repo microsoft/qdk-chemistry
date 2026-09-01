@@ -67,19 +67,26 @@ def resolve_project_file(
 
     native_path = Path(value)
     if native_path.is_absolute():
-        if not allow_absolute:
-            raise ValueError(f"Project filename must be relative: {value!r}")
         try:
             candidate = native_path.resolve()
         except (OSError, RuntimeError) as error:
             raise ValueError(f"Cannot resolve project filename {value!r}: {error}") from error
         if not candidate.is_relative_to(project_dir):
             raise ValueError(f"Project filename resolves outside project directory: {value!r}")
+        if not allow_absolute:
+            raise ValueError(f"Project filename must be relative: {value!r}")
         return candidate
 
     path_flavors = (PurePosixPath(value), PureWindowsPath(value))
     if any(path.is_absolute() or path.anchor or path.drive for path in path_flavors):
         raise ValueError(f"Project filename must be relative: {value!r}")
+    if any(".." in path.parts for path in path_flavors):
+        try:
+            candidate = (project_dir / value).resolve()
+        except (OSError, RuntimeError) as error:
+            raise ValueError(f"Cannot resolve project filename {value!r}: {error}") from error
+        if not candidate.is_relative_to(project_dir):
+            raise ValueError(f"Project filename resolves outside project directory: {value!r}")
     if any(part in {"", ".", ".."} for path in path_flavors for part in path.parts):
         raise ValueError(f"Project filename contains an invalid path component: {value!r}")
     if not allow_nested and any(len(path.parts) != 1 for path in path_flavors):

@@ -140,6 +140,7 @@ def _store_cached_result(
                 input_hashes=inputs.get("input_hashes"),
                 output_hashes=output_hashes,
                 output_is_tuple=output_is_tuple,
+                owner=inputs.get("owner"),
             ),
         )
         return True
