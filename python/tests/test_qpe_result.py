@@ -335,6 +335,58 @@ def test_qpe_result_from_phase_fraction_qubitization():
     assert result.metadata is None
 
 
+def test_qpe_result_records_every_branch_a_converter_reports():
+    """A converter that folds several energies onto one phase fills ``branching`` with all of them."""
+    result = QpeResult.from_phase_fraction(
+        method="qubitization_qpe",
+        phase_fraction=0.1,
+        eigenvalue_from_phase=lambda _: (1.5, -0.5, 0.25),
+    )
+
+    assert np.allclose(
+        result.branching,
+        (-0.5, 0.25, 1.5),
+        rtol=float_comparison_relative_tolerance,
+        atol=float_comparison_absolute_tolerance,
+    )
+    assert np.isclose(
+        result.raw_energy,
+        -0.5,
+        rtol=float_comparison_relative_tolerance,
+        atol=float_comparison_absolute_tolerance,
+    )
+
+
+def test_qpe_result_keeps_a_caller_supplied_branching():
+    """An algorithm that resolved the alias itself owns both ``branching`` and ``resolved_energy``."""
+    result = QpeResult.from_phase_fraction(
+        method="qubitization_qpe",
+        phase_fraction=0.1,
+        eigenvalue_from_phase=lambda _: (1.5, -0.5),
+        branching=(-0.5, 1.5, 2.5),
+        resolved_energy=1.5,
+    )
+
+    assert np.allclose(
+        result.branching,
+        (-0.5, 1.5, 2.5),
+        rtol=float_comparison_relative_tolerance,
+        atol=float_comparison_absolute_tolerance,
+    )
+    assert np.isclose(
+        result.raw_energy,
+        -0.5,
+        rtol=float_comparison_relative_tolerance,
+        atol=float_comparison_absolute_tolerance,
+    )
+    assert np.isclose(
+        result.resolved_energy,
+        1.5,
+        rtol=float_comparison_relative_tolerance,
+        atol=float_comparison_absolute_tolerance,
+    )
+
+
 @pytest.mark.parametrize(
     ("phi", "scale", "expected"),
     [

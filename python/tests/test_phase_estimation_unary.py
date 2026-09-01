@@ -26,6 +26,7 @@ from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
+from tests.reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
 
 def _address_qubits(num_actions: int) -> int:
@@ -191,6 +192,21 @@ class TestPhaseDecoding:
             assert 0.0 <= positive.canonical_phase_fraction <= 0.25
             assert positive.canonical_phase_fraction + negative.canonical_phase_fraction == pytest.approx(0.5)
             assert positive.raw_energy == pytest.approx(-negative.raw_energy)
+            # The flag names which of the two branches is resolved, not which magnitude is reported.
+            assert np.isclose(
+                positive.resolved_energy,
+                positive.raw_energy,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            assert np.isclose(
+                negative.resolved_energy,
+                negative.raw_energy,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            assert positive.raw_energy >= 0.0
+            assert negative.raw_energy <= 0.0
 
     def test_branching_is_still_two_candidates_at_the_degenerate_phase(self):
         """The half-way bin is the one that collapses, so pin it directly."""

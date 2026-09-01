@@ -19,7 +19,12 @@ from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import BlockEncodingContainer, LCUContainer
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 
-from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+from .reference_tolerances import (
+    float_comparison_absolute_tolerance,
+    float_comparison_relative_tolerance,
+    qpe_energy_tolerance,
+    qpe_phase_fraction_tolerance,
+)
 
 
 def _lcu_container() -> LCUContainer:
@@ -384,62 +389,44 @@ class TestLCUContainer:
         lam = hamiltonian.schatten_norm
 
         # φ=0 → E=λ
-        assert np.isclose(
+        assert np.allclose(
             container.eigenvalue_from_phase(0.0),
             (lam,),
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
-        ).all()
+        )
         # φ=0.25 → E=0
-        assert np.isclose(
-            container.eigenvalue_from_phase(0.25),
-            (0.0,),
-            atol=float_comparison_absolute_tolerance,
-        ).all()
+        assert np.allclose(container.eigenvalue_from_phase(0.25), (0.0,), atol=float_comparison_absolute_tolerance)
 
-    def test_walk_container_power_one_has_a_single_branch(self):
-        """A power-one walk inverts uniquely, so the branch tuple holds one eigenvalue."""
-        container = LCUWalkContainer(_lcu_container(), power=1, scale=6.0)
+    def test_walk_container_squared_folds_the_energy_sign(self):
+        """Squaring the walk sends θ and π-θ to the same eigenphases, so both signs are reported."""
+        container = LCUWalkContainer(_lcu_container(), power=2, scale=6.0)
+        energy = 6.0 * np.cos(np.pi * 0.1)
 
-        branches = container.eigenvalue_from_phase(0.1)
-
-        assert len(branches) == 1
-        assert np.isclose(
-            branches[0],
-            6.0 * np.cos(2 * np.pi * 0.1),
+        assert np.allclose(
+            container.eigenvalue_from_phase(0.1),
+            (-energy, energy),
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
 
     @pytest.mark.parametrize("power", [1, 2, 3, 4])
     @pytest.mark.parametrize("energy", [-5.5, -1.25, 0.0, 3.0, 6.0])
-    def test_walk_container_branches_contain_the_true_energy(self, power, energy):
-        """Every energy a powered walk can encode is recovered by one of the reported branches."""
+    def test_walk_container_branches_are_sound_and_complete(self, power, energy):
+        """Every branch re-encodes to the measured phase, and the true energy is among them."""
         lam = 6.0
         container = LCUWalkContainer(_lcu_container(), power=power, scale=lam)
         phase_fraction = (power * np.arccos(energy / lam) / (2 * np.pi)) % 1.0
 
-        branches = container.eigenvalue_from_phase(phase_fraction)
+        branches = np.array(container.eigenvalue_from_phase(phase_fraction))
 
         assert len(branches) <= power
-        assert list(branches) == sorted(branches)
-        assert any(
-            np.isclose(branch, energy, rtol=float_comparison_relative_tolerance, atol=1e-9) for branch in branches
-        )
-
-    def test_walk_container_reports_every_folded_branch(self):
-        """A powered walk that folds several energies onto a phase reports all of them."""
-        container = LCUWalkContainer(_lcu_container(), power=2, scale=6.0)
-
-        branches = container.eigenvalue_from_phase(0.1)
-
-        assert len(branches) == 2
-        assert np.isclose(
-            branches,
-            sorted((6.0 * np.cos(np.pi * 0.1), 6.0 * np.cos(np.pi * 1.1))),
-            rtol=float_comparison_relative_tolerance,
-            atol=float_comparison_absolute_tolerance,
-        ).all()
+        assert np.all(np.diff(branches) > 0.0)
+        # Soundness: pushing a branch back through W^p must reproduce the measured phase.
+        drift = (power * np.arccos(np.clip(branches / lam, -1.0, 1.0)) / (2 * np.pi) - phase_fraction) % 1.0
+        assert np.allclose(np.minimum(drift, 1.0 - drift), 0.0, atol=qpe_phase_fraction_tolerance)
+        # Completeness: the energy the phase was built from is one of them.
+        assert np.isclose(branches, energy, atol=qpe_energy_tolerance).any()
 
     def test_walk_container_powered_branches_survive_serialization(self):
         """Serialized walk containers keep the power that defines their inverse branches."""
