@@ -599,11 +599,11 @@ jobs:
       id: env2
       run: |
         # qdk TUs that include libint2 engine.impl.h peak at several GB under MSVC;
-        # cap concurrency by available RAM (~4 GB/job) to avoid C1060 (compiler out
+        # cap concurrency by available RAM (~6 GB/job) to avoid C1060 (compiler out
         # of heap space). Scales up automatically on a larger runner.
         $cpu = [int]$env:NUMBER_OF_PROCESSORS
         $ramGB = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
-        $jobs = [math]::Min($cpu, [math]::Max(1, [math]::Round($ramGB / 4)))
+        $jobs = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 6)))
         Write-Host "CPUs=$cpu RAM=${ramGB}GB -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
         "CMAKE_BUILD_PARALLEL_LEVEL=$jobs" >> $env:GITHUB_ENV
 
@@ -718,13 +718,11 @@ jobs:
         OMP_NUM_THREADS: '2'
       run: |
         Push-Location "cpp/build-${{ matrix.compiler }}"
-        # Exclude MACIS_SERIAL_TEST (as on Linux) and libint2's own unit tests:
-        # libint2/unit/build is a compile-at-test-time meta-test of the vendored
-        # libint2 dependency that exceeds the ctest timeout under MSVC. qdk's own
-        # tests still run.
+        # Skip the vendored libint2's own tests: they build the dependency at
+        # test time rather than exercising qdk. MACIS_SERIAL_TEST is excluded as on Linux.
         ctest --output-on-failure --verbose --timeout 400 `
           --output-junit ctest_results.xml `
-          -E "MACIS_SERIAL_TEST|libint2/unit"
+          -E "MACIS_SERIAL_TEST|libint2/unit|libint2/eritest"
         $code = $LASTEXITCODE
         Pop-Location
         if ($code -ne 0) { throw "ctest failed ($code)" }

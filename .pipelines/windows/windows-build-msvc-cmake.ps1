@@ -69,7 +69,13 @@ $QDK_UARCH = if ($Arch -eq "arm64") { "" } else { "x86-64-v3" }
 $hostArchRaw = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
 $HostArch = if ($hostArchRaw -eq "ARM64") { "arm64" } else { "x64" }
 $VcvarsArg = if ($HostArch -eq $Arch) { $Arch } else { "${HostArch}_${Arch}" }
-$NCPUS = [Math]::Max(1, [System.Environment]::ProcessorCount - 2)
+
+# qdk TUs including libint2 engine.impl.h peak at several GB under MSVC; cap
+# concurrency by available RAM (~6 GB/job) to avoid C1060 (compiler out of heap
+# space), not just CPU count.
+$cpu = [Math]::Max(1, [System.Environment]::ProcessorCount - 2)
+$ramGB = [math]::Floor((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
+$NCPUS = [Math]::Min($cpu, [Math]::Max(1, [math]::Floor($ramGB / 6)))
 
 $linkMode = if ($DynamicDeps) { "dynamic" } else { "static" }
 Write-Host "============================================" -ForegroundColor Cyan
