@@ -116,11 +116,11 @@ New-Item -ItemType Directory -Force -Path $DepsInstallDir | Out-Null
 New-Item -ItemType Directory -Force -Path $buildDir       | Out-Null
 
 # ─── Memory-aware build parallelism ──────────────────────────────────────────
-# Cap by RAM (~3.5 GB/job) to avoid OOM on machines with many cores but limited
+# Cap by RAM (~7 GB/job) to avoid OOM on machines with many cores but limited
 # memory. On typical CI runners this equals NUMBER_OF_PROCESSORS.
 $cpu   = [int]$env:NUMBER_OF_PROCESSORS
 $ramGB = [math]::Floor((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
-$jobs  = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 3.5)))
+$jobs  = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 7)))
 Write-Host "CPUs=$cpu  RAM=${ramGB}GB  -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
 $env:CMAKE_BUILD_PARALLEL_LEVEL = $jobs
 
