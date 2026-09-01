@@ -135,6 +135,16 @@ std::vector<TwoBodyFragment> eigen_decompose_two_body(
         " elements for norb = " + std::to_string(norb) + ", got " +
         std::to_string(two_body_integrals.size()) + ".");
   }
+  // A non-finite entry would otherwise survive every check below. NaN
+  // compares false against the symmetry tolerance, and it makes the sort
+  // comparator |a| > |b| false in both directions, which is not a strict weak
+  // ordering and is undefined behavior in std::sort. Infinities reach the
+  // same place, since the symmetrization turns Inf - Inf into NaN.
+  if (!two_body_integrals.allFinite()) {
+    throw std::invalid_argument(
+        "eigen_decompose_two_body: two_body_integrals contains a non-finite "
+        "value (NaN or infinity).");
+  }
 
   const Eigen::Index pair_size = static_cast<Eigen::Index>(pair_dim);
   const Eigen::Index num_orbitals = static_cast<Eigen::Index>(norb);

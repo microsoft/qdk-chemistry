@@ -146,6 +146,16 @@ TEST(DoubleFactorizerTest, RejectsInvalidInput) {
   // rather than fail.
   EXPECT_FALSE(eigen_decompose_two_body(tensor, norb, 0.0).empty());
 
+  // A non-finite entry defeats every later guard: NaN compares false against
+  // the symmetry tolerance, and it makes the sort comparator |a| > |b| false
+  // in both directions, which is undefined behavior in std::sort.
+  Eigen::VectorXd with_nan = make_two_body(norb, {1.0}, 31);
+  with_nan[0] = std::numeric_limits<double>::quiet_NaN();
+  EXPECT_THROW(eigen_decompose_two_body(with_nan, norb), std::invalid_argument);
+  Eigen::VectorXd with_inf = make_two_body(norb, {1.0}, 31);
+  with_inf[0] = std::numeric_limits<double>::infinity();
+  EXPECT_THROW(eigen_decompose_two_body(with_inf, norb), std::invalid_argument);
+
   EXPECT_THROW(factorizer->run(nullptr), std::invalid_argument);
   EXPECT_THROW(factorizer->run(make_unrestricted_hamiltonian(norb)),
                std::invalid_argument);

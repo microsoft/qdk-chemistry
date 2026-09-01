@@ -47,11 +47,11 @@ struct TwoBodyFragment {
 /// Eigen-decompose the spin-free two-electron tensor g_pqrs, flattened as
 /// p*norb^3 + q*norb^2 + r*norb + s, into low-rank fragments.
 ///
-/// @param two_body_integrals Flattened two-electron tensor, size norb^4. Must
-///        carry the full 8-fold chemist permutation symmetry of real
-///        orbitals; the (pq)<->(rs) and p<->q generators are validated, and a
-///        tensor violating either is rejected rather than silently replaced
-///        by its symmetric projection.
+/// @param two_body_integrals Flattened two-electron tensor, size norb^4. Every
+///        entry must be finite. Must carry the full 8-fold chemist
+///        permutation symmetry of real orbitals; the (pq)<->(rs) and p<->q
+///        generators are validated, and a tensor violating either is rejected
+///        rather than silently replaced by its symmetric projection.
 /// @param norb Number of (spatial) orbitals. Must be greater than zero.
 /// @param truncation_threshold Fragments whose supermatrix eigenvalue
 ///        magnitude falls below this threshold are dropped. Must be
@@ -71,8 +71,8 @@ struct TwoBodyFragment {
 ///         reproducible across builds or small input perturbations.
 /// @throws std::invalid_argument if `norb` is zero, if `truncation_threshold`
 ///         or `symmetry_tolerance` is negative or NaN, if `two_body_integrals`
-///         is not norb^4 long, or if it lacks the required permutation
-///         symmetry.
+///         is not norb^4 long, contains a non-finite value, or lacks the
+///         required permutation symmetry.
 /// @throws std::runtime_error if a LAPACK diagonalization fails.
 std::vector<TwoBodyFragment> eigen_decompose_two_body(
     const Eigen::VectorXd& two_body_integrals, std::size_t norb,
