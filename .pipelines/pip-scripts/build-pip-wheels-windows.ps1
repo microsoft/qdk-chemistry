@@ -34,10 +34,13 @@ if (-not $Triplet) {
 if (-not $DepsInstallDir) { $DepsInstallDir = "$SrcDir\deps-install-msvc" }
 Write-Host "vcpkg triplet: $Triplet"
 
+# qdk TUs that include libint2 engine.impl.h peak at several GB under MSVC, so
+# cap concurrency by available RAM (~6 GB/job) rather than by CPU count alone,
+# to avoid C1060 (compiler out of heap space).
 if (-not $env:CMAKE_BUILD_PARALLEL_LEVEL) {
     $cpu   = [int]$env:NUMBER_OF_PROCESSORS
     $ramGB = [math]::Floor((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
-    $jobs  = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 3.5)))
+    $jobs  = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 6)))
     Write-Host "CPUs=$cpu  RAM=${ramGB} GB  -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
     $env:CMAKE_BUILD_PARALLEL_LEVEL = $jobs
 }

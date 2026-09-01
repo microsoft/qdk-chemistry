@@ -274,10 +274,13 @@ jobs:
 
         echo "=== Running C++ Tests in Debug Mode with Coverage ==="
         set +e
+        # The slowest case (RKS_LEVEL_SHIFTING benzene RKS/PBE/cc-pvdz with
+        # GauXC) runs for ~280-300 s in this coverage-instrumented build, so a
+        # 300 s cap left no margin and timed out on runner-to-runner variation.
         if [ "$QDK_UARCH" == "native" ]; then # Exclude particular test on macOS builds
-          ctest --output-on-failure --verbose --timeout 300 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST|AtomInitGuessEnergyConvergence"
+          ctest --output-on-failure --verbose --timeout 600 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST|AtomInitGuessEnergyConvergence"
         else
-          ctest --output-on-failure --verbose --timeout 300 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST"
+          ctest --output-on-failure --verbose --timeout 600 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST"
         fi
 
         CTEST_EXIT_CODE=$?
@@ -813,11 +816,12 @@ jobs:
     - name: Set memory-aware build parallelism
       shell: pwsh
       run: |
-        # Match the x86_64 job: cap concurrency by available RAM (~4 GB/job) so
-        # that memory-hungry translation units don't exhaust the heap.
+        # Match the x86_64 job: qdk TUs that include libint2 engine.impl.h peak
+        # at several GB under MSVC, so cap concurrency by available RAM
+        # (~6 GB/job) to avoid C1060 (compiler out of heap space).
         $cpu = [int]$env:NUMBER_OF_PROCESSORS
         $ramGB = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
-        $jobs = [math]::Min($cpu, [math]::Max(1, [math]::Round($ramGB / 4)))
+        $jobs = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 6)))
         Write-Host "CPUs=$cpu RAM=${ramGB}GB -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
         "CMAKE_BUILD_PARALLEL_LEVEL=$jobs" >> $env:GITHUB_ENV
         Get-PSDrive -PSProvider FileSystem | Format-Table Name, Used, Free
