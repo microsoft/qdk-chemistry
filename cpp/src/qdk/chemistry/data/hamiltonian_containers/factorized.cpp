@@ -151,18 +151,18 @@ bool FactorizedHamiltonianContainer::is_restricted() const {
 
 bool FactorizedHamiltonianContainer::is_valid() const {
   QDK_LOG_TRACE_ENTERING();
+  // Check if essential data is present
   if (!has_one_body_integrals()) return false;
   if (!has_two_body_integrals()) return false;
   if (!has_orbitals()) return false;
-  size_t norb = get_num_orbitals();
-  size_t R = get_num_ranks();
-  size_t C = get_num_copies();
-  if (R == 0 || norb == 0) return false;
-  // U must partition evenly into R*N so that B is well defined.
-  if (static_cast<size_t>(_u.size()) % (R * norb) != 0) return false;
-  size_t B = static_cast<size_t>(_u.size()) / (R * norb);
-  if (static_cast<size_t>(_w.size()) != R * B * C) return false;
-  if (static_cast<size_t>(_signs.size()) != R) return false;
+
+  // Check dimension consistency
+  try {
+    validate_integral_dimensions();
+  } catch (const std::exception&) {
+    return false;
+  }
+
   return true;
 }
 
@@ -255,18 +255,18 @@ double FactorizedHamiltonianContainer::get_energy_gap() const {
 
 double FactorizedHamiltonianContainer::get_lambda() const {
   // norm (Eq. 34):
-  // Λ = Σ|eig(h1_majorana)| + 1/4 Σ_{rc} (|WB^{rc}| + Σ_b |W^{rc}_b|)^2.
+  // Λ = Σ|eig(h1_prime)| + 1/4 Σ_{rc} (|WB^{rc}| + Σ_b |W^{rc}_b|)^2.
   //
   // The per-rank signs are absent on purpose: every two-body contribution
   // enters through an absolute value and |s_r| = 1, so a negated fragment has
   // exactly the same 1-norm. They do still reach this function indirectly,
-  // through get_h1_majorana().
-  Eigen::MatrixXd h1m = get_h1_majorana();
-  Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(h1m);
+  // through get_h1_prime().
+  Eigen::MatrixXd h1p = get_h1_prime();
+  Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(h1p);
   if (solver.info() != Eigen::Success) {
     throw std::runtime_error(
         "FactorizedHamiltonianContainer::get_lambda: failed to diagonalize the "
-        "Majorana one-body matrix.");
+        "adjusted one-body matrix.");
   }
   double one_body_norm = solver.eigenvalues().array().abs().sum();
 
@@ -306,8 +306,8 @@ double FactorizedHamiltonianContainer::get_lambda_eff() const {
   return std::sqrt(_energy_gap * (2.0 * lambda - _energy_gap));
 }
 
-Eigen::MatrixXd FactorizedHamiltonianContainer::get_h1_majorana() const {
-  // Majorana one-body shift (Eq. 37). Writing the rank-r copy-c leaf as
+Eigen::MatrixXd FactorizedHamiltonianContainer::get_h1_prime() const {
+  // Adjusted one-body matrix h^(1)' (Eq. 37). Writing the rank-r copy-c leaf as
   //   M^{rc}_{pq} = Σ_{b∈[B]} w_b^{rc} u^r_{b,p} u^r_{b,q},
   // the three accumulated corrections are
   //   h1'_{pq} = h1_{pq} - ½ Σ_{rc} s_r (M^{rc} M^{rc})_{pq}  (a) normal-order
@@ -414,7 +414,8 @@ FactorizedHamiltonianContainer::from_json(const nlohmann::json& j) {
   auto u = json_to_vector(j.at("u_matrices"));
   auto w = json_to_vector(j.at("w_matrices"));
   auto wb = json_to_matrix(j.at("wb_matrix"));
-  // Optional: an absent sign vector means an all-positive factorization.
+  // Optional: an absent sign vector reads as an all-positive factorization,
+  // matching the constructor's default.
   Eigen::VectorXd signs;
   if (j.contains("signs")) {
     signs = json_to_vector(j.at("signs"));
@@ -422,7 +423,7 @@ FactorizedHamiltonianContainer::from_json(const nlohmann::json& j) {
   double core_energy = j.at("core_energy");
   double energy_gap = j.at("energy_gap");
 
-  // Optional: payloads written before the type was serialized are Hermitian.
+  // Optional: an absent "type" key defaults to Hermitian.
   HamiltonianType type = HamiltonianType::Hermitian;
   if (j.contains("type") && j.at("type").get<std::string>() == "NonHermitian") {
     type = HamiltonianType::NonHermitian;
@@ -541,7 +542,7 @@ FactorizedHamiltonianContainer::from_hdf5(H5::Group& group) {
   metadata_group.openAttribute("num_copies")
       .read(H5::PredType::NATIVE_HSIZE, &num_copies);
 
-  // Optional: payloads written before the type was serialized are Hermitian.
+  // Optional: an absent "type" attribute defaults to Hermitian.
   HamiltonianType type = HamiltonianType::Hermitian;
   if (metadata_group.attrExists("type")) {
     H5::Attribute type_attr = metadata_group.openAttribute("type");
@@ -590,6 +591,10 @@ void FactorizedHamiltonianContainer::validate_integral_dimensions() const {
   if (R == 0) {
     throw std::invalid_argument(
         "WB matrix must have at least one rank (row), got 0.");
+  }
+  if (C == 0) {
+    throw std::invalid_argument(
+        "WB matrix must have at least one copy (column), got 0.");
   }
   if (norb == 0) {
     throw std::invalid_argument("Number of active orbitals must be positive.");

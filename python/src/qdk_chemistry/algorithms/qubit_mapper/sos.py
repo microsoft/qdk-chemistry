@@ -59,7 +59,7 @@ class SOSQubitMapper(QubitMapper):
         u_matrices = np.asarray(container.get_u_matrices(), dtype=float)
         weights = np.asarray(container.get_w_matrices(), dtype=float)
         identity_weights = np.asarray(container.get_wb_matrix(), dtype=float)
-        eigenvalues, eigenvectors = np.linalg.eigh(np.asarray(container.get_h1_majorana(), dtype=float))
+        eigenvalues, eigenvectors = np.linalg.eigh(np.asarray(container.get_h1_prime(), dtype=float))
 
         x_pauli = sparse_pauli_word_to_label(mapping.majorana(0), 1)
         y_pauli = sparse_pauli_word_to_label(mapping.majorana(1), 1)

@@ -151,7 +151,7 @@ def _dfthc_m_matrices(basis_vectors, two_body_weights):
 
 
 def _h1_majorana(h1, basis_vectors, two_body_weights, identity_weight):
-    """Replicate ``FactorizedHamiltonianContainer::get_h1_majorana`` (Eq. 36).
+    """Replicate ``FactorizedHamiltonianContainer::get_h1_prime`` (Eq. 36).
 
     The SOS generators are built from the *normal-ordering corrected* one-body
     matrix, not from the bare ``h1``::
@@ -183,7 +183,7 @@ def _build_dfthc_hamiltonian_matrix(h1, basis_vectors, two_body_weights, identit
 
     The one-body generators come from diagonalizing the *Majorana-corrected*
     one-body matrix (Eq. 36), matching ``SOSQubitMapper``, which reads
-    ``container.get_h1_majorana()`` rather than the bare ``h1``.
+    ``container.get_h1_prime()`` rather than the bare ``h1``.
 
     For eigenvalue :math:`\lambda_k` of that matrix the mapper emits the LCU
     :math:`\sqrt{|\lambda_k|}\\,(X \pm iY)/2` on the rotated spin orbital.

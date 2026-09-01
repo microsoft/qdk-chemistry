@@ -1111,7 +1111,7 @@ Returns:
                            &FactorizedHamiltonianContainer::get_lambda, R"(
 Block-encoding normalization Lambda.
 
-``Lambda = sum|eig(h1_majorana)| + 0.25 * sum_{rc} (|WB_{rc}| + sum_b |W_{rb,c}|)^2``
+``Lambda = sum|eig(h1_prime)| + 0.25 * sum_{rc} (|WB_{rc}| + sum_b |W_{rb,c}|)^2``
 
 Returns:
     float: The block-encoding normalization factor
@@ -1132,13 +1132,15 @@ Raises:
     RuntimeError: If E_gap is non-positive or >= 2*Lambda
 )");
 
-  factorized_container.def("get_h1_majorana",
-                           &FactorizedHamiltonianContainer::get_h1_majorana, R"(
-Adjusted one-body matrix in Majorana basis.
+  factorized_container.def("get_h1_prime",
+                           &FactorizedHamiltonianContainer::get_h1_prime, R"(
+Adjusted one-body matrix h^(1)'.
 
-``h'(1)_{pq} = h1_{pq} - 0.5*sum_{rs} h2_{prrs->pq} + sum_{rs} h2_{pqrr} - sum_{rc,b} WB_{rc} W_{rb,c} U_{bp} U_{bq}``
+With the rank-r copy-c leaf ``M^{rc}_{pq} = sum_b W_{rb,c} U^r_{bp} U^r_{bq}``:
 
-Every correction term is scaled by that rank's sign.
+``h'(1)_{pq} = h1_{pq} - 0.5*sum_{rc} s_r (M^{rc} M^{rc})_{pq} + sum_{rc} s_r tr(M^{rc}) M^{rc}_{pq} - sum_{rc} s_r WB_{rc} M^{rc}_{pq}``
+
+Every correction term is scaled by that rank's sign ``s_r``.
 
 Returns:
     numpy.ndarray: The modified one-body matrix [N x N]
@@ -1162,6 +1164,31 @@ Get the full two-body integrals (lazily reconstructed).
 Returns:
     tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: Tuple of (aaaa, aabb, bbbb)
     two-body integral vectors [N^4] (all identical for restricted).
+)");
+
+  factorized_container.def(
+      "get_two_body_element",
+      &FactorizedHamiltonianContainer::get_two_body_element,
+      R"(
+Get specific two-electron integral element <ij|kl>.
+
+Args:
+    i, j, k, l (int): Orbital indices
+    channel (SpinChannel): Spin channel (aaaa, aabb, or bbbb), defaults to aaaa
+
+Returns:
+    float: Value of the two-electron integral <ij|kl>
+)",
+      py::arg("i"), py::arg("j"), py::arg("k"), py::arg("l"),
+      py::arg("channel") = SpinChannel::aaaa);
+
+  factorized_container.def(
+      "has_two_body_integrals",
+      &FactorizedHamiltonianContainer::has_two_body_integrals, R"(
+Check if two-body integrals are available.
+
+Returns:
+    bool: True if two-body integrals have been set
 )");
 
   factorized_container.def("is_restricted",
