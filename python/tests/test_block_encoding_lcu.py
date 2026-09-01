@@ -22,6 +22,12 @@ from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LC
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
 
+def _lcu_container() -> LCUContainer:
+    """Build a small LCU block encoding to wrap in a walk operator."""
+    hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ"], coefficients=np.array([0.25, 0.5]))
+    return LCUBuilder().run(hamiltonian).get_container()
+
+
 class TestLCUBuilder:
     """Tests for the LCU block encoding builder algorithm."""
 
@@ -390,3 +396,53 @@ class TestLCUContainer:
             0.0,
             atol=float_comparison_absolute_tolerance,
         )
+
+    def test_walk_container_power_one_has_a_single_branch(self):
+        """A power-one walk inverts uniquely, so the branch tuple holds one eigenvalue."""
+        container = LCUWalkContainer(_lcu_container(), power=1, scale=6.0)
+
+        assert container.eigenvalue_branches_from_phase(0.1) == (container.eigenvalue_from_phase(0.1),)
+        assert np.isclose(
+            container.eigenvalue_from_phase(0.1),
+            6.0 * np.cos(2 * np.pi * 0.1),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+
+    @pytest.mark.parametrize("power", [1, 2, 3, 4])
+    @pytest.mark.parametrize("energy", [-5.5, -1.25, 0.0, 3.0, 6.0])
+    def test_walk_container_branches_contain_the_true_energy(self, power, energy):
+        """Every energy a powered walk can encode is recovered by one of the reported branches."""
+        lam = 6.0
+        container = LCUWalkContainer(_lcu_container(), power=power, scale=lam)
+        phase_fraction = (power * np.arccos(energy / lam) / (2 * np.pi)) % 1.0
+
+        branches = container.eigenvalue_branches_from_phase(phase_fraction)
+
+        assert len(branches) <= power
+        assert list(branches) == sorted(branches)
+        assert any(
+            np.isclose(branch, energy, rtol=float_comparison_relative_tolerance, atol=1e-9) for branch in branches
+        )
+
+    def test_walk_container_reports_ambiguity_instead_of_one_branch(self):
+        """A powered walk that folds several energies onto a phase refuses to pick one."""
+        container = LCUWalkContainer(_lcu_container(), power=2, scale=6.0)
+
+        assert len(container.eigenvalue_branches_from_phase(0.1)) == 2
+        with pytest.raises(ValueError, match="consistent with 2 eigenvalues"):
+            container.eigenvalue_from_phase(0.1)
+
+    def test_walk_container_powered_branches_survive_serialization(self):
+        """Serialized walk containers keep the power that defines their inverse branches."""
+        container = LCUWalkContainer(_lcu_container(), power=3, scale=6.0)
+
+        restored = LCUWalkContainer.from_json(container.to_json())
+
+        assert restored.power == 3
+        assert restored.eigenvalue_branches_from_phase(0.1) == container.eigenvalue_branches_from_phase(0.1)
+
+    def test_walk_container_rejects_a_non_positive_power(self):
+        """A walk operator applied fewer than once represents nothing."""
+        with pytest.raises(ValueError, match="power must be a positive integer"):
+            LCUWalkContainer(_lcu_container(), power=0, scale=6.0)

@@ -22,7 +22,8 @@ When QPE acts on :math:`U = e^{-iHt}`, the eigenvalues are :math:`e^{-iEt}` and 
 
    E = -\frac{2\pi\varphi'}{t}
 
-where :math:`\varphi' \in (-1/2, 1/2]` is the measured phase fraction wrapped from :math:`[0, 1)` into :math:`(-1/2, 1/2]`.
+where :math:`\varphi' \in (-1/2, 1/2]` is the measured phase fraction wrapped from :math:`[0, 1)` into :math:`(-1/2, 1/2]`,
+and :math:`t` is the *total* evolution time the container represents, including any repetitions folded into the circuit by a power greater than one.
 
 **Qubitization**
 
@@ -34,6 +35,12 @@ When QPE acts on the qubitization walk operator :math:`W`, the eigenvalues are :
    E = \lambda \cos(2\pi\varphi)
 
 where :math:`\lambda = \sum_j |\alpha_j|` is the 1-norm of the Hamiltonian coefficients.
+
+A container representing :math:`W^p` with :math:`p > 1` generally folds several energies onto the same phase,
+:math:`E_k = \lambda \cos(2\pi(\varphi + k)/p)` for :math:`k = 0, \ldots, p - 1`.
+``eigenvalue_from_phase`` then raises a :class:`ValueError` rather than picking one of them, and
+:meth:`~qdk_chemistry.data.unitary_representation.containers.quantum_walk.QuantumWalkContainer.eigenvalue_branches_from_phase`
+reports every candidate so the caller can resolve the branch.
 
 :class:`~qdk_chemistry.data.QpeResult` is the output of the :doc:`PhaseEstimation <../algorithms/phase_estimation>` algorithm and supports full :doc:`serialization <serialization>` to JSON and HDF5 formats.
 For details on how different :term:`QPE` implementations (:ref:`IQPE <iqpe-algorithm>`, :ref:`standard QFT-based <standard-qpe-algorithm>`) populate this result, see the :doc:`PhaseEstimation algorithm documentation <../algorithms/phase_estimation>`.

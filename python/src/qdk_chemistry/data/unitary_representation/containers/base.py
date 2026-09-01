@@ -121,6 +121,27 @@ class UnitaryContainer(DataClass):
 
         """
 
+    def eigenvalue_branches_from_phase(self, phase_fraction: float) -> tuple[float, ...]:
+        r"""Recover every Hamiltonian eigenvalue consistent with a measured phase.
+
+        A representation that raises the base unitary to a power greater than
+        one may fold several eigenvalues onto the same phase.  This method
+        reports all of them, sorted in ascending order, so that a caller can
+        resolve the ambiguity with information the container does not have.
+
+        The default implementation is for representations that always invert
+        to a single eigenvalue and simply wraps
+        :meth:`eigenvalue_from_phase`.
+
+        Args:
+            phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.
+
+        Returns:
+            tuple[float, ...]: The candidate Hamiltonian eigenvalues.
+
+        """
+        return (self.eigenvalue_from_phase(phase_fraction),)
+
     @abstractmethod
     def combine(self, other: "UnitaryContainer") -> "UnitaryContainer":
         """Combine this container with another to represent sequential application.

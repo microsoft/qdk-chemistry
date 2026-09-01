@@ -76,7 +76,8 @@ class PauliProductFormulaContainer(UnitaryContainer):
             step_terms: The list of exponentiated Pauli terms in a single step.
             step_reps: The number of repetitions of the single step.
             num_qubits: The number of qubits the unitary acts on.
-            scale: The evolution time used for eigenvalue-phase conversion.
+            scale: The total evolution time represented by the container, including
+                any repetitions folded into ``step_reps``.
 
         Raises:
             TypeError: If ``step_reps`` is not an integer.

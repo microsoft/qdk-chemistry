@@ -51,12 +51,16 @@ class QuantumWalkContainer(UnitaryContainer):
         r"""Recover a Hamiltonian eigenvalue from a quantum-walk phase.
 
         For a walk operator whose eigenvalues are
-        :math:`e^{\pm i \arccos(E_k / \lambda)}`, QPE measures
-        :math:`\varphi = \arccos(E_k / \lambda) / (2\pi)`.  Inverting gives:
+        :math:`e^{\pm i \arccos(E_k / \lambda)}`, QPE applied to :math:`W^p`
+        measures :math:`\varphi = \pm p \arccos(E_k / \lambda) / (2\pi)
+        \bmod 1`.  For :math:`p = 1` this inverts uniquely to
 
         .. math::
 
             E_k = \lambda \cos(2\pi\varphi)
+
+        For :math:`p > 1` the inverse generally has several branches, which
+        :meth:`eigenvalue_branches_from_phase` reports in full.
 
         Args:
             phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.
@@ -64,9 +68,52 @@ class QuantumWalkContainer(UnitaryContainer):
         Returns:
             float: The corresponding Hamiltonian eigenvalue.
 
+        Raises:
+            ValueError: If the represented power folds several eigenvalues onto
+                ``phase_fraction``, so no single eigenvalue is implied.
+
+        """
+        branches = self.eigenvalue_branches_from_phase(phase_fraction)
+        if len(branches) > 1:
+            raise ValueError(
+                f"Phase fraction {phase_fraction} is consistent with {len(branches)} eigenvalues "
+                f"{branches} for a walk operator of power {self.power}. "
+                f"Use eigenvalue_branches_from_phase to inspect every branch."
+            )
+        return branches[0]
+
+    def eigenvalue_branches_from_phase(self, phase_fraction: float) -> tuple[float, ...]:
+        r"""Recover every eigenvalue consistent with a powered walk phase.
+
+        QPE on :math:`W^p` measures :math:`\varphi` such that
+        :math:`\arccos(E / \lambda) = 2\pi(\varphi + k)/p` for some integer
+        :math:`k`, so the candidate eigenvalues are
+
+        .. math::
+
+            E_k = \lambda \cos\!\left(\frac{2\pi(\varphi + k)}{p}\right),
+            \qquad k = 0, \ldots, p - 1
+
+        Branches whose walk angles coincide (up to a :math:`10^{-12}` phase
+        tolerance) are reported once, so :math:`p = 1` and degenerate powered
+        cases both yield a single eigenvalue.
+
+        Args:
+            phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.
+
+        Returns:
+            tuple[float, ...]: The candidate eigenvalues, sorted ascending.
+
         """
         phi = phase_fraction % 1.0
-        return float(self.scale * np.cos(2 * np.pi * phi))
+        power = self.power
+        # cos is even, so two branches coincide exactly when their walk angles fold
+        # onto the same value in [0, 1/2]; deduplicate on that folded angle.
+        folded_angles: set[float] = set()
+        for k in range(power):
+            angle = (phi + k) / power
+            folded_angles.add(round(min(angle, 1.0 - angle), 12))
+        return tuple(sorted(float(self.scale * np.cos(2 * np.pi * angle)) for angle in folded_angles))
 
     @property
     @abstractmethod
@@ -111,7 +158,12 @@ class LCUWalkContainer(QuantumWalkContainer):
             power: Number of times to apply the walk operator (for :math:`W^k` in QPE).
             scale: The 1-norm used for eigenvalue-phase conversion.
 
+        Raises:
+            ValueError: If ``power`` is not positive.
+
         """
+        if power < 1:
+            raise ValueError(f"power must be a positive integer, got {power}.")
         self._block_encoding = block_encoding
         self._power = power
         self.scale = scale
