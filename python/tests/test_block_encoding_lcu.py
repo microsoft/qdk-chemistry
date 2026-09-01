@@ -422,9 +422,12 @@ class TestLCUContainer:
 
         assert len(branches) <= power
         assert np.all(np.diff(branches) > 0.0)
-        # Soundness: pushing a branch back through W^p must reproduce the measured phase.
-        drift = (power * np.arccos(np.clip(branches / lam, -1.0, 1.0)) / (2 * np.pi) - phase_fraction) % 1.0
-        assert np.allclose(np.minimum(drift, 1.0 - drift), 0.0, atol=qpe_phase_fraction_tolerance)
+        # Soundness: pushing a branch back through W^p must reproduce the measured phase, up to
+        # the conjugate eigenphase the walk cannot distinguish.
+        walk_phase = power * np.arccos(np.clip(branches / lam, -1.0, 1.0)) / (2 * np.pi)
+        offsets = np.stack([walk_phase - phase_fraction, walk_phase + phase_fraction]) % 1.0
+        drift = np.minimum(offsets, 1.0 - offsets).min(axis=0)
+        assert np.allclose(drift, 0.0, atol=qpe_phase_fraction_tolerance)
         # Completeness: the energy the phase was built from is one of them.
         assert np.isclose(branches, energy, atol=qpe_energy_tolerance).any()
 

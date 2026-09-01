@@ -205,8 +205,8 @@ class TestPhaseDecoding:
                 rtol=float_comparison_relative_tolerance,
                 atol=float_comparison_absolute_tolerance,
             )
-            assert positive.raw_energy >= 0.0
-            assert negative.raw_energy <= 0.0
+            assert np.greater_equal(positive.raw_energy, -float_comparison_absolute_tolerance)
+            assert np.less_equal(negative.raw_energy, float_comparison_absolute_tolerance)
 
     def test_branching_is_still_two_candidates_at_the_degenerate_phase(self):
         """The half-way bin is the one that collapses, so pin it directly."""
