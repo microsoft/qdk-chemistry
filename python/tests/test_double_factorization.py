@@ -9,9 +9,13 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import DoubleFactorizer, create
-from qdk_chemistry.data import FactorizedHamiltonianContainer, Hamiltonian
+from qdk_chemistry.data import (
+    CanonicalFourCenterHamiltonianContainer,
+    FactorizedHamiltonianContainer,
+    Hamiltonian,
+)
 
-from .test_helpers import create_nontrivial_test_hamiltonian
+from .test_helpers import create_nontrivial_test_hamiltonian, create_test_orbitals
 
 
 @pytest.fixture
@@ -49,3 +53,31 @@ class TestDoubleFactorizer:
         num_ranks_truncated = truncated_factorizer.run(hamiltonian).get_container().get_num_ranks()
 
         assert 0 < num_ranks_truncated < num_ranks_exact
+
+    def test_asymmetric_two_body_integrals_are_rejected(self, factorizer):
+        n = 4
+        hamiltonian = create_nontrivial_test_hamiltonian(n)
+        h2 = hamiltonian.get_two_body_integrals()[0].reshape(n, n, n, n).copy()
+
+        # Break p<->q while leaving the (pq)<->(rs) supermatrix symmetric, so
+        # only the second symmetry generator can catch this.
+        h2[0, 1, 2, 2] += 1.0
+        h2[2, 2, 0, 1] += 1.0
+        asymmetric = Hamiltonian(
+            CanonicalFourCenterHamiltonianContainer(
+                hamiltonian.get_one_body_integrals()[0],
+                h2.ravel(),
+                create_test_orbitals(n),
+                0.5,
+                np.eye(0),
+            )
+        )
+
+        with pytest.raises(ValueError, match="not symmetric"):
+            factorizer.run(asymmetric)
+
+        # Loosening the tolerance past the perturbation accepts it again, so
+        # the rejection comes from the symmetry check and not another guard.
+        tolerant = create("double_factorizer", "eigen_decomposition")
+        tolerant.settings().set("symmetry_tolerance", 1e3)
+        assert tolerant.run(asymmetric).get_container().get_num_ranks() > 0
