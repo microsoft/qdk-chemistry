@@ -237,9 +237,7 @@ extends:
               inputs:
               - input: pipelineArtifact
                 artifactName: linux-x86_64-exachem-install
-                # Hardcoded path: templateContext.inputs run before this job's own checkout step, so
-                # $(System.DefaultWorkingDirectory) isn't reliable yet at download time.
-                targetPath: $(Agent.BuildDirectory)/qdk-chemistry/exachem_install
+                targetPath: $(Agent.BuildDirectory)/exachem_install
             outputs:
             - output: pipelineArtifact
               displayName: Upload Python $(pythonVersion) Wheels for ${{ target.os }} ${{ target.march }}
