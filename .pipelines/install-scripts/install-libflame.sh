@@ -3,8 +3,12 @@ set -e
 
 INSTALL_PREFIX=${1:-/usr/local}
 MARCH=${2:-x86-64-v3}
-LIBFLAME_VERSION=${3:-5.2.0}
-CFLAGS=${4:-"-fPIC -O3"}
+CFLAGS=${3:-"-fPIC -O3"}
+
+# Download libflame v5.2.0 (a stable release tag, not a floating branch -- checksum-verified below)
+# Pinned to the version LIBFLAME_CHECKSUM verifies; bump both together.
+LIBFLAME_VERSION=5.2.0
+LIBFLAME_CHECKSUM=e120f559758c21392448f45301918f45760f5ab59d246e4d144079c664d5b64b
 
 # Select architectures to build libflame for
 if [[ ${MARCH} == 'armv8-a' ]]; then
@@ -17,12 +21,10 @@ elif [[ ${MARCH} == 'x86-64-v3' ]]; then
     export LIBFLAME_ARCH=x86_64
 fi
 
-# Download libflame v5.2.0 (a stable release tag, not a floating branch -- checksum-verified below)
 echo "Downloading libflame ${LIBFLAME_VERSION}..."
 # Clean up any leftover state from a previous (possibly failed) attempt on
-# this self-hosted agent — the workspace persists across builds and retries.
+# this self-hosted agent — the workspace may persist across builds and retries.
 rm -rf libflame libflame-${LIBFLAME_VERSION} libflame.zip
-export LIBFLAME_CHECKSUM=e120f559758c21392448f45301918f45760f5ab59d246e4d144079c664d5b64b
 wget -q https://github.com/flame/libflame/archive/refs/tags/${LIBFLAME_VERSION}.zip -O libflame.zip
 echo "${LIBFLAME_CHECKSUM}  libflame.zip" | shasum -a 256 -c || exit 1
 unzip -q libflame.zip

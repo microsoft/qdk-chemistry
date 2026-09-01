@@ -179,11 +179,12 @@
     },
     {
       "component": {
-        "type": "git",
-        "git": {
-          "repositoryUrl": "https://github.com/HDFGroup/hdf5.git",
-          "commitHash": "34ae2775ac67f03f352a340352043e499e90141c",
-          "tag": "hdf5-1_13_0"
+        "type": "other",
+        "other": {
+          "name": "HDF5",
+          "version": "1.13.0",
+          "downloadUrl": "https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.13/hdf5-1.13.0/src/hdf5-1.13.0.tar.bz2",
+          "hash": "f47d88abcbdacbc05419be9b69d96da8c585ebe0"
         }
       },
       "developmentDependency": false

@@ -10,12 +10,10 @@ set -ex
 # Only ./exachem_install is written under the bind-mounted checkout (published/cached across runs); everything
 # else is written under /tmp and discarded, since all dependencies are built static.
 #
-# Usage: build-exachem-linux.sh [march] [blis_version] [libflame_version]
+# Usage: build-exachem-linux.sh [march]
 # Must be run from the repo root; writes ./exachem_install into the current directory.
 
 MARCH=${1:-x86-64-v3}
-BLIS_VERSION=${2:-2.0}
-LIBFLAME_VERSION=${3:-5.2.0}
 
 export DEBIAN_FRONTEND=noninteractive
 export CFLAGS="-fPIC -Os"
@@ -54,11 +52,11 @@ apt-get install -y -q \
     wget
 cmake --version
 
-echo "Installing BLIS ${BLIS_VERSION}..."
-bash "${SCRIPT_DIR}/install-blis.sh" /usr/local "${MARCH}" "${BLIS_VERSION}" "${CFLAGS}"
+echo "Installing BLIS..."
+bash "${SCRIPT_DIR}/install-blis.sh" /usr/local "${MARCH}" "${CFLAGS}"
 
-echo "Installing libflame ${LIBFLAME_VERSION}..."
-bash "${SCRIPT_DIR}/install-libflame.sh" /usr/local "${MARCH}" "${LIBFLAME_VERSION}" "${CFLAGS}"
+echo "Installing libflame..."
+bash "${SCRIPT_DIR}/install-libflame.sh" /usr/local "${MARCH}" "${CFLAGS}"
 
 CPP_DEPS_PREFIX=/tmp/cpp_deps_install
 echo "Installing qdk-chemistry C++ dependencies (BLIS vendor) into ${CPP_DEPS_PREFIX}..."

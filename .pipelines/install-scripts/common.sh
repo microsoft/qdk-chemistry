@@ -79,6 +79,21 @@ for reg in data['registrations']:
 "
 }
 
+# Resolve the declared version for an "other" (non-git) type component from cgmanifest.json, by component name.
+get_version() {
+    local manifest="$1" name="$2"
+    python3 -c "
+import json
+with open('$manifest') as f:
+    data = json.load(f)
+for reg in data['registrations']:
+    comp = reg['component']
+    if comp['type'] == 'other' and comp['other'].get('name') == '$name':
+        print(comp['other'].get('version', ''))
+        break
+"
+}
+
 # Download an "other" type cgmanifest component and verify its SHA-1 against the declared `hash`, so a
 # compromised or silently-changed upstream release asset is caught before it's extracted and built. Fails
 # loudly if the component has no downloadUrl or no declared hash. Downloads into the current directory (or

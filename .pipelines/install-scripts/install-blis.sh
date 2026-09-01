@@ -3,15 +3,17 @@ set -e
 
 INSTALL_PREFIX=${1:-/usr/local}
 MARCH=${2:-x86-64-v3}
-BLIS_VERSION=${3:-2.0}
-CFLAGS=${4:-"-fPIC -O3"}
+CFLAGS=${3:-"-fPIC -O3"}
 
 # Download BLIS v2.0 (a stable release tag, not a floating branch -- checksum-verified below)
+# Pinned to the version BLIS_CHECKSUM verifies; bump both together.
+BLIS_VERSION=2.0
+BLIS_CHECKSUM=40134f6570d5539609c6328252ad1530c010931bb96f4e249e08279fd978da7a
+
 echo "Downloading BLIS ${BLIS_VERSION}..."
 # Clean up any leftover state from a previous (possibly failed) attempt on
-# this self-hosted agent — the workspace persists across builds and retries.
+# this self-hosted agent — the workspace may persist across builds and retries.
 rm -rf blis blis-${BLIS_VERSION} blis.zip
-export BLIS_CHECKSUM=40134f6570d5539609c6328252ad1530c010931bb96f4e249e08279fd978da7a
 wget -q https://github.com/flame/blis/archive/refs/tags/${BLIS_VERSION}.zip -O blis.zip
 echo "${BLIS_CHECKSUM}  blis.zip" | shasum -a 256 -c || exit 1
 unzip -q blis.zip

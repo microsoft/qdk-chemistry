@@ -23,15 +23,6 @@ parameters:
 - name: pythonVersion
   type: string
   default: 3.11
-- name: hdf5Version
-  type: string
-  default: 1.13.0
-- name: blisVersion
-  type: string
-  default: 2.0
-- name: libflameVersion
-  type: string
-  default: 5.2.0
 - name: macBuild
   type: string
   default: OFF
@@ -75,9 +66,6 @@ steps:
                                                       ${{ parameters.buildType }} \
                                                       ${{ parameters.buildTesting }} \
                                                       ${{ parameters.enableCoverage }} \
-                                                      ${{ parameters.hdf5Version }} \
-                                                      ${{ parameters.blisVersion }} \
-                                                      ${{ parameters.libflameVersion }} \
                                                       ${{ parameters.macBuild }}
     displayName: Build wheel (Linux ${{ parameters.march }})
     retryCountOnTaskFailure: 2
@@ -103,9 +91,6 @@ steps:
                                                       ${{ parameters.buildType }} \
                                                       ${{ parameters.buildTesting }} \
                                                       ${{ parameters.enableCoverage }} \
-                                                      ${{ parameters.hdf5Version }} \
-                                                      ${{ parameters.blisVersion }} \
-                                                      ${{ parameters.libflameVersion }} \
                                                       ${{ parameters.macBuild }}
     displayName: Build wheel (Linux ${{ parameters.march }})
     retryCountOnTaskFailure: 2
@@ -122,9 +107,6 @@ steps:
                                                       ${{ parameters.buildType }} \
                                                       ${{ parameters.buildTesting }} \
                                                       ${{ parameters.enableCoverage }} \
-                                                      ${{ parameters.hdf5Version }} \
-                                                      ${{ parameters.blisVersion }} \
-                                                      ${{ parameters.libflameVersion }} \
                                                       ${{ parameters.macBuild }}
     displayName: Build wheel (macOS native)
     retryCountOnTaskFailure: 2
