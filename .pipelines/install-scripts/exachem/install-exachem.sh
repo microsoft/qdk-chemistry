@@ -8,7 +8,7 @@
 #
 # TAMM/ExaChem/CMSB/GlobalArrays commits are read from cgmanifest.json (this repo's Component Governance
 # manifest), not hardcoded here -- tracked there as development dependencies since all four execute in CI even
-# though none ship in the qdk_chemistry wheel. The four pins and the four patches under patches/ are validated
+# though none ship in the qdk_chemistry wheel. The four pins and the five patches under patches/ are validated
 # together as a set -- bumping one commit in cgmanifest.json requires re-running this script and re-checking
 # every patch still applies.
 #
@@ -244,6 +244,7 @@ echo "=== Building ExaChem (${EXACHEM_COMMIT}) ==="
 shallow_checkout "${EXACHEM_REPO}" "${EXACHEM_COMMIT}" "${BUILD_ROOT}/exachem"
 git -C "${BUILD_ROOT}/exachem" apply --verbose "${SCRIPT_DIR}/patches/exachem-serial-hdf5.patch"
 git -C "${BUILD_ROOT}/exachem" apply --verbose "${SCRIPT_DIR}/patches/exachem-gauxc-mpi.patch"
+git -C "${BUILD_ROOT}/exachem" apply --verbose "${SCRIPT_DIR}/patches/exachem-libint2-datadir.patch"
 
 CC=gcc CXX=g++ FC=gfortran cmake -S "${BUILD_ROOT}/exachem" -B "${BUILD_ROOT}/exachem/build" \
   -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" \
