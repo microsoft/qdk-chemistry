@@ -31,7 +31,9 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    * @param core_energy Nuclear and inactive-core energy.
    * @param u_matrices U factors, flattened as [R,B,N].
    * @param w_matrices W factors, flattened as [R,B,C].
-   * @param wb_matrix Identity weights [R,C].
+   * @param wb_matrix Identity-slot weights w_B [R,C]. This is the paper's
+   *        `w_B`, the extra weight on the identity in the sum of squares, not
+   *        the `W` factors above; the two differ by tr(M).
    * @param one_body_integrals One-body integrals [N,N].
    * @param inactive_fock_matrix Inactive Fock matrix.
    * @param orbitals Orbitals with an active space.
@@ -121,7 +123,7 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
   /** @return W flattened in [R,B,C] order. */
   const Eigen::VectorXd& get_w_matrices() const;
 
-  /** @return Identity weights WB with shape [R,C]. */
+  /** @return Identity-slot weights w_B with shape [R,C]. */
   const Eigen::MatrixXd& get_wb_matrix() const;
 
   /** @return Per-rank signs, length R, each +1.0 or -1.0. */
@@ -154,6 +156,12 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
   /**
    * @brief Compute the effective SOS normalization (Eq. 12).
    * λ_eff = √(E_gap · (2Λ - E_gap))
+   *
+   * Requires a positive E_gap, which the plain double factorization does not
+   * produce (DoubleFactorizer stores 0.0); the gap comes from the SOS consumer.
+   * The formula also assumes a genuine sum of squares, so it is not meaningful
+   * for a container with mixed signs -- check get_signs() first.
+   *
    * @throws std::runtime_error if E_gap is non-positive or >= 2Λ.
    */
   double get_lambda_eff() const;
@@ -163,7 +171,7 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    *
    * Named for the paper's symbol h^(1)'. This matrix is a plain one-body
    * coefficient tensor; it is not expressed in the Majorana representation,
-   * which the reference introduces separately (Eq. 25) for block-encoding.
+   * which the reference introduces separately for block-encoding.
    *
    * Writing the rank-r copy-c leaf as
    *   M^{rc}_{pq} = Σ_{b∈[B]} W^{rc}_b U^r_{bp} U^r_{bq},
@@ -183,8 +191,9 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    * h2_{pqrs} = Σ_{t,c} s_t (Σ_b U^t_{bp} U^t_{bq} W^t_{bc})
    *                          (Σ_{b'} U^t_{b'r} U^t_{b's} W^t_{b'c})
    *
-   * Note this is built purely from (U, W) and the per-rank signs: the identity
-   * weight WB is deliberately absent, matching Eq. 25.
+   * Note this is built purely from (U, W) and the per-rank signs: the
+   * identity-slot weight w_B is deliberately absent, matching the DFTHC
+   * two-body ansatz, which defines h2 from the W factors alone.
    *
    * @return A flat N^4 vector in [p,q,r,s] order.
    */
@@ -202,7 +211,7 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
 
   Eigen::VectorXd _u;      ///< Flat U matrices [R*B*N]
   Eigen::VectorXd _w;      ///< Flat W matrices [R*B*C]
-  Eigen::MatrixXd _wb;     ///< Identity weights [R*C]
+  Eigen::MatrixXd _wb;     ///< Identity-slot weights w_B [R*C]
   Eigen::VectorXd _signs;  ///< Per-rank signs [R], each +1.0 or -1.0
 
   double _energy_gap;  ///< E_gap for SOS block encoding

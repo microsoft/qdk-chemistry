@@ -88,6 +88,10 @@ std::vector<TwoBodyFragment> eigen_decompose_two_body(
   }
 
   // Sort by decreasing |eigenvalue| so the largest contributions come first.
+  // Within a degenerate block the eigenvector basis LAPACK returns is
+  // arbitrary, so eps and lambda_df are not fixed by the tensor alone. A
+  // stable sort would not change that: the freedom is in the basis, not the
+  // ordering. The reconstructed tensor is invariant either way.
   std::vector<std::size_t> order(pair_dim);
   for (std::size_t n = 0; n < pair_dim; ++n) {
     order[n] = n;

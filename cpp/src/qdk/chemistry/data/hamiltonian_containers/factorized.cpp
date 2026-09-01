@@ -414,7 +414,8 @@ FactorizedHamiltonianContainer::from_json(const nlohmann::json& j) {
   auto u = json_to_vector(j.at("u_matrices"));
   auto w = json_to_vector(j.at("w_matrices"));
   auto wb = json_to_matrix(j.at("wb_matrix"));
-  // Optional: an absent sign vector means an all-positive factorization.
+  // Optional: an absent sign vector reads as an all-positive factorization,
+  // matching the constructor's default.
   Eigen::VectorXd signs;
   if (j.contains("signs")) {
     signs = json_to_vector(j.at("signs"));
@@ -422,9 +423,7 @@ FactorizedHamiltonianContainer::from_json(const nlohmann::json& j) {
   double core_energy = j.at("core_energy");
   double energy_gap = j.at("energy_gap");
 
-  // A JSON payload written before "type" was serialized carries no such key.
-  // Those all predate the non-Hermitian support, so Hermitian is the correct
-  // reading rather than merely a convenient default.
+  // Optional: an absent "type" key defaults to Hermitian.
   HamiltonianType type = HamiltonianType::Hermitian;
   if (j.contains("type") && j.at("type").get<std::string>() == "NonHermitian") {
     type = HamiltonianType::NonHermitian;
@@ -543,9 +542,7 @@ FactorizedHamiltonianContainer::from_hdf5(H5::Group& group) {
   metadata_group.openAttribute("num_copies")
       .read(H5::PredType::NATIVE_HSIZE, &num_copies);
 
-  // An HDF5 payload written before "type" was serialized carries no such
-  // attribute. Those all predate the non-Hermitian support, so Hermitian is the
-  // correct reading rather than merely a convenient default.
+  // Optional: an absent "type" attribute defaults to Hermitian.
   HamiltonianType type = HamiltonianType::Hermitian;
   if (metadata_group.attrExists("type")) {
     H5::Attribute type_attr = metadata_group.openAttribute("type");
@@ -594,6 +591,10 @@ void FactorizedHamiltonianContainer::validate_integral_dimensions() const {
   if (R == 0) {
     throw std::invalid_argument(
         "WB matrix must have at least one rank (row), got 0.");
+  }
+  if (C == 0) {
+    throw std::invalid_argument(
+        "WB matrix must have at least one copy (column), got 0.");
   }
   if (norb == 0) {
     throw std::invalid_argument("Number of active orbitals must be positive.");

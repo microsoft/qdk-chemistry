@@ -43,12 +43,25 @@ struct TwoBodyFragment {
 /// Eigen-decompose the spin-free two-electron tensor g_pqrs, flattened as
 /// p*norb^3 + q*norb^2 + r*norb + s, into low-rank fragments.
 ///
-/// @param two_body_integrals Flattened two-electron tensor, size norb^4.
+/// @param two_body_integrals Flattened two-electron tensor, size norb^4. The
+///        decomposition assumes full chemist permutation symmetry: the tensor
+///        is projected onto its (pq)<->(rs) and p<->q symmetric parts, and a
+///        tensor lacking either is silently reconstructed from that projection
+///        rather than rejected.
 /// @param norb Number of (spatial) orbitals. Must be greater than zero.
 /// @param truncation_threshold Fragments whose supermatrix eigenvalue
 ///        magnitude falls below this threshold are dropped. Must be
-///        non-negative; 0.0 retains every fragment.
+///        non-negative; 0.0 retains every fragment. Note that 0.0 also retains
+///        the null-space fragments, whose eigenvalues are round-off noise of
+///        either sign, so a positive-semidefinite tensor can come back with
+///        many `sign == -1.0` fragments that carry no weight. Consumers that
+///        branch on the signs should keep the default threshold.
 /// @return The retained fragments, sorted by decreasing eigenvalue magnitude.
+///         Within a degenerate eigenvalue block the eigenvector basis is
+///         whatever LAPACK returns, so `eps` (and hence `lambda_df`) is not
+///         determined by the tensor alone; the reconstructed tensor is
+///         unaffected, but 1-norms computed from a degenerate spectrum are not
+///         reproducible across builds or small input perturbations.
 /// @throws std::invalid_argument if `norb` is zero, if `truncation_threshold`
 ///         is negative or NaN, or if `two_body_integrals` is not norb^4 long.
 /// @throws std::runtime_error if a LAPACK diagonalization fails.
