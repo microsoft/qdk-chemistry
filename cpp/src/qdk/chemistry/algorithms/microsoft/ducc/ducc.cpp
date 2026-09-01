@@ -22,6 +22,7 @@
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <unordered_map>
@@ -165,33 +166,22 @@ std::shared_ptr<data::Orbitals> _output_orbitals(
 }
 
 std::shared_ptr<data::Hamiltonian> _run_ducc(
-    const data::CanonicalFourCenterHamiltonianContainer& hamiltonian,
+    const data::Hamiltonian& hamiltonian,
     const data::Wavefunction& wavefunction, std::int64_t level,
     const std::vector<std::uint32_t>& p_space_a,
     const std::vector<std::uint32_t>& p_space_b,
     std::shared_ptr<data::Orbitals> orbitals) {
   // Convert spin blocks from symmetry-blocked Eigen storage to the dense BTAS
   // layout used by the generated contractions.
-  const auto& one_body = hamiltonian.one_body_integrals();
-  const auto& h_a = one_body.block({data::axes::alpha(), data::axes::alpha()});
-  const auto& h_b = one_body.block({data::axes::beta(), data::axes::beta()});
+  const auto [h_a, h_b] = hamiltonian.get_one_body_integrals();
   const auto nmo = static_cast<std::size_t>(h_a.rows());
-  const auto& two_body = hamiltonian.two_body_integrals();
+  const auto [v_aa, v_ab, v_bb] = hamiltonian.get_two_body_integrals();
 
   auto h_a_btas = _to_btas(h_a);
   auto h_b_btas = _to_btas(h_b);
-  auto v_aa_btas =
-      _to_btas_eri(two_body.block({data::axes::alpha(), data::axes::alpha(),
-                                   data::axes::alpha(), data::axes::alpha()}),
-                   nmo);
-  auto v_ab_btas =
-      _to_btas_eri(two_body.block({data::axes::alpha(), data::axes::alpha(),
-                                   data::axes::beta(), data::axes::beta()}),
-                   nmo);
-  auto v_bb_btas =
-      _to_btas_eri(two_body.block({data::axes::beta(), data::axes::beta(),
-                                   data::axes::beta(), data::axes::beta()}),
-                   nmo);
+  auto v_aa_btas = _to_btas_eri(v_aa, nmo);
+  auto v_ab_btas = _to_btas_eri(v_ab, nmo);
+  auto v_bb_btas = _to_btas_eri(v_bb, nmo);
 
   const auto& amplitudes =
       wavefunction.get_container<data::AmplitudeContainer>();
@@ -260,6 +250,9 @@ std::shared_ptr<data::Hamiltonian> DuccSolver::_run_impl(
   QDK_LOG_TRACE_ENTERING();
   _validate_inputs(reference, hamiltonian, p_space);
 
+  if (!hamiltonian->is_hermitian())
+    throw std::invalid_argument("ducc: input Hamiltonian must be Hermitian");
+
   const auto orbitals = hamiltonian->get_orbitals();
   const auto reference_orbitals = reference->get_orbitals();
   const auto active_a = data::spin_channel_indices(orbitals->active_indices(),
@@ -279,6 +272,9 @@ std::shared_ptr<data::Hamiltonian> DuccSolver::_run_impl(
       data::spin_channel_indices(p_space, data::axes::alpha());
   const auto p_space_b =
       data::spin_channel_indices(p_space, data::axes::beta());
+  if (p_space_a.empty() || p_space_b.empty())
+    throw std::invalid_argument(
+        "ducc: P-space must be non-empty in each spin channel");
   const auto p_space_positions_a = _positions_in_window(p_space_a, active_a);
   const auto p_space_positions_b = _positions_in_window(p_space_b, active_b);
 
@@ -287,16 +283,38 @@ std::shared_ptr<data::Hamiltonian> DuccSolver::_run_impl(
     throw std::runtime_error(
         "ducc: input Hamiltonian must span the full orbital space");
 
+  if (!reference->has_container_type<data::AmplitudeContainer>())
+    throw std::invalid_argument(
+        "ducc: reference must contain coupled-cluster amplitudes");
   const auto& amplitudes = reference->get_container<data::AmplitudeContainer>();
+  if (amplitudes.get_amplitude_type() != data::AmplitudeType::CoupledCluster)
+    throw std::invalid_argument(
+        "ducc: reference amplitudes must have coupled-cluster type");
   if (amplitudes.is_complex())
     throw std::runtime_error("ducc: complex amplitudes not yet implemented");
 
-  const auto& canonical =
-      hamiltonian
-          ->get_container<data::CanonicalFourCenterHamiltonianContainer>();
+  const auto amplitude_reference = amplitudes.get_wavefunction();
+  if (!amplitude_reference->has_container_type<data::StateVectorContainer>())
+    throw std::invalid_argument(
+        "ducc: coupled-cluster reference must be a single determinant");
+  const auto& determinants = amplitude_reference->get_active_determinants();
+  if (determinants.size() != 1)
+    throw std::invalid_argument(
+        "ducc: coupled-cluster reference must be a single determinant");
+
+  const auto& determinant = determinants.front();
+  const auto [nocc_a, nocc_b] = reference->get_active_num_electrons();
+  const auto expected_reference =
+      data::Configuration::canonical_hf_configuration(nocc_a, nocc_b,
+                                                      active_a.size());
+  if (determinant != expected_reference)
+    throw std::invalid_argument(
+        "ducc: occupied orbitals must be contiguous from index zero in each "
+        "spin channel");
+
   auto output_orbitals = _output_orbitals(*orbitals, *reference, p_space);
   return _run_ducc(
-      canonical, *reference, _settings->get<std::int64_t>("ducc_level"),
+      *hamiltonian, *reference, _settings->get<std::int64_t>("ducc_level"),
       p_space_positions_a, p_space_positions_b, std::move(output_orbitals));
 }
 

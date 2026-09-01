@@ -14,6 +14,7 @@
 #include <qdk/chemistry/data/configuration.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
@@ -62,10 +63,12 @@ class DuccTest : public ::testing::Test {
   }
 
   std::shared_ptr<Wavefunction> make_amplitude_reference(
-      const Eigen::VectorXd& t1, const Eigen::VectorXd& t2) const {
+      const Eigen::VectorXd& t1, const Eigen::VectorXd& t2,
+      AmplitudeType amplitude_type = AmplitudeType::CoupledCluster,
+      std::shared_ptr<Wavefunction> reference = nullptr) const {
     return std::make_shared<Wavefunction>(std::make_unique<AmplitudeContainer>(
-        orbitals, determinant_reference, AmplitudeType::CoupledCluster, t1,
-        t2));
+        orbitals, reference ? std::move(reference) : determinant_reference,
+        amplitude_type, t1, t2));
   }
 
   std::shared_ptr<Hamiltonian> run_ducc(
@@ -126,6 +129,20 @@ TEST_F(DuccTest, RejectsNullPSpace) {
   auto constructor = EffectiveHamiltonianConstructorFactory::create("ducc");
   EXPECT_THROW(constructor->run(amplitude_reference, hamiltonian, nullptr),
                std::invalid_argument);
+}
+
+TEST_F(DuccTest, RejectsEmptyPSpace) {
+  const std::array<std::shared_ptr<const SymmetryBlockedIndexSet>, 3>
+      empty_p_spaces{
+          testing::restricted_index_set(kNumOrbitals, {}),
+          testing::unrestricted_index_set(kNumOrbitals, {}, {0}),
+          testing::unrestricted_index_set(kNumOrbitals, {0}, {}),
+      };
+  for (const std::int64_t level : std::array<std::int64_t, 3>{0, 1, 2}) {
+    for (const auto& p_space : empty_p_spaces) {
+      EXPECT_THROW(run_ducc(level, p_space), std::invalid_argument);
+    }
+  }
 }
 
 TEST_F(DuccTest, RejectsDifferentOrbitals) {
@@ -196,6 +213,92 @@ TEST_F(DuccTest, RejectsComplexAmplitudes) {
       constructor->run(complex_reference, hamiltonian,
                        testing::restricted_index_set(kNumOrbitals, {0, 1})),
       std::runtime_error);
+}
+
+TEST_F(DuccTest, RejectsNonCoupledClusterAmplitudes) {
+  Eigen::VectorXd t1 = Eigen::VectorXd::Zero(2);
+  Eigen::VectorXd t2 = Eigen::VectorXd::Zero(4);
+
+  for (const auto amplitude_type :
+       {AmplitudeType::MollerPlesset, AmplitudeType::Unspecified}) {
+    const auto reference = make_amplitude_reference(t1, t2, amplitude_type);
+    EXPECT_THROW(
+        run_ducc(1, testing::restricted_index_set(kNumOrbitals, {0, 1}),
+                 reference),
+        std::invalid_argument);
+  }
+}
+
+TEST_F(DuccTest, RejectsMultiDeterminantReference) {
+  Eigen::VectorXd coefficients(2);
+  coefficients << 1.0, 0.0;
+  auto multi_determinant =
+      std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+          coefficients,
+          std::vector<Configuration>{
+              Configuration::from_spin_half_string("200"),
+              Configuration::from_spin_half_string("020")},
+          orbitals));
+  Eigen::VectorXd t1 = Eigen::VectorXd::Zero(2);
+  Eigen::VectorXd t2 = Eigen::VectorXd::Zero(4);
+  const auto reference = make_amplitude_reference(
+      t1, t2, AmplitudeType::CoupledCluster, multi_determinant);
+
+  EXPECT_THROW(run_ducc(1, testing::restricted_index_set(kNumOrbitals, {0, 1}),
+                        reference),
+               std::invalid_argument);
+}
+
+TEST_F(DuccTest, RejectsNonPrefixOccupiedOrbitals) {
+  auto non_prefix =
+      std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+          Configuration::from_spin_half_string("020"), orbitals));
+  Eigen::VectorXd t1 = Eigen::VectorXd::Zero(2);
+  Eigen::VectorXd t2 = Eigen::VectorXd::Zero(4);
+  const auto reference = make_amplitude_reference(
+      t1, t2, AmplitudeType::CoupledCluster, non_prefix);
+
+  EXPECT_THROW(run_ducc(1, testing::restricted_index_set(kNumOrbitals, {0, 1}),
+                        reference),
+               std::invalid_argument);
+}
+
+TEST_F(DuccTest, RejectsNonHermitianHamiltonian) {
+  Eigen::MatrixXd non_hermitian_one_body = one_body;
+  non_hermitian_one_body(0, 1) += 1.0;
+  auto non_hermitian = std::make_shared<Hamiltonian>(
+      std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+          non_hermitian_one_body, two_body, orbitals, 0.35, Eigen::MatrixXd{},
+          HamiltonianType::NonHermitian));
+  auto constructor = EffectiveHamiltonianConstructorFactory::create("ducc");
+
+  EXPECT_THROW(
+      constructor->run(amplitude_reference, non_hermitian,
+                       testing::restricted_index_set(kNumOrbitals, {0, 1})),
+      std::invalid_argument);
+}
+
+TEST_F(DuccTest, AcceptsCholeskyHamiltonian) {
+  const Eigen::MatrixXd three_center =
+      Eigen::MatrixXd::Zero(kNumOrbitals * kNumOrbitals, 1);
+  auto cholesky = std::make_shared<Hamiltonian>(
+      std::make_unique<CholeskyHamiltonianContainer>(
+          one_body, three_center, orbitals, 0.35, Eigen::MatrixXd{}));
+  auto constructor = EffectiveHamiltonianConstructorFactory::create("ducc");
+  constructor->settings().set("ducc_level", std::int64_t{0});
+
+  const auto output =
+      constructor->run(amplitude_reference, cholesky,
+                       testing::restricted_index_set(kNumOrbitals, {0, 1}));
+  const auto [one_a, one_b] = output->get_one_body_integrals();
+  EXPECT_TRUE(one_a.isApprox(one_body.topLeftCorner(2, 2),
+                             testing::integral_tolerance));
+  EXPECT_TRUE(one_b.isApprox(one_body.topLeftCorner(2, 2),
+                             testing::integral_tolerance));
+  const auto [two_aa, two_ab, two_bb] = output->get_two_body_integrals();
+  EXPECT_TRUE(two_aa.isZero(testing::integral_tolerance));
+  EXPECT_TRUE(two_ab.isZero(testing::integral_tolerance));
+  EXPECT_TRUE(two_bb.isZero(testing::integral_tolerance));
 }
 
 TEST_F(DuccTest, RejectsUnequalSpinPSpaceSizes) {

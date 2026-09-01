@@ -99,22 +99,37 @@ It evaluates a truncated Baker-Campbell-Hausdorff transformation
    \sigma = T_{\mathrm{ext}} - T_{\mathrm{ext}}^\dagger,
 
 where :math:`T_{\mathrm{ext}}` excludes amplitudes whose indices are all in :math:`P`.
-The reference wavefunction must contain real coupled-cluster amplitudes and use the same full-space orbitals as the Hamiltonian.
+The input Hamiltonian must be Hermitian and span the full orbital window, but it can use any Hamiltonian container that provides four-center integrals.
+The reference wavefunction must contain real coupled-cluster amplitudes built on a single determinant, use the same full-space orbitals as the Hamiltonian, and occupy a contiguous prefix of orbitals in each spin channel.
+The target P-space must be non-empty in each spin channel.
+
+The ``ducc_level`` setting selects the perturbatively consistent A(1), A(4), and A(7) approximations of :cite:`Bauman2022DUCC`.
+In all three schemes, the transformed operator is restricted to the target space and truncated to its scalar, one-body, and two-body components.
+With :math:`H_N` the normal-ordered Hamiltonian, :math:`F_N` its one-body Fock component, and :math:`\sigma = \sigma_{\mathrm{ext}}`, the retained terms are
+
+.. math::
+
+   \begin{aligned}
+   \mathrm{level\ 0\ (A(1)):}\quad
+      H_{\mathrm{eff}}^P &\simeq \hat P H \hat P, \\
+   \mathrm{level\ 1\ (A(4)):}\quad
+      H_{\mathrm{eff}}^P &\simeq \hat P \left(H + [H_N,\sigma]
+      + \frac{1}{2} [[F_N,\sigma],\sigma]\right) \hat P, \\
+   \mathrm{level\ 2\ (A(7)):}\quad
+      H_{\mathrm{eff}}^P &\simeq \hat P \left(H + [H_N,\sigma]
+      + \frac{1}{2} [[H_N,\sigma],\sigma]
+      + \frac{1}{6} [[[F_N,\sigma],\sigma],\sigma]\right) \hat P.
+   \end{aligned}
+
+Level 1 is the second-order perturbatively consistent expansion in Eq. (62) of :cite:`Bauman2019DUCC`; level 2 retains the full double commutator and the Fock-only triple commutator required for third-order consistency.
 
 .. rubric:: Settings
 
-.. list-table::
-   :header-rows: 1
-   :widths: 25 15 15 45
+.. csv-table::
+    :header: "Setting", "Type", "Default", "Description"
+    :widths: 25, 15, 15, 45
 
-   * - Setting
-     - Type
-     - Default
-     - Description
-   * - ``ducc_level``
-     - int
-     - ``2``
-     - Baker-Campbell-Hausdorff truncation level; supported values are 0, 1, and 2
+    "``ducc_level``", "int", "``2``", "Approximation scheme: 0 selects A(1), 1 selects A(4), and 2 selects A(7)"
 
 Related classes
 ---------------
