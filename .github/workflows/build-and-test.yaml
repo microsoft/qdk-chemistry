@@ -105,10 +105,10 @@ jobs:
     - name: Set memory-aware build parallelism
       if: matrix.os-name != 'macOS'
       run: |
-        # Cap concurrency by available RAM (~7 GB/job) so that memory-hungry translation units don't exhaust the heap.
+        # Cap concurrency by available RAM (~8 GB/job) so that memory-hungry translation units don't exhaust the heap.
         cpu=$(nproc)
         ram_gb=$(( $(grep MemTotal /proc/meminfo | awk '{print $2}') / 1024 / 1024 ))
-        jobs=$(printf "%.0f" "$(awk "BEGIN { print $ram_gb / 7 }")")
+        jobs=$(printf "%.0f" "$(awk "BEGIN { print $ram_gb / 8 }")")
         [ "$jobs" -lt 1 ] && jobs=1
         [ "$jobs" -gt "$cpu" ] && jobs=$cpu
         echo "CPUs=$cpu RAM=${ram_gb}GB -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
@@ -616,11 +616,11 @@ jobs:
       id: env2
       run: |
         # qdk TUs that include libint2 engine.impl.h peak at several GB under MSVC;
-        # cap concurrency by available RAM (~7 GB/job) to avoid C1060 (compiler out
+        # cap concurrency by available RAM (~8 GB/job) to avoid C1060 (compiler out
         # of heap space). Scales up automatically on a larger runner.
         $cpu = [int]$env:NUMBER_OF_PROCESSORS
         $ramGB = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
-        $jobs = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 7)))
+        $jobs = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 8)))
         Write-Host "CPUs=$cpu RAM=${ramGB}GB -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
         "CMAKE_BUILD_PARALLEL_LEVEL=$jobs" >> $env:GITHUB_ENV
 
@@ -842,11 +842,11 @@ jobs:
     - name: Set memory-aware build parallelism
       shell: pwsh
       run: |
-        # Match the x86_64 job: cap concurrency by available RAM (~7 GB/job) so
+        # Match the x86_64 job: cap concurrency by available RAM (~8 GB/job) so
         # that memory-hungry translation units don't exhaust the heap.
         $cpu = [int]$env:NUMBER_OF_PROCESSORS
         $ramGB = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
-        $jobs = [math]::Min($cpu, [math]::Max(1, [math]::Round($ramGB / 7)))
+        $jobs = [math]::Min($cpu, [math]::Max(1, [math]::Round($ramGB / 8)))
         Write-Host "CPUs=$cpu RAM=${ramGB}GB -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
         "CMAKE_BUILD_PARALLEL_LEVEL=$jobs" >> $env:GITHUB_ENV
         Get-PSDrive -PSProvider FileSystem | Format-Table Name, Used, Free
