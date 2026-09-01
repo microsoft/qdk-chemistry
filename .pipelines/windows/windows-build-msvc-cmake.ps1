@@ -71,11 +71,13 @@ $HostArch = if ($hostArchRaw -eq "ARM64") { "arm64" } else { "x64" }
 $VcvarsArg = if ($HostArch -eq $Arch) { $Arch } else { "${HostArch}_${Arch}" }
 
 # qdk TUs including libint2 engine.impl.h peak at several GB under MSVC; cap
-# concurrency by available RAM (~6 GB/job) to avoid C1060 (compiler out of heap
-# space), not just CPU count.
+# concurrency by available RAM to avoid C1060 (compiler out of heap space), not
+# just CPU count. ARM64 codegen needs more per TU than x64: 6 GB/job still
+# exhausted the heap on the ARM64 CI pool, so budget 10 GB/job there.
+$ramPerJobGB = if ($Arch -eq "arm64") { 10 } else { 6 }
 $cpu = [Math]::Max(1, [System.Environment]::ProcessorCount - 2)
 $ramGB = [math]::Floor((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
-$NCPUS = [Math]::Min($cpu, [Math]::Max(1, [math]::Floor($ramGB / 6)))
+$NCPUS = [Math]::Min($cpu, [Math]::Max(1, [math]::Floor($ramGB / $ramPerJobGB)))
 
 $linkMode = if ($DynamicDeps) { "dynamic" } else { "static" }
 Write-Host "============================================" -ForegroundColor Cyan

@@ -35,12 +35,14 @@ if (-not $DepsInstallDir) { $DepsInstallDir = "$SrcDir\deps-install-msvc" }
 Write-Host "vcpkg triplet: $Triplet"
 
 # qdk TUs that include libint2 engine.impl.h peak at several GB under MSVC, so
-# cap concurrency by available RAM (~6 GB/job) rather than by CPU count alone,
-# to avoid C1060 (compiler out of heap space).
+# cap concurrency by available RAM rather than by CPU count alone, to avoid
+# C1060 (compiler out of heap space). ARM64 codegen needs more per TU than x64:
+# 6 GB/job still exhausted the heap on the ARM64 CI pool, so budget 10 GB/job.
 if (-not $env:CMAKE_BUILD_PARALLEL_LEVEL) {
+    $ramPerJobGB = if ($Triplet -like 'arm64-*') { 10 } else { 6 }
     $cpu   = [int]$env:NUMBER_OF_PROCESSORS
     $ramGB = [math]::Floor((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
-    $jobs  = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 6)))
+    $jobs  = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / $ramPerJobGB)))
     Write-Host "CPUs=$cpu  RAM=${ramGB} GB  -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
     $env:CMAKE_BUILD_PARALLEL_LEVEL = $jobs
 }
