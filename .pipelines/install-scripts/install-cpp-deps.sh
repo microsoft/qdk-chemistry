@@ -217,10 +217,10 @@ rm -rf spdlog
 
 # Install blaspp / lapackpp
 echo "=== Installing blaspp ==="
-bash "${SCRIPT_DIR}/install-blaspp.sh" "$INSTALL_PREFIX" "$BLASPP_COMMIT" "$BLAS_VENDOR" "$MARCH" "$BUILD_SHARED_LIBS"
+bash "${SCRIPT_DIR}/install-blaspp.sh" "$INSTALL_PREFIX" "$BLASPP_COMMIT" "$BLAS_VENDOR" "$MARCH" "$BUILD_SHARED_LIBS" "$BUILD_TYPE"
 
 echo "=== Installing lapackpp ==="
-bash "${SCRIPT_DIR}/install-lapackpp.sh" "$INSTALL_PREFIX" "$LAPACKPP_COMMIT" "$MARCH" "$BUILD_SHARED_LIBS"
+bash "${SCRIPT_DIR}/install-lapackpp.sh" "$INSTALL_PREFIX" "$LAPACKPP_COMMIT" "$MARCH" "$BUILD_SHARED_LIBS" "$BUILD_TYPE"
 
 # Install libint2
 echo "=== Installing libint2 ==="

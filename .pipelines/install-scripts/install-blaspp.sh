@@ -8,19 +8,21 @@ set -e
 # The commit hash is NOT defaulted here: it must always be resolved from external/macis/manifest/cgmanifest.json
 # by the caller and passed in.
 #
-# Usage: install-blaspp.sh <install_prefix> <commit> [blas_vendor] [march] [build_shared_libs]
+# Usage: install-blaspp.sh <install_prefix> <commit> [blas_vendor] [march] [build_shared_libs] [build_type]
 #   install_prefix     - CMAKE_INSTALL_PREFIX (also searched for an existing BLAS install, e.g. OpenBLAS/BLIS).
 #   commit              - blaspp commit hash, resolved from external/macis/manifest/cgmanifest.json.
 #   blas_vendor         - BLAS++'s `-Dblas=` value: "auto" (link-tests against an already-found BLAS), "openblas"
 #                         (default), or "blis" (ADO's BLIS+LibFLAME stack).
 #   march               - -march= value for CMAKE_CXX_FLAGS (default: x86-64-v3).
 #   build_shared_libs   - ON/OFF (default: OFF, matches its callers' static default).
+#   build_type          - CMAKE_BUILD_TYPE (default: Release).
 
 INSTALL_PREFIX=${1:-/usr/local}
 COMMIT=${2:?commit hash is required (resolve it from external/macis/manifest/cgmanifest.json)}
 BLAS_VENDOR=${3:-openblas}
 MARCH=${4:-x86-64-v3}
 BUILD_SHARED_LIBS=${5:-OFF}
+BUILD_TYPE=${6:-Release}
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
@@ -35,7 +37,7 @@ rm -rf "${WORKDIR}"
 shallow_checkout "${BLASPP_REPO}" "${COMMIT}" "${WORKDIR}"
 
 cmake -S "${WORKDIR}" -B "${WORKDIR}/build" -GNinja \
-    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
     -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" \
     -DCMAKE_PREFIX_PATH="${INSTALL_PREFIX}" \
     -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
