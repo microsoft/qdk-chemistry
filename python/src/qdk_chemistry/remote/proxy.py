@@ -273,7 +273,7 @@ def run(
         job = resolved_cache.get_job(job_cache_key)
 
         if job is not None:
-            owner_matches = _owner is None or job.owner == _owner
+            owner_matches = _owner is None or job.owner is None or job.owner == _owner
             if owner_matches and remote is not None and not isinstance(remote, str):
                 job.attach_backend(remote)
 

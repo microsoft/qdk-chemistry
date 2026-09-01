@@ -185,15 +185,15 @@ def _script_path(scripts_dir: Path, script_name: str) -> Path:
 
 
 def _commands_for_current_environment(plugin_name: str) -> dict[str, str]:
-    try:
-        require_mcp()
-    except ModuleNotFoundError as exc:
-        raise PluginInstallError(MCP_INSTALL_MESSAGE) from exc
     if sys.prefix == sys.base_prefix and not hasattr(sys, "real_prefix"):
         raise PluginInstallError(
             "QDK Chemistry plugin installation requires a virtual environment; "
             "activate the venv and rerun with the 'qc' command from that environment"
         )
+    try:
+        require_mcp()
+    except ModuleNotFoundError as exc:
+        raise PluginInstallError(MCP_INSTALL_MESSAGE) from exc
     scripts_dir = Path(sysconfig.get_path("scripts"))
     return {
         server_name: str(_script_path(scripts_dir, script_name))
@@ -350,7 +350,7 @@ def _copy_component_directories(sources: list[Path], destination: Path) -> list[
                 )
             target = destination / source_file.relative_to(source)
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source_file, target, follow_symlinks=False)
+            shutil.copy2(source_file, target, follow_symlinks=True)
             copied.append(str(target))
     return copied
 

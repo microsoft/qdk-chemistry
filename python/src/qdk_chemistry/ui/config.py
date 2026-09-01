@@ -34,7 +34,9 @@ class QDKMCPConfig:
         default_scratch = Path("/scratch")
         bckp_scratch = Path.home() / ".qdk_chem" / "scratch"
 
-        if "QDK_SCRATCH_DIR" in os.environ:
+        if "QDK_WORKSPACE_ROOT" in os.environ:
+            self.scratch_dir = Path(os.environ["QDK_WORKSPACE_ROOT"])
+        elif "QDK_SCRATCH_DIR" in os.environ:
             self.scratch_dir = Path(os.environ["QDK_SCRATCH_DIR"])
         else:
             self.scratch_dir = default_scratch
@@ -73,6 +75,28 @@ class QDKMCPConfig:
             if "QDK_JOBS_DIR" not in os.environ:
                 self.jobs_dir = self.scratch_dir / "jobs"
             self._setup_directories()
+
+    def set_workspace_root(self, workspace_root: Path) -> None:
+        """Move default project, cache, and job storage into a workspace.
+
+        Args:
+            workspace_root: Bound workspace directory used as the storage root.
+
+        Raises:
+            OSError: If the workspace storage directories cannot be created.
+
+        """
+        projects_dir = workspace_root / "projects"
+        cache_dir = Path(os.environ["QDK_CACHE_DIR"]) if "QDK_CACHE_DIR" in os.environ else workspace_root / "cache"
+        jobs_dir = Path(os.environ["QDK_JOBS_DIR"]) if "QDK_JOBS_DIR" in os.environ else workspace_root / "jobs"
+
+        for directory in (workspace_root, projects_dir, cache_dir, jobs_dir):
+            directory.mkdir(parents=True, exist_ok=True)
+
+        self.scratch_dir = workspace_root
+        self.projects_dir = projects_dir
+        self.cache_dir = cache_dir
+        self.jobs_dir = jobs_dir
 
     def _setup_directories(self):
         """Set up scratch and project directories."""

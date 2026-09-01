@@ -100,6 +100,21 @@ def test_component_copy_rejects_symlink_outside_plugin_tree(tmp_path: Path) -> N
     assert not (destination / "SKILL.md").exists()
 
 
+def test_component_copy_dereferences_symlink_inside_plugin_tree(tmp_path: Path) -> None:
+    source = tmp_path / "plugin" / "skills"
+    nested = source / "shared"
+    nested.mkdir(parents=True)
+    (nested / "content.md").write_text("content\n", encoding="utf-8")
+    (source / "SKILL.md").symlink_to("shared/content.md")
+    destination = tmp_path / "workspace" / ".github" / "skills"
+
+    plugin_installer._copy_component_directories([source], destination)
+
+    copied = destination / "SKILL.md"
+    assert copied.read_text(encoding="utf-8") == "content\n"
+    assert not copied.is_symlink()
+
+
 def test_local_install_registers_ancestor_marketplace(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -228,6 +243,7 @@ def test_update_reapplies_recorded_command(
 def test_current_environment_must_be_a_venv(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(plugin_installer.sys, "prefix", "/usr")
     monkeypatch.setattr(plugin_installer.sys, "base_prefix", "/usr")
+    monkeypatch.delattr(plugin_installer.sys, "real_prefix", raising=False)
 
     with pytest.raises(plugin_installer.PluginInstallError, match="requires a virtual environment"):
         plugin_installer._commands_for_current_environment("qdk-chemistry")

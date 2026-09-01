@@ -8,7 +8,6 @@
 import ast
 import errno
 import json
-import os
 import tempfile
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -1001,15 +1000,24 @@ def test_remote_job_operations_hide_jobs_owned_by_other_workspaces():
 # ── Config ───────────────────────────────────────────────────────────────
 
 
-def test_config_jobs_dir_env():
+def test_config_jobs_dir_env(monkeypatch):
     with tempfile.TemporaryDirectory() as t:
-        os.environ["QDK_SCRATCH_DIR"] = t
-        os.environ["QDK_JOBS_DIR"] = t
-        try:
-            assert QDKMCPConfig().jobs_dir == Path(t)
-        finally:
-            del os.environ["QDK_JOBS_DIR"]
-            del os.environ["QDK_SCRATCH_DIR"]
+        monkeypatch.delenv("QDK_WORKSPACE_ROOT", raising=False)
+        monkeypatch.setenv("QDK_SCRATCH_DIR", t)
+        monkeypatch.setenv("QDK_JOBS_DIR", t)
+
+        assert QDKMCPConfig().jobs_dir == Path(t)
+
+
+def test_config_workspace_root_sets_default_storage(tmp_path, monkeypatch):
+    monkeypatch.setenv("QDK_WORKSPACE_ROOT", str(tmp_path))
+
+    workspace_config = QDKMCPConfig()
+
+    assert workspace_config.scratch_dir == tmp_path
+    assert workspace_config.projects_dir == tmp_path / "projects"
+    assert workspace_config.cache_dir == tmp_path / "cache"
+    assert workspace_config.jobs_dir == tmp_path / "jobs"
 
 
 def test_config_falls_back_from_read_only_default_scratch(monkeypatch, tmp_path):
@@ -1019,6 +1027,7 @@ def test_config_falls_back_from_read_only_default_scratch(monkeypatch, tmp_path)
         return original_mkdir(self, *args, **kwargs)
 
     monkeypatch.delenv("QDK_SCRATCH_DIR", raising=False)
+    monkeypatch.delenv("QDK_WORKSPACE_ROOT", raising=False)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     original_mkdir = Path.mkdir
     monkeypatch.setattr(Path, "mkdir", read_only_default_scratch)

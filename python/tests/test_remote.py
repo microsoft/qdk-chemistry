@@ -587,7 +587,7 @@ def test_shared_cache_transport_scopes_worker_and_client_jobs_by_owner(tmp_path,
 
     cached_algorithm = CachedAlgorithm()
     for owner, result in zip(owners, results, strict=True):
-        assert run(cached_algorithm, cache=shared_cache, remote=MagicMock(), _owner=owner) == result
+        assert run(cached_algorithm, cache=shared_cache, _owner=owner) == result
 
 
 def test_worker_logs_remote_cache_load_failure(tmp_path, monkeypatch, caplog):

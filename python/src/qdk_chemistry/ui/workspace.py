@@ -15,6 +15,8 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote, urlparse
 from urllib.request import url2pathname
 
+from qdk_chemistry.ui.config import config
+
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
@@ -66,6 +68,7 @@ def configure_workspace(path: Path) -> dict[str, object]:
         root.
 
     Raises:
+        OSError: If workspace storage directories cannot be created.
         ValueError: If ``path`` is relative or does not identify a directory.
         RuntimeError: If this process is already bound to a different workspace.
 
@@ -83,6 +86,7 @@ def configure_workspace(path: Path) -> dict[str, object]:
                 f"this QDK Chemistry MCP process is already bound to workspace {str(_WORKSPACE_ROOT)!r}; "
                 "start a separate MCP process for another workspace"
             )
+        config.set_workspace_root(resolved)
         os.environ["QDK_WORKSPACE_ROOT"] = str(resolved)
         _WORKSPACE_ROOT = resolved
 
