@@ -52,7 +52,7 @@ def _dump_op(op, num_qubits: int) -> np.ndarray:
 def _decode(counts: dict[str, int], num_bits: int, *, resolve_positive_branch: bool = False):
     """Run the decoder against a walk whose block encoding has ``lambda = 1``."""
     return _post_process_phase_estimation(
-        counts, num_bits, "qdk_unary", resolve_positive_branch, lambda phase: float(np.cos(2 * np.pi * phase))
+        counts, num_bits, "qdk_unary", resolve_positive_branch, lambda phase: (float(np.cos(2 * np.pi * phase)),)
     )
 
 

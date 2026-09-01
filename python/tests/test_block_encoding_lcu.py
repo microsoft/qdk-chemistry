@@ -386,24 +386,26 @@ class TestLCUContainer:
         # φ=0 → E=λ
         assert np.isclose(
             container.eigenvalue_from_phase(0.0),
-            lam,
+            (lam,),
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
-        )
+        ).all()
         # φ=0.25 → E=0
         assert np.isclose(
             container.eigenvalue_from_phase(0.25),
-            0.0,
+            (0.0,),
             atol=float_comparison_absolute_tolerance,
-        )
+        ).all()
 
     def test_walk_container_power_one_has_a_single_branch(self):
         """A power-one walk inverts uniquely, so the branch tuple holds one eigenvalue."""
         container = LCUWalkContainer(_lcu_container(), power=1, scale=6.0)
 
-        assert container.eigenvalue_branches_from_phase(0.1) == (container.eigenvalue_from_phase(0.1),)
+        branches = container.eigenvalue_from_phase(0.1)
+
+        assert len(branches) == 1
         assert np.isclose(
-            container.eigenvalue_from_phase(0.1),
+            branches[0],
             6.0 * np.cos(2 * np.pi * 0.1),
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
@@ -417,7 +419,7 @@ class TestLCUContainer:
         container = LCUWalkContainer(_lcu_container(), power=power, scale=lam)
         phase_fraction = (power * np.arccos(energy / lam) / (2 * np.pi)) % 1.0
 
-        branches = container.eigenvalue_branches_from_phase(phase_fraction)
+        branches = container.eigenvalue_from_phase(phase_fraction)
 
         assert len(branches) <= power
         assert list(branches) == sorted(branches)
@@ -425,13 +427,19 @@ class TestLCUContainer:
             np.isclose(branch, energy, rtol=float_comparison_relative_tolerance, atol=1e-9) for branch in branches
         )
 
-    def test_walk_container_reports_ambiguity_instead_of_one_branch(self):
-        """A powered walk that folds several energies onto a phase refuses to pick one."""
+    def test_walk_container_reports_every_folded_branch(self):
+        """A powered walk that folds several energies onto a phase reports all of them."""
         container = LCUWalkContainer(_lcu_container(), power=2, scale=6.0)
 
-        assert len(container.eigenvalue_branches_from_phase(0.1)) == 2
-        with pytest.raises(ValueError, match="consistent with 2 eigenvalues"):
-            container.eigenvalue_from_phase(0.1)
+        branches = container.eigenvalue_from_phase(0.1)
+
+        assert len(branches) == 2
+        assert np.isclose(
+            branches,
+            sorted((6.0 * np.cos(np.pi * 0.1), 6.0 * np.cos(np.pi * 1.1))),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        ).all()
 
     def test_walk_container_powered_branches_survive_serialization(self):
         """Serialized walk containers keep the power that defines their inverse branches."""
@@ -440,7 +448,7 @@ class TestLCUContainer:
         restored = LCUWalkContainer.from_json(container.to_json())
 
         assert restored.power == 3
-        assert restored.eigenvalue_branches_from_phase(0.1) == container.eigenvalue_branches_from_phase(0.1)
+        assert restored.eigenvalue_from_phase(0.1) == container.eigenvalue_from_phase(0.1)
 
     def test_walk_container_rejects_a_non_positive_power(self):
         """A walk operator applied fewer than once represents nothing."""

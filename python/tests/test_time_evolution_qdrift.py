@@ -627,7 +627,7 @@ class TestQDriftScale:
         builder = QDrift(time=t)
         container = builder.run(hamiltonian).get_container()
         assert np.isclose(
-            container.eigenvalue_from_phase(phi),
+            container.eigenvalue_from_phase(phi)[0],
             energy,
             rtol=1e-10,
             atol=1e-12,

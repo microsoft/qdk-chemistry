@@ -554,7 +554,7 @@ class TestTrotter:
         hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
         builder = Trotter(time=2.0)
         container = builder.run(hamiltonian).get_container()
-        assert np.isclose(container.eigenvalue_from_phase(0.0), 0.0, atol=float_comparison_absolute_tolerance)
+        assert np.isclose(container.eigenvalue_from_phase(0.0)[0], 0.0, atol=float_comparison_absolute_tolerance)
 
     def test_eigenvalue_from_phase_roundtrip(self):
         """Verify E -> phase -> E roundtrip for a known energy in the principal branch."""
@@ -565,7 +565,7 @@ class TestTrotter:
         builder = Trotter(time=t)
         container = builder.run(hamiltonian).get_container()
         assert np.isclose(
-            container.eigenvalue_from_phase(phi),
+            container.eigenvalue_from_phase(phi)[0],
             energy,
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
@@ -585,7 +585,7 @@ class TestTrotter:
 
         assert np.isclose(container.scale, t * power, rtol=float_comparison_relative_tolerance)
         assert np.isclose(
-            container.eigenvalue_from_phase(phi),
+            container.eigenvalue_from_phase(phi)[0],
             energy,
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
@@ -603,7 +603,7 @@ class TestTrotter:
         restored = PauliProductFormulaContainer.from_json(container.to_json())
 
         assert np.isclose(
-            restored.eigenvalue_from_phase(phi),
+            restored.eigenvalue_from_phase(phi)[0],
             energy,
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,

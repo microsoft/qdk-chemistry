@@ -357,7 +357,7 @@ class LCUContainer(BlockEncodingContainer):
         _hash_int(h, self.select.num_prepare_ancillas)
         _hash_int(h, self.select.num_target_qubits)
 
-    def eigenvalue_from_phase(self, phase_fraction: float) -> float:
+    def eigenvalue_from_phase(self, phase_fraction: float) -> tuple[float, ...]:
         """Not applicable for a raw block encoding.
 
         A plain block encoding does not define an eigenvalue-phase
