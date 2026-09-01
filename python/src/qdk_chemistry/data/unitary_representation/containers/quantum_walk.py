@@ -45,7 +45,7 @@ class QuantumWalkContainer(UnitaryContainer):
         return "quantum_walk_container"
 
     # Serialization version for this class
-    _serialization_version = "0.3.0"
+    _serialization_version = "0.2.0"
 
     def eigenvalue_from_phase(self, phase_fraction: float) -> tuple[float, ...]:
         r"""Recover every eigenvalue consistent with a quantum-walk phase.
@@ -118,7 +118,7 @@ class LCUWalkContainer(QuantumWalkContainer):
         return "lcu_walk_container"
 
     # Serialization version for this class
-    _serialization_version = "0.3.0"
+    _serialization_version = "0.2.0"
 
     def __init__(self, block_encoding: BlockEncodingContainer, power: int = 1, scale: float = 1.0) -> None:
         """Initialize an LCUWalkContainer.

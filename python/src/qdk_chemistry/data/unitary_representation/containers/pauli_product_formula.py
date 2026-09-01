@@ -61,7 +61,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
         return "pauli_product_formula_container"
 
     # Serialization version for this class
-    _serialization_version = "0.3.0"
+    _serialization_version = "0.2.0"
 
     def __init__(
         self,
