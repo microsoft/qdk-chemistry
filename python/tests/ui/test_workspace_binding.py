@@ -37,11 +37,12 @@ def _reset_workspace_binding(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_configure_workspace_sets_stable_absolute_root(tmp_path) -> None:
+    original_cwd = Path.cwd()
     result = workspace.configure_workspace(tmp_path)
 
     assert result == {"bound": True, "workspace_root": str(tmp_path)}
     assert os.environ["QDK_WORKSPACE_ROOT"] == str(tmp_path)
-    assert Path.cwd() == tmp_path
+    assert Path.cwd() == original_cwd
     assert workspace.configure_workspace(tmp_path)["bound"] is True
     other = tmp_path / "other"
     other.mkdir()
@@ -49,20 +50,11 @@ def test_configure_workspace_sets_stable_absolute_root(tmp_path) -> None:
         workspace.configure_workspace(other)
 
 
-def test_configure_workspace_does_not_publish_root_before_chdir(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
-    def failing_chdir(path: Path) -> None:
-        assert path == tmp_path
-        assert not workspace._WORKSPACE_LOCK.acquire(blocking=False)
-        assert workspace.current_workspace_root() is None
-        raise OSError("chdir failed")
+def test_configure_workspace_never_changes_cwd(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    chdir = pytest.fail
+    monkeypatch.setattr(os, "chdir", chdir)
 
-    with monkeypatch.context() as patch:
-        patch.setattr(os, "chdir", failing_chdir)
-
-        with pytest.raises(OSError, match="chdir failed"):
-            workspace.configure_workspace(tmp_path)
-
-    assert workspace.current_workspace_root() is None
+    assert workspace.configure_workspace(tmp_path)["bound"] is True
 
 
 def test_plugin_middleware_rejects_unbound_tool(monkeypatch: pytest.MonkeyPatch) -> None:

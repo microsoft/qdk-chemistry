@@ -7,12 +7,13 @@
 
 import ast
 import errno
+import json
 import os
 import tempfile
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import ANY, MagicMock, call, patch
 
 import numpy as np
 import pytest
@@ -23,6 +24,7 @@ from qdk_chemistry.remote.backends.base import RemoteBackend, get_mcp_safe_confi
 from qdk_chemistry.remote.job import Job
 from qdk_chemistry.ui import tools as srv
 from qdk_chemistry.ui.config import QDKMCPConfig, config
+from qdk_chemistry.ui.validation import validate_project
 
 
 @pytest.fixture
@@ -183,7 +185,7 @@ def test_project_management_rejects_symlink_escape(tool):
     result = tool(project_name="escape")
 
     assert result["status"] == "error"
-    assert "outside projects directory" in result["message"]
+    assert "symbolic link" in result["message"]
 
 
 # ── list_tools ───────────────────────────────────────────────────────────
@@ -401,6 +403,38 @@ def test_run_algorithm_rejects_unsafe_remote_config(remote, remote_config):
     remote_run.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    "remote_config",
+    [
+        {"poll_interval": True},
+        {"poll_interval": "1"},
+        {"timeout": None},
+        {"timeout": 0},
+        {"timeout": -1},
+        {"poll_interval": float("nan")},
+        {"poll_interval": float("inf")},
+        {"timeout": json.loads("1e309")},
+    ],
+)
+def test_run_algorithm_rejects_invalid_mcp_timing_config(remote_config):
+    """MCP timing controls must be finite, positive non-boolean numbers."""
+    algorithm = MagicMock()
+    with (
+        patch("qdk_chemistry.remote.backends.get_backend") as get_backend,
+        patch("qdk_chemistry.ui.tools._remote_run") as remote_run,
+        pytest.raises(ValueError, match="finite, positive number"),
+    ):
+        srv._run_algorithm(
+            algorithm,
+            remote="local",
+            remote_config=remote_config,
+            remote_timeout=None,
+        )
+
+    get_backend.assert_not_called()
+    remote_run.assert_not_called()
+
+
 def test_describe_remote_backend_only_lists_safe_mcp_config():
     """Backend discovery advertises only MCP-safe remote options."""
     result = srv.describe_backend(backend_type="remote", name="local")
@@ -514,6 +548,26 @@ def test_timed_remote_run_timeout_starts_after_handle_is_persisted():
     assert Job.load(config.jobs_dir / "run-hash.job.json").job_id == "remote-job"
 
 
+@pytest.mark.usefixtures("_dirs")
+def test_timed_remote_run_propagates_backend_timeout_after_submission():
+    algorithm = MagicMock()
+    algorithm.hash.return_value = "run-hash"
+    job = Job(job_id="remote-job", backend="test-remote", backend_config={}, backend_state={})
+
+    def remote_run(*_args, **kwargs):
+        callback = kwargs.get("_on_job_submitted")
+        assert callback is not None
+        callback(job)
+        raise TimeoutError("backend wait expired")
+
+    with (
+        patch("qdk_chemistry.ui.tools._REMOTE_AVAILABLE", True),
+        patch("qdk_chemistry.ui.tools._remote_run", side_effect=remote_run),
+        pytest.raises(TimeoutError, match="backend wait expired"),
+    ):
+        srv._run_algorithm(algorithm, "input", remote="test-remote", remote_timeout=120)
+
+
 def test_run_population_analysis_tool(h2_proj):
     algorithm = MagicMock()
     algorithm.name.return_value = "qdk"
@@ -539,6 +593,34 @@ def test_run_population_analysis_tool(h2_proj):
     assert run_algorithm.call_args.args[1:] == (ANY,)
     assert run_algorithm.call_args.kwargs["cache"] == "folder"
     assert run_algorithm.call_args.kwargs["remote"] == "local"
+
+
+def test_run_valence_active_space_selector_preserves_supplied_counts(h2_proj):
+    algorithm = MagicMock()
+    wavefunction = MagicMock()
+    settings = algorithm.settings.return_value
+
+    with (
+        patch("qdk_chemistry.ui.tools.algorithms.create", return_value=algorithm),
+        patch("qdk_chemistry.ui.tools._load_or_error", return_value=(wavefunction, None)),
+        patch("qdk_chemistry.ui.tools.compute_valence_space_parameters", return_value=(8, 7)),
+        patch("qdk_chemistry.ui.tools._run_algorithm", return_value=wavefunction),
+        patch("qdk_chemistry.ui.tools.save_data_object"),
+    ):
+        result = srv.run_active_space_selector(
+            project_name=h2_proj,
+            wavefunction_filename="input.wavefunction.json",
+            out_wavefunction_filename="result.wavefunction.json",
+            charge=0,
+            algorithm_name="qdk_valence",
+            settings={"num_active_orbitals": 6},
+        )
+
+    assert result["status"] == "ok", result
+    assert settings.set.call_args_list == [
+        call("num_active_orbitals", 6),
+        call("num_active_electrons", 8),
+    ]
 
 
 def test_run_scf_accepts_wavefunction_output(h2_proj):
@@ -596,6 +678,87 @@ def test_controlled_evolution_mapper_uses_common_execution_path(h2_proj):
         "overwrite": True,
     }
     save_data_object.assert_called_once_with(circuit, "controlled.circuit.json")
+
+
+def test_qubit_mapper_returns_companion_core_energy(h2_proj):
+    algorithm = MagicMock()
+    hamiltonian = MagicMock()
+    hamiltonian.get_core_energy.return_value = 1.25
+    mapping = MagicMock()
+    qubit_hamiltonian = MagicMock()
+
+    with (
+        patch("qdk_chemistry.ui.tools._prepare_output", return_value=("mapped.qubithamiltonian.json", None)),
+        patch(
+            "qdk_chemistry.ui.tools._load_or_error",
+            side_effect=[(hamiltonian, None), (mapping, None)],
+        ),
+        patch("qdk_chemistry.ui.tools.algorithms.create", return_value=algorithm),
+        patch("qdk_chemistry.ui.tools._run_algorithm", return_value=qubit_hamiltonian) as run_algorithm,
+        patch("qdk_chemistry.ui.tools.save_data_object") as save_data_object,
+    ):
+        result = srv.run_qubit_mapper(
+            project_name=h2_proj,
+            hamiltonian_filename="hamiltonian.json",
+            mapping_filename="mapping.json",
+            out_qubit_hamiltonian_filename="mapped.json",
+        )
+
+    assert result == {
+        "status": "ok",
+        "result": {
+            "qubit_hamiltonian_filename": "mapped.qubithamiltonian.json",
+            "core_energy": 1.25,
+        },
+    }
+    run_algorithm.assert_called_once()
+    save_data_object.assert_called_once_with(qubit_hamiltonian, "mapped.qubithamiltonian.json")
+
+
+@pytest.mark.parametrize("num_bits", [-1, 0])
+def test_phase_estimation_reports_invalid_num_bits_without_selection_advice(h2_proj, num_bits):
+    with (
+        patch("qdk_chemistry.ui.tools._load_or_error", return_value=(MagicMock(), None)),
+        patch("qdk_chemistry.ui.tools.load_data_object", return_value=MagicMock()),
+    ):
+        result = srv.run_phase_estimation(
+            project_name=h2_proj,
+            state_prep_circuit_filename="state.circuit.json",
+            qubit_hamiltonian_filename="hamiltonian.qubithamiltonian.json",
+            out_qpe_result_filename="result.qperesult.json",
+            settings={"qpe_circuit_builder": {"num_bits": num_bits}},
+        )
+
+    assert result["status"] == "error"
+    assert "settings.qpe_circuit_builder.num_bits must be set to a positive integer" in result["message"]
+    assert f"received {num_bits}" in result["message"]
+    assert "better" not in result["message"]
+    assert "feasible" not in result["message"]
+
+
+def test_phase_estimation_reports_invalid_time_without_selection_advice(h2_proj):
+    with (
+        patch("qdk_chemistry.ui.tools._load_or_error", return_value=(MagicMock(), None)),
+        patch("qdk_chemistry.ui.tools.load_data_object", return_value=MagicMock()),
+    ):
+        result = srv.run_phase_estimation(
+            project_name=h2_proj,
+            state_prep_circuit_filename="state.circuit.json",
+            qubit_hamiltonian_filename="hamiltonian.qubithamiltonian.json",
+            out_qpe_result_filename="result.qperesult.json",
+            settings={
+                "qpe_circuit_builder": {
+                    "num_bits": 4,
+                    "unitary_builder": {"time": 0.0},
+                }
+            },
+        )
+
+    assert result["status"] == "error"
+    assert "settings.qpe_circuit_builder.unitary_builder.time must be set explicitly" in result["message"]
+    assert "received 0.0" in result["message"]
+    assert "eigenvalue range" not in result["message"]
+    assert "Typical values" not in result["message"]
 
 
 def test_algorithm_runs_are_centralized():
@@ -712,6 +875,37 @@ def test_list_remote_jobs_only_returns_current_project_jobs():
 
     assert result["status"] == "ok"
     assert [job["job_id"] for job in result["result"]["jobs"]] == ["current"]
+
+
+@pytest.mark.usefixtures("_dirs")
+def test_check_remote_job_is_not_blocked_by_project_scoped_work():
+    owner = srv._current_job_owner("project-a")
+    Job(job_id="current", backend="local", backend_config={}, backend_state={}, owner=owner).save(
+        config.jobs_dir / "current.job.json"
+    )
+    calculation_entered = threading.Event()
+    release_calculation = threading.Event()
+
+    @validate_project
+    def slow_calculation(project_name: str) -> None:
+        del project_name
+        calculation_entered.set()
+        assert release_calculation.wait(timeout=2)
+
+    calculation_thread = threading.Thread(target=slow_calculation, args=("project-a",))
+    calculation_thread.start()
+    assert calculation_entered.wait(timeout=2)
+
+    try:
+        with patch.object(Job, "check", return_value=MagicMock(status="running", logs=[], error=None)):
+            result = srv.check_remote_job(project_name="project-a", job_id="current")
+        assert result["status"] == "ok"
+        assert calculation_thread.is_alive()
+    finally:
+        release_calculation.set()
+        calculation_thread.join(timeout=2)
+
+    assert not calculation_thread.is_alive()
 
 
 @pytest.mark.usefixtures("_dirs")

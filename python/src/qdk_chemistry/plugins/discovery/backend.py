@@ -338,6 +338,7 @@ class DiscoveryBackend(RemoteBackend):
                 algorithm_name=payload["algorithm_name"],
                 settings=payload["settings"],
                 run_hash=payload.get("run_hash"),
+                job_cache_key=payload.get("job_cache_key"),
                 input_hashes=payload.get("input_hashes"),
                 remote_cache=payload.get("remote_cache"),
                 remote_cache_backend=cache,
@@ -403,6 +404,7 @@ class DiscoveryBackend(RemoteBackend):
             "inline_manifest": base64.b64encode(gzip.compress(manifest)).decode("ascii"),
             "remote_cache": payload["remote_cache"],
             "run_hash": payload["run_hash"],
+            "job_cache_key": payload["job_cache_key"],
             "transport": "cache",
         }
 
@@ -576,9 +578,10 @@ class DiscoveryBackend(RemoteBackend):
         """Reconstruct a completed result from the configured shared cache."""
         cache = cls._shared_cache({"remote_cache": backend_state["remote_cache"]})
         run_hash = backend_state["run_hash"]
-        job = cache.get_job(run_hash)
+        job_cache_key = backend_state["job_cache_key"]
+        job = cache.get_job(job_cache_key)
         if job is None or job.output_hashes is None or job.output_is_tuple is None:
-            raise LookupError(f"Shared cache has no completed result for run {run_hash}")
+            raise LookupError(f"Shared cache has no completed result for run {job_cache_key}")
         results: list[Any] = []
         for entry in job.output_hashes:
             if "value" in entry:

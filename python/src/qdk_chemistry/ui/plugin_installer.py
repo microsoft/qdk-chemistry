@@ -17,6 +17,8 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+from ._mcp import MCP_INSTALL_MESSAGE, require_mcp
+
 _PLUGIN_SERVER_SCRIPTS = {"qdk-chemistry": {"qdk_chemistry": "qcmcp"}}
 _MANIFEST_PATHS = (
     Path("plugin.json"),
@@ -183,6 +185,10 @@ def _script_path(scripts_dir: Path, script_name: str) -> Path:
 
 
 def _commands_for_current_environment(plugin_name: str) -> dict[str, str]:
+    try:
+        require_mcp()
+    except ModuleNotFoundError as exc:
+        raise PluginInstallError(MCP_INSTALL_MESSAGE) from exc
     if sys.prefix == sys.base_prefix and not hasattr(sys, "real_prefix"):
         raise PluginInstallError(
             "QDK Chemistry plugin installation requires a virtual environment; "

@@ -7,6 +7,9 @@
 
 import asyncio
 
+import pytest
+
+from qdk_chemistry.ui._mcp import MCP_AVAILABLE
 from qdk_chemistry.ui.mcp import (
     _compact_tool_description,
     _install_tool_description_compactor,
@@ -77,6 +80,7 @@ _REVIEWED_TOOL_NAMES = {
     "visualize_scatter_plot",
 }
 _OPTIONAL_VISUALIZATION_TOOLS = {name for name in _REVIEWED_TOOL_NAMES if name.startswith("visualize_")}
+requires_mcp = pytest.mark.skipif(not MCP_AVAILABLE, reason="MCP support is not installed")
 
 
 def _compact_catalog():
@@ -116,6 +120,7 @@ def test_mcp_tool_description_compactor_keeps_summary_paragraph():
     assert _compact_tool_description("  One\nsummary line.\n\nDetails.  ") == "One summary line."
 
 
+@requires_mcp
 def test_live_mcp_catalog_has_compact_descriptions():
     tools = _compact_catalog()
 
@@ -127,6 +132,7 @@ def test_live_mcp_catalog_has_compact_descriptions():
     assert sum(len(description.encode()) for description in descriptions) < 16_000
 
 
+@requires_mcp
 def test_compact_descriptions_identify_tool_operations():
     descriptions = {tool.name: (tool.description or "").lower() for tool in _compact_catalog()}
     required_terms = {

@@ -535,6 +535,60 @@ def test_worker_cache_transport_skips_output_serialization(tmp_path, monkeypatch
     assert not output_dir.exists()
 
 
+def test_shared_cache_transport_scopes_worker_and_client_jobs_by_owner(tmp_path, monkeypatch):
+    """Two owners retain distinct shared-cache results for one run hash."""
+    shared_cache = FolderCache(path=tmp_path / "shared", is_shared=True)
+    owners = [
+        {"workspace_root": "/workspace", "project_name": "project-a"},
+        {"workspace_root": "/workspace", "project_name": "project-b"},
+    ]
+    run_hash = "testhash"
+    results = [1, 2]
+    algorithms = []
+
+    for index, (owner, result) in enumerate(zip(owners, results, strict=True)):
+        input_dir = tmp_path / f"input-{index}"
+        job_cache_key = _job_cache_key(run_hash, owner)
+        serialize_inputs(
+            input_dir,
+            args=(),
+            kwargs={},
+            algorithm_type="test_algorithm",
+            algorithm_name="plugin",
+            settings={},
+            run_hash=run_hash,
+            job_cache_key=job_cache_key,
+            remote_cache={"name": "folder", "path": str(tmp_path / "shared"), "is_shared": True},
+            remote_cache_transport=True,
+        )
+        algorithm = MagicMock()
+        algorithm.run.return_value = result
+        algorithms.append(algorithm)
+        monkeypatch.setattr(algorithms_module, "create", MagicMock(return_value=algorithm))
+
+        assert execute_job(input_dir, tmp_path / f"output-{index}") == result
+        assert shared_cache.get_job(job_cache_key) is not None
+
+    assert [algorithm.run.call_count for algorithm in algorithms] == [1, 1]
+
+    class CachedAlgorithm:
+        def type_name(self):
+            return "test_algorithm"
+
+        def name(self):
+            return "plugin"
+
+        def settings(self):
+            return Settings()
+
+        def hash(self, *_args, **_kwargs):
+            return run_hash
+
+    cached_algorithm = CachedAlgorithm()
+    for owner, result in zip(owners, results, strict=True):
+        assert run(cached_algorithm, cache=shared_cache, remote=MagicMock(), _owner=owner) == result
+
+
 def test_worker_logs_remote_cache_load_failure(tmp_path, monkeypatch, caplog):
     input_dir = tmp_path / "input"
     input_dir.mkdir()

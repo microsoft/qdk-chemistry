@@ -7,6 +7,10 @@
 
 from typing import Any
 
+import pytest
+
+pytest.importorskip("mcp")
+
 from qdk_chemistry.ui import visualization
 
 

@@ -61,6 +61,7 @@ python -m pip install "qdk-chemistry[all]"
 ```
 
 The `[all]` extra pulls in all optional dependencies so that examples and tests work without chasing missing packages. For other installation methods (Dev Container, building from source) and platform-specific notes, see [INSTALL.md](./INSTALL.md).
+On Windows arm64, dependencies without native wheels, including MCP, are omitted from `[all]`.
 
 Prebuilt wheels are published for Linux (x86_64, arm64), macOS (Apple Silicon), and Windows (x86_64, arm64). On Windows, [WSL](https://learn.microsoft.com/windows/wsl/install) is supported as well. See [Notes for Windows users](./INSTALL.md#notes-for-windows-users) for Windows-specific caveats.
 
@@ -73,9 +74,14 @@ configuration. Register the repository marketplace, then run the plugin
 installer from the virtual environment containing QDK Chemistry:
 
 ```bash
+python -m pip install 'qdk-chemistry[mcp]'
 copilot plugin marketplace add https://github.com/microsoft/qdk-chemistry.git
 qc plugin install qdk-chemistry@qdk-chemistry
 ```
+
+Installing the `mcp` extra automatically activates the server endpoint, tool
+registration, workspace middleware, and available MCP Apps visualizations.
+The `qc` CLI remains available without this extra.
 
 With no target directory, Copilot installs the plugin for the current user and
 QDK Chemistry pins its MCP command to that virtual environment. A local plugin

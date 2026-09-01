@@ -97,7 +97,12 @@ stored electronic-structure artifacts without selecting a scientific method.
 
 ## Quantum Artifacts
 
-`run_qubit_mapper` applies a stored mapping to a fermionic Hamiltonian.
+`run_qubit_mapper` applies a stored mapping to a fermionic Hamiltonian and
+returns the saved filename together with the Hamiltonian's `core_energy`.
+The saved `QubitHamiltonian` intentionally excludes that constant. Energies
+returned by the qubit solver, energy estimator, and phase estimation are mapped
+energies, so compute total molecular energies as
+`mapped_energy + core_energy`.
 `run_state_preparation` compiles wavefunction data into a circuit.
 Time-evolution and controlled-circuit tools persist their intermediate
 artifacts. `run_phase_estimation` returns a phase-estimation result. Circuit
@@ -106,19 +111,19 @@ different result structures.
 
 | Tool | Operation and result |
 |---|---|
-| `run_qubit_mapper` | Applies a stored `MajoranaMapping` to a fermionic Hamiltonian and stores a `QubitHamiltonian` |
+| `run_qubit_mapper` | Applies a stored `MajoranaMapping` to a fermionic Hamiltonian, stores a `QubitHamiltonian`, and returns its filename and the excluded `core_energy` |
 | `run_term_grouper` | Partitions Pauli terms with the selected grouping algorithm and stores the grouped operator |
-| `run_qubit_hamiltonian_solver` | Diagonalizes a qubit Hamiltonian and returns an eigenvalue and eigenstate data |
+| `run_qubit_hamiltonian_solver` | Diagonalizes a qubit Hamiltonian and returns a mapped eigenvalue, excluding `core_energy`, and eigenstate data |
 | `run_state_preparation` | Compiles a wavefunction with the selected implementation and stores a circuit |
 | `run_amplitude_amplification` | Combines state-preparation and good-state oracle circuits into an amplitude-amplified circuit |
-| `run_energy_estimator` | Executes the selected expectation estimator for a circuit and one or more Hamiltonians |
+| `run_energy_estimator` | Executes the selected expectation estimator for a circuit and one or more Hamiltonians; estimated energies exclude `core_energy` |
 | `run_hadamard_test` | Executes a Hadamard-test implementation for a state-preparation circuit and unitary representation |
 | `run_evolution_circuit_builder` | Builds a circuit for a base Hamiltonian plus a piecewise-linear driven term |
 | `run_hamiltonian_simulation` | Evolves the supplied driven Hamiltonian and returns measured observable results |
 | `run_time_evolution_builder` | Builds and stores a `TimeEvolutionUnitary` for a Hamiltonian and evolution time |
 | `run_controlled_evolution_circuit_mapper` | Maps a stored time-evolution unitary to a controlled circuit |
 | `run_circuit_executor` | Executes a stored circuit and stores executor data |
-| `run_phase_estimation` | Runs the selected phase-estimation implementation and stores a `QpeResult` |
+| `run_phase_estimation` | Runs the selected phase-estimation implementation and stores a `QpeResult` whose energies exclude `core_energy` |
 | `get_circuit_stats` | Returns logical register, operation-count, and circuit-depth data |
 | `estimate_circuit` | Applies QDK estimator parameters to a stored circuit and returns the estimate inline |
 

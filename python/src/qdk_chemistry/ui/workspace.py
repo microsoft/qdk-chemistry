@@ -15,13 +15,11 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote, urlparse
 from urllib.request import url2pathname
 
-from mcp.server.mcpserver import Context  # noqa: TC002
-from mcp.shared.exceptions import MCPError, NoBackChannelError
-
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     from mcp.server.context import HandlerResult, ServerRequestContext
+    from mcp.server.mcpserver import Context
 
 _WORKSPACE_LOCK = threading.Lock()
 _WORKSPACE_ROOT: Path | None = None
@@ -42,6 +40,8 @@ def _file_uri_path(uri: str) -> Path | None:
 
 
 async def _workspace_from_client(ctx: Context) -> tuple[Path | None, str | None]:
+    from mcp.shared.exceptions import MCPError, NoBackChannelError  # noqa: PLC0415
+
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
@@ -84,7 +84,6 @@ def configure_workspace(path: Path) -> dict[str, object]:
                 "start a separate MCP process for another workspace"
             )
         os.environ["QDK_WORKSPACE_ROOT"] = str(resolved)
-        os.chdir(resolved)
         _WORKSPACE_ROOT = resolved
 
     return {"bound": True, "workspace_root": str(resolved)}

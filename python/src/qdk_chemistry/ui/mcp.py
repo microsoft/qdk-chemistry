@@ -20,6 +20,7 @@ import os
 import re
 import sys
 
+from ._mcp import MCP_AVAILABLE, MCP_INSTALL_MESSAGE
 from .tools import app
 
 _TRANSPORTS = ("stdio", "streamable-http", "sse")
@@ -184,6 +185,8 @@ def _accept_relaxer_middleware(inner_app):
 def main() -> None:
     """Run the QDK/Chemistry MCP server."""
     args = _parse_args(sys.argv[1:])
+    if not MCP_AVAILABLE:
+        raise SystemExit(MCP_INSTALL_MESSAGE)
 
     # Suppress noisy INFO/DEBUG logs unless --verbose is given.
     level = logging.DEBUG if args.verbose else logging.WARNING

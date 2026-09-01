@@ -140,6 +140,7 @@ def _resolve_cli_project_path(project_name: str) -> Path:
     project_dir, error = resolve_project_path(project_name, config.projects_dir)
     if project_dir is None:
         _print_error(error)
+    assert project_dir is not None
     return project_dir
 
 

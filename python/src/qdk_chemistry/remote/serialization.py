@@ -556,6 +556,7 @@ def serialize_inputs(
     settings: dict,
     *,
     run_hash: str | None = None,
+    job_cache_key: str | None = None,
     input_hashes: dict[str, str] | None = None,
     force_rerun: bool = False,
     remote_cache: dict[str, Any] | None = None,
@@ -572,6 +573,7 @@ def serialize_inputs(
         algorithm_name: Name of algorithm implementation.
         settings: Algorithm settings dictionary.
         run_hash: Optional pre-computed algorithm run hash.
+        job_cache_key: Optional cache key for the remote job record.
         input_hashes: Optional dict mapping input names to their content hashes.
         force_rerun: Whether the compute node must skip its cache lookup.
         remote_cache: Optional coordinates passed to the remote cache factory, ``get_cache()``.
@@ -596,6 +598,8 @@ def serialize_inputs(
     }
     if run_hash is not None:
         manifest["run_hash"] = run_hash
+    if job_cache_key is not None:
+        manifest["job_cache_key"] = job_cache_key
     if input_hashes is not None:
         manifest["input_hashes"] = input_hashes
     if force_rerun:

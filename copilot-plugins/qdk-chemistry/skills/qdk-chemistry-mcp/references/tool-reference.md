@@ -94,14 +94,20 @@ supplied and the calculation returns that data.
 
 ## Qubit mapping and state construction
 
+The `QubitHamiltonian` saved by `run_qubit_mapper` intentionally excludes the
+fermionic Hamiltonian's core-energy constant. The mapper result preserves that
+constant as `core_energy`. Solver, estimator, and phase-estimation energies use
+the mapped energy frame; total molecular energy is
+`mapped_energy + core_energy`.
+
 | Tool | Operation and result |
 |---|---|
-| `run_qubit_mapper` | Applies a stored `MajoranaMapping` to a stored fermionic Hamiltonian and saves the resulting `QubitHamiltonian`. |
+| `run_qubit_mapper` | Applies a stored `MajoranaMapping` to a stored fermionic Hamiltonian, saves the resulting `QubitHamiltonian`, and returns its filename and the excluded `core_energy`. |
 | `run_term_grouper` | Partitions Pauli terms according to the selected grouping implementation and saves the grouped operator. |
-| `run_qubit_hamiltonian_solver` | Diagonalizes a stored `QubitHamiltonian` and returns its ground-state energy and eigenstate vector. |
+| `run_qubit_hamiltonian_solver` | Diagonalizes a stored `QubitHamiltonian` and returns its mapped ground-state energy, excluding `core_energy`, and eigenstate vector. |
 | `run_state_preparation` | Compiles a stored wavefunction into a quantum `Circuit` and saves it. |
 | `run_amplitude_amplification` | Combines stored state-preparation and good-state oracle circuits into an amplitude-amplified circuit and saves it. |
-| `run_energy_estimator` | Executes expectation-value estimation for a circuit and one or more qubit Hamiltonians, returning estimated values and variances. |
+| `run_energy_estimator` | Executes expectation-value estimation for a circuit and one or more qubit Hamiltonians, returning mapped values that exclude `core_energy` and their variances. |
 | `run_hadamard_test` | Executes a Hadamard test for a state-preparation circuit and unitary representation, then saves executor data. |
 
 ## Evolution and phase estimation
@@ -111,7 +117,7 @@ supplied and the calculation returns that data.
 | `run_time_evolution_builder` | Builds a `TimeEvolutionUnitary` representing $U=\exp(-iHt)$ for a stored qubit Hamiltonian and supplied evolution time, then saves it. |
 | `run_controlled_evolution_circuit_mapper` | Maps a stored time-evolution unitary to a controlled quantum circuit and saves the circuit. |
 | `run_circuit_executor` | Executes a stored circuit with the selected executor and saves executor data. |
-| `run_phase_estimation` | Runs the selected phase-estimation implementation for a state-preparation circuit and qubit Hamiltonian, then saves a `QpeResult`. |
+| `run_phase_estimation` | Runs the selected phase-estimation implementation for a state-preparation circuit and qubit Hamiltonian, then saves a `QpeResult` whose energies exclude `core_energy`. |
 | `run_evolution_circuit_builder` | Builds a circuit for a driven Hamiltonian $H(t)=H_0+f(t)H_1$ from the supplied piecewise-linear drive schedule. |
 | `run_hamiltonian_simulation` | Evolves a driven Hamiltonian, measures supplied observables, and saves the returned result pairs. |
 

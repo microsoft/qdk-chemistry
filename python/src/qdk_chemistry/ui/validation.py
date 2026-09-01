@@ -5,8 +5,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import os
-import threading
 from collections.abc import Callable
 from contextvars import ContextVar
 from functools import wraps
@@ -21,8 +19,8 @@ from .config import config
 F = TypeVar("F", bound=Callable[..., Any])
 T = TypeVar("T")
 
-_PROJECT_CWD_LOCK = threading.RLock()
 _CURRENT_PROJECT_NAME: ContextVar[str | None] = ContextVar("qdk_current_project_name", default=None)
+_CURRENT_PROJECT_DIR: ContextVar[Path | None] = ContextVar("qdk_current_project_dir", default=None)
 
 
 def current_project_name() -> str | None:
@@ -30,11 +28,77 @@ def current_project_name() -> str | None:
     return _CURRENT_PROJECT_NAME.get()
 
 
+def current_project_dir() -> Path | None:
+    """Return the absolute project directory validated for this execution context."""
+    return _CURRENT_PROJECT_DIR.get()
+
+
+def resolve_project_file(
+    filename: str | Path,
+    *,
+    allow_nested: bool = False,
+    allow_absolute: bool = False,
+) -> Path:
+    """Resolve a client-provided filename inside the current project sandbox.
+
+    Absolute paths, traversal components, Windows drive or UNC paths, and
+    symlinks that resolve outside the project are rejected.
+
+    Args:
+        filename: Project-relative filename to resolve.
+        allow_nested: Whether ordinary nested path components are accepted.
+        allow_absolute: Whether an internal absolute path may be revalidated.
+
+    Returns:
+        An absolute path contained by the current project directory.
+
+    Raises:
+        RuntimeError: If called outside a validated project context.
+        ValueError: If the filename is invalid or escapes the project.
+
+    """
+    project_dir = current_project_dir()
+    if project_dir is None:
+        raise RuntimeError("Project file access requires a validated project context")
+
+    value = str(filename)
+    if not value or not value.strip() or "\x00" in value:
+        raise ValueError("Project filename must be a non-empty string")
+
+    native_path = Path(value)
+    if native_path.is_absolute():
+        if not allow_absolute:
+            raise ValueError(f"Project filename must be relative: {value!r}")
+        try:
+            candidate = native_path.resolve()
+        except (OSError, RuntimeError) as error:
+            raise ValueError(f"Cannot resolve project filename {value!r}: {error}") from error
+        if not candidate.is_relative_to(project_dir):
+            raise ValueError(f"Project filename resolves outside project directory: {value!r}")
+        return candidate
+
+    path_flavors = (PurePosixPath(value), PureWindowsPath(value))
+    if any(path.is_absolute() or path.anchor or path.drive for path in path_flavors):
+        raise ValueError(f"Project filename must be relative: {value!r}")
+    if any(part in {"", ".", ".."} for path in path_flavors for part in path.parts):
+        raise ValueError(f"Project filename contains an invalid path component: {value!r}")
+    if not allow_nested and any(len(path.parts) != 1 for path in path_flavors):
+        raise ValueError(f"Project filename must be a single path component: {value!r}")
+
+    try:
+        candidate = (project_dir / value).resolve()
+    except (OSError, RuntimeError) as error:
+        raise ValueError(f"Cannot resolve project filename {value!r}: {error}") from error
+    if not candidate.is_relative_to(project_dir):
+        raise ValueError(f"Project filename resolves outside project directory: {value!r}")
+    return candidate
+
+
 class FilenameFormatError(Exception):
     """Raised when a filename has an invalid format for the expected data type."""
 
 
-def resolve_project_path(project_name: str, projects_dir: str | Path) -> tuple[Path | None, str]:
+def resolve_project_path(project_name: str, projects_dir: str | Path) -> tuple[Path | None, str]:  # noqa: PLR0911
     """Resolve a single-component project name beneath the projects directory.
 
     Args:
@@ -60,7 +124,10 @@ def resolve_project_path(project_name: str, projects_dir: str | Path) -> tuple[P
 
     try:
         projects_root = projects_dir.resolve()
-        project_path = (projects_root / project_name).resolve()
+        unresolved_project_path = projects_root / project_name
+        if unresolved_project_path.is_symlink():
+            return None, f"Project path {unresolved_project_path} must not be a symbolic link"
+        project_path = unresolved_project_path.resolve()
     except (OSError, RuntimeError) as e:
         return None, f"Cannot resolve project directory: {e}"
 
@@ -137,8 +204,8 @@ def ensure_filename_format(filename: str, data_type: str) -> str:
 def validate_project(func: F) -> F:
     """Decorator to validate project before executing the function.
 
-    Validates that a project exists, is properly structured, and is the
-    current working directory before executing the decorated function.
+    Validates that a project exists and exposes its absolute directory through
+    the current execution context. The process working directory is unchanged.
 
     It expects the decorated function to have ``project_name`` as its
     first parameter after ``self`` (if applicable).
@@ -174,24 +241,21 @@ def validate_project(func: F) -> F:
             returns the result of the decorated function
 
         """
-        with _PROJECT_CWD_LOCK:
-            try:
-                original_cwd = Path.cwd()
-            except FileNotFoundError:
-                original_cwd = config.projects_dir
+        is_valid, message = is_project_valid(project_name, config.projects_dir)
+        if not is_valid:
+            return f"Project validation failed: {message} for project_name: {project_name}"
 
-            try:
-                is_valid, message = is_project_valid(project_name, config.projects_dir)
-                if not is_valid:
-                    return f"Project validation failed: {message} for project_name: {project_name}"
+        project_dir, error = resolve_project_path(project_name, config.projects_dir)
+        if project_dir is None:
+            return f"Project validation failed: {error} for project_name: {project_name}"
 
-                token = _CURRENT_PROJECT_NAME.set(project_name)
-                try:
-                    return func(project_name, *args, **kwargs)
-                finally:
-                    _CURRENT_PROJECT_NAME.reset(token)
-            finally:
-                os.chdir(original_cwd)
+        name_token = _CURRENT_PROJECT_NAME.set(project_name)
+        dir_token = _CURRENT_PROJECT_DIR.set(project_dir)
+        try:
+            return func(project_name, *args, **kwargs)
+        finally:
+            _CURRENT_PROJECT_DIR.reset(dir_token)
+            _CURRENT_PROJECT_NAME.reset(name_token)
 
     return cast("F", wrapper)
 
@@ -201,7 +265,8 @@ def is_project_valid(  # noqa: PLR0911
 ) -> tuple[bool, str]:
     """Checks validity of base project dir/name combination.
 
-    Tries to make directory if it doesn't exist yet.
+    Tries to make the directory if it doesn't exist yet. This function does
+    not change the process working directory.
 
     Args:
         project_name: Name of specific project
@@ -231,12 +296,7 @@ def is_project_valid(  # noqa: PLR0911
         except OSError as e:
             return False, f"Cannot create project directory {project_path}: {e}"
 
-    # change to current working directory
-    try:
-        os.chdir(project_path)
-    except PermissionError as e:
-        return False, f"Cannot move to {project_path} : {e}"
-    except OSError as e:
-        return False, f"Cannot access project directory {project_path} : {e}"
+    if not project_path.is_dir():
+        return False, f"Project path {project_path} is not a directory"
 
-    return True, f"Project with path {project_path} exists and is the current working directory"
+    return True, f"Project with path {project_path} exists"

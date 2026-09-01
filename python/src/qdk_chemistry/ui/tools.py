@@ -7,25 +7,24 @@
 
 # ruff: noqa: ARG001, PLR0911
 # ARG001: All MCP tool functions accept ``project_name`` which is consumed by
-# the ``@validate_project`` decorator (validates & chdir's into the project
-# dir) before the function body runs.
+# the ``@validate_project`` decorator before the function body runs.
 # PLR0911: MCP tools use early-return error handling at each validation step,
 # which legitimately requires many return statements.
 
+import concurrent.futures
 import functools
 import hashlib
 import inspect
 import itertools
 import json
+import math
 from datetime import datetime, timezone
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
 import numpy as np
-from mcp.server.mcpserver import Context as _Context
-from mcp.server.mcpserver import MCPServer
 
-from qdk_chemistry import __version__, algorithms, constants, data
+from qdk_chemistry import algorithms, constants, data
 from qdk_chemistry.data import AlgorithmRef as _AlgorithmRef
 
 # Remote execution support — optional; the MCP server works without it.
@@ -45,6 +44,8 @@ from qdk_chemistry.utils import (
     compute_valence_space_parameters,
 )
 
+from ._mcp import MCP_AVAILABLE, app
+from ._mcp import MCPContext as _Context
 from .config import config
 from .io import (
     check_output_exists,
@@ -56,39 +57,32 @@ from .validation import (
     FilenameFormatError,
     current_project_name,
     ensure_filename_format,
+    resolve_project_file,
     resolve_project_path,
     validate_project,
 )
-from .workspace import current_workspace_root
+from .workspace import bind_workspace as _bind_workspace
+from .workspace import current_workspace_root, workspace_binding_middleware
 
-# Initialize MCP server app
-app = MCPServer(
-    "qdk-chemistry",
-    version=__version__,
-    dependencies=["qdk_chemistry"],
-    instructions=(
-        "Call bind_workspace before every other QDK Chemistry tool when it is available. "
-        "Plugin-launched servers require one immutable absolute workspace binding. "
-        "Tool descriptions are compact call contracts; before chaining tools or choosing methods and settings, "
-        "load the qdk-chemistry-mcp skill when it is available."
-    ),
+_REMOTE_WAITER_POOL = concurrent.futures.ThreadPoolExecutor(
+    max_workers=1024,
+    thread_name_prefix="qdk-chemistry-remote",
 )
 
-# Register MCP Apps visualization tools (interactive UI via ui:// resources)
-from .visualization import register_visualization_tools  # noqa: E402
+if MCP_AVAILABLE:
+    # Register MCP Apps visualization tools (interactive UI via ui:// resources).
+    from .visualization import register_visualization_tools
 
-register_visualization_tools(app)
+    register_visualization_tools(app)
 
-
-from .workspace import bind_workspace as _bind_workspace  # noqa: E402
-from .workspace import workspace_binding_middleware  # noqa: E402
-
-app.middleware.append(workspace_binding_middleware)
+    app.middleware.append(workspace_binding_middleware)
 
 
 @app.tool()
 async def bind_workspace(ctx: _Context, workspace_root: str | None = None) -> dict[str, object]:
     """Bind this MCP process to a workspace root."""
+    if not MCP_AVAILABLE:
+        raise RuntimeError("MCP support is unavailable")
     return await _bind_workspace(ctx, workspace_root)
 
 
@@ -226,6 +220,10 @@ def _validate_mcp_remote_config(name: str, remote_config: dict[str, Any]) -> Non
             f"remote_config contains options that MCP clients cannot control for backend '{name}': "
             f"{', '.join(sorted(unsupported))}. Allowed options: {allowed_message}."
         )
+    for option in {"poll_interval", "timeout"} & remote_config.keys():
+        value = remote_config[option]
+        if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value) or value <= 0:
+            raise ValueError(f"remote_config '{option}' must be a finite, positive number for MCP clients.")
 
 
 def _strip(filename: str) -> str:
@@ -467,8 +465,6 @@ def _run_algorithm(
     # early if the job is still running. The timeout starts only after
     # the SDK has persisted a durable job handle.
     if remote is not None and remote_timeout is not None:
-        import concurrent.futures  # noqa: PLC0415
-
         try:
             run_hash = algorithm.hash(*args, **kwargs)
         except Exception as exc:
@@ -491,9 +487,8 @@ def _run_algorithm(
                 job.save(_job_record_path(job, run_hash))
                 submitted.set_result(job)
 
-        pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         sdk_kwargs["_on_job_submitted"] = on_job_submitted
-        future = pool.submit(run_remote)
+        future = _REMOTE_WAITER_POOL.submit(run_remote)
         try:
             completed, _ = concurrent.futures.wait(
                 (future, submitted),
@@ -503,17 +498,19 @@ def _run_algorithm(
                 result = future.result()
             else:
                 job = submitted.result()
-                result = future.result(timeout=remote_timeout)
+                try:
+                    result = future.result(timeout=remote_timeout)
+                except concurrent.futures.TimeoutError:
+                    if future.done():
+                        # The remote backend raised TimeoutError; this was not
+                        # the MCP return-window deadline.
+                        result = future.result()
+                    else:
+                        raise _JobSubmittedError(job) from None
         except concurrent.futures.TimeoutError:
-            # Let the thread keep running — don't wait for it.
-            pool.shutdown(wait=False)
-            raise _JobSubmittedError(job) from None
-        except Exception:
-            pool.shutdown(wait=False)
+            # A backend TimeoutError before durable submission propagates.
             raise
-        else:
-            pool.shutdown(wait=False)
-            return result
+        return result
 
     # No timeout (cache-only, or blocking remote) — call directly
     return run_remote()
@@ -649,7 +646,7 @@ def list_projects() -> dict:
     projects_dir = config.projects_dir
     if not projects_dir.exists():
         return {"projects": []}
-    projects = sorted(d.name for d in projects_dir.iterdir() if d.is_dir())
+    projects = sorted(d.name for d in projects_dir.iterdir() if d.is_dir() and not d.is_symlink())
     return {"projects": projects}
 
 
@@ -681,7 +678,7 @@ def list_project_files(project_name: str) -> dict | str:
 
     files = []
     for f in sorted(project_dir.iterdir()):
-        if f.is_file():
+        if f.is_file() and not f.is_symlink():
             entry: dict[str, Any] = {"filename": f.name, "size_bytes": f.stat().st_size}
             for ext in (".json", ".hdf5", ".h5"):
                 if f.name.endswith(ext):
@@ -1013,17 +1010,10 @@ def create_structure(
             f"must match number of atoms ({len(coordinates)})."
         )
 
-    project_dir, project_error = resolve_project_path(project_name, config.projects_dir)
-    if project_dir is None:
-        return f"ERROR: Cannot resolve project directory: {project_error}"
-
     try:
-        save_path = (project_dir / filename_to_save).resolve()
-    except (OSError, RuntimeError) as e:
+        save_path = resolve_project_file(filename_to_save, allow_nested=True)
+    except (OSError, RuntimeError, ValueError) as e:
         return f"ERROR: Cannot resolve output filename '{filename_to_save}': {e}"
-
-    if not save_path.is_relative_to(project_dir):
-        return f"ERROR: Output filename '{filename_to_save}' resolves outside project directory '{project_dir}'"
 
     # Check if output file already exists
     if not overwrite:
@@ -1235,15 +1225,17 @@ def run_active_space_selector(
     if _err:
         return _err
 
+    active_space_selector = algorithms.create("active_space_selector", algorithm_name)
+    _apply_settings(active_space_selector, settings)
+
     if charge is not None and algorithm_name == "qdk_valence":
-        active_space_selector = algorithms.create("active_space_selector", "qdk_valence")
         # grab valence electrons/orbitals count using helper function
         n_active_electrons, n_active_orbitals = compute_valence_space_parameters(wavefunction, charge)
-        active_space_selector.settings().set("num_active_electrons", n_active_electrons)
-        active_space_selector.settings().set("num_active_orbitals", n_active_orbitals)
-    else:
-        active_space_selector = algorithms.create("active_space_selector", algorithm_name)
-        _apply_settings(active_space_selector, settings)
+        supplied_settings = settings or {}
+        if "num_active_electrons" not in supplied_settings:
+            active_space_selector.settings().set("num_active_electrons", n_active_electrons)
+        if "num_active_orbitals" not in supplied_settings:
+            active_space_selector.settings().set("num_active_orbitals", n_active_orbitals)
 
     # run active space selection
     out_wavefunction = _run_algorithm(
@@ -1698,7 +1690,7 @@ def run_stability_checker(
         )
 
     except RuntimeError as e:
-        return f"The stability checker did not converge: {e}. Perhaps consider changing the basis set of the system."
+        return f"The stability checker did not converge: {e}."
 
     # save to file
     save_data_object(stability_result, out_stability_result_filename)
@@ -2011,7 +2003,7 @@ def run_qubit_hamiltonian_solver(
     remote: str | None = None,
     remote_config: dict | None = None,
 ) -> str | tuple[float, list]:
-    """Diagonalize a QubitHamiltonian and return its ground-state energy and eigenstate."""
+    """Diagonalize a QubitHamiltonian and return its mapped energy, excluding core energy, and eigenstate."""
     # Strip filename in case full path is passed
     qubit_hamiltonian_filename = _strip(qubit_hamiltonian_filename)
 
@@ -2054,7 +2046,7 @@ def run_energy_estimator(
     remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str | tuple[str, str]:
-    """Estimate a Hamiltonian expectation value and variance from a Circuit."""
+    """Estimate a mapped Hamiltonian expectation value, excluding core energy, and variance from a Circuit."""
     # Strip filenames in case full path is passed
     circuit_filename = _strip(circuit_filename)
     qubit_hamiltonian_filename = _strip(qubit_hamiltonian_filename)
@@ -2182,8 +2174,8 @@ def run_qubit_mapper(
     remote_config: dict | None = None,
     remote_timeout: int = 120,
     overwrite: bool = False,
-) -> str:
-    """Map a fermionic Hamiltonian and MajoranaMapping to a saved QubitHamiltonian."""
+) -> str | dict[str, str | float]:
+    """Save a mapped QubitHamiltonian excluding core energy and return its filename with the companion offset."""
     # Strip filenames in case full path is passed
     hamiltonian_filename = _strip(hamiltonian_filename)
     mapping_filename = _strip(mapping_filename)
@@ -2221,7 +2213,10 @@ def run_qubit_mapper(
     # save to file
     save_data_object(qubit_hamiltonian, out_qubit_hamiltonian_filename)
 
-    return out_qubit_hamiltonian_filename
+    return {
+        "qubit_hamiltonian_filename": out_qubit_hamiltonian_filename,
+        "core_energy": float(hamiltonian.get_core_energy()),
+    }
 
 
 @app.tool()
@@ -2494,7 +2489,7 @@ def run_phase_estimation(
     remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str:
-    """Run phase estimation for a Circuit and QubitHamiltonian and save the QpeResult."""
+    """Run phase estimation and save a QpeResult whose mapped energies exclude core energy."""
     # Strip filenames in case full path is passed
     state_prep_circuit_filename = _strip(state_prep_circuit_filename)
     qubit_hamiltonian_filename = _strip(qubit_hamiltonian_filename)
@@ -2527,12 +2522,10 @@ def run_phase_estimation(
         num_bits = qpe_circuit_builder_settings.get("num_bits") if qpe_circuit_builder_settings is not None else -1
     except (KeyError, RuntimeError):
         num_bits = -1
-    if num_bits == -1:
+    if num_bits <= 0:
         return (
-            "You need to set settings.qpe_circuit_builder.num_bits for QPE. A higher value will "
-            "result in a better, but more expensive calculation. "
-            "Consider the size of the problem setting, and what is "
-            "feasible."
+            "Invalid QPE setting: settings.qpe_circuit_builder.num_bits must be set to a positive integer; "
+            f"received {num_bits!r}."
         )
 
     try:
@@ -2545,12 +2538,8 @@ def run_phase_estimation(
         evolution_time = 0.0
     if evolution_time == 0.0:
         return (
-            "You need to set settings.qpe_circuit_builder.unitary_builder.time for QPE. "
-            "The default value of 0.0 is invalid. "
-            "Choose a value based on the eigenvalue range of your Hamiltonian. "
-            "A good starting point is evolution_time = 2*pi / (E_max - E_min), "
-            "where E_max and E_min are estimated energy bounds. "
-            "Typical values range from 0.1 to 10.0 depending on the system."
+            "Invalid QPE setting: settings.qpe_circuit_builder.unitary_builder.time must be set explicitly "
+            f"to a nonzero value for the selected unitary builder; received {evolution_time!r}."
         )
 
     # Run phase estimation
@@ -3353,7 +3342,9 @@ def retrieve_remote_results(
     if load_err:
         return load_err
 
-    project_dir = config.projects_dir / project_name
+    project_dir, project_error = resolve_project_path(project_name, config.projects_dir)
+    if project_dir is None:
+        return f"Failed to resolve project directory: {project_error}"
     try:
         job.fetch(local_dir=project_dir)  # updates status to "retrieved" & saves
     except Exception as e:  # noqa: BLE001

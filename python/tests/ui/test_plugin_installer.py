@@ -233,6 +233,16 @@ def test_current_environment_must_be_a_venv(monkeypatch: pytest.MonkeyPatch) -> 
         plugin_installer._commands_for_current_environment("qdk-chemistry")
 
 
+def test_current_environment_requires_mcp_support(monkeypatch: pytest.MonkeyPatch) -> None:
+    def missing_mcp() -> None:
+        raise ModuleNotFoundError(plugin_installer.MCP_INSTALL_MESSAGE)
+
+    monkeypatch.setattr(plugin_installer, "require_mcp", missing_mcp)
+
+    with pytest.raises(plugin_installer.PluginInstallError, match=r"qdk-chemistry\[mcp\]"):
+        plugin_installer._commands_for_current_environment("qdk-chemistry")
+
+
 def test_plugin_commands_are_registered() -> None:
     args = create_parser().parse_args(
         ["plugin", "install", "qdk-chemistry@qdk-chemistry", "--target-dir", "/workspace"]

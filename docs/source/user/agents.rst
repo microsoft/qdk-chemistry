@@ -16,7 +16,12 @@ capabilities for shell-based workflows.
 Getting started
 ---------------
 
-1. **Install QDK/Chemistry** into a virtual environment (see :doc:`quickstart`).
+1. **Install QDK/Chemistry with MCP support** into a virtual environment (see
+   :doc:`quickstart`):
+
+   .. code-block:: bash
+
+      python -m pip install 'qdk-chemistry[mcp]'
 
 2. **Deploy the plugin** into your project directory:
 
@@ -84,6 +89,10 @@ MCP server
 The MCP server is the interface between the AI assistant and QDK/Chemistry. It
 exposes ~50 tools organized into categories that the assistant discovers via
 ``list_tools``.
+
+MCP support is optional. Installing ``qdk-chemistry[mcp]`` automatically
+activates the server, transports, workspace middleware, and any visualization
+resources whose widget dependencies are installed.
 
 Every tool returns a structured JSON envelope with ``status`` (``"ok"``,
 ``"error"``, ``"exists"``, or ``"submitted"``). All ``run_*`` tools

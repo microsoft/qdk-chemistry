@@ -9,6 +9,8 @@ import importlib
 
 from qdk_chemistry import __version__
 
+from ._mcp import require_mcp
+
 __copyright__ = """"""
 
 __all__ = ["app", "cli"]
@@ -24,6 +26,7 @@ def __getattr__(name: str):
         globals()[name] = module
         return module
     if name == "app":
+        require_mcp()
         application = importlib.import_module(".tools", __name__).app
         globals()[name] = application
         return application

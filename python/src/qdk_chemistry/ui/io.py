@@ -7,6 +7,15 @@
 
 import os
 
+from .validation import current_project_dir, resolve_project_file
+
+
+def _validated_project_path(filename: str | os.PathLike[str]) -> str:
+    """Confine MCP I/O to its project, preserving standalone CLI paths."""
+    if current_project_dir() is None:
+        return os.fspath(filename)
+    return os.fspath(resolve_project_file(os.fspath(filename), allow_absolute=True))
+
 
 def _load_data_object_from_path(filename: str | os.PathLike[str], data_class):
     """Load a data object from an exact filesystem path.
@@ -22,7 +31,7 @@ def _load_data_object_from_path(filename: str | os.PathLike[str], data_class):
         ValueError: If the file extension is unsupported.
 
     """
-    filename = os.fspath(filename)
+    filename = _validated_project_path(filename)
     if filename.endswith(".json"):
         return data_class.from_json_file(filename)
     if filename.endswith((".hdf5", ".h5")):
@@ -41,7 +50,7 @@ def check_output_path_exists(filename: str | os.PathLike[str], data_class: type 
         A message when valid output exists, otherwise ``None``.
 
     """
-    filename = os.fspath(filename)
+    filename = _validated_project_path(filename)
 
     if not os.path.exists(filename):
         return None
@@ -79,7 +88,6 @@ def check_output_exists(filename: str, data_class: type | None = None) -> str | 
         Optional[str]: A message if the file exists with valid content, None otherwise
 
     """
-    filename = os.path.basename(filename)  # Strip path if provided
     return check_output_path_exists(filename, data_class)
 
 
@@ -114,7 +122,7 @@ def save_data_object(data_obj, filename: str | os.PathLike[str]):
         ValueError: If file extension is not supported
 
     """
-    filename = os.fspath(filename)
+    filename = _validated_project_path(filename)
 
     if filename.endswith(".json"):
         data_obj.to_json_file(filename)
