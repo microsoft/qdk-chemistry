@@ -18,6 +18,12 @@ namespace qdk::chemistry::algorithms {
 /**
  * @file
  * @brief Double factorization of a Hamiltonian's two-electron integrals.
+ *
+ * @note "Low 2025" equation numbers here cite the published version:
+ * G. H. Low et al., "Fast Quantum Simulation of Electronic Structure by
+ * Spectral Amplification", Phys. Rev. X 15, 041016 (2025),
+ * doi:10.1103/pb2g-j9cw (bib key Low2025). The numbering of arXiv:2502.15882v1
+ * is identical, so a reader holding either edition can follow the references.
  */
 
 /// Default fragment-truncation threshold on the supermatrix eigenvalue
@@ -39,7 +45,7 @@ struct TwoBodyFragment {
   double sign = 1.0;    ///< +1.0 or -1.0.
 
   /// Contribution to the block-encoding 1-norm,
-  /// 0.25 * (sum_b |eps_b|)^2 (Low 2025 Eq. 34; von Burg 2021 Eq. 16).
+  /// 0.25 * (sum_b |eps_b|)^2 (Low 2025 Eq. 33; von Burg 2021 Eq. 16).
   /// Rescale this by the square of any factor applied to `eps`.
   double lambda_df = 0.0;
 };

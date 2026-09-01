@@ -20,6 +20,12 @@ namespace qdk::chemistry::data {
  * @brief Restricted, spin-free double-factorized tensor hypercontraction(DFTHC)
  *        Hamiltonian container (Low 2025).
  *
+ * @note Equation numbers in this file and its .cpp cite the published version:
+ * G. H. Low et al., "Fast Quantum Simulation of Electronic Structure by
+ * Spectral Amplification", Phys. Rev. X 15, 041016 (2025),
+ * doi:10.1103/pb2g-j9cw (bib key Low2025). The numbering of arXiv:2502.15882v1
+ * is identical, so a reader holding either edition can follow the references.
+ *
  * @note Consumers that genuinely require a sum of squares must check
  * get_signs().
  */
@@ -145,7 +151,7 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
   double get_energy_gap() const;
 
   /**
-   * @brief Compute the block-encoding normalization (Eq. 34).
+   * @brief Compute the block-encoding normalization (Eq. 33).
    * Λ = Σ|eig(h1_prime)| + 1/4 Σ_{rc} (|WB^{rc}| + Σ_b |W^{rc}_b|)²
    *
    * The per-rank signs do not appear: every two-body term enters through an
@@ -154,7 +160,7 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
   double get_lambda() const;
 
   /**
-   * @brief Compute the effective SOS normalization (Eq. 12).
+   * @brief Compute the effective SOS normalization (Eq. 11).
    * λ_eff = √(E_gap · (2Λ - E_gap))
    *
    * Requires a positive E_gap, which the plain double factorization does not
@@ -167,7 +173,7 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
   double get_lambda_eff() const;
 
   /**
-   * @brief Compute the adjusted one-body matrix h'(1) (Eq. 37).
+   * @brief Compute the adjusted one-body matrix h'(1) (Eq. 36).
    *
    * Named for the paper's symbol h^(1)'. This matrix is a plain one-body
    * coefficient tensor; it is not expressed in the Majorana representation,

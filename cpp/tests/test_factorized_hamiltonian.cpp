@@ -195,7 +195,7 @@ TEST_F(FactorizedHamiltonianTest, NegativeSignPropagatesToAllH1PrimeTerms) {
       expected -= sign_value * wb_value * m;   // (c)
 
       EXPECT_TRUE(container.get_h1_prime().isApprox(expected, 1e-12))
-          << "signed three-term Eq. 37 model failed at sign=" << sign_value
+          << "signed three-term Eq. 36 model failed at sign=" << sign_value
           << ", wB=" << wb_value;
     }
   }

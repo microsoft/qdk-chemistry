@@ -254,7 +254,7 @@ double FactorizedHamiltonianContainer::get_energy_gap() const {
 }
 
 double FactorizedHamiltonianContainer::get_lambda() const {
-  // norm (Eq. 34):
+  // norm (Eq. 33):
   // Λ = Σ|eig(h1_prime)| + 1/4 Σ_{rc} (|WB^{rc}| + Σ_b |W^{rc}_b|)^2.
   //
   // The per-rank signs are absent on purpose: every two-body contribution
@@ -294,7 +294,7 @@ double FactorizedHamiltonianContainer::get_lambda() const {
 }
 
 double FactorizedHamiltonianContainer::get_lambda_eff() const {
-  // Effective SOS-walk normalization (Eq. 12): λ_eff = √(E_gap·(2Λ - E_gap)).
+  // Effective SOS-walk normalization (Eq. 11): λ_eff = √(E_gap·(2Λ - E_gap)).
   double lambda = get_lambda();
   if (_energy_gap <= 0.0) {
     throw std::runtime_error("E_gap must be positive for a valid SOS walk");
@@ -307,7 +307,7 @@ double FactorizedHamiltonianContainer::get_lambda_eff() const {
 }
 
 Eigen::MatrixXd FactorizedHamiltonianContainer::get_h1_prime() const {
-  // Adjusted one-body matrix h^(1)' (Eq. 37). Writing the rank-r copy-c leaf as
+  // Adjusted one-body matrix h^(1)' (Eq. 36). Writing the rank-r copy-c leaf as
   //   M^{rc}_{pq} = Σ_{b∈[B]} w_b^{rc} u^r_{b,p} u^r_{b,q},
   // the three accumulated corrections are
   //   h1'_{pq} = h1_{pq} - ½ Σ_{rc} s_r (M^{rc} M^{rc})_{pq}  (a) normal-order
@@ -318,7 +318,7 @@ Eigen::MatrixXd FactorizedHamiltonianContainer::get_h1_prime() const {
   // single fragment operator s_r (Σ_b w_b n_b - wB)², so negating the fragment
   // negates the square, the cross term and the trace correction together.
   //
-  // Term (a) has no counterpart in Eq. 37 as printed, because the paper writes
+  // Term (a) has no counterpart in Eq. 36 as printed, because the paper writes
   // the two-body term as a plain product of E operators while this container
   // stores h2 = (pq|rs) normal-ordered, i.e.
   //   H = E_core + Σ h1_{pq} E_pq + ½ Σ h2_{pqrs} (E_pq E_rs - δ_qr E_ps).

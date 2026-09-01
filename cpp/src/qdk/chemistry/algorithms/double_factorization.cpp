@@ -229,7 +229,7 @@ std::vector<TwoBodyFragment> eigen_decompose_two_body(
     fragment.U = std::move(fragment_matrix);
 
     // Contribution to the block-encoding 1-norm, 1/4 (sum_b |eps_b|)^2,
-    // matching FactorizedHamiltonianContainer::get_lambda() (Eq. 34) and
+    // matching FactorizedHamiltonianContainer::get_lambda() (Eq. 33) and
     // von Burg 2021 Eq. 16. Patel 2025 Eq. 17 writes the same quantity as
     // 1/2 (sum_b |eps_b|)^2, but in a convention whose two-body operator
     // carries no 1/2, so its coefficients are ours scaled by 1/sqrt(2).

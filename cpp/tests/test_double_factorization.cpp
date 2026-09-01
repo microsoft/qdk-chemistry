@@ -247,7 +247,7 @@ TEST(DoubleFactorizerTest, FragmentLambdaMatchesContainerLambda) {
   // lambda_df is a per-fragment share of the same block-encoding 1-norm that
   // get_lambda() reports, so the fragments must sum to the container's
   // two-body part. Asserting lambda_df against its own defining formula would
-  // only restate the code; this pins the shared 1/4 convention (Eq. 34)
+  // only restate the code; this pins the shared 1/4 convention (Eq. 33)
   // across both call sites.
   constexpr std::size_t norb = 4;
   const auto two_body = make_two_body(norb, {1.0, -1.0}, 41);
