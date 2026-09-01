@@ -15,7 +15,13 @@ echo "Downloading BLIS ${BLIS_VERSION}..."
 # this self-hosted agent — the workspace may persist across builds and retries.
 rm -rf blis blis-${BLIS_VERSION} blis.zip
 wget -q https://github.com/flame/blis/archive/refs/tags/${BLIS_VERSION}.zip -O blis.zip
-echo "${BLIS_CHECKSUM}  blis.zip" | shasum -a 256 -c || exit 1
+# sha256sum (coreutils) is always present on Linux, even minimal images that lack shasum (a Perl script not
+# always pulled in); shasum is the fallback for macOS, which has no sha256sum by default.
+if command -v sha256sum >/dev/null 2>&1; then
+    echo "${BLIS_CHECKSUM}  blis.zip" | sha256sum -c || exit 1
+else
+    echo "${BLIS_CHECKSUM}  blis.zip" | shasum -a 256 -c || exit 1
+fi
 unzip -q blis.zip
 rm blis.zip
 mv blis-${BLIS_VERSION} blis

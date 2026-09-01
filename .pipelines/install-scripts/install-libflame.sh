@@ -26,7 +26,13 @@ echo "Downloading libflame ${LIBFLAME_VERSION}..."
 # this self-hosted agent — the workspace may persist across builds and retries.
 rm -rf libflame libflame-${LIBFLAME_VERSION} libflame.zip
 wget -q https://github.com/flame/libflame/archive/refs/tags/${LIBFLAME_VERSION}.zip -O libflame.zip
-echo "${LIBFLAME_CHECKSUM}  libflame.zip" | shasum -a 256 -c || exit 1
+# sha256sum (coreutils) is always present on Linux, even minimal images that lack shasum (a Perl script not
+# always pulled in); shasum is the fallback for macOS, which has no sha256sum by default.
+if command -v sha256sum >/dev/null 2>&1; then
+    echo "${LIBFLAME_CHECKSUM}  libflame.zip" | sha256sum -c || exit 1
+else
+    echo "${LIBFLAME_CHECKSUM}  libflame.zip" | shasum -a 256 -c || exit 1
+fi
 unzip -q libflame.zip
 rm libflame.zip
 mv libflame-${LIBFLAME_VERSION} libflame
