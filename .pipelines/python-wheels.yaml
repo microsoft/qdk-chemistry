@@ -162,6 +162,7 @@ extends:
             - template: .pipelines/templates/build-exachem-linux.yml@self
               parameters:
                 march: x86-64-v3
+                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
 
       # Same rationale for Windows ARM64, on the 1ES ARM64 pool. hostArchitecture
       # avoids the 1ES template defaulting to an x64-emulated agent.

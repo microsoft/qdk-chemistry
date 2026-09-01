@@ -21,7 +21,7 @@ steps:
   displayName: Restore/save ExaChem install cache
   inputs:
     key: >-
-      "linux-exachem-${{ parameters.march }}-v1" |
+      "linux-exachem-${{ parameters.march }}-v1" | "${{ parameters.dockerImage }}" |
       cpp/manifest/qdk-chemistry/cgmanifest.json |
       external/macis/manifest/cgmanifest.json |
       .pipelines/install-scripts/build-exachem-linux.sh |
