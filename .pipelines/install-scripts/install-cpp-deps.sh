@@ -53,13 +53,16 @@ INSTALL_PREFIX="${INSTALL_PREFIX:-/usr/local}"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 BUILD_SHARED_LIBS="${BUILD_SHARED_LIBS:-OFF}"  # Default to static
 MARCH="${MARCH:-x86-64-v3}"  # matches the uarch qdk-chemistry's Linux CI runners build for
-LIBINT_JOBS=${LIBINT_JOBS:-4}  # Limit libint build jobs to 4 due to high memory usage
 KEEP_BUILD_DIR="${KEEP_BUILD_DIR:-0}"
 if command -v nproc >/dev/null 2>&1; then
-    JOBS=$(nproc) # Linux
+    DEFAULT_JOBS=$(nproc) # Linux
 else
-    JOBS=$(sysctl -n hw.logicalcpu) # macOS
+    DEFAULT_JOBS=$(sysctl -n hw.logicalcpu) # macOS
 fi
+# Falls back to the pipeline's own memory-aware CMAKE_BUILD_PARALLEL_LEVEL (see build-and-test.yaml's "Set
+# memory-aware build parallelism" step) when JOBS isn't set explicitly, so this script doesn't independently
+# re-derive a job count that could exceed what the runner's memory actually supports.
+JOBS="${JOBS:-${CMAKE_BUILD_PARALLEL_LEVEL:-$DEFAULT_JOBS}}"
 MAC_BUILD="OFF"
 if [[ "$OSTYPE" == "darwin"* ]]; then
     MAC_BUILD="ON"
@@ -246,8 +249,7 @@ cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
          -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
          -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
          -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS"
-# libint's compilation is memory intensive so parallel jobs are limited to 4 to prevent OOM errors
-make -j"$LIBINT_JOBS"
+make -j"$JOBS"
 make install
 cd "$BUILD_DIR"
 rm -rf "$LIBINT_DIR" "$LIBINT_TARBALL"

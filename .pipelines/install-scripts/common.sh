@@ -64,7 +64,7 @@ for reg in data['registrations']:
 }
 
 # Resolve the declared SHA-1 (`hash`) for an "other" (non-git) type component from cgmanifest.json, by
-# component name. Not every "other" entry declares one (e.g. Boost doesn't); callers must check for empty.
+# component name. Not every "other" entry declares one; callers must check for empty.
 get_hash() {
     local manifest="$1" name="$2"
     python3 -c "

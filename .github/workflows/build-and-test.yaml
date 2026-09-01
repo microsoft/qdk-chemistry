@@ -233,6 +233,7 @@ jobs:
           BLAS_VENDOR=openblas
         fi
         INSTALL_PREFIX="${{ env.CPP_DEPS_PREFIX }}" \
+        JOBS="$CMAKE_BUILD_PARALLEL_LEVEL" \
           bash ${{ github.workspace }}/.pipelines/install-scripts/install-cpp-deps.sh \
           ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json \
           ${{ github.workspace }}/external/macis/manifest/cgmanifest.json \
