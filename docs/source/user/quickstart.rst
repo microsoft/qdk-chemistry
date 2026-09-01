@@ -11,13 +11,34 @@ Installation
 
 Install from PyPI with all optional dependencies:
 
-.. code-block:: bash
+.. tab:: Linux / macOS
 
-   python3 -m venv venv && source venv/bin/activate
-   python3 -m pip install 'qdk-chemistry[all]'
+   .. code-block:: bash
+
+      python3 -m venv venv && source venv/bin/activate
+      python3 -m pip install 'qdk-chemistry[all]'
+
+.. tab:: Windows (PowerShell)
+
+   .. code-block:: powershell
+
+      python -m venv venv; .\venv\Scripts\Activate.ps1
+      python -m pip install "qdk-chemistry[all]"
 
 ``[all]`` pulls in all optional dependencies so that examples and tests work without extra steps.
 For a minimal install, other methods (Dev Container, building from source), and platform-specific notes, see the `installation instructions <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_.
+
+Prebuilt wheels are published for Linux (x86_64, arm64), macOS (Apple Silicon), and Windows
+(x86_64, arm64). `WSL <https://learn.microsoft.com/windows/wsl/install>`_ is supported as well,
+and inside it you follow the Linux instructions.
+
+.. note::
+
+   PySCF is the only package in the ``plugins`` extra and publishes no Windows wheels, so it is
+   skipped on native Windows. This also affects ``jupyter``, ``test``, and ``all``, which depend on
+   ``plugins``. On Windows arm64, Qiskit, PennyLane and RDKit are skipped as well, because they
+   require ``rustworkx``, which publishes no win-arm64 wheels. See :ref:`pyscf-plugin-details` and the
+   `Windows notes <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md#notes-for-windows-users>`_.
 
 End-to-end example
 ------------------
@@ -33,11 +54,12 @@ To run the examples, either clone the repository or download the packaged exampl
    If you installed ``qdk-chemistry`` from PyPI, use the ``stable/major.minor`` branch
    when cloning the repository for examples.
    The ``main`` branch is the active development branch and may be incompatible with
-   the released pip package. For example, to clone the repository for the latest stable 1.0 release, use:
+   the released pip package. For example, if you have version ``<major>.<minor>.x``
+   installed (check with ``pip show qdk-chemistry``), use:
 
    .. code-block:: bash
 
-      git clone --branch stable/1.0 https://github.com/microsoft/qdk-chemistry.git
+      git clone --branch stable/<major>.<minor> https://github.com/microsoft/qdk-chemistry.git
 
    See the `examples README <https://github.com/microsoft/qdk-chemistry/blob/main/examples/README.md>`_ for details.
 
@@ -290,7 +312,23 @@ Once installed, you can compile examples by linking against the ``qdk::chemistry
 
 Then build with CMake, pointing to your QDK/Chemistry installation:
 
-.. code-block:: bash
+.. tab:: Linux / macOS
 
-   cmake -B build -DCMAKE_PREFIX_PATH="/path/to/qdk/install"
-   cmake --build build
+   .. code-block:: bash
+
+      cmake -B build -DCMAKE_PREFIX_PATH="/path/to/qdk/install"
+      cmake --build build
+
+.. tab:: Windows (PowerShell)
+
+   .. code-block:: powershell
+
+      cmake -B build -DCMAKE_PREFIX_PATH="C:/path/to/qdk/install"
+      cmake --build build
+
+.. note::
+
+   On Windows, run these commands from a *Developer PowerShell for VS 2022* so that the MSVC
+   toolchain is on ``PATH``. If the library was built against vcpkg dependencies, also pass
+   ``-DCMAKE_TOOLCHAIN_FILE`` and ``-DVCPKG_TARGET_TRIPLET`` as described in the
+   `installation instructions <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md#building-on-windows>`_.

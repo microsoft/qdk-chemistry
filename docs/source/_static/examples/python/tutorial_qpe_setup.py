@@ -53,6 +53,8 @@ from qdk_chemistry.algorithms import create
 required_implementations = (
     create("scf_solver", "qdk"),
     create("active_space_selector", "qdk_autocas_eos"),
+    create("orbital_localizer", "qdk_natural_orbitals"),
+    create("orbital_localizer", "qdk_gauge_fixing"),
     create("hamiltonian_constructor", "qdk"),
     create("multi_configuration_calculator", "macis_cas"),
     create("qubit_mapper", "qdk"),

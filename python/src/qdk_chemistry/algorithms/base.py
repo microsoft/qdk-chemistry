@@ -440,6 +440,7 @@ class AlgorithmFactory(ABC):
     def __init__(self) -> None:
         """Initialize the algorithm factory with an empty registry."""
         self._registry: dict[str, Callable[[], Algorithm]] = {}
+        self._aliases: dict[str, str] = {}
 
     @abstractmethod
     def algorithm_type_name(self) -> str:
@@ -492,14 +493,9 @@ class AlgorithmFactory(ABC):
         """
         if name is None or name == "":
             name = self.default_algorithm_name()
-        generator = self._registry.get(name)
+        generator = self._registry.get(self._aliases.get(name, name))
         if generator is not None:
             return generator()
-
-        for generator in self._registry.values():
-            instance = generator()
-            if name in instance.aliases():
-                return instance
 
         raise RuntimeError(
             f"Algorithm '{name}' of type '{self.algorithm_type_name()}' is not registered. "
@@ -527,16 +523,15 @@ class AlgorithmFactory(ABC):
         """
         instance = generator()
         name = instance.name()
-        registered_aliases = {
-            alias for registered_generator in self._registry.values() for alias in registered_generator().aliases()
-        }
-        for alias in instance.aliases():
-            if alias in registered_aliases:
+        aliases = set(instance.aliases()) | {name}
+        for alias in aliases:
+            if alias in self._aliases:
                 raise _DuplicateRegistrationError(
                     f"Algorithm factory for {self.algorithm_type_name()}: "
                     f"algorithm with name/alias '{alias}' already exists in registry"
                 )
         self._registry[name] = generator
+        self._aliases.update(dict.fromkeys(aliases, name))
 
     def unregister_instance(self, name: str) -> bool:
         """Remove an algorithm implementation from this factory.
@@ -552,7 +547,10 @@ class AlgorithmFactory(ABC):
             >>> success = factory.unregister_instance("my_custom_scf")
 
         """
-        return self._registry.pop(name, None) is not None
+        if self._registry.pop(name, None) is None:
+            return False
+        self._aliases = {alias: owner for alias, owner in self._aliases.items() if owner != name}
+        return True
 
     def available(self) -> list[str]:
         """Get a list of all available algorithm names in this factory.
@@ -598,3 +596,4 @@ class AlgorithmFactory(ABC):
 
         """
         self._registry.clear()
+        self._aliases.clear()

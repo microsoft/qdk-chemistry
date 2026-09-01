@@ -25,12 +25,11 @@ After completing this chapter, you will be able to:
    Record the algorithm settings before starting the final simulation and record the measured values after it finishes.
    Use the completed lab notebook to explain whether the result meets the teaching target and which chemistry and algorithm limitations remain.
 
-Example download
-================
+Example files
+=============
 
-Download :download:`tutorial_run_iqpe.py <../../_static/examples/python/tutorial_run_iqpe.py>` and save it in the tutorial working directory alongside :download:`tutorial_orbital_coordinates.py <../../_static/examples/python/tutorial_orbital_coordinates.py>`, :download:`tutorial_choose_active_space.py <../../_static/examples/python/tutorial_choose_active_space.py>`, :download:`tutorial_map_n2_to_qubits.py <../../_static/examples/python/tutorial_map_n2_to_qubits.py>`, and :download:`tutorial_prepare_trial_state.py <../../_static/examples/python/tutorial_prepare_trial_state.py>`.
-Also download :download:`tutorial_visualize_iqpe_circuit.ipynb <../../_static/examples/python/tutorial_visualize_iqpe_circuit.ipynb>` to the same directory.
-Open the files in Visual Studio Code and review the complete :term:`IQPE` script, including imports, data classes, and helper functions omitted from the excerpts below.
+Add :download:`tutorial_run_iqpe.py <../../_static/examples/python/tutorial_run_iqpe.py>` and :download:`tutorial_visualize_iqpe_circuit.ipynb <../../_static/examples/python/tutorial_visualize_iqpe_circuit.ipynb>` to your tutorial working folder.
+Open the new files in Visual Studio Code and review the complete :term:`IQPE` script, including imports, data classes, and helper functions omitted from the excerpts below.
 The script imports the mapping and trial-state workflows from previous chapters so every stage uses the same selected Hamiltonian and four-determinant trial state.
 The Jupyter notebook constructs and renders the shortest iteration circuit without executing the simulator.
 
@@ -102,7 +101,7 @@ From zero through one half, the signed angle is nonnegative, so :math:`E=-\alpha
 Immediately above one half, the signed angle wraps from :math:`+\pi` to just above :math:`-\pi`; the corresponding energy jumps to just below :math:`+\pi/t` and then returns toward zero along the purple branch.
 At :math:`\varphi=1/2`, the lower filled point includes :math:`-\pi/t`, while the upper open point excludes the equivalent :math:`+\pi/t` representation.
 
-.. figure:: /_static/diagrams/tutorial_qpe_phase_wrapping.png
+.. figure:: /_static/diagrams/tutorial_qpe_phase_wrapping.svg
    :alt: Signed reconstructed energy plotted against phase fraction from zero to one. Phase fractions from zero through one half map from zero down to minus pi over t. Immediately above one half, the signed branch wraps to just below plus pi over t and returns toward zero as the phase approaches one. A neutral dashed guide connects the included minus pi over t point and excluded plus pi over t point at phase one half. A red bracket beside the plot spans their energy difference of two pi over t. Phase one wraps to phase zero.
    :align: center
    :width: 100%
@@ -250,10 +249,11 @@ If iteration :math:`k` selects bit :math:`b_k`, QDK/Chemistry updates its accumu
 After the last iteration, the reported phase fraction is :math:`\Phi_m/\pi`.
 The following figure summarizes one iteration, from fresh register preparation through repeated shots, majority voting, and the feedback update for the next phase bit.
 
-.. graphviz:: /_static/diagrams/tutorial_qpe_iqpe_iteration.dot
+.. figure:: /_static/diagrams/tutorial_qpe_iqpe_iteration.svg
    :alt: Flow through one IQPE iteration. In parallel, freshly prepare the molecular trial state on the compute register and a Hadamard superposition on a new readout ancilla. Rotate the ancilla using feedback from earlier measured bits, then use it to control this iteration's time-evolution power on the compute register. Apply a final Hadamard gate and measure the ancilla for one shot. Repeat with fresh registers for an odd number of shots; their majority selects phase bit b sub k. Use that bit to update the classical feedback angle and continue to iteration k plus 1.
    :align: center
-   :caption: One :term:`IQPE` iteration estimates phase bit :math:`b_k`. Every shot freshly prepares the trial state and readout ancilla; the majority outcome updates :math:`\Phi_{k+1}=\Phi_k/2+\pi b_k/2` for the next controlled power.
+
+   One :term:`IQPE` iteration estimates phase bit :math:`b_k`. Every shot freshly prepares the trial state and readout ancilla; the majority outcome updates :math:`\Phi_{k+1}=\Phi_k/2+\pi b_k/2` for the next controlled power.
 
 After all iterations, the feedback accumulator determines the final phase fraction.
 

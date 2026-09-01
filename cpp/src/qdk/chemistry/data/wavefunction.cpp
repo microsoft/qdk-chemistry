@@ -25,6 +25,7 @@
 #include "hdf5_error_handling.hpp"
 #include "hdf5_serialization.hpp"
 #include "json_serialization.hpp"
+#include "orbital_entropy.hpp"
 
 namespace qdk::chemistry::data {
 namespace detail {
@@ -600,31 +601,11 @@ Eigen::VectorXd WavefunctionContainer::get_single_orbital_entropies() const {
   };
 
   // Source: Boguslawski & Tecmer (2015). doi:10.1002/qua.24832
-  // s1_i  = - \sum_alpha \omega_i,alpha * ln(omega_i,alpha)
   Eigen::VectorXd s1_entropies = Eigen::VectorXd::Zero(norbs);
   for (std::size_t i = 0; i < norbs; ++i) {
-    // omega_1 = 1 - \gamma_{ii} - \gamma_{\bar{i}\bar{i}} +
-    // \Gamma_{i\bar{i}i\bar{i}}
-    auto ordm1 = 1 - one_rdm_aa(i, i) - one_rdm_bb(i, i) +
-                 get_active_two_rdm_element(i, i, i, i);
-    if (ordm1 > 0) {
-      s1_entropies(i) -= ordm1 * std::log(ordm1);
-    }
-    // omega_2 = \gamma_{ii} - \Gamma_{i\bar{i}i\bar{i}}
-    auto ordm2 = one_rdm_aa(i, i) - get_active_two_rdm_element(i, i, i, i);
-    if (ordm2 > 0) {
-      s1_entropies(i) -= ordm2 * std::log(ordm2);
-    }
-    // omega_3 = \gamma_{\bar{i}\bar{i}} - \Gamma_{i\bar{i}i\bar{i}}
-    auto ordm3 = one_rdm_bb(i, i) - get_active_two_rdm_element(i, i, i, i);
-    if (ordm3 > 0) {
-      s1_entropies(i) -= ordm3 * std::log(ordm3);
-    }
-    // omega_4 = \Gamma_{i\bar{i}i\bar{i}}
-    auto ordm4 = get_active_two_rdm_element(i, i, i, i);
-    if (ordm4 > 0) {
-      s1_entropies(i) -= ordm4 * std::log(ordm4);
-    }
+    s1_entropies(i) =
+        detail::single_orbital_entropy(one_rdm_aa(i, i), one_rdm_bb(i, i),
+                                       get_active_two_rdm_element(i, i, i, i));
   }
   // Cache the result
   _entropies.single_orbital = s1_entropies;

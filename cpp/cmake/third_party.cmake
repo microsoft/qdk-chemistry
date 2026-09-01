@@ -40,10 +40,6 @@ handle_dependency(nlohmann_json
 )
 
 # Libint2 for CPU Integral evaluation
-set(_libint2_source_subdir "SOURCE_SUBDIR;libint-2.9.0")
-if(APPLE)
-    set(_libint2_source_subdir "")
-endif()
 # MSVC x64 doesn't define __SSE__/__SSE2__; patch vector_x86.h to define them.
 set(_libint2_patch_args "")
 if(MSVC AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -52,35 +48,19 @@ if(MSVC AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     )
 endif()
 handle_dependency(libint2
-  URL https://github.com/evaleev/libint/releases/download/v2.9.0/libint-2.9.0-mpqc4.tgz
+  URL https://github.com/evaleev/libint/releases/download/v2.13.1/libint-2.13.1-mpqc4.tgz
   BUILD_TARGET Libint2::cxx
   INSTALL_TARGET Libint2::cxx
-  ${_libint2_source_subdir}
   ${DEPENDENCY_BUILD_FLAGS}
   ${_libint2_patch_args}
   REQUIRED
 )
-foreach(_libint2_cxx_target libint2_cxx Libint2::libint2_cxx)
-  if(MSVC AND TARGET ${_libint2_cxx_target})
-    # libint2 needs /Zc:__cplusplus (C++11 detection) and /Zc:preprocessor
-    # (Boost.Preprocessor). Apply to both the FetchContent target (libint2_cxx)
-    # and the installed imported target (Libint2::libint2_cxx).
-    # clang-cl rejects /Zc:preprocessor; omit it there.
-    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
-      target_compile_options(${_libint2_cxx_target} INTERFACE /Zc:__cplusplus)
-    else()
-      target_compile_options(${_libint2_cxx_target} INTERFACE /Zc:__cplusplus /Zc:preprocessor)
-    endif()
-  endif()
-endforeach()
-# eritest-libint2 links only to libint2-static (C library), so it misses the
-# INTERFACE flags from libint2_cxx but still needs C++11 detection.
+# eritest-libint2, libint2's own ERI test, links the plain C library
+# (Libint2::int2) and so inherits nothing from the C++ target, yet its sources
+# still need MSVC to report C++11. The chemistry target gets the same flag in
+# cpp/CMakeLists.txt.
 if(MSVC AND TARGET eritest-libint2)
-  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
-    target_compile_options(eritest-libint2 PRIVATE /Zc:__cplusplus)
-  else()
-    target_compile_options(eritest-libint2 PRIVATE /Zc:__cplusplus /Zc:preprocessor)
-  endif()
+  target_compile_options(eritest-libint2 PRIVATE /Zc:__cplusplus)
 endif()
 
 # MSVC's /O2 optimizer is pathologically slow on libint2's large CMake Unity
@@ -120,12 +100,26 @@ set(GAUXC_ENABLE_CUDA ${QDK_CHEMISTRY_ENABLE_GPU} CACHE BOOL "Enable gauxc CUDA 
 set(GAUXC_ENABLE_MPI  ${QDK_CHEMISTRY_ENABLE_MPI} CACHE BOOL "Enable gauxc MPI Support"  FORCE)
 set(GAUXC_ENABLE_OPENMP ${QDK_ENABLE_OPENMP} CACHE BOOL "Enable gauxc OpenMP Support" FORCE)
 
+set(_gauxc_patch_args "")
+if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND CMAKE_C_SIMULATE_ID STREQUAL "MSVC")
+  set(_gauxc_patch_args FETCHCONTENT_ARGS
+      PATCH_COMMAND "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_LIST_DIR}/patches/gauxc-clang-cl-gau2grid-stdlib.cmake"
+  )
+endif()
+# gauXC is pinned to an unreleased upstream merge commit that first provides the
+# cube backend (gauxc/external/cube.hpp). Older installations report the same
+# project version, so find_package cannot tell them apart and would be accepted
+# silently, only to fail later on the missing header. FORCE_FETCH keeps the
+# build on the revision recorded in cgmanifest.json.
 handle_dependency(gauxc
   GIT_REPOSITORY https://github.com/wavefunction91/gauxc.git
-  GIT_TAG f05cd68e1fd549cc45a318e6d039f49d044d3e1d
+  GIT_TAG 162e4562552323a871af17ae4acd73b71071bd24
   BUILD_TARGET gauxc::gauxc
   INSTALL_TARGET gauxc::gauxc
+  REQUIRED_HEADER gauxc/external/cube.hpp
   ${DEPENDENCY_BUILD_FLAGS}
+  ${_gauxc_patch_args}
+  FORCE_FETCH
   REQUIRED
 )
 
