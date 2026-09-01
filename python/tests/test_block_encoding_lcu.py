@@ -22,8 +22,6 @@ from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LC
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
     float_comparison_relative_tolerance,
-    qpe_energy_tolerance,
-    qpe_phase_fraction_tolerance,
 )
 
 
@@ -427,9 +425,9 @@ class TestLCUContainer:
         walk_phase = power * np.arccos(np.clip(branches / lam, -1.0, 1.0)) / (2 * np.pi)
         offsets = np.stack([walk_phase - phase_fraction, walk_phase + phase_fraction]) % 1.0
         drift = np.minimum(offsets, 1.0 - offsets).min(axis=0)
-        assert np.allclose(drift, 0.0, atol=qpe_phase_fraction_tolerance)
+        assert np.allclose(drift, 0.0, atol=1e-13)
         # Completeness: the energy the phase was built from is one of them.
-        assert np.isclose(branches, energy, atol=qpe_energy_tolerance).any()
+        assert np.isclose(branches, energy, atol=1e-13).any()
 
     def test_walk_container_powered_branches_survive_serialization(self):
         """Serialized walk containers keep the power that defines their inverse branches."""

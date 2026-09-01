@@ -152,8 +152,10 @@ class QpeResult(DataClass):
         canonical = normalized_phase if canonical_phase_fraction is None else float(canonical_phase_fraction % 1.0)
         canonical_angle = float(canonical * (2 * np.pi))
         energies = eigenvalue_from_phase(canonical)
-        if isinstance(energies, (int | float | np.floating)):
+        if isinstance(energies, np.ndarray) and energies.ndim == 0:
             branches: tuple[float, ...] = (float(energies),)
+        elif isinstance(energies, (int | float | np.number)):
+            branches = (float(energies),)
         else:
             branches = tuple(sorted(float(energy) for energy in energies))
             if not branches:

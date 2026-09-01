@@ -14,7 +14,6 @@ from qdk_chemistry.data import (
     QuantumErrorProfile,
     QubitOperator,
 )
-from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 from qdk_chemistry.utils import Logger
 
 from .base import PhaseEstimation, PhaseEstimationSettings
@@ -179,14 +178,12 @@ class UnaryPhaseEstimation(PhaseEstimation):
                 f"but got {type(circuit_builder)} instead."
             )
 
-        # Resolve container before running the circuit
+        # Resolve container before running the circuit. The builder drops any carried power,
+        # so inversion must use the base (power=1) unitary.
         unitary_builder = circuit_builder._create_nested("unitary_builder")  # noqa: SLF001
+        unitary_builder.settings().update("power", 1)
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
         container = unitary_rep.get_container()
-        # The builder drops any carried power, so the measured phase follows the plain walk law
-        # and must be inverted against a power-one walk rather than the container's own power.
-        if isinstance(container, LCUWalkContainer) and container.power != 1:
-            container = LCUWalkContainer(container.block_encoding, power=1, scale=container.scale)
 
         _, num_bits = circuit_builder.resolve_num_queries()
         circuits = circuit_builder.run(

@@ -45,7 +45,7 @@ class QuantumWalkContainer(UnitaryContainer):
         return "quantum_walk_container"
 
     # Serialization version for this class
-    _serialization_version = "0.2.0"
+    _serialization_version = "0.3.0"
 
     def eigenvalue_from_phase(self, phase_fraction: float) -> tuple[float, ...]:
         r"""Recover every eigenvalue consistent with a quantum-walk phase.
@@ -74,13 +74,16 @@ class QuantumWalkContainer(UnitaryContainer):
         """
         phi = phase_fraction % 1.0
         power = self.power
-        # cos is even, so two branches coincide exactly when their walk angles fold
-        # onto the same value in [0, 1/2]; deduplicate on that folded angle.
-        folded_angles: set[float] = set()
+        if power == 1:
+            return (float(self.scale * np.cos(2 * np.pi * phi)),)
+        # cos is even, so two branches coincide exactly when their walk angles fold onto
+        # the same value in [0, 1/2]. Round only the dedup key, never the returned value.
+        folded_angles: dict[float, float] = {}
         for k in range(power):
             angle = (phi + k) / power
-            folded_angles.add(round(min(angle, 1.0 - angle), 12))
-        return tuple(sorted(float(self.scale * np.cos(2 * np.pi * angle)) for angle in folded_angles))
+            folded = min(angle, 1.0 - angle)
+            folded_angles.setdefault(round(folded, 12), folded)
+        return tuple(sorted(float(self.scale * np.cos(2 * np.pi * a)) for a in folded_angles.values()))
 
     @property
     @abstractmethod
@@ -115,7 +118,7 @@ class LCUWalkContainer(QuantumWalkContainer):
         return "lcu_walk_container"
 
     # Serialization version for this class
-    _serialization_version = "0.2.0"
+    _serialization_version = "0.3.0"
 
     def __init__(self, block_encoding: BlockEncodingContainer, power: int = 1, scale: float = 1.0) -> None:
         """Initialize an LCUWalkContainer.
@@ -126,13 +129,17 @@ class LCUWalkContainer(QuantumWalkContainer):
             scale: The 1-norm used for eigenvalue-phase conversion.
 
         Raises:
+            TypeError: If ``power`` is not an integer.
             ValueError: If ``power`` is not positive.
 
         """
-        if not isinstance(power, int) or isinstance(power, bool) or power < 1:
-            raise ValueError(f"power must be a positive integer, got {power!r}.")
+        # bool is an int subclass, but True as a power is always a mistake.
+        if isinstance(power, bool) or not isinstance(power, int | np.integer):
+            raise TypeError(f"power must be an integer, got {type(power).__name__}.")
+        if power < 1:
+            raise ValueError(f"power must be a positive integer, got {power}.")
         self._block_encoding = block_encoding
-        self._power = power
+        self._power = int(power)
         self.scale = scale
         super().__init__()
 

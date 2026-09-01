@@ -61,7 +61,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
         return "pauli_product_formula_container"
 
     # Serialization version for this class
-    _serialization_version = "0.2.0"
+    _serialization_version = "0.3.0"
 
     def __init__(
         self,
@@ -210,11 +210,6 @@ class PauliProductFormulaContainer(UnitaryContainer):
                 f"num_qubits (self.num_qubits={self.num_qubits}, "
                 f"other_container.num_qubits={other_container.num_qubits})."
             )
-        if not np.isclose(self.scale, other_container.scale):
-            raise ValueError(
-                f"Cannot combine PauliProductFormulaContainer instances with different "
-                f"scale (self.scale={self.scale}, other_container.scale={other_container.scale})."
-            )
 
         merged: list[ExponentiatedPauliTerm] = []
         for step_terms, step_reps in (
@@ -235,7 +230,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
             step_terms=merged,
             step_reps=1,
             num_qubits=self.num_qubits,
-            scale=self.scale,
+            scale=self.scale + other_container.scale,
         )
 
     def to_json(self) -> dict[str, Any]:
