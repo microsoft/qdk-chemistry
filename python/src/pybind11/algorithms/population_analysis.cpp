@@ -64,6 +64,9 @@ Args:
 Returns:
     list[float]: Per-center populations in center order.
 )");
+  analyzer.def(
+      "hash", &PopulationAnalyzer::hash, py::arg("input"),
+      R"(Compute a deterministic content hash for a population analysis run.)");
   analyzer.def("settings", &PopulationAnalyzer::settings,
                py::return_value_policy::reference_internal,
                R"(Return the analyzer settings.)");

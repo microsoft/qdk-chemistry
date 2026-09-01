@@ -14,7 +14,8 @@ Algorithms are obtained from the registry:
 - `algorithm.settings()` returns its settings object.
 - `algorithm.run(...)` executes it.
 - `algorithm.hash(...)` computes the content hash for a call.
-- `algorithm.on_remote(...)` returns a remote-bound algorithm.
+- `algorithm.run(..., remote=name_or_backend)` executes it through a registered
+	remote backend and waits for the result.
 
 Algorithm `run` signatures and data-class APIs define accepted inputs and
 returned objects. Coordinates supplied to `Structure` are in Bohr. The
@@ -45,9 +46,20 @@ Algorithms and data objects expose deterministic content hashes. An algorithm
 call hash includes the implementation, settings, and inputs. Cache backends use
 that identity to associate a call with serialized outputs.
 
-## Remote Binding
+## Remote Execution
 
-`on_remote(backend, **configuration)` retains the algorithm configuration and
-routes execution through a remote backend. Blocking execution returns the same
-result shape as local execution. Submitted execution returns a job handle whose
-state and outputs can be retrieved later.
+`algorithm.run(..., remote=name_or_backend)` routes a call through a registered
+backend and returns the same result shape as local execution. The module-level
+`qdk_chemistry.remote.run(algorithm, ..., remote=name_or_backend)` function
+provides the same blocking behavior for any compatible algorithm object.
+
+For asynchronous execution,
+`qdk_chemistry.remote.submit(algorithm, ..., remote=name_or_backend)` returns a
+`Job`. A job can be checked, waited on, fetched, canceled, saved, and loaded.
+Pass `job_dir` to `submit` to save its record automatically; otherwise the job
+is returned in memory.
+
+Use `available_backends()` to inspect registered SDK backends and
+`create_remote(name, **configuration)` to create a connected backend instance.
+The package ships only the `local` subprocess backend. Installed plugins can
+register additional backends.

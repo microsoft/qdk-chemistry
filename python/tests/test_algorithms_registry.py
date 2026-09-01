@@ -629,6 +629,21 @@ def test_all_registered_algorithms_expose_aliases(algorithm_type: str, algorithm
     _REGISTERED_PAIRS,
     ids=[f"{t}/{n}" for t, n in _REGISTERED_PAIRS],
 )
+def test_all_registered_algorithms_expose_hash(algorithm_type: str, algorithm_name: str):
+    """Every registered algorithm exposes its content-hash method."""
+    try:
+        algorithm = registry.create(algorithm_type, algorithm_name)
+    except (ImportError, RuntimeError) as exc:
+        pytest.skip(f"cannot instantiate {algorithm_type}/{algorithm_name}: {exc}")
+
+    assert callable(algorithm.hash)
+
+
+@pytest.mark.parametrize(
+    ("algorithm_type", "algorithm_name"),
+    _REGISTERED_PAIRS,
+    ids=[f"{t}/{n}" for t, n in _REGISTERED_PAIRS],
+)
 class TestStringSettingsHaveGuidance:
     """Every string-typed setting must expose a description or an allowed-values list."""
 

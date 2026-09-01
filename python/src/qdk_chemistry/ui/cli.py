@@ -79,6 +79,7 @@ from .tools import (
     run_state_preparation,
     run_time_evolution_builder,
 )
+from .validation import resolve_project_path
 
 # Registry of all subparser commands, populated by create_parser().
 # Maps command name → argparse sub-parser instance.
@@ -132,6 +133,14 @@ def _print_error(message: str, exit_code: int = 1) -> None:
     print(json.dumps({"success": False, "error": message}, indent=2))
     if exit_code:
         sys.exit(exit_code)
+
+
+def _resolve_cli_project_path(project_name: str) -> Path:
+    """Resolve a project name beneath the configured projects directory."""
+    project_dir, error = resolve_project_path(project_name, config.projects_dir)
+    if project_dir is None:
+        _print_error(error)
+    return project_dir
 
 
 def cmd_plugin(args: argparse.Namespace) -> None:
@@ -768,7 +777,7 @@ def _get_data_classes():
 def cmd_data_summary(args):
     """Print a human-readable summary of any data file."""
     filename = args.filename.split("/")[-1]
-    project_dir = config.projects_dir / args.project_name
+    project_dir = _resolve_cli_project_path(args.project_name)
     os.chdir(project_dir)
 
     for cls in _get_data_classes():
@@ -787,7 +796,7 @@ def cmd_data_convert(args):
     """Convert a data file between JSON and HDF5 formats."""
     filename = args.filename.split("/")[-1]
     out_filename = args.out_filename.split("/")[-1]
-    project_dir = config.projects_dir / args.project_name
+    project_dir = _resolve_cli_project_path(args.project_name)
     os.chdir(project_dir)
 
     for cls in _get_data_classes():
@@ -858,7 +867,7 @@ def cmd_data_create_structure(args):
 def cmd_data_get_energy(args):
     """Get energy value from a Wavefunction, QpeResult, or EnergyExpectationResult."""
     filename = args.filename.split("/")[-1]
-    project_dir = config.projects_dir / args.project_name
+    project_dir = _resolve_cli_project_path(args.project_name)
     os.chdir(project_dir)
 
     # Try Wavefunction — energy is in the summary
@@ -900,7 +909,7 @@ def cmd_data_get_energy(args):
 def cmd_data_get_structure_xyz(args):
     """Export structure as XYZ format string."""
     filename = args.filename.split("/")[-1]
-    project_dir = config.projects_dir / args.project_name
+    project_dir = _resolve_cli_project_path(args.project_name)
     os.chdir(project_dir)
 
     try:
@@ -921,7 +930,7 @@ def cmd_data_get_structure_xyz(args):
 def cmd_data_get_circuit_qasm(args):
     """Export circuit as OpenQASM string."""
     filename = args.filename.split("/")[-1]
-    project_dir = config.projects_dir / args.project_name
+    project_dir = _resolve_cli_project_path(args.project_name)
     os.chdir(project_dir)
 
     try:
@@ -936,7 +945,7 @@ def cmd_data_get_circuit_qasm(args):
 def cmd_data_get_circuit_stats(args):
     """Analyze circuit resource profile: gates, depth, qubits."""
     filename = args.filename.split("/")[-1]
-    project_dir = config.projects_dir / args.project_name
+    project_dir = _resolve_cli_project_path(args.project_name)
     os.chdir(project_dir)
 
     try:
@@ -959,7 +968,7 @@ def cmd_data_get_circuit_stats(args):
 def cmd_data_get_qubit_hamiltonian_info(args):
     """Inspect qubit Hamiltonian: qubits, terms, norm, hermiticity."""
     filename = args.filename.split("/")[-1]
-    project_dir = config.projects_dir / args.project_name
+    project_dir = _resolve_cli_project_path(args.project_name)
     os.chdir(project_dir)
 
     try:
@@ -984,7 +993,7 @@ def cmd_data_get_qubit_hamiltonian_info(args):
 def cmd_data_get_stability_result(args):
     """Inspect wavefunction stability result."""
     filename = args.filename.split("/")[-1]
-    project_dir = config.projects_dir / args.project_name
+    project_dir = _resolve_cli_project_path(args.project_name)
     os.chdir(project_dir)
 
     try:
@@ -1003,7 +1012,7 @@ def cmd_data_get_stability_result(args):
 def cmd_data_get_qpe_result(args):
     """Inspect QPE result: energies, phase, bits."""
     filename = args.filename.split("/")[-1]
-    project_dir = config.projects_dir / args.project_name
+    project_dir = _resolve_cli_project_path(args.project_name)
     os.chdir(project_dir)
 
     try:
@@ -1035,14 +1044,14 @@ def cmd_utils_list_projects(_args):
 
 def cmd_utils_create_project(args):
     """Create a new project directory."""
-    project_dir = config.projects_dir / args.project_name
+    project_dir = _resolve_cli_project_path(args.project_name)
     project_dir.mkdir(parents=True, exist_ok=True)
     _print_result(str(project_dir))
 
 
 def cmd_utils_list_files(args):
     """List data files in a project, with inferred types."""
-    project_dir = config.projects_dir / args.project_name
+    project_dir = _resolve_cli_project_path(args.project_name)
     if not project_dir.exists():
         _print_error(f"Project '{args.project_name}' not found.")
 
@@ -1126,7 +1135,7 @@ def cmd_utils_convert_energy(args):
 def cmd_utils_compute_valence_params(args):
     """Compute valence space parameters (active electrons & orbitals)."""
     filename = args.wavefunction_filename.split("/")[-1]
-    project_dir = config.projects_dir / args.project_name
+    project_dir = _resolve_cli_project_path(args.project_name)
     os.chdir(project_dir)
 
     try:
@@ -1150,7 +1159,7 @@ def cmd_utils_compute_valence_params(args):
 def cmd_utils_resolve_phase_energy(args):
     """Resolve QPE phase to energy using the unitary's phase mapping."""
     filename = args.unitary_representation_filename.split("/")[-1]
-    project_dir = config.projects_dir / args.project_name
+    project_dir = _resolve_cli_project_path(args.project_name)
     os.chdir(project_dir)
 
     unitary = load_data_object(filename, qdk_data.UnitaryRepresentation)

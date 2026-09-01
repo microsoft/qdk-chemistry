@@ -18,8 +18,8 @@ import inspect
 import itertools
 import json
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Literal
+from pathlib import Path, PureWindowsPath
+from typing import Any
 
 import numpy as np
 from mcp.server.mcpserver import Context as _Context
@@ -230,7 +230,7 @@ def _validate_mcp_remote_config(name: str, remote_config: dict[str, Any]) -> Non
 
 def _strip(filename: str) -> str:
     """Strip directory path from a filename, keeping only the base name."""
-    return filename.rsplit("/", maxsplit=1)[-1]
+    return PureWindowsPath(filename).name
 
 
 def _prepare_output(
@@ -295,71 +295,6 @@ def _load_driven_hamiltonian(
         return data.DrivenQubitHamiltonian(base_hamiltonian, drive_hamiltonian, drive=drive), None
     except (TypeError, ValueError) as error:
         return None, f"Failed to construct driven Hamiltonian: {error!s}"
-
-
-def _evaluate_circuit_qre(
-    circuit: data.Circuit,
-    *,
-    architecture: Literal["majorana", "gate_based"],
-    physical_error_rate: float | None,
-    max_error: float,
-    gate_time_ns: int,
-    measurement_time_ns: int,
-    use_graph: bool,
-    name: str,
-):
-    """Evaluate a circuit with the QDK QRE Pareto-front API."""
-    from qdk.qre import estimate  # noqa: PLC0415
-    from qdk.qre.models import GateBased, Majorana, RoundBasedFactory, SurfaceCode, ThreeAux  # noqa: PLC0415
-
-    if not 0 < max_error <= 1:
-        raise ValueError("max_error must be greater than 0 and at most 1")
-
-    if physical_error_rate is None:
-        physical_error_rate = 1e-5 if architecture == "majorana" else 1e-4
-    if not 0 < physical_error_rate <= 1:
-        raise ValueError("physical_error_rate must be greater than 0 and at most 1")
-
-    if architecture == "majorana":
-        qre_architecture = Majorana(error_rate=physical_error_rate)
-        qec_query = ThreeAux.q()
-        factory_code_query = ThreeAux.q()
-        qec_scheme = "three_aux"
-    elif architecture == "gate_based":
-        if gate_time_ns <= 0 or measurement_time_ns <= 0:
-            raise ValueError("gate_time_ns and measurement_time_ns must be positive")
-        qre_architecture = GateBased(
-            error_rate=physical_error_rate,
-            gate_time=gate_time_ns,
-            measurement_time=measurement_time_ns,
-        )
-        qec_query = SurfaceCode.q()
-        factory_code_query = SurfaceCode.q()
-        qec_scheme = "surface_code"
-    else:
-        raise ValueError(f"Unsupported architecture: {architecture}")
-
-    isa_query = qec_query * RoundBasedFactory.q(use_cache=True, code_query=factory_code_query)
-    table = estimate(
-        application=circuit.get_qre_application(),
-        architecture=qre_architecture,
-        isa_query=isa_query,
-        max_error=max_error,
-        use_graph=use_graph,
-        name=name,
-    )
-    assumptions: dict[str, Any] = {
-        "architecture": architecture,
-        "physical_error_rate": physical_error_rate,
-        "qec_scheme": qec_scheme,
-        "factory": "round_based",
-        "max_error": max_error,
-        "use_graph": use_graph,
-    }
-    if architecture == "gate_based":
-        assumptions["gate_time_ns"] = gate_time_ns
-        assumptions["measurement_time_ns"] = measurement_time_ns
-    return table, assumptions
 
 
 def _dict_to_algorithm_ref(existing_ref, override_dict: dict):
@@ -849,7 +784,7 @@ _TOOL_CATEGORIES: dict[str, list[str]] = {
         "run_term_grouper",
         "run_qubit_hamiltonian_solver",
         "run_energy_estimator",
-        "run_resource_estimation",
+        "estimate_circuit",
     ],
     "qpe": [
         "run_time_evolution_builder",
@@ -2340,56 +2275,18 @@ def run_state_preparation(
 @app.tool()
 @_structured
 @validate_project
-def run_resource_estimation(
+def estimate_circuit(
     project_name: str,
     circuit_filename: str,
-    architecture: Literal["majorana", "gate_based"] = "majorana",
-    physical_error_rate: float | None = None,
-    max_error: float = 0.01,
-    gate_time_ns: int = 50,
-    measurement_time_ns: int = 100,
-    use_graph: bool = True,
-) -> dict | str:
-    """Evaluate a Circuit with QDK QRE and return physical-resource Pareto points."""
+    params: dict[str, Any] | list[dict[str, Any]] | None = None,
+) -> dict | list | str:
+    """Estimate a stored Circuit with its QDK estimator parameters and return the result inline."""
     circuit_filename = _strip(circuit_filename)
-    circuit, _err = _load_or_error(circuit_filename, data.Circuit, "circuit")
-    if _err:
-        return _err
+    circuit, error = _load_or_error(circuit_filename, data.Circuit, "circuit")
+    if error:
+        return error
 
-    table, assumptions = _evaluate_circuit_qre(
-        circuit,
-        architecture=architecture,
-        physical_error_rate=physical_error_rate,
-        max_error=max_error,
-        gate_time_ns=gate_time_ns,
-        measurement_time_ns=measurement_time_ns,
-        use_graph=use_graph,
-        name=Path(circuit_filename).stem,
-    )
-    points = sorted(
-        (
-            {
-                "physical_qubits": int(entry.qubits),
-                "runtime_ns": int(entry.runtime),
-                "error": float(entry.error),
-            }
-            for entry in table
-        ),
-        key=lambda point: (point["physical_qubits"], point["runtime_ns"]),
-    )
-    pareto_front = {
-        "point_count": len(points),
-        "min_physical_qubits": min((point["physical_qubits"] for point in points), default=None),
-        "max_physical_qubits": max((point["physical_qubits"] for point in points), default=None),
-        "min_runtime_ns": min((point["runtime_ns"] for point in points), default=None),
-        "max_runtime_ns": max((point["runtime_ns"] for point in points), default=None),
-        "points": points,
-    }
-    return {
-        "circuit_filename": circuit_filename,
-        "assumptions": assumptions,
-        "pareto_front": pareto_front,
-    }
+    return circuit.estimate(params).data()
 
 
 @app.tool()
@@ -2746,10 +2643,7 @@ def run_scf(
 @validate_project
 def run_population_analysis(
     project_name: str,
-    input_filename: str,
-    charge: int = 0,
-    spin_multiplicity: int = 1,
-    n_inactive_orbitals: int = 0,
+    wavefunction_filename: str,
     algorithm_name: str | None = None,
     settings: dict | None = None,
     cache: str | None = None,
@@ -2758,30 +2652,18 @@ def run_population_analysis(
     remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> dict | str:
-    """Compute and return per-center populations from a Structure or Wavefunction."""
-    input_filename = _strip(input_filename)
-
-    input_object = None
-    input_type = None
-    for cls, label in ((data.Structure, "Structure"), (data.Wavefunction, "Wavefunction")):
-        try:
-            input_object = load_data_object(input_filename, cls)
-            input_type = label
-            break
-        except (RuntimeError, ValueError, FileNotFoundError, OSError):
-            continue
-    if input_object is None:
-        return f"Failed to load {input_filename} as a Structure or Wavefunction."
+    """Compute and return per-center populations from a Wavefunction."""
+    wavefunction_filename = _strip(wavefunction_filename)
+    wavefunction, error = _load_or_error(wavefunction_filename, data.Wavefunction, "wavefunction")
+    if error:
+        return error
 
     analyzer = algorithms.create("population_analyzer", algorithm_name)
     _apply_settings(analyzer, settings)
 
     populations = _run_algorithm(
         analyzer,
-        input_object,
-        charge,
-        spin_multiplicity,
-        n_inactive_orbitals,
+        wavefunction,
         cache=cache,
         remote=remote,
         remote_config=remote_config,
@@ -2792,7 +2674,7 @@ def run_population_analysis(
         return populations
 
     return {
-        "input_type": input_type,
+        "wavefunction_filename": wavefunction_filename,
         "algorithm": analyzer.name(),
         "populations": [float(population) for population in populations],
         "population_sum": float(sum(populations)),

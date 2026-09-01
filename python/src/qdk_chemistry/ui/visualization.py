@@ -87,23 +87,11 @@ def _build_html(
     embedded_data: dict | None = None,
     min_height: int = 500,
 ) -> str:
-    """Build a self-contained HTML page for a qsharp-widgets component.
-
-    The JavaScript and CSS from ``qsharp_widgets/static`` are inlined so
-    the page can be served via ``ui://`` without any external resources.
-
-    When *embedded_data_json* is provided (a JSON string), the widget
-    renders immediately on page load with that data — no MCP Apps host
-    handshake or message protocol required.
-    """
+    """Build a self-contained HTML page for a qsharp-widgets component."""
     static = _widgets_static_dir()
     js_text = (static / "index.js").read_text(encoding="utf-8")
     css_text = (static / "index.css").read_text(encoding="utf-8")
 
-    # Rewrite the ESM export to a window assignment so a second
-    # <script type=module> can access the widget render functions.
-    # The minified variable names change across builds, so match
-    # the pattern rather than hardcoding specific identifiers.
     m = re.search(r"export\{(\w+) as default,(\w+) as mdRenderer\}", js_text)
     if m:
         default_var, md_var = m.group(1), m.group(2)
@@ -112,7 +100,6 @@ def _build_html(
             f"window.__qdk_widget={{default:{default_var},mdRenderer:{md_var}}}",
         )
     else:
-        # Fallback: leave as-is and hope ESM import works
         js_patched = js_text
 
     return (
@@ -139,10 +126,8 @@ def _build_html(
         "<body>\n"
         '  <div id="widget-root"><div id="loading">Loading widget\u2026</div></div>\n'
         "\n"
-        "  <!-- Widget bundle (rewritten export \u2192 window assignment) -->\n"
         '  <script type="module">\n' + js_patched + "\n  </script>\n"
         "\n"
-        "  <!-- Render widget with embedded data -->\n"
         '  <script type="module">\n'
         "    try {\n"
         '    const config = JSON.parse(document.getElementById("widget-config").textContent);\n'
@@ -312,106 +297,6 @@ def _expired_visualization_html() -> str:
 # Public API: register resources and tools on the MCPServer app
 # ---------------------------------------------------------------------------
 
-_MINIMAL_TEST_HTML = """\
-<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="utf-8"/><title>MCP Test</title>
-<style>
-html, body { margin: 0; padding: 10px; font-family: monospace; font-size: 12px; }
-.box { width: 200px; height: 200px; border-radius: 12px;
-       display: flex; align-items: center; justify-content: center;
-       color: white; font-size: 18px; font-weight: bold; }
-#log { margin-top: 10px; background: #111; color: #0f0; padding: 8px;
-       max-height: 400px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
-</style>
-</head>
-<body>
-<div id="root"><div class="box" style="background:#0078d4">Waiting...</div></div>
-<div id="log"></div>
-<script>
-const logEl = document.getElementById("log");
-function log(msg) {
-  logEl.textContent += msg + "\\n";
-  logEl.scrollTop = logEl.scrollHeight;
-}
-log("iframe loaded, listening for messages...");
-
-function _sendNotification(method, params) {
-  window.parent.postMessage({ jsonrpc: "2.0", method, params }, "*");
-}
-
-function tryRender(data) {
-  if (!data) return false;
-  const color = data.color || '#00cc00';
-  const label = data.label || 'Got data!';
-  const el = document.getElementById("root");
-  el.innerHTML = '<div class="box" style="background:' + color + '">' + label + '</div>';
-  log("RENDERED: " + JSON.stringify(data));
-  requestAnimationFrame(() => {
-    const rect = el.getBoundingClientRect();
-    _sendNotification("ui/notifications/size-changed", {
-      width: Math.ceil(rect.width), height: Math.ceil(rect.height + logEl.offsetHeight + 30),
-    });
-  });
-  return true;
-}
-
-window.addEventListener("message", (ev) => {
-  const d = ev.data;
-  if (!d) { log("msg: empty"); return; }
-  if (d.jsonrpc !== "2.0") { log("msg (non-jsonrpc): " + JSON.stringify(d).slice(0, 200)); return; }
-
-  log("JSONRPC method=" + d.method + " id=" + (d.id ?? "none"));
-
-  if (d.method === "ui/initialize" && d.id != null) {
-    log("  -> responding to ui/initialize");
-    window.parent.postMessage({
-      jsonrpc: "2.0", id: d.id,
-      result: {
-        protocolVersion: "2026-01-26",
-        appCapabilities: {},
-        appInfo: { name: "mcp-test-square", version: "1.0.0" },
-      },
-    }, "*");
-    _sendNotification("ui/notifications/initialized", {});
-    return;
-  }
-
-  // Log all params keys for any tool-related message
-  if (d.params) {
-    log("  params keys: " + Object.keys(d.params).join(", "));
-    if (d.params.structuredContent) {
-      log("  structuredContent: " + JSON.stringify(d.params.structuredContent).slice(0, 300));
-    }
-    if (d.params.content) {
-      log("  content: " + JSON.stringify(d.params.content).slice(0, 300));
-    }
-  }
-
-  // Try to extract data from multiple possible locations
-  if (d.method === "ui/notifications/tool-result" || d.method === "ui/notifications/tool-input") {
-    log("  -> tool result/input received!");
-    // Try structuredContent first
-    if (tryRender(d.params?.structuredContent)) return;
-    // Try content text
-    const textPart = d.params?.content?.find((c) => c.type === "text");
-    if (textPart) {
-      log("  text content: " + textPart.text.slice(0, 200));
-      try {
-        const parsed = JSON.parse(textPart.text);
-        if (tryRender(parsed)) return;
-      } catch(e) { log("  parse error: " + e); }
-    }
-    log("  -> could not extract render data");
-  }
-});
-
-log("message listener registered");
-</script>
-</body>
-</html>
-"""
-
 
 def register_visualization_tools(app) -> None:
     """Register interactive widget-based visualization tools on an MCP server.
@@ -426,31 +311,6 @@ def register_visualization_tools(app) -> None:
     """
     if not _WIDGETS_AVAILABLE:
         return
-
-    # ── Minimal test tool ─────────────────────────────────────────
-    @app.resource(
-        "ui://qdk-chem-mcp/test-square",
-        name="test_square",
-        description="Minimal test: renders a colored square",
-        mime_type="text/html;profile=mcp-app",
-    )
-    def test_square_resource() -> str:
-        return _MINIMAL_TEST_HTML
-
-    @app.tool(
-        description="Render a test square in VS Code MCP Apps.",
-        meta={"ui": {"resourceUri": "ui://qdk-chem-mcp/test-square"}},
-        structured_output=False,
-    )
-    def visualize_test_square(
-        color: str = "#0078d4",
-        label: str = "Hello MCP!",
-    ) -> CallToolResult:
-        """Render a colored test square in VS Code MCP Apps."""
-        return CallToolResult(
-            content=[TextContent(type="text", text=f"Test square: {label} ({color})")],
-            structuredContent={"color": color, "label": label},
-        )
 
     # ── Circuit viewer ────────────────────────────────────────────
     _circuit_bridge = _WidgetBridge(

@@ -6,24 +6,34 @@ description: 'Describes the QDK Chemistry remote execution API and job lifecycle
 
 # Remote Execution
 
-`on_remote` binds an algorithm to a configured backend. `run` submits the call
-and waits for a result. `submit` returns a persisted job handle. A job handle
-supports status inspection, result retrieval, and cancellation.
+`algorithm.run(..., remote=name_or_backend)` submits a call through a registered
+backend and waits for its result. The module-level
+`qdk_chemistry.remote.run(algorithm, ..., remote=name_or_backend)` function has
+the same blocking behavior. For asynchronous execution,
+`qdk_chemistry.remote.submit(algorithm, ..., remote=name_or_backend)` returns a
+`Job` immediately.
+
+A `Job` supports `check()`, `wait()`, `fetch()`, `cancel()`, `save()`, and
+`load()`. Pass `job_dir` to `submit` to save the job record automatically;
+without it, the SDK returns an in-memory job that can be saved explicitly.
 
 MCP `run_*` tools accept `remote`, `remote_config`, and `remote_timeout` when
 the selected algorithm supports remote execution. A submitted call returns a
 job identifier. `check_remote_job`, `retrieve_remote_results`,
 `list_remote_jobs`, and `cancel_remote_job` operate on persisted jobs.
 
-Backend discovery and description APIs define available backend names and
-configuration arguments.
+The SDK's `available_backends()` reports registered names. MCP
+`list_remote_backends` and `describe_backend` report the registered backends
+and their MCP-safe configuration arguments.
 
 ## Execution Modes
 
 Blocking execution submits a call, waits for terminal job state, retrieves the
-outputs, and deserializes the algorithm result. Asynchronous execution persists
-a job record and returns before result retrieval. The job record allows another
-process or session to inspect the same submitted job.
+outputs, and deserializes the algorithm result. Asynchronous SDK execution
+returns before result retrieval and persists the job only when `job_dir` is
+provided or `Job.save()` is called. MCP-managed asynchronous execution persists
+the record automatically so another process or session can inspect the same
+submitted job.
 
 ## Job Lifecycle
 
@@ -43,16 +53,19 @@ Nested algorithm-reference settings remain nested in the manifest.
 
 ## Backends
 
-The SSH backend transfers files and invokes the configured Python interpreter
-on an SSH-accessible system. The local backend runs the same serialization and
-job protocol in a subprocess. Registered custom backends implement connection,
-transfer, execution, status, retrieval, and cancellation operations exposed by
-the remote backend interface.
+The package ships one backend: `local`. It runs the serialization and job
+protocol in an isolated local subprocess for testing and development.
+
+Installed plugins can register additional backends through a
+`QdkChemistryPlugin` in the `qdk_chemistry.plugins` entry-point group. A custom
+backend can also be registered directly with `register_backend`. Registered
+custom backends implement connection, transfer, submission, status, retrieval,
+and cancellation operations exposed by `RemoteBackend`.
 
 The selected remote environment needs a compatible QDK Chemistry installation
 and access to dependencies required by the selected algorithm. Backend
-configuration can include connection details, interpreter location, timeouts,
-and backend-specific options reported by `describe_backend`.
+configuration is backend-specific; MCP exposes only options declared safe by
+that backend and reported by `describe_backend`.
 
 ## MCP Results
 

@@ -55,11 +55,11 @@ The `[all]` extra pulls in all optional dependencies so that examples and tests 
 
 For a complete, end-to-end walkthrough from installation through a full quantum chemistry pipeline, see the [Quickstart guide](https://microsoft.github.io/qdk-chemistry/user/quickstart.html) and the [examples/](./examples/) directory.
 
-## Agent Integration Files
+## Copilot Plugin
 
-QDK Chemistry publishes a Copilot agent plugin from this repository. Register
-the repository marketplace, then run the plugin installer from the virtual
-environment containing QDK Chemistry:
+QDK Chemistry publishes a Copilot plugin containing skills and an MCP server
+configuration. Register the repository marketplace, then run the plugin
+installer from the virtual environment containing QDK Chemistry:
 
 ```bash
 copilot plugin marketplace add https://github.com/microsoft/qdk-chemistry.git
@@ -78,7 +78,7 @@ qc plugin install OWNER/REPO:copilot-plugins/qdk-chemistry
 ```
 
 To configure one workspace instead, pass its root. QDK Chemistry copies the
-fetched agents and skills into `.github`, merges its MCP server into
+fetched skills into `.github`, merges its MCP server into
 `.vscode/mcp.json` and `.github/mcp.json`, and keeps fetch/update state beneath
 the ignored `.qdk_chem` directory:
 
@@ -110,8 +110,6 @@ an absolute `workspace_root`. Plugin-launched servers reject other tool calls
 until binding succeeds and cannot be rebound to another workspace.
 
 **Skills** provide tested domain knowledge: tool references, workflow recipes, parameter guidance, and common pitfalls.
-
-**Agents** coordinate multi-step quantum chemistry workflows (research → plan → critique → execute → visualize → report). Use them for complex tasks; use skills directly for simple questions.
 
 ## Telemetry
 

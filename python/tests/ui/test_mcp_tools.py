@@ -97,6 +97,14 @@ def test_get_summary_loads_registered_data_class(h2_proj):
     assert result["result"]["data_type"] == "Structure"
 
 
+@pytest.mark.parametrize("filename", [r"..\h2.structure.json", r"C:\outside\h2.structure.json"])
+def test_get_summary_normalizes_windows_filename_paths(h2_proj, filename):
+    result = srv.get_summary(project_name=h2_proj, filename=filename)
+
+    assert result["status"] == "ok"
+    assert result["result"]["data_type"] == "Structure"
+
+
 @pytest.mark.usefixtures("_dirs")
 def test_create_structure_rejects_output_paths_outside_project():
     coordinates = "[[0.0, 0.0, 0.0], [1.4, 0.0, 0.0]]"
@@ -509,25 +517,26 @@ def test_timed_remote_run_timeout_starts_after_handle_is_persisted():
 def test_run_population_analysis_tool(h2_proj):
     algorithm = MagicMock()
     algorithm.name.return_value = "qdk"
+    orbitals = data.ModelOrbitals(3)
+    wavefunction = data.Wavefunction(data.StateVectorContainer(data.Configuration.from_bitstring("110"), orbitals))
+    wavefunction.to_json_file(str(config.projects_dir / h2_proj / "h2.wavefunction.json"))
     with (
         patch("qdk_chemistry.ui.tools.algorithms.create", return_value=algorithm),
         patch("qdk_chemistry.ui.tools._run_algorithm", return_value=[0.1, -0.1]) as run_algorithm,
     ):
         r = srv.run_population_analysis(
             project_name=h2_proj,
-            input_filename="h2.structure.json",
-            charge=0,
-            spin_multiplicity=1,
-            n_inactive_orbitals=2,
+            wavefunction_filename="h2.wavefunction.json",
             cache="folder",
             remote="local",
         )
 
     assert r["status"] == "ok"
+    assert r["result"]["wavefunction_filename"] == "h2.wavefunction.json"
     assert r["result"]["algorithm"] == "qdk"
     assert r["result"]["populations"] == [0.1, -0.1]
     assert r["result"]["population_sum"] == 0.0
-    assert run_algorithm.call_args.args[1:] == (ANY, 0, 1, 2)
+    assert run_algorithm.call_args.args[1:] == (ANY,)
     assert run_algorithm.call_args.kwargs["cache"] == "folder"
     assert run_algorithm.call_args.kwargs["remote"] == "local"
 

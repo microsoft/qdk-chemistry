@@ -126,12 +126,14 @@ separately.
 | Tool | Operation and result |
 |---|---|
 | `get_circuit_stats` | Reads a stored circuit and returns logical qubit count, operation counts, and circuit-depth metrics. |
-| `run_resource_estimation` | Evaluates a stored circuit with QDK QRE and returns estimation assumptions and physical-resource Pareto points. |
+| `estimate_circuit` | Applies optional QDK estimator parameter objects to a stored circuit and returns one estimate or a batch inline. |
 
 These tools inspect the exact circuit supplied by `circuit_filename`.
 `get_circuit_stats` reports properties of the logical circuit.
-`run_resource_estimation` reports physical-resource estimates from QDK QRE and
-does not persist a separate QDK Chemistry result object.
+`estimate_circuit` reports logical and physical resources from the circuit's
+estimator and does not persist a separate QDK Chemistry result object. The
+`resource-estimation` skill documents its parameter objects and the separate
+programmatic `qdk.qre` architecture and ISA interface.
 
 ## Remote jobs
 
@@ -153,7 +155,6 @@ that project directory.
 
 | Tool | Operation and result |
 |---|---|
-| `visualize_test_square` | Returns a colored test-square payload for the MCP Apps host. |
 | `visualize_circuit` | Loads a stored `Circuit` and returns an interactive circuit view. |
 | `visualize_orbital_entanglement` | Loads RDM and mutual-information data from a stored `Wavefunction` and returns an entanglement view. |
 | `visualize_molecule` | Loads a stored `Structure` and returns an interactive molecular view. |

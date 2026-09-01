@@ -81,6 +81,11 @@ Args:
 Returns:
   tuple: ``(energy, structure, hessian, wavefunction)``.
 )");
+  optimizer.def(
+      "hash", &GeometryOptimizer::hash, py::arg("structure"), py::arg("charge"),
+      py::arg("spin_multiplicity"), py::arg("input"),
+      py::arg("n_inactive_orbitals") = 0,
+      R"(Compute a deterministic content hash for an optimization run.)");
   optimizer.def("settings", &GeometryOptimizer::settings,
                 py::return_value_policy::reference_internal,
                 R"(Return the optimizer settings.)");

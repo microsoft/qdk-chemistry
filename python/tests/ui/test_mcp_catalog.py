@@ -27,6 +27,7 @@ _REVIEWED_TOOL_NAMES = {
     "create_structure",
     "describe_algorithm",
     "describe_backend",
+    "estimate_circuit",
     "get_active_space_indices",
     "get_algorithm_default_settings",
     "get_algorithm_default_type",
@@ -64,7 +65,6 @@ _REVIEWED_TOOL_NAMES = {
     "run_projected_multi_configuration_calculation",
     "run_qubit_hamiltonian_solver",
     "run_qubit_mapper",
-    "run_resource_estimation",
     "run_scf",
     "run_stability_checker",
     "run_state_preparation",
@@ -75,7 +75,6 @@ _REVIEWED_TOOL_NAMES = {
     "visualize_orbital_entanglement",
     "visualize_orbitals",
     "visualize_scatter_plot",
-    "visualize_test_square",
 }
 _OPTIONAL_VISUALIZATION_TOOLS = {name for name in _REVIEWED_TOOL_NAMES if name.startswith("visualize_")}
 
@@ -135,7 +134,7 @@ def test_compact_descriptions_identify_tool_operations():
         "run_active_space_selector": ("active-space selector", "wavefunction"),
         "run_multi_configuration_calculation": ("multi-configuration calculation", "wavefunction"),
         "run_phase_estimation": ("phase estimation", "qperesult"),
-        "run_resource_estimation": ("qdk qre", "pareto points"),
+        "estimate_circuit": ("stored circuit", "estimator parameters"),
         "get_circuit_stats": ("logical-qubit", "gate-count", "depth"),
         "run_state_preparation": ("wavefunction", "circuit"),
         "run_controlled_evolution_circuit_mapper": ("timeevolutionunitary", "controlled circuit"),

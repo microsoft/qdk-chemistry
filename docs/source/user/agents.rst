@@ -1,11 +1,12 @@
 .. _agents:
 
-Working with AI Agents
-======================
+Working with AI Assistants
+==========================
 
-QDK/Chemistry can be driven entirely by AI agents — no Python scripting
-required. An MCP server exposes the full chemistry pipeline as structured
-tools, and a CLI provides the same capabilities for shell-based workflows.
+QDK/Chemistry can be used through AI assistants without Python scripting.
+The plugin provides skills with QDK/Chemistry guidance and an MCP server that
+exposes the chemistry pipeline as structured tools. A CLI provides the same
+capabilities for shell-based workflows.
 
 .. contents:: On This Page
    :local:
@@ -17,24 +18,23 @@ Getting started
 
 1. **Install QDK/Chemistry** into a virtual environment (see :doc:`quickstart`).
 
-2. **Deploy agent configs** into your project directory:
+2. **Deploy the plugin** into your project directory:
 
    .. code-block:: bash
 
-      # Install the QDK/Chemistry plugin and deploy its agents and skills.
+      # Install the QDK/Chemistry plugin and deploy its skills and MCP configuration.
       qc plugin install qdk-chemistry@qdk-chemistry --target-dir .
 
       # Or install from a local QDK/Chemistry checkout.
       qc plugin install ./copilot-plugins/qdk-chemistry --target-dir .
 
-   This creates skills, agent definitions, and an MCP server config
-   (``.vscode/mcp.json`` and ``.github/mcp.json``) — everything an agent
-   needs to start working.
+   This creates skills and MCP server configurations
+   (``.vscode/mcp.json`` and ``.github/mcp.json``) for the AI assistant.
 
-3. **Open the project** in VS Code (or your agent platform). The MCP
-   server starts automatically when the agent makes its first tool call.
+3. **Open the project** in VS Code (or another compatible client). The MCP
+   server starts automatically when the assistant makes its first tool call.
 
-That's it. Ask the agent to *"run an SCF calculation on water with
+That's it. Ask the assistant to *"run an SCF calculation on water with
 cc-pVDZ"* and it will handle structure upload, coordinate conversion,
 SCF, stability check, and result inspection autonomously.
 
@@ -54,51 +54,35 @@ What gets deployed
      - Tells GitHub Copilot where to find the MCP server
    * - ``.github/skills/``
      - Domain knowledge: tool reference, workflow patterns, pitfalls, worked examples
-   * - ``.github/agents/``
-     - Multi-agent definitions (quantum-agent, researcher, reviewer, chemist, reporter)
 
-Customizing agent behavior
---------------------------
+Customizing plugin guidance
+---------------------------
 
-The deployed files are plain Markdown — edit them freely to change how
-the agent works, what it prioritizes, and how it interacts with tools.
+The deployed skills are plain Markdown. Edit them to customize the guidance
+available to the assistant.
 
 Editing skills
 ~~~~~~~~~~~~~~
 
 Skills live in ``.github/skills/<skill-name>/SKILL.md`` with optional
 ``references/`` subdirectories. Each skill is a self-contained knowledge
-bundle that the agent loads on demand.
+bundle that the assistant loads on demand.
 
 To customize a skill, edit the ``.md`` files directly. For example, to
 add a new workflow pattern:
 
 1. Open ``.github/skills/qdk-chemistry-mcp/SKILL.md``
 2. Add your pattern under the appropriate section
-3. The agent will pick it up on the next invocation
+3. The assistant will pick it up on the next invocation
 
 To add an entirely new skill, create a new directory under
 ``.github/skills/`` with a ``SKILL.md`` file.
 
-Editing agent definitions
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Agent definitions in ``.github/agents/`` control the multi-agent
-orchestration pipeline (research → plan → critique → execute → report).
-Each ``.agent.md`` file specifies:
-
-- Which tools the agent can use
-- Which sub-agents it can delegate to
-- Behavioral instructions and constraints
-
-For simple tasks, agents use skills directly — the full multi-agent
-pipeline is only invoked for complex, multi-step workflows.
-
 MCP server
 ----------
 
-The MCP server is the interface between the agent and QDK/Chemistry. It
-exposes ~50 tools organized into categories that the agent discovers via
+The MCP server is the interface between the AI assistant and QDK/Chemistry. It
+exposes ~50 tools organized into categories that the assistant discovers via
 ``list_tools``.
 
 Every tool returns a structured JSON envelope with ``status`` (``"ok"``,

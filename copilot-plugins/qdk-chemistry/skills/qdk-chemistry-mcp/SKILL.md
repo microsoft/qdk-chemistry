@@ -120,7 +120,7 @@ different result structures.
 | `run_circuit_executor` | Executes a stored circuit and stores executor data |
 | `run_phase_estimation` | Runs the selected phase-estimation implementation and stores a `QpeResult` |
 | `get_circuit_stats` | Returns logical register, operation-count, and circuit-depth data |
-| `run_resource_estimation` | Sends the supplied circuit to QDK QRE and returns assumptions and Pareto points inline |
+| `estimate_circuit` | Applies QDK estimator parameters to a stored circuit and returns the estimate inline |
 
 Nested algorithm settings are dictionaries whose `algorithm_name` selects the
 nested implementation. The remaining keys configure that implementation.

@@ -17,6 +17,7 @@ _EXPECTED_SKILLS = {
     "qdk-chemistry-mcp",
     "qdk-chemistry-overview",
     "remote-execution",
+    "resource-estimation",
     "visualization",
 }
 

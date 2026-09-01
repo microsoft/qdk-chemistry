@@ -748,6 +748,20 @@ def test_cli_utils_create_project(temp_project_dir, capsys):
     assert (temp_project_dir / "new_project").exists()
 
 
+@pytest.mark.parametrize("project_name", ["../outside", r"..\outside", r"C:\outside"])
+@pytest.mark.parametrize("command", ["create", "files"])
+def test_cli_utils_rejects_non_component_project_names(temp_project_dir, capsys, command, project_name):
+    sys.argv = ["qc", "project", command, "--project-name", project_name]
+
+    with contextlib.suppress(SystemExit):
+        main()
+
+    result = json.loads(capsys.readouterr().out)
+    assert result["success"] is False
+    assert "single path component" in result["error"]
+    assert not (temp_project_dir.parent / "outside").exists()
+
+
 @pytest.mark.usefixtures("temp_project_dir", "h2_structure_file")
 def test_cli_utils_list_files(capsys):
     """Test utils list-files command."""
