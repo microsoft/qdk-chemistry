@@ -117,7 +117,12 @@ download_and_verify() {
     [[ -n "$dest" ]] || dest="$(basename "$url")"
     wget -q "$url" -O "$dest"
 
-    actual="$(shasum -a 1 "$dest" | awk '{print $1}')"
+    # shasum is the fallback for macOS
+    if command -v sha1sum >/dev/null 2>&1; then
+        actual="$(sha1sum "$dest" | awk '{print $1}')"
+    else
+        actual="$(shasum -a 1 "$dest" | awk '{print $1}')"
+    fi
     if [[ "$actual" != "$hash" ]]; then
         echo "ERROR: SHA-1 mismatch for '$name' ($url): expected $hash, got $actual" >&2
         rm -f "$dest"

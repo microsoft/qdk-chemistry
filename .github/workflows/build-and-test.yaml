@@ -91,7 +91,9 @@ jobs:
       run: |
         echo "PATH=${{ github.workspace }}/install/bin:${{ github.workspace }}/install/lib:$PATH" >> $GITHUB_ENV
         echo "PYTHONPATH=${{ github.workspace }}/install/lib/python${{ matrix.python-version }}/site-packages:${{ github.workspace }}/install/lib:$PYTHONPATH" >> $GITHUB_ENV
-        echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+        # ${LD_LIBRARY_PATH:+...} avoids a trailing ":" when unset -- the dynamic loader treats an empty
+        # path component as the current working directory, an untrusted-search-path risk.
+        echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
 
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -201,7 +203,7 @@ jobs:
     - name: Add C++ deps prefix to CMake search path
       run: |
         echo "CMAKE_PREFIX_PATH=${{ env.CPP_DEPS_PREFIX }}:${CMAKE_PREFIX_PATH}" >> $GITHUB_ENV
-        echo "LD_LIBRARY_PATH=${{ env.CPP_DEPS_PREFIX }}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=${{ env.CPP_DEPS_PREFIX }}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
         echo "PATH=${{ env.CPP_DEPS_PREFIX }}/bin:${PATH}" >> $GITHUB_ENV
 
     - name: Install C++ dependencies and ExaChem (Linux)
@@ -365,7 +367,9 @@ jobs:
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
         # Scoped to this step only, for the ExaChem CCSD integration test.
         PATH: ${{ matrix.os-name == 'Linux' && format('{0}/bin:{1}', env.EXACHEM_INSTALL_PREFIX, env.PATH) || env.PATH }}
-        LD_LIBRARY_PATH: ${{ matrix.os-name == 'Linux' && format('{0}/lib:{0}/lib64:{1}', env.EXACHEM_INSTALL_PREFIX, env.LD_LIBRARY_PATH) || env.LD_LIBRARY_PATH }}
+        # The nested ternary omits the trailing ":" when env.LD_LIBRARY_PATH is empty -- an empty path
+        # component is otherwise treated as the current working directory by the dynamic loader.
+        LD_LIBRARY_PATH: ${{ matrix.os-name == 'Linux' && (env.LD_LIBRARY_PATH && format('{0}/lib:{0}/lib64:{1}', env.EXACHEM_INSTALL_PREFIX, env.LD_LIBRARY_PATH) || format('{0}/lib:{0}/lib64', env.EXACHEM_INSTALL_PREFIX)) || env.LD_LIBRARY_PATH }}
       working-directory: python
       run: |
         set -e
@@ -1041,7 +1045,9 @@ jobs:
       run: |
         echo "PATH=${{ github.workspace }}/install/bin:${{ github.workspace }}/install/lib:$PATH" >> $GITHUB_ENV
         echo "PYTHONPATH=${{ github.workspace }}/install/lib/python3.13/site-packages:${{ github.workspace }}/install/lib:$PYTHONPATH" >> $GITHUB_ENV
-        echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+        # ${LD_LIBRARY_PATH:+...} avoids a trailing ":" when unset -- the dynamic loader treats an empty
+        # path component as the current working directory, an untrusted-search-path risk.
+        echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
 
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0

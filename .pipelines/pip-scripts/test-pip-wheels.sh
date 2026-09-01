@@ -138,7 +138,9 @@ if [ -d "/workspace/exachem_install" ]; then
     # Scoped to just this pytest invocation, for the (upcoming, PR #611) ExaChem CCSD integration test's
     # shutil.which("ExaChem") lookup.
     export PATH="${EXACHEM_INSTALL_DIR}/bin:${PATH}"
-    export LD_LIBRARY_PATH="${EXACHEM_INSTALL_DIR}/lib:${EXACHEM_INSTALL_DIR}/lib64:${LD_LIBRARY_PATH:-}"
+    # ${LD_LIBRARY_PATH:+...} avoids a trailing/empty ":" component when unset -- the dynamic loader treats
+    # that as the current working directory, an untrusted-search-path risk.
+    export LD_LIBRARY_PATH="${EXACHEM_INSTALL_DIR}/lib:${EXACHEM_INSTALL_DIR}/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 
     # command -v confirms the binary is actually reachable on PATH.
     command -v ExaChem
