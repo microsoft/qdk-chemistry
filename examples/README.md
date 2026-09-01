@@ -41,6 +41,22 @@ python -m pip install 'qdk-chemistry[all]'
 python -m pip install pennylane rdkit
 ```
 
+In PowerShell, use double quotes around targets containing square brackets:
+
+```powershell
+python -m pip install "qdk-chemistry[all]"
+python -m pip install pennylane rdkit
+```
+
+### Platform notes
+
+The examples run on Linux, macOS, and Windows, with one exception. `factory_list.ipynb` and
+`extended_hubbard.ipynb` import `qdk_chemistry.plugins.pyscf`, and PySCF publishes no Windows
+wheels, so those two notebooks fail at the import on native Windows. Run them under
+[WSL](https://learn.microsoft.com/windows/wsl/install) instead. See
+[Notes for Windows users](https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md#notes-for-windows-users)
+for details.
+
 ## Standalone examples and data
 
 Some notebooks import helper modules from the `utils/` directory.
