@@ -80,18 +80,6 @@ Args:
 Returns:
     tuple: ``(energy, gradients, hessian, wavefunction)``.
 )");
-  calculator.def(
-      "hash",
-      [](const NuclearDerivativeCalculator& self,
-         std::shared_ptr<Structure> structure, int charge,
-         int spin_multiplicity, NuclearDerivativeSeedType seed,
-         unsigned int n_inactive_orbitals) {
-        return self.hash(structure, charge, spin_multiplicity, seed,
-                         n_inactive_orbitals);
-      },
-      py::arg("structure"), py::arg("charge"), py::arg("spin_multiplicity"),
-      py::arg("seed_or_basis"), py::arg("n_inactive_orbitals") = 0,
-      R"(Compute a deterministic content hash for a derivative run.)");
   calculator.def("settings", &NuclearDerivativeCalculator::settings,
                  py::return_value_policy::reference_internal,
                  R"(Return the calculator settings.)");
@@ -108,8 +96,6 @@ Returns:
       R"(Internal settings replacement hook for Python subclasses.)");
   calculator.def("name", &NuclearDerivativeCalculator::name,
                  R"(Return the implementation name.)");
-  calculator.def("aliases", &NuclearDerivativeCalculator::aliases,
-                 R"(Return all registered names for the implementation.)");
   calculator.def("type_name", &NuclearDerivativeCalculator::type_name,
                  R"(Return the algorithm type name.)");
   calculator.def("__repr__", [](const NuclearDerivativeCalculator& self) {
@@ -132,7 +118,7 @@ Returns:
   py::class_<QdkNuclearDerivativeCalculator, NuclearDerivativeCalculator,
              py::smart_holder>(
       m, "QdkNuclearDerivativeCalculator",
-      R"(QDK nuclear derivative calculator using analytic internal SCF gradients and gradient-difference Hessians.)")
+      R"(QDK nuclear derivative calculator using analytic internal SCF gradients.)")
       .def(py::init<>(),
-           R"(Create a QDK analytic-gradient nuclear derivative calculator.)");
+           R"(Create a QDK analytic nuclear derivative calculator.)");
 }

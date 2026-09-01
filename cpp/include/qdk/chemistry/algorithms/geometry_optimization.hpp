@@ -48,7 +48,8 @@ class GeometryOptimizerSettings : public data::Settings {
    */
   GeometryOptimizerSettings() {
     set_default("derivative_calculator",
-                data::AlgorithmRef("nuclear_derivative_calculator", "qdk"),
+                data::AlgorithmRef("nuclear_derivative_calculator",
+                                   "qdk_finite_difference"),
                 "Nuclear derivative calculator used to evaluate energies and "
                 "gradients during optimization.");
     set_default("max_iterations", static_cast<int64_t>(300),
