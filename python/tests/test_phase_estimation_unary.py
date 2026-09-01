@@ -214,6 +214,11 @@ class TestPhaseDecoding:
         assert result.canonical_phase_fraction == pytest.approx(0.25)
         assert result.branching == pytest.approx((0.0, 0.0), abs=1e-12)
 
+    def test_a_unitary_that_folds_several_energies_onto_a_phase_is_rejected(self):
+        """The sign flag names one energy per branch, so an ambiguous inverse has nothing to name."""
+        with pytest.raises(ValueError, match="one eigenvalue per sign branch"):
+            _post_process_phase_estimation({"01": 1}, 2, "qdk_unary", True, lambda _: (-1.0, 1.0))
+
     @pytest.mark.parametrize("resolve_positive_branch", [True, False])
     def test_tied_counts_decode_independently_of_shot_order(self, resolve_positive_branch):
         """Bins that tie on counts must not decode differently just because they arrived in a different order."""

@@ -14,6 +14,7 @@ from qdk_chemistry.data import (
     QuantumErrorProfile,
     QubitOperator,
 )
+from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 from qdk_chemistry.utils import Logger
 
 from .base import PhaseEstimation, PhaseEstimationSettings
@@ -63,6 +64,10 @@ def _post_process_phase_estimation(
         ``canonical_phase_fraction`` is the decoded walk phase, and ``branching``
         holds both sign candidates.
 
+    Raises:
+        ValueError: If the unitary folds several eigenvalues onto a phase, since the sign branch
+            the flag names is then not a single energy.
+
     """
     num_bins = 2**num_bits
     canonical_counts: dict[float, int] = {}
@@ -77,6 +82,12 @@ def _post_process_phase_estimation(
     canonical_phase_fraction = max(canonical_counts, key=lambda phase: (canonical_counts[phase], -phase))
     raw_branches = eigenvalue_from_phase(canonical_phase_fraction)
     mirror_branches = eigenvalue_from_phase(0.5 - canonical_phase_fraction)
+    if len(raw_branches) != 1 or len(mirror_branches) != 1:
+        raise ValueError(
+            f"Unary-iteration phase estimation resolves one eigenvalue per sign branch, but the unitary "
+            f"reported {len(raw_branches)} and {len(mirror_branches)} candidates for the two branches of "
+            f"phase {canonical_phase_fraction}."
+        )
 
     phase_fraction = 2.0 * min(canonical_phase_fraction, 0.5 - canonical_phase_fraction)
     bitstring_msb_first = format(round(phase_fraction * num_bins), f"0{num_bits}b")
@@ -86,7 +97,7 @@ def _post_process_phase_estimation(
         phase_fraction=phase_fraction,
         eigenvalue_from_phase=eigenvalue_from_phase,
         canonical_phase_fraction=canonical_phase_fraction,
-        branching=tuple(sorted(tuple(raw_branches) + tuple(mirror_branches))),
+        branching=tuple(sorted(raw_branches + mirror_branches)),
         resolved_energy=raw_branches[0],
         bits_msb_first=tuple(int(bit) for bit in bitstring_msb_first),
         bitstring_msb_first=bitstring_msb_first,
@@ -172,6 +183,10 @@ class UnaryPhaseEstimation(PhaseEstimation):
         unitary_builder = circuit_builder._create_nested("unitary_builder")  # noqa: SLF001
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
         container = unitary_rep.get_container()
+        # The builder drops any carried power, so the measured phase follows the plain walk law
+        # and must be inverted against a power-one walk rather than the container's own power.
+        if isinstance(container, LCUWalkContainer) and container.power != 1:
+            container = LCUWalkContainer(container.block_encoding, power=1, scale=container.scale)
 
         _, num_bits = circuit_builder.resolve_num_queries()
         circuits = circuit_builder.run(
