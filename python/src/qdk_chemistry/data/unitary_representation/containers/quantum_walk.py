@@ -129,8 +129,8 @@ class LCUWalkContainer(QuantumWalkContainer):
             ValueError: If ``power`` is not positive.
 
         """
-        if power < 1:
-            raise ValueError(f"power must be a positive integer, got {power}.")
+        if not isinstance(power, int) or isinstance(power, bool) or power < 1:
+            raise ValueError(f"power must be a positive integer, got {power!r}.")
         self._block_encoding = block_encoding
         self._power = power
         self.scale = scale
