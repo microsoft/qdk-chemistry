@@ -6,6 +6,7 @@
 
 #include <memory>
 #include <qdk/chemistry/algorithms/algorithm.hpp>
+#include <qdk/chemistry/data/auxiliary_basis.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/settings.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
@@ -41,25 +42,34 @@ namespace qdk::chemistry::algorithms {
  * arguments; concrete implementations decide whether to call
  * @ref _validate_inputs.
  *
+ * Methods that need a secondary Gaussian basis (for example the complementary
+ * auxiliary basis of an explicitly correlated method) read it from the
+ * @c auxiliary_bases argument. Pass a null collection when the method does not
+ * need one. Such a basis may itself constitute part of the external space, in
+ * which case Q is not confined to @f$W \setminus P@f$; explicitly correlated
+ * methods fold in an auxiliary basis lying outside @f$W@f$ entirely.
+ *
  * Typical usage:
  * @code
  * auto constructor =
  *   EffectiveHamiltonianConstructorFactory::create("algorithm_name");
  * auto effective_hamiltonian =
- *   constructor->run(reference, hamiltonian, p_indices);
+ *   constructor->run(reference, hamiltonian, p_indices, auxiliary_bases);
  * @endcode
  *
  * @see EffectiveHamiltonianConstructorFactory for creating instances
  * @see data::Wavefunction for the reference wavefunction input
  * @see data::Hamiltonian for the input and output Hamiltonians
  * @see data::SymmetryBlockedIndexSet for the target P-space indices
+ * @see data::AuxiliaryBasisCollection for the optional auxiliary bases
  */
 class EffectiveHamiltonianConstructor
     : public Algorithm<EffectiveHamiltonianConstructor,
                        std::shared_ptr<data::Hamiltonian>,
                        std::shared_ptr<data::Wavefunction>,
                        std::shared_ptr<data::Hamiltonian>,
-                       std::shared_ptr<const data::SymmetryBlockedIndexSet>> {
+                       std::shared_ptr<const data::SymmetryBlockedIndexSet>,
+                       std::shared_ptr<const data::AuxiliaryBasisCollection>> {
  public:
   /**
    * @brief Default constructor.
@@ -80,6 +90,7 @@ class EffectiveHamiltonianConstructor
    * \cup Q@f$.
    * @param p_indices Absolute molecular-orbital indices of the target space P,
    *        which must lie within the input Hamiltonian's active orbital window.
+   * @param auxiliary_bases Auxiliary bases required by the method; may be null.
    * \endcond
    * @return The effective Hamiltonian acting on the target space P, following
    *         the output contract documented on this class.
@@ -141,13 +152,15 @@ class EffectiveHamiltonianConstructor
    * \cup Q@f$.
    * @param p_indices Absolute molecular-orbital indices of the target space P,
    *        which must lie within the input Hamiltonian's active orbital window.
+   * @param auxiliary_bases Auxiliary bases required by the method, or null.
    * @return The effective Hamiltonian acting on the target space P. It must
    *         satisfy the output contract documented on this class.
    */
   virtual std::shared_ptr<data::Hamiltonian> _run_impl(
       std::shared_ptr<data::Wavefunction> reference,
       std::shared_ptr<data::Hamiltonian> hamiltonian,
-      std::shared_ptr<const data::SymmetryBlockedIndexSet> p_indices)
+      std::shared_ptr<const data::SymmetryBlockedIndexSet> p_indices,
+      std::shared_ptr<const data::AuxiliaryBasisCollection> auxiliary_bases)
       const override = 0;
 };
 
@@ -161,7 +174,7 @@ struct EffectiveHamiltonianConstructorFactory
     return "effective_hamiltonian_constructor";
   }
   static void register_default_instances();
-  static std::string default_algorithm_name() { return ""; }
+  static std::string default_algorithm_name() { return "qdk_ct_f12"; }
 };
 
 }  // namespace qdk::chemistry::algorithms

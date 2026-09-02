@@ -2,12 +2,12 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <qdk/chemistry/scf/core/eri.h>
 #include <qdk/chemistry/scf/scf/scf_solver.h>
 
 #include <algorithm>
 #include <cmath>
 #include <memory>
-#include <qdk/chemistry/scf/core/eri.h>
 #include <stdexcept>
 #include <utility>
 
@@ -21,8 +21,7 @@ RowMajorMatrix closed_shell_density(std::size_t n_orbitals,
   if (n_occupied > n_orbitals)
     throw std::invalid_argument(
         "Dense Hamiltonian SCF has more occupied than total orbitals");
-  RowMajorMatrix density =
-      RowMajorMatrix::Zero(n_orbitals, n_orbitals);
+  RowMajorMatrix density = RowMajorMatrix::Zero(n_orbitals, n_orbitals);
   for (std::size_t i = 0; i < n_occupied; ++i)
     density(static_cast<Eigen::Index>(i), static_cast<Eigen::Index>(i)) = 2.0;
   return density;
@@ -35,8 +34,8 @@ class DensePhysicistERI final : public ERI {
       : ERI(SCFOrbitalType::Restricted, 0.0, basis_set, mpi),
         integrals_(std::move(integrals)),
         n_orbitals_(n_orbitals) {
-    if (integrals_.size() != n_orbitals_ * n_orbitals_ * n_orbitals_ *
-                                 n_orbitals_)
+    if (integrals_.size() !=
+        n_orbitals_ * n_orbitals_ * n_orbitals_ * n_orbitals_)
       throw std::invalid_argument(
           "Dense Hamiltonian SCF two-body tensor has incorrect dimensions");
   }
@@ -73,23 +72,20 @@ class DensePhysicistERI final : public ERI {
             k_value += integrals_[index(p, r, s, q)] * d;
           }
         if (coulomb) coulomb[p * n_orbitals_ + q] = j_value;
-        if (exchange)
-          exchange[p * n_orbitals_ + q] = (alpha + beta) * k_value;
+        if (exchange) exchange[p * n_orbitals_ + q] = (alpha + beta) * k_value;
       }
 
     for (std::size_t p = 0; p < n_orbitals_; ++p)
       for (std::size_t q = 0; q < p; ++q) {
         if (coulomb) {
-          const double value =
-              0.5 * (coulomb[p * n_orbitals_ + q] +
-                     coulomb[q * n_orbitals_ + p]);
+          const double value = 0.5 * (coulomb[p * n_orbitals_ + q] +
+                                      coulomb[q * n_orbitals_ + p]);
           coulomb[p * n_orbitals_ + q] = value;
           coulomb[q * n_orbitals_ + p] = value;
         }
         if (exchange) {
-          const double value =
-              0.5 * (exchange[p * n_orbitals_ + q] +
-                     exchange[q * n_orbitals_ + p]);
+          const double value = 0.5 * (exchange[p * n_orbitals_ + q] +
+                                      exchange[q * n_orbitals_ + p]);
           exchange[p * n_orbitals_ + q] = value;
           exchange[q * n_orbitals_ + p] = value;
         }
@@ -112,18 +108,16 @@ class DenseHamiltonianSCFImpl final : public SCFImpl {
                           std::size_t n_occupied,
                           std::shared_ptr<BasisSet> basis_set,
                           double scalar_energy)
-      : SCFImpl(
-            basis_set ? basis_set->mol : nullptr, cfg,
-            closed_shell_density(
-                static_cast<std::size_t>(one_body.rows()), n_occupied),
-            basis_set, basis_set, /*delay_eri=*/true),
+      : SCFImpl(basis_set ? basis_set->mol : nullptr, cfg,
+                closed_shell_density(static_cast<std::size_t>(one_body.rows()),
+                                     n_occupied),
+                basis_set, basis_set, /*delay_eri=*/true),
         one_body_(std::move(one_body)),
         scalar_energy_(scalar_energy) {
     if (cfg.scf_orbital_type != SCFOrbitalType::Restricted)
       throw std::invalid_argument(
           "Dense Hamiltonian SCF currently supports restricted orbitals only");
-    if (cfg.density_init_method !=
-        DensityInitializationMethod::UserProvided)
+    if (cfg.density_init_method != DensityInitializationMethod::UserProvided)
       throw std::invalid_argument(
           "Dense Hamiltonian SCF requires a user-provided density");
     if (one_body_.rows() != one_body_.cols() ||
@@ -135,9 +129,9 @@ class DenseHamiltonianSCFImpl final : public SCFImpl {
       throw std::invalid_argument(
           "Dense Hamiltonian SCF occupation disagrees with molecular metadata");
 
-    eri_ = std::make_shared<DensePhysicistERI>(
-        *ctx_.basis_set, cfg.mpi, std::move(two_body_physicist),
-        num_atomic_orbitals_);
+    eri_ = std::make_shared<DensePhysicistERI>(*ctx_.basis_set, cfg.mpi,
+                                               std::move(two_body_physicist),
+                                               num_atomic_orbitals_);
   }
 
  private:

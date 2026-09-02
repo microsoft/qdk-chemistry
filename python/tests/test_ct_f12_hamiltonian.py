@@ -20,7 +20,14 @@ from qdk_chemistry.algorithms import (
     create,
     registry,
 )
-from qdk_chemistry.data import Hamiltonian, Structure
+from qdk_chemistry.data import (
+    AuxiliaryBasis,
+    AuxiliaryBasisCollection,
+    AuxiliaryBasisRole,
+    Hamiltonian,
+    Structure,
+)
+from qdk_chemistry.data.symmetry import spin_index_set
 
 
 @pytest.fixture(scope="module")
@@ -55,9 +62,7 @@ class TestCtF12Settings:
     def test_default_settings(self):
         s = create("effective_hamiltonian_constructor").settings()
         assert s.get("gamma") == 1.0
-        assert s.get("cabs_basis") == ""
         assert s.get("frozen_core") == 0
-        assert s.get("max_mos") == 0
         assert s.get("eri_method") == "direct"
         assert s.get("slater_factor") == "stg"
         assert s.get("orbital_basis") == "relaxed"
@@ -68,12 +73,10 @@ class TestCtF12Settings:
             "effective_hamiltonian_constructor",
             "qdk_ct_f12",
             gamma=1.5,
-            cabs_basis="aug-cc-pvtz-optri",
-            max_mos=10,
+            frozen_core=1,
         )
         assert ctf12.settings().get("gamma") == 1.5
-        assert ctf12.settings().get("cabs_basis") == "aug-cc-pvtz-optri"
-        assert ctf12.settings().get("max_mos") == 10
+        assert ctf12.settings().get("frozen_core") == 1
 
     def test_gamma_bound_enforced(self):
         s = create("effective_hamiltonian_constructor").settings()
@@ -100,16 +103,32 @@ class TestCtF12Run:
             "qdk_ct_f12",
             gamma=1.5,
             frozen_core=1,
-            max_mos=6,
-            cabs_basis="aug-cc-pvdz-optri",
         )
-        dressed = ctf12.run(neon_hf)
+        orbitals = neon_hf.get_orbitals()
+        structure = orbitals.get_basis_set().get_structure()
+        window = create("hamiltonian_constructor").run(orbitals)
+        n_mo = orbitals.get_num_molecular_orbitals()
+        p_indices = spin_index_set(n_mo, range(1, 6), range(1, 6))
+        aux = AuxiliaryBasisCollection(
+            {AuxiliaryBasisRole.CABS: AuxiliaryBasis.from_basis_name("aug-cc-pvdz-optri", structure)}
+        )
+
+        dressed = ctf12.run(neon_hf, window, p_indices, aux)
         assert isinstance(dressed, Hamiltonian)
 
-        orbitals = dressed.get_orbitals()
-        assert orbitals.has_energies()
-        # The frozen core is inactive and max_mos caps the active range [1, 6).
-        active_alpha, active_beta = orbitals.get_active_space_indices()
+        dressed_orbitals = dressed.get_orbitals()
+        assert dressed_orbitals.has_energies()
+        # The frozen core is inactive and the P-space caps the active range.
+        active_alpha, active_beta = dressed_orbitals.get_active_space_indices()
         assert active_alpha == active_beta == list(range(1, 6))
         assert dressed.get_one_body_integrals()[0].shape == (5, 5)
         assert dressed.get_two_body_integrals()[0].size == 5**4
+
+    def test_run_without_cabs_raises(self, neon_hf):
+        ctf12 = create("effective_hamiltonian_constructor", "qdk_ct_f12")
+        orbitals = neon_hf.get_orbitals()
+        window = create("hamiltonian_constructor").run(orbitals)
+        n_mo = orbitals.get_num_molecular_orbitals()
+        p_indices = spin_index_set(n_mo, range(n_mo), range(n_mo))
+        with pytest.raises(ValueError, match="CABS"):
+            ctf12.run(neon_hf, window, p_indices)

@@ -19,7 +19,6 @@
 #include <vector>
 
 #include "ctf12_f12.hpp"
-#include "ctf12_support.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
 
@@ -41,12 +40,11 @@ CtF12ScfSolver::_run_impl(std::shared_ptr<data::Structure> structure,
 
   const ctf12::F12HartreeFockInput input = ctf12::f12_input_from_wavefunction(
       *reference, gamma, cabs_basis, frozen_core);
-  const ctf12::DressedHamiltonian dressed =
-      ctf12::build_dressed_hamiltonian(input, /*relax_orbitals=*/true);
+  const ctf12::F12HartreeFockResult f12 = ctf12::run_f12_hf(input);
 
-  const std::size_t n = dressed.n_mo;
-  const std::size_t nc = dressed.n_core;
-  const std::size_t nocc = dressed.n_occupied;
+  const std::size_t n = f12.n_mo;
+  const std::size_t nc = f12.n_core;
+  const std::size_t nocc = f12.n_occupied;
 
   // Relaxed F12-HF orbitals with the frozen core marked inactive.
   auto reference_orbitals = reference->get_orbitals();
@@ -58,8 +56,10 @@ CtF12ScfSolver::_run_impl(std::shared_ptr<data::Structure> structure,
   for (std::size_t i = 0; i < nc; ++i) inactive_indices.push_back(i);
   for (std::size_t i = nc; i < n; ++i) active_indices.push_back(i);
 
+  const Eigen::MatrixXd relaxed_coefficients =
+      input.mo_coefficients * f12.relaxation;
   auto orbitals = std::make_shared<data::Orbitals>(
-      dressed.mo_coefficients, std::make_optional(dressed.orbital_energies),
+      relaxed_coefficients, std::make_optional(f12.relaxed_energies),
       ao_overlap, reference_orbitals->get_basis_set(),
       std::make_optional(std::make_tuple(active_indices, inactive_indices)));
 
@@ -73,7 +73,7 @@ CtF12ScfSolver::_run_impl(std::shared_ptr<data::Structure> structure,
   auto relaxed_reference =
       std::make_shared<data::Wavefunction>(std::move(container));
 
-  const double total_energy = e_hf + (dressed.e_f12hf - dressed.e_hf);
+  const double total_energy = e_hf + (f12.e_f12hf - f12.e_hf);
   return {total_energy, relaxed_reference};
 }
 

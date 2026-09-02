@@ -5,55 +5,163 @@
 #include "ctf12_hamiltonian.hpp"
 
 #include <Eigen/Dense>
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
-#include <tuple>
+#include <unordered_map>
 #include <vector>
-
-#include "ctf12_f12.hpp"
-#include "ctf12_support.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
 
+namespace ctf12 {
+
+DressedHamiltonian build_dressed_hamiltonian(const F12HartreeFockInput& in,
+                                             bool relax_orbitals) {
+  QDK_LOG_TRACE_ENTERING();
+  const F12HartreeFockResult r = run_f12_hf(in);
+  const std::size_t n = r.n_mo;
+
+  DressedHamiltonian out;
+  out.n_mo = n;
+  out.n_occupied = r.n_occupied;
+  out.n_core = r.n_core;
+  out.e_hf = r.e_hf;
+  out.e_f12hf = r.e_f12hf;
+
+  std::vector<double> two_body_phys;  // dressed <pq|rs> in the chosen basis
+  if (relax_orbitals) {
+    const Eigen::MatrixXd& u = r.relaxation;  // original-MO -> relaxed-MO
+    out.mo_coefficients = in.mo_coefficients * u;
+    out.orbital_energies = r.relaxed_energies;
+    out.one_body = u.transpose() * r.one_body * u;
+
+    // Rotate the dressed <pq|rs> into the relaxed basis by four sequential
+    // GEMM index transforms, cycling the leading index to the back each step.
+    two_body_phys = r.two_body;
+    const std::size_t n3 = n * n * n;
+    using RowMajorMat =
+        Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+    for (int step = 0; step < 4; ++step) {
+      Eigen::Map<RowMajorMat> m(two_body_phys.data(),
+                                static_cast<Eigen::Index>(n),
+                                static_cast<Eigen::Index>(n3));
+      const RowMajorMat rotated = (u.transpose() * m).transpose();
+      std::copy(rotated.data(), rotated.data() + n * n3, two_body_phys.begin());
+    }
+  } else {
+    out.mo_coefficients = in.mo_coefficients;
+    out.orbital_energies = in.orbital_energies;
+    out.one_body = r.one_body;
+    two_body_phys = r.two_body;
+  }
+
+  // Convert the dressed integrals from physicists' <pq|rs> to chemists'
+  // (pq|rs) = <pr|qs>, matching the data::Hamiltonian two-body layout.
+  out.two_body.assign(n * n * n * n, 0.0);
+  auto flat = [&](std::size_t p, std::size_t q, std::size_t rr, std::size_t s) {
+    return ((p * n + q) * n + rr) * n + s;
+  };
+  for (std::size_t p = 0; p < n; ++p)
+    for (std::size_t q = 0; q < n; ++q)
+      for (std::size_t rr = 0; rr < n; ++rr)
+        for (std::size_t s = 0; s < n; ++s)
+          out.two_body[flat(p, q, rr, s)] = two_body_phys[flat(p, rr, q, s)];
+
+  return out;
+}
+
+}  // namespace ctf12
+
+namespace {
+
+std::shared_ptr<const data::AuxiliaryBasis> resolve_cabs(
+    const std::shared_ptr<const data::AuxiliaryBasisCollection>&
+        auxiliary_bases) {
+  if (!auxiliary_bases ||
+      !auxiliary_bases->has_auxiliary_basis(data::AuxiliaryBasisRole::CABS)) {
+    throw std::invalid_argument(
+        "CT-F12: run() requires an auxiliary-basis collection carrying a CABS "
+        "entry; the complementary auxiliary basis is the external space the "
+        "transformation folds in");
+  }
+  return auxiliary_bases->get_auxiliary_basis(data::AuxiliaryBasisRole::CABS);
+}
+
+// Restricted spin-blocked index set over `num_modes` molecular orbitals.
+std::shared_ptr<const data::SymmetryBlockedIndexSet> restricted_index_set(
+    std::size_t num_modes, const std::vector<std::size_t>& indices) {
+  const std::vector<std::uint32_t> selected(indices.begin(), indices.end());
+  return std::make_shared<const data::SymmetryBlockedIndexSet>(
+      std::make_shared<const data::SymmetryProduct>(
+          data::SymmetryProduct({data::axes::spin(1, true)})),
+      std::unordered_map<data::SymmetryLabel, std::size_t>{
+          {data::axes::alpha(), num_modes}, {data::axes::beta(), num_modes}},
+      std::unordered_map<data::SymmetryLabel, std::vector<std::uint32_t>>{
+          {data::axes::alpha(), selected}, {data::axes::beta(), selected}});
+}
+
+}  // namespace
+
 std::shared_ptr<data::Hamiltonian> CtF12HamiltonianConstructor::_run_impl(
-    std::shared_ptr<data::Wavefunction> reference) const {
+    std::shared_ptr<data::Wavefunction> reference,
+    std::shared_ptr<data::Hamiltonian> hamiltonian,
+    std::shared_ptr<const data::SymmetryBlockedIndexSet> p_indices,
+    std::shared_ptr<const data::AuxiliaryBasisCollection> auxiliary_bases)
+    const {
   QDK_LOG_TRACE_ENTERING();
 
-  if (!reference) {
+  _validate_inputs(reference, hamiltonian, p_indices);
+
+  const auto active =
+      data::spin_channel_indices(p_indices, data::axes::alpha());
+  if (active != data::spin_channel_indices(p_indices, data::axes::beta())) {
     throw std::invalid_argument(
-        "CtF12HamiltonianConstructor: reference wavefunction is null");
+        "CT-F12 requires a closed-shell target space (equal alpha and beta "
+        "P-space indices)");
+  }
+  if (active.empty()) {
+    throw std::invalid_argument("CT-F12: the target P-space is empty");
   }
 
   const double gamma = _settings->get<double>("gamma");
-  const std::string cabs_basis = _settings->get<std::string>("cabs_basis");
   const auto frozen_core =
       static_cast<std::size_t>(_settings->get<std::int64_t>("frozen_core"));
-  const auto max_mos =
-      static_cast<std::size_t>(_settings->get<std::int64_t>("max_mos"));
   const bool relax = _settings->get<std::string>("orbital_basis") == "relaxed";
   const bool symmetrize = _settings->get<bool>("symmetrize_two_body");
 
   const ctf12::F12HartreeFockInput input = ctf12::f12_input_from_wavefunction(
-      *reference, gamma, cabs_basis, frozen_core);
-  const ctf12::DressedHamiltonian dressed =
+      *reference, gamma, /*cabs_basis=*/"", frozen_core,
+      resolve_cabs(auxiliary_bases));
+  ctf12::DressedHamiltonian dressed =
       ctf12::build_dressed_hamiltonian(input, relax);
 
   const std::size_t n = dressed.n_mo;
-  const std::size_t nc = dressed.n_core;
-  const std::size_t active_end = max_mos == 0 || max_mos > n ? n : max_mos;
-  if (active_end < dressed.n_occupied) {
+  if (active.back() >= n) {
     throw std::invalid_argument(
-        "CT-F12: max_mos must include all occupied molecular orbitals");
+        "CT-F12: the target P-space contains molecular-orbital indices outside "
+        "the orbital basis");
   }
-  const std::size_t nact = active_end - nc;
+
+  // Occupied orbitals left out of P are folded into the constant energy term
+  // and the inactive Fock matrix; unoccupied ones are dropped.
+  std::vector<std::size_t> inactive;
+  for (std::size_t i = 0; i < dressed.n_occupied; ++i) {
+    if (!std::binary_search(active.begin(), active.end(), i)) {
+      inactive.push_back(i);
+    }
+  }
+
+  const std::size_t nact = active.size();
   const Eigen::MatrixXd& h1 = dressed.one_body;
-  std::vector<double> g = dressed.two_body;  // chemists' (pq|rs), flat n^4
+  std::vector<double> g = std::move(dressed.two_body);  // chemists' (pq|rs)
   auto gidx = [&](std::size_t p, std::size_t q, std::size_t r, std::size_t s) {
     return ((p * n + q) * n + r) * n + s;
   };
@@ -74,12 +182,12 @@ std::shared_ptr<data::Hamiltonian> CtF12HamiltonianConstructor::_run_impl(
     g = std::move(gs);
   }
 
-  // Dressed inactive (core) Fock over the full orbital space.
+  // Dressed inactive Fock over the full orbital space.
   Eigen::MatrixXd f_inactive = h1;
   for (std::size_t p = 0; p < n; ++p)
     for (std::size_t q = 0; q < n; ++q) {
       double v = 0.0;
-      for (std::size_t i = 0; i < nc; ++i)
+      for (const std::size_t i : inactive)
         v += 2.0 * g[gidx(p, q, i, i)] - g[gidx(p, i, i, q)];
       f_inactive(static_cast<Eigen::Index>(p), static_cast<Eigen::Index>(q)) +=
           v;
@@ -91,8 +199,8 @@ std::shared_ptr<data::Hamiltonian> CtF12HamiltonianConstructor::_run_impl(
   for (std::size_t a = 0; a < nact; ++a)
     for (std::size_t b = 0; b < nact; ++b)
       h_active(static_cast<Eigen::Index>(a), static_cast<Eigen::Index>(b)) =
-          f_inactive(static_cast<Eigen::Index>(nc + a),
-                     static_cast<Eigen::Index>(nc + b));
+          f_inactive(static_cast<Eigen::Index>(active[a]),
+                     static_cast<Eigen::Index>(active[b]));
 
   Eigen::VectorXd moeri(static_cast<Eigen::Index>(nact * nact * nact * nact));
   for (std::size_t a = 0; a < nact; ++a)
@@ -101,30 +209,26 @@ std::shared_ptr<data::Hamiltonian> CtF12HamiltonianConstructor::_run_impl(
         for (std::size_t d = 0; d < nact; ++d)
           moeri(static_cast<Eigen::Index>(((a * nact + b) * nact + c) * nact +
                                           d)) =
-              g[gidx(nc + a, nc + b, nc + c, nc + d)];
+              g[gidx(active[a], active[b], active[c], active[d])];
 
   double e_inactive = 0.0;
-  for (std::size_t i = 0; i < nc; ++i)
+  for (const std::size_t i : inactive)
     e_inactive +=
         h1(static_cast<Eigen::Index>(i), static_cast<Eigen::Index>(i)) +
         f_inactive(static_cast<Eigen::Index>(i), static_cast<Eigen::Index>(i));
 
   // Build the orbitals of the emitted Hamiltonian (relaxed F12-HF or reference
-  // basis), carrying the selected contiguous active space.
+  // basis), carrying the target P-space as its active space.
   auto reference_orbitals = reference->get_orbitals();
   auto basis_set = reference_orbitals->get_basis_set();
   std::optional<Eigen::MatrixXd> ao_overlap;
   if (reference_orbitals->has_overlap_matrix())
     ao_overlap = reference_orbitals->get_overlap_matrix();
 
-  std::vector<std::size_t> active_indices, inactive_indices;
-  for (std::size_t i = 0; i < nc; ++i) inactive_indices.push_back(i);
-  for (std::size_t i = nc; i < active_end; ++i) active_indices.push_back(i);
-
   auto orbitals = std::make_shared<data::Orbitals>(
       dressed.mo_coefficients, std::make_optional(dressed.orbital_energies),
-      ao_overlap, basis_set,
-      std::make_optional(std::make_tuple(active_indices, inactive_indices)));
+      ao_overlap, basis_set, restricted_index_set(n, active),
+      restricted_index_set(n, inactive));
 
   const double core_energy =
       e_inactive +
