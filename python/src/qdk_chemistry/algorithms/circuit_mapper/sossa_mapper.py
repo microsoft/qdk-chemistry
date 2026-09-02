@@ -21,6 +21,9 @@ __all__: list[str] = [
     "SOSSAMapperSettings",
 ]
 
+# Two SELECT calls, each conjugated by the inner PREPARE, so the alias table is read four times.
+_INNER_LOOKUPS_PER_BLOCK_ENCODING = 4
+
 
 class SOSSAMapperSettings(Settings):
     """Settings for the SOSSAMapper."""
@@ -101,13 +104,44 @@ class SOSSAMapper(CircuitMapper):
         circuit = prepare_algorithm.run(container.outer_prepare)
         return circuit._qsharp_op, circuit.metadata.num_phase_gradient_ancillas  # noqa: SLF001
 
+    def _hoist_free_rider(self, container: SOSSAWalkContainer) -> bool:
+        r"""Whether the free-rider word is loaded once per block encoding rather than per PREPARE.
+
+        Carrying it in the alias table widens the QROAM output word, which the swap network is
+        charged for on each of the four lookups a block encoding performs; hoisting replaces
+        that with one ``Select`` round trip over the conditions. Which wins depends on the
+        shape, so the comparison is left to ``SeparateWordLoadPays``.
+
+        Args:
+            container: The SOSSA walk container describing the block encoding.
+
+        Returns:
+            True when a separate load is the cheaper of the two.
+
+        """
+        if self._settings.get("inner_prepare_algorithm") != "controlled_alias_sampling":
+            return True
+        free_rider = container.inner_prepare.free_rider_data
+        if free_rider is None or free_rider.size == 0:
+            return False
+        layout = container.layout
+        mu = int(self._settings.get("coefficient_bit_precision"))
+        return QSHARP_UTILS.SelectSwap.SeparateWordLoadPays(
+            container.inner_prepare.conditional_coefficients.shape[0],
+            1 << layout.inner_prep_bits,
+            mu + layout.inner_prep_bits + 2,
+            layout.num_free_rider_bits,
+            _INNER_LOOKUPS_PER_BLOCK_ENCODING,
+        )
+
     def _build_inner_prep(self, container: SOSSAWalkContainer) -> Any:
         r"""Build the Q# inner (controlled) PREPARE callable.
 
-        Creates a superposition over bases :math:`b` conditioned on :math:`x_o`.
+        Creates a superposition over bases :math:`b` conditioned on :math:`x_o`. The
+        free-rider word is loaded here only when :meth:`_hoist_free_rider` says otherwise.
 
         Algorithms:
-            - ``"controlled_alias_sampling"``: 2D alias sampling with free-rider data.
+            - ``"controlled_alias_sampling"``: 2D alias sampling.
             - ``"direct"``: Direct multiplexed preparation (ControlledPureStatePrep).
 
         Args:
@@ -124,8 +158,26 @@ class SOSSAMapper(CircuitMapper):
         free_rider_data = free_rider_data.tolist() if free_rider_data is not None else []
 
         if algorithm == "controlled_alias_sampling":
-            return QSHARP_UTILS.SOSSAWalk.MakeInnerPrepareAliasSampling(coefficients, free_rider_data, coeff_bits)
+            inline = [] if self._hoist_free_rider(container) else free_rider_data
+            return QSHARP_UTILS.SOSSAWalk.MakeInnerPrepareAliasSampling(coefficients, inline, coeff_bits)
         return QSHARP_UTILS.SOSSAWalk.MakeInnerPrepareDirect(coefficients, free_rider_data)
+
+    def _build_free_rider_load(self, container: SOSSAWalkContainer) -> Any:
+        r"""Build the Q# callable that loads the free-rider word :math:`(G, r)` for one :math:`x_o`.
+
+        Args:
+            container: The SOSSA container carrying the free-rider table.
+
+        Returns:
+            A Q# callable ``(Qubit[], Qubit[]) => Unit is Adj + Ctl``, a no-op when the inner
+            PREPARE carries the word itself.
+
+        """
+        if not self._hoist_free_rider(container):
+            return QSHARP_UTILS.SOSSAWalk.MakeFreeRiderLoadOp([])
+        free_rider_data = container.inner_prepare.free_rider_data
+        free_rider_data = free_rider_data.tolist() if free_rider_data is not None else []
+        return QSHARP_UTILS.SOSSAWalk.MakeFreeRiderLoadOp(free_rider_data)
 
     def _build_select(self, container: SOSSAWalkContainer) -> Any:
         r"""Build the SELECT step.
@@ -241,11 +293,12 @@ class SOSSAMapper(CircuitMapper):
             numReflectInner=regs["num_reflect_inner"],
             numPhaseGradientQubits=regs["num_phase_gradient_qubits"],
             numOuterPrepareGradientQubits=regs["num_outer_prepare_gradient_qubits"],
+            numFreeRiderQubits=num_free_rider_bits,
         )
         return regs, walk_layout
 
-    def _build_walk_oracles(self, container: SOSSAWalkContainer, regs: dict[str, int]) -> tuple[Any, Any, Any]:
-        """Build the outer PREPARE, inner PREPARE and SELECT callables of the block encoding.
+    def _build_walk_oracles(self, container: SOSSAWalkContainer, regs: dict[str, int]) -> tuple[Any, Any, Any, Any]:
+        """Build the outer PREPARE, free-rider load, inner PREPARE and SELECT of the block encoding.
 
         Raises:
             ValueError: If the outer PREPARE circuit declares a different phase gradient
@@ -262,6 +315,7 @@ class SOSSAMapper(CircuitMapper):
             )
         return (
             outer_prepare_op,
+            self._build_free_rider_load(container),
             self._build_inner_prep(container),
             self._build_select(container),
         )
@@ -300,12 +354,13 @@ class SOSSAMapper(CircuitMapper):
             Logger.warn(f"The container's walk power {container.power} is ignored.")
 
         regs, walk_layout = self._compute_register_sizes(container)
-        outer_prepare_op, inner_prepare_op, select_op = self._build_walk_oracles(container, regs)
+        outer_prepare_op, free_rider_op, inner_prepare_op, select_op = self._build_walk_oracles(container, regs)
 
         qsharp_factory = QsharpFactoryData(
             program=QSHARP_UTILS.SOSSAWalk.MakeSOSSABlockEncodingCircuit,
             parameter={
                 "outerPrepareOp": outer_prepare_op,
+                "freeRiderOp": free_rider_op,
                 "innerPrepareOp": inner_prepare_op,
                 "selectOp": select_op,
                 "layout": walk_layout,
@@ -313,6 +368,7 @@ class SOSSAMapper(CircuitMapper):
         )
         qsharp_op = QSHARP_UTILS.SOSSAWalk.MakeSOSSABlockEncodingOp(
             outer_prepare_op,
+            free_rider_op,
             inner_prepare_op,
             select_op,
             walk_layout,

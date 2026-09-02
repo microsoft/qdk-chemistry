@@ -49,10 +49,11 @@ _DATA_2D_RAGGED_OUTER = [
 _PHASE_TRIALS = 12
 
 
-def _assert_phase_agreement(operation_name, data, num_swap_bits):
+def _assert_phase_agreement(operation_name, data, num_swap_bits, outer_always_valid=False):
     """Fail if any trial reports disagreement; a single passing trial proves nothing."""
     operation = getattr(get_qsharp_context().code.QDKChemistry.Utils.SelectSwap, operation_name)
-    failures = sum(1 for _ in range(_PHASE_TRIALS) if not operation(data, num_swap_bits))
+    args = (data, num_swap_bits) if "1D" in operation_name else (data, num_swap_bits, outer_always_valid)
+    failures = sum(1 for _ in range(_PHASE_TRIALS) if not operation(*args))
     assert failures == 0, (
         f"{operation_name} disagreed with the plain-select path in {failures}/{_PHASE_TRIALS} "
         f"trials at num_swap_bits={num_swap_bits}: the swap path corrupts the address phase."
@@ -74,16 +75,18 @@ class TestSelectSwapLoadsCorrectValues:
             _DATA_1D_RAGGED, num_swap_bits
         )
 
+    @pytest.mark.parametrize("outer_always_valid", [False, True])
     @pytest.mark.parametrize("num_swap_bits", [0, 1, 2])
-    def test_2d_loads_every_address(self, num_swap_bits):
+    def test_2d_loads_every_address(self, num_swap_bits, outer_always_valid):
         assert get_qsharp_context().code.QDKChemistry.Utils.SelectSwap.TestSelect2DLoadCorrectness(
-            _DATA_2D, num_swap_bits
+            _DATA_2D, num_swap_bits, outer_always_valid
         )
 
+    @pytest.mark.parametrize("outer_always_valid", [False, True])
     @pytest.mark.parametrize("num_swap_bits", [0, 1, 2])
-    def test_2d_loads_every_address_when_outer_length_is_not_a_power_of_two(self, num_swap_bits):
+    def test_2d_loads_every_address_when_outer_length_is_not_a_power_of_two(self, num_swap_bits, outer_always_valid):
         assert get_qsharp_context().code.QDKChemistry.Utils.SelectSwap.TestSelect2DLoadCorrectness(
-            _DATA_2D_RAGGED_OUTER, num_swap_bits
+            _DATA_2D_RAGGED_OUTER, num_swap_bits, outer_always_valid
         )
 
 
@@ -103,10 +106,16 @@ class TestSelectSwapPreservesAddressPhases:
     def test_1d_swap_path_matches_plain_select_when_length_is_not_a_power_of_two(self, num_swap_bits):
         _assert_phase_agreement("TestSelectSwap1DPhaseAgreement", _DATA_1D_RAGGED, num_swap_bits)
 
+    @pytest.mark.parametrize("outer_always_valid", [False, True])
     @pytest.mark.parametrize("num_swap_bits", [1, 2])
-    def test_2d_swap_path_matches_plain_select(self, num_swap_bits):
-        _assert_phase_agreement("TestSelect2DLoadPhaseAgreement", _DATA_2D, num_swap_bits)
+    def test_2d_swap_path_matches_plain_select(self, num_swap_bits, outer_always_valid):
+        _assert_phase_agreement("TestSelect2DLoadPhaseAgreement", _DATA_2D, num_swap_bits, outer_always_valid)
 
+    @pytest.mark.parametrize("outer_always_valid", [False, True])
     @pytest.mark.parametrize("num_swap_bits", [1, 2])
-    def test_2d_swap_path_matches_plain_select_when_outer_length_is_not_a_power_of_two(self, num_swap_bits):
-        _assert_phase_agreement("TestSelect2DLoadPhaseAgreement", _DATA_2D_RAGGED_OUTER, num_swap_bits)
+    def test_2d_swap_path_matches_plain_select_when_outer_length_is_not_a_power_of_two(
+        self, num_swap_bits, outer_always_valid
+    ):
+        _assert_phase_agreement(
+            "TestSelect2DLoadPhaseAgreement", _DATA_2D_RAGGED_OUTER, num_swap_bits, outer_always_valid
+        )

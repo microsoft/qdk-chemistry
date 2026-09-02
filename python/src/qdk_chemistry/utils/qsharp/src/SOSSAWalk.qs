@@ -48,7 +48,13 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// Build an inner PREPARE using conditional alias sampling (2D QROM).
     ///
     /// Uses ConditionalAliasSamplingPrepareWithFreeRider to prepare:
-    ///   |x_o⟩|0⟩ → |x_o⟩ Σ_b √(p̃_{x_o,b}) e^{iπ·sign} |b⟩|freeRider⟩|garbage⟩
+    ///   |x_o⟩|0⟩ → |x_o⟩ Σ_b √(p̃_{x_o,b}) e^{iπ·sign} |b⟩|garbage⟩
+    ///
+    /// Pass `freeRiderData = []` to leave the free-rider word to `MakeFreeRiderLoadOp`. That
+    /// pays off only when the lookup takes the select-swap path, where the word widens the
+    /// QROAM output the swap network is charged for, four times per block encoding. On the
+    /// unary-iteration path the cost does not depend on the output width, so carrying it here
+    /// is free and a separate load would be pure overhead.
     ///
     /// The returned callable expects:
     ///   outerReg — conditional address register (x_o)
@@ -88,28 +94,31 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         }
     }
 
+    /// Load the free-rider word (G, r) for the current x_o.
+    ///
+    /// It is a function of x_o alone, so the block encoding loads it once around both SELECT
+    /// calls rather than letting each inner PREPARE carry it: one `Select` round trip against
+    /// four widened QROAM round trips.
+    function MakeFreeRiderLoadOp(freeRiderData : Bool[][]) : (Qubit[], Qubit[]) => Unit is Adj + Ctl {
+        (outerReg, freeRiderReg) => {
+            if Length(freeRiderData) > 0 and Length(freeRiderReg) > 0 {
+                Select(freeRiderData, outerReg, freeRiderReg);
+            }
+        }
+    }
+
     /// Build an inner PREPARE using direct controlled preparation.
-    /// Loads free-rider data (G, r) via Select QROM and prepares b superposition
-    /// via controlled PreparePureStateD.
+    /// Prepares the b superposition via controlled PreparePureStateD. The free-rider word is
+    /// loaded by `MakeFreeRiderLoadOp`, hoisted out of the block encoding's inner loop.
     function MakeInnerPrepareDirect(
         innerCoefficients : Double[][],
         freeRiderData : Bool[][]
     ) : (Qubit[], Qubit[]) => Unit is Adj + Ctl {
         let nCoeffs = Length(innerCoefficients[0]);
         let nIndexBits = BitSizeI((if nCoeffs > 1 { nCoeffs } else { 2 }) - 1);
-        let nFreeRider = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
         // innerReg layout: bReg[nIndexBits] + freeRiderReg[nFR]
         (outerReg, innerReg) => {
             let bReg = innerReg[0..nIndexBits - 1];
-            let freeRiderReg = if nFreeRider > 0 {
-                innerReg[nIndexBits..nIndexBits + nFreeRider - 1]
-            } else {
-                []
-            };
-
-            if nFreeRider > 0 {
-                Select(freeRiderData, outerReg, freeRiderReg);
-            }
 
             let xo = Length(innerCoefficients);
             for i in 0..xo - 1 {
@@ -292,11 +301,13 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// leaves unchanged, so PREPARE and SELECT may both address it.
     operation SOSSABlockEncoding(
         outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
+        freeRiderOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
         innerPrepareOp : (Qubit[], Qubit[]) => Unit is Adj,
         selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
         numReflectInner : Int,
         numOuterIndexQubits : Int,
         numOuterPrepareGradientQubits : Int,
+        numFreeRiderQubits : Int,
         outerReg : Qubit[],
         innerReg : Qubit[],
         spinReg : Qubit[],
@@ -305,23 +316,35 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     ) : Unit is Adj {
         let outerIndexReg = outerReg[0..numOuterIndexQubits - 1];
         let outerPrepareReg = outerReg + phaseGradientReg[0..numOuterPrepareGradientQubits - 1];
+        let freeRiderReg = if numFreeRiderQubits > 0 {
+            innerReg[Length(innerReg) - numFreeRiderQubits...]
+        } else {
+            []
+        };
 
         outerPrepareOp(outerPrepareReg);
         H(spinReg[0]);
+        // The free-rider word depends only on x_o, which is fixed for the whole block, so it
+        // is loaded once around both SELECT calls. It sits past `numReflectInner`, so holding
+        // it live across the reflection does not disturb it.
         within {
-            innerPrepareOp(outerIndexReg, innerReg);
-            H(spinReg[1]);
+            freeRiderOp(outerIndexReg, freeRiderReg);
         } apply {
-            selectOp(outerIndexReg, innerReg, spinReg, systemReg, phaseGradientReg);
-        }
+            within {
+                innerPrepareOp(outerIndexReg, innerReg);
+                H(spinReg[1]);
+            } apply {
+                selectOp(outerIndexReg, innerReg, spinReg, systemReg, phaseGradientReg);
+            }
 
-        Reflect(innerReg[0..numReflectInner - 1] + [spinReg[1]]);
+            Reflect(innerReg[0..numReflectInner - 1] + [spinReg[1]]);
 
-        within {
-            innerPrepareOp(outerIndexReg, innerReg);
-            H(spinReg[1]);
-        } apply {
-            Adjoint selectOp(outerIndexReg, innerReg, spinReg, systemReg, phaseGradientReg);
+            within {
+                innerPrepareOp(outerIndexReg, innerReg);
+                H(spinReg[1]);
+            } apply {
+                Adjoint selectOp(outerIndexReg, innerReg, spinReg, systemReg, phaseGradientReg);
+            }
         }
         H(spinReg[0]);
         Adjoint outerPrepareOp(outerPrepareReg);
@@ -339,6 +362,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// contiguous block, so a SOSSA walk pairs with the generic `MakeAncillaReflectionOp`.
     operation SOSSABlockEncodingOnRegister(
         outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
+        freeRiderOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
         innerPrepareOp : (Qubit[], Qubit[]) => Unit is Adj,
         selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
         layout : SOSSAWalkLayout,
@@ -348,11 +372,13 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         use innerScratch = Qubit[SOSSAInnerScratchCount(layout)];
         SOSSABlockEncoding(
             outerPrepareOp,
+            freeRiderOp,
             innerPrepareOp,
             selectOp,
             layout.numReflectInner,
             layout.numOuterIndexQubits,
             layout.numOuterPrepareGradientQubits,
+            layout.numFreeRiderQubits,
             regs.outerReg,
             regs.innerReg + innerScratch,
             regs.spinReg,
@@ -367,11 +393,12 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// the gradient tail is only present when `layout.numPhaseGradientQubits > 0`.
     function MakeSOSSABlockEncodingOp(
         outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
+        freeRiderOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
         innerPrepareOp : (Qubit[], Qubit[]) => Unit is Adj,
         selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
         layout : SOSSAWalkLayout,
     ) : (Qubit[] => Unit is Adj) {
-        SOSSABlockEncodingOnRegister(outerPrepareOp, innerPrepareOp, selectOp, layout, _)
+        SOSSABlockEncodingOnRegister(outerPrepareOp, freeRiderOp, innerPrepareOp, selectOp, layout, _)
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -402,6 +429,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         numReflectInner : Int,
         numPhaseGradientQubits : Int,
         numOuterPrepareGradientQubits : Int,
+        numFreeRiderQubits : Int,
     }
 
     /// The individual registers sliced out of the target register.
@@ -457,6 +485,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// Register layout: [systemReg | outerReg | innerReg | spinReg | phaseGradientReg].
     operation MakeSOSSABlockEncodingCircuit(
         outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
+        freeRiderOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
         innerPrepareOp : (Qubit[], Qubit[]) => Unit is Adj,
         selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
         layout : SOSSAWalkLayout,
@@ -466,7 +495,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             let gradientStart = Length(allQubits) - layout.numPhaseGradientQubits;
             PreparePhaseGradientState(allQubits[gradientStart...]);
         }
-        SOSSABlockEncodingOnRegister(outerPrepareOp, innerPrepareOp, selectOp, layout, allQubits);
+        SOSSABlockEncodingOnRegister(outerPrepareOp, freeRiderOp, innerPrepareOp, selectOp, layout, allQubits);
         ResetAll(allQubits);
     }
 
@@ -560,9 +589,9 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// Applies the Givens basis change from a QROM-loaded angle word, runs `action` in that
     /// rotated basis, then undoes the chain and releases the angle word.
     ///
-    /// Loads ALL (N-1) rotation angles at once using two Controlled Select calls:
+    /// Loads ALL (N-1) rotation angles at once using two Select calls:
+    ///   - SF: Select over min(R*2^bBits, (B+1)*2^rankBits) entries, uncontrolled
     ///   - DQ: Select(N entries) addressed by xoReg[0..⌈log₂N⌉-1], fires when isSF=0
-    ///   - SF: Select(R*2^bBits entries) addressed by bReg++rBits, fires when isSF=1
     ///
     /// `action` runs inside the table load rather than around this whole operation, so the
     /// angle word stays live across the forward chain, `action`, and the inverse chain, and
@@ -570,15 +599,16 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// `action` leaves the QROM address (`isSF`, `xoReg`, `bReg`, `rBits`) untouched, so the
     /// unlookup addresses the same entry that was loaded.
     ///
-    /// Cost: N + R*2^bBits (Select) + 2 × (N-1) × Adder(bRot) (rotations).
+    /// Cost: (L_SF - 2) + unlookup(L_SF) for SF, 2*(N-1) for DQ, and 2 × (N-1) × Adder(bRot)
+    /// for the rotations. The SF unlookup is measurement-based and costs O(sqrt(L)), which is
+    /// the paper's R + B phase fixup: at FeMoco-54 (N=54, R=10, B=27) it is 37 Toffolis
+    /// against the paper's R + B = 37.
     ///
-    /// The Select term is above the paper's N + R*B: the SF Select is addressed by the full
-    /// bReg, so its table is padded from B+1 entries up to 2^bBits =
-    /// 2^⌈log₂(B+1)⌉. At FeMoco-54 (N=54, R=10, B=27) that is R*2^bBits + N = 374 vs the
-    /// paper's R*(B+1) + N = 334 entries. Collapsing the gap needs a Select that can address
-    /// a non-power-of-two range, not a change here.
+    /// L_SF is above the paper's R*B because `Select` pads whichever register addresses the
+    /// low bits out to a power of two; `SFTableRankAddressedFirst` picks the cheaper of the
+    /// two orderings, which is all that can be done without a non-power-of-two stride.
     ///
-    /// Reference: arXiv:2502.15882v1, Appendix B.5; Babbush et al. (arXiv:1805.03662).
+    /// Reference: arXiv:2502.15882v1, Appendix B.5 and B step 7; Babbush et al. (arXiv:1805.03662).
     operation WithGivensRotationsQROM(
         params : SelectParams,
         N : Int,
@@ -604,9 +634,11 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         // DQ table: N entries × (N-1)*bRot bits, addressed by xoReg[0..nDQBits-1]
         let dqData = BuildDQBulkRotationData(params, N, numRotAngles, bRot);
 
-        // SF table: R*2^bBits entries × ((N-1)*bRot + 1) bits, addressed by bReg++rBits
-        // The +1 bit is the bEqB flag (1 when b == B).
-        let sfData = BuildSFBulkRotationData(params, R, numRotAngles, bRot, bBits);
+        // SF table: addressed by (bReg ++ rBits) or (rBits ++ bReg), whichever is smaller.
+        // Each entry is (N-1)*bRot rotation bits plus the bEqB flag (1 when b == B).
+        let rankFirst = SFTableRankAddressedFirst(R, params.numBases, bBits, Length(rBits));
+        let sfData = BuildSFBulkRotationData(params, R, numRotAngles, bRot, bBits, Length(rBits), rankFirst);
+        let sfAddress = if rankFirst { rBits + bReg } else { bReg + rBits };
 
         // Allocate rotation target register: (N-1)*bRot rotation bits + 1 bEqB flag bit.
         use rotTarget = Qubit[nRotBits + 1];
@@ -614,15 +646,42 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         // The two table loads are conjugated around their consumers so `rotTarget` is
         // uncomputed and released in |0⟩, matching how every other QROM read in this
         // project is written (QROMStatePrep.qs, SelectSwap.qs).
+        //
+        // Order matters: the SF load is outermost so that its uncompute runs last, when
+        // `rotTarget` again holds exactly `sfData[address]` and nothing else. Reordering it
+        // inside the DQ load leaves the DQ word on the register at that point, and the
+        // measurement-based unlookup would then apply the phase fixup for a word the target
+        // does not hold.
         within {
-            // DQ load: fires when isSF=0, addressed by first ⌈log₂N⌉ bits of xoReg
+            // SF load: uncontrolled, addressed by `sfAddress`. Dropping the control is
+            // what makes the uncompute `Adjoint Select`, a measurement-based unlookup costing
+            // O(sqrt(L)) rather than the full L of a controlled adjoint -- this is the phase
+            // fixup of arXiv:2502.15882v1, Appendix B step 7.
+            // SF entries include the bEqB flag at position nRotBits.
+            Select(sfData, sfAddress, rotTarget);
+
+            // Uncontrolled means DQ entries also read the table. They address row 0, because
+            // the inner PREPARE gives every one-body generator b = 0 and r = 0 (see
+            // `_inner_conditional_coefficients` and `_compute_free_rider_data` in
+            // block_encoding/sossa.py). That row is classical, so removing it again costs
+            // CNOTs and no Toffolis.
+            within { X(isSF); } apply {
+                for index in 0..Length(sfData[0]) - 1 {
+                    if sfData[0][index] {
+                        CNOT(isSF, rotTarget[index]);
+                    }
+                }
+            }
+
+            // DQ load: fires when isSF=0, addressed by first ⌈log₂N⌉ bits of xoReg.
             // DQ entries have only rotation bits (no bEqB), so target excludes last qubit.
+            // This one stays controlled: SF values of x_o alias onto real DQ rows rather than
+            // onto a single constant, so the trick above does not apply, and giving the table
+            // its own isSF address bit doubles it -- which costs more than the cheaper
+            // unlookup saves at every size measured.
             within { X(isSF); } apply {
                 Controlled Select([isSF], (dqData, xoReg[0..nDQBits - 1], rotTarget[0..nRotBits - 1]));
             }
-            // SF load: fires when isSF=1, addressed by (bReg ++ rBits)
-            // SF entries include bEqB flag at position nRotBits.
-            Controlled Select([isSF], (sfData, bReg + rBits, rotTarget));
         } apply {
             within {
                 // Copy bEqB flag from QROM output to persistent qubit.
@@ -679,25 +738,49 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         return table;
     }
 
-    /// Build SF bulk rotation data: R*2^bBits entries, each containing all (N-1) quantized angles
-    /// plus a 1-bit bEqB flag indicating b == numBases.
-    /// Address layout: bReg (low bBits) ++ rBits (high), so addr = b + r * 2^bBits.
-    /// The DFTHC cost formula counts R*(B+1) useful entries; the table is padded up to the
-    /// next power of two per rank (2^bBits ≥ B+1) because bReg addresses it directly.
+    /// Whether the SF rotation table is cheaper addressed `rBits ++ bReg` than `bReg ++ rBits`.
+    ///
+    /// `Select`'s address is the integer value of the register, so the *low* register is padded
+    /// out to its full power of two while the high one is not: `b` low costs `R * 2^bBits`
+    /// entries and `r` low costs `(B+1) * 2^rankBits`. Neither dominates -- which is smaller
+    /// depends only on how close `R` and `B+1` sit to a power of two -- so take the smaller.
+    /// Both orderings put (b=0, r=0) at address 0, which the one-body cancellation relies on.
+    ///
+    /// Reaching the paper's `R*B` needs an address with a non-power-of-two stride, which
+    /// `Select` cannot express; it would take a nested unary iteration over b then r, whose
+    /// uncompute would no longer be the measurement-based unlookup.
+    internal function SFTableRankAddressedFirst(
+        numRanks : Int,
+        numBases : Int,
+        bBits : Int,
+        rankBits : Int,
+    ) : Bool {
+        (numBases + 1) * (1 <<< rankBits) < numRanks * (1 <<< bBits)
+    }
+
+    /// Build SF bulk rotation data: all (N-1) quantized angles per entry, plus a 1-bit bEqB
+    /// flag indicating b == numBases.
+    ///
+    /// `rankFirst` selects the address layout, and must match the register order the caller
+    /// hands to `Select`: `addr = r + b * 2^rankBits` when true, `addr = b + r * 2^bBits`
+    /// otherwise. The table is sized to exactly cover the reachable addresses of that layout.
     internal function BuildSFBulkRotationData(
         params : SelectParams,
         R : Int,
         numRotAngles : Int,
         bRot : Int,
         bBits : Int,
+        rankBits : Int,
+        rankFirst : Bool,
     ) : Bool[][] {
-        let nInnerSlots = 1 <<< bBits; // 2^bBits
-        let tableSize = R * nInnerSlots;
+        let bSlots = 1 <<< bBits;
+        let rSlots = 1 <<< rankBits;
+        let tableSize = if rankFirst { (params.numBases + 1) * rSlots } else { R * bSlots };
 
         mutable table : Bool[][] = [];
         for idx in 0..tableSize - 1 {
-            let b = idx % nInnerSlots;   // basis = low bits (bReg is LSB)
-            let r = idx / nInnerSlots;   // rank = high bits (rBits is MSB)
+            let b = if rankFirst { idx / rSlots } else { idx % bSlots };
+            let r = if rankFirst { idx % rSlots } else { idx / bSlots };
 
             mutable bits : Bool[] = [];
             for j in 0..numRotAngles - 1 {
@@ -793,9 +876,16 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// same Givens basis change, the latter to `rotationBitPrecision` accuracy. Running both
     /// and comparing the resulting states is what makes the QROM path testable, since it has
     /// no independent reference to be checked against.
+    ///
+    /// `bValue` addresses the SF angle table, and the rank is derived from `xoValue` exactly
+    /// as the inner PREPARE would emit it, so the two backends see a consistent (b, r). An
+    /// `xoValue >= numOrbitals` with a nonzero `bValue` is what exercises the SF table: at
+    /// b = r = 0 both address layouts of `BuildSFBulkRotationData` agree, so a mismatch
+    /// between the table build and the address concatenation would go unseen.
     operation TestSelectDQ(
         selectData : SelectParams,
         xoValue : Int,
+        bValue : Int,
         usePhaseGradient : Bool,
     ) : Unit {
         let N = selectData.numOrbitals;
@@ -832,9 +922,23 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         }
         H(spinReg[0]); // spinDQ
 
+        for bit in 0..bBits - 1 {
+            if (bValue >>> bit) &&& 1 == 1 {
+                X(innerReg[bit]);
+            }
+        }
+
         let frStart = bBits;
         if xoValue >= N { X(innerReg[frStart]); }
         if xoValue >= numPositiveOneBody { X(innerReg[frStart + 1]); }
+
+        // Rank as the inner PREPARE's free-rider data would carry it: 0 for one-body.
+        let rValue = if xoValue >= N { (xoValue - N) / selectData.numCopies } else { 0 };
+        for bit in 0..nFR - 3 {
+            if (rValue >>> bit) &&& 1 == 1 {
+                X(innerReg[frStart + 2 + bit]);
+            }
+        }
 
         X(systemReg[0]);
 

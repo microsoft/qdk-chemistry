@@ -912,8 +912,17 @@ class TestSOSSAResourceEstimation:
 
     _PROBLEM: ClassVar[dict[str, int]] = {"num_orbitals": 2, "num_ranks": 1, "num_bases": 1, "num_copies": 1}
 
-    def test_fe2s2_matches_archived_resource_estimate(self):
-        """The temporary resource-only PREPARE model must reproduce the archived Fe2S2 headline."""
+    def test_fe2s2_logical_resource_estimate(self):
+        """Pin the Fe2S2-20 logical cost of the circuit that actually runs.
+
+        This used to assert 32,457,481, a figure produced by ``Legacy*ResourceEstimate``
+        branches that ``IsResourceEstimating()`` substituted for the real PREPAREs. Those
+        omitted the alias-sampling comparator and controlled index swap and used a 2D
+        unlookup that is not a valid circuit, so the number was never achievable. With the
+        branches deleted the estimate is the executable circuit throughout, and the honest
+        cost is higher: the PREPAREs alone went from 1,013 to 2,719 Toffolis per block
+        encoding. SELECT moved the other way -- see ``test_sossa_resource_baseline.py``.
+        """
         circuit = _sossa_unary_qpe_circuit(
             10_162,
             num_orbitals=20,
@@ -930,8 +939,8 @@ class TestSOSSAResourceEstimation:
 
         logical_counts = circuit.estimate().logical_counts
 
-        assert logical_counts["cczCount"] + logical_counts["ccixCount"] == 32_457_481
-        assert logical_counts["numQubits"] == 463
+        assert logical_counts["cczCount"] + logical_counts["ccixCount"] == 37_873_827
+        assert logical_counts["numQubits"] == 470
 
     @pytest.mark.slow
     @pytest.mark.skipif(not _RUN_SLOW_TESTS, reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.")

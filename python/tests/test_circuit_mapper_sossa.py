@@ -401,34 +401,35 @@ class TestSelectFullFidelity:
     """Tests for the full SELECT operation fidelity with known rotation angles."""
 
     @staticmethod
-    def _select_data(N: int, rotation_bit_precision: int) -> dict:  # noqa: N803
+    def _select_data(
+        N: int,  # noqa: N803
+        rotation_bit_precision: int,
+        num_ranks: int = 1,
+        num_bases: int = 1,
+        num_copies: int = 1,
+    ) -> dict:
         rng = np.random.default_rng(42 + N)
-        dq_angles = []
-        for _ in range(N):
+
+        def unit_angles() -> list[float]:
             v = rng.standard_normal(N)
-            v /= np.linalg.norm(v)
-            dq_angles.append(_vector_to_givens_angles(v))
+            return _vector_to_givens_angles(v / np.linalg.norm(v))
 
-        R, B, C = 1, 1, 1  # noqa: N806
-        sf_angles = [
-            [0.0] * (N - 1) + [0.0],
-            [0.0] * (N - 1) + [1.0],
-        ]
-
+        rank_bits = math.ceil(math.log2(num_ranks)) if num_ranks > 1 else 0
         return {
             "numOrbitals": N,
-            "numRanks": R,
-            "numBases": B,
-            "numCopies": C,
+            "numRanks": num_ranks,
+            "numBases": num_bases,
+            "numCopies": num_copies,
             "numPositiveOneBody": N,
-            "OneBodyRotationAngles": dq_angles,
-            "TwoBodyRotationAngles": sf_angles,
+            "OneBodyRotationAngles": [unit_angles() for _ in range(N)],
+            # Indexed b * R + r, matching both BuildSFBulkRotationData and the direct path.
+            "TwoBodyRotationAngles": [unit_angles() for _ in range(num_ranks * (num_bases + 1))],
             "rotationBitPrecision": rotation_bit_precision,
-            "numFreeRiderBits": 2,
+            "numFreeRiderBits": 2 + rank_bits,
         }
 
     @staticmethod
-    def _run_select(select_data: dict, use_phase_gradient: bool) -> np.ndarray:
+    def _run_select(select_data: dict, use_phase_gradient: bool, xo_value: int = 0, b_value: int = 0) -> np.ndarray:
         """Run TestSelectDQ in its own context and return the resulting state vector.
 
         A fresh context per run is required: ``TestSelectDQ`` allocates through the QIR
@@ -436,7 +437,7 @@ class TestSelectFullFidelity:
         runs' qubits.
         """
         ctx = create_qsharp_context()
-        ctx.code.QDKChemistry.Utils.SOSSAWalk.TestSelectDQ(select_data, 0, use_phase_gradient)
+        ctx.code.QDKChemistry.Utils.SOSSAWalk.TestSelectDQ(select_data, xo_value, b_value, use_phase_gradient)
         return np.array(ctx.dump_machine().as_dense_state())
 
     @pytest.mark.parametrize("N", [2, 3])
@@ -444,7 +445,7 @@ class TestSelectFullFidelity:
         """Verify SELECT with a DQ entry produces a non-trivial rotation."""
         select_data = self._select_data(N, rotation_bit_precision=10)
 
-        qdk_ctx.code.QDKChemistry.Utils.SOSSAWalk.TestSelectDQ(select_data, 0, False)
+        qdk_ctx.code.QDKChemistry.Utils.SOSSAWalk.TestSelectDQ(select_data, 0, 0, False)
         state = qdk_ctx.dump_machine()
         sv = np.array(state.as_dense_state())
 
@@ -476,6 +477,36 @@ class TestSelectFullFidelity:
         direct = self._run_select(select_data, use_phase_gradient=False)
         qrom = self._run_select(select_data, use_phase_gradient=True)
 
+        self._assert_backends_agree(direct, qrom, N, rotation_bit_precision)
+
+    @pytest.mark.parametrize("N", [2, 3])
+    def test_select_sf_rotation_backends_agree(self, N):  # noqa: N803
+        """The same agreement, on a spin-free entry with b and r both nonzero.
+
+        ``BuildSFBulkRotationData`` packs the SF angle table under whichever of
+        ``bReg ++ rBits`` / ``rBits ++ bReg`` is the smaller address space, and
+        ``WithGivensRotationsQROM`` has to concatenate the registers the same way. At
+        b = r = 0 -- which is all the DQ test above reaches -- both layouts give address 0,
+        so a build/address mismatch is invisible. R=2, B=2 selects the rank-first layout
+        (``(B+1)*2^rankBits = 6 < R*2^bBits = 8``), and b = r = 1 lands on address 3 there
+        against 5 in the other layout, so the two disagree on which angles to load.
+
+        The direct backend reaches the same angles through an independent route: it indexes
+        ``TwoBodyRotationAngles`` by ``b*R + r`` with r derived from x_o, never touching the
+        packed table.
+        """
+        select_data = self._select_data(N, 8, num_ranks=2, num_bases=2, num_copies=1)
+        # x_o = N + 1 is the second SF generator, so r = 1; b = 1 is a non-identity basis.
+        xo_value, b_value = N + 1, 1
+
+        direct = self._run_select(select_data, False, xo_value, b_value)
+        qrom = self._run_select(select_data, True, xo_value, b_value)
+
+        self._assert_backends_agree(direct, qrom, N, 8)
+
+    @staticmethod
+    def _assert_backends_agree(direct: np.ndarray, qrom: np.ndarray, N: int, rotation_bit_precision: int) -> None:  # noqa: N803
+        """Compare the two rotation backends up to angle quantization and a global phase."""
         # The QROM path additionally allocates the phase gradient register, which is
         # conjugated back to |0...0>. Those qubits are allocated last and so are the least
         # significant index bits, making the gradient=|0...0> subspace every stride-th entry.
@@ -626,7 +657,7 @@ class TestSelectSwapCorrectness:
     def test_2d_all_addresses(self, n_outer, n_inner, n_bits, num_swap_bits, qdk_ctx):
         """For each (i, j), Select2DLoad should load data[i][j] into target."""
         data = _make_random_data_2d(n_outer, n_inner, n_bits)
-        result = qdk_ctx.eval(f"{_NS}.TestSelect2DLoadCorrectness({_bools_to_qs(data)}, {num_swap_bits})")
+        result = qdk_ctx.eval(f"{_NS}.TestSelect2DLoadCorrectness({_bools_to_qs(data)}, {num_swap_bits}, false)")
         assert result, (
             f"Select2DLoad failed: n_outer={n_outer}, n_inner={n_inner}, n_bits={n_bits}, num_swap_bits={num_swap_bits}"
         )

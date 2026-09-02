@@ -18,15 +18,12 @@ namespace QDKChemistry.Utils.AliasSampling {
     import Std.Math.Ceiling;
     import Std.Math.Floor;
     import Std.Math.Lg;
-    import Std.ResourceEstimation.IsResourceEstimating;
     import Std.StatePreparation.PrepareUniformSuperposition;
     import Std.Arrays.Mapped;
     import Std.Arrays.Padded;
     import Std.Arrays.Zipped;
     import Std.TableLookup.Select;
     import QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D;
-    import QDKChemistry.Utils.SelectSwap.LegacySelect2DLoadResourceEstimate;
-    import QDKChemistry.Utils.SelectSwap.LegacySelectSwapResourceEstimate;
     import QDKChemistry.Utils.SelectSwap.Select2DLoad;
     import QDKChemistry.Utils.SelectSwap.SelectSwap;
 
@@ -154,7 +151,7 @@ namespace QDKChemistry.Utils.AliasSampling {
     ///   uniformRegister[bitsPrecision] — ancilla for comparison σ
     ///   flagQubit[1] — ancilla for alias resolution
     ///   qromOutput[bitsPrecision + numIndexQubits] — QROM target (keep_ℓ, alt_ℓ)
-    internal operation AliasSamplingPreparePhaseCorrect(
+    operation AliasSamplingPrepare(
         params : AliasSamplingParams,
         qs : Qubit[],
     ) : Unit is Adj + Ctl {
@@ -200,49 +197,6 @@ namespace QDKChemistry.Utils.AliasSampling {
         // Step 5: Conditional swap index ↔ alt
         for i in 0..nIndexQubits - 1 {
             Controlled SWAP([flagQubit], (indexRegister[i], altLoaded[i]));
-        }
-    }
-
-    /// Uses the historical lookup model only while tracing resources.
-    internal operation AliasSamplingPrepareLegacyResourceEstimate(
-        params : AliasSamplingParams,
-        qs : Qubit[],
-    ) : Unit is Adj + Ctl {
-        Fact(IsResourceEstimating(), "AliasSamplingPrepareLegacyResourceEstimate is not executable");
-        let nIndexQubits = params.numIndexQubits;
-        let mu = params.bitsPrecision;
-        let nCoeffs = Length(params.coefficients);
-        let indexRegister = qs[0..nIndexQubits - 1];
-        let uniformRegister = qs[nIndexQubits..nIndexQubits + mu - 1];
-        let qromOutput = qs[nIndexQubits + mu + 1..2 * nIndexQubits + 2 * mu];
-        let (keepCoeff, altIndex) = DiscretizedProbabilityDistribution(mu, params.coefficients);
-        let nPadded = 1 <<< nIndexQubits;
-        let maxKeep = (1 <<< mu) - 1;
-        let selectData = MappedOverRange(
-            idx -> if idx < nCoeffs {
-                IntAsBoolArray(keepCoeff[idx], mu) + IntAsBoolArray(altIndex[idx], nIndexQubits)
-            } else {
-                IntAsBoolArray(maxKeep, mu) + IntAsBoolArray(idx, nIndexQubits)
-            },
-            0..nPadded - 1
-        );
-
-        PrepareUniformSuperposition(nCoeffs, indexRegister);
-        ApplyToEachCA(H, uniformRegister);
-        LegacySelectSwapResourceEstimate(-1, selectData, indexRegister, qromOutput);
-
-        // TODO: Remove this calibration with the historical resource model. The
-        // archived estimate omitted the comparator and controlled index swap.
-    }
-
-    operation AliasSamplingPrepare(
-        params : AliasSamplingParams,
-        qs : Qubit[],
-    ) : Unit is Adj + Ctl {
-        if IsResourceEstimating() {
-            AliasSamplingPrepareLegacyResourceEstimate(params, qs);
-        } else {
-            AliasSamplingPreparePhaseCorrect(params, qs);
         }
     }
 
@@ -361,7 +315,7 @@ namespace QDKChemistry.Utils.AliasSampling {
     ///   5. Conditional swap index ↔ alt
     ///   6. Conditional swap signOrig ↔ signAlt
     ///   7. Z(signOrig) for sign encoding
-    internal operation ConditionalAliasSamplingPrepareWithFreeRiderPhaseCorrect(
+    operation ConditionalAliasSamplingPrepareWithFreeRider(
         coefficients : Double[][],
         freeRiderData : Bool[][],
         bitsPrecision : Int,
@@ -392,20 +346,24 @@ namespace QDKChemistry.Utils.AliasSampling {
         let nInnerData = Length(table3D[0]);
         let m = Length(qromOutput) + Length(freeRiderRegister);
         let lambda = if numSwapBits == -1 {
-            ComputeOptimalLambda2D(nCond, nInnerData, m)
+            ComputeOptimalLambda2D(nCond, nInnerData, m, true)
         } elif numSwapBits > 0 {
             numSwapBits
         } else {
             0
         };
+        // The conditional register is an outer PREPARE's index register, which only ever holds
+        // a value below the number of conditions: its uniform superposition spans exactly
+        // [0, nCond) and alias sampling can only swap one such index for another. That lets the
+        // lookup skip the padding out to a power of two in the outer index.
         if lambda == 0 {
-            Select2DLoad(table3D, conditionalRegister, indexRegister, 0, qromOutput + freeRiderRegister);
+            Select2DLoad(table3D, conditionalRegister, indexRegister, 0, true, qromOutput + freeRiderRegister);
         } else {
             // SelectSwap leaves the non-addressed chunks dirty, so copy the addressed
             // word out and let the within/apply uncompute and free the swap ancilla.
             use swapTarget = Qubit[m * (1 <<< lambda)];
             within {
-                Select2DLoad(table3D, conditionalRegister, indexRegister, lambda, swapTarget);
+                Select2DLoad(table3D, conditionalRegister, indexRegister, lambda, true, swapTarget);
             } apply {
                 ApplyToEachCA(CNOT, Zipped(swapTarget[0..m - 1], qromOutput + freeRiderRegister));
             }
@@ -427,121 +385,6 @@ namespace QDKChemistry.Utils.AliasSampling {
         // Sign encoding (Von Burg arXiv:2011.03494, Def. 1)
         Controlled SWAP([flagQubit], (signOrigQubit, signAltQubit));
         Z(signOrigQubit);
-    }
-
-    /// Reproduces the historical dirty-scratch estimate without changing execution.
-    ///
-    /// TODO: Replace this compatibility path with a phase-correct measurement unlookup
-    /// that attains the same resource count. The resource-only branch releases nonzero
-    /// swap scratch and uses an incomplete address-phase repair, so it must never execute.
-    internal operation ConditionalAliasSamplingPrepareWithFreeRiderLegacyResourceEstimate(
-        coefficients : Double[][],
-        freeRiderData : Bool[][],
-        bitsPrecision : Int,
-        conditionalRegister : Qubit[],
-        indexRegister : Qubit[],
-        uniformRegister : Qubit[],
-        flagQubit : Qubit,
-        qromOutput : Qubit[],
-        freeRiderRegister : Qubit[],
-        numSwapBits : Int,
-    ) : Unit is Adj {
-        Fact(
-            IsResourceEstimating(),
-            "ConditionalAliasSamplingPrepareWithFreeRiderLegacyResourceEstimate is not executable"
-        );
-        let nIndexBits = Length(indexRegister);
-        let nCoeffs = Length(coefficients[0]);
-        let table3D = BuildConditionalAliasTable3D(
-            coefficients,
-            freeRiderData,
-            bitsPrecision,
-            nIndexBits
-        );
-
-        PrepareUniformSuperposition(nCoeffs, indexRegister);
-        ApplyToEachCA(H, uniformRegister);
-
-        let nCond = Length(table3D);
-        let nInnerData = Length(table3D[0]);
-        let m = Length(qromOutput) + Length(freeRiderRegister);
-        let lambda = if numSwapBits == -1 {
-            ComputeOptimalLambda2D(nCond, nInnerData, m)
-        } elif numSwapBits > 0 {
-            numSwapBits
-        } else {
-            0
-        };
-        if lambda == 0 {
-            LegacySelect2DLoadResourceEstimate(
-                table3D,
-                conditionalRegister,
-                indexRegister,
-                0,
-                qromOutput + freeRiderRegister
-            );
-        } else {
-            use swapAnc = Qubit[m * ((1 <<< lambda) - 1)];
-            LegacySelect2DLoadResourceEstimate(
-                table3D,
-                conditionalRegister,
-                indexRegister,
-                lambda,
-                qromOutput + freeRiderRegister + swapAnc
-            );
-        }
-
-        let keepCoeffLoaded = qromOutput[0..bitsPrecision - 1];
-        let altIndexReg = qromOutput[bitsPrecision..bitsPrecision + nIndexBits - 1];
-        let signOrigQubit = qromOutput[bitsPrecision + nIndexBits];
-        let signAltQubit = qromOutput[bitsPrecision + nIndexBits + 1];
-        ApplyIfGreaterLE(X, uniformRegister, keepCoeffLoaded, flagQubit);
-        for i in 0..nIndexBits - 1 {
-            Controlled SWAP([flagQubit], (indexRegister[i], altIndexReg[i]));
-        }
-        Controlled SWAP([flagQubit], (signOrigQubit, signAltQubit));
-        Z(signOrigQubit);
-    }
-
-    operation ConditionalAliasSamplingPrepareWithFreeRider(
-        coefficients : Double[][],
-        freeRiderData : Bool[][],
-        bitsPrecision : Int,
-        conditionalRegister : Qubit[],
-        indexRegister : Qubit[],
-        uniformRegister : Qubit[],
-        flagQubit : Qubit,
-        qromOutput : Qubit[],
-        freeRiderRegister : Qubit[],
-        numSwapBits : Int,
-    ) : Unit is Adj {
-        if IsResourceEstimating() {
-            ConditionalAliasSamplingPrepareWithFreeRiderLegacyResourceEstimate(
-                coefficients,
-                freeRiderData,
-                bitsPrecision,
-                conditionalRegister,
-                indexRegister,
-                uniformRegister,
-                flagQubit,
-                qromOutput,
-                freeRiderRegister,
-                numSwapBits
-            );
-        } else {
-            ConditionalAliasSamplingPrepareWithFreeRiderPhaseCorrect(
-                coefficients,
-                freeRiderData,
-                bitsPrecision,
-                conditionalRegister,
-                indexRegister,
-                uniformRegister,
-                flagQubit,
-                qromOutput,
-                freeRiderRegister,
-                numSwapBits
-            );
-        }
     }
 
     /// Test wrapper: conditional alias sampling on `[condition | index | uniform | flag | qrom]`.

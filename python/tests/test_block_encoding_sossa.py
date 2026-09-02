@@ -279,6 +279,39 @@ class TestSOSSABuilder:
         unnormalized = amplitudes * np.sqrt(2.0 * container.metadata.normalization)
         assert np.isclose(np.sum(unnormalized**2), 2.0 * container.metadata.normalization)
 
+    @pytest.mark.parametrize(
+        ("num_orbitals", "num_ranks", "num_bases", "num_copies"),
+        [(2, 1, 1, 1), (3, 2, 2, 1), (4, 3, 2, 2), (6, 3, 3, 2)],
+        ids=["N2R1B1C1", "N3R2B2C1", "N4R3B2C2", "N6R3B3C2"],
+    )
+    def test_one_body_generators_address_the_first_sf_rotation_row(
+        self, num_orbitals, num_ranks, num_bases, num_copies
+    ):
+        """Every one-body generator must yield ``b = 0`` and ``r = 0``.
+
+        ``WithGivensRotationsQROM`` reads the SF rotation table uncontrolled so that its
+        uncompute is a measurement-based unlookup. One-body generators therefore also read
+        that table, and the word they pick up is removed again with CNOTs -- which is only
+        possible because they all address the same row, row 0, whose contents are classical.
+        Break this and the Givens angles for every one-body term are silently wrong.
+        """
+        fh = create_random_factorized_hamiltonian(
+            num_orbitals=num_orbitals,
+            num_ranks=num_ranks,
+            num_bases=num_bases,
+            num_copies=num_copies,
+        )
+        container = SOSSABuilder().run(to_sossa_operator(fh)).get_container()
+
+        one_body = np.asarray(container.inner_prepare.conditional_coefficients, dtype=float)[:num_orbitals]
+        expected = np.zeros_like(one_body)
+        expected[:, 0] = 1.0
+        assert np.array_equal(one_body, expected), f"one-body inner-PREPARE rows are not a delta at b=0:\n{one_body}"
+
+        free_rider = np.asarray(container.inner_prepare.free_rider_data, dtype=bool)[:num_orbitals]
+        rank_bits = free_rider[:, 2:]
+        assert not rank_bits.any(), f"one-body free-rider rank bits are not all zero:\n{rank_bits}"
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Q# component tests
