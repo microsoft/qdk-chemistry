@@ -12,6 +12,7 @@
 #include <cmath>
 #include <cstdint>
 #include <map>
+#include <numeric>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/dynamical_correlation_calculator.hpp>
 #include <qdk/chemistry/algorithms/effective_hamiltonian.hpp>
@@ -267,6 +268,100 @@ TEST(SchriefferWolffPT2Test, DownfoldRunsEndToEndWater) {
   auto cas_bare = MultiConfigurationCalculatorFactory::create("macis_cas");
   auto [E_sw_bare, wfn_bare] = cas_bare->run(H_eff_bare, 2, 2);
   EXPECT_GT(E_sw_bare, E_sw);  // regularization lowers the energy vs bare PT2
+}
+
+// The MP2 limit, where the downfold has a closed-form answer to compare
+// against. Put every occupied orbital in the active space, leave the inactive
+// set empty, fold all the virtuals, and switch the regularizer off. Nothing in
+// H_BD can change the virtual occupation, so <HF|H_BD|HF> is E_HF; and
+// Brillouin kills the singles channel of <HF| 1/2 [S, H_OD] |HF>, leaving
+// exactly the doubles sum that defines MP2. Rank-3 terms of the commutator do
+// contribute at ten electrons, but the reference density here is the idempotent
+// HF one, for which the fold onto two-body is exact on the reference
+// determinant. The active space comes out completely filled, so its CI space is
+// a single determinant and the emitted Hamiltonian's ground state *is* that
+// expectation value.
+//
+// This is the one test in the suite that checks the downfold against physics
+// rather than against a second expansion of the same commutator: the reference
+// number comes from the repository's MP2 calculator, which shares only the SCF
+// and integral layers with this code path.
+//
+// Bare denominators log a large-amplitude warning on this window, and MP2 does
+// not, which is consistent rather than contradictory: the offending channel is
+// semi-internal (eps_5 + eps_1 - 2 eps_4 = 0.043 Eh here), and MP2 has no such
+// channel -- its own oo->vv denominators bottom out at 1.7 Eh. That channel is
+// blocked on the reference determinant, so it cannot move the number compared
+// here, but it is a real feature of the emitted operator. The agreement below
+// therefore constrains the doubles channel and the fold; it says nothing about
+// the semi-internal ones, which the symbolic term table covers instead.
+TEST(SchriefferWolffPT2Test, ReproducesMp2WhenEveryOccupiedOrbitalIsActive) {
+  namespace qcd = qdk::chemistry::data;
+  auto water = testing::create_water_structure();
+  auto scf = ScfSolverFactory::create();
+  auto [E_hf, wfn_hf] = scf->run(water, 0, 1, "sto-3g");
+  const auto orbitals = wfn_hf->get_orbitals();
+  const size_t norb = orbitals->get_num_molecular_orbitals();
+  const auto [na, nb] = wfn_hf->get_active_num_electrons();
+  ASSERT_EQ(na, nb) << "the closed-shell argument above assumes a singlet";
+
+  std::vector<size_t> occupied(na), window(norb);
+  std::iota(occupied.begin(), occupied.end(), size_t{0});
+  std::iota(window.begin(), window.end(), size_t{0});
+  ASSERT_LT(occupied.size(), window.size()) << "nothing would be folded";
+
+  // Single-determinant HF reference over the occupied block, no inactive space.
+  auto ref_orbs = testing::with_active_space(orbitals, occupied, {});
+  auto reference = std::make_shared<qcd::Wavefunction>(
+      std::make_unique<qcd::StateVectorContainer>(
+          qcd::Configuration::from_spin_half_string(std::string(na, '2')),
+          ref_orbs));
+
+  auto ham = HamiltonianConstructorFactory::create();
+  auto H_window = ham->run(testing::with_active_space(orbitals, window, {}));
+  auto swpt2 = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
+  swpt2->settings().set("regularizer_sigma2", 0.0);  // bare MP denominators
+  auto H_eff = swpt2->run(reference, H_window,
+                          testing::restricted_index_set(norb, occupied));
+  ASSERT_NE(H_eff, nullptr);
+
+  const auto [T_a, T_b] = H_eff->get_one_body_integrals();
+  const auto [g_eff, g_eff_ab, g_eff_bb] = H_eff->get_two_body_integrals();
+  const int m = static_cast<int>(T_a.rows());
+  const auto H_so = testing::build_spin_orbital_tensors(
+      T_a, T_a, g_eff, g_eff, g_eff, H_eff->get_core_energy(), m);
+  std::vector<int> orbs(2 * m);
+  std::iota(orbs.begin(), orbs.end(), 0);
+  const double E_downfold =
+      fci_ground_energy(H_so.core_energy, H_so.one_body, H_so.two_body, 2 * m,
+                        orbs, static_cast<int>(na), static_cast<int>(nb));
+
+  auto H_full = ham->run(orbitals);
+  auto ansatz = std::make_shared<qcd::Ansatz>(*H_full, *wfn_hf);
+  auto [E_mp2, mp2_ket, mp2_bra] =
+      DynamicalCorrelationCalculatorFactory::create("qdk_mp2_calculator")
+          ->run(ansatz);
+
+  EXPECT_LT(E_mp2, E_hf - 1e-3) << "the correlation being matched is not noise";
+  EXPECT_NEAR(E_downfold, E_mp2, 1e-9);
+
+  // The identity above is not free: at ten active electrons the rank-3 part of
+  // the commutator has a large expectation in the reference, and only the fold
+  // onto the reference density recovers it. Dropping it moves the answer by
+  // several Hartree, so the agreement above is a real constraint on the fold.
+  auto unfolded = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
+  unfolded->settings().set("regularizer_sigma2", 0.0);
+  unfolded->settings().set("fold_above_two_body", false);
+  auto H_unfolded = unfolded->run(
+      reference, H_window, testing::restricted_index_set(norb, occupied));
+  const auto [U_a, U_b] = H_unfolded->get_one_body_integrals();
+  const auto [g_u, g_u_ab, g_u_bb] = H_unfolded->get_two_body_integrals();
+  const auto U_so = testing::build_spin_orbital_tensors(
+      U_a, U_a, g_u, g_u, g_u, H_unfolded->get_core_energy(), m);
+  const double E_unfolded =
+      fci_ground_energy(U_so.core_energy, U_so.one_body, U_so.two_body, 2 * m,
+                        orbs, static_cast<int>(na), static_cast<int>(nb));
+  EXPECT_GT(std::abs(E_unfolded - E_mp2), 1.0);
 }
 
 // A mean-field HF reference (single determinant, no active 1-RDM) must work:
