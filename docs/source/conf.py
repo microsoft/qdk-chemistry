@@ -254,6 +254,11 @@ todo_link_only = True  # Link to the todo item only, not the full text
 # Setup-related functions
 # -----------------------------------------------------------------------------
 
+_AUTODOC_EXCLUDED_ALIASES = {
+    ("qdk_chemistry._core._algorithms", "Localizer"),
+    ("qdk_chemistry.algorithms", "Localizer"),
+}
+
 
 def autodoc_skip_imports(app, what, name, obj, skip, options):
     """Skip documentation for imported standard library and third-party modules.
@@ -261,6 +266,13 @@ def autodoc_skip_imports(app, what, name, obj, skip, options):
     Prevent Sphinx from documenting standard library and third-party modules.
     This stops pathlib, pydantic_settings, etc. from being included in docs.
     """
+    member_name = name.rsplit(".", 1)[-1]
+    if (
+        getattr(obj, "__module__", ""),
+        member_name,
+    ) in _AUTODOC_EXCLUDED_ALIASES:
+        return True
+
     # Get the module where the object is defined
     if hasattr(obj, "__module__"):
         module = obj.__module__

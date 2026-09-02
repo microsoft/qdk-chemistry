@@ -59,7 +59,7 @@ class ActiveSpaceQIOLocalizerSettings : public data::Settings {
  *
  * @see Wavefunction::get_single_orbital_entropies
  */
-class ActiveSpaceQIOLocalizer : public Localizer {
+class ActiveSpaceQIOLocalizer : public OrbitalLocalizer {
  public:
   /**
    * @brief Default constructor

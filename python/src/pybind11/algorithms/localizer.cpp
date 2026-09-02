@@ -21,15 +21,15 @@ using namespace qdk::chemistry::algorithms;
 using namespace qdk::chemistry::data;
 
 // Trampoline class for enabling Python inheritance
-class LocalizerBase : public Localizer,
+class LocalizerBase : public OrbitalLocalizer,
                       public pybind11::trampoline_self_life_support {
  public:
   std::string name() const override {
-    PYBIND11_OVERRIDE_PURE(std::string, Localizer, name);
+    PYBIND11_OVERRIDE_PURE(std::string, OrbitalLocalizer, name);
   }
 
   std::vector<std::string> aliases() const override {
-    PYBIND11_OVERRIDE(std::vector<std::string>, Localizer, aliases);
+    PYBIND11_OVERRIDE(std::vector<std::string>, OrbitalLocalizer, aliases);
   }
 
   // Helper method to expose _settings for Python binding
@@ -43,8 +43,9 @@ class LocalizerBase : public Localizer,
       std::shared_ptr<Wavefunction> wavefunction,
       const std::vector<size_t> &loc_indices_a,
       const std::vector<size_t> &loc_indices_b) const override {
-    PYBIND11_OVERRIDE_PURE(std::shared_ptr<Wavefunction>, Localizer, _run_impl,
-                           wavefunction, loc_indices_a, loc_indices_b);
+    PYBIND11_OVERRIDE_PURE(std::shared_ptr<Wavefunction>, OrbitalLocalizer,
+                           _run_impl, wavefunction, loc_indices_a,
+                           loc_indices_b);
   }
 };
 
@@ -72,8 +73,8 @@ Returns:
     qdk_chemistry.data.Wavefunction: Aufbau determinant wavefunction with the supplied orbitals
 )");
 
-  // Localizer abstract base class
-  py::class_<Localizer, LocalizerBase, py::smart_holder> localizer(
+  // OrbitalLocalizer abstract base class
+  py::class_<OrbitalLocalizer, LocalizerBase, py::smart_holder> localizer(
       m, "OrbitalLocalizer", R"(
 Abstract base class for orbital localization and transformation algorithms.
 
@@ -110,7 +111,7 @@ Examples:
 
 )");
 
-  localizer.def("run", &Localizer::run,
+  localizer.def("run", &OrbitalLocalizer::run,
                 R"(
 Transform selected molecular orbitals in the given wavefunction.
 
@@ -134,7 +135,7 @@ Raises:
                 py::arg("wavefunction"), py::arg("loc_indices_a"),
                 py::arg("loc_indices_b"));
 
-  localizer.def("settings", &Localizer::settings,
+  localizer.def("settings", &OrbitalLocalizer::settings,
                 R"(
 Access the localizer's configuration settings.
 
@@ -167,7 +168,7 @@ Examples:
 
 )");
 
-  localizer.def("name", &Localizer::name,
+  localizer.def("name", &OrbitalLocalizer::name,
                 R"(
 The algorithm's name.
 
@@ -176,7 +177,7 @@ Returns:
 
 )");
 
-  localizer.def("type_name", &Localizer::type_name,
+  localizer.def("type_name", &OrbitalLocalizer::type_name,
                 R"(
 The algorithm's type name.
 
@@ -184,24 +185,24 @@ Returns:
     str: The type name of the algorithm
 )");
 
-  localizer.def("hash", &Localizer::hash, py::arg("wavefunction"),
+  localizer.def("hash", &OrbitalLocalizer::hash, py::arg("wavefunction"),
                 py::arg("loc_indices_a"), py::arg("loc_indices_b"));
 
   // Factory class binding - creates LocalizerFactory class
   // with static methods
-  qdk::chemistry::python::bind_algorithm_factory<LocalizerFactory, Localizer,
-                                                 LocalizerBase>(
+  qdk::chemistry::python::bind_algorithm_factory<
+      OrbitalLocalizerFactory, OrbitalLocalizer, LocalizerBase>(
       m, "LocalizerFactory");
 
-  localizer.def("__repr__", [](const Localizer &) {
+  localizer.def("__repr__", [](const OrbitalLocalizer &) {
     return "<qdk_chemistry.algorithms.OrbitalLocalizer>";
   });
 
   qdk::chemistry::python::bind_create_nested(localizer);
 
   // Bind concrete microsoft::PipekMezeyLocalizer implementation
-  py::class_<microsoft::PipekMezeyLocalizer, Localizer, py::smart_holder>(
-      m, "QdkPipekMezeyLocalizer", R"(
+  py::class_<microsoft::PipekMezeyLocalizer, OrbitalLocalizer,
+             py::smart_holder>(m, "QdkPipekMezeyLocalizer", R"(
 QDK Pipek-Mezey orbital localizer.
 
 This class provides a concrete implementation of the orbital localizer using
@@ -246,7 +247,7 @@ Initializes a Pipek-Mezey localizer with default settings.
   // compile-time deprecation warning for naming the deprecated class here.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-  py::class_<microsoft::MP2NaturalOrbitalLocalizer, Localizer,
+  py::class_<microsoft::MP2NaturalOrbitalLocalizer, OrbitalLocalizer,
              py::smart_holder>(m, "QdkMP2NaturalOrbitalLocalizer", R"(
 QDK MP2 natural orbital transformer.
 
@@ -299,8 +300,8 @@ Initializes an MP2 natural orbital transformer with default settings.
 #pragma GCC diagnostic pop
 
   // Bind concrete microsoft::NaturalOrbitalLocalizer implementation
-  py::class_<microsoft::NaturalOrbitalLocalizer, Localizer, py::smart_holder>(
-      m, "QdkNaturalOrbitalLocalizer", R"(
+  py::class_<microsoft::NaturalOrbitalLocalizer, OrbitalLocalizer,
+             py::smart_holder>(m, "QdkNaturalOrbitalLocalizer", R"(
 QDK natural orbital transformer.
 
 This class provides a concrete implementation that transforms molecular
@@ -341,8 +342,8 @@ Initializes a natural orbital transformer with default settings.
 )");
 
   // Bind concrete microsoft::GaugeFixingLocalizer implementation
-  py::class_<microsoft::GaugeFixingLocalizer, Localizer, py::smart_holder>(
-      m, "QdkGaugeFixingLocalizer", R"(
+  py::class_<microsoft::GaugeFixingLocalizer, OrbitalLocalizer,
+             py::smart_holder>(m, "QdkGaugeFixingLocalizer", R"(
 QDK gauge-fixing orbital localizer.
 
 Orbitals with equal occupation numbers span a well-defined subspace without
@@ -372,8 +373,8 @@ Initializes a gauge-fixing localizer with default settings.
 )");
 
   // Bind concrete microsoft::ActiveSpaceQIOLocalizer implementation
-  py::class_<microsoft::ActiveSpaceQIOLocalizer, Localizer, py::smart_holder>(
-      m, "QdkActiveSpaceQIOLocalizer", R"(
+  py::class_<microsoft::ActiveSpaceQIOLocalizer, OrbitalLocalizer,
+             py::smart_holder>(m, "QdkActiveSpaceQIOLocalizer", R"(
 QDK quantum-information orbital (QIO) active-space localizer.
 
 Rotates restricted active orbitals to minimize the total single-orbital entropy
@@ -400,7 +401,7 @@ Initializes a quantum-information orbital localizer with default settings.
 )");
 
   // Bind concrete microsoft::VVHVLocalizer implementation
-  py::class_<microsoft::VVHVLocalizer, Localizer, py::smart_holder>(
+  py::class_<microsoft::VVHVLocalizer, OrbitalLocalizer, py::smart_holder>(
       m, "QdkVVHVLocalizer", R"(
 QDK Valence Virtual - Hard Virtual (VV-HV) orbital localizer.
 

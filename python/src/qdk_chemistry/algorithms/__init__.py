@@ -86,6 +86,7 @@ __all__ = [
     "HadamardTest",
     "HamiltonianConstructor",
     "HamiltonianUnitaryBuilder",
+    "Localizer",
     "MultiConfigurationCalculator",
     "MultiConfigurationScf",
     "NuclearDerivativeCalculator",
@@ -149,6 +150,7 @@ _REGISTRY_EXPORTS = frozenset(
 # DeprecationWarning but returns the new class object, so existing code keeps working.
 _DEPRECATED_ALIASES = {
     "EnergyEstimator": "ExpectationEstimator",
+    "Localizer": "OrbitalLocalizer",
     "QdkEnergyEstimator": "QdkExpectationEstimator",
 }
 

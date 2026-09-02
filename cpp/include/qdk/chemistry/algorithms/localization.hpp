@@ -67,20 +67,20 @@ std::shared_ptr<data::Wavefunction> new_aufbau_determinant_wavefunction(
  * @brief Abstract base class for orbital localization and transformation
  * algorithms
  *
- * The Localizer class provides a common interface for various orbital
+ * The OrbitalLocalizer class provides a common interface for various orbital
  * localization and transformation methods used in quantum chemistry.
  * Implementations transform selected molecular orbitals into alternative
  * representations, which may be spatially localized or otherwise useful for
  * analysis and downstream calculations.
  *
- * This class uses the Factory design pattern through LocalizerFactory to
+ * This class uses the Factory design pattern through OrbitalLocalizerFactory to
  * allow dynamic creation of different localization algorithms at runtime.
  *
  * Example usage:
  * @code
  * // Create a concrete localizer (e.g., PipekMezeyLocalizer)
  * auto localizer =
- * qdk::chemistry::algorithms::LocalizerFactory::create_localizer(
+ * qdk::chemistry::algorithms::OrbitalLocalizerFactory::create(
  *   "qdk_pipek_mezey");
  * // Create indices for all orbitals
  * auto all_indices = wavefunction->orbitals->get_all_mo_indices();
@@ -88,20 +88,20 @@ std::shared_ptr<data::Wavefunction> new_aufbau_determinant_wavefunction(
  *   all_indices, all_indices);
  * @endcode
  */
-class Localizer
-    : public Algorithm<Localizer, std::shared_ptr<data::Wavefunction>,
+class OrbitalLocalizer
+    : public Algorithm<OrbitalLocalizer, std::shared_ptr<data::Wavefunction>,
                        std::shared_ptr<data::Wavefunction>,
                        const std::vector<size_t>&, const std::vector<size_t>&> {
  public:
   /**
    * @brief Default constructor
    */
-  Localizer() = default;
+  OrbitalLocalizer() = default;
 
   /**
    * @brief Virtual destructor for proper inheritance
    */
-  virtual ~Localizer() = default;
+  virtual ~OrbitalLocalizer() = default;
 
   /**
    * @brief Transform the selected molecular orbitals
@@ -189,10 +189,29 @@ class Localizer
  * based on a string key. It allows for easy extension and registration
  * of different localization implementations.
  */
-struct LocalizerFactory : public AlgorithmFactory<Localizer, LocalizerFactory> {
+struct OrbitalLocalizerFactory
+    : public AlgorithmFactory<OrbitalLocalizer, OrbitalLocalizerFactory> {
   static std::string algorithm_type_name() { return "orbital_localizer"; }
   static void register_default_instances();
   static std::string default_algorithm_name() { return "qdk_pipek_mezey"; }
 };
+
+/**
+ * @brief Deprecated source alias for OrbitalLocalizer.
+ *
+ * @deprecated Use OrbitalLocalizer.
+ */
+using Localizer
+    [[deprecated("Localizer is deprecated; use OrbitalLocalizer instead.")]] =
+        OrbitalLocalizer;
+
+/**
+ * @brief Deprecated source alias for OrbitalLocalizerFactory.
+ *
+ * @deprecated Use OrbitalLocalizerFactory.
+ */
+using LocalizerFactory [[deprecated(
+    "LocalizerFactory is deprecated; use OrbitalLocalizerFactory instead.")]] =
+    OrbitalLocalizerFactory;
 
 }  // namespace qdk::chemistry::algorithms

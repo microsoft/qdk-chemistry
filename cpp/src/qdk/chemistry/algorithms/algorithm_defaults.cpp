@@ -49,7 +49,7 @@ std::shared_ptr<data::Settings> resolve_algorithm_defaults(
   REGISTER_FACTORY_SETTINGS_INIT(GeometryOptimizerFactory)
   REGISTER_FACTORY_SETTINGS_INIT(MultiConfigurationScfFactory)
   REGISTER_FACTORY_SETTINGS_INIT(NuclearDerivativeCalculatorFactory)
-  REGISTER_FACTORY_SETTINGS_INIT(LocalizerFactory)
+  REGISTER_FACTORY_SETTINGS_INIT(OrbitalLocalizerFactory)
   REGISTER_FACTORY_SETTINGS_INIT(StabilityCheckerFactory)
 
 #undef REGISTER_FACTORY_SETTINGS_INIT

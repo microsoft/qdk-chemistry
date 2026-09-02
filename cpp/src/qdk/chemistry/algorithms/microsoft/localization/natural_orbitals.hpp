@@ -18,7 +18,7 @@ namespace qdk::chemistry::algorithms::microsoft {
  * orbital set, so alpha and beta selection indices must match the active-space
  * indices exactly; the result is always restricted.
  */
-class NaturalOrbitalLocalizer : public Localizer {
+class NaturalOrbitalLocalizer : public OrbitalLocalizer {
  public:
   NaturalOrbitalLocalizer() = default;
   ~NaturalOrbitalLocalizer() override = default;

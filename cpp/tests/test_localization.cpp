@@ -22,6 +22,7 @@
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <random>
+#include <type_traits>
 
 #include "qdk/chemistry/utils/golden_section.hpp"
 #include "testing_utilities.hpp"
@@ -30,13 +31,28 @@
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
 
+#if defined(__clang__) || defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#elif defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
+static_assert(std::is_same_v<OrbitalLocalizer, Localizer>);
+static_assert(std::is_same_v<OrbitalLocalizerFactory, LocalizerFactory>);
+#if defined(__clang__) || defined(__GNUC__)
+#pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
+#pragma warning(pop)
+#endif
+
 namespace {
 constexpr double kHalfPi = 1.57079632679489661923;
 }
 
 class LocalizationTest : public ::testing::Test {};
 
-class TestLocalization : public Localizer {
+class TestLocalization : public OrbitalLocalizer {
  public:
   TestLocalization() = default;
   ~TestLocalization() override = default;
@@ -53,12 +69,12 @@ class TestLocalization : public Localizer {
 };
 
 TEST_F(LocalizationTest, LocalizationSelector_MetaData) {
-  auto selector = LocalizerFactory::create();
+  auto selector = OrbitalLocalizerFactory::create();
   EXPECT_NO_THROW({ auto settings = selector->settings(); });
 }
 
 TEST_F(LocalizationTest, GaugeFixingHamiltonianConstructorDefault) {
-  auto localizer = LocalizerFactory::create("qdk_gauge_fixing");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_gauge_fixing");
   const auto constructor_ref =
       localizer->settings().get<AlgorithmRef>("hamiltonian_constructor");
   EXPECT_EQ(constructor_ref.get_algorithm_type(), "hamiltonian_constructor");
@@ -66,7 +82,7 @@ TEST_F(LocalizationTest, GaugeFixingHamiltonianConstructorDefault) {
 }
 
 TEST_F(LocalizationTest, Factory) {
-  auto available_localizers = LocalizerFactory::available();
+  auto available_localizers = OrbitalLocalizerFactory::available();
   // Lower bound rather than an exact count: adding future localizers should not
   // break this test. The specific expected IDs are asserted individually below.
   EXPECT_GE(available_localizers.size(), 5u);
@@ -88,28 +104,29 @@ TEST_F(LocalizationTest, Factory) {
   EXPECT_TRUE(std::find(available_localizers.begin(),
                         available_localizers.end(),
                         "qdk_gauge_fixing") != available_localizers.end());
-  EXPECT_THROW(LocalizerFactory::create("nonexistent_localizer"),
+  EXPECT_THROW(OrbitalLocalizerFactory::create("nonexistent_localizer"),
                std::runtime_error);
-  EXPECT_NO_THROW(LocalizerFactory::register_instance(
-      []() -> LocalizerFactory::return_type {
+  EXPECT_NO_THROW(OrbitalLocalizerFactory::register_instance(
+      []() -> OrbitalLocalizerFactory::return_type {
         return std::make_unique<TestLocalization>();
       }));
-  EXPECT_THROW(LocalizerFactory::register_instance(
-                   []() -> LocalizerFactory::return_type {
+  EXPECT_THROW(OrbitalLocalizerFactory::register_instance(
+                   []() -> OrbitalLocalizerFactory::return_type {
                      return std::make_unique<TestLocalization>();
                    }),
                std::runtime_error);
 
   // Test unregister_instance
   // First test unregistering a non-existent key (should return false)
-  EXPECT_FALSE(LocalizerFactory::unregister_instance("nonexistent_key"));
+  EXPECT_FALSE(OrbitalLocalizerFactory::unregister_instance("nonexistent_key"));
 
   // Test unregistering an existing key (should return true)
-  EXPECT_TRUE(LocalizerFactory::unregister_instance("_dummy_localizer"));
+  EXPECT_TRUE(OrbitalLocalizerFactory::unregister_instance("_dummy_localizer"));
 
   // Test unregistering the same key again (should return false since it's
   // already removed)
-  EXPECT_FALSE(LocalizerFactory::unregister_instance("_dummy_localizer"));
+  EXPECT_FALSE(
+      OrbitalLocalizerFactory::unregister_instance("_dummy_localizer"));
 }
 
 TEST_F(LocalizationTest,
@@ -132,7 +149,7 @@ TEST_F(LocalizationTest,
                                                     "qdk_gauge_fixing"};
 
   for (const auto& localizer_name : localizer_names) {
-    auto localizer = LocalizerFactory::create(localizer_name);
+    auto localizer = OrbitalLocalizerFactory::create(localizer_name);
     auto localized_wfn = localizer->run(wfn, empty_indices, empty_indices);
 
     ASSERT_NE(localized_wfn, nullptr) << localizer_name;
@@ -159,7 +176,7 @@ TEST_F(LocalizationTest,
 }
 
 TEST_F(LocalizationTest, WaterPipekMezey) {
-  auto localizer = LocalizerFactory::create("qdk_pipek_mezey");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_pipek_mezey");
   EXPECT_NO_THROW({ auto settings = localizer->settings(); });
 
   // Get a canonical set of water orbitals
@@ -243,7 +260,7 @@ TEST_F(LocalizationTest, WaterPipekMezey) {
 }
 
 TEST_F(LocalizationTest, O2TripletPipekMezey) {
-  auto localizer = LocalizerFactory::create("qdk_pipek_mezey");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_pipek_mezey");
   EXPECT_NO_THROW({ auto settings = localizer->settings(); });
 
   // Get a canonical set of o2 orbitals
@@ -394,7 +411,7 @@ TEST_F(LocalizationTest, Iterative_EdgeCase) {
   std::vector<size_t> indices_b({0, 1, 3});
   EXPECT_THROW(
       {
-        auto localizer = LocalizerFactory::create("qdk_pipek_mezey");
+        auto localizer = OrbitalLocalizerFactory::create("qdk_pipek_mezey");
         Eigen::MatrixXd coeffs(4, 4);
         coeffs.setIdentity();
         // Create a fake basis set with 4 atomic orbitals for testing
@@ -419,7 +436,7 @@ TEST_F(LocalizationTest, Iterative_EdgeCase) {
   std::vector<size_t> sorted_indices({0, 1, 2});
   EXPECT_THROW(
       {
-        auto localizer = LocalizerFactory::create("qdk_pipek_mezey");
+        auto localizer = OrbitalLocalizerFactory::create("qdk_pipek_mezey");
         Eigen::MatrixXd coeffs(4, 4);
         coeffs.setIdentity();
         auto fake_basis_set = testing::create_random_basis_set(4, "test");
@@ -436,7 +453,7 @@ TEST_F(LocalizationTest, Iterative_EdgeCase) {
 }
 
 TEST_F(LocalizationTest, MP2) {
-  auto localizer = LocalizerFactory::create("qdk_mp2_natural_orbitals");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_mp2_natural_orbitals");
   EXPECT_NO_THROW({ auto settings = localizer->settings(); });
 
   // Get a canonical set of water orbitals
@@ -555,7 +572,8 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
   // Throw on missing orbital energies (non-canonical orbitals)
   EXPECT_THROW(
       {
-        auto localizer = LocalizerFactory::create("qdk_mp2_natural_orbitals");
+        auto localizer =
+            OrbitalLocalizerFactory::create("qdk_mp2_natural_orbitals");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
             fake_basis_set);
@@ -570,7 +588,8 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
   // Throw on unrestricted orbitals
   EXPECT_THROW(
       {
-        auto localizer = LocalizerFactory::create("qdk_mp2_natural_orbitals");
+        auto localizer =
+            OrbitalLocalizerFactory::create("qdk_mp2_natural_orbitals");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, coeffs_beta, fake_energies, fake_energies,
             std::make_optional(fake_ao_overlap), fake_basis_set);
@@ -585,7 +604,8 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
   // Throw on no occupations
   EXPECT_THROW(
       {
-        auto localizer = LocalizerFactory::create("qdk_mp2_natural_orbitals");
+        auto localizer =
+            OrbitalLocalizerFactory::create("qdk_mp2_natural_orbitals");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, fake_energies, std::make_optional(fake_ao_overlap),
             fake_basis_set);
@@ -600,7 +620,8 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
   // Throw on open shell
   EXPECT_THROW(
       {
-        auto localizer = LocalizerFactory::create("qdk_mp2_natural_orbitals");
+        auto localizer =
+            OrbitalLocalizerFactory::create("qdk_mp2_natural_orbitals");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, fake_energies, std::make_optional(fake_ao_overlap),
             fake_basis_set);
@@ -618,7 +639,8 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
   std::vector<size_t> indices_b({1, 2});  // Different from indices_a
   EXPECT_THROW(
       {
-        auto localizer = LocalizerFactory::create("qdk_mp2_natural_orbitals");
+        auto localizer =
+            OrbitalLocalizerFactory::create("qdk_mp2_natural_orbitals");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, fake_energies, std::make_optional(fake_ao_overlap),
             fake_basis_set);
@@ -634,7 +656,8 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
   std::vector<size_t> unsorted_indices({2, 0, 1});  // Not sorted
   EXPECT_THROW(
       {
-        auto localizer = LocalizerFactory::create("qdk_mp2_natural_orbitals");
+        auto localizer =
+            OrbitalLocalizerFactory::create("qdk_mp2_natural_orbitals");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, fake_energies, std::make_optional(fake_ao_overlap),
             fake_basis_set);
@@ -659,7 +682,7 @@ TEST_F(LocalizationTest, VVHV_EdgeCase) {
   std::vector<size_t> all_indices_b({0, 1, 2, 3});
   EXPECT_THROW(
       {
-        auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
+        auto vvhv_localizer = OrbitalLocalizerFactory::create("qdk_vvhv");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
             fake_basis_set);
@@ -676,7 +699,7 @@ TEST_F(LocalizationTest, VVHV_EdgeCase) {
   std::vector<size_t> incomplete_indices_b({0, 1, 2});  // Missing orbital 3
   EXPECT_THROW(
       {
-        auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
+        auto vvhv_localizer = OrbitalLocalizerFactory::create("qdk_vvhv");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, coeffs, std::nullopt, std::nullopt,
             std::make_optional(fake_ao_overlap), fake_basis_set);
@@ -694,7 +717,7 @@ TEST_F(LocalizationTest, VVHV_EdgeCase) {
       {0, 1, 3, 2});  // Different order from indices_a
   EXPECT_THROW(
       {
-        auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
+        auto vvhv_localizer = OrbitalLocalizerFactory::create("qdk_vvhv");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
             fake_basis_set);
@@ -710,7 +733,7 @@ TEST_F(LocalizationTest, VVHV_EdgeCase) {
   std::vector<size_t> sorted_indices({0, 1, 2, 3});
   EXPECT_THROW(
       {
-        auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
+        auto vvhv_localizer = OrbitalLocalizerFactory::create("qdk_vvhv");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
             fake_basis_set);
@@ -728,7 +751,7 @@ TEST_F(LocalizationTest, VVHV_EdgeCase) {
   std::vector<size_t> valid_indices({0, 1, 2, 3});
   EXPECT_THROW(
       {
-        auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
+        auto vvhv_localizer = OrbitalLocalizerFactory::create("qdk_vvhv");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
             fake_basis_set);
@@ -741,8 +764,8 @@ TEST_F(LocalizationTest, VVHV_EdgeCase) {
 }
 
 TEST_F(LocalizationTest, WaterVVHV) {
-  auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
-  auto pm_localizer = LocalizerFactory::create("qdk_pipek_mezey");
+  auto vvhv_localizer = OrbitalLocalizerFactory::create("qdk_vvhv");
+  auto pm_localizer = OrbitalLocalizerFactory::create("qdk_pipek_mezey");
   EXPECT_NO_THROW({ auto settings = vvhv_localizer->settings(); });
 
   // Set the minimal basis to lowercase as required by VVHV
@@ -788,8 +811,8 @@ TEST_F(LocalizationTest, WaterVVHV) {
 }
 
 TEST_F(LocalizationTest, WaterVVHV_ccpvtz) {
-  auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
-  auto pm_localizer = LocalizerFactory::create("qdk_pipek_mezey");
+  auto vvhv_localizer = OrbitalLocalizerFactory::create("qdk_vvhv");
+  auto pm_localizer = OrbitalLocalizerFactory::create("qdk_pipek_mezey");
   EXPECT_NO_THROW({ auto settings = vvhv_localizer->settings(); });
 
   // Set the minimal basis to lowercase as required by VVHV
@@ -835,8 +858,8 @@ TEST_F(LocalizationTest, WaterVVHV_ccpvtz) {
 }
 
 TEST_F(LocalizationTest, O2TripletVVHV) {
-  auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
-  auto pm_localizer = LocalizerFactory::create("qdk_pipek_mezey");
+  auto vvhv_localizer = OrbitalLocalizerFactory::create("qdk_vvhv");
+  auto pm_localizer = OrbitalLocalizerFactory::create("qdk_pipek_mezey");
   EXPECT_NO_THROW({ auto settings = vvhv_localizer->settings(); });
 
   // Set the minimal basis to lowercase as required by VVHV
@@ -954,8 +977,8 @@ static auto scramble_basis_shells(std::shared_ptr<BasisSet> basis) {
 // reordering. It should obtain the same Pipek Mezey value as the 'WaterVVHV'
 // test
 TEST_F(LocalizationTest, ScrambledShellsWaterVVHV) {
-  auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
-  auto pm_localizer = LocalizerFactory::create("qdk_pipek_mezey");
+  auto vvhv_localizer = OrbitalLocalizerFactory::create("qdk_vvhv");
+  auto pm_localizer = OrbitalLocalizerFactory::create("qdk_pipek_mezey");
   EXPECT_NO_THROW({ auto settings = vvhv_localizer->settings(); });
 
   // Set the minimal basis to lowercase as required by VVHV
@@ -1010,8 +1033,8 @@ TEST_F(LocalizationTest, ScrambledShellsWaterVVHV) {
 // The test verifies that the same Pipek Mezey value is attained when the
 // cc-pvtz basis is scrambled
 TEST_F(LocalizationTest, ScrambledShellsWaterVVHV_ccpvtz) {
-  auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
-  auto pm_localizer = LocalizerFactory::create("qdk_pipek_mezey");
+  auto vvhv_localizer = OrbitalLocalizerFactory::create("qdk_vvhv");
+  auto pm_localizer = OrbitalLocalizerFactory::create("qdk_pipek_mezey");
   EXPECT_NO_THROW({ auto settings = vvhv_localizer->settings(); });
 
   // Set the minimal basis to lowercase as required by VVHV
@@ -1064,8 +1087,8 @@ TEST_F(LocalizationTest, ScrambledShellsWaterVVHV_ccpvtz) {
 // reordering. It should obtain the same Pipek Mezey value as the
 // 'O2TripletVVHV' test
 TEST_F(LocalizationTest, ScrambledShellsO2TripletVVHV) {
-  auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
-  auto pm_localizer = LocalizerFactory::create("qdk_pipek_mezey");
+  auto vvhv_localizer = OrbitalLocalizerFactory::create("qdk_vvhv");
+  auto pm_localizer = OrbitalLocalizerFactory::create("qdk_pipek_mezey");
   EXPECT_NO_THROW({ auto settings = vvhv_localizer->settings(); });
 
   // Set the minimal basis to lowercase as required by VVHV
@@ -1194,7 +1217,7 @@ TEST_P(ActiveSpacePreservationTest, PreservesActiveSpaceRestricted) {
       active_wfn->get_orbitals()->active_indices(), axes::beta());
 
   // Localize
-  auto localizer = LocalizerFactory::create(localizer_name);
+  auto localizer = OrbitalLocalizerFactory::create(localizer_name);
   auto localized_wfn = localizer->run(active_wfn, active_alpha, active_beta);
 
   verify_active_space_preserved(active_wfn, localized_wfn, localizer_name);
@@ -1256,7 +1279,7 @@ TEST_F(LocalizationTest, PipekMezeyPreservesActiveSpaceUnrestricted) {
           wfn->get_active_determinants()[0], active_orbitals));
 
   // Localize only the active orbitals
-  auto localizer = LocalizerFactory::create("qdk_pipek_mezey");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_pipek_mezey");
   auto localized_wfn = localizer->run(active_wfn, active_alpha, active_beta);
 
   verify_active_space_preserved(active_wfn, localized_wfn,
@@ -1285,7 +1308,7 @@ TEST_F(LocalizationTest, VVHVPreservesActiveSpace) {
   }
 
   // Localize virtual orbitals with VVHV
-  auto localizer = LocalizerFactory::create("qdk_vvhv");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_vvhv");
   localizer->settings().set("minimal_basis", "sto-3g");
   auto localized_wfn = localizer->run(active_wfn, virt_indices, virt_indices);
 
@@ -1350,7 +1373,7 @@ TEST_F(LocalizationTest, VVHVPreservesActiveSpaceUnrestricted) {
   }
 
   // Localize virtual orbitals with VVHV
-  auto localizer = LocalizerFactory::create("qdk_vvhv");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_vvhv");
   localizer->settings().set("minimal_basis", "sto-3g");
   auto localized_wfn = localizer->run(active_wfn, virt_alpha, virt_beta);
 
@@ -1359,7 +1382,7 @@ TEST_F(LocalizationTest, VVHVPreservesActiveSpaceUnrestricted) {
 }
 
 TEST_F(LocalizationTest, NaturalOrbitals) {
-  auto localizer = LocalizerFactory::create("qdk_natural_orbitals");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_natural_orbitals");
   EXPECT_NO_THROW({ auto settings = localizer->settings(); });
 
   // Get a canonical set of water orbitals
@@ -1473,7 +1496,7 @@ TEST_F(LocalizationTest, NaturalOrbitals) {
 }
 
 TEST_F(LocalizationTest, NaturalOrbitalsRejectsPartialActiveSpaceIndices) {
-  auto localizer = LocalizerFactory::create("qdk_natural_orbitals");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_natural_orbitals");
 
   Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(4, 4);
   Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(4, 4);
@@ -1525,7 +1548,7 @@ TEST_F(LocalizationTest, NaturalOrbitalsPreserveOpenShellSpinOccupations) {
           "electrons"));
   std::vector<size_t> indices({0, 1, 2, 3});
 
-  auto localizer = LocalizerFactory::create("qdk_natural_orbitals");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_natural_orbitals");
   auto no_wfn = localizer->run(wfn, indices, indices);
 
   auto [alpha_occ, beta_occ] = no_wfn->get_active_orbital_occupations();
@@ -1583,7 +1606,7 @@ TEST_F(LocalizationTest, StretchedN2NaturalOrbitals) {
 
   // Run the natural orbital localizer — should accept UKS and produce
   // restricted NOs.
-  auto localizer = LocalizerFactory::create("qdk_natural_orbitals");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_natural_orbitals");
   const size_t n_mo = c_a.cols();
   std::vector<size_t> indices(n_mo);
   std::iota(indices.begin(), indices.end(), 0);
@@ -1642,7 +1665,8 @@ TEST_F(LocalizationTest, NaturalOrbitals_EdgeCase) {
   std::vector<size_t> indices_b({1, 2});
   EXPECT_THROW(
       {
-        auto localizer = LocalizerFactory::create("qdk_natural_orbitals");
+        auto localizer =
+            OrbitalLocalizerFactory::create("qdk_natural_orbitals");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
             fake_basis_set, std::nullopt);
@@ -1657,7 +1681,8 @@ TEST_F(LocalizationTest, NaturalOrbitals_EdgeCase) {
   std::vector<size_t> unsorted_indices({2, 0, 1});
   EXPECT_THROW(
       {
-        auto localizer = LocalizerFactory::create("qdk_natural_orbitals");
+        auto localizer =
+            OrbitalLocalizerFactory::create("qdk_natural_orbitals");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
             fake_basis_set, std::nullopt);
@@ -1672,7 +1697,8 @@ TEST_F(LocalizationTest, NaturalOrbitals_EdgeCase) {
   std::vector<size_t> duplicate_indices({0, 1, 1});
   EXPECT_THROW(
       {
-        auto localizer = LocalizerFactory::create("qdk_natural_orbitals");
+        auto localizer =
+            OrbitalLocalizerFactory::create("qdk_natural_orbitals");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
             fake_basis_set, std::nullopt);
@@ -1687,7 +1713,8 @@ TEST_F(LocalizationTest, NaturalOrbitals_EdgeCase) {
   std::vector<size_t> oob_indices({0, 1, 4});
   EXPECT_THROW(
       {
-        auto localizer = LocalizerFactory::create("qdk_natural_orbitals");
+        auto localizer =
+            OrbitalLocalizerFactory::create("qdk_natural_orbitals");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
             fake_basis_set, std::nullopt);
@@ -1708,7 +1735,8 @@ TEST_F(LocalizationTest, NaturalOrbitals_EdgeCase) {
   ci_coeffs_sci << 1.0, 0.0;
   EXPECT_THROW(
       {
-        auto localizer = LocalizerFactory::create("qdk_natural_orbitals");
+        auto localizer =
+            OrbitalLocalizerFactory::create("qdk_natural_orbitals");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, fake_energies, std::make_optional(fake_ao_overlap),
             fake_basis_set, std::make_tuple(active_indices, inactive_indices));
@@ -1730,7 +1758,8 @@ TEST_F(LocalizationTest, NaturalOrbitals_EdgeCase) {
   std::vector<size_t> empty_active;
   EXPECT_THROW(
       {
-        auto localizer = LocalizerFactory::create("qdk_natural_orbitals");
+        auto localizer =
+            OrbitalLocalizerFactory::create("qdk_natural_orbitals");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, fake_energies, std::make_optional(fake_ao_overlap),
             fake_basis_set, std::make_tuple(empty_active, all_indices));
@@ -1754,7 +1783,8 @@ TEST_F(LocalizationTest, NaturalOrbitals_EdgeCase) {
   std::vector<size_t> wrong_indices({1});
   EXPECT_THROW(
       {
-        auto localizer = LocalizerFactory::create("qdk_natural_orbitals");
+        auto localizer =
+            OrbitalLocalizerFactory::create("qdk_natural_orbitals");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, fake_energies, std::make_optional(fake_ao_overlap),
             fake_basis_set, std::make_tuple(active_indices, inactive_indices));
@@ -1778,7 +1808,8 @@ TEST_F(LocalizationTest, NaturalOrbitals_EdgeCase) {
   Eigen::MatrixXd one_rdm_unrestricted = Eigen::MatrixXd::Identity(2, 2);
   EXPECT_THROW(
       {
-        auto localizer = LocalizerFactory::create("qdk_natural_orbitals");
+        auto localizer =
+            OrbitalLocalizerFactory::create("qdk_natural_orbitals");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, coeffs, std::nullopt, std::nullopt,
             std::make_optional(fake_ao_overlap), fake_basis_set,
@@ -1831,14 +1862,14 @@ GaugeFixingFixture make_gauge_fixing_fixture() {
   std::vector<size_t> active_indices(active_channel.begin(),
                                      active_channel.end());
 
-  auto natural = LocalizerFactory::create("qdk_natural_orbitals")
+  auto natural = OrbitalLocalizerFactory::create("qdk_natural_orbitals")
                      ->run(wfn_cas, active_indices, active_indices);
   return {natural, active_indices, num_alpha, num_beta};
 }
 
 TEST_F(LocalizationTest, GaugeFixingUsesConfiguredHamiltonianConstructor) {
   auto fixture = make_gauge_fixing_fixture();
-  auto localizer = LocalizerFactory::create("qdk_gauge_fixing");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_gauge_fixing");
   localizer->settings().set(
       "hamiltonian_constructor",
       AlgorithmRef("hamiltonian_constructor",
@@ -1991,7 +2022,7 @@ TEST_F(LocalizationTest, GaugeFixingPreservesEnergyAndDoesNotIncreaseNorm) {
       mapped_coefficient_norm(fixture.natural_wavefunction->get_orbitals(),
                               fixture.active_indices.size());
 
-  auto gauge_fixed = LocalizerFactory::create("qdk_gauge_fixing")
+  auto gauge_fixed = OrbitalLocalizerFactory::create("qdk_gauge_fixing")
                          ->run(fixture.natural_wavefunction,
                                fixture.active_indices, fixture.active_indices);
 
@@ -2010,7 +2041,7 @@ TEST_F(LocalizationTest, GaugeFixingCarriesTheSpinResolvedActiveOneRdm) {
   auto fixture = make_gauge_fixing_fixture();
   ASSERT_TRUE(fixture.natural_wavefunction->has_active_one_rdm());
 
-  auto gauge_fixed = LocalizerFactory::create("qdk_gauge_fixing")
+  auto gauge_fixed = OrbitalLocalizerFactory::create("qdk_gauge_fixing")
                          ->run(fixture.natural_wavefunction,
                                fixture.active_indices, fixture.active_indices);
 
@@ -2046,7 +2077,7 @@ TEST_F(LocalizationTest, GaugeFixingIsIdempotentAndPreservesOccupations) {
           fixture.natural_wavefunction->get_active_one_rdm_spin_traced())
           .diagonal();
 
-  auto gauge_fixed = LocalizerFactory::create("qdk_gauge_fixing")
+  auto gauge_fixed = OrbitalLocalizerFactory::create("qdk_gauge_fixing")
                          ->run(fixture.natural_wavefunction,
                                fixture.active_indices, fixture.active_indices);
   const Eigen::VectorXd occupations =
@@ -2057,7 +2088,7 @@ TEST_F(LocalizationTest, GaugeFixingIsIdempotentAndPreservesOccupations) {
               1e-12);
 
   auto repeated =
-      LocalizerFactory::create("qdk_gauge_fixing")
+      OrbitalLocalizerFactory::create("qdk_gauge_fixing")
           ->run(gauge_fixed, fixture.active_indices, fixture.active_indices);
   const auto& first = gauge_fixed->get_orbitals()->coefficients()->block(
       {axes::alpha(), axes::alpha()});
@@ -2085,7 +2116,7 @@ TEST_F(LocalizationTest, GaugeFixingIsIndependentOfStartingOrientation) {
   }
   ASSERT_EQ(degenerate.size(), 2u);
 
-  auto localizer = LocalizerFactory::create("qdk_gauge_fixing");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_gauge_fixing");
   auto expected =
       localizer->run(fixture.natural_wavefunction, fixture.active_indices,
                      fixture.active_indices);
@@ -2112,7 +2143,7 @@ TEST_F(LocalizationTest, GaugeFixingIsIndependentOfStartingOrientation) {
           fixture.natural_wavefunction, rotated_orbitals,
           ContainerTypes::MatrixVariant(one_rdm));
 
-  auto actual = LocalizerFactory::create("qdk_gauge_fixing")
+  auto actual = OrbitalLocalizerFactory::create("qdk_gauge_fixing")
                     ->run(rotated_wavefunction, fixture.active_indices,
                           fixture.active_indices);
   const auto& expected_coefficients =
@@ -2151,7 +2182,7 @@ TEST_F(LocalizationTest, GaugeFixingRejectsSplitDegenerateBlock) {
 
   // Rotating a partly selected block would change the selected subspace.
   EXPECT_THROW(
-      LocalizerFactory::create("qdk_gauge_fixing")
+      OrbitalLocalizerFactory::create("qdk_gauge_fixing")
           ->run(fixture.natural_wavefunction, split_indices, split_indices),
       std::runtime_error);
 }
@@ -2160,20 +2191,20 @@ TEST_F(LocalizationTest, GaugeFixingRejectsInvalidIndices) {
   auto fixture = make_gauge_fixing_fixture();
   std::vector<size_t> unsorted(fixture.active_indices.rbegin(),
                                fixture.active_indices.rend());
-  EXPECT_THROW(LocalizerFactory::create("qdk_gauge_fixing")
+  EXPECT_THROW(OrbitalLocalizerFactory::create("qdk_gauge_fixing")
                    ->run(fixture.natural_wavefunction, unsorted, unsorted),
                std::invalid_argument);
 
   std::vector<size_t> shortened(fixture.active_indices.begin(),
                                 fixture.active_indices.end() - 1);
-  EXPECT_THROW(LocalizerFactory::create("qdk_gauge_fixing")
+  EXPECT_THROW(OrbitalLocalizerFactory::create("qdk_gauge_fixing")
                    ->run(fixture.natural_wavefunction, fixture.active_indices,
                          shortened),
                std::invalid_argument);
 
   std::vector<size_t> duplicated{fixture.active_indices.front(),
                                  fixture.active_indices.front()};
-  EXPECT_THROW(LocalizerFactory::create("qdk_gauge_fixing")
+  EXPECT_THROW(OrbitalLocalizerFactory::create("qdk_gauge_fixing")
                    ->run(fixture.natural_wavefunction, duplicated, duplicated),
                std::invalid_argument);
 }
@@ -2183,7 +2214,7 @@ TEST_F(LocalizationTest, GaugeFixingRejectsNonFiniteToleranceSettings) {
   // The settings bounds cannot reject NaN, so every tolerance the algorithm
   // branches on has to be checked before it is used.
   for (const auto* key : {"degeneracy_tolerance", "improvement_tolerance"}) {
-    auto localizer = LocalizerFactory::create("qdk_gauge_fixing");
+    auto localizer = OrbitalLocalizerFactory::create("qdk_gauge_fixing");
     localizer->settings().set(key, std::numeric_limits<double>::quiet_NaN());
     EXPECT_THROW(localizer->run(fixture.natural_wavefunction,
                                 fixture.active_indices, fixture.active_indices),
@@ -2219,7 +2250,7 @@ TEST_F(LocalizationTest, GaugeFixingPreservesActiveSpaceForPartialSelection) {
       fixture.num_alpha, fixture.num_beta);
 
   auto gauge_fixed =
-      LocalizerFactory::create("qdk_gauge_fixing")
+      OrbitalLocalizerFactory::create("qdk_gauge_fixing")
           ->run(fixture.natural_wavefunction, degenerate, degenerate);
 
   // Selecting a subset restricts which blocks are swept; it must not truncate
@@ -2261,7 +2292,7 @@ TEST_F(LocalizationTest, GaugeFixingBoundsBlockSpreadByDegeneracyTolerance) {
           fixture.natural_wavefunction, orbitals,
           ContainerTypes::MatrixVariant(chained_rdm));
 
-  auto localizer = LocalizerFactory::create("qdk_gauge_fixing");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_gauge_fixing");
   localizer->settings().set("degeneracy_tolerance", degeneracy_tolerance);
   auto gauge_fixed =
       localizer->run(chained, fixture.active_indices, fixture.active_indices);
@@ -2497,7 +2528,7 @@ static void expect_active_space_qio_reference_entropy(
   const auto active_indices =
       spin_channel_indices(active_orbitals->active_indices(), axes::alpha());
   const double entropy_before = wfn_cas->get_single_orbital_entropies().sum();
-  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_active_space_qio");
   auto qio_wfn = localizer->run(wfn_cas, active_indices, active_indices);
 
   auto [E_rotated_cas, rotated_wfn_cas] =
@@ -2521,7 +2552,7 @@ TEST_F(LocalizationTest, ActiveSpaceQIOReferenceEntropyOpenShell) {
 }
 
 TEST_F(LocalizationTest, ActiveSpaceQIO) {
-  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_active_space_qio");
   EXPECT_NO_THROW({ auto settings = localizer->settings(); });
 
   // Get a canonical set of water orbitals.
@@ -2649,7 +2680,7 @@ TEST_F(LocalizationTest,
 }
 
 TEST_F(LocalizationTest, ActiveSpaceQIORejectsMismatchedSpinIndices) {
-  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_active_space_qio");
 
   Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(4, 4);
   Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(4, 4);
@@ -2690,13 +2721,13 @@ static std::shared_ptr<Wavefunction> make_minimal_active_space_qio_wfn(
 }
 
 TEST_F(LocalizationTest, ActiveSpaceQIORejectsUnsortedIndices) {
-  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_active_space_qio");
   auto wfn = make_minimal_active_space_qio_wfn({0, 1, 2, 3}, {}, "2200");
   std::vector<size_t> unsorted({2, 0, 1, 3});
   EXPECT_THROW(localizer->run(wfn, unsorted, unsorted), std::invalid_argument);
 }
 TEST_F(LocalizationTest, ActiveSpaceQIORejectsDuplicateIndices) {
-  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_active_space_qio");
   auto wfn = make_minimal_active_space_qio_wfn({0, 1, 2, 3}, {}, "2200");
   std::vector<size_t> duplicated({0, 1, 1, 2});  // sorted but not unique
   EXPECT_THROW(localizer->run(wfn, duplicated, duplicated),
@@ -2704,7 +2735,7 @@ TEST_F(LocalizationTest, ActiveSpaceQIORejectsDuplicateIndices) {
 }
 
 TEST_F(LocalizationTest, ActiveSpaceQIORejectsMissingOverlap) {
-  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_active_space_qio");
   const std::vector<size_t> active({0, 1, 2, 3});
   const std::vector<size_t> inactive;
   Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(4, 4);
@@ -2720,7 +2751,7 @@ TEST_F(LocalizationTest, ActiveSpaceQIORejectsMissingOverlap) {
 }
 
 TEST_F(LocalizationTest, ActiveSpaceQIOEmptyIndicesAreNoOp) {
-  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_active_space_qio");
   auto wfn = make_minimal_active_space_qio_wfn({0, 1, 2, 3}, {}, "2200");
   std::shared_ptr<Wavefunction> result;
   std::vector<size_t> empty;
@@ -2742,7 +2773,7 @@ TEST_F(LocalizationTest, ActiveSpaceQIOEmptyIndicesAreNoOp) {
 }
 
 TEST_F(LocalizationTest, ActiveSpaceQIORejectsUnrestricted) {
-  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_active_space_qio");
   Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(4, 4);
   Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(4, 4);
   Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(4, 4);
@@ -2758,14 +2789,14 @@ TEST_F(LocalizationTest, ActiveSpaceQIORejectsUnrestricted) {
 }
 
 TEST_F(LocalizationTest, ActiveSpaceQIORejectsPartialActiveSpaceIndices) {
-  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_active_space_qio");
   auto wfn = make_minimal_active_space_qio_wfn({0, 1, 2, 3}, {}, "2200");
   std::vector<size_t> partial({1, 2});  // strict subset of the active space
   EXPECT_THROW(localizer->run(wfn, partial, partial), std::invalid_argument);
 }
 
 TEST_F(LocalizationTest, ActiveSpaceQIORejectsMissingSpinDependentRdm) {
-  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_active_space_qio");
   // A multi-determinant wavefunction that neither carries nor can lazily
   // generate the spin-dependent active RDMs that QIO requires.
   Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(4, 4);
@@ -2884,7 +2915,7 @@ make_scrambled_meanfield_active_space_qio_wfn(size_t n) {
 }
 
 TEST_F(LocalizationTest, ActiveSpaceQIOSettings) {
-  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_active_space_qio");
   auto& settings = localizer->settings();
   // Jacobi-sweep controls are exposed with documented defaults.
   EXPECT_EQ(settings.get<int64_t>("max_cycles"), 200);
@@ -2923,7 +2954,7 @@ TEST_F(LocalizationTest, ActiveSpaceQIOSettings) {
 TEST_F(LocalizationTest, ActiveSpaceQIORejectsNonFiniteSetting) {
   // A NaN slips past the BoundConstraint range check (every comparison with NaN
   // is false), so it must be rejected at run time with std::invalid_argument.
-  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_active_space_qio");
   localizer->settings().set("coarse_angle_step",
                             std::numeric_limits<double>::quiet_NaN());
   const size_t n = 4;
