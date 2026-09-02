@@ -5,32 +5,83 @@
 #pragma once
 #include <functional>
 #include <iostream>
+#include <optional>
 #include <qdk/chemistry/algorithms/algorithm.hpp>
 #include <qdk/chemistry/data/settings.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
+#include <string>
 #include <vector>
 
 namespace qdk::chemistry::algorithms {
 
+namespace detail {
 /**
- * @brief Abstract base class for orbital localization algorithms
+ * @brief Check whether a wavefunction is exactly the Aufbau determinant.
+ *
+ * An Aufbau determinant wavefunction contains a single determinant with the
+ * canonical Aufbau occupation implied by its electron counts.
+ *
+ * @param wavefunction The wavefunction to check.
+ * @return True if the wavefunction is exactly the Aufbau determinant.
+ */
+bool is_aufbau_determinant_wavefunction(
+    std::shared_ptr<data::Wavefunction> wavefunction);
+
+/**
+ * @brief Log a warning when a localizer receives a non-Aufbau wavefunction.
+ *
+ * Localizers transform orbitals and return an Aufbau determinant wavefunction;
+ * correlated-state coefficients from a multi-determinant input are not carried
+ * through the transformation.
+ *
+ * @param wavefunction The wavefunction to check.
+ * @param localizer_name Name of the localizer issuing the warning.
+ */
+void warn_if_not_aufbau_determinant_wavefunction(
+    std::shared_ptr<data::Wavefunction> wavefunction,
+    const std::string& localizer_name);
+
+/**
+ * @brief Create an Aufbau determinant wavefunction with updated orbitals.
+ *
+ * The returned wavefunction contains the canonical Aufbau determinant with a
+ * new set of orbitals.
+ *
+ * @param wavefunction The original wavefunction providing electron counts.
+ * @param new_orbitals The orbitals to attach to the output wavefunction.
+ * @param one_rdm_spin_traced Optional spin-traced active-space 1-RDM payload.
+ * @param active_one_rdm Optional spin-dependent active-space 1-RDM payload.
+ * @return An Aufbau determinant wavefunction with the updated orbitals.
+ */
+std::shared_ptr<data::Wavefunction> new_aufbau_determinant_wavefunction(
+    std::shared_ptr<data::Wavefunction> wavefunction,
+    std::shared_ptr<data::Orbitals> new_orbitals,
+    const std::optional<data::ContainerTypes::MatrixVariant>&
+        one_rdm_spin_traced = std::nullopt,
+    std::shared_ptr<const data::SymmetryBlockedTensorVariant<2>>
+        active_one_rdm = nullptr);
+}  // namespace detail
+
+/**
+ * @brief Abstract base class for orbital localization and transformation
+ * algorithms
  *
  * The Localizer class provides a common interface for various orbital
- * localization methods used in quantum chemistry. Orbital localization
- * transforms canonical molecular orbitals (which are typically delocalized
- * across the entire molecule) into localized orbitals that are confined
- * subject to some metric (spatial, bond, etc.).
+ * localization and transformation methods used in quantum chemistry.
+ * Implementations transform selected molecular orbitals into alternative
+ * representations, which may be spatially localized or otherwise useful for
+ * analysis and downstream calculations.
  *
  * This class uses the Factory design pattern through LocalizerFactory to
  * allow dynamic creation of different localization algorithms at runtime.
  *
  * Example usage:
  * @code
- * // Create a concrete localizer (e.g., BoysLocalizer)
+ * // Create a concrete localizer (e.g., PipekMezeyLocalizer)
  * auto localizer =
  * qdk::chemistry::algorithms::LocalizerFactory::create_localizer(
- *   "mp2_natural_orbitals");
+ *   "qdk_pipek_mezey");
  * // Create indices for all orbitals
  * auto all_indices = wavefunction->orbitals->get_all_mo_indices();
  * auto localized_orbital_wavefunction = localizer->run(wavefunction,
@@ -53,20 +104,20 @@ class Localizer
   virtual ~Localizer() = default;
 
   /**
-   * @brief Localize the given molecular orbitals
+   * @brief Transform the selected molecular orbitals
    *
    *
    * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
-   * @param orbitals The orbitals to localize
-   * @param loc_indices_a Indices of alpha orbitals to localize (must be sorted,
-   * if empty, no alpha orbitals are localized)
-   * @param loc_indices_b Indices of beta orbitals to localize (must be sorted,
-   * if empty, no beta orbitals are localized)
+   * @param wavefunction The wavefunction containing the orbitals to transform
+   * @param loc_indices_a Indices of alpha orbitals to transform (must be
+   * sorted; empty selects no alpha orbitals)
+   * @param loc_indices_b Indices of beta orbitals to transform (must be sorted;
+   * empty selects no beta orbitals)
    * \endcond
    *
-   * @return The localized molecular orbitals with updated coefficients.
+   * @return The output wavefunction with transformed orbital coefficients.
    *
-   * @throws std::runtime_error If localization fails
+   * @throws std::runtime_error If the transformation fails
    * @throws std::invalid_argument If the input orbitals are invalid for the
    *                               specified instance of the localizer
    * @throws qdk::chemistry::data::SettingsAreLocked if attempting to modify
@@ -81,6 +132,9 @@ class Localizer
    * @note The specific requirements for the inputs and settings affecting
    * this method may vary by implementation. See the documentation for
    * the specific localizer being used (docstring).
+   * @note Localizers return a single Aufbau determinant wavefunction with
+   * updated orbitals. Localizers may attach derived RDM payloads when their
+   * algorithm naturally produces them.
    * @note The number of electrons is an input for the
    * MP2NaturalOrbitalLocalizer and VVHVLocalizer. Orbital indices <
    * n_alpha_electrons/n_beta_electrons are treated as occupied, indices >=
@@ -108,17 +162,19 @@ class Localizer
 
  protected:
   /**
-   * @brief Implementation of orbital localization
+   * @brief Implementation of the orbital transformation
    *
-   * This method contains the actual localization logic. It is automatically
+   * This method contains the transformation logic. It is automatically
    * called by run() after settings have been locked.
    *
    * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
-   * @param orbitals The orbitals to localize
-   * @param loc_indices_a Indices of alpha orbitals to localize (must be sorted)
-   * @param loc_indices_b Indices of beta orbitals to localize (must be sorted)
+   * @param wavefunction The wavefunction containing the orbitals to transform
+   * @param loc_indices_a Indices of alpha orbitals to transform (must be
+   * sorted; empty selects no alpha orbitals)
+   * @param loc_indices_b Indices of beta orbitals to transform (must be sorted;
+   * empty selects no beta orbitals)
    * \endcond
-   * @return The localized orbitals
+   * @return The output wavefunction with transformed orbitals
    */
   virtual std::shared_ptr<data::Wavefunction> _run_impl(
       std::shared_ptr<data::Wavefunction> wavefunction,

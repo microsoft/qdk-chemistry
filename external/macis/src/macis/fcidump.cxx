@@ -115,16 +115,26 @@ FCIDumpFormat detect_fcidump_format(const std::string& line) {
 auto fcidump_line_integral_first(const std::string& line) {
   int32_t p, q, r, s;
   double integral;
+#ifdef _MSC_VER
+  int parsed =
+      sscanf_s(line.c_str(), "%lf %d %d %d %d", &integral, &p, &q, &r, &s);
+#else
   int parsed =
       sscanf(line.c_str(), "%lf %d %d %d %d", &integral, &p, &q, &r, &s);
+#endif
   return std::make_tuple(bool(parsed == 5), p, q, r, s, integral);
 }
 
 auto fcidump_line_indices_first(const std::string& line) {
   int32_t p, q, r, s;
   double integral;
+#ifdef _MSC_VER
+  int parsed =
+      sscanf_s(line.c_str(), "%d %d %d %d %lf", &p, &q, &r, &s, &integral);
+#else
   int parsed =
       sscanf(line.c_str(), "%d %d %d %d %lf", &p, &q, &r, &s, &integral);
+#endif
   return std::make_tuple(bool(parsed == 5), p, q, r, s, integral);
 }
 

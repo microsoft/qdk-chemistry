@@ -109,6 +109,20 @@ class Logger {
   static void set_global_level(LogLevel level);
 
   /**
+   * @brief Restore the global log level if it has not changed.
+   *
+   * Atomically compares the current global log level with expected_current. If
+   * they match, restores restored_level and returns true. Otherwise leaves the
+   * current level unchanged and returns false.
+   *
+   * @param expected_current The level that must still be current
+   * @param restored_level The level to restore when expected_current matches
+   * @return Whether restored_level was applied
+   */
+  static bool restore_global_level_if_unchanged(LogLevel expected_current,
+                                                LogLevel restored_level);
+
+  /**
    * @brief Get the current global log level
    *
    * Returns the current global logging level. This uses mutex protection
@@ -130,6 +144,29 @@ class Logger {
    */
   static std::string get_source_context(
       const std::source_location& location = std::source_location::current());
+};
+
+/**
+ * @class ScopedLogLevel
+ * @brief Temporarily raises the global log level for a scope.
+ *
+ * If the current global log level is more verbose than the requested minimum,
+ * the constructor raises it to that minimum. The destructor restores the
+ * previous level only if no other code changed the global level while the guard
+ * was active.
+ */
+class ScopedLogLevel {
+ public:
+  explicit ScopedLogLevel(LogLevel minimum_level);
+  ~ScopedLogLevel();
+
+  ScopedLogLevel(const ScopedLogLevel&) = delete;
+  ScopedLogLevel& operator=(const ScopedLogLevel&) = delete;
+
+ private:
+  LogLevel previous_level_;
+  LogLevel scoped_level_ = LogLevel::off;
+  bool changed_ = false;
 };
 
 /**

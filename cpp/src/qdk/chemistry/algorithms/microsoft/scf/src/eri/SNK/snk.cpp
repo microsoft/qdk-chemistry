@@ -65,6 +65,10 @@ class ERI {
     num_atomic_orbitals_ = basis_set.num_atomic_orbitals;
 
     const bool has_spin_split_density = spin_density_factor_ > 1;
+    // The functional name and spin treatment are part of the registry key so
+    // that distinct configurations do not alias to the same cached instance.
+    gauxc_input_.xc_name = xc_name_;
+    gauxc_input_.unrestricted = has_spin_split_density;
     // Get or create the GauXC implementation from the registry
     util::GAUXCRegistry::get_or_create(const_cast<BasisSet&>(basis_set),
                                        gauxc_input_, has_spin_split_density,

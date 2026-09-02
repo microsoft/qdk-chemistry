@@ -33,7 +33,7 @@ void compute_orbital_rotation(NumOrbital _norb, double alpha, const double* K,
 void fock_to_gradient(NumOrbital _norb, NumInactive _ninact, NumActive _nact,
                       NumVirtual _num_virtual_orbitals, const double* F,
                       size_t LDF, double* OG, size_t LDOG) {
-  const auto norb = _norb.get();
+  [[maybe_unused]] const auto norb = _norb.get();
   const auto nact = _nact.get();
   const auto ninact = _ninact.get();
   const auto num_virtual_orbitals = _num_virtual_orbitals.get();
@@ -74,8 +74,8 @@ void orbital_rotated_generalized_fock(
     double* T_trans, size_t LDTT, double* V_trans, size_t LDVT, double* F,
     size_t LDF) {
   const auto norb = _norb.get();
-  const auto nact = _nact.get();
-  const auto ninact = _ninact.get();
+  [[maybe_unused]] const auto nact = _nact.get();
+  [[maybe_unused]] const auto ninact = _ninact.get();
 
   // Transform Integrals
   two_index_transform(norb, norb, T, LDT, U, LDU, T_trans, LDTT);
@@ -201,19 +201,19 @@ void numerical_orbital_hessian(NumOrbital _norb, NumInactive ninact,
           std::fill(K.begin(), K.end(), 0);
           for (size_t p = 0; p < norb2; ++p) K[p] = 2 * Kx[p] + Ky[p];
           compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
-          auto E_xp2_yp1 = energy();
+          [[maybe_unused]] auto E_xp2_yp1 = energy();
 
           // E(x+h,y+2h)
           std::fill(K.begin(), K.end(), 0);
           for (size_t p = 0; p < norb2; ++p) K[p] = Kx[p] + 2 * Ky[p];
           compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
-          auto E_xp1_yp2 = energy();
+          [[maybe_unused]] auto E_xp1_yp2 = energy();
 
           // E(x+2h,y+2h)
           std::fill(K.begin(), K.end(), 0);
           for (size_t p = 0; p < norb2; ++p) K[p] = 2 * Kx[p] + 2 * Ky[p];
           compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
-          auto E_xp2_yp2 = energy();
+          [[maybe_unused]] auto E_xp2_yp2 = energy();
 
           // E(x+h,y-h)
           std::fill(K.begin(), K.end(), 0);
@@ -225,19 +225,19 @@ void numerical_orbital_hessian(NumOrbital _norb, NumInactive ninact,
           std::fill(K.begin(), K.end(), 0);
           for (size_t p = 0; p < norb2; ++p) K[p] = 2 * Kx[p] - Ky[p];
           compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
-          auto E_xp2_ym1 = energy();
+          [[maybe_unused]] auto E_xp2_ym1 = energy();
 
           // E(x+h,y-2h)
           std::fill(K.begin(), K.end(), 0);
           for (size_t p = 0; p < norb2; ++p) K[p] = Kx[p] - 2 * Ky[p];
           compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
-          auto E_xp1_ym2 = energy();
+          [[maybe_unused]] auto E_xp1_ym2 = energy();
 
           // E(x+2h,y-2h)
           std::fill(K.begin(), K.end(), 0);
           for (size_t p = 0; p < norb2; ++p) K[p] = 2 * Kx[p] - 2 * Ky[p];
           compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
-          auto E_xp2_ym2 = energy();
+          [[maybe_unused]] auto E_xp2_ym2 = energy();
 
           // E(x-h,y+h)
           std::fill(K.begin(), K.end(), 0);
@@ -249,19 +249,19 @@ void numerical_orbital_hessian(NumOrbital _norb, NumInactive ninact,
           std::fill(K.begin(), K.end(), 0);
           for (size_t p = 0; p < norb2; ++p) K[p] = -2 * Kx[p] + Ky[p];
           compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
-          auto E_xm2_yp1 = energy();
+          [[maybe_unused]] auto E_xm2_yp1 = energy();
 
           // E(x-h,y+2h)
           std::fill(K.begin(), K.end(), 0);
           for (size_t p = 0; p < norb2; ++p) K[p] = -Kx[p] + 2 * Ky[p];
           compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
-          auto E_xm1_yp2 = energy();
+          [[maybe_unused]] auto E_xm1_yp2 = energy();
 
           // E(x-2h,y+2h)
           std::fill(K.begin(), K.end(), 0);
           for (size_t p = 0; p < norb2; ++p) K[p] = -2 * Kx[p] + 2 * Ky[p];
           compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
-          auto E_xm2_yp2 = energy();
+          [[maybe_unused]] auto E_xm2_yp2 = energy();
 
           // E(x-h,y-h)
           std::fill(K.begin(), K.end(), 0);
@@ -273,19 +273,19 @@ void numerical_orbital_hessian(NumOrbital _norb, NumInactive ninact,
           std::fill(K.begin(), K.end(), 0);
           for (size_t p = 0; p < norb2; ++p) K[p] = -2 * Kx[p] - Ky[p];
           compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
-          auto E_xm2_ym1 = energy();
+          [[maybe_unused]] auto E_xm2_ym1 = energy();
 
           // E(x-h,y-2h)
           std::fill(K.begin(), K.end(), 0);
           for (size_t p = 0; p < norb2; ++p) K[p] = -Kx[p] - 2 * Ky[p];
           compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
-          auto E_xm1_ym2 = energy();
+          [[maybe_unused]] auto E_xm1_ym2 = energy();
 
           // E(x-2h,y-2h)
           std::fill(K.begin(), K.end(), 0);
           for (size_t p = 0; p < norb2; ++p) K[p] = -2 * Kx[p] - 2 * Ky[p];
           compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
-          auto E_xm2_ym2 = energy();
+          [[maybe_unused]] auto E_xm2_ym2 = energy();
 
           OH[a + i * LDOH + b * LDOH * LDOH + j * LDOH * LDOH * LDOH] =
               (E_xp1_yp1 + E_xm1_ym1 - E_xp1_ym1 - E_xm1_yp1) / (4 * dk * dk);

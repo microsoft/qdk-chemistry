@@ -12,9 +12,21 @@ from pathlib import Path
 
 import h5py
 import pytest
-import qsharp
+from qdk import TargetProfile
+from qdk.openqasm import circuit as openqasm_circuit
+from qdk.openqasm import compile as openqasm_compile
 
+try:
+    from qdk._interpreter import QirInputData
+    from qdk._native import Circuit as QdkCircuitType
+
+except ImportError:
+    from qsharp._native import Circuit as QdkCircuitType
+    from qsharp._qsharp import QirInputData
+
+from qdk_chemistry.algorithms.state_preparation._binary_encoding_utils import MatrixCompressionType
 from qdk_chemistry.data import Circuit
+from qdk_chemistry.data import circuit as circuit_module
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -41,7 +53,7 @@ def simple_qasm() -> str:
 @pytest.fixture
 def simple_qir(simple_qasm) -> str:
     """The QIR representation of the simple QASM string."""
-    return str(qsharp.openqasm.compile(simple_qasm))
+    return str(openqasm_compile(simple_qasm, target_profile=TargetProfile.Base))
 
 
 class TestCircuitConstruction:
@@ -59,13 +71,13 @@ class TestCircuitConstruction:
         c[0] = measure q[0];
         c[1] = measure q[1];
         """
-        qir = qsharp.openqasm.compile(qasm)
-        qsharp_circuit = qsharp.openqasm.circuit(qasm)
+        qir = openqasm_compile(qasm, target_profile=TargetProfile.Base)
+        qsharp_circuit = openqasm_circuit(qasm)
         circuit = Circuit(qasm=qasm, qir=qir, qsharp=qsharp_circuit)
         assert circuit.qasm is not None
         assert "h q[0];" in circuit.qasm
-        assert isinstance(circuit.qir, qsharp._qsharp.QirInputData)
-        assert isinstance(circuit.qsharp, qsharp._native.Circuit)
+        assert isinstance(circuit.qir, QirInputData)
+        assert isinstance(circuit.qsharp, QdkCircuitType)
 
     def test_circuit_construction_raises(self):
         """Test that Circuit construction without QASM raises RuntimeError."""
@@ -84,6 +96,11 @@ class TestCircuitConstruction:
         retrieved_qasm = circuit.get_qasm()
         assert retrieved_qasm == qasm
         assert "h q[0];" in retrieved_qasm
+
+    def test_num_qubits_records_the_declared_width(self):
+        """Callers read the register width off the circuit rather than its producer."""
+        assert Circuit(qasm="OPENQASM 3.0;", num_qubits=5).num_qubits == 5
+        assert Circuit(qasm="OPENQASM 3.0;", num_qubits=0).num_qubits == 0
 
 
 class TestGetQsharpCircuit:
@@ -106,7 +123,7 @@ class TestGetQsharpCircuit:
         qdk_circuit_info = json.loads(qdk_circuit.json())
         assert len(qdk_circuit_info["qubits"]) == 3
         qir = circuit.get_qir()
-        assert isinstance(qir, qsharp._qsharp.QirInputData)
+        assert isinstance(qir, QirInputData)
 
     def test_get_circuit_from_factory(self):
         """Test that get_qir and get_qsharp_circuit can generate and cache QIR and Q# circuit from Q# factory data."""
@@ -119,16 +136,23 @@ class TestGetQsharpCircuit:
         assert circuit.qsharp is None
         qir = circuit.get_qir()
         qsc = circuit.get_qsharp_circuit()
-        assert isinstance(qir, qsharp._qsharp.QirInputData)
-        assert isinstance(circuit.qir, qsharp._qsharp.QirInputData)
-        assert isinstance(qsc, qsharp._native.Circuit)
+        assert isinstance(qir, QirInputData)
+        assert isinstance(circuit.qir, QirInputData)
+        assert isinstance(qsc, QdkCircuitType)
 
     def test_get_qsharp_circuit_prune_classical_qubits(self):
         """Test that get_qsharp_circuit can prune classical qubits when requested."""
         state_prep_params = {
             "rowMap": [1, 0],
             "stateVector": [0.6, 0.0, 0.0, 0.8],
-            "expansionOps": [[2]],
+            "expansionOps": [
+                {
+                    "kind": MatrixCompressionType.X.qsharp_code,
+                    "qubits": [2],
+                    "controlState": 0,
+                    "lookupData": [],
+                }
+            ],
             "numQubits": 4,
         }
         qsharp_factory = QsharpFactoryData(
@@ -207,6 +231,28 @@ class TestCircuitSerialization:
         assert reconstructed.qasm == original.qasm
         assert reconstructed.qir == original.qir
 
+    def test_json_roundtrip_preserves_num_qubits(self, simple_qasm, simple_qir):
+        """A declared register width has to survive a save/load cycle."""
+        original = Circuit(qasm=simple_qasm, qir=simple_qir, num_qubits=7)
+        reconstructed = Circuit.from_json(original.to_json())
+
+        assert reconstructed.num_qubits == 7
+
+    def test_json_omits_an_undeclared_num_qubits(self, simple_qasm, simple_qir):
+        """Undeclared stays undeclared; it must not round-trip as a made-up width."""
+        json_data = Circuit(qasm=simple_qasm, qir=simple_qir).to_json()
+
+        assert "num_qubits" not in json_data
+        assert Circuit.from_json(json_data).num_qubits is None
+
+    def test_a_payload_written_before_num_qubits_existed_still_loads(self, simple_qasm, simple_qir):
+        """A literal v0.1.0 payload, written before ``num_qubits`` was added, must still load."""
+        legacy = {"qasm": simple_qasm, "qir": str(simple_qir), "version": "0.1.0"}
+        circuit = Circuit.from_json(legacy)
+
+        assert circuit.qasm == simple_qasm
+        assert circuit.num_qubits is None
+
     def test_to_hdf5(self, simple_qasm, simple_qir):
         """Test that to_hdf5 saves Circuit correctly."""
         qasm = simple_qasm
@@ -283,7 +329,7 @@ class TestCircuitSerialization:
         try:
             circuit.to_json_file(tmp_path)
 
-            with open(tmp_path) as f:
+            with open(tmp_path, encoding="utf-8") as f:
                 loaded_data = json.load(f)
 
             assert "qasm" in loaded_data
@@ -413,6 +459,18 @@ class TestCircuitImmutability:
 class TestCircuitEstimate:
     """Test cases for Circuit.estimate method."""
 
+    _QASM_WITH_T = """
+        OPENQASM 3.0;
+        include "stdgates.inc";
+        qubit[2] q;
+        bit[2] c;
+        h q[0];
+        t q[0];
+        cx q[0], q[1];
+        c[0] = measure q[0];
+        c[1] = measure q[1];
+    """
+
     def test_estimate_from_factory(self):
         """Test that estimate works with Q# factory data."""
         state_prep_params = {
@@ -432,25 +490,28 @@ class TestCircuitEstimate:
 
     def test_estimate_from_qasm(self):
         """Test that estimate works with QASM representation."""
-        qasm_with_t = """
-            OPENQASM 3.0;
-            include "stdgates.inc";
-            qubit[2] q;
-            bit[2] c;
-            h q[0];
-            t q[0];
-            cx q[0], q[1];
-            c[0] = measure q[0];
-            c[1] = measure q[1];
-        """
-        circuit = Circuit(qasm=qasm_with_t)
+        circuit = Circuit(qasm=self._QASM_WITH_T)
         result = circuit.estimate()
         assert result is not None
         assert hasattr(result, "logical_counts")
 
+    def test_estimate_warns_when_the_declared_width_disagrees(self, monkeypatch):
+        """A stale ``num_qubits`` is surfaced and replaced by the estimated width."""
+        warnings: list[str] = []
+        monkeypatch.setattr(circuit_module.Logger, "warn", warnings.append)
+
+        circuit = Circuit(qasm=self._QASM_WITH_T, num_qubits=5)
+        result = circuit.estimate()
+
+        assert result.logical_counts["numQubits"] == 2
+        assert len(warnings) == 1
+        assert "declares 5 qubits" in warnings[0]
+        assert circuit.num_qubits == 2
+
     def test_estimate_raises_with_qir_only(self):
         """Test that estimate raises when only QIR representation is available."""
-        qir = qsharp.openqasm.compile("""
+        qir = openqasm_compile(
+            """
             OPENQASM 3.0;
             include "stdgates.inc";
             qubit[2] q;
@@ -459,7 +520,70 @@ class TestCircuitEstimate:
             cx q[0], q[1];
             c[0] = measure q[0];
             c[1] = measure q[1];
-        """)
+            """,
+            target_profile=TargetProfile.Base,
+        )
         circuit = Circuit(qir=qir)
         with pytest.raises(RuntimeError, match="Cannot estimate resources"):
             circuit.estimate()
+
+
+class TestGetQreApplication:
+    """Test cases for Circuit.get_qre_application method."""
+
+    def test_get_qre_application_from_factory(self):
+        """Test that get_qre_application works with Q# factory data."""
+        from qdk.qre.application import QSharpApplication  # noqa: PLC0415
+
+        state_prep_params = {
+            "rowMap": [1, 0],
+            "stateVector": [0.6, 0.0, 0.0, 0.8],
+            "expansionOps": [],
+            "numQubits": 2,
+        }
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+            parameter=state_prep_params,
+        )
+        circuit = Circuit(qsharp_factory=qsharp_factory)
+        app = circuit.get_qre_application()
+        assert isinstance(app, QSharpApplication)
+
+    def test_get_qre_application_from_qasm(self):
+        """Test that get_qre_application works with QASM-only circuit."""
+        from qdk.qre.application import OpenQASMApplication  # noqa: PLC0415
+
+        qasm = """
+            OPENQASM 3.0;
+            include "stdgates.inc";
+            qubit[2] q;
+            bit[2] c;
+            h q[0];
+            cx q[0], q[1];
+            c[0] = measure q[0];
+            c[1] = measure q[1];
+        """
+        circuit = Circuit(qasm=qasm)
+        app = circuit.get_qre_application()
+        assert isinstance(app, OpenQASMApplication)
+
+    def test_get_qre_application_from_qir(self):
+        """Test that get_qre_application works with QIR-only circuit."""
+        from qdk.qre.application import QIRApplication  # noqa: PLC0415
+
+        qir = openqasm_compile(
+            """
+            OPENQASM 3.0;
+            include "stdgates.inc";
+            qubit[2] q;
+            bit[2] c;
+            h q[0];
+            cx q[0], q[1];
+            c[0] = measure q[0];
+            c[1] = measure q[1];
+            """,
+            target_profile=TargetProfile.Base,
+        )
+        circuit = Circuit(qir=qir)
+        app = circuit.get_qre_application()
+        assert isinstance(app, QIRApplication)

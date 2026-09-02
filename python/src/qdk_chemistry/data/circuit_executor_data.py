@@ -10,6 +10,7 @@ from typing import Any
 import h5py
 import numpy as np
 
+from qdk_chemistry.data._hashing import _hash_arg, _hash_int, _hash_str, _hash_uint
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.utils import Logger
 
@@ -19,8 +20,15 @@ __all__: list[str] = []
 class CircuitExecutorData(DataClass):
     """Bitstring data and metadata from quantum circuit executions."""
 
-    # Class attribute for filename validation
-    _data_type_name = "circuit_executor_data"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for circuit executor data.
+
+        Returns:
+            ``"circuit_executor_data"``.
+
+        """
+        return "circuit_executor_data"
 
     # Serialization version for this class
     _serialization_version = "0.1.0"
@@ -54,6 +62,17 @@ class CircuitExecutorData(DataClass):
         self._executor_metadata = executor_metadata
         self.loss_bitstrings = loss_bitstrings
         super().__init__()
+
+    def _hash_update(self, h) -> None:
+        """Feed identifying data into the hasher."""
+        _hash_str(h, "circuit_executor_data")
+        _hash_uint(h, len(self.bitstring_counts))
+        for k in sorted(self.bitstring_counts.keys()):
+            _hash_str(h, k)
+            _hash_int(h, self.bitstring_counts[k])
+        _hash_int(h, self.total_shots)
+        _hash_str(h, self.executor)
+        _hash_arg(h, self._executor_metadata)
 
     def get_executor_metadata(self) -> Any | None:
         """Get the executor metadata.

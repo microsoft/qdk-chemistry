@@ -18,8 +18,15 @@ __all__: list[str] = ["UnitaryContainer"]
 class UnitaryContainer(DataClass):
     """Abstract class for a unitary container."""
 
-    # Class attribute for filename validation
-    _data_type_name = "unitary_container"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for unitary containers.
+
+        Returns:
+            ``"unitary_container"``.
+
+        """
+        return "unitary_container"
 
     # Serialization version for this class
     _serialization_version = "0.1.0"
@@ -94,5 +101,34 @@ class UnitaryContainer(DataClass):
 
         Returns:
             str: Summary string describing the UnitaryContainer's contents and properties
+
+        """
+
+    @abstractmethod
+    def eigenvalue_from_phase(self, phase_fraction: float) -> float:
+        r"""Recover a Hamiltonian eigenvalue from the measured phase fraction.
+
+        Each unitary encoding maps Hamiltonian eigenvalues to phases on the
+        unit circle.  This method inverts that mapping so that a measured
+        phase fraction :math:`\varphi \in [0, 1)` is converted back to the
+        corresponding eigenvalue :math:`E`.
+
+        Args:
+            phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.
+
+        Returns:
+            float: The corresponding Hamiltonian eigenvalue.
+
+        """
+
+    @abstractmethod
+    def combine(self, other: "UnitaryContainer") -> "UnitaryContainer":
+        """Combine this container with another to represent sequential application.
+
+        Args:
+            other: The container to append after this one.
+
+        Returns:
+            A new container representing the combined evolution.
 
         """

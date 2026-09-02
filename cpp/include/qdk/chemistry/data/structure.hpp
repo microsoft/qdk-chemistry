@@ -10,7 +10,6 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/element_data.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <string>
 #include <utility>
 #include <vector>
@@ -117,12 +116,12 @@ class Structure : public DataClass,
   /**
    * @brief Copy assignment operator
    */
-  Structure& operator=(const Structure& other) = default;
+  Structure& operator=(const Structure&) = delete;
 
   /**
    * @brief Move assignment operator
    */
-  Structure& operator=(Structure&& other) noexcept = default;
+  Structure& operator=(Structure&&) = delete;
 
   /**
    * @brief Destructor
@@ -220,12 +219,18 @@ class Structure : public DataClass,
   double get_total_mass() const;
 
   /**
-   * @brief Get the data type name for this class
+   * @brief Get the static data type name for this class.
    * @return "structure"
    */
-  std::string get_data_type_name() const override {
+  static std::string data_type_name() {
     return DATACLASS_TO_SNAKE_CASE(Structure);
   }
+
+  /**
+   * @brief Get the data type name for this instance.
+   * @return "structure"
+   */
+  std::string get_data_type_name() const override { return data_type_name(); }
 
   /**
    * @brief Get summary string of structure information
@@ -428,6 +433,8 @@ class Structure : public DataClass,
   static unsigned get_default_nuclear_charge(Element element);
 
  private:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   /// Serialization version
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
 

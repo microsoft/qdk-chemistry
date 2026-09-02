@@ -4,10 +4,16 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cmath>
 #include <filesystem>
+#include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
+#include <qdk/chemistry/algorithms/stability.hpp>
+#include <qdk/chemistry/data/ansatz.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
+#include <qdk/chemistry/utils/orbital_rotation.hpp>
 
 #include "../src/qdk/chemistry/algorithms/microsoft/utils.hpp"
 #include "ut_common.hpp"
@@ -45,17 +51,27 @@ class TestSCF : public ScfSolver {
 
     auto orbitals = std::make_shared<Orbitals>(coefficients, energies,
                                                std::nullopt, nullptr);
-    auto wfn = std::make_shared<Wavefunction>(
-        std::make_unique<SlaterDeterminantContainer>(Configuration("000"),
-                                                     orbitals));
+    auto wfn =
+        std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+            Configuration::from_spin_half_string("000"), orbitals));
     return {0.0, wfn};
   }
 };
 
 TEST_F(ScfTest, Factory) {
   auto available_solvers = ScfSolverFactory::available();
-  EXPECT_EQ(available_solvers.size(), 1);
-  EXPECT_EQ(available_solvers[0], "qdk");
+  EXPECT_NE(
+      std::find(available_solvers.begin(), available_solvers.end(), "qdk"),
+      available_solvers.end());
+  EXPECT_NE(std::find(available_solvers.begin(), available_solvers.end(),
+                      "qdk_stabilized"),
+            available_solvers.end());
+  EXPECT_NE(std::find(available_solvers.begin(), available_solvers.end(),
+                      "stabilized"),
+            available_solvers.end());
+  EXPECT_NE(std::find(available_solvers.begin(), available_solvers.end(),
+                      "stabilized_scf"),
+            available_solvers.end());
   EXPECT_THROW(ScfSolverFactory::create("nonexistent_solver"),
                std::runtime_error);
   EXPECT_NO_THROW(ScfSolverFactory::register_instance(
@@ -66,8 +82,55 @@ TEST_F(ScfTest, Factory) {
                    []() -> ScfSolverFactory::return_type {
                      return std::make_unique<TestSCF>();
                    }),
-               std::runtime_error);
+               qdk::chemistry::DuplicateRegistrationError);
   auto test_scf = ScfSolverFactory::create("test_scf");
+}
+
+TEST_F(ScfTest, StabilizedScfSolverPassthrough) {
+  auto water = testing::create_water_structure();
+  auto regular_scf_solver = ScfSolverFactory::create("qdk");
+  regular_scf_solver->settings().set("method", "hf");
+  auto [regular_energy, regular_wavefunction] =
+      regular_scf_solver->run(water, 0, 1, "sto-3g");
+
+  auto scf_solver = ScfSolverFactory::create("qdk_stabilized");
+  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("max_stability_iterations", 0);
+
+  auto [energy, wavefunction] = scf_solver->run(water, 0, 1, "sto-3g");
+
+  EXPECT_NEAR(energy, regular_energy, testing::scf_energy_tolerance);
+  EXPECT_TRUE(regular_wavefunction->get_orbitals()->is_restricted());
+  EXPECT_TRUE(wavefunction->get_orbitals()->is_restricted());
+}
+
+TEST_F(ScfTest, StabilizedScfSolverPrefersExternalInstability) {
+  auto n2 = testing::create_stretched_n2_structure(1.6);
+
+  auto regular_scf_solver = ScfSolverFactory::create("qdk");
+  regular_scf_solver->settings().set("method", "hf");
+  auto [_regular_energy, regular_wavefunction] =
+      regular_scf_solver->run(n2, 0, 1, "def2-svp");
+
+  auto stability_checker = StabilityCheckerFactory::create("qdk");
+  stability_checker->settings().set("internal", true);
+  stability_checker->settings().set("external", true);
+  auto [regular_is_stable, regular_stability_result] =
+      stability_checker->run(regular_wavefunction);
+
+  EXPECT_FALSE(regular_stability_result->is_internal_stable());
+  EXPECT_FALSE(regular_stability_result->is_external_stable());
+  EXPECT_FALSE(regular_is_stable);
+
+  auto stabilized_scf_solver = ScfSolverFactory::create("qdk_stabilized");
+  stabilized_scf_solver->settings().set("method", "hf");
+  stabilized_scf_solver->settings().set("max_stability_iterations", 1);
+  stabilized_scf_solver->settings().set("fail_on_unstable", false);
+  auto [stabilized_energy, stabilized_wavefunction] =
+      stabilized_scf_solver->run(n2, 0, 1, "def2-svp");
+
+  EXPECT_LT(stabilized_energy, _regular_energy);
+  EXPECT_FALSE(stabilized_wavefunction->get_orbitals()->is_restricted());
 }
 
 TEST_F(ScfTest, Water) {
@@ -150,14 +213,15 @@ TEST_F(ScfTest, OH_ROHF_INCORE_DIIS) {
   EXPECT_TRUE(wfn_doublet->get_orbitals()->is_restricted());
 }
 
-TEST_F(ScfTest, OH_ROHF_Invalid_GDM) {
+TEST_F(ScfTest, OH_ROKS_invalid) {
   auto oh = testing::create_oh_structure();
   auto scf_solver = ScfSolverFactory::create();
   scf_solver->settings().set("enable_gdm", true);
-  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("method", "pbe");
   scf_solver->settings().set("scf_type", "restricted");
 
-  EXPECT_THROW(scf_solver->run(oh, 0, 2, "sto-3g"), std::runtime_error);
+  // Restricted ROKS should reject this open-shell doublet case.
+  EXPECT_THROW(scf_solver->run(oh, 0, 2, "sto-3g"), std::invalid_argument);
 }
 
 TEST_F(ScfTest, Oxygen_atom_gdm) {
@@ -227,6 +291,34 @@ TEST_F(ScfTest, Oxygen_atom_charged_doublet_gdm) {
   EXPECT_FALSE(wfn_doublet->get_orbitals()->is_restricted());
 }
 
+TEST_F(ScfTest, OH_ROHF_GDM) {
+  auto oh = testing::create_oh_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("enable_gdm", true);
+  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("scf_type", "restricted");
+  auto [E_doublet, wfn_doublet] = scf_solver->run(oh, 0, 2, "sto-3g");
+
+  EXPECT_NEAR(E_doublet, -74.361530753176, testing::scf_energy_tolerance);
+
+  // Check doublet orbitals
+  EXPECT_TRUE(wfn_doublet->get_orbitals()->is_restricted());
+}
+
+TEST_F(ScfTest, Oxygen_atom_ROHF_GDM) {
+  auto oxygen = testing::create_oxygen_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("enable_gdm", true);
+  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("scf_type", "restricted");
+  auto [E_triplet, wfn_triplet] = scf_solver->run(oxygen, 0, 3, "cc-pvdz");
+
+  EXPECT_NEAR(E_triplet, -74.787513074624, testing::scf_energy_tolerance);
+
+  // Check triplet orbitals are restricted (ROHF)
+  EXPECT_TRUE(wfn_triplet->get_orbitals()->is_restricted());
+}
+
 TEST_F(ScfTest, Oxygen_atom_invalid_energy_thresh_diis_switch_gdm) {
   auto oxygen = testing::create_oxygen_structure();
   auto scf_solver = ScfSolverFactory::create();
@@ -234,9 +326,8 @@ TEST_F(ScfTest, Oxygen_atom_invalid_energy_thresh_diis_switch_gdm) {
   scf_solver->settings().set("method", "pbe");
   scf_solver->settings().set("enable_gdm", true);
   scf_solver->settings().set("energy_thresh_diis_switch", -2e-4);
-  // Default should be a singlet
-  EXPECT_THROW(scf_solver->run(oxygen, 0, 1, "cc-pvdz"),
-               std::invalid_argument);  // open-shell dublet
+
+  EXPECT_THROW(scf_solver->run(oxygen, 0, 1, "cc-pvdz"), std::invalid_argument);
 }
 
 TEST_F(ScfTest, Oxygen_atom_invalid_bfgs_history_size_limit_gdm) {
@@ -246,7 +337,7 @@ TEST_F(ScfTest, Oxygen_atom_invalid_bfgs_history_size_limit_gdm) {
   scf_solver->settings().set("method", "pbe");
   scf_solver->settings().set("enable_gdm", true);
   scf_solver->settings().set("gdm_bfgs_history_size_limit", 0);
-  // Default should be a singlet
+
   EXPECT_THROW(scf_solver->run(oxygen, 0, 1, "cc-pvdz"), std::invalid_argument);
 }
 
@@ -272,9 +363,55 @@ TEST_F(ScfTest, WaterDftPbe) {
 
   auto [E_pbe, wfn_pbe] = scf_solver->run(water, 0, 1, "def2-svp");
 
-  // PBE should give a different energy than B3LYP
   EXPECT_NEAR(E_pbe, -76.251126664739658, testing::scf_energy_tolerance);
   EXPECT_TRUE(wfn_pbe->get_orbitals()->is_restricted());
+}
+
+TEST_F(ScfTest, WaterRangeSeparatedDftDirectMatchesIncore) {
+  auto water = testing::create_water_structure();
+
+  auto direct_solver = ScfSolverFactory::create();
+  direct_solver->settings().set("method", "cam-b3lyp");
+  direct_solver->settings().set("eri_method", "direct");
+  auto [direct_energy, direct_wavefunction] =
+      direct_solver->run(water, 0, 1, "sto-3g");
+
+  auto incore_solver = ScfSolverFactory::create();
+  incore_solver->settings().set("method", "cam-b3lyp");
+  incore_solver->settings().set("eri_method", "incore");
+  auto [incore_energy, incore_wavefunction] =
+      incore_solver->run(water, 0, 1, "sto-3g");
+
+  EXPECT_TRUE(std::isfinite(direct_energy));
+  EXPECT_TRUE(std::isfinite(incore_energy));
+  EXPECT_TRUE(direct_wavefunction->get_orbitals()->is_restricted());
+  EXPECT_TRUE(incore_wavefunction->get_orbitals()->is_restricted());
+  EXPECT_NEAR(direct_energy, incore_energy,
+              2.0 * testing::scf_energy_tolerance);
+}
+
+TEST_F(ScfTest, WaterRangeSeparatedDftDirectEnergy) {
+  auto water = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("method", "cam-b3lyp");
+  scf_solver->settings().set("eri_method", "direct");
+
+  auto [energy, wavefunction] = scf_solver->run(water, 0, 1, "sto-3g");
+
+  EXPECT_NEAR(energy, -75.27665598860905, testing::scf_energy_tolerance);
+  EXPECT_TRUE(wavefunction->get_orbitals()->is_restricted());
+}
+
+TEST_F(ScfTest, LithiumRangeSeparatedDftDirectEnergyUks) {
+  auto lithium = testing::create_li_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("method", "cam-b3lyp");
+  scf_solver->settings().set("eri_method", "direct");
+
+  auto [energy, wavefunction] = scf_solver->run(lithium, 0, 2, "sto-3g");
+
+  EXPECT_NEAR(energy, -7.3499880727469851, testing::scf_energy_tolerance);
+  EXPECT_FALSE(wavefunction->get_orbitals()->is_restricted());
 }
 
 TEST_F(ScfTest, LithiumDftB3lypUks) {
@@ -527,6 +664,46 @@ TEST_F(ScfTest, InitialGuessRestart) {
   EXPECT_NEAR(energy_first, energy_second, testing::scf_energy_tolerance);
 }
 
+TEST_F(ScfTest, CustomElementMapBasisRotatedOrbitalInitialGuessRuns) {
+  using namespace qdk::chemistry::utils;
+
+  auto water = testing::create_water_structure();
+
+  std::map<std::string, std::string> element_basis_map = {{"O", "sto-3g"},
+                                                          {"H", "sto-3g"}};
+  auto custom_basis = BasisSet::from_element_map(element_basis_map, water);
+
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("convergence_threshold", 1e-2);
+  auto [energy_first, wfn_first] = scf_solver->run(water, 0, 1, custom_basis);
+
+  auto orbitals_first = wfn_first->get_orbitals();
+  EXPECT_EQ(orbitals_first->get_basis_set()->get_name(), BasisSet::custom_name);
+
+  auto [n_alpha, n_beta] = wfn_first->get_total_num_electrons();
+  const size_t n_mo = orbitals_first->get_num_molecular_orbitals();
+  const size_t n_virtual = n_mo - n_alpha;
+  const size_t rotation_size = n_alpha * n_virtual;
+  Eigen::VectorXd rotation_vector =
+      Eigen::VectorXd::Constant(rotation_size, 0.01);
+
+  auto rotated_orbitals =
+      rotate_orbitals(orbitals_first, rotation_vector, n_alpha, n_beta);
+  EXPECT_EQ(rotated_orbitals->get_basis_set()->get_name(),
+            BasisSet::custom_name);
+
+  auto scf_solver_restart = ScfSolverFactory::create();
+  scf_solver_restart->settings().set("method", "hf");
+  scf_solver_restart->settings().set("convergence_threshold", 1e-2);
+
+  std::pair<double, std::shared_ptr<Wavefunction>> restart_result;
+  EXPECT_NO_THROW({
+    restart_result = scf_solver_restart->run(water, 0, 1, rotated_orbitals);
+  });
+  EXPECT_NE(restart_result.second, nullptr);
+}
+
 TEST_F(ScfTest, OxygenTripletInitialGuessRestart) {
   auto o2 = testing::create_o2_structure();
   auto scf_solver = ScfSolverFactory::create();
@@ -590,10 +767,36 @@ TEST_F(ScfTest, AgHDef2SvpWithEcp) {
   EXPECT_EQ(ecp_electrons[0], 28);  // Ag has 28 core electrons replaced by ECP
   EXPECT_EQ(ecp_electrons[1], 0);   // H has no ECP (0 core electrons)
 
-  // Verify the electronic energy matches expected value
-  double nuclear_repulsion = agh->calculate_nuclear_repulsion_energy();
-  double electronic_energy = energy - nuclear_repulsion;
-  EXPECT_NEAR(electronic_energy, -162.0054639312,
+  const auto& nuclear_charges = agh->get_nuclear_charges();
+  ASSERT_EQ(nuclear_charges.size(), 2);
+  EXPECT_DOUBLE_EQ(nuclear_charges(0), 47.0);
+  EXPECT_DOUBLE_EQ(nuclear_charges(1), 1.0);
+
+  const auto effective_charges = basis_set->get_effective_nuclear_charges();
+  ASSERT_EQ(effective_charges.size(), 2);
+  EXPECT_DOUBLE_EQ(effective_charges(0), 19.0);
+  EXPECT_DOUBLE_EQ(effective_charges(1), 1.0);
+
+  const double bond_length =
+      (agh->get_atom_coordinates(1) - agh->get_atom_coordinates(0)).norm();
+  const double expected_nuclear_repulsion = 47.0 / bond_length;
+  const double expected_effective_nuclear_repulsion = 19.0 / bond_length;
+  EXPECT_NEAR(agh->calculate_nuclear_repulsion_energy(),
+              expected_nuclear_repulsion, testing::numerical_zero_tolerance);
+  EXPECT_NEAR(basis_set->calculate_effective_nuclear_repulsion_energy(),
+              expected_effective_nuclear_repulsion,
+              testing::numerical_zero_tolerance);
+
+  auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
+  auto hamiltonian = hamiltonian_constructor->run(orbitals);
+  EXPECT_NEAR(hamiltonian->get_core_energy(),
+              expected_effective_nuclear_repulsion,
+              testing::scf_energy_tolerance);
+
+  Ansatz mean_field_ansatz(hamiltonian, wfn);
+  EXPECT_NEAR(mean_field_ansatz.calculate_energy(), energy,
+              testing::scf_energy_tolerance);
+  EXPECT_NEAR(mean_field_ansatz.calculate_energy(), -146.62430815169887,
               testing::scf_energy_tolerance);
 
   // Check electron count - with ECP, should have 20 valence electrons
@@ -601,6 +804,17 @@ TEST_F(ScfTest, AgHDef2SvpWithEcp) {
       wfn->get_total_orbital_occupations();
   double total_electrons = occupations_alpha.sum() + occupations_beta.sum();
   EXPECT_NEAR(total_electrons, 20.0, testing::numerical_zero_tolerance);
+
+  auto restart_solver = ScfSolverFactory::create();
+  restart_solver->settings().set("method", "hf");
+  restart_solver->settings().set("max_iterations", 2);
+  auto [restart_energy, restart_wfn] = restart_solver->run(agh, 0, 1, orbitals);
+
+  EXPECT_NEAR(restart_energy, energy, testing::scf_energy_tolerance);
+  auto [restart_n_alpha, restart_n_beta] =
+      restart_wfn->get_total_num_electrons();
+  EXPECT_EQ(restart_n_alpha, 10);
+  EXPECT_EQ(restart_n_beta, 10);
 
   // Verify ECP angular momentum types are present
   // def2-svp ECP for Ag includes different angular momentum shells
@@ -704,14 +918,18 @@ TEST_F(ScfTest, AgHBasisSetRoundTripSerialization) {
   EXPECT_EQ(shells2.size(), shells1.size());
 
   // Verify the basis set structure can be used to create valid orbitals
-  auto [coeff_alpha, coeff_beta] = orbitals1->get_coefficients();
-  auto [energies_alpha, energies_beta] = orbitals1->get_energies();
+  const auto& coeff_alpha =
+      orbitals1->coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& coeff_beta =
+      orbitals1->coefficients()->block({axes::beta(), axes::beta()});
+  const auto& energies_alpha = orbitals1->energies()->block({axes::alpha()});
+  const auto& energies_beta = orbitals1->energies()->block({axes::beta()});
   auto overlap = orbitals1->get_overlap_matrix();
 
   // Create orbitals with the deserialized basis set - this validates
   // that the basis set is fully functional
-  auto orbitals2 = std::make_shared<Orbitals>(
-      coeff_alpha, energies_alpha, overlap, basis_set2, std::nullopt);
+  auto orbitals2 = std::make_shared<Orbitals>(coeff_alpha, energies_alpha,
+                                              overlap, basis_set2);
 
   EXPECT_TRUE(orbitals2->has_basis_set());
   EXPECT_EQ(orbitals2->get_basis_set()->get_name(), "def2-svp");
@@ -774,7 +992,7 @@ TEST_F(ScfTest, AgHBasisSetEcpConversion) {
   // H (atom 1) should have 0 core electrons (no ECP)
   EXPECT_EQ(ecp_electrons[1], 0);
 
-  // Verify the element_ecp_electrons mapping was correctly applied
+  // Verify the total ECP electron count
   // Total electrons: Ag=47, H=1 -> 48 total
   // With ECP: Ag has 28 core electrons removed -> 19 valence
   // So total valence electrons = 19 (Ag) + 1 (H) = 20
@@ -787,14 +1005,14 @@ TEST_F(ScfTest, AgHBasisSetEcpConversion) {
   // Verify the orbital count is consistent with valence electrons
   // With 20 valence electrons and restricted calculation, we expect 10 occupied
   // orbitals
-  auto [coeff_alpha, coeff_beta] = orbitals->get_coefficients();
+  const auto& coeff_alpha =
+      orbitals->coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& coeff_beta =
+      orbitals->coefficients()->block({axes::beta(), axes::beta()});
   EXPECT_EQ(coeff_alpha.rows(), basis_set->get_num_atomic_orbitals());
 }
 
-TEST_F(ScfTest, AgHBasisSetEcpJsonMapping) {
-  // Test element_ecp_electrons mapping in convert_to_json
-  // This validates that the element_ecp_electrons map is correctly built
-  // from per-atom ECP electrons and serialized as a flat list in JSON
+TEST_F(ScfTest, AgHBasisSetEcpJsonRoundTrip) {
   auto agh = testing::create_agh_structure();
   auto scf_solver = ScfSolverFactory::create();
 
@@ -822,60 +1040,9 @@ TEST_F(ScfTest, AgHBasisSetEcpJsonMapping) {
     EXPECT_TRUE(shell_json.contains("coeff"));
   }
 
-  // Verify element_ecp_electrons mapping
-  EXPECT_TRUE(json.contains("element_ecp_electrons"));
-  auto element_ecp_electrons_json = json["element_ecp_electrons"];
-
-  // element_ecp_electrons should be a flat list: [atomic_num1, ecp_elec1,
-  // atomic_num2, ecp_elec2, ...] For AgH: Ag (Z=47) has 28 ECP electrons, H
-  // (Z=1) has 0 (not in map) So the flat list should be: [47, 28]
-  EXPECT_TRUE(element_ecp_electrons_json.is_array());
-  EXPECT_EQ(element_ecp_electrons_json.size(),
-            2);  // One element (Ag) with non-zero ECP
-
-  // Parse the flat list
-  std::map<int, int> element_ecp_map;
-  for (size_t i = 0; i + 1 < element_ecp_electrons_json.size(); i += 2) {
-    int atomic_num = element_ecp_electrons_json[i];
-    int ecp_elec = element_ecp_electrons_json[i + 1];
-    element_ecp_map[atomic_num] = ecp_elec;
-  }
-
-  // Verify Ag (Z=47) has 28 ECP electrons
-  EXPECT_EQ(element_ecp_map.size(), 1);
-  EXPECT_TRUE(element_ecp_map.find(47) != element_ecp_map.end());
-  EXPECT_EQ(element_ecp_map[47], 28);
-
-  // Verify H (Z=1) is NOT in the map (has 0 ECP electrons)
-  EXPECT_TRUE(element_ecp_map.find(1) == element_ecp_map.end());
-
-  // Verify the logic that builds element_ecp_electrons from per-atom vector
-  // Iterating through atoms and filtering non-zero ECP
-  auto ecp_electrons = basis_set->get_ecp_electrons();
-  auto structure = basis_set->get_structure();
-  auto nuclear_charges = structure->get_nuclear_charges();
-
-  // Build the map manually to verify the algorithm
-  std::map<int, int> expected_map;
-  for (size_t i = 0; i < ecp_electrons.size(); ++i) {
-    if (ecp_electrons[i] > 0) {
-      int atomic_num = static_cast<int>(nuclear_charges[i]);
-      expected_map[atomic_num] = static_cast<int>(ecp_electrons[i]);
-    }
-  }
-
-  EXPECT_EQ(expected_map.size(), element_ecp_map.size());
-  EXPECT_EQ(expected_map, element_ecp_map);
-
-  // Verify the flat list serialization
-  std::vector<int> expected_flat_list;
-  for (const auto& [k, v] : expected_map) {
-    expected_flat_list.push_back(k);
-    expected_flat_list.push_back(v);
-  }
-
-  std::vector<int> actual_flat_list = element_ecp_electrons_json;
-  EXPECT_EQ(actual_flat_list, expected_flat_list);
+  EXPECT_TRUE(json.contains("atom_ecp_electrons"));
+  EXPECT_EQ(json["atom_ecp_electrons"], std::vector<size_t>({28, 0}));
+  EXPECT_FALSE(json.contains("element_ecp_electrons"));
 
   // Verify nuclear_charges transformation
   EXPECT_TRUE(json.contains("atoms"));
@@ -902,6 +1069,56 @@ TEST_F(ScfTest, AgHBasisSetEcpJsonMapping) {
   EXPECT_TRUE(json.contains("electron_shells"));
   auto electron_shells_json = json["electron_shells"];
   EXPECT_GT(electron_shells_json.size(), 0);
+
+  auto internal_basis =
+      qdk::chemistry::utils::microsoft::convert_basis_set_from_qdk(*basis_set);
+  auto legacy_json = internal_basis->to_json();
+  legacy_json.erase("atom_ecp_electrons");
+  legacy_json["element_ecp_electrons"] = std::vector<int>({47, 28});
+  auto legacy_basis = qdk::chemistry::scf::BasisSet::from_serialized_json(
+      internal_basis->mol, legacy_json);
+  EXPECT_EQ(legacy_basis->atom_ecp_electrons, std::vector<int>({28, 0}));
+}
+
+TEST_F(ScfTest, SameElementAtomsPreserveDistinctEcpTreatment) {
+  std::vector<Eigen::Vector3d> coordinates = {
+      {0.0, 0.0, 0.0},
+      {5.0, 0.0, 0.0},
+  };
+  std::vector<Element> elements = {Element::Ag, Element::Ag};
+  auto structure = std::make_shared<Structure>(coordinates, elements);
+  auto basis_set = BasisSet::from_index_map(
+      std::map<size_t, std::string>{{0, "def2-svp"}, {1, "ano-rcc"}},
+      structure);
+
+  ASSERT_EQ(basis_set->get_ecp_electrons(), std::vector<size_t>({28, 0}));
+
+  auto json = qdk::chemistry::utils::microsoft::convert_to_json(*basis_set);
+  EXPECT_EQ(json["atom_ecp_electrons"], std::vector<size_t>({28, 0}));
+  EXPECT_FALSE(json.contains("element_ecp_electrons"));
+
+  auto internal_basis =
+      qdk::chemistry::utils::microsoft::convert_basis_set_from_qdk(*basis_set);
+  EXPECT_EQ(internal_basis->atom_ecp_electrons, std::vector<int>({28, 0}));
+  EXPECT_EQ(internal_basis->mol->atomic_charges,
+            std::vector<uint64_t>({19, 47}));
+  EXPECT_EQ(internal_basis->get_n_ecp_electrons(), 28);
+  EXPECT_EQ(internal_basis->mol->n_electrons, 66);
+  EXPECT_FALSE(internal_basis->to_json().contains("element_ecp_electrons"));
+
+  auto round_tripped =
+      qdk::chemistry::utils::microsoft::convert_basis_set_to_qdk(
+          *internal_basis);
+  EXPECT_EQ(round_tripped.get_ecp_electrons(), std::vector<size_t>({28, 0}));
+
+  internal_basis->atom_ecp_electrons[0] = -1;
+  EXPECT_THROW(qdk::chemistry::utils::microsoft::convert_basis_set_to_qdk(
+                   *internal_basis),
+               std::runtime_error);
+  internal_basis->atom_ecp_electrons[0] = 48;
+  EXPECT_THROW(qdk::chemistry::utils::microsoft::convert_basis_set_to_qdk(
+                   *internal_basis),
+               std::runtime_error);
 }
 
 TEST_F(ScfTest, AgHEcpShellIndices) {

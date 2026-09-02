@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <blas.hh>
 #include <iostream>
-#include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
 #include "../utils.hpp"
@@ -21,9 +20,11 @@ std::shared_ptr<data::Wavefunction> PipekMezeyLocalizer::_run_impl(
   QDK_LOG_TRACE_ENTERING();
   auto orbitals = wavefunction->get_orbitals();
 
+  detail::warn_if_not_aufbau_determinant_wavefunction(wavefunction, name());
+
   // If both index vectors are empty, return original orbitals unchanged
   if (loc_indices_a.size() == 0 && loc_indices_b.size() == 0) {
-    return wavefunction;
+    return detail::new_aufbau_determinant_wavefunction(wavefunction, orbitals);
   }
 
   // Early validation: Check that indices are sorted
@@ -95,7 +96,10 @@ std::shared_ptr<data::Wavefunction> PipekMezeyLocalizer::_run_impl(
   };
 
   // Construct the localized orbitals object
-  auto [coeffs_alpha, coeffs_beta] = orbitals->get_coefficients();
+  const auto& coeffs_alpha = orbitals->coefficients()->block(
+      {data::axes::alpha(), data::axes::alpha()});
+  const auto& coeffs_beta =
+      orbitals->coefficients()->block({data::axes::beta(), data::axes::beta()});
 
   if (not orbitals->is_restricted()) {
     // Alpha spin channel - localize selected orbitals
@@ -104,47 +108,26 @@ std::shared_ptr<data::Wavefunction> PipekMezeyLocalizer::_run_impl(
     // Beta spin channel - localize selected orbitals
     Eigen::MatrixXd C_beta = do_loc(coeffs_beta, loc_indices_b);
 
-    // Preserve active space indices from input orbitals if they exist
-    std::optional<data::Orbitals::UnrestrictedCASIndices> unrestricted_indices;
-    if (orbitals->has_active_space()) {
-      auto [active_a, active_b] = orbitals->get_active_space_indices();
-      auto [inactive_a, inactive_b] = orbitals->get_inactive_space_indices();
-      // Order: (active_alpha, active_beta, inactive_alpha, inactive_beta)
-      unrestricted_indices = std::make_tuple(
-          std::vector<size_t>(active_a.begin(), active_a.end()),
-          std::vector<size_t>(active_b.begin(), active_b.end()),
-          std::vector<size_t>(inactive_a.begin(), inactive_a.end()),
-          std::vector<size_t>(inactive_b.begin(), inactive_b.end()));
-    }
-
     auto new_orbitals = std::make_shared<data::Orbitals>(
         C_alpha, C_beta, std::nullopt,
-        std::nullopt,           // no energies for localized orbitals
-        ao_overlap,             // Atomic Orbital overlap
-        basis_set,              // basis set
-        unrestricted_indices);  // preserve active space indices from input
-    return detail::new_wavefunction(wavefunction, new_orbitals);
+        std::nullopt,  // no energies for localized orbitals
+        ao_overlap,    // Atomic Orbital overlap
+        basis_set,     // basis set
+        orbitals->active_indices(), orbitals->inactive_indices());
+    return detail::new_aufbau_determinant_wavefunction(wavefunction,
+                                                       new_orbitals);
   } else {
     // Localize selected orbitals
     Eigen::MatrixXd C_lmo = do_loc(coeffs_alpha, loc_indices_a);
 
-    // Preserve active space indices from input orbitals if they exist
-    std::optional<data::Orbitals::RestrictedCASIndices> restricted_indices;
-    if (orbitals->has_active_space()) {
-      auto [active_a, active_b] = orbitals->get_active_space_indices();
-      auto [inactive_a, inactive_b] = orbitals->get_inactive_space_indices();
-      restricted_indices = std::make_tuple(
-          std::vector<size_t>(active_a.begin(), active_a.end()),
-          std::vector<size_t>(inactive_a.begin(), inactive_a.end()));
-    }
-
     auto new_orbitals = std::make_shared<data::Orbitals>(
         C_lmo,
-        std::nullopt,         // no energies for localized orbitals
-        ao_overlap,           // Atomic Orbital overlap
-        basis_set,            // basis set
-        restricted_indices);  // preserve active space indices from input
-    return detail::new_wavefunction(wavefunction, new_orbitals);
+        std::nullopt,  // no energies for localized orbitals
+        ao_overlap,    // Atomic Orbital overlap
+        basis_set,     // basis set
+        orbitals->active_indices(), orbitals->inactive_indices());
+    return detail::new_aufbau_determinant_wavefunction(wavefunction,
+                                                       new_orbitals);
   }
 }
 
@@ -228,7 +211,7 @@ Eigen::MatrixXd PipekMezeyLocalization::localize(
   const auto tol = this->settings_.get<double>("tolerance");
   const auto AB_tol = this->settings_.get<double>("small_rotation_tolerance");
   size_t i_sweep;
-  for (i_sweep = 0; i_sweep < max_sweeps; ++i_sweep) {
+  for (i_sweep = 0; i_sweep < static_cast<size_t>(max_sweeps); ++i_sweep) {
     // Compute Xi
     Xi.setZero();
     for (auto p = 0; p < num_orbitals; ++p)

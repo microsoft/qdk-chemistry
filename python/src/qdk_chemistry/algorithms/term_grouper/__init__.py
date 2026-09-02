@@ -1,0 +1,41 @@
+"""Term-grouper algorithms for :class:`~qdk_chemistry.data.QubitOperator`.
+
+A *term grouper* takes a :class:`~qdk_chemistry.data.QubitOperator` and
+returns a new one with a populated
+:attr:`~qdk_chemistry.data.QubitOperator.term_partition` that downstream
+algorithms can exploit.
+
+Example:
+    >>> from qdk_chemistry.algorithms import registry
+    >>> grouper = registry.create("term_grouper", "qubit_wise_commuting")
+    >>> grouped = grouper.run(my_hamiltonian)
+    >>> grouped.term_partition  # FlatPartition with strategy="qubit_wise_commuting"
+
+"""
+
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
+from qdk_chemistry.algorithms.term_grouper.base import TermGrouper, TermGrouperFactory, TermGrouperSettings
+from qdk_chemistry.algorithms.term_grouper.commuting import (
+    FullCommutingTermGrouper,
+    QubitWiseCommutingTermGrouper,
+)
+from qdk_chemistry.algorithms.term_grouper.identity import IdentityTermGrouper
+from qdk_chemistry.algorithms.term_grouper.vacuum_annihilating import (
+    VacuumAnnihilatingTermGrouper,
+    VacuumAnnihilatingTermGrouperSettings,
+)
+
+__all__ = [
+    "FullCommutingTermGrouper",
+    "IdentityTermGrouper",
+    "QubitWiseCommutingTermGrouper",
+    "TermGrouper",
+    "TermGrouperFactory",
+    "TermGrouperSettings",
+    "VacuumAnnihilatingTermGrouper",
+    "VacuumAnnihilatingTermGrouperSettings",
+]

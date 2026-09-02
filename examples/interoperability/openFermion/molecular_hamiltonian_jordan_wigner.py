@@ -11,7 +11,7 @@ Demonstrates the round-trip workflow:
    via the OpenFermion plugin, then convert to an OpenFermion ``QubitOperator``
    for exact diagonalisation.
 2. OpenFermion → QDK/Chemistry: take that ``QubitOperator`` and convert it back
-   to a QDK ``QubitHamiltonian``.
+   to a QDK ``QubitOperator``.
 
 This example is adapted from the introduction to OpenFermion tutorial:
 https://quantumai.google/openfermion/tutorials/intro_to_openfermion
@@ -21,6 +21,7 @@ import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import Structure
+from qdk_chemistry.data import MajoranaMapping
 from qdk_chemistry.utils import Logger
 
 # OpenFermion must be installed to run this example.
@@ -74,20 +75,22 @@ Logger.info(f"  SCF total energy: {scf_energy: .8f} Hartree")
 ########################################################################################
 # 3. QDK → OpenFermion: map to qubits via the plugin, then exact-diagonalise
 ########################################################################################
-mapper = create("qubit_mapper", "openfermion", encoding="jordan-wigner")
-qdk_qubit_ham = mapper.run(active_hamiltonian)
+mapper = create("qubit_mapper", "openfermion")
+n_spin_orbitals = 2 * active_hamiltonian.get_orbitals().get_num_molecular_orbitals()
+mapping = MajoranaMapping.jordan_wigner(n_spin_orbitals)
+qdk_qubit_ham = mapper.run(active_hamiltonian, mapping)
 
 Logger.info("=== QDK → OpenFermion (Jordan-Wigner) ===")
 Logger.info(f"  Pauli terms: {len(qdk_qubit_ham.pauli_strings)}")
 
-# Convert QDK QubitHamiltonian → OpenFermion QubitOperator and diagonalise.
+# Convert QDK QubitOperator → OpenFermion QubitOperator and diagonalise.
 qop = qubit_hamiltonian_to_qubit_operator(qdk_qubit_ham)
 sparse = of.linalg.get_sparse_operator(qop)
 energy, _ = of.linalg.get_ground_state(sparse)
 Logger.info(f"  Ground-state energy: {energy: .15f} Hartree")
 
 ########################################################################################
-# 4. OpenFermion → QDK: convert the QubitOperator back to a QDK QubitHamiltonian
+# 4. OpenFermion → QDK: convert the QubitOperator back to a QDK QubitOperator
 ########################################################################################
 qdk_qubit_ham_rt = qubit_operator_to_qubit_hamiltonian(qop, encoding="jordan-wigner")
 

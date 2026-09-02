@@ -14,8 +14,8 @@
 #include <qdk/chemistry/data/settings.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/cc.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 
 #include "ut_common.hpp"
 
@@ -47,11 +47,11 @@ class MockCoupledClusterCalculator : public DynamicalCorrelationCalculator {
     Eigen::VectorXd t2(1);
     t2(0) = 0.005;
 
-    std::optional<CoupledClusterContainer::VectorVariant> t1_opt = t1;
-    std::optional<CoupledClusterContainer::VectorVariant> t2_opt = t2;
+    std::optional<AmplitudeContainer::VectorVariant> t1_opt = t1;
+    std::optional<AmplitudeContainer::VectorVariant> t2_opt = t2;
 
-    auto cc_container = std::make_unique<CoupledClusterContainer>(
-        orbs, original_wfn, t1_opt, t2_opt);
+    auto cc_container = std::make_unique<AmplitudeContainer>(
+        orbs, original_wfn, AmplitudeType::CoupledCluster, t1_opt, t2_opt);
 
     // Create wavefunction with CC container
     auto result_wfn = std::make_shared<Wavefunction>(std::move(cc_container));
@@ -93,8 +93,8 @@ TEST(CoupledClusterCalculatorTest, Calculate) {
   // Create a dummy Orbitals object for testing
   Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(2, 2);
   auto basis = testing::create_random_basis_set(2);
-  auto dummy_orbitals = std::make_shared<Orbitals>(
-      coeffs, std::nullopt, std::nullopt, basis, std::nullopt);
+  auto dummy_orbitals =
+      std::make_shared<Orbitals>(coeffs, std::nullopt, std::nullopt, basis);
 
   // Create a dummy Hamiltonian for testing
   Eigen::MatrixXd empty_one_body = Eigen::MatrixXd::Zero(2, 2);
@@ -105,8 +105,8 @@ TEST(CoupledClusterCalculatorTest, Calculate) {
           empty_one_body, empty_two_body, dummy_orbitals, 0.0, empty_fock));
 
   // Perform calculation with electron counts
-  Wavefunction wfn(std::make_unique<SlaterDeterminantContainer>(
-      Configuration("20"), dummy_orbitals));
+  Wavefunction wfn(std::make_unique<StateVectorContainer>(
+      Configuration::from_spin_half_string("20"), dummy_orbitals));
   auto ansatz_ptr =
       std::make_shared<Ansatz>(std::move(hamiltonian), std::move(wfn));
   auto [energy, result_wavefunction, bra_wavefunction] =
@@ -118,8 +118,7 @@ TEST(CoupledClusterCalculatorTest, Calculate) {
   EXPECT_FALSE(bra_wavefunction.has_value());
 
   // Test that we can get the amplitudes from the wavefunction container
-  auto& cc_container =
-      result_wavefunction->get_container<CoupledClusterContainer>();
+  auto& cc_container = result_wavefunction->get_container<AmplitudeContainer>();
   EXPECT_TRUE(cc_container.has_t1_amplitudes());
   EXPECT_TRUE(cc_container.has_t2_amplitudes());
 }

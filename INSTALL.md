@@ -51,7 +51,7 @@ If you prefer a minimal install (core library only, no optional backends):
 python3 -m pip install qdk-chemistry
 ```
 
-> **NOTE:** The `all` and `qiskit-extras` extras are not supported on Python 3.14 because Qiskit does not yet publish Python 3.14 wheels. See the [Optional Extras](#optional-extras) table below for details and alternative install targets.
+> **NOTE:** On Python 3.14, `qiskit-aer` is omitted from the `qiskit-extras` and `all` extras on Linux ARM64 (aarch64), because Qiskit does not yet publish a Python 3.14 wheel for that platform. All other platforms (Linux x86_64, macOS, Windows) install the full set. See the [Optional Extras](#optional-extras) table below for details.
 
 ### Step 3: Verify the installation
 
@@ -84,8 +84,15 @@ If you chose the minimal `pip install qdk-chemistry` above, you can add specific
 | `plugins` | Third-party quantum chemistry backends | PySCF |
 | `qiskit-extras` | Qiskit ecosystem packages | qiskit, qiskit-aer, qiskit-nature |
 | `openfermion-extras` | OpenFermion ecosystem packages | openfermion |
+| `networkx-extras` | NetworkX ecosystem packages | networkx |
+| `docs` | [Sphinx documentation build tools](docs/README.md) | sphinx, sphinx-rtd-theme, myst-parser, breathe, sphinx-autodoc-typehints, sphinx-inline-tabs, sphinxcontrib-napoleon, sphinxcontrib-bibtex, sphinx_copybutton |
+| `qre` | Quantum Resource Estimator support | qdk[qre,jupyter]>=1.30.0 |
 | `dev` | Development and testing tools | pytest, ruff, mypy, and related tooling |
+| `test` | Testing tools and optional runtime dependencies; does not include `docs` | qdk-chemistry[coverage,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre], nbclient, nbformat, pennylane, rdkit, requests>=2.33.0 |
 | `all` | **All of the above** | All optional dependencies |
+
+Building the documentation also requires the system packages Doxygen and
+Graphviz. See the [documentation build instructions](docs/README.md).
 
 Install one or more extras with:
 
@@ -122,6 +129,31 @@ Alternatively, click the green button in the bottom-left corner of VS Code and s
 ### Step 3: Restart VS Code
 
 After the initial build, restart VS Code and reopen in the container to ensure the Python virtual environment is properly loaded.
+
+### Step 4: Develop
+
+The dev container installs the Python package in editable mode, so changes to pure Python files are available immediately. After changing pybind11 sources, rebuild the Python package:
+
+```bash
+python -m pip install --no-build-isolation --check-build-dependencies --no-deps \
+  -C build-dir="build/{wheel_tag}" -e ./python
+```
+
+After changing the C++ library, build and install it before rebuilding the Python bindings:
+
+```bash
+cmake --build cpp/build --target chemistry
+cmake --install cpp/build
+python -m pip install --no-build-isolation --check-build-dependencies --no-deps \
+  -C build-dir="build/{wheel_tag}" -e ./python
+```
+
+Build only the relevant C++ test target during development, then run its tests from the directory where CTest registers them. For example:
+
+```bash
+cmake --build cpp/build --target test_algorithm_hash
+ctest --test-dir cpp/build/tests --output-on-failure -R AlgorithmHash
+```
 
 **NOTE:**
 
@@ -217,9 +249,11 @@ Build from source if you need to modify the C++ core, work with unreleased featu
 
 **Linux**: A Debian-based distribution is recommended for the broadest package availability. Other distributions may require building some dependencies (e.g. Eigen3, nlohmann-json) from source.
 
-**Windows**: Native Windows builds are not supported. Use the [Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/en-us/windows/wsl/install) instead.
+**Windows**: Native Windows builds (MSVC / clang-cl with vcpkg) are **experimental** and in active development. Helper scripts are available under [`.pipelines/windows/`](.pipelines/windows/). For a fully supported build, use the [Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/en-us/windows/wsl/install) instead.
 
 **macOS**: The latest version of [Xcode](https://apps.apple.com/us/app/xcode/id497799835?mt=12) must be installed.
+
+> **NOTE:** QDK/Chemistry requires a **64-bit** platform.
 
 ### Step 2: Install system dependencies
 

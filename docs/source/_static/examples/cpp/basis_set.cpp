@@ -3,6 +3,7 @@
 // license information.
 
 // Basis Set usage examples.
+#include <cassert>
 #include <qdk/chemistry.hpp>
 using namespace qdk::chemistry::data;
 
@@ -32,9 +33,18 @@ int main() {
 
   // --------------------------------------------------------------------------------------------
   // start-cell-loading-with-aux
-  // Load a primary basis set with an auxiliary basis set for density fitting
-  auto basis_with_aux =
-      BasisSet::from_basis_name("def2-svp", "def2-universal-jfit", structure);
+  // Build the primary and auxiliary inputs independently
+  auto primary_basis = BasisSet::from_basis_name("def2-svp", structure);
+  auto auxiliary_structure = std::make_shared<Structure>(structure);
+  auto aux_basis = AuxiliaryBasis::from_basis_name("def2-universal-jfit",
+                                                   auxiliary_structure);
+  auto named_auxiliary_bases = std::make_shared<AuxiliaryBasisCollection>(
+      AuxiliaryBasisCollection::Map{{AuxiliaryBasisRole::JFit, aux_basis}});
+
+  assert(named_auxiliary_bases->get_auxiliary_basis(AuxiliaryBasisRole::JFit) ==
+         aux_basis);
+  assert(primary_basis->get_structure()->content_hash() ==
+         aux_basis->get_structure()->content_hash());
   // end-cell-loading-with-aux
   // --------------------------------------------------------------------------------------------
 
@@ -78,6 +88,11 @@ int main() {
   size_t num_shells = basis_set.get_num_shells();
   size_t num_atomic_orbitals = basis_set.get_num_atomic_orbitals();
   size_t num_atoms = basis_set.get_num_atoms();
+
+  // Get ECP-adjusted nuclear properties
+  Eigen::VectorXd effective_charges = basis_set.get_effective_nuclear_charges();
+  double effective_nuclear_repulsion =
+      basis_set.calculate_effective_nuclear_repulsion_energy();
 
   // Get atomic orbital information (returns std::pair<size_t, int>)
   auto [shell_index, m_quantum_number] = basis_set.get_atomic_orbital_info(2);
@@ -172,50 +187,28 @@ int main() {
   // --------------------------------------------------------------------------------------------
 
   // --------------------------------------------------------------------------------------------
-  // start-cell-ecp
-  // Create an ECP shell with radial powers (r^n terms)
-  Eigen::VectorXd ecp_exp(2), ecp_coeff(2);
-  Eigen::VectorXi ecp_rpow(2);
-  ecp_exp << 10.0, 5.0;
-  ecp_coeff << 50.0, 20.0;
-  ecp_rpow << 0, 2;
-  Shell ecp_shell(0, OrbitalType::S, ecp_exp, ecp_coeff, ecp_rpow);
-
-  // Create a basis set with ECP data
-  std::vector<Shell> ecp_shells = {ecp_shell};
-  std::vector<size_t> ecp_electrons = {28, 0, 0};
-  BasisSet basis_with_ecp("my-basis", shells, "my-ecp", ecp_shells,
-                          ecp_electrons, structure);
-
-  // Query ECP data
-  bool has_ecp = basis_with_ecp.has_ecp_shells();
-  std::string ecp_name = basis_with_ecp.get_ecp_name();
-  size_t num_ecp_shells = basis_with_ecp.get_num_ecp_shells();
-  // end-cell-ecp
-  // --------------------------------------------------------------------------------------------
-
-  // --------------------------------------------------------------------------------------------
   // start-cell-auxiliary
-  // Create auxiliary shells for density fitting
+  // Create custom auxiliary shells
   std::vector<Shell> aux_shells;
   aux_shells.emplace_back(0, OrbitalType::S, std::vector{5.0},
                           std::vector{2.0});
   aux_shells.emplace_back(1, OrbitalType::S, std::vector{4.0},
                           std::vector{1.5});
 
-  // Construct a basis set with a named auxiliary basis
-  BasisSet basis_with_aux_manual("my-basis", shells, "my-aux-fit", aux_shells,
-                                 structure);
+  // Construct a named auxiliary basis for this molecular structure
+  auto auxiliary_basis = std::make_shared<AuxiliaryBasis>(
+      "my-aux-fit", aux_shells, auxiliary_structure);
+  AuxiliaryBasisCollection custom_auxiliary_bases(
+      {{AuxiliaryBasisRole::RIFit, auxiliary_basis}});
 
   // Query auxiliary data
-  bool has_aux = basis_with_aux_manual.has_aux_basis();
-  std::string aux_name = basis_with_aux_manual.get_aux_name();
-  size_t num_aux = basis_with_aux_manual.get_num_aux_shells();
+  auto stored_aux =
+      custom_auxiliary_bases.get_auxiliary_basis(AuxiliaryBasisRole::RIFit);
+  std::string aux_name = stored_aux->get_name();
+  size_t num_aux = stored_aux->get_num_shells();
 
   // Retrieve auxiliary shell data
-  auto all_aux_shells = basis_with_aux_manual.get_aux_shells();
-  const Shell& aux_s = basis_with_aux_manual.get_aux_shell(0);
-  const auto& atom0_aux = basis_with_aux_manual.get_aux_shells_for_atom(0);
+  auto all_aux_shells = stored_aux->get_shells();
   // end-cell-auxiliary
   // --------------------------------------------------------------------------------------------
 

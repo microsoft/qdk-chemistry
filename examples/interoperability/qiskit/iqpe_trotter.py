@@ -25,7 +25,7 @@ except ImportError as ex:
 from qdk_chemistry.algorithms import (
     create,
 )
-from qdk_chemistry.data import AlgorithmRef, Circuit, Structure
+from qdk_chemistry.data import AlgorithmRef, Circuit, MajoranaMapping, Structure
 from qdk_chemistry.utils import Logger
 
 Logger.set_global_level("info")
@@ -80,8 +80,11 @@ Logger.info(f"  CASCI total energy: {casci_energy: .8f} Hartree")
 ########################################################################################
 # 3. Preparing the qubit Hamiltonian and sparse-isometry trial state
 ########################################################################################
-qubit_mapper = create("qubit_mapper", "qiskit", encoding="jordan-wigner")
-qubit_hamiltonian = qubit_mapper.run(active_hamiltonian)
+qubit_mapper = create("qubit_mapper", "qiskit")
+n_spin_orbitals = 2 * active_hamiltonian.get_orbitals().get_num_molecular_orbitals()
+qubit_hamiltonian = qubit_mapper.run(
+    active_hamiltonian, MajoranaMapping.jordan_wigner(n_spin_orbitals)
+)
 
 qubit_pauli_op = SparsePauliOp(
     qubit_hamiltonian.pauli_strings, qubit_hamiltonian.coefficients
@@ -94,7 +97,7 @@ E_sparse, sparse_wavefunction = pmc.run(
     active_hamiltonian, list(top_configurations.keys())
 )
 
-sparse_state_prep = create("state_prep", algorithm_name="sparse_isometry_gf2x")
+sparse_state_prep = create("state_prep", algorithm_name="sparse_isometry")
 state_prep = sparse_state_prep.run(sparse_wavefunction).get_qiskit_circuit()
 state_prep = transpile(
     state_prep,
@@ -113,21 +116,26 @@ Logger.info(
 ########################################################################################
 iqpe = create(
     "phase_estimation",
-    "iterative",
-    num_bits=M_PRECISION,
+    "qdk_iterative",
     shots_per_bit=SHOTS_PER_BIT,
+)
+iqpe.settings().set(
+    "qpe_circuit_builder",
+    AlgorithmRef(
+        "qpe_circuit_builder",
+        "qiskit_iterative",
+        num_bits=M_PRECISION,
+        controlled_circuit_mapper=AlgorithmRef(
+            "controlled_circuit_mapper", "pauli_sequence"
+        ),
+        unitary_builder=AlgorithmRef(
+            "hamiltonian_unitary_builder", "trotter", time=T_TIME
+        ),
+    ),
 )
 iqpe.settings().set(
     "circuit_executor",
     AlgorithmRef("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED),
-)
-iqpe.settings().set(
-    "unitary_builder",
-    AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=T_TIME),
-)
-iqpe.settings().set(
-    "circuit_mapper",
-    AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
 )
 
 
@@ -147,11 +155,7 @@ result = iqpe.run(
 
 phase_angle_measured = result.phase_angle
 phase_angle_canonical = result.canonical_phase_angle
-raw_energy = result.raw_energy
-candidate_energies = result.branching
-estimated_electronic_energy = (
-    result.resolved_energy if result.resolved_energy is not None else raw_energy
-)
+estimated_electronic_energy = result.raw_energy
 estimated_total_energy = estimated_electronic_energy + core_energy
 
 Logger.info(f"Measured bits (MSB → LSB): {list(result.bits_msb_first or [])}")
@@ -162,10 +166,6 @@ if not np.isclose(result.phase_fraction, result.canonical_phase_fraction):
     Logger.info(
         f"Canonical phase fraction φ: {result.canonical_phase_fraction:.6f} (angle = {phase_angle_canonical:.6f} rad)",
     )
-Logger.info(f"Raw energy_from_phase output: {raw_energy:+.8f} Hartree")
-Logger.info("Candidate energies (alias checks):")
-for energy in candidate_energies:
-    Logger.info(f"  E = {energy:+.8f} Hartree")
 Logger.info(f"Estimated electronic energy: {estimated_electronic_energy:.8f} Hartree")
 Logger.info(f"Estimated total energy: {estimated_total_energy:.8f} Hartree")
 Logger.info(f"Reference total energy (CASCI): {casci_energy:.8f} Hartree")

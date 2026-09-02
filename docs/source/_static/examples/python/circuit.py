@@ -8,9 +8,10 @@
 ################################################################################
 # start-cell-qsharp-workflow
 import json
+from pathlib import Path
 
 import qdk
-import qsharp
+from qdk import qsharp
 from qdk_chemistry.data import Circuit
 from qdk_chemistry.data.circuit import QsharpFactoryData
 
@@ -88,6 +89,87 @@ circuit.get_qir()  # → qsharp.compile(program, **params)
 ################################################################################
 
 ################################################################################
+# start-cell-byo-operation
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
+from qdk_chemistry.data.circuit import QsharpFactoryData
+from qdk_chemistry.utils.qsharp import get_qsharp_context
+
+# get_qsharp_context() returns the context QDK/Chemistry uses internally. Define your
+# own Q# operation against it so it composes with the chemistry builders.
+context = get_qsharp_context()
+context.eval(
+    "operation BellState(qs : Qubit[]) : Unit is Adj + Ctl { H(qs[0]); CNOT(qs[0], qs[1]); }"
+)
+bell_state = context.eval("BellState")
+custom_state_prep = Circuit(
+    qsharp_op=bell_state,
+    qsharp_factory=QsharpFactoryData(program=bell_state, parameter={}),
+)
+
+# Feed the user-defined state prep straight into the standard QPE builder.
+builder = create("qpe_circuit_builder", "qdk_standard", num_bits=2)
+builder.settings().set(
+    "controlled_circuit_mapper",
+    AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+)
+builder.settings().set(
+    "unitary_builder", AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=1.0)
+)
+hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
+qpe_circuit = builder.run(
+    state_preparation=custom_state_prep, qubit_hamiltonian=hamiltonian
+)[0]
+qpe_circuit.get_qsharp_circuit()
+# end-cell-byo-operation
+################################################################################
+
+################################################################################
+# start-cell-byo-context
+from qdk import TargetProfile
+from qdk_chemistry.utils.qsharp import (
+    create_qsharp_context,
+    get_qsharp_context,
+    use_qsharp_context,
+)
+
+# create_qsharp_context forwards target_profile (and any other qdk.Context kwargs)
+# while keeping the Q# chemistry utilities loaded on the project root.
+custom_context = create_qsharp_context(target_profile=TargetProfile.Adaptive_RIF)
+
+# use_qsharp_context temporarily makes it the shared context on this thread, so the
+# chemistry utilities and your own operations both resolve against it inside the block.
+with use_qsharp_context(custom_context):
+    context = get_qsharp_context()  # -> custom_context
+    context.eval(
+        "operation BellState(qs : Qubit[]) : Unit is Adj + Ctl { H(qs[0]); CNOT(qs[0], qs[1]); }"
+    )
+    bell_state = context.eval("BellState")
+    custom_state_prep = Circuit(
+        qsharp_op=bell_state,
+        qsharp_factory=QsharpFactoryData(program=bell_state, parameter={}),
+    )
+    builder = create("qpe_circuit_builder", "qdk_standard", num_bits=2)
+    builder.settings().set(
+        "controlled_circuit_mapper",
+        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+    )
+    builder.settings().set(
+        "unitary_builder",
+        AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=1.0),
+    )
+    hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
+    qpe_circuit = builder.run(
+        state_preparation=custom_state_prep, qubit_hamiltonian=hamiltonian
+    )[0]
+    qpe_circuit.get_qsharp_circuit()
+
+# For a permanent, process-wide switch use set_qsharp_context(custom_context) instead,
+# and set_qsharp_context(None) to restore the default.
+# end-cell-byo-context
+################################################################################
+
+################################################################################
 # start-cell-conversion
 import numpy as np
 from qdk_chemistry.algorithms import create
@@ -104,7 +186,7 @@ ham = create("hamiltonian_constructor").run(wfn.get_orbitals())
 _, wfn_cas = create("multi_configuration_calculator").run(ham, 1, 1)
 
 # StatePreparation produces a Circuit with a native Q# factory
-state_prep = create("state_prep", "sparse_isometry_gf2x")
+state_prep = create("state_prep", "sparse_isometry")
 circuit = state_prep.run(wfn_cas)
 
 # Inspect the Q# circuit (prune unused qubits for clarity)
@@ -142,4 +224,6 @@ circuit.to_hdf5_file("example_circuit.circuit.h5")
 # Load from HDF5
 loaded_h5 = Circuit.from_hdf5_file("example_circuit.circuit.h5")
 # end-cell-serialization
+Path("example_circuit.circuit.json").unlink(missing_ok=True)
+Path("example_circuit.circuit.h5").unlink(missing_ok=True)
 ################################################################################

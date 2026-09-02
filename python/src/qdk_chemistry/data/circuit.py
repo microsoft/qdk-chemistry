@@ -18,13 +18,24 @@ from dataclasses import dataclass
 from typing import Any
 
 import h5py
-import qsharp._native
-import qsharp.estimator
-import qsharp.openqasm
-from qsharp.openqasm import OutputSemantics
+from qdk import TargetProfile, qsharp
+from qdk.estimator import EstimatorParams, EstimatorResult
+from qdk.openqasm import OutputSemantics
+from qdk.openqasm import circuit as openqasm_circuit
+from qdk.openqasm import compile as openqasm_compile
+from qdk.openqasm import estimate as openqasm_estimate
 
+from qdk_chemistry.data._hashing import _hash_optional, _hash_str, _hash_uint
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.utils import Logger
+from qdk_chemistry.utils.qsharp import get_qsharp_context
+
+try:
+    from qdk._interpreter import QirInputData
+    from qdk._native import Circuit as QdkCircuitType
+except ImportError:
+    from qsharp._native import Circuit as QdkCircuitType
+    from qsharp._qsharp import QirInputData
 
 __all__: list[str] = ["QsharpFactoryData"]
 
@@ -43,21 +54,29 @@ class QsharpFactoryData:
 class Circuit(DataClass):
     """Data class for a quantum circuit."""
 
-    # Class attribute for filename validation
-    _data_type_name = "circuit"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for circuits.
 
-    # Serialization version for this class
-    _serialization_version = "0.1.0"
+        Returns:
+            ``"circuit"``.
+
+        """
+        return "circuit"
+
+    # Serialization version for this class.
+    _serialization_version = "0.1.1"
 
     # Use keyword arguments to be future-proof
     def __init__(
         self,
         qasm: str | None = None,
-        qir: qsharp._qsharp.QirInputData | str | None = None,
-        qsharp: qsharp._native.Circuit | None = None,
+        qir: QirInputData | str | None = None,
+        qsharp: QdkCircuitType | None = None,
         qsharp_op: Callable[..., Any] | None = None,
         qsharp_factory: QsharpFactoryData | None = None,
         encoding: str | None = None,
+        num_qubits: int | None = None,
     ) -> None:
         """Initialize a Circuit.
 
@@ -70,6 +89,9 @@ class Circuit(DataClass):
             encoding: The fermion-to-qubit encoding assumed by this circuit.
                 Valid values include "jordan-wigner", "bravyi-kitaev", "parity", or None.
                 Defaults to None.
+            num_qubits: The width of the register ``qsharp_op`` acts on, when the producer
+                knows it. Scratch qubits a circuit allocates internally are not counted.
+                Defaults to None.
 
         Notes:
             At least one representation (qasm, qir, qsharp, or qsharp_factory) must be provided.
@@ -79,6 +101,9 @@ class Circuit(DataClass):
             - get_qsharp_circuit(): Returns Q# circuit if available, otherwise converts from qasm
             - get_qiskit_circuit(): Converts from qir if available, otherwise converts from qasm
 
+        Raises:
+            ValueError: If ``num_qubits`` is negative.
+
         """
         Logger.trace_entering()
         self.qasm = qasm
@@ -87,6 +112,9 @@ class Circuit(DataClass):
         self._qsharp_factory = qsharp_factory
         self._qsharp_op = qsharp_op
         self.encoding = encoding
+        if num_qubits is not None and num_qubits < 0:
+            raise ValueError(f"num_qubits must be non-negative. Got {num_qubits}.")
+        self.num_qubits = num_qubits
 
         # Check that a representation of the quantum circuit is given by the keyword arguments
         if not any([self.qasm, self.qsharp, self.qir, self._qsharp_factory]):
@@ -133,7 +161,7 @@ class Circuit(DataClass):
         qir = self.get_qir()
         return qasm3.dumps(qir_ir_to_qiskit(str(qir)))
 
-    def get_qir(self) -> qsharp._qsharp.QirInputData | str:
+    def get_qir(self) -> QirInputData | str:
         """Get QIR representation of the quantum circuit.
 
         Returns:
@@ -150,16 +178,19 @@ class Circuit(DataClass):
                 Logger.warn("Both QIR and QASM representations are available. Return QIR.")
             return self.qir
         if self._qsharp_factory and self.qir is None:
-            compiled_qir = qsharp.compile(self._qsharp_factory.program, *self._qsharp_factory.parameter.values())
+            context = getattr(self._qsharp_factory.program, "_qdk_context", qsharp)
+            compiled_qir = context.compile(self._qsharp_factory.program, *self._qsharp_factory.parameter.values())
             # Cache the compiled qir if qir is not already set
             object.__setattr__(self, "qir", compiled_qir)
             return compiled_qir
         if self.qasm:
-            return qsharp.openqasm.compile(self.qasm, output_semantics=OutputSemantics.OpenQasm)
+            return openqasm_compile(
+                self.qasm, output_semantics=OutputSemantics.OpenQasm, target_profile=TargetProfile.Base
+            )
 
         raise RuntimeError("The QIR representation of the quantum circuit is not set.")
 
-    def get_qsharp_circuit(self, prune_classical_qubits: bool = False) -> qsharp._native.Circuit:
+    def get_qsharp_circuit(self, prune_classical_qubits: bool = False) -> QdkCircuitType:
         """Parse a Circuit object into a Q# circuit object.
 
         Args:
@@ -167,7 +198,7 @@ class Circuit(DataClass):
                 when converting from Q# factory data.
 
         Returns:
-            qsharp._native.Circuit: A Q# Circuit object.
+            QdkCircuitType: A Q# Circuit object.
 
         Raises:
             RuntimeError: If the circuit cannot be converted to Q# format.
@@ -183,42 +214,85 @@ class Circuit(DataClass):
                 Logger.warn("Both Q# and QASM representations are available. Return Q# circuit.")
             return self.qsharp
         if self._qsharp_factory and self.qsharp is None:
-            return qsharp.circuit(
+            context = getattr(self._qsharp_factory.program, "_qdk_context", qsharp)
+            return context.circuit(
                 self._qsharp_factory.program,
                 *self._qsharp_factory.parameter.values(),
                 prune_classical_qubits=prune_classical_qubits,
             )
         if self.qasm:
-            return qsharp.openqasm.circuit(self.qasm)
+            return openqasm_circuit(self.qasm)
 
         raise RuntimeError("The quantum circuit is not set in a Q# format.")
 
     def estimate(
         self,
-        params: dict[str, Any] | list[Any] | qsharp.estimator.EstimatorParams | None = None,
-    ) -> qsharp.estimator.EstimatorResult:
+        params: dict[str, Any] | list[Any] | EstimatorParams | None = None,
+    ) -> EstimatorResult:
         """Estimate resources for the quantum circuit.
 
         Args:
             params: Resource estimation parameters. Accepts a dict, list, or ``qsharp.estimator.EstimatorParams``.
 
         Returns:
-            qsharp.estimator.EstimatorResult: The estimated resources.
+            The estimated resources.
 
         Raises:
             RuntimeError: If no suitable circuit representation is available for estimation.
 
         """
         if self._qsharp_factory is not None:
-            return qsharp.estimate(
+            context = getattr(self._qsharp_factory.program, "_qdk_context", qsharp)
+            logical_counts = context.logical_counts(
                 self._qsharp_factory.program,
-                params,
                 *self._qsharp_factory.parameter.values(),
             )
-        if self.qasm is not None:
-            return qsharp.openqasm.estimate(self.qasm, params)
+            result = logical_counts.estimate(params)
+        elif self.qasm is not None:
+            result = openqasm_estimate(self.qasm, params)
+        else:
+            raise RuntimeError("Cannot estimate resources: no Q# factory data or QASM representation is available.")
 
-        raise RuntimeError("Cannot estimate resources: no Q# factory data or QASM representation is available.")
+        estimated_num_qubits = getattr(result, "logical_counts", {}).get("numQubits")
+        if self.num_qubits is not None and estimated_num_qubits is not None and estimated_num_qubits != self.num_qubits:
+            Logger.warn(
+                f"This circuit declares {self.num_qubits} qubits but the resource estimate reports "
+                f"{estimated_num_qubits}; num_qubits is updated to {estimated_num_qubits}."
+            )
+            object.__setattr__(self, "num_qubits", estimated_num_qubits)
+        return result
+
+    def get_qre_application(self):
+        """Convert the circuit to a ``qdk.qre`` Application for resource estimation.
+
+        Returns a ``QSharpApplication``, ``OpenQASMApplication``, or ``QIRApplication``
+        depending on the available circuit representation.
+
+        Returns:
+            A ``qdk.qre`` Application instance suitable for passing to ``qdk.qre.estimate()``.
+
+        Raises:
+            RuntimeError: If qdk.qre is not installed or no suitable representation is available.
+
+        """
+        try:
+            from qdk.qre.application import OpenQASMApplication, QIRApplication, QSharpApplication  # noqa: PLC0415
+        except ImportError as err:
+            raise RuntimeError(
+                "qdk.qre is not available. Install QRE dependencies with: pip install 'qdk-chemistry[qre]'"
+            ) from err
+
+        if self._qsharp_factory is not None:
+            return QSharpApplication(
+                self._qsharp_factory.program,
+                args=tuple(self._qsharp_factory.parameter.values()),
+            )
+        if self.qasm is not None:
+            return OpenQASMApplication(self.qasm)
+        if self.qir is not None:
+            return QIRApplication(str(self.qir))
+
+        raise RuntimeError("Cannot create QRE application: no Q# factory, QASM, or QIR representation is available.")
 
     def get_qiskit_circuit(self):
         """Convert the Circuit to a Qiskit QuantumCircuit.
@@ -251,6 +325,12 @@ class Circuit(DataClass):
             if self.qasm:
                 Logger.warn("Both QIR and QASM representations are available. Convert from QIR.")
             result = qir_ir_to_qiskit(str(self.get_qir()))
+            if result.num_clbits > 0 and (profile := get_qsharp_context().get_target_profile()) != TargetProfile.Base:
+                Logger.warn(
+                    f"The {profile} target profile produced a circuit with {result.num_clbits} classical bits. "
+                    f"Classically controlled operations might fail; consider switching to the Base profile "
+                    f"with use_qsharp_context(create_qsharp_context(TargetProfile.Base))."
+                )
         elif self.qasm:
             result = qasm3.loads(self.qasm)
         else:
@@ -273,7 +353,28 @@ class Circuit(DataClass):
             lines.append(f"  QASM string: {self.qasm}")
         if self.encoding is not None:
             lines.append(f"  Encoding: {self.encoding}")
+        if self.num_qubits is not None:
+            lines.append(f"  Number of qubits: {self.num_qubits}")
         return "\n".join(lines)
+
+    def _hash_update(self, h) -> None:
+        """Feed identifying data into the hasher."""
+        _hash_str(h, "circuit")
+        if self.qasm is not None:
+            _hash_str(h, "qasm")
+            _hash_str(h, self.qasm)
+        elif self.qir is not None:
+            _hash_str(h, "qir")
+            _hash_str(h, str(self.qir))
+        elif self.qsharp is not None:
+            _hash_str(h, "qsharp")
+            _hash_str(h, self.qsharp.json())
+        elif self._qsharp_factory is not None:
+            # Deterministically identify factory-based circuits by hashing the compiled QIR.
+            _hash_str(h, "qsharp_factory_qir")
+            _hash_str(h, str(self.get_qir()))
+        _hash_optional(h, self.encoding, _hash_str)
+        _hash_optional(h, self.num_qubits, _hash_uint)
 
     def to_json(self) -> dict[str, Any]:
         """Convert the Circuit to a dictionary for JSON serialization.
@@ -289,6 +390,8 @@ class Circuit(DataClass):
             data["qir"] = str(self.get_qir())
         if self.encoding is not None:
             data["encoding"] = self.encoding
+        if self.num_qubits is not None:
+            data["num_qubits"] = self.num_qubits
         return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
@@ -305,6 +408,8 @@ class Circuit(DataClass):
             group.attrs["qir"] = str(self.get_qir())
         if self.encoding is not None:
             group.attrs["encoding"] = self.encoding
+        if self.num_qubits is not None:
+            group.attrs["num_qubits"] = self.num_qubits
 
     @classmethod
     def from_json(cls, json_data: dict[str, Any]) -> "Circuit":
@@ -325,6 +430,7 @@ class Circuit(DataClass):
             qasm=json_data.get("qasm"),
             qir=json_data.get("qir"),
             encoding=json_data.get("encoding"),
+            num_qubits=json_data.get("num_qubits"),
         )
 
     @classmethod
@@ -346,8 +452,10 @@ class Circuit(DataClass):
         # Decode encoding if it's stored as bytes (HDF5 behavior can vary)
         if encoding is not None and isinstance(encoding, bytes):
             encoding = encoding.decode("utf-8")
+        num_qubits = group.attrs.get("num_qubits")
         return cls(
             qasm=group.attrs.get("qasm"),
             qir=group.attrs.get("qir"),
             encoding=encoding,
+            num_qubits=None if num_qubits is None else int(num_qubits),
         )

@@ -11,12 +11,12 @@ from qdk_chemistry.data import (
     Ansatz,
     BasisSet,
     CanonicalFourCenterHamiltonianContainer,
-    CasWavefunctionContainer,
     Configuration,
     Hamiltonian,
     Orbitals,
     OrbitalType,
     Shell,
+    StateVectorContainer,
     Structure,
     Wavefunction,
 )
@@ -208,11 +208,11 @@ def create_test_wavefunction(num_orbitals: int = 2):
 
     # Create single determinant configuration (e.g., "20" for 2 electrons in first orbital)
     config_string = "2" + "0" * (num_orbitals - 1)
-    det = Configuration(config_string)
+    det = Configuration.from_spin_half_string(config_string)
 
     # Single determinant with coefficient 1.0
     coeffs = np.array([1.0])
-    container = CasWavefunctionContainer(coeffs, [det], orbitals)
+    container = StateVectorContainer(coeffs, [det], orbitals)
 
     return Wavefunction(container)
 
@@ -239,11 +239,104 @@ def create_test_ansatz(num_orbitals: int = 2):
     # Create wavefunction using the same shared orbitals
     # Create single determinant configuration (e.g., "20" for 2 electrons in first orbital)
     config_string = "2" + "0" * (num_orbitals - 1)
-    det = Configuration(config_string)
+    det = Configuration.from_spin_half_string(config_string)
 
     # Single determinant with coefficient 1.0
     coeffs = np.array([1.0])
-    container = CasWavefunctionContainer(coeffs, [det], orbitals)
+    container = StateVectorContainer(coeffs, [det], orbitals)
     wavefunction = Wavefunction(container)
 
     return Ansatz(hamiltonian, wavefunction)
+
+
+def create_random_bitstring_matrix(
+    n_electrons: int,
+    n_orbitals: int,
+    n_dets: int,
+    seed: int = 0,
+) -> np.ndarray:
+    """Generate a random bitstring matrix for sparse isometry testing.
+
+    Args:
+        n_electrons: Total number of electrons.
+        n_orbitals: Number of spatial orbitals.
+        n_dets: Target number of determinants (columns).
+        seed: Random seed for reproducibility.
+
+    Returns:
+        Binary matrix of shape ``(2 * n_orbitals, n_dets)`` where rows are
+        qubits and columns are determinants.
+
+    """
+    n_alpha = n_electrons // 2
+    n_beta = n_electrons - n_alpha
+    rng = np.random.default_rng(seed)
+
+    hf_config = Configuration.canonical_hf_configuration(n_alpha, n_beta, n_orbitals)
+    alpha_bits, beta_bits = hf_config.to_binary_strings(n_orbitals)
+    hf = np.array([int(bit) for bit in alpha_bits + beta_bits], dtype=np.int8)
+
+    seen: set[bytes] = {hf.tobytes()}
+    dets = [hf]
+    for _ in range(n_dets * 200):
+        if len(dets) >= n_dets:
+            break
+        new_det = hf.copy()
+        for channel_start in (0, n_orbitals):
+            channel = hf[channel_start : channel_start + n_orbitals]
+            occupied = np.where(channel == 1)[0]
+            virtual = np.where(channel == 0)[0]
+            if len(occupied) == 0 or len(virtual) == 0:
+                continue
+            order = rng.integers(0, min(len(occupied), len(virtual)) + 1)
+            if order == 0:
+                continue
+            occ = rng.choice(occupied, size=order, replace=False)
+            vir = rng.choice(virtual, size=order, replace=False)
+            new_det[channel_start + occ] = 0
+            new_det[channel_start + vir] = 1
+        if not np.array_equal(new_det, hf) and new_det.tobytes() not in seen:
+            seen.add(new_det.tobytes())
+            dets.append(new_det)
+
+    return np.array(dets, dtype=np.int8).T
+
+
+def create_random_wavefunction(
+    n_electrons: int,
+    n_orbitals: int,
+    n_dets: int,
+    seed: int = 0,
+) -> Wavefunction:
+    """Generate a random normalised Wavefunction for testing.
+
+    Builds physically meaningful determinants from the Hartree-Fock reference
+    plus random excitations, assigns random normalised coefficients.
+
+    Args:
+        n_electrons: Total number of electrons.
+        n_orbitals: Number of spatial orbitals.
+        n_dets: Target number of determinants.
+        seed: Random seed for reproducibility.
+
+    Returns:
+        A normalised :class:`Wavefunction` with ``n_dets`` determinants.
+
+    """
+    det_matrix = create_random_bitstring_matrix(n_electrons, n_orbitals, n_dets, seed).T
+    actual_n_dets = det_matrix.shape[0]
+
+    mapping = {(1, 1): "2", (1, 0): "u", (0, 1): "d", (0, 0): "0"}
+    configs = [
+        Configuration.from_spin_half_string(
+            "".join(mapping[int(row[i]), int(row[n_orbitals + i])] for i in range(n_orbitals))
+        )
+        for row in det_matrix
+    ]
+
+    coeff_rng = np.random.default_rng(seed)
+    raw = coeff_rng.standard_normal(actual_n_dets)
+    coeffs = raw / np.linalg.norm(raw)
+
+    orbitals = create_test_orbitals(n_orbitals)
+    return Wavefunction(StateVectorContainer(coeffs, configs, orbitals))

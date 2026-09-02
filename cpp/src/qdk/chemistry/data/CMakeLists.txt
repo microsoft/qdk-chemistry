@@ -1,5 +1,7 @@
 target_sources(chemistry PRIVATE
     ansatz.cpp
+    auxiliary_basis.cpp
+    basis_library.cpp
     basis_set.cpp
     configuration.cpp
     lattice_graph.cpp
@@ -11,15 +13,24 @@ target_sources(chemistry PRIVATE
     hamiltonian_containers/canonical_four_center.cpp
     hamiltonian_containers/cholesky.cpp
     hamiltonian_containers/sparse.cpp
+    majorana_map_engine.cpp
+    majorana_mapping.cpp
+    majorana_mapping_factories.cpp
     orbitals.cpp
+    nuclear_gradients.cpp
+    nuclear_hessian.cpp
     pauli_operator.cpp
     settings.cpp
+    shell.cpp
     stability_result.cpp
     structure.cpp
+    symmetry/symmetry.cpp
+    symmetry/symmetry_blocked_sparse_map.cpp
+    symmetry/symmetry_blocked_scalar.cpp
+    symmetry/symmetry_blocked_tensor.cpp
+    symmetry/symmetry_blocked_index_set.cpp
+    tapering.cpp
     wavefunction.cpp
-    wavefunction_containers/cas.cpp
-    wavefunction_containers/cc.cpp
-    wavefunction_containers/mp2.cpp
-    wavefunction_containers/sci.cpp
-    wavefunction_containers/sd.cpp
+    wavefunction_containers/amplitude_container.cpp
+    wavefunction_containers/state_vector.cpp
 )

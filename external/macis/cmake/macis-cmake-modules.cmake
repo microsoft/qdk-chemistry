@@ -9,7 +9,7 @@ include( FetchContent )
 
 FetchContent_Declare( linalg-cmake-modules
   GIT_REPOSITORY https://github.com/wavefunction91/linalg-cmake-modules.git
-  GIT_TAG        main
+  GIT_TAG        222364df5e7639f371bf2f37ceb0f476301101a1
 )
 FetchContent_GetProperties( linalg-cmake-modules )
 if( NOT linalg-cmake-modules_POPULATED )

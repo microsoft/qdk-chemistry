@@ -8,7 +8,6 @@
 
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/lattice_graph.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -23,7 +22,6 @@ void lattice_graph_to_file_wrapper(
   self.to_file(qdk::chemistry::python::utils::to_string_path(filename),
                format_type);
 }
-
 qdk::chemistry::data::LatticeGraph lattice_graph_from_file_wrapper(
     const py::object &filename, const std::string &format_type) {
   return qdk::chemistry::data::LatticeGraph::from_file(
@@ -58,6 +56,31 @@ void bind_lattice_graph(pybind11::module &m) {
   using namespace qdk::chemistry::data;
 
   using qdk::chemistry::python::utils::bind_getter_as_property;
+
+  // Module-level free function: trivial_edge_coloring
+  m.def(
+      "trivial_edge_coloring",
+      [](const Eigen::SparseMatrix<double> &adj) -> py::dict {
+        auto coloring = trivial_edge_coloring(adj);
+        py::dict out;
+        for (const auto &[edge, color] : coloring) {
+          out[py::make_tuple(edge.first, edge.second)] = color;
+        }
+        return out;
+      },
+      R"(
+Trivial edge coloring where every edge receives a unique color.
+
+Useful as a fallback when no topology-aware coloring is available.
+
+Args:
+    adj (scipy.sparse matrix): Sparse adjacency matrix of the graph.
+
+Returns:
+    dict[tuple[int, int], int]: Mapping of canonical edges to distinct
+    color labels 0, 1, 2, ... in iteration order.
+)",
+      py::arg("adj"));
 
   py::class_<LatticeGraph, DataClass, py::smart_holder> lattice_graph(
       m, "LatticeGraph", R"(
@@ -216,6 +239,30 @@ Returns:
 )",
                     py::arg("i"), py::arg("j"));
 
+  lattice_graph.def_property_readonly(
+      "edge_coloring",
+      [](const LatticeGraph &self) -> std::optional<py::dict> {
+        const auto &coloring = self.edge_coloring();
+        if (!coloring.has_value()) {
+          return std::nullopt;
+        }
+        py::dict out;
+        for (const auto &[edge, color] : *coloring) {
+          out[py::make_tuple(edge.first, edge.second)] = color;
+        }
+        return out;
+      },
+      R"(
+Edge coloring stored at construction time, or ``None``.
+
+Factory methods for recognised topologies pre-populate this field.
+Returns ``None`` for lattices constructed without a coloring.
+
+Returns:
+    dict[tuple[int, int], int] | None: Mapping of canonical edges (``i < j``)
+    to non-negative color labels, or ``None``.
+)");
+
   // Static factory methods
   lattice_graph.def_static("chain", &LatticeGraph::chain, R"(
 Create a one-dimensional chain lattice.
@@ -246,7 +293,7 @@ Examples:
     >>> ring = LatticeGraph.chain(6, periodic=True)
 )",
                            py::arg("n"), py::arg("periodic") = false,
-                           py::arg("t") = 1.0);
+                           py::arg("t") = 1.0, py::arg("dfs_ordering") = false);
 
   lattice_graph.def_static("square", &LatticeGraph::square, R"(
 Create a two-dimensional square lattice.
@@ -283,9 +330,11 @@ Raises:
 )",
                            py::arg("nx"), py::arg("ny"),
                            py::arg("periodic_x") = false,
-                           py::arg("periodic_y") = false, py::arg("t") = 1.0);
+                           py::arg("periodic_y") = false, py::arg("t") = 1.0,
+                           py::arg("dfs_ordering") = false);
 
-  lattice_graph.def_static("triangular", &LatticeGraph::triangular, R"(
+  lattice_graph.def_static(
+      "triangular", &LatticeGraph::triangular, R"(
 Create a two-dimensional triangular lattice.
 
 Sites are indexed in row-major order: site index = y * nx + x.
@@ -314,6 +363,7 @@ Args:
     periodic_y (bool, optional): If True, apply periodic boundary conditions
         along y. Requires ny >= 2. Defaults to False.
     t (float, optional): Hopping weight for all edges. Defaults to 1.0.
+    coloring_seed (int, optional): PRNG seed for greedy edge coloring. Defaults to 0.
 
 Returns:
     LatticeGraph: Triangular lattice with nx * ny sites.
@@ -321,9 +371,9 @@ Returns:
 Raises:
     ValueError: If nx or ny is 0.
 )",
-                           py::arg("nx"), py::arg("ny"),
-                           py::arg("periodic_x") = false,
-                           py::arg("periodic_y") = false, py::arg("t") = 1.0);
+      py::arg("nx"), py::arg("ny"), py::arg("periodic_x") = false,
+      py::arg("periodic_y") = false, py::arg("t") = 1.0,
+      py::arg("coloring_seed") = 0, py::arg("dfs_ordering") = false);
 
   lattice_graph.def_static("honeycomb", &LatticeGraph::honeycomb, R"(
 Create a two-dimensional honeycomb lattice.
@@ -366,9 +416,11 @@ Raises:
 )",
                            py::arg("nx"), py::arg("ny"),
                            py::arg("periodic_x") = false,
-                           py::arg("periodic_y") = false, py::arg("t") = 1.0);
+                           py::arg("periodic_y") = false, py::arg("t") = 1.0,
+                           py::arg("dfs_ordering") = false);
 
-  lattice_graph.def_static("kagome", &LatticeGraph::kagome, R"(
+  lattice_graph.def_static(
+      "kagome", &LatticeGraph::kagome, R"(
 Create a two-dimensional kagome lattice.
 
 The kagome lattice has three sites per unit cell, arranged as
@@ -408,6 +460,7 @@ Args:
     periodic_y (bool, optional): If True, apply periodic boundary conditions
         along y. Requires ny >= 2. Defaults to False.
     t (float, optional): Hopping weight for all edges. Defaults to 1.0.
+    coloring_seed (int, optional): PRNG seed for greedy edge coloring. Defaults to 0.
 
 Returns:
     LatticeGraph: Kagome lattice with 3 * nx * ny sites.
@@ -415,9 +468,9 @@ Returns:
 Raises:
     ValueError: If nx or ny is 0.
 )",
-                           py::arg("nx"), py::arg("ny"),
-                           py::arg("periodic_x") = false,
-                           py::arg("periodic_y") = false, py::arg("t") = 1.0);
+      py::arg("nx"), py::arg("ny"), py::arg("periodic_x") = false,
+      py::arg("periodic_y") = false, py::arg("t") = 1.0,
+      py::arg("coloring_seed") = 0, py::arg("dfs_ordering") = false);
 
   lattice_graph.def("__repr__", [](const LatticeGraph &self) {
     return "<LatticeGraph sites=" + std::to_string(self.num_sites()) +
@@ -569,5 +622,12 @@ Examples:
       }));
 
   // Data type name class attribute
-  lattice_graph.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(LatticeGraph);
+  lattice_graph.def_static("data_type_name", &LatticeGraph::data_type_name,
+                           R"(
+Return the wire-format identifier for lattice graphs.
+
+Returns:
+        str: ``"lattice_graph"``
+
+)");
 }

@@ -5,10 +5,16 @@
 #include <pybind11/pybind11.h>
 
 #include <qdk/chemistry/data/settings.hpp>
+#include <qdk/chemistry/exceptions.hpp>
 
 namespace py = pybind11;
 
 void bind_base_class(py::module& m);
+void bind_symmetry(py::module& m);
+void bind_symmetry_blocked_scalar(py::module& m);
+void bind_symmetry_blocked_tensor(py::module& m);
+void bind_symmetry_blocked_index_set(py::module& m);
+void bind_symmetry_blocked_sparse_map(py::module& m);
 void bind_element_data(py::module& m);
 void bind_orbitals(py::module& m);
 void bind_hamiltonian(py::module& m);
@@ -18,14 +24,21 @@ void bind_configuration_set(py::module& m);
 void bind_localizer(py::module& m);
 void bind_stability(py::module& m);
 void bind_stability_result(py::module& m);
+void bind_nuclear_gradients(py::module& m);
+void bind_nuclear_hessian(py::module& m);
 void bind_settings(py::module& m);
 void bind_structure(py::module& m);
 void bind_basis_set(py::module& m);
+void bind_auxiliary_basis(py::module& m);
 void bind_serialization(py::module& m);
 void bind_mc(py::module& m);
 void bind_mcscf(py::module& m);
 void bind_hamiltonian_constructor(py::module& m);
+void bind_effective_hamiltonian_constructor(py::module& m);
 void bind_scf(py::module& m);
+void bind_nuclear_derivative(py::module& m);
+void bind_population_analysis(py::module& m);
+void bind_geometry_optimization(py::module& m);
 void bind_active_space(py::module& m);
 void bind_constants(py::module& m);
 void bind_pmc(py::module& m);
@@ -33,6 +46,7 @@ void bind_configuration(py::module& m);
 void bind_qdk_chemistry_config(py::module& m);
 void bind_pauli_operator(py::module& m);
 void bind_valence_space(py::module& m);
+void bind_majorana_mapping(py::module& m);
 void bind_orbital_rotation(py::module& m);
 void bind_dynamical_correlation_calculator(py::module& m);
 void bind_logger(py::module& m);
@@ -40,9 +54,13 @@ void bind_davidson_solver(py::module& m);
 void bind_syev_solver(py::module& m);
 void bind_lattice_graph(py::module& m);
 void bind_model_hamiltonians(py::module& m);
+void bind_cube_generator(py::module& m);
 
 PYBIND11_MODULE(_core, m) {
   m.doc() = "QDK/Chemistry C++ core bindings";
+
+  py::register_exception<qdk::chemistry::DuplicateRegistrationError>(
+      m, "DuplicateRegistrationError", PyExc_ValueError);
 
   auto data = m.def_submodule("data");
   data.doc() = R"(Data submodule)";
@@ -53,13 +71,23 @@ PYBIND11_MODULE(_core, m) {
   auto utils = m.def_submodule("utils");
   utils.doc() = R"(Utilities submodule)";
 
+  auto symmetry = data.def_submodule("symmetry");
+  symmetry.doc() =
+      R"(Single-particle SymmetryProduct and symmetry-blocked storage)";
+
   // Ordering is important!
 
   bind_base_class(data);
+  bind_symmetry(symmetry);  // axis types + SBT/SBIS before orbital containers
+  bind_symmetry_blocked_scalar(symmetry);
+  bind_symmetry_blocked_tensor(symmetry);
+  bind_symmetry_blocked_index_set(symmetry);
+  bind_symmetry_blocked_sparse_map(symmetry);
   bind_element_data(data);  // Element enums must be bound before Structure
   bind_structure(data);
   bind_settings(data);
   bind_basis_set(data);
+  bind_auxiliary_basis(data);
   bind_orbitals(data);
   bind_lattice_graph(data);
   bind_hamiltonian(data);
@@ -68,14 +96,22 @@ PYBIND11_MODULE(_core, m) {
   bind_wavefunction(data);
   bind_ansatz(data);
   bind_stability_result(data);
+  bind_nuclear_gradients(data);
+  bind_nuclear_hessian(data);
   bind_pauli_operator(data);
+  bind_majorana_mapping(
+      data);  // Depends on SparsePauliWord from pauli_operator
   bind_serialization(data);
 
   bind_localizer(algorithms);
   bind_mc(algorithms);
   bind_mcscf(algorithms);
   bind_hamiltonian_constructor(algorithms);
+  bind_effective_hamiltonian_constructor(algorithms);
   bind_scf(algorithms);
+  bind_nuclear_derivative(algorithms);
+  bind_population_analysis(algorithms);
+  bind_geometry_optimization(algorithms);
   bind_active_space(algorithms);
   bind_dynamical_correlation_calculator(algorithms);
   bind_pmc(algorithms);
@@ -88,6 +124,7 @@ PYBIND11_MODULE(_core, m) {
   bind_orbital_rotation(utils);
   bind_model_hamiltonians(utils);
   bind_logger(utils);
+  bind_cube_generator(utils);
 
   // Bind constants and config at the top level
   bind_constants(m);

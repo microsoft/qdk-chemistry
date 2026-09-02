@@ -15,13 +15,16 @@ from qdk_chemistry import algorithms
 from qdk_chemistry.data import (
     Ansatz,
     CanonicalFourCenterHamiltonianContainer,
-    CasWavefunctionContainer,
     Configuration,
     Hamiltonian,
     Orbitals,
+    StateVectorContainer,
     Structure,
     Wavefunction,
 )
+from qdk_chemistry.data._spin_channels import spin_channel_matrix
+from qdk_chemistry.data._type_name import class_data_type_name
+from qdk_chemistry.data.symmetry import axes
 
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
@@ -63,10 +66,10 @@ class TestAnsatzSerialization:
     @pytest.fixture
     def test_wavefunction(self, basic_orbitals):
         """Create a test wavefunction."""
-        det1 = Configuration("20")
+        det1 = Configuration.from_spin_half_string("20")
         coeffs = np.array([1.0])  # Single determinant with coefficient 1.0
 
-        container = CasWavefunctionContainer(coeffs, [det1], basic_orbitals)
+        container = StateVectorContainer(coeffs, [det1], basic_orbitals)
         return Wavefunction(container)
 
     @pytest.fixture
@@ -298,7 +301,16 @@ class TestAnsatzSerialization:
             orig_orbs = test_ansatz.get_orbitals()
             restored_orbs = ansatz_restored.get_orbitals()
             assert orig_orbs.get_num_molecular_orbitals() == restored_orbs.get_num_molecular_orbitals()
-            assert np.array_equal(orig_orbs.get_coefficients(), restored_orbs.get_coefficients())
+            orig_coefficients = orig_orbs.coefficients()
+            restored_coefficients = restored_orbs.coefficients()
+            assert np.array_equal(
+                spin_channel_matrix(orig_coefficients, axes.alpha()),
+                spin_channel_matrix(restored_coefficients, axes.alpha()),
+            )
+            assert np.array_equal(
+                spin_channel_matrix(orig_coefficients, axes.beta()),
+                spin_channel_matrix(restored_coefficients, axes.beta()),
+            )
 
     def test_restricted_closed_shell_energy(self):
         """Test the energy evaluation for a restricted closed-shell system."""
@@ -341,6 +353,5 @@ class TestAnsatzSerialization:
 
 
 def test_ansatz_data_type_name():
-    """Test that Ansatz has the correct _data_type_name class attribute."""
-    assert hasattr(Ansatz, "_data_type_name")
-    assert Ansatz._data_type_name == "ansatz"
+    """Test that Ansatz exposes its static wire-format identifier."""
+    assert class_data_type_name(Ansatz) == "ansatz"

@@ -110,7 +110,7 @@ SpMatType extract_submatrix(const SpMatType& A, std::pair<int64_t, int64_t> lo,
 
   // Calculate total NNZ
   const auto nnz_sub =
-      std::accumulate(row_counts.begin(), row_counts.end(), 0ul);
+      std::accumulate(row_counts.begin(), row_counts.end(), size_t{0});
 
   // Allocate submatrix
   SpMatType sub(M_sub, N_sub, nnz_sub, indexing);
@@ -207,7 +207,7 @@ SpMatType extract_submatrix_inclrow_exclcol(const SpMatType& A,
 
   // Calculate total NNZ
   const auto nnz_sub =
-      std::accumulate(row_counts.begin(), row_counts.end(), 0ul);
+      std::accumulate(row_counts.begin(), row_counts.end(), size_t{0});
 
   // Allocate submatrix
   SpMatType sub(M_sub, N_sub, nnz_sub, indexing);

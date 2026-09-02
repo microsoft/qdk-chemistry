@@ -20,7 +20,7 @@ import pytest
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
-from qdk_chemistry.data import Structure
+from qdk_chemistry.data import MajoranaMapping, Structure
 
 from .reference_tolerances import float_comparison_absolute_tolerance, scf_energy_tolerance
 from .test_sample_workflow_utils import (
@@ -79,8 +79,11 @@ def test_openfermion_molecular_hamiltonian_jordan_wigner():
 
     # Obtain qubit Hamiltonian assuming block ordering - spin up first then spin down
     # Note if printed directly, the Pauli operators will not match with OpenFermion output
-    qubit_mapper = create("qubit_mapper", "qdk", encoding="jordan-wigner")
-    qubit_hamiltonian = qubit_mapper.run(active_hamiltonian)
+
+    n_spatial = active_hamiltonian.get_one_body_integrals()[0].shape[0]
+    qubit_mapper = create("qubit_mapper", "qdk")
+    mapping = MajoranaMapping.jordan_wigner(num_modes=2 * n_spatial)
+    qubit_hamiltonian = qubit_mapper.run(active_hamiltonian, mapping)
 
     # Obtain the ground state energy by diagonalizing the qubit Hamiltonian matrix
     jordan_wigner_matrix = qubit_hamiltonian.to_matrix()

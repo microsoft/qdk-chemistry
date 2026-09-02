@@ -9,7 +9,8 @@
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 
 #include "ut_common.hpp"
 
@@ -32,8 +33,9 @@ class TestMultiConfigurationCalculator : public MultiConfigurationCalculator {
     // Dummy implementation for testing
     Eigen::VectorXcd coeffs(1);
     coeffs(0) = std::complex<double>(1.0, 0.0);
-    Wavefunction::DeterminantVector dets{Configuration("2000000")};
-    auto container = std::make_unique<CasWavefunctionContainer>(
+    Wavefunction::DeterminantVector dets{
+        Configuration::from_spin_half_string("2000000")};
+    auto container = std::make_unique<StateVectorContainer>(
         coeffs, dets, hamiltonian->get_orbitals());
     Wavefunction wfn(std::move(container));
     return {0.0, std::make_shared<Wavefunction>(std::move(wfn))};
@@ -302,13 +304,19 @@ TEST_F(MCTest, HydrogenAtom_CCPVDZ_SCI) {
       wfn_HF->get_orbitals(), std::vector<size_t>{0, 1}, std::vector<size_t>{});
   // fake restricted orbitals from unrestricted SCF
   auto restricted_orbitals = std::make_shared<Orbitals>(
-      orbitals_with_active_space->get_coefficients().first,
-      orbitals_with_active_space->get_energies().first,
+      orbitals_with_active_space->coefficients()->block(
+          {axes::alpha(), axes::alpha()}),
+      orbitals_with_active_space->energies()->block({axes::alpha()}),
       orbitals_with_active_space->get_overlap_matrix(),
       orbitals_with_active_space->get_basis_set(),
-      std::make_tuple(
-          orbitals_with_active_space->get_active_space_indices().first,
-          orbitals_with_active_space->get_inactive_space_indices().first));
+      testing::restricted_index_set(
+          orbitals_with_active_space->get_num_molecular_orbitals(),
+          spin_channel_indices(orbitals_with_active_space->active_indices(),
+                               axes::alpha())),
+      testing::restricted_index_set(
+          orbitals_with_active_space->get_num_molecular_orbitals(),
+          spin_channel_indices(orbitals_with_active_space->inactive_indices(),
+                               axes::alpha())));
   auto ham = hamiltonian_constructor->run(restricted_orbitals);
 
   // Run selected CI calculation (1 alpha electron, 0 beta electrons)
@@ -343,13 +351,19 @@ TEST_F(MCTest, NitrogenAtom_CCPVDZ_SCI) {
       std::vector<size_t>{0});
   // fake restricted orbitals from unrestricted SCF
   auto restricted_orbitals = std::make_shared<Orbitals>(
-      orbitals_with_active_space->get_coefficients().first,
-      orbitals_with_active_space->get_energies().first,
+      orbitals_with_active_space->coefficients()->block(
+          {axes::alpha(), axes::alpha()}),
+      orbitals_with_active_space->energies()->block({axes::alpha()}),
       orbitals_with_active_space->get_overlap_matrix(),
       orbitals_with_active_space->get_basis_set(),
-      std::make_tuple(
-          orbitals_with_active_space->get_active_space_indices().first,
-          orbitals_with_active_space->get_inactive_space_indices().first));
+      testing::restricted_index_set(
+          orbitals_with_active_space->get_num_molecular_orbitals(),
+          spin_channel_indices(orbitals_with_active_space->active_indices(),
+                               axes::alpha())),
+      testing::restricted_index_set(
+          orbitals_with_active_space->get_num_molecular_orbitals(),
+          spin_channel_indices(orbitals_with_active_space->inactive_indices(),
+                               axes::alpha())));
   auto ham = hamiltonian_constructor->run(restricted_orbitals);
 
   // Run selected CI calculation (4 alpha electrons, 1 beta electron)

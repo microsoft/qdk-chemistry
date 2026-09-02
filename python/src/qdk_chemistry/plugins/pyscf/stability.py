@@ -210,7 +210,13 @@ class PyscfStabilitySettings(Settings):
         self._set_default("nroots", "int", 3)
         self._set_default("davidson_tolerance", "double", 1e-8)
         self._set_default("stability_tolerance", "double", -1e-4)
-        self._set_default("method", "string", "hf")
+        self._set_default(
+            "method",
+            "string",
+            "hf",
+            "SCF method: 'hf' for Hartree-Fock, or a DFT functional name. "
+            "See the user manual for the complete list of available options.",
+        )
         self._set_default(
             "xc_grid", "int", 3, "Density functional integration grid level (0=coarse, 9=very fine)", list(range(10))
         )
@@ -240,7 +246,7 @@ class PyscfStabilityChecker(StabilityChecker):
     - Returns StabilityResult with separate internal and external stability information
 
     Raises:
-        ValueError: If wavefunction is not a SlaterDeterminantContainer (container type "sd").
+        ValueError: If wavefunction is not a single-determinant state vector.
 
     Examples:
         >>> checker = PyscfStabilityChecker()
@@ -273,14 +279,14 @@ class PyscfStabilityChecker(StabilityChecker):
             with detailed analysis results.
 
         Raises:
-            ValueError: If wavefunction is not a SlaterDeterminantContainer or if external
+            ValueError: If wavefunction is not a single-determinant state vector or if external
                 stability analysis is requested for ROHF/UHF wavefunctions.
 
         """
         Logger.trace_entering()
-        # Verify wavefunction compatibility: Only SlaterDeterminantContainer currently supported
-        if wavefunction.get_container_type() != "sd":
-            raise ValueError("Stability analysis currently only supports SlaterDeterminantContainer wavefunctions")
+        # Verify wavefunction compatibility: only single-determinant state vectors are supported
+        if wavefunction.get_container_type() != "state_vector" or wavefunction.size() != 1:
+            raise ValueError("Stability analysis currently only supports single-determinant wavefunctions")
 
         # Extract settings
         do_internal = self._settings.get("internal")

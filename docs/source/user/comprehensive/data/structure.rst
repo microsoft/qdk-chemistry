@@ -46,19 +46,19 @@ Creating a structure object
 
 A :class:`~qdk_chemistry.data.Structure` object can be created by specifying coordinates explicitly (in Bohr):
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/structure.cpp
-      :language: cpp
-      :start-after: // start-cell-create
-      :end-before: // end-cell-create
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/structure.py
       :language: python
       :start-after: # start-cell-create
       :end-before: # end-cell-create
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/structure.cpp
+      :language: cpp
+      :start-after: // start-cell-create
+      :end-before: // end-cell-create
 
 Loading a structure from file
 -----------------------------
@@ -67,19 +67,19 @@ A :class:`~qdk_chemistry.data.Structure` object can also be loaded from a file.
 When loading from an XYZ file, coordinates are automatically converted from Angstrom to Bohr.
 When loading from a JSON file, coordinates are assumed to already be in Bohr.
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/structure.cpp
-      :language: cpp
-      :start-after: // start-cell-from-file
-      :end-before: // end-cell-from-file
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/structure.py
       :language: python
       :start-after: # start-cell-from-file
       :end-before: # end-cell-from-file
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/structure.cpp
+      :language: cpp
+      :start-after: // start-cell-from-file
+      :end-before: // end-cell-from-file
 
 Accessing structure data
 ------------------------
@@ -90,12 +90,9 @@ Functions that deal with specific atoms include the word "atom" in their name (e
 All atomic data is const and immutable once set, following QDK/Chemistry's :doc:`immutable data pattern <../design/index>`.
 If you need to modify coordinates or other properties, you must create a new Structure object with the desired changes.
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/structure.cpp
-      :language: cpp
-      :start-after: // start-cell-data
-      :end-before: // end-cell-data
+.. note::
+   ``get_nuclear_charges()`` and ``calculate_nuclear_repulsion_energy()`` use the charges stored on the structure; applying an :term:`ECP` does not change them.
+   For ECP-adjusted charges and nuclear repulsion, use ``get_effective_nuclear_charges()`` and ``calculate_effective_nuclear_repulsion_energy()`` on the associated :doc:`BasisSet <basis_set>`.
 
 .. tab:: Python API
 
@@ -103,6 +100,13 @@ If you need to modify coordinates or other properties, you must create a new Str
       :language: python
       :start-after: # start-cell-data
       :end-before: # end-cell-data
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/structure.cpp
+      :language: cpp
+      :start-after: // start-cell-data
+      :end-before: // end-cell-data
 
 Serialization
 -------------
@@ -137,6 +141,7 @@ Note that here the coordinates are in Angstrom, since this is the standard in xy
 Related classes
 ---------------
 
+- :doc:`BasisSet <basis_set>`: Basis functions, ECP metadata, and ECP-adjusted nuclear properties
 - :doc:`Orbitals <orbitals>`: Molecular orbitals calculated from the structure
 - :doc:`ScfSolver <../algorithms/scf_solver>`: Algorithm that performs calculations on the structure
 

@@ -33,12 +33,184 @@ Important Notes
 from __future__ import annotations
 
 import atexit
+import warnings
 from typing import TYPE_CHECKING, Any
+
+from qdk_chemistry._core import DuplicateRegistrationError as _DuplicateRegistrationError
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
+
+
+class _AlgorithmWrapper:
+    """Thin wrapper that adds a ``cache`` kwarg to ``run()``.
+
+    Forwards every other attribute to the wrapped algorithm so it
+    behaves identically for ``settings()``, ``hash()``, ``type_name()``,
+    ``name()``, etc.  The ``__class__`` property makes CPython's
+    ``isinstance()`` report the wrapped type because
+    ``type.__instancecheck__`` reads ``obj.__class__`` (not
+    ``type(obj)``) when the two differ.  Note that ``type(wrapper)``
+    still returns ``_AlgorithmWrapper``.
+    """
+
+    __slots__ = ("_algo",)
+
+    def __init__(self, algo: Any) -> None:
+        object.__setattr__(self, "_algo", algo)
+
+    @property  # type: ignore[misc, override]
+    def __class__(self):
+        return self._algo.__class__
+
+    def run(
+        self,
+        *args: Any,
+        cache: Any = None,
+        force_rerun: bool = False,
+        **kwargs: Any,
+    ) -> Any:
+        """Execute the algorithm with optional caching.
+
+        Without ``cache`` this is equivalent to calling
+        the underlying ``algorithm.run()`` directly.
+
+        Args:
+            *args: Positional arguments for the algorithm.
+            cache: Cache backend — a :class:`CacheBackend`, a path
+                (``str`` / ``Path`` → :class:`FolderCache`), or ``None``.
+            force_rerun: If ``True``, skip the cache lookup and re-execute,
+                overwriting any previously cached result.
+            **kwargs: Keyword arguments for the algorithm.
+
+        Returns:
+            The algorithm result.
+
+        """
+        if cache is None:
+            return self._algo.run(*args, **kwargs)
+
+        from qdk_chemistry.remote.cache import resolve_cache  # noqa: PLC0415
+
+        resolved_cache = resolve_cache(cache)
+        if resolved_cache is None:
+            return self._algo.run(*args, **kwargs)
+
+        run_hash = None
+        try:
+            run_hash = self._algo.hash(*args, **kwargs)
+        except AttributeError as exc:
+            warnings.warn(
+                f"Caching was requested for {self._algo!r}, but a run hash could not be computed "
+                f"because the algorithm does not expose a compatible hash method: {exc}",
+                UserWarning,
+                stacklevel=2,
+            )
+        except TypeError as exc:
+            warnings.warn(
+                f"Caching was requested for {self._algo!r}, but a run hash could not be computed "
+                f"with the provided arguments: {exc}",
+                UserWarning,
+                stacklevel=2,
+            )
+
+        if run_hash is None:
+            return self._algo.run(*args, **kwargs)
+
+        # Check the cache (skip on force_rerun)
+        if not force_rerun:
+            hit = _try_cache_hit(resolved_cache, run_hash)
+            if hit is not None:
+                return hit
+
+        # Cache miss — execute locally and store
+        result = self._algo.run(*args, **kwargs)
+        _store_result(resolved_cache, run_hash, self._algo, result, args, kwargs)
+        return result
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._algo, name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        setattr(self._algo, name, value)
+
+    def __repr__(self) -> str:
+        return repr(self._algo)
+
+
+def _try_cache_hit(cache: Any, run_hash: str) -> Any | None:
+    """Return the cached result if available, else None."""
+    job = cache.get_job(run_hash)
+    if job is None or not job.output_hashes:
+        return None
+
+    items: list[Any] = []
+    for entry in job.output_hashes:
+        if "value" in entry:
+            items.append(entry["value"])
+        else:
+            data = cache.get_data(entry["hash"])
+            if data is None:
+                return None
+            items.append(data)
+    return items[0] if len(items) == 1 else tuple(items)
+
+
+def _store_result(
+    cache: Any,
+    run_hash: str,
+    algorithm: Any,
+    result: Any,
+    args: tuple,
+    kwargs: dict,
+) -> None:
+    """Store a computation result in the cache."""
+    from qdk_chemistry.data._hashing import _item_content_hash, collect_content_hashes  # noqa: PLC0415
+    from qdk_chemistry.remote.job import Job  # noqa: PLC0415
+
+    output_hashes = collect_content_hashes(result)
+
+    input_hashes: dict[str, str] = {}
+    for i, arg in enumerate(args):
+        input_hashes[f"arg_{i}"] = _item_content_hash(arg)
+    for key, val in kwargs.items():
+        input_hashes[key] = _item_content_hash(val)
+
+    job = Job(
+        job_id=run_hash[:12],
+        backend="local",
+        backend_config={},
+        backend_state={},
+        algorithm_info={
+            "type": algorithm.type_name(),
+            "name": algorithm.name(),
+            "settings": algorithm.settings().to_dict(),
+        },
+        status="retrieved",
+        run_hash=run_hash,
+        input_hashes=input_hashes or None,
+        output_hashes=output_hashes,
+    )
+
+    # Persist DataClass blobs
+    items = result if isinstance(result, tuple) else (result,)
+    for entry, item in zip(output_hashes, items, strict=False):
+        if "value" not in entry:
+            try:
+                cache.put_data(entry["hash"], item)
+            except (AttributeError, OSError, TypeError, ValueError) as exc:
+                warnings.warn(
+                    f"Caching skipped for {algorithm.type_name()}/{algorithm.name()} because output "
+                    f"{entry.get('type', type(item).__name__)!r} could not be persisted: {exc}",
+                    UserWarning,
+                    stacklevel=2,
+                )
+                return
+
+    cache.put_job(run_hash, job)
+
 
 __all__ = [
     "available",
@@ -56,6 +228,68 @@ __all__ = [
 __cleanup_registered: bool = False
 
 __factories: list[AlgorithmFactory] = []
+
+# Deprecated algorithm-type keys mapped to their current names. Accessing a
+# deprecated key still works but emits a DeprecationWarning.
+_DEPRECATED_TYPE_ALIASES: dict[str, str] = {
+    "controlled_evolution_circuit_mapper": "controlled_circuit_mapper",
+    "energy_estimator": "expectation_estimator",
+    "time_evolution_builder": "hamiltonian_unitary_builder",
+}
+
+
+def _resolve_algorithm_type(algorithm_type: str) -> str:
+    """Map a deprecated algorithm-type key to its current name.
+
+    Args:
+        algorithm_type (str): The requested algorithm type key.
+
+    Returns:
+        str: The resolved algorithm type key. A deprecated key is mapped to its replacement and
+            triggers a ``DeprecationWarning``; any other value passes through unchanged.
+
+    """
+    new_type = _DEPRECATED_TYPE_ALIASES.get(algorithm_type)
+    if new_type is not None:
+        warnings.warn(
+            f"Algorithm type '{algorithm_type}' is deprecated and will be removed in a "
+            f"future release; use '{new_type}' instead.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        return new_type
+    return algorithm_type
+
+
+# Deprecated algorithm names keyed by ``(algorithm_type, deprecated_name)``. Using a
+# deprecated name still works but emits a DeprecationWarning.
+_DEPRECATED_NAME_ALIASES: dict[tuple[str, str], str] = {
+    ("state_prep", "sparse_isometry_gf2x"): "sparse_isometry",
+}
+
+
+def _resolve_algorithm_name(algorithm_type: str, algorithm_name: str) -> str:
+    """Map a deprecated algorithm name to its current name.
+
+    Args:
+        algorithm_type (str): The resolved algorithm type key.
+        algorithm_name (str): The requested algorithm name.
+
+    Returns:
+        str: The resolved algorithm name. A deprecated name is mapped to its replacement and
+            triggers a ``DeprecationWarning``; any other value passes through unchanged.
+
+    """
+    new_name = _DEPRECATED_NAME_ALIASES.get((algorithm_type, algorithm_name))
+    if new_name is not None:
+        warnings.warn(
+            f"Algorithm '{algorithm_name}' of type '{algorithm_type}' is deprecated and will be "
+            f"removed in a future release; use '{new_name}' instead.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        return new_name
+    return algorithm_name
 
 
 def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> Algorithm:
@@ -104,14 +338,14 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
         >>> default_calc = registry.create("dynamical_correlation_calculator")
 
     """
+    algorithm_type = _resolve_algorithm_type(algorithm_type)
     if algorithm_name is None:
         algorithm_name = ""
+    algorithm_name = _resolve_algorithm_name(algorithm_type, algorithm_name)
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             try:
                 instance = factory.create(algorithm_name)
-                instance.settings().update(kwargs or {})
-                return instance
             except (KeyError, RuntimeError, ValueError) as e:
                 available_algorithms = factory.available()
                 if not available_algorithms:
@@ -126,6 +360,9 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
                     "Please ensure the relevant plugins are loaded or custom algorithms are registered "
                     "ahead of calling create()."
                 ) from e
+            # Settings failures are configuration errors, not lookup failures, so they propagate as-is.
+            instance.settings().update(kwargs or {})
+            return _AlgorithmWrapper(instance)
     available_types = [factory.algorithm_type_name() for factory in __factories]
     raise KeyError(
         f"Algorithm type '{algorithm_type}' is not registered. Available algorithm types: {', '.join(available_types)}."
@@ -172,6 +409,8 @@ def print_settings(algorithm_type: str, algorithm_name: str, characters: int = 1
         >>> registry.print_settings("scf_solver", "pyscf", characters=100)
 
     """
+    algorithm_type = _resolve_algorithm_type(algorithm_type)
+    algorithm_name = _resolve_algorithm_name(algorithm_type, algorithm_name)
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             instance = factory.create(algorithm_name)
@@ -231,6 +470,8 @@ def inspect_settings(algorithm_type: str, algorithm_name: str) -> list[tuple[str
         force_restricted: bool = False  # Force restricted calculation
 
     """
+    algorithm_type = _resolve_algorithm_type(algorithm_type)
+    algorithm_name = _resolve_algorithm_name(algorithm_type, algorithm_name)
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             instance = factory.create(algorithm_name)
@@ -268,6 +509,7 @@ def register(generator: Callable[[], Algorithm]) -> None:
             from the factory.
 
     Raises:
+        DuplicateRegistrationError: If the algorithm name or an alias is already registered.
         KeyError: If the algorithm's type is not a recognized algorithm type in the system.
 
     Examples:
@@ -341,6 +583,7 @@ def available(algorithm_type: str | None = None) -> dict[str, list[str]] | list[
         for factory in __factories:
             result[factory.algorithm_type_name()] = factory.available()
         return result
+    algorithm_type = _resolve_algorithm_type(algorithm_type)
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             return factory.available()
@@ -382,6 +625,7 @@ def show_default(algorithm_type: str | None = None) -> dict[str, str] | str:
         for factory in __factories:
             result[factory.algorithm_type_name()] = factory.default_algorithm_name()
         return result
+    algorithm_type = _resolve_algorithm_type(algorithm_type)
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             return factory.default_algorithm_name()
@@ -429,13 +673,13 @@ def register_factory(factory: AlgorithmFactory) -> None:
         factory (AlgorithmFactory): The factory instance to register.
 
     Raises:
-        ValueError: If a factory with the same algorithm type name is already registered.
+        DuplicateRegistrationError: If a factory with the same algorithm type name is already registered.
 
     """
     algorithm_type = factory.algorithm_type_name()
     for existing_factory in __factories:
         if existing_factory.algorithm_type_name() == algorithm_type:
-            raise ValueError(f"Factory for algorithm type '{algorithm_type}' is already registered.")
+            raise _DuplicateRegistrationError(f"Factory for algorithm type '{algorithm_type}' is already registered.")
     __factories.append(factory)
 
 
@@ -473,22 +717,30 @@ def _register_cpp_factories():
     from qdk_chemistry._core._algorithms import (  # noqa: PLC0415
         ActiveSpaceSelectorFactory,
         DynamicalCorrelationCalculatorFactory,
+        EffectiveHamiltonianConstructorFactory,
+        GeometryOptimizerFactory,
         HamiltonianConstructorFactory,
         LocalizerFactory,
         MultiConfigurationCalculatorFactory,
         MultiConfigurationScfFactory,
+        NuclearDerivativeCalculatorFactory,
+        PopulationAnalyzerFactory,
         ProjectedMultiConfigurationCalculatorFactory,
         ScfSolverFactory,
         StabilityCheckerFactory,
     )
 
     register_factory(ActiveSpaceSelectorFactory)
+    register_factory(DynamicalCorrelationCalculatorFactory)
+    register_factory(EffectiveHamiltonianConstructorFactory)
+    register_factory(GeometryOptimizerFactory)
     register_factory(HamiltonianConstructorFactory)
     register_factory(LocalizerFactory)
     register_factory(MultiConfigurationCalculatorFactory)
     register_factory(MultiConfigurationScfFactory)
+    register_factory(NuclearDerivativeCalculatorFactory)
+    register_factory(PopulationAnalyzerFactory)
     register_factory(ProjectedMultiConfigurationCalculatorFactory)
-    register_factory(DynamicalCorrelationCalculatorFactory)
     register_factory(ScfSolverFactory)
     register_factory(StabilityCheckerFactory)
 
@@ -497,30 +749,62 @@ def _register_python_factories():
     """Register all built-in Python algorithm factories.
 
     This internal initialization function registers all the Python-implemented
-    algorithm factories. This includes factories for energy estimators, phase estimation algorithms,
+    algorithm factories. This includes factories for expectation estimators, phase estimation algorithms,
     qubit Hamiltonian solvers, qubit mappers, time evolution algorithms, and state preparation algorithms
     that are implemented in Python.
 
     This function is automatically called during module import and should not
     be called by users.
     """
+    from qdk_chemistry.algorithms.amplitude_amplification.amplitude_amplification import (  # noqa: PLC0415
+        AmplitudeAmplificationFactory,
+    )
+    from qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace import (  # noqa: PLC0415
+        AmplitudeAmplificationOracleFactory,
+    )
     from qdk_chemistry.algorithms.circuit_executor import CircuitExecutorFactory  # noqa: PLC0415
-    from qdk_chemistry.algorithms.controlled_circuit_mapper import ControlledCircuitMapperFactory  # noqa: PLC0415
-    from qdk_chemistry.algorithms.energy_estimator import EnergyEstimatorFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.circuit_mapper import CircuitMapperFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
+        ControlledCircuitMapperFactory,
+    )
+    from qdk_chemistry.algorithms.expectation_estimator import ExpectationEstimatorFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.hadamard_test import HadamardTestFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.hadamard_test.circuit_builder import (  # noqa: PLC0415
+        HadamardTestCircuitBuilderFactory,
+    )
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder import HamiltonianUnitaryBuilderFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.phase_estimation import PhaseEstimationFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.phase_estimation.circuit_builder import QpeCircuitBuilderFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.propagator import PropagatorFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import QubitHamiltonianSolverFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QubitMapperFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import StatePreparationFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.term_grouper import TermGrouperFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder import (  # noqa: PLC0415
+        EvolutionCircuitBuilderFactory,
+    )
+    from qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation import (  # noqa: PLC0415
+        HamiltonianSimulationFactory,
+    )
 
-    register_factory(EnergyEstimatorFactory())
+    register_factory(ExpectationEstimatorFactory())
+    register_factory(CircuitMapperFactory())
+    register_factory(HamiltonianSimulationFactory())
+    register_factory(EvolutionCircuitBuilderFactory())
     register_factory(StatePreparationFactory())
+    register_factory(TermGrouperFactory())
     register_factory(QubitMapperFactory())
     register_factory(QubitHamiltonianSolverFactory())
     register_factory(HamiltonianUnitaryBuilderFactory())
     register_factory(ControlledCircuitMapperFactory())
     register_factory(CircuitExecutorFactory())
+    register_factory(QpeCircuitBuilderFactory())
     register_factory(PhaseEstimationFactory())
+    register_factory(HadamardTestFactory())
+    register_factory(HadamardTestCircuitBuilderFactory())
+    register_factory(PropagatorFactory())
+    register_factory(AmplitudeAmplificationFactory())
+    register_factory(AmplitudeAmplificationOracleFactory())
 
 
 _ = _register_cpp_factories()
@@ -566,42 +850,112 @@ def _register_python_algorithms():
     """Register all built-in Python algorithm instances.
 
     This internal initialization function registers specific Python-implemented
-    algorithm instances as built-in algorithms. This includes the default QDK energy estimator,
+    algorithm instances as built-in algorithms. This includes the default QDK expectation estimator,
     phase estimation algorithms, qubit Hamiltonian solvers, time evolution algorithms, and state preparation algorithms.
 
     This function is automatically called during module import and should not
     be called by users.
     """
+    from qdk_chemistry.algorithms.amplitude_amplification.amplitude_amplification import (  # noqa: PLC0415
+        AmplitudeAmplification,
+    )
+    from qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace import QPESubspaceMarking  # noqa: PLC0415
     from qdk_chemistry.algorithms.circuit_executor.qdk import (  # noqa: PLC0415
         QdkFullStateSimulator,
         QdkSparseStateSimulator,
     )
-    from qdk_chemistry.algorithms.controlled_circuit_mapper import PauliSequenceMapper  # noqa: PLC0415
-    from qdk_chemistry.algorithms.energy_estimator.qdk import QdkEnergyEstimator  # noqa: PLC0415
+    from qdk_chemistry.algorithms.circuit_mapper import PauliSequenceMapper, PSPMapper  # noqa: PLC0415
+    from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
+        ControlledPauliSequenceMapper,
+        ControlledPSPMapper,
+        ControlledSwapPauliSequenceMapper,
+    )
+    from qdk_chemistry.algorithms.expectation_estimator.qdk import QdkExpectationEstimator  # noqa: PLC0415
+    from qdk_chemistry.algorithms.hadamard_test.circuit_builder.qdk_builder import (  # noqa: PLC0415
+        QdkHadamardTestCircuitBuilder,
+    )
+    from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTest  # noqa: PLC0415
+    from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import (  # noqa: PLC0415
+        LCUBuilder,
+    )
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized import (  # noqa: PLC0415
         PartiallyRandomized,
     )
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift import QDrift  # noqa: PLC0415
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter  # noqa: PLC0415
+    from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus import (  # noqa: PLC0415
+        Zassenhaus,
+    )
+    from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder import (  # noqa: PLC0415
+        QdkIterativeQpeCircuitBuilder,
+    )
+    from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder import (  # noqa: PLC0415
+        QdkStandardQpeCircuitBuilder,
+    )
+    from qdk_chemistry.algorithms.phase_estimation.circuit_builder.unary_phase_estimation_builder import (  # noqa: PLC0415
+        QdkUnaryQpeCircuitBuilder,
+    )
     from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import (  # noqa: PLC0415
         IterativePhaseEstimation,
     )
+    from qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation import (  # noqa: PLC0415
+        StandardPhaseEstimation,
+    )
+    from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import (  # noqa: PLC0415
+        UnaryPhaseEstimation,
+    )
+    from qdk_chemistry.algorithms.propagator import MagnusPropagator  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import DenseMatrixSolver, SparseMatrixSolver  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper  # noqa: PLC0415
-    from qdk_chemistry.algorithms.state_preparation import SparseIsometryGF2XStatePreparation  # noqa: PLC0415
+    from qdk_chemistry.algorithms.state_preparation import SparseIsometryStatePreparation  # noqa: PLC0415
+    from qdk_chemistry.algorithms.state_preparation.dense_pure_state import DensePureStatePreparation  # noqa: PLC0415
+    from qdk_chemistry.algorithms.term_grouper import (  # noqa: PLC0415
+        FullCommutingTermGrouper,
+        IdentityTermGrouper,
+        QubitWiseCommutingTermGrouper,
+        VacuumAnnihilatingTermGrouper,
+    )
+    from qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder import (  # noqa: PLC0415
+        EulerEvolutionCircuitBuilder,
+    )
+    from qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation import EulerIntegrator  # noqa: PLC0415
 
-    register(lambda: QdkEnergyEstimator())
-    register(lambda: SparseIsometryGF2XStatePreparation())
+    register(lambda: QdkExpectationEstimator())
+    # Must precede SparseIsometryStatePreparation, whose settings resolve it by name at construction.
+    register(lambda: DensePureStatePreparation())
+    register(lambda: SparseIsometryStatePreparation())
     register(lambda: DenseMatrixSolver())
     register(lambda: SparseMatrixSolver())
     register(lambda: QdkQubitMapper())
+    register(lambda: FullCommutingTermGrouper())
+    register(lambda: QubitWiseCommutingTermGrouper())
+    register(lambda: IdentityTermGrouper())
+    register(lambda: VacuumAnnihilatingTermGrouper())
     register(lambda: Trotter())
+    register(lambda: Zassenhaus())
     register(lambda: QDrift())
     register(lambda: PartiallyRandomized())
+    register(lambda: LCUBuilder())
     register(lambda: PauliSequenceMapper())
+    register(lambda: PSPMapper())
+    register(lambda: ControlledPSPMapper())
+    register(lambda: ControlledPauliSequenceMapper())
+    register(lambda: ControlledSwapPauliSequenceMapper())
+    register(lambda: EulerIntegrator())
+    register(lambda: EulerEvolutionCircuitBuilder())
+    register(lambda: MagnusPropagator())
     register(lambda: QdkFullStateSimulator())
     register(lambda: QdkSparseStateSimulator())
+    register(lambda: QdkIterativeQpeCircuitBuilder())
+    register(lambda: QdkStandardQpeCircuitBuilder())
+    register(lambda: QdkUnaryQpeCircuitBuilder())
     register(lambda: IterativePhaseEstimation())
+    register(lambda: HadamardTest())
+    register(lambda: QdkHadamardTestCircuitBuilder())
+    register(lambda: StandardPhaseEstimation())
+    register(lambda: UnaryPhaseEstimation())
+    register(lambda: AmplitudeAmplification())
+    register(lambda: QPESubspaceMarking())
 
 
 _register_python_algorithms()

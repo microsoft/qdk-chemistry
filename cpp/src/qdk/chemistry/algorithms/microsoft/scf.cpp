@@ -10,7 +10,8 @@
 #include <qdk/chemistry/scf/util/gauxc_registry.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <numeric>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <string>
 
@@ -31,23 +32,27 @@ using qdk::chemistry::utils::Logger;
 using qdk::chemistry::utils::LogLevel;
 
 // Helper function to calculate alpha and beta electron counts
-std::pair<int, int> calculate_electron_counts(int nuclear_charge, int charge,
-                                              int multiplicity) {
+std::pair<int, int> calculate_electron_counts(
+    int total_effective_nuclear_charge, int charge, int multiplicity) {
   QDK_LOG_TRACE_ENTERING();
-  int total_electrons = nuclear_charge - charge;
+  int total_electrons = total_effective_nuclear_charge - charge;
   int n_alpha = (total_electrons + multiplicity - 1) / 2;
   int n_beta = total_electrons - n_alpha;
   return {n_alpha, n_beta};
 }
 
-std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
+ScfCalculationResult ScfSolver::_run_with_options(
     std::shared_ptr<data::Structure> structure, int charge, int multiplicity,
-    BasisOrGuessType basis_or_guess) const {
+    BasisOrGuessType basis_or_guess, bool require_gradient) const {
   QDK_LOG_TRACE_ENTERING();
   // Initialize the backend if not already done
   utils::microsoft::initialize_backend();
 
   // check basis_or_guess type
+  if (basis_or_guess.valueless_by_exception()) {
+    throw std::invalid_argument(
+        "basis_or_guess is valueless due to an exception.");
+  }
   enum class BasisSetType { Explicit, FromString, FromOrbitals };
   BasisSetType basis_set_type;
 
@@ -55,27 +60,44 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   std::shared_ptr<data::BasisSet> qdk_raw_basis_set = nullptr;
 
   if (std::holds_alternative<std::shared_ptr<data::Orbitals>>(basis_or_guess)) {
-    basis_set_name = std::get<std::shared_ptr<data::Orbitals>>(basis_or_guess)
-                         ->get_basis_set()
-                         ->get_name();
+    auto orbitals = std::get<std::shared_ptr<data::Orbitals>>(basis_or_guess);
+    if (!orbitals || !orbitals->get_basis_set()) {
+      throw std::invalid_argument(
+          "Orbitals initial guess must include a basis set.");
+    }
     basis_set_type = BasisSetType::FromOrbitals;
-    // Assume the guess is generated with the same basis set. Adjust here and
-    // later code if this assumption is no longer valid in the future.
-    qdk_raw_basis_set =
-        std::get<std::shared_ptr<data::Orbitals>>(basis_or_guess)
-            ->get_basis_set();
+    basis_set_name = orbitals->get_basis_set()->get_name();
+    std::transform(
+        basis_set_name.begin(), basis_set_name.end(), basis_set_name.begin(),
+        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    qdk_raw_basis_set = orbitals->get_basis_set();
   } else if (std::holds_alternative<std::shared_ptr<data::BasisSet>>(
                  basis_or_guess)) {
-    basis_set_name =
-        std::get<std::shared_ptr<data::BasisSet>>(basis_or_guess)->get_name();
+    auto basis = std::get<std::shared_ptr<data::BasisSet>>(basis_or_guess);
+    if (!basis) {
+      throw std::invalid_argument(
+          "Explicit BasisSet argument must not be null.");
+    }
     basis_set_type = BasisSetType::Explicit;
-    qdk_raw_basis_set =
-        std::get<std::shared_ptr<data::BasisSet>>(basis_or_guess);
+    basis_set_name = basis->get_name();
+    std::transform(
+        basis_set_name.begin(), basis_set_name.end(), basis_set_name.begin(),
+        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    qdk_raw_basis_set = basis;
   } else if (std::holds_alternative<std::string>(basis_or_guess)) {
-    basis_set_name = std::get<std::string>(basis_or_guess);
     basis_set_type = BasisSetType::FromString;
+    basis_set_name = std::get<std::string>(basis_or_guess);
+    std::transform(
+        basis_set_name.begin(), basis_set_name.end(), basis_set_name.begin(),
+        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (basis_set_name == data::BasisSet::custom_name) {
+      throw std::invalid_argument(
+          "Custom basis name requires an explicit BasisSet or Orbitals.");
+    }
     qdk_raw_basis_set =
         data::BasisSet::from_basis_name(basis_set_name, structure);
+  } else {
+    throw std::logic_error("Unhandled basis_or_guess alternative.");
   }
   std::transform(basis_set_name.begin(), basis_set_name.end(),
                  basis_set_name.begin(), ::tolower);
@@ -91,16 +113,17 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     symbols[i] = structure->get_atom_symbol(i);
   }
 
-  // Compute sum of nuclear charges
-  int nuclear_charge = 0;
-  for (auto i = 0; i < structure->get_num_atoms(); ++i) {
-    nuclear_charge += structure->get_atom_nuclear_charge(i);
-  }
+  const auto effective_nuclear_charges =
+      utils::microsoft::to_integral_nuclear_charges(
+          qdk_raw_basis_set->get_effective_nuclear_charges());
+  const int total_effective_nuclear_charge = static_cast<int>(
+      std::accumulate(effective_nuclear_charges.begin(),
+                      effective_nuclear_charges.end(), std::uint64_t{0}));
 
   // Determine the multiplicity
   if (multiplicity < 0) {
     // Default to singlet for closed shell, doublet for open-shell
-    multiplicity = ((nuclear_charge - charge) % 2 == 0) ? 1 : 2;
+    multiplicity = ((total_effective_nuclear_charge - charge) % 2 == 0) ? 1 : 2;
     QDK_LOGGER().warn("No multiplicity specified. Defaulting to {} ({}).",
                       multiplicity, multiplicity == 1 ? "singlet" : "doublet");
   }
@@ -157,17 +180,14 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   // Create Molecule object
   auto ms_mol = qdk::chemistry::utils::microsoft::convert_to_molecule(
       *structure, charge, multiplicity);
-  // update atomic charges for ECPs
-  auto ecp_electrons = qdk_raw_basis_set->get_ecp_electrons();
   for (size_t i = 0; i < ms_mol->n_atoms; ++i) {
-    int n_core_electrons = static_cast<int>(ecp_electrons[i]);
-    ms_mol->atomic_charges[i] = ms_mol->atomic_nums[i] - n_core_electrons;
+    ms_mol->atomic_charges[i] = effective_nuclear_charges[i];
   }
 
   // Create SCFConfig
   auto ms_scf_config = std::make_unique<qcs::SCFConfig>();
   ms_scf_config->mpi = qcs::mpi_default_input();
-  ms_scf_config->require_gradient = false;
+  ms_scf_config->require_gradient = require_gradient;
   ms_scf_config->require_polarizability = false;
   ms_scf_config->exc.xc_name = method;
   std::transform(ms_scf_config->exc.xc_name.begin(),
@@ -355,11 +375,14 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   if (basis_set_type == BasisSetType::FromOrbitals) {
     auto initial_guess =
         std::get<std::shared_ptr<data::Orbitals>>(basis_or_guess);
-    auto [coeff_alpha, coeff_beta] = initial_guess->get_coefficients();
+    const auto& coeff_alpha = initial_guess->coefficients()->block(
+        {data::axes::alpha(), data::axes::alpha()});
+    const auto& coeff_beta = initial_guess->coefficients()->block(
+        {data::axes::beta(), data::axes::beta()});
 
     // Calculate number of electrons
-    auto [n_alpha, n_beta] =
-        calculate_electron_counts(nuclear_charge, charge, multiplicity);
+    auto [n_alpha, n_beta] = calculate_electron_counts(
+        total_effective_nuclear_charge, charge, multiplicity);
 
     const size_t num_atomic_orbitals = coeff_alpha.rows();
 
@@ -484,15 +507,9 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     Eigen::VectorXd energies_alpha = eps.row(0);
     Eigen::VectorXd energies_beta = eps.row(1);
 
-    // Construct orbitals with correct parameter order:
-    // (coeff_alpha, coeff_beta,
-    //  energies_alpha, energies_beta, ao_overlap,
-    //  basis_set_name, active_indices_alpha,
-    //  active_indices_beta)
-    orbitals = std::make_shared<data::Orbitals>(
-        C_alpha, C_beta, energies_alpha, energies_beta, ao_overlap,
-        qdk_raw_basis_set,
-        std::nullopt);  // no active space indices
+    orbitals = std::make_shared<data::Orbitals>(C_alpha, C_beta, energies_alpha,
+                                                energies_beta, ao_overlap,
+                                                qdk_raw_basis_set);
 
   } else {
     // Restricted case - store matrices first to avoid
@@ -504,35 +521,18 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     const auto& eps = scf->get_eigenvalues();
     energies = eps.row(0);
 
-    // Construct orbitals with correct parameter order:
-    // (coefficients, energies, ao_overlap, basis_set_name,
-    // active_space_indices)
-    orbitals = std::make_shared<data::Orbitals>(
-        coefficients, energies, ao_overlap, qdk_raw_basis_set,
-        std::nullopt);  // no active space indices
+    orbitals = std::make_shared<data::Orbitals>(coefficients, energies,
+                                                ao_overlap, qdk_raw_basis_set);
   }
 
   // Create canonical Hartree-Fock Configuration
   size_t n_orbitals = orbitals->get_num_molecular_orbitals();
+  auto hf_det = data::Configuration::canonical_hf_configuration(
+      nelec[0], nelec[1], n_orbitals);
 
-  // Create canonical HF configuration string
-  std::string config_str(n_orbitals, '0');
-
-  for (size_t i = 0; i < n_orbitals; ++i) {
-    if (nelec[0] > i and nelec[1] > i) {
-      config_str[i] = '2';
-    } else if (nelec[0] > i) {
-      config_str[i] = 'u';
-    } else if (nelec[1] > i) {
-      config_str[i] = 'd';
-    }
-  }
-  // Create Configuration object
-  data::Configuration hf_det(config_str);
-
-  // Create SlaterDeterminantContainer
-  auto container =
-      std::make_unique<data::SlaterDeterminantContainer>(hf_det, orbitals);
+  // Create StateVectorContainer
+  auto container = std::make_unique<data::StateVectorContainer>(
+      hf_det, orbitals, "electrons");
 
   // Create Wavefunction
   data::Wavefunction wavefunction(std::move(container));
@@ -540,7 +540,38 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   // Return total energy
   double total_energy = context.result.scf_total_energy;
 
-  return std::make_pair(total_energy, std::make_shared<data::Wavefunction>(
-                                          std::move(wavefunction)));
+  std::optional<Eigen::VectorXd> gradient;
+  if (require_gradient && ms_scf_config->mpi.world_rank == 0) {
+    const auto& raw_gradient = context.result.scf_total_gradient;
+    const auto expected_size = 3 * structure->get_num_atoms();
+    if (raw_gradient.size() != expected_size) {
+      throw std::runtime_error(
+          "Internal SCF did not return the requested analytic nuclear "
+          "gradient");
+    }
+    gradient = Eigen::Map<const Eigen::VectorXd>(
+        raw_gradient.data(), static_cast<Eigen::Index>(raw_gradient.size()));
+  }
+
+  auto wavefunction_ptr =
+      std::make_shared<data::Wavefunction>(std::move(wavefunction));
+
+  return {total_energy, wavefunction_ptr, gradient};
+}
+
+ScfCalculationResult ScfSolver::run_with_analytic_gradient(
+    std::shared_ptr<data::Structure> structure, int charge, int multiplicity,
+    BasisOrGuessType basis_or_guess) const {
+  this->lock_settings();
+  return _run_with_options(structure, charge, multiplicity, basis_or_guess,
+                           true);
+}
+
+std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
+    std::shared_ptr<data::Structure> structure, int charge, int multiplicity,
+    BasisOrGuessType basis_or_guess) const {
+  auto result =
+      _run_with_options(structure, charge, multiplicity, basis_or_guess, false);
+  return {result.energy, result.wavefunction};
 }
 }  // namespace qdk::chemistry::algorithms::microsoft

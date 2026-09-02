@@ -274,16 +274,15 @@ auto davidson(int64_t N, int64_t max_m, const Functor& op, const double* D,
   logger->info("  {} = {:6}, {} = {:4}, {} = {:10.5e}", "N", N, "MAX_M", max_m,
                "RES_TOL", tol);
 
-  // Handle trivial case of 1x1 matrix
+  // Handle trivial case of 1x1 matrix by evaluating the operator on the
+  // current trial vector (instead of using the preconditioner diagonal D[0]).
   if (N == 1) {
-    // For a 1x1 matrix, the eigenvalue is simply the diagonal element
-    double eigenvalue = D[0];
-    X[0] = 1.0;  // Normalized eigenvector
+    X[0] = 1.0;
+    double AX = 0.0;
+    op.operator_action(1, 1., X, N, 0., &AX, N);
     logger->info(
-        "iter =    0, LAM(0) = {:20.12e}, RNORM =   0.000000000000e+00",
-        eigenvalue);
-    logger->info("Davidson Converged!");
-    return std::make_pair(size_t(0), eigenvalue);
+        "iter =    0, LAM(0) = {:20.12e}, RNORM =   0.000000000000e+00", AX);
+    return std::make_pair(size_t(0), AX);
   }
 
   std::vector<double> V(N * (max_m + 1)), AV(N * (max_m + 1)),

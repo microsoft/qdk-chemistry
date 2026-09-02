@@ -500,3 +500,197 @@ TEST_F(LatticeGraphTest, KagomeConstructor) {
         kg_pxy.adjacency_matrix().isApprox(expected_pxy.adjacency_matrix()));
   }
 }
+
+// Coloring helper: confirm no two same-color edges share a vertex.
+static void check_valid_edge_coloring(const EdgeColoring& coloring) {
+  std::map<std::uint64_t, std::set<int>> incident;
+  for (const auto& [edge, color] : coloring) {
+    auto [a, b] = edge;
+    EXPECT_EQ(incident[a].count(color), 0u)
+        << "vertex " << a << " has two edges of color " << color;
+    EXPECT_EQ(incident[b].count(color), 0u)
+        << "vertex " << b << " has two edges of color " << color;
+    incident[a].insert(color);
+    incident[b].insert(color);
+  }
+}
+
+TEST_F(LatticeGraphTest, ColorCount) {
+  auto chain_open = LatticeGraph::chain(5, false);
+  ASSERT_TRUE(chain_open.edge_coloring().has_value());
+  std::set<int> chain_open_colors;
+  for (const auto& [e, c] : *chain_open.edge_coloring())
+    chain_open_colors.insert(c);
+  // Open chain uses exactly 2 colors (alternating)
+  EXPECT_EQ(chain_open_colors.size(), 2u);
+
+  auto chain_periodic_even = LatticeGraph::chain(6, true);
+  ASSERT_TRUE(chain_periodic_even.edge_coloring().has_value());
+  std::set<int> chain_even_colors;
+  for (const auto& [e, c] : *chain_periodic_even.edge_coloring())
+    chain_even_colors.insert(c);
+  // Even periodic chain uses exactly 2 colors
+  EXPECT_EQ(chain_even_colors.size(), 2u);
+
+  // Odd periodic chain needs 3 colors
+  auto chain_periodic_odd = LatticeGraph::chain(5, true);
+  ASSERT_TRUE(chain_periodic_odd.edge_coloring().has_value());
+  std::set<int> chain_odd_colors;
+  for (const auto& [e, c] : *chain_periodic_odd.edge_coloring())
+    chain_odd_colors.insert(c);
+  EXPECT_EQ(chain_odd_colors.size(), 3u);
+
+  auto hc = LatticeGraph::honeycomb(3, 3, true, true);
+  ASSERT_TRUE(hc.edge_coloring().has_value());
+  // Honeycomb uses exactly 3 colors.
+  std::set<int> hc_colors;
+  for (const auto& [e, c] : *hc.edge_coloring()) hc_colors.insert(c);
+  EXPECT_EQ(hc_colors.size(), 3u);
+}
+
+TEST_F(LatticeGraphTest, EdgeColoringIsValid) {
+  // For every factory-built lattice, the coloring must be present and valid.
+  std::vector<LatticeGraph> graphs;
+  graphs.emplace_back(LatticeGraph::chain(8, true));
+  graphs.emplace_back(LatticeGraph::square(4, 4, true, true));
+  graphs.emplace_back(LatticeGraph::triangular(4, 4, true, true));
+  graphs.emplace_back(LatticeGraph::honeycomb(3, 3, true, true));
+  graphs.emplace_back(LatticeGraph::kagome(2, 3, true, true));
+
+  for (const auto& g : graphs) {
+    ASSERT_TRUE(g.edge_coloring().has_value());
+    check_valid_edge_coloring(*g.edge_coloring());
+  }
+
+  // Custom adjacency: no coloring by default.
+  using Edge = std::pair<std::uint64_t, std::uint64_t>;
+  std::map<Edge, double> custom_edges = {
+      {{0, 1}, 1.0}, {{1, 2}, 1.0}, {{2, 3}, 1.0}, {{3, 0}, 1.0}};
+  LatticeGraph custom(custom_edges, 4);
+  EXPECT_FALSE(custom.edge_coloring().has_value());
+}
+
+TEST_F(LatticeGraphTest, EdgeColoringIsImmutable) {
+  auto sq = LatticeGraph::square(4, 4, true, true);
+  const auto& first = sq.edge_coloring();
+  const auto& second = sq.edge_coloring();
+  EXPECT_EQ(&first, &second);
+}
+
+TEST_F(LatticeGraphTest, TrivialEdgeColoring) {
+  // Build a small graph and check trivial coloring assigns unique colors.
+  auto chain = LatticeGraph::chain(5);
+  const auto& adj = chain.sparse_adjacency_matrix();
+  auto coloring = trivial_edge_coloring(adj);
+
+  // 4 edges in a 5-site open chain
+  EXPECT_EQ(coloring.size(), 4u);
+
+  // Each edge should have a distinct color 0..3
+  std::set<int> colors;
+  for (const auto& [edge, c] : coloring) {
+    colors.insert(c);
+  }
+  EXPECT_EQ(colors.size(), 4u);
+  EXPECT_EQ(*colors.begin(), 0);
+  EXPECT_EQ(*colors.rbegin(), 3);
+
+  // Also valid as an edge coloring (trivially, since all colors differ)
+  check_valid_edge_coloring(coloring);
+}
+
+TEST_F(LatticeGraphTest, TrivialEdgeColoringEmpty) {
+  // Single-site graph has no edges → empty coloring
+  auto single = LatticeGraph::chain(1);
+  auto coloring = trivial_edge_coloring(single.sparse_adjacency_matrix());
+  EXPECT_TRUE(coloring.empty());
+}
+
+TEST_F(LatticeGraphTest, ColoringSeedDeterministic) {
+  // Same seed → same coloring.
+  auto tri_a = LatticeGraph::triangular(3, 3, true, true, 1.0, 42);
+  auto tri_b = LatticeGraph::triangular(3, 3, true, true, 1.0, 42);
+  ASSERT_TRUE(tri_a.edge_coloring().has_value());
+  ASSERT_TRUE(tri_b.edge_coloring().has_value());
+  EXPECT_EQ(*tri_a.edge_coloring(), *tri_b.edge_coloring());
+
+  // Different seed may produce a different coloring (or same, but at
+  // least both must be valid).
+  auto tri_c = LatticeGraph::triangular(3, 3, true, true, 1.0, 99);
+  ASSERT_TRUE(tri_c.edge_coloring().has_value());
+  check_valid_edge_coloring(*tri_c.edge_coloring());
+}
+
+TEST_F(LatticeGraphTest, KagomeColoringSeed) {
+  auto kg_a = LatticeGraph::kagome(2, 2, true, true, 1.0, 7);
+  auto kg_b = LatticeGraph::kagome(2, 2, true, true, 1.0, 7);
+  ASSERT_TRUE(kg_a.edge_coloring().has_value());
+  ASSERT_TRUE(kg_b.edge_coloring().has_value());
+  EXPECT_EQ(*kg_a.edge_coloring(), *kg_b.edge_coloring());
+  check_valid_edge_coloring(*kg_a.edge_coloring());
+}
+
+TEST_F(LatticeGraphTest, Permute) {
+  // Create a 2x3 square lattice (6 sites):
+  // 3 -- 4 -- 5
+  // |    |    |
+  // 0 -- 1 -- 2
+  //
+  // Adjacency connections:
+  // (0,1), (1,2), (3,4), (4,5) [horizontal]
+  // (0,3), (1,4), (2,5) [vertical]
+  auto sq = LatticeGraph::square(3, 2, false, false);
+  ASSERT_TRUE(sq.edge_coloring().has_value());
+
+  // Define a permutation path that is not an involution:
+  std::vector<std::uint64_t> path = {1, 2, 0, 4, 5, 3};
+  auto permuted = LatticeGraph::permute(sq, path);
+
+  EXPECT_EQ(permuted.num_sites(), sq.num_sites());
+  EXPECT_EQ(permuted.num_edges(), sq.num_edges());
+
+  // Verify that new vertex i corresponds to old vertex path[i] (locks down
+  // permutation direction)
+  for (std::uint64_t i = 0; i < 6; ++i) {
+    for (std::uint64_t j = i + 1; j < 6; ++j) {
+      EXPECT_EQ(permuted.are_connected(i, j),
+                sq.are_connected(path[i], path[j]));
+    }
+  }
+
+  // Inverse permutation mapping for checking:
+  // inv_p[old_site] = new_site
+  std::vector<std::uint64_t> inv_p(6);
+  for (std::uint64_t i = 0; i < 6; ++i) {
+    inv_p[path[i]] = i;
+  }
+
+  // Assert are_connected(i,j) after permute matches the remapped coloring keys
+  const auto& new_coloring = *permuted.edge_coloring();
+  for (std::uint64_t i = 0; i < 6; ++i) {
+    for (std::uint64_t j = i + 1; j < 6; ++j) {
+      bool connected = permuted.are_connected(i, j);
+      auto key = std::make_pair(i, j);
+      bool in_coloring = (new_coloring.count(key) > 0);
+      EXPECT_EQ(connected, in_coloring);
+
+      if (connected) {
+        // Find corresponding old vertices
+        std::uint64_t old_u = path[i];
+        std::uint64_t old_v = path[j];
+        auto old_key = std::minmax(old_u, old_v);
+        // Assert color matches
+        EXPECT_EQ(new_coloring.at(key),
+                  sq.edge_coloring()->at({old_key.first, old_key.second}));
+      }
+    }
+  }
+
+  // Confirms dfs_ordering=true yields path-consecutive adjacency
+  auto ordered_sq = LatticeGraph::square(3, 3, false, false, 1.0, true);
+  for (std::uint64_t i = 0; i < ordered_sq.num_sites() - 1; ++i) {
+    EXPECT_TRUE(ordered_sq.are_connected(i, i + 1))
+        << "ordered_sq sites " << i << " and " << (i + 1)
+        << " are not connected";
+  }
+}

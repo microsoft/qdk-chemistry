@@ -10,6 +10,9 @@ import pytest
 
 from qdk_chemistry import algorithms, data
 from qdk_chemistry.data import AlgorithmRef, Ansatz, Settings, Structure
+from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix
+from qdk_chemistry.data.symmetry import SymmetryProduct, axes, spin_index_set
+from qdk_chemistry.utils import Logger
 
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
@@ -35,6 +38,8 @@ except ImportError:
 
 if PYSCF_AVAILABLE:
     from qdk_chemistry.constants import ANGSTROM_TO_BOHR
+    from qdk_chemistry.data import AOType, BasisSet, OrbitalType, Shell
+    from qdk_chemistry.plugins.pyscf import population_analysis as pyscf_population_analysis
     from qdk_chemistry.plugins.pyscf.conversion import (
         basis_to_pyscf_mol,
         hamiltonian_to_scf,
@@ -50,13 +55,13 @@ if PYSCF_AVAILABLE:
 pytestmark = pytest.mark.skipif(not PYSCF_AVAILABLE, reason="PySCF not available")
 
 
-def create_n2_structure():
+def create_n2_structure(distance_angstrom=2.0):
     """Create a nitrogen molecule structure."""
     symbols = ["N", "N"]
     coords = np.array(
         [
-            [0.000000000, 0.0000000000, 2.000000000000 * ANGSTROM_TO_BOHR],
             [0.000000000, 0.0000000000, 0.000000000000],
+            [distance_angstrom * ANGSTROM_TO_BOHR, 0.0000000000, 0.000000000000],
         ]
     )
     return Structure(symbols, coords)
@@ -86,6 +91,14 @@ def create_helium_structure():
 def create_li_structure():
     """Create a lithium atom structure."""
     return Structure(["Li"], np.array([[0.0, 0.0, 0.0]]))
+
+
+def create_lih_structure():
+    """Create a lithium hydride structure."""
+    return Structure(
+        ["Li", "H"],
+        np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.595 * ANGSTROM_TO_BOHR]]),
+    )
 
 
 def create_o2_structure():
@@ -140,6 +153,7 @@ class TestPyscfPlugin:
         """Test that PySCF plugin is properly registered."""
         available_solvers = algorithms.available("scf_solver")
         assert "pyscf" in available_solvers
+        assert "pyscf_stabilized" in available_solvers
 
         available_localizers = algorithms.available("orbital_localizer")
         assert "pyscf_multi" in available_localizers
@@ -150,9 +164,18 @@ class TestPyscfPlugin:
         available_stability_checkers = algorithms.available("stability_checker")
         assert "pyscf" in available_stability_checkers
 
+        available_population_analyzers = algorithms.available("population_analyzer")
+        assert "pyscf" in available_population_analyzers
+        assert "pyscf_mulliken" not in available_population_analyzers
+
     def test_pyscf_scf_solver_creation(self):
         """Test creating PySCF SCF solver."""
         scf_solver = algorithms.create("scf_solver", "pyscf")
+        assert scf_solver is not None
+
+    def test_pyscf_stabilized_scf_solver_creation(self):
+        """Test creating PySCF stabilized SCF solver."""
+        scf_solver = algorithms.create("scf_solver", "pyscf_stabilized")
         assert scf_solver is not None
 
     def test_pyscf_localizer_creation(self):
@@ -175,6 +198,144 @@ class TestPyscfPlugin:
         stability_checker = algorithms.create("stability_checker", "pyscf")
         assert stability_checker is not None
 
+    def test_pyscf_population_analyzer_creation(self):
+        """Test creating PySCF population analyzer."""
+        population_analyzer = algorithms.create("population_analyzer", "pyscf")
+        assert population_analyzer is not None
+        assert population_analyzer.settings().get("method") == "mulliken"
+        with pytest.raises(ValueError, match="Allowed options"):
+            population_analyzer.settings().set("method", "unsupported")
+
+    def test_pyscf_population_analysis_requires_basis_set(self):
+        """Test that PySCF population analysis rejects model-system orbitals."""
+        orbitals = data.ModelOrbitals(3)
+        determinant = data.Configuration.from_bitstring("110")
+        wavefunction = data.Wavefunction(data.StateVectorContainer(determinant, orbitals))
+        analyzer = algorithms.create("population_analyzer", "pyscf")
+
+        with pytest.raises(ValueError, match="requires orbitals with an associated basis set"):
+            analyzer.run(wavefunction)
+
+    def test_pyscf_population_analysis_requires_overlap(self):
+        """Test that PySCF population analysis requires a stored AO overlap matrix."""
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+        _, reference = scf_solver.run(create_lih_structure(), charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+        reference_orbitals = reference.get_orbitals()
+        coefficients = spin_channel_matrix(reference_orbitals.coefficients(), axes.alpha())
+        orbitals = data.Orbitals(
+            coefficients,
+            None,
+            None,
+            reference_orbitals.get_basis_set(),
+        )
+        determinant = data.Configuration.from_spin_half_string("220000")
+        wavefunction = data.Wavefunction(data.StateVectorContainer(determinant, orbitals))
+        analyzer = algorithms.create("population_analyzer", "pyscf")
+
+        with pytest.raises(RuntimeError, match="(?i)overlap"):
+            analyzer.run(wavefunction)
+
+    def test_pyscf_population_analysis_uses_stored_overlap(self, monkeypatch):
+        """Test that PySCF population analysis contracts with the orbitals' AO overlap."""
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+        _, reference = scf_solver.run(create_lih_structure(), charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+        reference_orbitals = reference.get_orbitals()
+        overlap = np.array(reference_orbitals.get_overlap_matrix(), copy=True)
+        overlap[0, 1] += 0.125
+        overlap[1, 0] += 0.125
+        coefficients = spin_channel_matrix(reference_orbitals.coefficients(), axes.alpha())
+        orbitals = data.Orbitals(
+            coefficients,
+            None,
+            overlap,
+            reference_orbitals.get_basis_set(),
+        )
+        determinant = data.Configuration.from_spin_half_string("220000")
+        wavefunction = data.Wavefunction(data.StateVectorContainer(determinant, orbitals))
+        analyzer = algorithms.create("population_analyzer", "pyscf")
+        captured = {}
+
+        def capture_overlap(*args, **kwargs):
+            captured["overlap"] = kwargs["s"]
+            return np.zeros(args[0].nao_nr()), None
+
+        monkeypatch.setattr(pyscf_population_analysis, "mulliken_pop", capture_overlap)
+
+        analyzer.run(wavefunction)
+
+        np.testing.assert_allclose(captured["overlap"], overlap)
+
+    def test_pyscf_lih_population_analysis(self):
+        """Test heteronuclear AO-to-atom population assignment."""
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+        _, wavefunction = scf_solver.run(create_lih_structure(), charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+        pyscf_analyzer = algorithms.create("population_analyzer", "pyscf")
+
+        pyscf_populations = pyscf_analyzer.run(wavefunction)
+
+        np.testing.assert_allclose(
+            pyscf_populations,
+            [3.0161156314704147, 0.9838843685295866],
+            atol=1e-6,
+            err_msg="LiH populations must follow the five-AO lithium and one-AO hydrogen boundary",
+        )
+
+    def test_pyscf_population_analysis_uses_correlated_one_rdm(self):
+        """Test that correlated populations use the 1-RDM in the current MO basis."""
+        h2 = Structure(
+            ["H", "H"],
+            np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4 * ANGSTROM_TO_BOHR]]),
+        )
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+        _, reference = scf_solver.run(h2, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+        reference_orbitals = reference.get_orbitals()
+        coefficients = np.array(
+            spin_channel_matrix(reference_orbitals.coefficients(), axes.alpha()),
+            copy=True,
+        )
+        for column in range(coefficients.shape[1]):
+            first_nonzero = np.flatnonzero(np.abs(coefficients[:, column]) > 1e-12)[0]
+            if coefficients[first_nonzero, column] < 0:
+                coefficients[:, column] *= -1
+        orbitals = data.Orbitals(
+            coefficients,
+            None,
+            reference_orbitals.get_overlap_matrix(),
+            reference_orbitals.get_basis_set(),
+        )
+        determinants = [
+            data.Configuration.from_spin_half_string("20"),
+            data.Configuration.from_spin_half_string("du"),
+        ]
+        coefficients = np.full(2, 1.0 / np.sqrt(2.0))
+        one_rdm = np.array([[1.5, 0.5], [0.5, 0.5]])
+        wavefunction = data.Wavefunction(data.StateVectorContainer(coefficients, determinants, orbitals, one_rdm))
+        pyscf_analyzer = algorithms.create("population_analyzer", "pyscf")
+
+        pyscf_populations = pyscf_analyzer.run(wavefunction)
+
+        np.testing.assert_allclose(
+            pyscf_populations,
+            [1.523406124803181, 0.4765938751968194],
+            atol=1e-8,
+            err_msg="Correlated population analysis must preserve off-diagonal 1-RDM contributions",
+        )
+
+    def test_pyscf_lih_cation_unrestricted_population_analysis(self):
+        """Test spin-summed heteronuclear populations from unrestricted orbitals."""
+        scf_solver = algorithms.create("scf_solver", "pyscf", scf_type="unrestricted")
+        _, wavefunction = scf_solver.run(create_lih_structure(), charge=1, spin_multiplicity=2, basis_or_guess="sto-3g")
+        pyscf_analyzer = algorithms.create("population_analyzer", "pyscf")
+
+        pyscf_populations = pyscf_analyzer.run(wavefunction)
+
+        np.testing.assert_allclose(
+            pyscf_populations,
+            [2.19786389376805, 0.8021361062319504],
+            atol=1e-8,
+            err_msg="Unrestricted LiH+ populations must include both spin-resolved 1-RDM blocks",
+        )
+
     def test_pyscf_scf_solver_settings(self):
         """Test PySCF SCF solver settings interface."""
         scf_solver = algorithms.create("scf_solver", "pyscf")
@@ -192,6 +353,38 @@ class TestPyscfPlugin:
         # Test setting other parameters
         settings.set("scf_type", "restricted")
         assert settings.get("scf_type") == "restricted"
+
+    def test_pyscf_stabilized_scf_solver_settings(self):
+        """Test PySCF stabilized SCF solver settings interface."""
+        scf_solver = algorithms.create("scf_solver", "pyscf_stabilized")
+        settings = scf_solver.settings()
+
+        assert settings is not None
+        assert settings.get("max_stability_iterations") == 5
+        assert settings.get("check_internal") is True
+        assert settings.get("check_external") is True
+        assert settings.get("fail_on_unstable") is True
+
+        settings.set("max_stability_iterations", 2)
+        assert settings.get("max_stability_iterations") == 2
+
+    def test_pyscf_stabilized_scf_solver_stretched_n2(self):
+        """Test PySCF stabilized SCF solver on the stretched N2 system used by C++ tests."""
+        n2 = create_n2_structure(1.6)
+
+        regular_scf_solver = algorithms.create("scf_solver", "pyscf")
+        regular_scf_solver.settings().set("method", "hf")
+        regular_energy, regular_wavefunction = regular_scf_solver.run(n2, 0, 1, "def2-svp")
+
+        stabilized_scf_solver = algorithms.create("scf_solver", "pyscf_stabilized")
+        stabilized_scf_solver.settings().set("method", "hf")
+        stabilized_scf_solver.settings().set("max_stability_iterations", 1)
+        stabilized_scf_solver.settings().set("fail_on_unstable", False)
+        stabilized_energy, stabilized_wavefunction = stabilized_scf_solver.run(n2, 0, 1, "def2-svp")
+
+        assert regular_wavefunction.get_orbitals().is_restricted()
+        assert stabilized_energy < regular_energy
+        assert not stabilized_wavefunction.get_orbitals().is_restricted()
 
     def test_pyscf_localizer_settings(self):
         """Test PySCF localizer settings interface."""
@@ -671,7 +864,9 @@ class TestPyscfPlugin:
         orbitals = wavefunction.get_orbitals()
 
         # Compute the objective function for the canonical orbitals
-        can_objective_value = pipek_objective_function(orbitals, orbitals.get_coefficients()[0])
+        can_objective_value = pipek_objective_function(
+            orbitals, spin_channel_matrix(orbitals.coefficients(), axes.alpha())
+        )
 
         # Get orbital occupancy information
         num_elec = wavefunction.get_total_num_electrons()
@@ -679,7 +874,7 @@ class TestPyscfPlugin:
 
         # Prepare for Test 2: Calculate can_random_objective_value before localizer creation
         random_occ_indices = [1, 3, 4]  # Random subset of occupied orbitals
-        ca_can, _ = orbitals.get_coefficients()
+        ca_can = spin_channel_matrix(orbitals.coefficients(), axes.alpha())
         ca_selected = ca_can[:, random_occ_indices]
         can_random_objective_value = pipek_objective_function(orbitals, ca_selected)
 
@@ -700,13 +895,14 @@ class TestPyscfPlugin:
 
         # Check that the objective function improved for the final orbitals
         localized_virt = localized_virt_wfn.get_orbitals()
-        mos_final, _ = localized_virt.get_coefficients()
+        mos_final = spin_channel_matrix(localized_virt.coefficients(), axes.alpha())
         final_objective_value = pipek_objective_function(localized_virt, mos_final)
         assert final_objective_value > can_objective_value
 
         # Test 2: Randomly choose indices from occupied orbitals only
         localized_random = localizer.run(wavefunction, random_occ_indices, random_occ_indices)
-        mos_rand, _ = localized_random.get_orbitals().get_coefficients()
+        random_orbitals = localized_random.get_orbitals()
+        mos_rand = spin_channel_matrix(random_orbitals.coefficients(), axes.alpha())
 
         # Extract the submatrix for the localized indices
         s_matrix = orbitals.get_overlap_matrix()
@@ -735,7 +931,9 @@ class TestPyscfPlugin:
         orbitals = wavefunction.get_orbitals()
 
         # Compute the objective function for the canonical orbitals
-        can_objective_value = boys_objective_function(orbitals, orbitals.get_coefficients()[0])
+        can_objective_value = boys_objective_function(
+            orbitals, spin_channel_matrix(orbitals.coefficients(), axes.alpha())
+        )
 
         # Get orbital occupancy information
         num_elec = wavefunction.get_total_num_electrons()
@@ -743,7 +941,7 @@ class TestPyscfPlugin:
 
         # Prepare for Test 2: Calculate can_random_objective_value before localizer creation
         random_virt_indices = [5, 7, 9]  # Random subset of virtual orbitals (indices >= num_occupied_orbitals)
-        ca_can, _ = orbitals.get_coefficients()
+        ca_can = spin_channel_matrix(orbitals.coefficients(), axes.alpha())
         ca_selected = ca_can[:, random_virt_indices]
         can_random_objective_value = boys_objective_function(orbitals, ca_selected)
 
@@ -765,13 +963,14 @@ class TestPyscfPlugin:
 
         # Check that the objective function improved for the final orbitals
         localized_virt = localized_virt_wfn.get_orbitals()
-        mos_final, _ = localized_virt.get_coefficients()
+        mos_final = spin_channel_matrix(localized_virt.coefficients(), axes.alpha())
         final_objective_value = boys_objective_function(localized_virt, mos_final)
         assert final_objective_value < can_objective_value
 
         # Test 2: Randomly choose indices from virtual orbitals only
         localized_random = localizer.run(wavefunction, random_virt_indices, random_virt_indices)
-        mos_rand, _ = localized_random.get_orbitals().get_coefficients()
+        random_orbitals = localized_random.get_orbitals()
+        mos_rand = spin_channel_matrix(random_orbitals.coefficients(), axes.alpha())
 
         # Extract the submatrix for the localized indices
         s_matrix = orbitals.get_overlap_matrix()
@@ -798,9 +997,11 @@ class TestPyscfPlugin:
 
         _, wavefunction = scf_solver.run(water, 0, 1, "def2-svp")
         orbitals = wavefunction.get_orbitals()
-        ca_can, _ = orbitals.get_coefficients()
+        ca_can = spin_channel_matrix(orbitals.coefficients(), axes.alpha())
         # Compute the objective function for the canonical orbitals
-        can_objective_value = er_objective_function(orbitals, orbitals.get_coefficients()[0])
+        can_objective_value = er_objective_function(
+            orbitals, spin_channel_matrix(orbitals.coefficients(), axes.alpha())
+        )
         # Random subset of occupied orbitals, must include 0 (O 1s), possibly due to numerical instability
         random_occ_indices = [0, 1, 4]
         # Prepare for Test 2: Calculate can_random_objective_value before localizer creation
@@ -828,13 +1029,14 @@ class TestPyscfPlugin:
 
         # Check that the objective function improved for the final orbitals
         localized_virt = localized_virt_wfn.get_orbitals()
-        mos_final, _ = localized_virt.get_coefficients()
+        mos_final = spin_channel_matrix(localized_virt.coefficients(), axes.alpha())
         final_objective_value = er_objective_function(localized_virt, mos_final)
         assert final_objective_value > can_objective_value
 
         # Test 2: Randomly choose indices from occupied orbitals only
         localized_random = localizer.run(wavefunction, random_occ_indices, random_occ_indices)
-        mos_rand, _ = localized_random.get_orbitals().get_coefficients()
+        random_orbitals = localized_random.get_orbitals()
+        mos_rand = spin_channel_matrix(random_orbitals.coefficients(), axes.alpha())
 
         # Extract the submatrix for the localized indices
         s_matrix = orbitals.get_overlap_matrix()
@@ -861,7 +1063,9 @@ class TestPyscfPlugin:
         _, wavefunction = scf_solver.run(o2, 0, 3, "def2-svp")
         orbitals = wavefunction.get_orbitals()
 
-        [can_a, can_b] = orbitals.get_coefficients()
+        coefficients = orbitals.coefficients()
+        can_a = spin_channel_matrix(coefficients, axes.alpha())
+        can_b = spin_channel_matrix(coefficients, axes.beta())
         can_objective_value_a = pipek_objective_function(orbitals, can_a)
         can_objective_value_b = pipek_objective_function(orbitals, can_b)
 
@@ -896,7 +1100,9 @@ class TestPyscfPlugin:
 
         # Check that the objective function improved for the final orbitals
         localized_virt = localized_virt_wfn.get_orbitals()
-        mos_final_a, mos_final_b = localized_virt.get_coefficients()
+        localized_virt_coefficients = localized_virt.coefficients()
+        mos_final_a = spin_channel_matrix(localized_virt_coefficients, axes.alpha())
+        mos_final_b = spin_channel_matrix(localized_virt_coefficients, axes.beta())
         final_objective_value_a = pipek_objective_function(localized_virt, mos_final_a)
         final_objective_value_b = pipek_objective_function(localized_virt, mos_final_b)
         assert final_objective_value_a > can_objective_value_a
@@ -904,7 +1110,10 @@ class TestPyscfPlugin:
 
         # Test 2: Randomly choose indices to localize for both spin channels
         localized_random = localizer.run(wavefunction, random_occ_indices_alpha, random_occ_indices_beta)
-        mos_rand_a, mos_rand_b = localized_random.get_orbitals().get_coefficients()
+        random_orbitals = localized_random.get_orbitals()
+        random_coefficients = random_orbitals.coefficients()
+        mos_rand_a = spin_channel_matrix(random_coefficients, axes.alpha())
+        mos_rand_b = spin_channel_matrix(random_coefficients, axes.beta())
 
         # Test alpha channel
         s_matrix = orbitals.get_overlap_matrix()
@@ -949,7 +1158,9 @@ class TestPyscfPlugin:
         orbitals = wavefunction.get_orbitals()
 
         # Compute the objective function for the canonical orbitals
-        [can_a, can_b] = orbitals.get_coefficients()
+        coefficients = orbitals.coefficients()
+        can_a = spin_channel_matrix(coefficients, axes.alpha())
+        can_b = spin_channel_matrix(coefficients, axes.beta())
         can_objective_value_a = boys_objective_function(orbitals, can_a)
         can_objective_value_b = boys_objective_function(orbitals, can_b)
 
@@ -991,7 +1202,9 @@ class TestPyscfPlugin:
 
         # Check that the objective function improved for the final orbitals
         localized_virt = localized_virt_wfn.get_orbitals()
-        mos_final_a, mos_final_b = localized_virt.get_coefficients()
+        localized_virt_coefficients = localized_virt.coefficients()
+        mos_final_a = spin_channel_matrix(localized_virt_coefficients, axes.alpha())
+        mos_final_b = spin_channel_matrix(localized_virt_coefficients, axes.beta())
         final_objective_value_a = boys_objective_function(localized_virt, mos_final_a)
         final_objective_value_b = boys_objective_function(localized_virt, mos_final_b)
         assert final_objective_value_a < can_objective_value_a
@@ -999,7 +1212,10 @@ class TestPyscfPlugin:
 
         # Test 2: Randomly choose indices from virtual orbitals only for both spin channels
         localized_random = localizer.run(wavefunction, random_virt_indices_alpha, random_virt_indices_beta)
-        mos_rand_a, mos_rand_b = localized_random.get_orbitals().get_coefficients()
+        random_orbitals = localized_random.get_orbitals()
+        random_coefficients = random_orbitals.coefficients()
+        mos_rand_a = spin_channel_matrix(random_coefficients, axes.alpha())
+        mos_rand_b = spin_channel_matrix(random_coefficients, axes.beta())
 
         # Test alpha channel
         s_matrix = orbitals.get_overlap_matrix()
@@ -1044,7 +1260,9 @@ class TestPyscfPlugin:
         orbitals = wavefunction.get_orbitals()
 
         # Compute the objective function for the canonical orbitals
-        [can_a, can_b] = orbitals.get_coefficients()
+        coefficients = orbitals.coefficients()
+        can_a = spin_channel_matrix(coefficients, axes.alpha())
+        can_b = spin_channel_matrix(coefficients, axes.beta())
         can_objective_value_a = er_objective_function(orbitals, can_a)
         can_objective_value_b = er_objective_function(orbitals, can_b)
 
@@ -1079,7 +1297,9 @@ class TestPyscfPlugin:
 
         # Check that the objective function improved for the final orbitals
         localized_virt = localized_virt_wfn.get_orbitals()
-        mos_final_a, mos_final_b = localized_virt.get_coefficients()
+        localized_virt_coefficients = localized_virt.coefficients()
+        mos_final_a = spin_channel_matrix(localized_virt_coefficients, axes.alpha())
+        mos_final_b = spin_channel_matrix(localized_virt_coefficients, axes.beta())
         final_objective_value_a = er_objective_function(localized_virt, mos_final_a)
         final_objective_value_b = er_objective_function(localized_virt, mos_final_b)
         assert final_objective_value_a > can_objective_value_a
@@ -1087,7 +1307,10 @@ class TestPyscfPlugin:
 
         # Test 2: Randomly choose indices to localize for both spin channels
         localized_random = localizer.run(wavefunction, random_occ_indices_alpha, random_occ_indices_beta)
-        mos_rand_a, mos_rand_b = localized_random.get_orbitals().get_coefficients()
+        random_orbitals = localized_random.get_orbitals()
+        random_coefficients = random_orbitals.coefficients()
+        mos_rand_a = spin_channel_matrix(random_coefficients, axes.alpha())
+        mos_rand_b = spin_channel_matrix(random_coefficients, axes.beta())
 
         # Test alpha channel
         s_matrix = orbitals.get_overlap_matrix()
@@ -1133,7 +1356,7 @@ class TestPyscfPlugin:
         orbitals = wavefunction.get_orbitals()
 
         # Compute the objective function for the canonical orbitals
-        can_mos, _ = orbitals.get_coefficients()
+        can_mos = spin_channel_matrix(orbitals.coefficients(), axes.alpha())
         can_objective_value = pipek_objective_function(orbitals, can_mos)
 
         # Get orbital occupancy information
@@ -1162,13 +1385,14 @@ class TestPyscfPlugin:
 
         # Check that the objective function improved for the final orbitals
         localized_virt = localized_virt_wfn.get_orbitals()
-        mos_final, _ = localized_virt.get_coefficients()
+        mos_final = spin_channel_matrix(localized_virt.coefficients(), axes.alpha())
         final_objective_value = pipek_objective_function(localized_virt, mos_final)
         assert final_objective_value > can_objective_value
 
         # Test 2: Randomly choose indices from occupied orbitals only
         localized_random = localizer.run(wavefunction, random_occ_indices, random_occ_indices)
-        mos_rand, _ = localized_random.get_orbitals().get_coefficients()
+        random_orbitals = localized_random.get_orbitals()
+        mos_rand = spin_channel_matrix(random_orbitals.coefficients(), axes.alpha())
 
         # Extract the submatrix for the localized indices
         s_matrix = orbitals.get_overlap_matrix()
@@ -1198,7 +1422,7 @@ class TestPyscfPlugin:
         orbitals = wavefunction.get_orbitals()
 
         # Compute the objective function for the canonical orbitals
-        can_mos, _ = orbitals.get_coefficients()
+        can_mos = spin_channel_matrix(orbitals.coefficients(), axes.alpha())
         can_objective_value = boys_objective_function(orbitals, can_mos)
 
         # Get orbital occupancy information
@@ -1233,13 +1457,14 @@ class TestPyscfPlugin:
 
         # Check that the objective function improved for the final orbitals
         localized_virt = localized_virt_wfn.get_orbitals()
-        mos_final, _ = localized_virt.get_coefficients()
+        mos_final = spin_channel_matrix(localized_virt.coefficients(), axes.alpha())
         final_objective_value = boys_objective_function(localized_virt, mos_final)
         assert final_objective_value < can_objective_value
 
         # Test 2: Randomly choose indices from virtual orbitals only
         localized_random = localizer.run(wavefunction, random_virt_indices, random_virt_indices)
-        mos_rand, _ = localized_random.get_orbitals().get_coefficients()
+        random_orbitals = localized_random.get_orbitals()
+        mos_rand = spin_channel_matrix(random_orbitals.coefficients(), axes.alpha())
 
         # Extract the submatrix for the localized indices
         s_matrix = orbitals.get_overlap_matrix()
@@ -1269,7 +1494,7 @@ class TestPyscfPlugin:
         orbitals = wavefunction.get_orbitals()
 
         # Compute the objective function for the canonical orbitals
-        can_mos, _ = orbitals.get_coefficients()
+        can_mos = spin_channel_matrix(orbitals.coefficients(), axes.alpha())
         can_objective_value = er_objective_function(orbitals, can_mos)
 
         # Get orbital occupancy information
@@ -1299,13 +1524,14 @@ class TestPyscfPlugin:
 
         # Check that the objective function improved for the final orbitals
         localized_virt = localized_virt_wfn.get_orbitals()
-        mos_final, _ = localized_virt.get_coefficients()
+        mos_final = spin_channel_matrix(localized_virt.coefficients(), axes.alpha())
         final_objective_value = er_objective_function(localized_virt, mos_final)
         assert final_objective_value > can_objective_value
 
         # Test 2: Randomly choose indices from occupied orbitals only
         localized_random = localizer.run(wavefunction, random_occ_indices, random_occ_indices)
-        mos_rand, _ = localized_random.get_orbitals().get_coefficients()
+        random_orbitals = localized_random.get_orbitals()
+        mos_rand = spin_channel_matrix(random_orbitals.coefficients(), axes.alpha())
 
         # Extract the submatrix for the localized indices
         s_matrix = orbitals.get_overlap_matrix()
@@ -1338,11 +1564,50 @@ class TestPyscfPlugin:
         assert orbitals_before.has_active_space()
         assert orbitals_after.has_active_space(), f"Active space lost after {localizer_name} localization"
 
-        alpha_before, beta_before = orbitals_before.get_active_space_indices()
-        alpha_after, beta_after = orbitals_after.get_active_space_indices()
+        alpha_before = spin_channel_indices(orbitals_before.active_indices(), axes.alpha())
+        beta_before = spin_channel_indices(orbitals_before.active_indices(), axes.beta())
+        alpha_after = spin_channel_indices(orbitals_after.active_indices(), axes.alpha())
+        beta_after = spin_channel_indices(orbitals_after.active_indices(), axes.beta())
 
         assert list(alpha_before) == list(alpha_after), f"{localizer_name}: alpha indices changed"
         assert list(beta_before) == list(beta_after), f"{localizer_name}: beta indices changed"
+
+    def test_pyscf_localization_multi_determinant_warns(self, monkeypatch):
+        """Localizing a multi-determinant wavefunction warns and returns one determinant."""
+        water = create_water_structure()
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+        _, wavefunction = scf_solver.run(water, 0, 1, "sto-3g")
+
+        # Select an active space (6 electrons, 5 orbitals -> 3 alpha, 3 beta)
+        selector = algorithms.create("active_space_selector", "qdk_valence")
+        selector.settings().set("num_active_electrons", 6)
+        selector.settings().set("num_active_orbitals", 5)
+        active_wfn = selector.run(wavefunction)
+
+        active_orbitals = active_wfn.get_orbitals()
+        active_alpha = spin_channel_indices(active_orbitals.active_indices(), axes.alpha())
+        active_beta = spin_channel_indices(active_orbitals.active_indices(), axes.beta())
+
+        # Build a two-determinant expansion over the active space
+        expected_mean_field_det = data.Configuration.canonical_hf_configuration(3, 3, 5)
+        dets = [data.Configuration.from_spin_half_string("22020"), expected_mean_field_det]
+        coeffs = np.array([0.96, np.sqrt(1.0 - 0.96**2)])
+        multi_wfn = data.Wavefunction(data.StateVectorContainer(coeffs, dets, active_orbitals))
+        assert len(multi_wfn.get_active_determinants()) == 2
+
+        localizer = algorithms.create("orbital_localizer", "pyscf_multi")
+        localizer.settings().set("method", "pipek-mezey")
+
+        warnings: list[str] = []
+        monkeypatch.setattr(Logger, "warn", warnings.append)
+
+        localized_wfn = localizer.run(multi_wfn, list(active_alpha), list(active_beta))
+
+        assert warnings
+        assert any("multi-determinant wavefunction" in warn for warn in warnings)
+        assert len(localized_wfn.get_active_determinants()) == 1
+        assert localized_wfn.get_active_determinants()[0] == expected_mean_field_det
+        self._verify_active_space_preserved(multi_wfn, localized_wfn, "pyscf_multi")
 
     @pytest.mark.parametrize("method", ["pipek-mezey", "foster-boys", "edmiston-ruedenberg", "cholesky"])
     def test_pyscf_localization_preserves_active_space_restricted(self, method):
@@ -1357,7 +1622,9 @@ class TestPyscfPlugin:
         selector.settings().set("num_active_orbitals", 5)
         active_wfn = selector.run(wavefunction)
 
-        active_alpha, active_beta = active_wfn.get_orbitals().get_active_space_indices()
+        active_orbitals = active_wfn.get_orbitals()
+        active_alpha = spin_channel_indices(active_orbitals.active_indices(), axes.alpha())
+        active_beta = spin_channel_indices(active_orbitals.active_indices(), axes.beta())
 
         # Localize
         localizer = algorithms.create("orbital_localizer", "pyscf_multi")
@@ -1378,24 +1645,27 @@ class TestPyscfPlugin:
         num_mo = orbitals.get_num_molecular_orbitals()
 
         # Define active space: frozen core (first 2 are inactive), rest are active
-        # Must include all occupied orbitals in active space for SlaterDeterminantContainer
+        # Must include all occupied orbitals in active space for StateVectorContainer
         active_alpha = list(range(2, num_mo))
         active_beta = list(range(2, num_mo))
         inactive_alpha = [0, 1]
         inactive_beta = [0, 1]
 
         # Create orbitals with active space
-        coeffs_alpha, coeffs_beta = orbitals.get_coefficients()
+        coefficients = orbitals.coefficients()
+        coeffs_alpha = spin_channel_matrix(coefficients, axes.alpha())
+        coeffs_beta = spin_channel_matrix(coefficients, axes.beta())
         active_orbitals = data.Orbitals(
             coefficients_alpha=coeffs_alpha,
             coefficients_beta=coeffs_beta,
             ao_overlap=orbitals.get_overlap_matrix() if orbitals.has_overlap_matrix() else None,
             basis_set=orbitals.get_basis_set(),
-            indices=(active_alpha, active_beta, inactive_alpha, inactive_beta),
+            active_indices=spin_index_set(num_mo, active_alpha, active_beta, equivalent=False),
+            inactive_indices=spin_index_set(num_mo, inactive_alpha, inactive_beta, equivalent=False),
         )
 
         active_wfn = data.Wavefunction(
-            data.SlaterDeterminantContainer(wavefunction.get_active_determinants()[0], active_orbitals)
+            data.StateVectorContainer(wavefunction.get_active_determinants()[0], active_orbitals)
         )
 
         # Localize only the active orbitals
@@ -1417,7 +1687,9 @@ class TestPyscfPlugin:
         avas_selector.settings().set("ao_labels", ["O 2s", "O 2p", "H 1s"])
         active_wfn = avas_selector.run(wavefunction)
 
-        act_a, act_b = active_wfn.get_orbitals().get_active_space_indices()
+        active_orbitals = active_wfn.get_orbitals()
+        act_a = spin_channel_indices(active_orbitals.active_indices(), axes.alpha())
+        act_b = spin_channel_indices(active_orbitals.active_indices(), axes.beta())
         assert act_a == act_b
         assert act_a == [2, 3, 4, 5, 6]
 
@@ -1442,7 +1714,9 @@ class TestPyscfPlugin:
         avas_selector.settings().set("ao_labels", ["O 2s", "O 2p"])
         active_wfn = avas_selector.run(wavefunction)
 
-        act_a, act_b = active_wfn.get_orbitals().get_active_space_indices()
+        active_orbitals = active_wfn.get_orbitals()
+        act_a = spin_channel_indices(active_orbitals.active_indices(), axes.alpha())
+        act_b = spin_channel_indices(active_orbitals.active_indices(), axes.beta())
         assert act_a == act_b
         assert act_a == [2, 3, 4, 5, 6, 7, 8, 9]
 
@@ -1481,7 +1755,7 @@ class TestPyscfPlugin:
         # Verify we have unrestricted orbitals
         orbitals = wavefunction.get_orbitals()
         assert orbitals.is_unrestricted(), "O2 triplet should have unrestricted orbitals"
-        assert wavefunction.get_container_type() == "sd"
+        assert wavefunction.get_container_type() == "state_vector"
         assert wavefunction.size() == 1, "single determinant"
 
         # Create Hamiltonian
@@ -1546,7 +1820,7 @@ class TestPyscfPlugin:
         _, cc_wavefunction, _ = cc_calculator.run(ansatz_object)
 
         # Verify original wavefunction properties
-        assert cc_wavefunction.get_container_type() == "coupled_cluster"
+        assert cc_wavefunction.get_container_type() == "amplitude"
 
         # Get original container and check it has amplitudes
         original_container = cc_wavefunction.get_container()
@@ -1576,7 +1850,7 @@ class TestPyscfPlugin:
         restored_json = data.Wavefunction.from_json(wf_json)
 
         # Verify JSON restored wavefunction
-        assert restored_json.get_container_type() == "coupled_cluster"
+        assert restored_json.get_container_type() == "amplitude"
 
         json_container = restored_json.get_container()
         assert json_container.has_t1_amplitudes()
@@ -1632,7 +1906,7 @@ class TestPyscfPlugin:
         restored_hdf5 = data.Wavefunction.from_hdf5_file(str(filename))
 
         # Verify HDF5 restored wavefunction
-        assert restored_hdf5.get_container_type() == "coupled_cluster"
+        assert restored_hdf5.get_container_type() == "amplitude"
 
         hdf5_container = restored_hdf5.get_container()
         assert hdf5_container.has_t1_amplitudes()
@@ -1698,7 +1972,7 @@ class TestPyscfPlugin:
         _, cc_wavefunction, _ = cc_calculator.run(ansatz_object)
 
         # Verify original wavefunction properties
-        assert cc_wavefunction.get_container_type() == "coupled_cluster"
+        assert cc_wavefunction.get_container_type() == "amplitude"
 
         # Get original container and check it has amplitudes
         original_container = cc_wavefunction.get_container()
@@ -1723,7 +1997,7 @@ class TestPyscfPlugin:
         restored_json = data.Wavefunction.from_json(wf_json)
 
         # Verify JSON restored wavefunction
-        assert restored_json.get_container_type() == "coupled_cluster"
+        assert restored_json.get_container_type() == "amplitude"
 
         json_container = restored_json.get_container()
         assert json_container.has_t1_amplitudes()
@@ -1760,7 +2034,7 @@ class TestPyscfPlugin:
         restored_hdf5 = data.Wavefunction.from_hdf5_file(str(filename))
 
         # Verify HDF5 restored wavefunction
-        assert restored_hdf5.get_container_type() == "coupled_cluster"
+        assert restored_hdf5.get_container_type() == "amplitude"
 
         hdf5_container = restored_hdf5.get_container()
         assert hdf5_container.has_t1_amplitudes()
@@ -2129,7 +2403,9 @@ class TestPyscfPlugin:
         hamiltonian = hamiltonian_calculator.run(orbitals)
 
         # Verify the orbitals have coefficients (non-model)
-        coeff_a, coeff_b = orbitals.get_coefficients()
+        coefficients = orbitals.coefficients()
+        coeff_a = spin_channel_matrix(coefficients, axes.alpha())
+        coeff_b = spin_channel_matrix(coefficients, axes.beta())
         assert coeff_a is not None
         assert coeff_b is not None
 
@@ -2147,7 +2423,7 @@ class TestPyscfPlugin:
         )
 
         # 2. Unrestricted model Hamiltonian should throw
-        model_orbitals_unrestricted = data.ModelOrbitals(4, False)  # unrestricted
+        model_orbitals_unrestricted = data.ModelOrbitals(4, SymmetryProduct([axes.spin(1, False)]))  # unrestricted
         one_body_alpha = np.eye(4)
         one_body_beta = np.eye(4) * 1.1
         two_body_aaaa = np.zeros(4**4)
@@ -2176,7 +2452,9 @@ class TestPyscfPlugin:
         # 3. Non-rerouting for valid model Hamiltonian
 
         # Create a model Hamiltonian (restricted, closed-shell, full active space)
-        model_orbitals_proper = data.ModelOrbitals(4, True)  # All orbitals are active by default
+        model_orbitals_proper = data.ModelOrbitals(
+            4, SymmetryProduct([axes.spin(1, True)])
+        )  # All orbitals are active by default
         one_body_model = np.eye(4) * 0.5
         two_body_model = np.zeros(4**4)
         h_model = data.Hamiltonian(
@@ -2264,6 +2542,16 @@ class TestQDKChemistryPySCFBasisConversion:
         assert np.allclose(
             coords[0], [0.0, 0.0, 0.0], rtol=float_comparison_relative_tolerance, atol=plain_text_tolerance
         )
+
+    def test_qdk_to_pyscf_preserves_diffuse_exponent(self):
+        """Small valid exponents must not be rounded to zero."""
+        exponent = 1e-9
+        shell = Shell(0, OrbitalType.S, np.array([exponent]), np.array([1.0]))
+        qdk_basis = BasisSet("diffuse", [shell], self.he_structure)
+
+        pyscf_mol = basis_to_pyscf_mol(qdk_basis)
+
+        assert pyscf_mol.bas_exp(0)[0] == pytest.approx(exponent)
 
     def test_qdk_to_pyscf_conversion_water(self):
         """Test converting QDK/Chemistry basis set to PySCF for water."""
@@ -2438,7 +2726,7 @@ class TestQDKChemistryPySCFBasisConversion:
         scf_solver = algorithms.create("scf_solver", "pyscf")
         qdk_energy, qdk_wavefunction = scf_solver.run(self.he_structure, 0, 1, "sto-3g")
         qdk_orbitals = qdk_wavefunction.get_orbitals()
-        qdk_mos = qdk_orbitals.get_coefficients()[0]
+        qdk_mos = spin_channel_matrix(qdk_orbitals.coefficients(), axes.alpha())
 
         # Convert basis and solve with PySCF
         qdk_basis = qdk_orbitals.get_basis_set()
@@ -2505,6 +2793,153 @@ class TestQDKChemistryPySCFBasisConversion:
         ecp_electrons = qdk_basis.get_ecp_electrons()
         assert len(ecp_electrons) == 1
         assert ecp_electrons[0] == 28  # LANL2DZ ECP for Ag removes 28 core electrons
+
+    def test_qdk_to_pyscf_preserves_atom_specific_ecp(self):
+        """Test mixed ECP treatment for atoms of the same element."""
+        structure = Structure(
+            ["Ag", "Ag"],
+            np.array(
+                [
+                    [0.0, 0.0, 0.0],
+                    [5.0, 0.0, 0.0],
+                ]
+            ),
+        )
+        basis = BasisSet.from_index_map({0: "def2-svp", 1: "ano-rcc"}, structure)
+
+        pyscf_mol = basis_to_pyscf_mol(basis)
+
+        assert basis.get_ecp_electrons() == [28, 0]
+        assert set(pyscf_mol.ecp) == {"Ag1"}
+        assert pyscf_mol.atom_charges().tolist() == [19, 47]
+        assert pyscf_mol.nelectron == 66
+
+        roundtrip_basis = pyscf_mol_to_qdk_basis(pyscf_mol, structure)
+        assert roundtrip_basis.get_ecp_electrons() == [28, 0]
+        assert roundtrip_basis.get_num_ecp_shells() == basis.get_num_ecp_shells()
+
+    def test_qdk_to_pyscf_preserves_uniform_element_ecp_key(self):
+        """Test uniform ECP treatment retains the conventional element key."""
+        structure = Structure(
+            ["Ag", "Ag"],
+            np.array(
+                [
+                    [0.0, 0.0, 0.0],
+                    [5.0, 0.0, 0.0],
+                ]
+            ),
+        )
+        basis = BasisSet.from_index_map({0: "def2-svp", 1: "def2-svp"}, structure)
+
+        pyscf_mol = basis_to_pyscf_mol(basis)
+
+        assert basis.get_ecp_electrons() == [28, 28]
+        assert set(pyscf_mol.ecp) == {"Ag"}
+        assert pyscf_mol.atom_charges().tolist() == [19, 19]
+        assert pyscf_mol.nelectron == 38
+
+    def test_qdk_to_pyscf_rejects_partial_explicit_ecp_data(self):
+        """Test explicit ECP metadata requires shells for every treated atom."""
+        structure = Structure(
+            ["Ag", "Ag"],
+            np.array(
+                [
+                    [0.0, 0.0, 0.0],
+                    [5.0, 0.0, 0.0],
+                ]
+            ),
+        )
+        complete_basis = BasisSet.from_index_map({0: "def2-svp", 1: "def2-svp"}, structure)
+        atom_zero_ecp_shells = [shell for shell in complete_basis.get_ecp_shells() if shell.atom_index == 0]
+        partial_basis = BasisSet(
+            "partial-explicit-ecp",
+            complete_basis.get_shells(),
+            complete_basis.get_ecp_name(),
+            atom_zero_ecp_shells,
+            [28, 28],
+            structure,
+        )
+
+        with pytest.raises(ValueError, match="Atom 1 has 28 ECP electrons but no explicit ECP shells"):
+            basis_to_pyscf_mol(partial_basis)
+
+    def test_qdk_to_pyscf_preserves_atom_specific_named_ecp(self):
+        """Test mixed ECP metadata without explicit ECP shells."""
+        structure = Structure(
+            ["Ag", "Ag"],
+            np.array(
+                [
+                    [0.0, 0.0, 0.0],
+                    [5.0, 0.0, 0.0],
+                ]
+            ),
+        )
+        orbital_basis = BasisSet.from_index_map({0: "lanl2dz", 1: "lanl2dz"}, structure)
+        basis = BasisSet(
+            "lanl2dz",
+            orbital_basis.get_shells(),
+            "lanl2dz",
+            [],
+            [28, 0],
+            structure,
+        )
+
+        pyscf_mol = basis_to_pyscf_mol(basis)
+
+        assert set(pyscf_mol.ecp) == {"Ag1"}
+        assert pyscf_mol.atom_charges().tolist() == [19, 47]
+        assert pyscf_mol.nelectron == 66
+
+    def test_qdk_to_pyscf_preserves_uniform_named_ecp_key(self):
+        """Test uniform named ECP metadata retains the conventional element key."""
+        structure = Structure(
+            ["Ag", "Ag"],
+            np.array(
+                [
+                    [0.0, 0.0, 0.0],
+                    [5.0, 0.0, 0.0],
+                ]
+            ),
+        )
+        orbital_basis = BasisSet.from_index_map({0: "lanl2dz", 1: "lanl2dz"}, structure)
+        basis = BasisSet(
+            "lanl2dz",
+            orbital_basis.get_shells(),
+            "lanl2dz",
+            [],
+            [28, 28],
+            structure,
+        )
+
+        pyscf_mol = basis_to_pyscf_mol(basis)
+
+        assert set(pyscf_mol.ecp) == {"Ag"}
+        assert pyscf_mol.atom_charges().tolist() == [19, 19]
+        assert pyscf_mol.nelectron == 38
+
+    def test_qdk_to_pyscf_rejects_named_ecp_count_mismatch(self):
+        """Test named ECP metadata matches the library's resolved core counts."""
+        structure = Structure(
+            ["Ag", "Ag"],
+            np.array(
+                [
+                    [0.0, 0.0, 0.0],
+                    [5.0, 0.0, 0.0],
+                ]
+            ),
+        )
+        orbital_basis = BasisSet.from_index_map({0: "lanl2dz", 1: "lanl2dz"}, structure)
+        basis = BasisSet(
+            "lanl2dz",
+            orbital_basis.get_shells(),
+            "lanl2dz",
+            [],
+            [28, 10],
+            structure,
+        )
+
+        with pytest.raises(ValueError, match="basis has 10, mol.atom_nelec_core has 28"):
+            basis_to_pyscf_mol(basis)
 
     def test_ecp_roundtrip_conversion(self):
         """Test round-trip conversion of ECP shells and metadata: QDK -> PySCF -> QDK."""
@@ -2587,7 +3022,17 @@ class TestQDKChemistryPySCFBasisConversion:
         """Test ECP edge cases: shells without metadata and full structure format."""
         ag_structure = Structure(["Ag"], np.array([[0.0, 0.0, 0.0]]))
 
-        # Edge case: Full ECP structure format roundtrip
+        # Edge case 1: ECP shells exist without ECP metadata
+        shells = [Shell(0, OrbitalType.S, [1.0], [1.0])]
+        ecp_shells = [Shell(0, OrbitalType.S, [10.0, 5.0], [50.0, 20.0], [0, 2])]
+        qdk_basis_no_meta = BasisSet("test-basis", shells, ecp_shells, ag_structure, AOType.Spherical)
+
+        assert qdk_basis_no_meta.has_ecp_shells()
+        assert qdk_basis_no_meta.get_num_ecp_shells() == 1
+        assert not qdk_basis_no_meta.has_ecp_electrons()  # No metadata set
+        assert qdk_basis_no_meta.get_ecp_name() == "none"
+
+        # Edge case 2: Full ECP structure format roundtrip
         pyscf_mol_orig = pyscf.gto.M(atom="Ag 0 0 0", spin=1, basis="lanl2dz", ecp="lanl2dz", verbose=0)
         qdk_basis_1 = pyscf_mol_to_qdk_basis(pyscf_mol_orig, ag_structure)
 
@@ -2633,8 +3078,29 @@ class TestQDKChemistryPySCFBasisConversion:
         # Create QDK Structure
         structure = Structure(symbols=["Ag", "H"], coordinates=mol1.atom_coords())
 
+        # Run native QDK SCF once and compare its ECP-adjusted quantities with PySCF
+        qdk_scf = algorithms.create("scf_solver", "qdk")
+        qdk_energy, qdk_wavefunction = qdk_scf.run(structure, 0, 1, "def2-svp")
+        qdk_native_basis = qdk_wavefunction.get_orbitals().get_basis_set()
+
+        np.testing.assert_allclose(qdk_native_basis.get_effective_nuclear_charges(), mol1.atom_charges())
+        assert np.isclose(
+            qdk_native_basis.calculate_effective_nuclear_repulsion_energy(),
+            mol1.energy_nuc(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        # Allow small numerical differences between the independent QDK and PySCF integral engines.
+        assert np.isclose(qdk_energy, energy1, rtol=float_comparison_relative_tolerance, atol=10 * scf_energy_tolerance)
+
         # Convert PySCF Mole to QDK BasisSet
         qdk_basis = pyscf_mol_to_qdk_basis(mol1, structure, basis_name="def2-svp")
+        assert not np.isclose(
+            structure.calculate_nuclear_repulsion_energy(),
+            qdk_basis.calculate_effective_nuclear_repulsion_energy(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
 
         # Convert QDK BasisSet back to PySCF Mole
         mol2 = basis_to_pyscf_mol(qdk_basis)

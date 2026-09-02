@@ -16,6 +16,7 @@ import pytest
 
 import qdk_chemistry.algorithms as alg
 from qdk_chemistry.data import AOType, BasisSet, Element, OrbitalType, Shell, Structure
+from qdk_chemistry.data._type_name import class_data_type_name
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
@@ -321,29 +322,15 @@ def test_summary():
     assert "shells: 2" in summary
     assert "atomic orbitals: 4" in summary
 
-    # Test summary with auxiliary basis set
-    positions = np.array([[0.0, 0.0, 0.0]])
-    elements = ["H"]
-    structure = Structure(elements, positions)
-    aux_shells = [Shell(0, OrbitalType.S, [2.0], [1.0])]
-    basis_with_aux = BasisSet("6-31G", shells, "aux-basis", aux_shells, structure)
-    summary_with_aux = basis_with_aux.get_summary()
-    assert "Auxiliary" in summary_with_aux
-
 
 def test_json_serialization():
     """Test JSON serialization and deserialization."""
     # Create a basis set with data
-    positions = np.array([[0.0, 0.0, 0.0]])
-    elements = ["H"]
-    structure = Structure(elements, positions)
-
     shells = [
         Shell(0, OrbitalType.S, [1.0], [1.0]),
         Shell(0, OrbitalType.P, [0.5], [1.0]),
     ]
-    aux_shells = [Shell(0, OrbitalType.S, [2.0], [1.0]), Shell(0, OrbitalType.D, [0.3], [0.5])]
-    basis_out = BasisSet("STO-3G", shells, "aux-fit", aux_shells, structure)
+    basis_out = BasisSet("STO-3G", shells)
 
     # Test direct JSON conversion
     json_data = basis_out.to_json()
@@ -356,12 +343,10 @@ def test_json_serialization():
     assert basis_in.get_name() == "STO-3G"
     assert basis_in.get_num_shells() == 2
     assert basis_in.get_num_atomic_orbitals() == 4
-    assert basis_in.has_aux_basis()
-    assert basis_in.get_aux_name() == "aux-fit"
-    assert basis_in.get_num_aux_shells() == 2
-    assert basis_in.get_num_auxiliary_orbitals() == 6
 
-    # Test file-based serialization
+    # Test file-based serialization.
+    # delete=False + manual unlink() avoids the Windows file lock from NamedTemporaryFile.
+    # NOTE: Python 3.12+ supports `delete=False, delete_on_close=True` which would avoid the manual unlink() at the end.
     with tempfile.NamedTemporaryFile(suffix=".basis_set.json", mode="w", delete=False) as tmp:
         filename = tmp.name
 
@@ -374,27 +359,18 @@ def test_json_serialization():
         assert basis_file.get_name() == "STO-3G"
         assert basis_file.get_num_shells() == 2
         assert basis_file.get_num_atomic_orbitals() == 4
-        assert basis_file.get_aux_name() == "aux-fit"
-        assert basis_file.get_num_aux_shells() == 2
-        assert basis_out.get_num_auxiliary_orbitals() == 6
-        assert basis_file.get_num_auxiliary_orbitals() == 6
     finally:
-        Path(filename).unlink()
+        Path(filename).unlink(missing_ok=True)
 
 
 def test_hdf5_serialization():
     """Test HDF5 serialization and deserialization."""
     # Create a basis set with data
-    positions = np.array([[0.0, 0.0, 0.0]])
-    elements = ["H"]
-    structure = Structure(elements, positions)
-
     shells = [
         Shell(0, OrbitalType.S, [1.0], [1.0]),
         Shell(0, OrbitalType.P, [0.5], [1.0]),
     ]
-    aux_shells = [Shell(0, OrbitalType.S, [2.0], [1.0]), Shell(0, OrbitalType.P, [0.8], [0.7])]
-    basis_out = BasisSet("cc-pVDZ", shells, "aux-fit", aux_shells, structure, AOType.Spherical)
+    basis_out = BasisSet("cc-pVDZ", shells, AOType.Spherical)
 
     try:
         with tempfile.NamedTemporaryFile(suffix=".basis_set.h5", delete=False) as tmp:
@@ -408,8 +384,6 @@ def test_hdf5_serialization():
         assert basis_in.get_name() == "cc-pVDZ"
         assert basis_in.get_num_shells() == 2
         assert basis_in.get_num_atomic_orbitals() == 4
-        assert basis_in.get_aux_name() == "aux-fit"
-        assert basis_in.get_num_aux_shells() == 2
 
     except RuntimeError as e:
         pytest.skip(f"HDF5 test skipped - {e!s}")
@@ -569,9 +543,10 @@ def test_basis_set_file_io_generic():
     basis = BasisSet("STO-3G", shells)
 
     # Test JSON file I/O
-    with tempfile.NamedTemporaryFile(suffix=".basis_set.json") as tmp_json:
+    with tempfile.NamedTemporaryFile(suffix=".basis_set.json", delete=False) as tmp_json:
         json_filename = tmp_json.name
 
+    try:
         # Save using generic method
         basis.to_file(json_filename, "json")
 
@@ -583,11 +558,14 @@ def test_basis_set_file_io_generic():
         assert basis2.get_num_shells() == basis.get_num_shells()
         assert basis2.get_num_atomic_orbitals() == basis.get_num_atomic_orbitals()
         assert basis2.get_num_atoms() == basis.get_num_atoms()
+    finally:
+        Path(json_filename).unlink(missing_ok=True)
 
     # Test HDF5 file I/O
-    with tempfile.NamedTemporaryFile(suffix=".basis_set.h5") as tmp_hdf5:
+    with tempfile.NamedTemporaryFile(suffix=".basis_set.h5", delete=False) as tmp_hdf5:
         hdf5_filename = tmp_hdf5.name
 
+    try:
         # Save using generic method
         basis.to_file(hdf5_filename, "hdf5")
 
@@ -599,6 +577,8 @@ def test_basis_set_file_io_generic():
         assert basis3.get_num_shells() == basis.get_num_shells()
         assert basis3.get_num_atomic_orbitals() == basis.get_num_atomic_orbitals()
         assert basis3.get_num_atoms() == basis.get_num_atoms()
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)
 
     # Test unsupported file type
     with pytest.raises(RuntimeError, match="Unsupported file type"):
@@ -627,9 +607,10 @@ def test_basis_set_hdf5_specific():
     basis = BasisSet("6-31G", shells)
 
     # Test new to_hdf5_file method
-    with tempfile.NamedTemporaryFile(suffix=".basis_set.h5") as tmp_hdf5:
+    with tempfile.NamedTemporaryFile(suffix=".basis_set.h5", delete=False) as tmp_hdf5:
         hdf5_filename = tmp_hdf5.name
 
+    try:
         # Save using new method
         basis.to_hdf5_file(hdf5_filename)
 
@@ -662,6 +643,8 @@ def test_basis_set_hdf5_specific():
                 rtol=float_comparison_relative_tolerance,
                 atol=float_comparison_absolute_tolerance,
             )
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)
 
 
 def test_basis_set_json_specific():
@@ -683,9 +666,10 @@ def test_basis_set_json_specific():
     basis = BasisSet("cc-pVDZ", shells, AOType.Cartesian)
 
     # Test updated JSON file I/O methods
-    with tempfile.NamedTemporaryFile(suffix=".basis_set.json") as tmp_json:
+    with tempfile.NamedTemporaryFile(suffix=".basis_set.json", delete=False) as tmp_json:
         json_filename = tmp_json.name
 
+    try:
         # Save using to_json_file method
         basis.to_json_file(json_filename)
 
@@ -719,6 +703,8 @@ def test_basis_set_json_specific():
                 rtol=float_comparison_relative_tolerance,
                 atol=float_comparison_absolute_tolerance,
             )
+    finally:
+        Path(json_filename).unlink(missing_ok=True)
 
 
 def test_basis_set_file_io_validation():
@@ -784,9 +770,10 @@ def test_basis_set_file_io_round_trip():
     basis = BasisSet("complex-basis", shells, AOType.Spherical)
 
     # Test JSON round-trip
-    with tempfile.NamedTemporaryFile(suffix=".basis_set.json") as tmp_json:
+    with tempfile.NamedTemporaryFile(suffix=".basis_set.json", delete=False) as tmp_json:
         json_filename = tmp_json.name
 
+    try:
         # Save and reload
         basis.to_json_file(json_filename)
         basis_json = BasisSet.from_json_file(json_filename)
@@ -818,11 +805,14 @@ def test_basis_set_file_io_round_trip():
                 rtol=float_comparison_relative_tolerance,
                 atol=float_comparison_absolute_tolerance,
             )
+    finally:
+        Path(json_filename).unlink(missing_ok=True)
 
     # Test HDF5 round-trip
-    with tempfile.NamedTemporaryFile(suffix=".basis_set.h5") as tmp_hdf5:
+    with tempfile.NamedTemporaryFile(suffix=".basis_set.h5", delete=False) as tmp_hdf5:
         hdf5_filename = tmp_hdf5.name
 
+    try:
         # Save and reload
         basis.to_hdf5_file(hdf5_filename)
         basis_hdf5 = BasisSet.from_hdf5_file(hdf5_filename)
@@ -852,6 +842,8 @@ def test_basis_set_file_io_round_trip():
                 rtol=float_comparison_relative_tolerance,
                 atol=float_comparison_absolute_tolerance,
             )
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)
 
 
 def test_basis_set_consistency_between_methods():
@@ -1049,12 +1041,7 @@ def test_basis_set_pickling_and_repr():
         Shell(0, OrbitalType.P, [1.158, 0.325], [0.155916, 0.607684]),
     ]
 
-    # Create a basis set with auxiliary shells
-    positions = np.array([[0.0, 0.0, 0.0]])
-    elements = ["H"]
-    structure = Structure(elements, positions)
-    aux_shells = [Shell(0, OrbitalType.S, [2.0, 0.5], [0.6, 0.4])]
-    original = BasisSet("STO-3G", shells, "aux-jfit", aux_shells, structure)
+    original = BasisSet("STO-3G", shells)
 
     # Test pickling and unpickling
     pickled_data = pickle.dumps(original)
@@ -1068,11 +1055,6 @@ def test_basis_set_pickling_and_repr():
     assert unpickled.get_num_shells() == original.get_num_shells()
     assert unpickled.get_num_atomic_orbitals() == original.get_num_atomic_orbitals()
     assert unpickled.get_atomic_orbital_type() == original.get_atomic_orbital_type()
-
-    # Verify auxiliary basis set is preserved through pickling
-    assert unpickled.has_aux_basis()
-    assert unpickled.get_aux_name() == "aux-jfit"
-    assert unpickled.get_num_aux_shells() == 1
 
     # Verify shells are preserved
     original_shells = original.get_shells()
@@ -1151,7 +1133,7 @@ def test_basis_set_ecp_functionality():
 
     # Test default ECP state
     assert not basis.has_ecp_electrons()
-    assert basis.get_ecp_name() == ""
+    assert basis.get_ecp_name() == "none"
     assert basis.get_ecp_electrons() == [0, 0, 0]
 
     # Test creating ECP with constructor
@@ -1225,7 +1207,7 @@ def test_basis_set_ecp_shells():
     ecp_shells = [ecp_shell_s, ecp_shell_p]
 
     # Create basis set with ECP shells
-    basis = BasisSet("test-basis", shells, ecp_shells, [2], structure)
+    basis = BasisSet("test-basis", shells, ecp_shells, structure)
 
     # Test ECP shell queries
     assert basis.has_ecp_shells()
@@ -1301,37 +1283,6 @@ def test_basis_set_ecp_shells_serialization():
         assert np.array_equal(loaded_shell.rpowers, [0, 2])
 
 
-def test_auxiliary_basis_set_serialization():
-    """Test auxiliary basis set serialization and deserialization."""
-    # Create a basis set with auxiliary basis
-    positions = np.array([[0.0, 0.0, 0.0]])
-    elements = ["H"]
-    structure = Structure(elements, positions)
-    shells = [Shell(0, OrbitalType.S, [1.0], [1.0])]
-    aux_shells = [Shell(0, OrbitalType.S, [4.0, 1.0], [0.7, 0.3])]
-
-    basis = BasisSet("test-basis", shells, "aux_basis", aux_shells, structure)
-
-    # Test JSON serialization
-    with tempfile.TemporaryDirectory() as tmpdir:
-        json_file = str(Path(tmpdir) / "test_aux.basis_set.json")
-        basis.to_json_file(json_file)
-
-        loaded_basis = BasisSet.from_json_file(json_file)
-        assert loaded_basis.has_aux_basis()
-        assert loaded_basis.get_aux_name() == "aux_basis"
-        assert loaded_basis.get_num_aux_shells() == 1
-
-    # Test HDF5 serialization
-    with tempfile.TemporaryDirectory() as tmpdir:
-        hdf5_file = str(Path(tmpdir) / "test_aux.basis_set.h5")
-        basis.to_hdf5_file(hdf5_file)
-
-        loaded_basis = BasisSet.from_hdf5_file(hdf5_file)
-        assert loaded_basis.has_aux_basis()
-        assert loaded_basis.get_aux_name() == "aux_basis"
-
-
 def test_basis_set_ecp_shells_copy():
     """Test that ECP shells are properly copied."""
     # Create structure and shells
@@ -1358,23 +1309,6 @@ def test_basis_set_ecp_shells_copy():
     assert np.array_equal(copy_shell.coefficients, orig_shell.coefficients)
 
 
-def test_auxiliary_basis_set_copy():
-    """Test that auxiliary basis set is properly copied."""
-    positions = np.array([[0.0, 0.0, 0.0]])
-    elements = ["H"]
-    structure = Structure(elements, positions)
-    shells = [Shell(0, OrbitalType.S, [1.0], [1.0])]
-    aux_shells = [Shell(0, OrbitalType.S, [3.0], [1.0]), Shell(0, OrbitalType.P, [1.5], [0.8])]
-
-    basis = BasisSet("test-basis", shells, "aux-copy-test", aux_shells, structure)
-
-    # Test copy constructor
-    basis_copy = BasisSet(basis)
-    assert basis_copy.has_aux_basis()
-    assert basis_copy.get_aux_name() == "aux-copy-test"
-    assert basis_copy.get_num_aux_shells() == 2
-
-
 def test_basis_set_ecp_shells_multi_atom():
     """Test ECP shells in multi-atom systems."""
     # Create structure with multiple atoms
@@ -1396,7 +1330,7 @@ def test_basis_set_ecp_shells_multi_atom():
         Shell(1, OrbitalType.D, [12.0], [40.0], [2]),
     ]
 
-    basis = BasisSet("test-basis", shells, ecp_shells, [0, 2, 0], structure)
+    basis = BasisSet("test-basis", shells, ecp_shells, structure)
 
     # Test total ECP shells
     assert basis.get_num_ecp_shells() == 3
@@ -1438,13 +1372,6 @@ def test_basis_set_from_basis_name():
     num_orbitals = determinant.get_orbitals().get_num_molecular_orbitals()
     assert num_orbitals == 7
 
-    # Test from_basis_name with auxiliary basis set
-    basis_with_aux = BasisSet.from_basis_name("sto-3g", "def2-universal-jfit", structure)
-    assert basis_with_aux.get_name() == "sto-3g"
-    assert basis_with_aux.has_aux_basis()
-    assert basis_with_aux.get_aux_name() == "def2-universal-jfit"
-    assert basis_with_aux.get_num_aux_shells() > 0
-
 
 def test_basis_set_from_element_map():
     """Test creating basis set using from_element_map static method."""
@@ -1471,13 +1398,6 @@ def test_basis_set_from_element_map():
     num_orbitals = determinant.get_orbitals().get_num_molecular_orbitals()
     assert num_orbitals == 15
 
-    # Test from_element_map with auxiliary basis set
-    element_aux_map = {"H": "def2-universal-jfit", "O": "def2-universal-jfit"}
-    basis_with_aux = BasisSet.from_element_map(element_basis_map, element_aux_map, structure)
-    assert basis_with_aux.get_name() == "custom_basis_set"
-    assert basis_with_aux.has_aux_basis()
-    assert basis_with_aux.get_num_aux_shells() > 0
-
 
 def test_basis_set_from_index_map():
     """Test creating basis set using from_index_map static method."""
@@ -1503,17 +1423,6 @@ def test_basis_set_from_index_map():
     # Check number of orbitals
     num_orbitals = determinant.get_orbitals().get_num_molecular_orbitals()
     assert num_orbitals == 24
-
-    # Test from_index_map with auxiliary basis set
-    index_aux_map = {
-        0: "def2-universal-jfit",
-        1: "def2-universal-jfit",
-        2: "def2-universal-jfit",
-    }
-    basis_with_aux = BasisSet.from_index_map(index_basis_map, index_aux_map, structure)
-    assert basis_with_aux.get_name() == "custom_basis_set"
-    assert basis_with_aux.has_aux_basis()
-    assert basis_with_aux.get_num_aux_shells() > 0
 
 
 def test_basis_set_static_constants():
@@ -1558,266 +1467,5 @@ def test_get_supported_elements_for_basis_set():
 
 
 def test_basis_set_data_type_name():
-    """Test that BasisSet has the correct _data_type_name class attribute."""
-    assert hasattr(BasisSet, "_data_type_name")
-    assert BasisSet._data_type_name == "basis_set"
-
-
-def test_auxiliary_basis_set_accessors():
-    """Test has/get auxiliary basis set methods."""
-    positions = np.array([[0.0, 0.0, 0.0]])
-    elements = ["H"]
-    structure = Structure(elements, positions)
-
-    shells = [
-        Shell(0, OrbitalType.S, [1.0], [1.0]),
-        Shell(0, OrbitalType.P, [0.5], [1.0]),
-    ]
-
-    # Basis without auxiliary
-    basis_no_aux = BasisSet("test-basis", shells, structure)
-    assert not basis_no_aux.has_aux_basis()
-    assert basis_no_aux.get_num_aux_shells() == 0
-
-    # Basis with auxiliary shells (unnamed)
-    aux_shells = [Shell(0, OrbitalType.S, [2.0], [1.0])]
-    basis_with_aux = BasisSet("test-basis", shells, aux_shells, structure)
-    assert basis_with_aux.has_aux_basis()
-    assert basis_with_aux.get_num_aux_shells() == 1
-    retrieved_aux = basis_with_aux.get_aux_shells()
-    assert len(retrieved_aux) == 1
-    assert retrieved_aux[0].orbital_type == OrbitalType.S
-
-    # Basis with named auxiliary shells
-    basis_named_aux = BasisSet("test-basis", shells, "aux-test", aux_shells, structure)
-    assert basis_named_aux.has_aux_basis()
-    assert basis_named_aux.get_aux_name() == "aux-test"
-    assert basis_named_aux.get_num_aux_shells() == 1
-
-    # Test per-atom auxiliary shell access
-    aux_for_atom0 = basis_with_aux.get_aux_shells_for_atom(0)
-    assert len(aux_for_atom0) == 1
-    assert aux_for_atom0[0].orbital_type == OrbitalType.S
-
-
-def test_auxiliary_basis_set_from_basis_name_database():
-    """Test from_basis_name with auxiliary using actual basis set database."""
-    positions = np.array([[0.0, 0.0, 0.0], [1.4, 0.0, 0.0]])
-    elements = ["H", "H"]
-    structure = Structure(elements, positions)
-
-    # Test with def2-universal-jfit auxiliary
-    basis = BasisSet.from_basis_name("cc-pvdz", "def2-universal-jfit", structure)
-    assert basis.get_name() == "cc-pvdz"
-    assert basis.has_aux_basis()
-    assert basis.get_aux_name() == "def2-universal-jfit"
-    assert basis.get_num_aux_shells() > 0
-    assert basis.has_structure()
-
-    # Verify primary basis is still correct
-    assert basis.get_num_shells() > 0
-    assert basis.has_structure()
-
-    # Verify JSON round-trip preserves both primary and aux from database
-    with tempfile.TemporaryDirectory() as tmpdir:
-        json_file = str(Path(tmpdir) / "db_aux.basis_set.json")
-        basis.to_json_file(json_file)
-
-        loaded = BasisSet.from_json_file(json_file)
-        assert loaded.get_name() == "cc-pvdz"
-        assert loaded.has_aux_basis()
-        assert loaded.get_aux_name() == "def2-universal-jfit"
-        assert loaded.get_num_shells() == basis.get_num_shells()
-        assert loaded.get_num_aux_shells() == basis.get_num_aux_shells()
-
-
-# ---------------------------------------------------------------------------
-# Tests for __init__ dispatcher: positional, keyword, mixed, and error paths
-# ---------------------------------------------------------------------------
-
-
-class TestBasisSetConstructorDispatch:
-    """Tests for the BasisSet __init__ dispatcher.
-
-    Covers all constructor signatures with positional, keyword, and mixed
-    calling conventions.
-    """
-
-    @pytest.fixture
-    def shell(self):
-        return Shell(0, OrbitalType.S, [1.0], [1.0])
-
-    @pytest.fixture
-    def shells(self, shell):
-        return [shell]
-
-    @pytest.fixture
-    def structure(self):
-        positions = np.array([[0.0, 0.0, 0.0]])
-        return Structure(["H"], positions)
-
-    @pytest.fixture
-    def aux_shells(self):
-        return [Shell(0, OrbitalType.S, [2.0], [1.0])]
-
-    @pytest.fixture
-    def ecp_shells(self):
-        return [Shell(0, OrbitalType.S, [5.0], [10.0], [1])]
-
-    # --- Copy constructor: BasisSet(other) ---
-
-    def test_copy_positional(self, shells):
-        original = BasisSet("orig", shells)
-        copy = BasisSet(original)
-        assert copy.get_name() == "orig"
-        assert copy.get_num_shells() == 1
-
-    def test_copy_rejects_kwargs(self, shells):
-        original = BasisSet("orig", shells)
-        with pytest.raises(TypeError, match="incompatible constructor arguments"):
-            BasisSet(original, atomic_orbital_type=AOType.Cartesian)
-
-    # --- (name, shells) ---
-
-    def test_name_shells_positional(self, shells):
-        b = BasisSet("test", shells)
-        assert b.get_name() == "test"
-        assert b.get_num_shells() == 1
-        assert b.get_atomic_orbital_type() == AOType.Spherical
-
-    def test_name_shells_all_kwargs(self, shells):
-        b = BasisSet(name="test", shells=shells)
-        assert b.get_name() == "test"
-        assert b.get_num_shells() == 1
-
-    def test_name_shells_mixed(self, shells):
-        b = BasisSet("test", shells=shells)
-        assert b.get_name() == "test"
-        assert b.get_num_shells() == 1
-
-    def test_name_shells_with_ao_kwarg(self, shells):
-        b = BasisSet("test", shells, atomic_orbital_type=AOType.Cartesian)
-        assert b.get_atomic_orbital_type() == AOType.Cartesian
-
-    def test_name_shells_with_ao_positional(self, shells):
-        b = BasisSet("test", shells, AOType.Cartesian)
-        assert b.get_atomic_orbital_type() == AOType.Cartesian
-
-    def test_name_shells_fully_kwarg_with_ao(self, shells):
-        b = BasisSet(name="test", shells=shells, atomic_orbital_type=AOType.Cartesian)
-        assert b.get_name() == "test"
-        assert b.get_atomic_orbital_type() == AOType.Cartesian
-
-    # --- (name, shells, structure) ---
-
-    def test_name_shells_structure_positional(self, shells, structure):
-        b = BasisSet("test", shells, structure)
-        assert b.has_structure()
-        assert b.get_structure().get_num_atoms() == 1
-
-    def test_name_shells_structure_kwarg(self, shells, structure):
-        b = BasisSet("test", shells, structure=structure)
-        assert b.has_structure()
-
-    def test_name_shells_structure_all_kwargs(self, shells, structure):
-        b = BasisSet(name="test", shells=shells, structure=structure)
-        assert b.has_structure()
-
-    def test_name_shells_structure_with_ao(self, shells, structure):
-        b = BasisSet("test", shells, structure, AOType.Cartesian)
-        assert b.has_structure()
-        assert b.get_atomic_orbital_type() == AOType.Cartesian
-
-    def test_name_shells_structure_ao_kwarg(self, shells, structure):
-        b = BasisSet("test", shells, structure=structure, atomic_orbital_type=AOType.Cartesian)
-        assert b.has_structure()
-        assert b.get_atomic_orbital_type() == AOType.Cartesian
-
-    # --- (name, shells, aux_shells, structure) --- n==4 path
-
-    def test_name_shells_aux_structure_positional(self, shells, aux_shells, structure):
-        b = BasisSet("test", shells, aux_shells, structure)
-        assert b.has_aux_basis()
-        assert b.get_num_aux_shells() == 1
-        assert b.has_structure()
-
-    def test_name_shells_aux_structure_with_ao(self, shells, aux_shells, structure):
-        b = BasisSet("test", shells, aux_shells, structure, AOType.Cartesian)
-        assert b.has_aux_basis()
-        assert b.get_atomic_orbital_type() == AOType.Cartesian
-
-    # --- (name, shells, aux_name, aux_shells, structure) --- n==5 str path
-
-    def test_name_shells_auxname_aux_structure_positional(self, shells, aux_shells, structure):
-        b = BasisSet("test", shells, "my-aux", aux_shells, structure)
-        assert b.has_aux_basis()
-        assert b.get_aux_name() == "my-aux"
-        assert b.has_structure()
-
-    # --- (name, shells, ecp_shells, ecp_electrons, structure) --- n==5 list path
-
-    def test_name_shells_ecp_ecpelec_structure_positional(self, shells, ecp_shells, structure):
-        b = BasisSet("test", shells, ecp_shells, [2], structure)
-        assert b.has_ecp_shells()
-        assert b.get_num_ecp_shells() == 1
-        assert list(b.get_ecp_electrons()) == [2]
-
-    # --- (name, shells, ecp_name, ecp_shells, ecp_electrons, structure) --- n==6 list path
-
-    def test_name_shells_ecpname_ecp_ecpelec_structure(self, shells, ecp_shells, structure):
-        b = BasisSet("test", shells, "my-ecp", ecp_shells, [2], structure)
-        assert b.has_ecp_shells()
-        assert b.get_ecp_name() == "my-ecp"
-        assert list(b.get_ecp_electrons()) == [2]
-
-    # --- (name, shells, ecp_name, ecp_shells, ecp_electrons, aux_name, aux_shells, structure) --- n==8 path
-
-    def test_full_8arg_constructor(self, shells, ecp_shells, aux_shells, structure):
-        b = BasisSet("test", shells, "my-ecp", ecp_shells, [2], "my-aux", aux_shells, structure)
-        assert b.has_ecp_shells()
-        assert b.get_ecp_name() == "my-ecp"
-        assert b.has_aux_basis()
-        assert b.get_aux_name() == "my-aux"
-        assert b.has_structure()
-
-    # --- Error cases: unexpected kwargs ---
-
-    def test_rejects_unexpected_kwarg(self, shells):
-        with pytest.raises(TypeError, match="incompatible constructor arguments"):
-            BasisSet("test", shells, bogus=42)
-
-    def test_rejects_unexpected_kwarg_typo(self, shells):
-        with pytest.raises(TypeError, match="incompatible constructor arguments"):
-            BasisSet("test", shells, struture="oops")
-
-    # --- Error cases: multiple values ---
-
-    def test_rejects_name_multiple_values(self, shells):
-        with pytest.raises(TypeError, match="incompatible constructor arguments"):
-            BasisSet("test", name="other", shells=shells)
-
-    def test_rejects_shells_multiple_values(self, shells):
-        with pytest.raises(TypeError, match="incompatible constructor arguments"):
-            BasisSet("test", shells, shells=shells)
-
-    # --- Error cases: structure without shells ---
-
-    def test_rejects_structure_without_shells(self, structure):
-        with pytest.raises(TypeError, match="incompatible constructor arguments"):
-            BasisSet(name="test", structure=structure)
-
-    # --- Error cases: no matching constructor ---
-
-    def test_rejects_wrong_types(self):
-        with pytest.raises(TypeError):
-            BasisSet(123, 456)
-
-    def test_rejects_no_args(self):
-        with pytest.raises(TypeError):
-            BasisSet()
-
-    # --- Error cases: ECP shells at n==4 should raise ---
-
-    def test_ecp_at_n4_raises(self, shells, ecp_shells, structure):
-        with pytest.raises(ValueError, match="Auxiliary shells contain a shell with radial powers"):
-            BasisSet("test", shells, ecp_shells, structure)
+    """Test that BasisSet exposes its static wire-format identifier."""
+    assert class_data_type_name(BasisSet) == "basis_set"

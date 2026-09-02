@@ -44,7 +44,7 @@ std::shared_ptr<data::Wavefunction> AutocasEosActiveSpaceSelector::_run_impl(
 
   // find first index where diff is larger than threshold
   std::vector<size_t> active_space_sizes;
-  for (size_t i = 0; i < diff.size(); ++i) {
+  for (size_t i = 0; i < static_cast<size_t>(diff.size()); ++i) {
     if (sorted_entropies(i) > entropy_threshold &&
         diff(i) > plateau_threshold) {
       active_space_sizes.push_back(i + 1);

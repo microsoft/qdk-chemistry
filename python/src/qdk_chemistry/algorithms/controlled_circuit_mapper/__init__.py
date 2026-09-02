@@ -5,7 +5,20 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from .base import ControlledCircuitMapperFactory
-from .pauli_sequence_mapper import PauliSequenceMapper
+from .base import ControlledCircuitMapperFactory, ControlledCircuitMapperSettings
+from .controlled_pauli_sequence_mapper import ControlledPauliSequenceMapper
+from .controlled_psp_mapper import ControlledPSPMapper, ControlledPSPMapperSettings
+from .controlled_swap_pauli_sequence_mapper import (
+    ControlledSwapPauliSequenceMapper,
+    ControlledSwapPauliSequenceMapperSettings,
+)
 
-__all__ = ["ControlledCircuitMapperFactory", "PauliSequenceMapper"]
+__all__ = [
+    "ControlledCircuitMapperFactory",
+    "ControlledCircuitMapperSettings",
+    "ControlledPSPMapper",
+    "ControlledPSPMapperSettings",
+    "ControlledPauliSequenceMapper",
+    "ControlledSwapPauliSequenceMapper",
+    "ControlledSwapPauliSequenceMapperSettings",
+]

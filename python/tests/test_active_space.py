@@ -9,6 +9,8 @@ import numpy as np
 import pytest
 
 from qdk_chemistry import algorithms, data
+from qdk_chemistry.data._spin_channels import spin_channel_indices
+from qdk_chemistry.data.symmetry import axes
 
 
 class TestWavefunctionBasedActiveSpaceSelector:
@@ -57,7 +59,9 @@ class TestWavefunctionBasedActiveSpaceSelector:
         selector = algorithms.create("active_space_selector", "qdk_autocas")
         selected_wfn = selector.run(wfn)
         selected_orbitals = selected_wfn.get_orbitals()
-        alpha_indices, beta_indices = selected_orbitals.get_active_space_indices()
+        active_indices = selected_orbitals.active_indices()
+        alpha_indices = spin_channel_indices(active_indices, axes.alpha())
+        beta_indices = spin_channel_indices(active_indices, axes.beta())
         assert alpha_indices == [4, 5, 6, 7, 8, 9]
         assert beta_indices == [4, 5, 6, 7, 8, 9]
 
@@ -65,6 +69,8 @@ class TestWavefunctionBasedActiveSpaceSelector:
         selector = algorithms.create("active_space_selector", "qdk_autocas_eos")
         selected_wfn = selector.run(wfn)
         selected_orbitals = selected_wfn.get_orbitals()
-        alpha_indices, beta_indices = selected_orbitals.get_active_space_indices()
+        active_indices = selected_orbitals.active_indices()
+        alpha_indices = spin_channel_indices(active_indices, axes.alpha())
+        beta_indices = spin_channel_indices(active_indices, axes.beta())
         assert alpha_indices == [4, 5, 6, 7, 8, 9]
         assert beta_indices == [4, 5, 6, 7, 8, 9]

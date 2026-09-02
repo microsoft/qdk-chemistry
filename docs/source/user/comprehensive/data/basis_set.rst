@@ -19,8 +19,6 @@ Key features of the :class:`~qdk_chemistry.data.BasisSet` class include:
 - Basis set metadata (name, parameters)
 - Integration with molecular structure information
 - On-demand expansion of shells to individual basis functions
-- Effective Core Potentials (ECP) with radial powers
-- Auxiliary basis sets for density fitting
 
 Usage
 -----
@@ -83,13 +81,6 @@ The library supports three methods for loading basis sets:
 .. note::
    If a basis set includes an :term:`ECP` (Effective Core Potential), it will be automatically loaded. ECPs are commonly used to replace core electrons with pseudopotentials, particularly for heavy atoms.
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
-      :language: cpp
-      :start-after: // start-cell-loading
-      :end-before: // end-cell-loading
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/basis_set.py
@@ -97,10 +88,17 @@ The library supports three methods for loading basis sets:
       :start-after: # start-cell-loading
       :end-before: # end-cell-loading
 
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
+      :language: cpp
+      :start-after: // start-cell-loading
+      :end-before: // end-cell-loading
+
 .. seealso::
    For a complete list of available basis sets, see the :doc:`Supported Basis Sets <../basis_functionals>` documentation.
 
-The library also supports loading an auxiliary basis set alongside the primary basis set in a single call:
+Primary and auxiliary bases are independent values constructed against the same molecular structure. Group auxiliary bases in an :class:`~qdk_chemistry.data.AuxiliaryBasisCollection`, keyed by role. The collection is an independent data model for future algorithm inputs and is not stored on the primary basis or wavefunction. Current algorithms do not consume it; computational integration such as density fitting is outside this feature:
 
 .. tab:: C++ API
 
@@ -123,13 +121,6 @@ Creating a basis set
    In most cases, you should use the built-in basis set library rather than creating basis sets manually.
    Manual creation is primarily for advanced use cases or when working with custom basis sets not available in the library.
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
-      :language: cpp
-      :start-after: // start-cell-create
-      :end-before: // end-cell-create
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/basis_set.py
@@ -137,22 +128,25 @@ Creating a basis set
       :start-after: # start-cell-create
       :end-before: # end-cell-create
 
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
+      :language: cpp
+      :start-after: // start-cell-create
+      :end-before: // end-cell-create
+
 Accessing basis set data
 ------------------------
 
 Following the :doc:`immutable design principle <../design/index>` used throughout QDK/Chemistry, all getter methods return const references or copies of the data.
 This ensures that the basis set data remains consistent and prevents accidental modifications that could lead to inconsistent states.
 
+For basis sets containing an :term:`ECP`, ``get_effective_nuclear_charges()`` returns each nuclear charge after subtracting the core electrons represented by the ECP, and ``calculate_effective_nuclear_repulsion_energy()`` uses those charges.
+The associated :class:`~qdk_chemistry.data.Structure` retains the physical atomic charges and physical nuclear repulsion energy.
+
 .. note::
    If you need to modify a basis set after creation, you should create a new BasisSet object with the desired
    changes rather than trying to modify an existing one.
-
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
-      :language: cpp
-      :start-after: // start-cell-access
-      :end-before: // end-cell-access
 
 .. tab:: Python API
 
@@ -161,17 +155,17 @@ This ensures that the basis set data remains consistent and prevents accidental 
       :start-after: # start-cell-access
       :end-before: # end-cell-access
 
-Working with shells
--------------------
-
-The ``Shell`` structure contains information about a group of basis functions:
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
       :language: cpp
-      :start-after: // start-cell-shells
-      :end-before: // end-cell-shells
+      :start-after: // start-cell-access
+      :end-before: // end-cell-access
+
+Working with shells
+-------------------
+
+The ``Shell`` structure contains information about a group of basis functions:
 
 .. tab:: Python API
 
@@ -180,40 +174,22 @@ The ``Shell`` structure contains information about a group of basis functions:
       :start-after: # start-cell-shells
       :end-before: # end-cell-shells
 
-Working with ECP shells
------------------------
-
-Effective Core Potentials (ECPs) replace inner-core electrons with a pseudopotential, reducing computational cost for heavy atoms.
-ECP shells are stored alongside primary shells but include an additional **radial powers** vector (:math:`r^n` terms).
-
-ECP data is specified at construction time via dedicated constructors that accept ``ecp_shells``, ``ecp_electrons``, and an optional ``ecp_name``.
-The ``ecp_electrons`` vector records how many core electrons each atom has replaced.
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
       :language: cpp
-      :start-after: // start-cell-ecp
-      :end-before: // end-cell-ecp
-
-.. tab:: Python API
-
-   .. literalinclude:: ../../../_static/examples/python/basis_set.py
-      :language: python
-      :start-after: # start-cell-ecp
-      :end-before: # end-cell-ecp
-
-.. note::
-   If a basis set from the library includes an ECP, it will be loaded automatically.
-   Manual ECP construction is only needed for custom basis sets.
+      :start-after: // start-cell-shells
+      :end-before: // end-cell-shells
 
 Auxiliary basis sets
 --------------------
 
-Auxiliary basis sets are used in density-fitting (DF) and resolution-of-the-identity (RI) approximations to speed up two-electron integral evaluation.
-The auxiliary shells are stored inside the same :class:`~qdk_chemistry.data.BasisSet` object as supplementary data alongside the primary shells.
+An auxiliary basis is a secondary basis supplied to algorithms that require one. Density fitting (DF/RI) is the most common consumer, but the class carries no algorithm-specific role.
+The auxiliary name, shells, orbital representation, and molecular structure form an independent :class:`~qdk_chemistry.data.AuxiliaryBasis` value.
 
-Auxiliary basis data can be attached at construction time or loaded from the library using ``from_basis_name`` with an auxiliary name.
+Construct an :class:`~qdk_chemistry.data.AuxiliaryBasis` explicitly for custom data, or load it from the library with :meth:`~qdk_chemistry.data.AuxiliaryBasis.from_basis_name`. The role belongs to its entry in :class:`~qdk_chemistry.data.AuxiliaryBasisCollection`, not to the auxiliary value itself. :class:`~qdk_chemistry.data.AuxiliaryBasisRole` provides ``JFIT``, ``JKFIT``, ``RIFIT``, and ``CABS`` tags. Basis-family names remain ordinary auxiliary-basis names: for example, tag an MP2FIT-named basis as ``RIFIT`` or an OptRI/OptRI+ basis as ``CABS``.
+
+A collection may carry several roles simultaneously. Exact lookup is available through :meth:`~qdk_chemistry.data.AuxiliaryBasisCollection.get_auxiliary_basis`. :meth:`~qdk_chemistry.data.AuxiliaryBasisCollection.resolve_auxiliary_basis` additionally permits a ``JKFIT`` entry to satisfy a ``JFIT`` requirement, but never the inverse. :func:`~qdk_chemistry.data.with_auxiliary_basis` returns a new collection with one role added or replaced.
 
 .. tab:: C++ API
 
@@ -232,12 +208,14 @@ Auxiliary basis data can be attached at construction time or loaded from the lib
 Serialization
 -------------
 
-The :class:`~qdk_chemistry.data.BasisSet` class supports serialization to and from JSON and HDF5 formats.
+The :class:`~qdk_chemistry.data.BasisSet`, :class:`~qdk_chemistry.data.AuxiliaryBasis`, and :class:`~qdk_chemistry.data.AuxiliaryBasisCollection` classes support serialization to and from JSON and HDF5 formats independently.
 For detailed information about serialization in QDK/Chemistry, see the :doc:`Serialization <../data/serialization>` documentation.
 
 .. note::
    All basis set-related files require the ``.basis_set`` suffix before the file type extension, for example ``molecule.basis_set.json`` and ``h2.basis_set.h5`` for JSON and HDF5 files respectively.
    This naming convention is enforced to maintain consistency across the QDK/Chemistry ecosystem.
+
+   Standalone auxiliary basis files use the ``.auxiliary_basis`` suffix, for example ``water.auxiliary_basis.json``. Tagged collections use ``.auxiliary_basis_collection``.
 
 File formats
 ~~~~~~~~~~~~
@@ -252,42 +230,32 @@ JSON representation of a :class:`~qdk_chemistry.data.BasisSet` has the following
 .. code-block:: json
 
    {
-     "version": "0.1.0",
-     "name": "6-31G",
-     "atomic_orbital_type": "spherical",
-     "num_atomic_orbitals": 9,
-     "num_shells": 3,
-     "num_atoms": 2,
      "atoms": [
        {
          "atom_index": 0,
          "shells": [
            {
-             "orbital_type": "s",
+                   "coefficients": [0.1543289673, 0.5353281423, 0.4446345422],
              "exponents": [3.425250914, 0.6239137298, 0.168855404],
-             "coefficients": [0.1543289673, 0.5353281423, 0.4446345422]
-           }
-         ],
-         "ecp_shells": [
+                   "orbital_type": "s"
+                },
            {
-             "orbital_type": "s",
-             "exponents": [10.0, 5.0],
-             "coefficients": [50.0, 20.0],
-             "rpowers": [2, 2]
-           }
-         ],
-         "aux_shells": [
-           {
-             "orbital_type": "s",
-             "exponents": [5.0],
-             "coefficients": [2.0]
+                   "coefficients": [0.1559162750, 0.6076837186],
+                   "exponents": [0.7868272350, 0.1881288540],
+                   "orbital_type": "p"
            }
          ]
+          },
+          {
+             "atom_index": 1,
+             "shells": ["..."]
        }
      ],
-     "ecp_name": "my-ecp",
-     "ecp_electrons": [28, 0],
-     "aux_name": "my-aux-fit"
+       "basis_type": "spherical",
+       "name": "6-31G",
+       "num_atoms": 2,
+       "num_basis_functions": 9,
+       "num_shells": 3
    }
 
 HDF5 format
@@ -297,47 +265,15 @@ HDF5 representation of a :class:`~qdk_chemistry.data.BasisSet` has the following
 
 .. code-block:: text
 
-   /basis_set                                     (Group - top-level)
-   ├── @version = "0.1.0"                         (Attribute, variable-length string)
-   ├── @ecp_name = "lanl2dz"                      (Attribute, variable-length string, optional)
-   ├── @aux_name = "cc-pVDZ-RI"                   (Attribute, variable-length string, optional)
-   │
-   ├── metadata/                                  (Group)
-   │   ├── @name = "cc-pVDZ"                      (Attribute, variable-length string)
-   │   └── @atomic_orbital_type = "spherical"     (Attribute, variable-length string)
-   │
-   ├── shells/                                    (Group, present if num_shells > 0)
-   │   ├── atom_indices                           (Dataset: uint32, 1D, one per shell)
-   │   ├── orbital_types                          (Dataset: int32, 1D, one per shell)
-   │   ├── num_primitives                         (Dataset: uint32, 1D, one per shell)
-   │   ├── exponents                              (Dataset: float64, 1D, flattened across shells)
-   │   └── coefficients                           (Dataset: float64, 1D, flattened across shells)
-   │
-   ├── ecp_shells/                                (Group, optional - present if ECP shells exist)
-   │   ├── atom_indices                           (Dataset: uint32, 1D, one per shell)
-   │   ├── orbital_types                          (Dataset: int32, 1D, one per shell)
-   │   ├── num_primitives                         (Dataset: uint32, 1D, one per shell)
-   │   ├── exponents                              (Dataset: float64, 1D, flattened across shells)
-   │   ├── coefficients                           (Dataset: float64, 1D, flattened across shells)
-   │   └── rpowers                                (Dataset: int32, 1D, flattened across shells)
-   │
-   ├── ecp_electrons                              (Dataset: uint64, 1D per atom, optional)
-   │
-   ├── aux_shells/                                (Group, optional - present if auxiliary basis exists)
-   │   ├── atom_indices                           (Dataset: uint32, 1D, one per shell)
-   │   ├── orbital_types                          (Dataset: int32, 1D, one per shell)
-   │   ├── num_primitives                         (Dataset: uint32, 1D, one per shell)
-   │   ├── exponents                              (Dataset: float64, 1D, flattened across shells)
-   │   └── coefficients                           (Dataset: float64, 1D, flattened across shells)
-   │
-   └── structure/                                 (Group, optional - nested Structure object)
-
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
-      :language: cpp
-      :start-after: // start-cell-serialization
-      :end-before: // end-cell-serialization
+      /
+      ├── shells/             # Group
+      │   ├── atom_indices    # Dataset: uint32, 1D Array of atom indices
+      │   ├── coefficients    # Dataset: float64, 1D Array of orbital coefficients
+      │   ├── exponents       # Dataset: float64, 1D Array of orbital exponents
+      │   ├── num_primitives  # Dataset: uint32, 1D Array of number of primitives per orbital
+      │   └── orbital_types   # Dataset: int32, 1D Array of orbital type per orbital
+      └── metadata/           # Group
+         └── name            # Attribute: string value of the basis set name
 
 .. tab:: Python API
 
@@ -346,17 +282,17 @@ HDF5 representation of a :class:`~qdk_chemistry.data.BasisSet` has the following
       :start-after: # start-cell-serialization
       :end-before: # end-cell-serialization
 
-Utility functions
------------------
-
-The :class:`~qdk_chemistry.data.BasisSet` class provides several static utility functions:
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
       :language: cpp
-      :start-after: // start-cell-utility-functions
-      :end-before: // end-cell-utility-functions
+      :start-after: // start-cell-serialization
+      :end-before: // end-cell-serialization
+
+Utility functions
+-----------------
+
+The :class:`~qdk_chemistry.data.BasisSet` class provides several static utility functions:
 
 .. tab:: Python API
 
@@ -365,6 +301,13 @@ The :class:`~qdk_chemistry.data.BasisSet` class provides several static utility 
       :start-after: # start-cell-utility-functions
       :end-before: # end-cell-utility-functions
 
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
+      :language: cpp
+      :start-after: // start-cell-utility-functions
+      :end-before: // end-cell-utility-functions
+
 Predefined basis sets
 ---------------------
 
@@ -372,19 +315,19 @@ QDK/Chemistry provides access to a library of standard basis sets commonly used 
 These predefined basis sets can be easily loaded without having to manually specify the basis functions.
 For a complete list of available basis sets and their specifications, see the :doc:`Supported Basis Sets <../basis_functionals>` documentation.
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
-      :language: cpp
-      :start-after: // start-cell-library
-      :end-before: // end-cell-library
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/basis_set.py
       :language: python
       :start-after: # start-cell-library
       :end-before: # end-cell-library
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
+      :language: cpp
+      :start-after: // start-cell-library
+      :end-before: // end-cell-library
 
 .. note::
    The basis set library includes popular basis sets such as :term:`STO`-nG, Pople basis sets (3-21G, 6-31G, etc.), correlation-consistent basis sets (cc-pVDZ, cc-pVTZ, etc.), and more.

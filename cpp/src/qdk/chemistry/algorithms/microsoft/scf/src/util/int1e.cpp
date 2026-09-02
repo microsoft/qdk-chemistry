@@ -91,7 +91,7 @@ class Libint2Engine : public OneBodyIntegralEngine {
    * @brief Get number of operator components
    * @return Number of matrices/operators this engine computes
    */
-  size_t nopers() const {
+  size_t nopers() const override {
     QDK_LOG_TRACE_ENTERING();
     return engine_.results().size();
   }
@@ -179,7 +179,7 @@ class ECPIntEngine : public OneBodyIntegralEngine {
    * @return Number of matrices this engine computes (1 for integrals, 3*natom
    * for gradients)
    */
-  size_t nopers() const {
+  size_t nopers() const override {
     QDK_LOG_TRACE_ENTERING();
     return buf_.size();
   }
