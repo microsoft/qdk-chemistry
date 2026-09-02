@@ -344,7 +344,8 @@ def _copy_component_directories(sources: list[Path], destination: Path) -> list[
         source_root = source.resolve()
         for source_file in sorted(path for path in source.rglob("*") if path.is_file() or path.is_symlink()):
             try:
-                resolved_source_file = source_file.resolve(strict=True)
+                candidate = source_file.parent / source_file.readlink() if source_file.is_symlink() else source_file
+                resolved_source_file = candidate.resolve(strict=True)
             except OSError as exc:
                 raise PluginInstallError(f"cannot resolve plugin component file {source_file}: {exc}") from exc
             if resolved_source_file.is_dir():
