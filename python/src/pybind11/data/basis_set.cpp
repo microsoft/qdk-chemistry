@@ -76,6 +76,7 @@ void bind_basis_set(py::module& m) {
 
   // Bind OrbitalType enum
   py::enum_<OrbitalType>(m, "OrbitalType", "Enumeration of orbital types")
+      .value("UL", OrbitalType::UL, "ECP local potential (l=-1)")
       .value("S", OrbitalType::S, "s orbital (l=0)")
       .value("P", OrbitalType::P, "p orbital (l=1)")
       .value("D", OrbitalType::D, "d orbital (l=2)")
@@ -147,12 +148,30 @@ Examples:
            py::arg("coefficients"), py::arg("rpowers"))
       .def_readwrite("atom_index", &Shell::atom_index, "Index of the atom")
       .def_readwrite("orbital_type", &Shell::orbital_type, "Type of orbital")
-      .def_readwrite("exponents", &Shell::exponents,
-                     "Vector of orbital exponents")
-      .def_readwrite("coefficients", &Shell::coefficients,
-                     "Vector of contraction coefficients")
-      .def_readwrite("rpowers", &Shell::rpowers,
-                     "Vector of radial powers for ECP shells (r^n terms)")
+      .def_property(
+          "exponents",
+          [](Shell& shell) -> Eigen::VectorXd& { return shell.exponents; },
+          [](Shell& shell, const Eigen::VectorXd& value) {
+            shell.exponents = value;
+          },
+          py::return_value_policy::reference_internal,
+          "Vector of orbital exponents")
+      .def_property(
+          "coefficients",
+          [](Shell& shell) -> Eigen::VectorXd& { return shell.coefficients; },
+          [](Shell& shell, const Eigen::VectorXd& value) {
+            shell.coefficients = value;
+          },
+          py::return_value_policy::reference_internal,
+          "Vector of contraction coefficients")
+      .def_property(
+          "rpowers",
+          [](Shell& shell) -> Eigen::VectorXi& { return shell.rpowers; },
+          [](Shell& shell, const Eigen::VectorXi& value) {
+            shell.rpowers = value;
+          },
+          py::return_value_policy::reference_internal,
+          "Vector of radial powers for ECP shells (r^n terms)")
       .def("get_num_primitives", &Shell::get_num_primitives,
            R"(
 Get the number of primitive Gaussians in this shell.
