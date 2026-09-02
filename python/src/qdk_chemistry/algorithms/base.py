@@ -12,107 +12,13 @@ integrated into the QDK/Chemistry framework.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from qdk_chemistry._core import DuplicateRegistrationError as _DuplicateRegistrationError
 from qdk_chemistry.data import Settings
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-
-
-class LiveSettings(Settings):
-    """Settings base supporting slots that hold live, non-serializable objects.
-
-    Declare slot names in ``_live_keys``. Values stored there are held in Python
-    only: they never appear in ``keys()``, are never written to JSON/HDF5, and never
-    contribute to the algorithm content hash. Use this for handles that cannot be
-    rebuilt from configuration, such as an authenticated service client.
-
-    Examples:
-        >>> class MySettings(LiveSettings):
-        ...     _live_keys = ("client",)
-
-    """
-
-    _live_keys: tuple[str, ...] = ()
-
-    def __init__(self) -> None:
-        """Initialize the live-slot storage."""
-        super().__init__()
-        # object.__setattr__: Settings routes normal attribute writes to setting keys.
-        object.__setattr__(self, "_live_values", {})
-
-    def live_items(self) -> dict[str, Any]:
-        """Return the currently populated live slots.
-
-        Returns:
-            dict[str, Any]: Mapping of slot name to live object.
-
-        """
-        return {key: value for key, value in self._live_values.items() if value is not None}
-
-    def set(self, key: str, value: Any) -> None:
-        """Set a setting value, routing live slots to Python-only storage.
-
-        Args:
-            key: The setting key name.
-            value: The new value.
-
-        """
-        if key in self._live_keys:
-            self._live_values[key] = value
-            return
-        super().set(key, value)
-
-    def get(self, key: str) -> Any:
-        """Return a setting value, routing live slots to Python-only storage.
-
-        Args:
-            key: The setting key name.
-
-        Returns:
-            Any: The stored value, or None for an unpopulated live slot.
-
-        """
-        if key in self._live_keys:
-            return self._live_values.get(key)
-        return super().get(key)
-
-    def has(self, key: str) -> bool:
-        """Return whether *key* is a known setting, including live slots.
-
-        Args:
-            key: The setting key name.
-
-        Returns:
-            bool: True if the key is known.
-
-        """
-        return key in self._live_keys or super().has(key)
-
-    def update(self, *args: Any, **kwargs: Any) -> None:
-        """Update existing settings, extracting live slots before delegating.
-
-        Mirrors the bound overloads ``update(key, value)`` and ``update(dict)``.
-
-        Args:
-            args: Either a single mapping, or a ``(key, value)`` pair.
-            kwargs: Forwarded to the base implementation.
-
-        """
-        if len(args) == 2 and args[0] in self._live_keys:
-            self._live_values[args[0]] = args[1]
-            return
-        if len(args) == 1 and isinstance(args[0], dict):
-            remaining = dict(args[0])
-            for key in self._live_keys:
-                if key in remaining:
-                    self._live_values[key] = remaining.pop(key)
-            if not remaining:
-                return
-            args = (remaining,)
-        super().update(*args, **kwargs)
 
 
 class Algorithm(ABC):
@@ -176,7 +82,6 @@ class Algorithm(ABC):
         """Initialize the base algorithm."""
         super().__init__()
         self._settings = Settings()
-        self._algorithm_instances: dict[str, Algorithm] = {}
 
     @abstractmethod
     def _run_impl(self, *args, **kwargs):
@@ -237,45 +142,12 @@ class Algorithm(ABC):
         """
         return self._settings
 
-    def set_algorithm_instance(self, setting_key: str, instance: Any) -> None:
-        """Provide a live instance for a named slot, in place of a serializable descriptor.
-
-        Named slots are normally described declaratively in settings (a nested
-        ``AlgorithmRef``, or a plain value) and materialized from those serializable
-        values at run time. Use this method instead when the slot must hold a live
-        object that cannot be reconstructed from ``Settings`` — for example a nested
-        algorithm instance holding a live network client, or a plugin-specific handle
-        such as an Azure Quantum ``target``. The instance is stored on this algorithm
-        only, is never serialized, and is never part of the content hash; for a nested
-        algorithm slot it takes precedence over any ``AlgorithmRef`` at *setting_key*.
-
-        Args:
-            setting_key: Slot the algorithm reads at run time (e.g. "circuit_executor", "target").
-            instance: A live object to use for that slot.
-
-        """
-        self._algorithm_instances[setting_key] = instance
-
-    def _get_algorithm_instance(self, setting_key: str, default: Any = None) -> Any:
-        """Return a live instance provided via :meth:`set_algorithm_instance`, or *default*.
-
-        Args:
-            setting_key: The slot to look up.
-            default: Value to return when nothing is provided for *setting_key*.
-
-        Returns:
-            Any: The provided instance, or *default* if none was set.
-
-        """
-        return getattr(self, "_algorithm_instances", {}).get(setting_key, default)
-
     def _create_nested(self, setting_key: str):
         """Instantiate a nested algorithm for *setting_key*.
 
-        If a live instance was provided via :meth:`set_algorithm_instance`, it is
-        returned directly. Otherwise the ``AlgorithmRef`` stored at *setting_key* is
-        read, the corresponding algorithm is created via the registry, and any nested
-        settings overrides are applied.
+        The ``AlgorithmRef`` stored at *setting_key* is read, the corresponding
+        algorithm is created via the registry, and any nested settings overrides
+        are applied.
 
         Args:
             setting_key: Settings key that holds an ``AlgorithmRef`` value.
@@ -287,9 +159,6 @@ class Algorithm(ABC):
             KeyError: If the algorithm type or name cannot be found.
 
         """
-        instance = self._get_algorithm_instance(setting_key)
-        if instance is not None:
-            return instance
         return create_from_ref(self._settings, setting_key)
 
     @abstractmethod
@@ -368,7 +237,6 @@ def create_from_ref(settings, setting_key: str):
     ref = settings.get(setting_key)
     if ref.settings is not None:
         kwargs = {k: ref.settings.get(k) for k in ref.settings}
-        kwargs.update(getattr(ref.settings, "live_items", dict)())
         return registry.create(ref.algorithm_type, ref.algorithm_name, **kwargs)
     return registry.create(ref.algorithm_type, ref.algorithm_name)
 
