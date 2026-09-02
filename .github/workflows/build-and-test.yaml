@@ -213,6 +213,20 @@ jobs:
         MARCH: ${{ matrix.uarch }}
         KEEP_BUILD_DIR: 1
       run: |
+        # This step's own JOBS, scoped here only: the matrix's build-parallel is sized for the
+        # already-built qdk-chemistry/ExaChem binaries (test run, no compilation), not for building
+        # ExaChem/TAMM's memory-hungry translation units from scratch, so cap by available RAM instead.
+        cpu=$(command -v nproc >/dev/null 2>&1 && nproc || sysctl -n hw.logicalcpu)
+        if [ -r /proc/meminfo ]; then
+          ram_gb=$(( $(grep MemTotal /proc/meminfo | awk '{print $2}') / 1024 / 1024 ))
+        else
+          ram_gb=$(( $(sysctl -n hw.memsize) / 1024 / 1024 / 1024 ))
+        fi
+        jobs=$(printf "%.0f" "$(awk "BEGIN { print $ram_gb / 8 }")")
+        [ "$jobs" -lt 1 ] && jobs=1
+        [ "$jobs" -gt "$cpu" ] && jobs=$cpu
+        echo "CPUs=$cpu RAM=${ram_gb}GB -> JOBS=$jobs"
+
         # macOS has no BLAS package installed, so let BLAS++ auto-detect Apple's Accelerate framework; Linux
         # installs OpenBLAS via apt above.
         if [ "${{ matrix.os-name }}" == "macOS" ]; then
@@ -221,7 +235,7 @@ jobs:
           BLAS_VENDOR=openblas
         fi
         INSTALL_PREFIX="${{ env.CPP_DEPS_PREFIX }}" \
-        JOBS="$CMAKE_BUILD_PARALLEL_LEVEL" \
+        JOBS="$jobs" \
           bash ${{ github.workspace }}/.pipelines/install-scripts/install-cpp-deps.sh \
           ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json \
           ${{ github.workspace }}/external/macis/manifest/cgmanifest.json \
@@ -232,7 +246,7 @@ jobs:
           # would shadow the real OpenBLAS for the main build otherwise (caused SEGFAULTs).
           INSTALL_PREFIX="${{ env.EXACHEM_INSTALL_PREFIX }}" \
           BUILD_ROOT="${{ github.workspace }}/exachem_build" \
-          JOBS="$CMAKE_BUILD_PARALLEL_LEVEL" \
+          JOBS="$jobs" \
             bash ${{ github.workspace }}/.pipelines/install-scripts/exachem/install-exachem.sh
         fi
 
