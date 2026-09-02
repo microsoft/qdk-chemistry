@@ -44,7 +44,7 @@ def is_cacheable(value: Any) -> bool:
         return True
     if isinstance(value, np.ndarray):
         return not value.dtype.hasobject
-    if isinstance(value, list):
+    if isinstance(value, list | tuple):
         return all(_is_cache_node(item) for item in value)
     return False
 
@@ -127,3 +127,7 @@ class CacheBackend(ABC):
         dict, which is only valid for backends that need no arguments.
         """
         return {}
+
+    def for_remote(self) -> CacheBackend | None:
+        """Return the cache view reachable from a remote compute node."""
+        return self if self.is_shared else None

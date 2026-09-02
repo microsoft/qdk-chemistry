@@ -19,6 +19,7 @@ from qdk_chemistry.plugins.qiskit import (
     QDK_CHEMISTRY_HAS_QISKIT_AER,
     QDK_CHEMISTRY_HAS_QISKIT_NATURE,
 )
+from qdk_chemistry.remote.job import Job
 
 try:
     import pyscf  # noqa: F401
@@ -30,6 +31,120 @@ except ImportError:
 # Algorithm types that ship as an interface only, with no registered implementation
 # and therefore an empty default name. Remove entries here as implementations land.
 INTERFACE_ONLY_TYPES: set[str] = set()
+
+
+def test_algorithm_wrapper_forwards_remote_execution_options(monkeypatch):
+    """Remote execution options are handled outside the wrapped algorithm."""
+    algorithm = object()
+    backend = object()
+    remote_run = MagicMock(return_value="remote result")
+    monkeypatch.setattr("qdk_chemistry.remote.proxy.run", remote_run)
+
+    wrapped = registry._AlgorithmWrapper(algorithm)
+    result = wrapped.run(
+        "input",
+        keyword="value",
+        cache="cache",
+        remote=backend,
+        force_rerun=True,
+    )
+
+    assert result == "remote result"
+    remote_run.assert_called_once_with(
+        algorithm,
+        "input",
+        keyword="value",
+        cache="cache",
+        remote=backend,
+        force_rerun=True,
+    )
+
+
+@pytest.mark.parametrize(
+    "result",
+    [
+        pytest.param(None, id="none"),
+        pytest.param((42,), id="singleton-tuple"),
+        pytest.param((), id="empty-tuple"),
+    ],
+)
+def test_algorithm_wrapper_local_cache_satisfies_remote_run(tmp_path, result):
+    """A complete local result is a cache hit when a remote is later requested."""
+
+    class CachedAlgorithm:
+        calls = 0
+
+        def hash(self):
+            return "cached_result"
+
+        def run(self):
+            self.calls += 1
+            return result
+
+        def type_name(self):
+            return "test_algorithm"
+
+        def name(self):
+            return "cached_result"
+
+        def settings(self):
+            settings = MagicMock()
+            settings.to_dict.return_value = {}
+            return settings
+
+    implementation = CachedAlgorithm()
+    algorithm = registry._AlgorithmWrapper(implementation)
+    backend = MagicMock()
+    backend.submit.side_effect = AssertionError("remote backend was submitted")
+
+    assert algorithm.run(cache=tmp_path) == result
+    assert algorithm.run(cache=tmp_path, remote=backend) == result
+    assert implementation.calls == 1
+    backend.submit.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "result",
+    [
+        pytest.param(None, id="none"),
+        pytest.param((42,), id="singleton-tuple"),
+        pytest.param((), id="empty-tuple"),
+    ],
+)
+def test_algorithm_wrapper_remote_cache_satisfies_local_run(tmp_path, result):
+    """A remotely fetched result is a cache hit for a later local request."""
+    implementation = MagicMock()
+    implementation.hash.return_value = "cached_result"
+    implementation.type_name.return_value = "test_algorithm"
+    implementation.name.return_value = "cached_result"
+    implementation.settings().to_dict.return_value = {}
+    algorithm = registry._AlgorithmWrapper(implementation)
+    backend = MagicMock()
+    job = Job(
+        job_id="remote-job",
+        backend="test",
+        backend_config={},
+        backend_state={},
+        status="succeeded",
+    )
+    job.fetch = MagicMock(return_value=result)
+    job.attach_backend(backend)
+    backend.submit.return_value = job
+
+    assert algorithm.run(cache=tmp_path, remote=backend) == result
+    assert algorithm.run(cache=tmp_path) == result
+    implementation.run.assert_not_called()
+    backend.submit.assert_called_once()
+
+
+def test_algorithm_wrapper_does_not_reserve_poll_interval():
+    """An algorithm can define its own poll_interval keyword argument."""
+    algorithm = MagicMock()
+    wrapped = registry._AlgorithmWrapper(algorithm)
+
+    wrapped.run("input", poll_interval=0.25)
+
+    algorithm.run.assert_called_once_with("input", poll_interval=0.25)
 
 
 class TestRegistryShowDefault:
