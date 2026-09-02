@@ -21,10 +21,9 @@ namespace QDKChemistry.Utils.AliasSampling {
     import Std.StatePreparation.PrepareUniformSuperposition;
     import Std.Arrays.Mapped;
     import Std.Arrays.Padded;
-    import Std.Arrays.Zipped;
     import Std.TableLookup.Select;
     import QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D;
-    import QDKChemistry.Utils.SelectSwap.Select2DLoad;
+    import QDKChemistry.Utils.SelectSwap.Select2DLoadWord;
     import QDKChemistry.Utils.SelectSwap.SelectSwap;
 
     /// Parameters for alias sampling state preparation.
@@ -226,7 +225,7 @@ namespace QDKChemistry.Utils.AliasSampling {
     /// optional free-rider data.
     ///
     /// Returns Bool[][][] of shape [nCond][nPaddedIdx][dataBits], suitable for
-    /// Select2DLoad with outerAddress=conditionalRegister, innerAddress=indexRegister.
+    /// Select2DLoadWord with outerAddress=conditionalRegister, innerAddress=indexRegister.
     ///
     /// Each row encodes: keepCoeff[μ] + altIndex[nIdx] + signOrig[1] + signAlt[1] + freeRider[*].
     function BuildConditionalAliasTable3D(
@@ -267,7 +266,7 @@ namespace QDKChemistry.Utils.AliasSampling {
     /// Conditional alias sampling PREPARE (2D) — prepares
     /// |c⟩|0⟩ → |c⟩ Σ_ℓ √(p̃_{c,ℓ}) e^{iπ·sign_{c,ℓ}} |ℓ⟩|garbage⟩.
     ///
-    /// Uses Select2DLoad to load per-condition alias tables in a single QROM pass.
+    /// Uses Select2DLoadWord to load per-condition alias tables in a single QROM pass.
     /// Sign bits encode negative amplitudes via Z phase (Von Burg arXiv:2011.03494, Def. 1).
     ///
     /// Register layout:
@@ -310,7 +309,7 @@ namespace QDKChemistry.Utils.AliasSampling {
     /// Circuit (arXiv:2502.15882v1, Table A):
     ///   1. PrepareUniformSuperposition on indexRegister
     ///   2. H⊗μ on uniformRegister
-    ///   3. Select2DLoad: (cond, idx) → (keep, alt, signOrig, signAlt, freeRider)
+    ///   3. Select2DLoadWord: (cond, idx) → (keep, alt, signOrig, signAlt, freeRider)
     ///   4. Compare σ ≥ keep → set flag
     ///   5. Conditional swap index ↔ alt
     ///   6. Conditional swap signOrig ↔ signAlt
@@ -356,18 +355,19 @@ namespace QDKChemistry.Utils.AliasSampling {
         // a value below the number of conditions: its uniform superposition spans exactly
         // [0, nCond) and alias sampling can only swap one such index for another. That lets the
         // lookup skip the padding out to a power of two in the outer index.
-        if lambda == 0 {
-            Select2DLoad(table3D, conditionalRegister, indexRegister, 0, true, qromOutput + freeRiderRegister);
-        } else {
-            // SelectSwap leaves the non-addressed chunks dirty, so copy the addressed
-            // word out and let the within/apply uncompute and free the swap ancilla.
-            use swapTarget = Qubit[m * (1 <<< lambda)];
-            within {
-                Select2DLoad(table3D, conditionalRegister, indexRegister, lambda, true, swapTarget);
-            } apply {
-                ApplyToEachCA(CNOT, Zipped(swapTarget[0..m - 1], qromOutput + freeRiderRegister));
-            }
-        }
+        //
+        // `Select2DLoadWord` owns the select-swap copy-out, so the uncompute this operation's
+        // adjoint reaches is a phase fixup over the (condition, index) address rather than a
+        // second lookup. The alias garbage is live across SELECT, so the load is uncomputed by
+        // that adjoint rather than here.
+        Select2DLoadWord(
+            table3D,
+            conditionalRegister,
+            indexRegister,
+            lambda,
+            true,
+            qromOutput + freeRiderRegister
+        );
 
         let keepCoeffLoaded = qromOutput[0..bitsPrecision - 1];
         let altIndexReg = qromOutput[bitsPrecision..bitsPrecision + nIndexBits - 1];

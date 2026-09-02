@@ -89,6 +89,22 @@ class TestSelectSwapLoadsCorrectValues:
             _DATA_2D_RAGGED_OUTER, num_swap_bits, outer_always_valid
         )
 
+    @pytest.mark.parametrize("outer_always_valid", [False, True])
+    @pytest.mark.parametrize("num_swap_bits", [0, 1, 2])
+    def test_2d_word_loads_every_address(self, num_swap_bits, outer_always_valid):
+        assert get_qsharp_context().code.QDKChemistry.Utils.SelectSwap.TestSelect2DLoadWordCorrectness(
+            _DATA_2D, num_swap_bits, outer_always_valid
+        )
+
+    @pytest.mark.parametrize("outer_always_valid", [False, True])
+    @pytest.mark.parametrize("num_swap_bits", [0, 1, 2])
+    def test_2d_word_loads_every_address_when_outer_length_is_not_a_power_of_two(
+        self, num_swap_bits, outer_always_valid
+    ):
+        assert get_qsharp_context().code.QDKChemistry.Utils.SelectSwap.TestSelect2DLoadWordCorrectness(
+            _DATA_2D_RAGGED_OUTER, num_swap_bits, outer_always_valid
+        )
+
 
 class TestSelectSwapPreservesAddressPhases:
     """The swap path must agree with the plain-select path as a *phase* oracle.
@@ -96,6 +112,10 @@ class TestSelectSwapPreservesAddressPhases:
     A lookup that loads the right bits but routes unused addresses differently from the
     plain-select path, or that uncomputes incorrectly, still passes every value test above:
     the damage lands on the phase of the address register, where only these tests see it.
+
+    The 2D sweeps include ``num_swap_bits == 0``. That case is no longer the unary-iteration
+    reference it compares against -- it is the same select-swap construction with an empty
+    butterfly -- so it needs the same check as any other split.
     """
 
     @pytest.mark.parametrize("num_swap_bits", [1, 2, 3])
@@ -107,15 +127,34 @@ class TestSelectSwapPreservesAddressPhases:
         _assert_phase_agreement("TestSelectSwap1DPhaseAgreement", _DATA_1D_RAGGED, num_swap_bits)
 
     @pytest.mark.parametrize("outer_always_valid", [False, True])
-    @pytest.mark.parametrize("num_swap_bits", [1, 2])
+    @pytest.mark.parametrize("num_swap_bits", [0, 1, 2])
     def test_2d_swap_path_matches_plain_select(self, num_swap_bits, outer_always_valid):
         _assert_phase_agreement("TestSelect2DLoadPhaseAgreement", _DATA_2D, num_swap_bits, outer_always_valid)
 
     @pytest.mark.parametrize("outer_always_valid", [False, True])
-    @pytest.mark.parametrize("num_swap_bits", [1, 2])
+    @pytest.mark.parametrize("num_swap_bits", [0, 1, 2])
     def test_2d_swap_path_matches_plain_select_when_outer_length_is_not_a_power_of_two(
         self, num_swap_bits, outer_always_valid
     ):
         _assert_phase_agreement(
             "TestSelect2DLoadPhaseAgreement", _DATA_2D_RAGGED_OUTER, num_swap_bits, outer_always_valid
+        )
+
+    @pytest.mark.parametrize("outer_always_valid", [False, True])
+    @pytest.mark.parametrize("num_swap_bits", [0, 1, 2])
+    def test_2d_word_load_matches_plain_select(self, num_swap_bits, outer_always_valid):
+        """``Select2DLoadWord`` erases against the flat table whatever swap width it loaded at.
+
+        Its adjoint is written by hand rather than derived from its body, so this is the only
+        test that can see an erasure that is wrong in phase but right in value.
+        """
+        _assert_phase_agreement("TestSelect2DLoadWordPhaseAgreement", _DATA_2D, num_swap_bits, outer_always_valid)
+
+    @pytest.mark.parametrize("outer_always_valid", [False, True])
+    @pytest.mark.parametrize("num_swap_bits", [0, 1, 2])
+    def test_2d_word_load_matches_plain_select_when_outer_length_is_not_a_power_of_two(
+        self, num_swap_bits, outer_always_valid
+    ):
+        _assert_phase_agreement(
+            "TestSelect2DLoadWordPhaseAgreement", _DATA_2D_RAGGED_OUTER, num_swap_bits, outer_always_valid
         )
