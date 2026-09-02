@@ -36,7 +36,21 @@ def _load_remote_cache(input_dir: Path) -> tuple[Any, str | None, str | None, bo
 
         manifest = _load_manifest(input_dir / "manifest.json")
         run_hash = manifest.get("run_hash")
-        job_cache_key = manifest.get("job_cache_key", run_hash)
+        owner = manifest.get("owner")
+        job_cache_key = manifest.get("job_cache_key")
+        if job_cache_key is None and run_hash is not None and isinstance(owner, dict):
+            import hashlib  # noqa: PLC0415
+
+            try:
+                owner_json = json.dumps(owner, sort_keys=True, separators=(",", ":"))
+            except (TypeError, ValueError):
+                owner_json = ""
+
+            if owner_json:
+                owner_digest = hashlib.sha256(owner_json.encode()).hexdigest()[:16]
+                job_cache_key = f"{owner_digest}.{run_hash}"
+        if job_cache_key is None:
+            job_cache_key = run_hash
         force_rerun = manifest.get("force_rerun", False)
         cache_info = manifest.get("remote_cache")
         if not cache_info or not cache_info.get("name"):
