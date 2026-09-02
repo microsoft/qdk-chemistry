@@ -115,6 +115,27 @@ def test_component_copy_dereferences_symlink_inside_plugin_tree(tmp_path: Path) 
     assert not copied.is_symlink()
 
 
+def test_component_copy_rejects_symlink_to_directory(tmp_path: Path) -> None:
+    source = tmp_path / "plugin" / "skills"
+    nested = source / "shared"
+    nested.mkdir(parents=True)
+    (source / "linked-directory").symlink_to(nested, target_is_directory=True)
+    destination = tmp_path / "workspace" / ".github" / "skills"
+
+    with pytest.raises(plugin_installer.PluginInstallError, match="resolves to a directory"):
+        plugin_installer._copy_component_directories([source], destination)
+
+
+def test_component_copy_rejects_broken_symlink(tmp_path: Path) -> None:
+    source = tmp_path / "plugin" / "skills"
+    source.mkdir(parents=True)
+    (source / "missing.md").symlink_to("does-not-exist.md")
+    destination = tmp_path / "workspace" / ".github" / "skills"
+
+    with pytest.raises(plugin_installer.PluginInstallError, match="cannot resolve plugin component file"):
+        plugin_installer._copy_component_directories([source], destination)
+
+
 def test_local_install_registers_ancestor_marketplace(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

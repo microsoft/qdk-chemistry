@@ -343,7 +343,12 @@ def _copy_component_directories(sources: list[Path], destination: Path) -> list[
     for source in sources:
         source_root = source.resolve()
         for source_file in sorted(path for path in source.rglob("*") if path.is_file() or path.is_symlink()):
-            resolved_source_file = source_file.resolve()
+            try:
+                resolved_source_file = source_file.resolve(strict=True)
+            except OSError as exc:
+                raise PluginInstallError(f"cannot resolve plugin component file {source_file}: {exc}") from exc
+            if resolved_source_file.is_dir():
+                raise PluginInstallError(f"plugin component file {source_file} resolves to a directory")
             if not resolved_source_file.is_relative_to(source_root):
                 raise PluginInstallError(
                     f"plugin component file {source_file} resolves outside {source_root} "
@@ -351,7 +356,10 @@ def _copy_component_directories(sources: list[Path], destination: Path) -> list[
                 )
             target = destination / source_file.relative_to(source)
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(resolved_source_file, target)
+            try:
+                shutil.copy2(resolved_source_file, target)
+            except OSError as exc:
+                raise PluginInstallError(f"cannot copy plugin component file {source_file}: {exc}") from exc
             copied.append(str(target))
     return copied
 

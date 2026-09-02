@@ -132,6 +132,8 @@ class TestProjectValidation:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         projects_dir = tmp_path / "projects"
+        for name in ("first", "second"):
+            (projects_dir / name).mkdir(parents=True)
         monkeypatch.setattr("qdk_chemistry.ui.validation.config.projects_dir", projects_dir)
         entered = threading.Barrier(2)
         results: dict[str, Path] = {}
