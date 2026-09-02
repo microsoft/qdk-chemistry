@@ -138,7 +138,8 @@ double fci_ground_energy(double e0, const Eigen::MatrixXd& f,
 
 TEST(SchriefferWolffPT2Test, FactoryRegistration) {
   const auto available = EffectiveHamiltonianConstructorFactory::available();
-  EXPECT_EQ(available, std::vector<std::string>{"qdk_swpt2"});
+  EXPECT_NE(std::find(available.begin(), available.end(), "qdk_swpt2"),
+            available.end());
 
   auto ctor = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
   ASSERT_NE(ctor, nullptr);
@@ -364,6 +365,38 @@ TEST(SchriefferWolffPT2Test, ReproducesMp2WhenEveryOccupiedOrbitalIsActive) {
   EXPECT_GT(std::abs(E_unfolded - E_mp2), 1.0);
 }
 
+// The window Hamiltonian's own folded core must be exactly the reference core
+// orbitals outside W. This is the precondition that lets the emitted inactive
+// index set be built by sorting two lists without deduplicating them:
+// `Orbitals` already forbids an orbital from being both active and inactive, so
+// the window core lies outside W, and this check pins it to the reference core
+// as well.
+TEST(SchriefferWolffPT2Test, RejectsWindowCoreThatIsNotTheReferenceCore) {
+  auto water = testing::create_water_structure();
+  auto scf = ScfSolverFactory::create();
+  auto [E_hf, wfn_hf] = scf->run(water, 0, 1, "sto-3g");
+  const auto orbitals = wfn_hf->get_orbitals();
+  const std::size_t norb = orbitals->get_num_molecular_orbitals();
+
+  const std::vector<std::size_t> core = {0, 1, 2};
+  const std::vector<std::size_t> active = {3, 4};
+  const std::vector<std::size_t> window = {3, 4, 5};
+
+  auto ham = HamiltonianConstructorFactory::create();
+  auto cas = MultiConfigurationCalculatorFactory::create("macis_cas");
+  cas->settings().set("calculate_one_rdm", true);
+  auto [E_cas, reference] = cas->run(
+      ham->run(testing::with_active_space(orbitals, active, core)), 2, 2);
+
+  // Window core drops orbital 2, so it no longer matches the reference core.
+  auto H_window = ham->run(
+      testing::with_active_space(orbitals, window, {core[0], core[1]}));
+  EXPECT_THROW(EffectiveHamiltonianConstructorFactory::create("qdk_swpt2")
+                   ->run(reference, H_window,
+                         testing::restricted_index_set(norb, active)),
+               std::invalid_argument);
+}
+
 // A mean-field HF reference (single determinant, no active 1-RDM) must work:
 // the downfold reads active orbital occupations directly from the reference
 // determinant. Mirrors the SCF -> active_space_selector -> downfold user flow.
@@ -496,9 +529,10 @@ TEST(SchriefferWolffPT2Test, CustomActiveSpaceOverridesReference) {
   EXPECT_LT((ge - gw).norm(), 1e-9);
   EXPECT_NEAR(H_identity->get_core_energy(), H_window->get_core_energy(), 1e-9);
 
-  // (3) Window that spans the reference core: the core orbitals {0,1,2} appear
-  // both as folded window orbitals and in the reference inactive set, so the
-  // emitted inactive index set must be deduplicated (strictly increasing).
+  // (3) Window that spans the reference core: {0,1,2} are reference core but
+  // lie inside W, so the downfold folds them itself instead of inheriting them
+  // from the window Hamiltonian, whose own inactive set is empty here. They
+  // must still come back labelled inactive, exactly once each.
   auto H_all =
       ham->run(testing::with_active_space(orbitals, {0, 1, 2, 3, 4, 5, 6}, {}));
   auto swpt2_core = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");

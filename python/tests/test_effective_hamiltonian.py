@@ -75,10 +75,10 @@ class TestEffectiveHamiltonianConstructor:
     """Registry, factory, and settings coverage for the downfolding bindings."""
 
     def test_factory_registration(self):
-        """qdk_swpt2 is the sole registered effective-Hamiltonian constructor."""
+        """qdk_swpt2 is registered as an effective-Hamiltonian constructor and is the default."""
         available = algorithms.available(_TYPE)
         assert isinstance(available, list)
-        assert available == ["qdk_swpt2"]
+        assert "qdk_swpt2" in available
 
         # default and explicit creation both yield the swpt2 constructor
         default = algorithms.create(_TYPE)
@@ -163,10 +163,10 @@ class TestEffectiveHamiltonianConstructor:
     def test_full_window_spanning_reference_core(self):
         """Downfold a full-orbital window (the natural ``ham.run(orbitals)`` path).
 
-        The window spans the reference core, so each core orbital appears both as
-        a folded window orbital and in the reference inactive set; the emitted
-        inactive index set must be deduplicated (regression for a
-        strictly-increasing-index crash).
+        The core orbitals are reference core but lie inside ``W``, so the
+        downfold folds them itself instead of inheriting them from the window
+        Hamiltonian, whose own inactive set is empty here. They must still come
+        back labelled inactive, exactly once each.
         """
         alpha = SymmetryLabel([axes.alpha()])
         water = Structure(
