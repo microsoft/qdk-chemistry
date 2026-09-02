@@ -105,6 +105,21 @@ class IterativePhaseEstimation(PhaseEstimation):
         num_bits = circuit_builder.settings().get("num_bits")
         if num_bits <= 0:
             raise ValueError(f"num_bits must be a positive integer. Got {num_bits}.")
+
+        # Full single-circuit IQPE with in-circuit classical feedback (Adaptive-profile targets).
+        builder_settings = circuit_builder.settings()
+        builder_keys = builder_settings.keys()
+        if "combine_iterations" in builder_keys and builder_settings.get("combine_iterations"):
+            return self._run_single_circuit(
+                circuit_builder=circuit_builder,
+                circuit_executor=circuit_executor,
+                state_preparation=state_preparation,
+                qubit_hamiltonian=qubit_hamiltonian,
+                container=container,
+                num_bits=num_bits,
+                noise=noise,
+            )
+
         # Initialize the parameters
         phase_feedback = 0.0
         bits: list[int] = []
@@ -142,6 +157,63 @@ class IterativePhaseEstimation(PhaseEstimation):
             phase_fraction=phase_fraction,
             eigenvalue_from_phase=container.eigenvalue_from_phase,
             bits_msb_first=bits[::-1],
+        )
+
+    def _run_single_circuit(
+        self,
+        *,
+        circuit_builder: IterativeQpeCircuitBuilder,
+        circuit_executor,
+        state_preparation: Circuit,
+        qubit_hamiltonian: QubitOperator,
+        container,
+        num_bits: int,
+        noise: QuantumErrorProfile | None,
+    ) -> QpeResult:
+        """Run the full IQPE as a single circuit with in-circuit classical feedback.
+
+        The builder produces one circuit that performs every round using mid-circuit
+        measurement and classical feed-forward. The executor returns each shot's full
+        measured bitstring MSB-first (same convention as the standard QPE path); the most
+        frequent bitstring is decoded as ``int(bitstring_msb_first, 2) / 2**num_bits``.
+
+        Args:
+            circuit_builder: The iterative circuit builder configured with ``combine_iterations`` enabled.
+            circuit_executor: The circuit executor used to run the circuit.
+            state_preparation: The state preparation circuit.
+            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
+            container: The unitary container providing ``eigenvalue_from_phase``.
+            num_bits: The number of phase bits to estimate.
+            noise: The quantum error profile to simulate noise, defaults to None.
+
+        Returns:
+            QpeResult: The result of the phase estimation.
+
+        Raises:
+            RuntimeError: If the executor returns no measurement results.
+
+        """
+        full_circuit = circuit_builder._run_impl(  # noqa: SLF001
+            state_preparation=state_preparation, qubit_hamiltonian=qubit_hamiltonian
+        )[0]
+        Logger.info("Running full IQPE as a single circuit with in-circuit classical feedback.")
+        executor_data = circuit_executor.run(full_circuit, shots=self.settings().get("shots_per_bit"), noise=noise)
+        counts = executor_data.bitstring_counts
+        if not counts:
+            raise RuntimeError("No measurement results returned from the circuit executor.")
+
+        # Most frequent bitstring across shots, decoded like standard QPE. The executor
+        # returns each bitstring MSB-first (same convention as the standard QPE path).
+        bitstring_msb_first = max(counts, key=counts.get)
+        Logger.info(f"Dominant measured bitstring (MSB first): {bitstring_msb_first}")
+        phase_fraction = int(bitstring_msb_first, 2) / (2**num_bits)
+
+        return QpeResult.from_phase_fraction(
+            method=self.name(),
+            phase_fraction=phase_fraction,
+            eigenvalue_from_phase=container.eigenvalue_from_phase,
+            bits_msb_first=[int(c) for c in bitstring_msb_first],
+            bitstring_msb_first=bitstring_msb_first,
         )
 
     def name(self) -> str:
