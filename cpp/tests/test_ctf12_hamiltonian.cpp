@@ -424,28 +424,13 @@ TEST(CtF12AbsoluteEnergy, StretchedN2InternalAndEmissionBoundaries) {
   EXPECT_LT(max_orbital_energy_residual, 2e-6)
       << "Regenerated Fock diagonal does not match input orbital energies";
 
-  const ctf12::DressedHamiltonian dressed =
-      ctf12::build_dressed_hamiltonian(input, /*relax_orbitals=*/true);
+  // Only the bare-reference side is checked here; that the emitted Hamiltonian
+  // reproduces the F12-HF energy is covered by
+  // StretchedN2HamiltonianMatchesHfAndMp2Apis.
+  const ctf12::F12HartreeFockResult f12 = ctf12::run_f12_hf(input);
 
-  EXPECT_NEAR(dressed.e_hf + nuclear_repulsion, hf_energy, 1e-8);
-  EXPECT_NEAR(dressed.e_hf + nuclear_repulsion, original_determinant_energy,
-              1e-8);
-
-  auto index = [&](std::size_t p, std::size_t q, std::size_t r, std::size_t s) {
-    return ((p * dressed.n_mo + q) * dressed.n_mo + r) * dressed.n_mo + s;
-  };
-  double emitted_determinant_energy = nuclear_repulsion;
-  for (std::size_t i = 0; i < dressed.n_occupied; ++i) {
-    emitted_determinant_energy += 2.0 * dressed.one_body(i, i);
-    for (std::size_t j = 0; j < dressed.n_occupied; ++j) {
-      emitted_determinant_energy += 2.0 * dressed.two_body[index(i, i, j, j)] -
-                                    dressed.two_body[index(i, j, j, i)];
-    }
-  }
-  EXPECT_NEAR(emitted_determinant_energy, dressed.e_f12hf + nuclear_repulsion,
-              1e-8);
-  EXPECT_NEAR(emitted_determinant_energy,
-              hf_energy + dressed.e_f12hf - dressed.e_hf, 1e-8);
+  EXPECT_NEAR(f12.e_hf + nuclear_repulsion, hf_energy, 1e-8);
+  EXPECT_NEAR(f12.e_hf + nuclear_repulsion, original_determinant_energy, 1e-8);
 }
 
 TEST(CtF12AbsoluteEnergy, StretchedN2HamiltonianMatchesHfAndMp2Apis) {
@@ -670,11 +655,10 @@ void run_neon_effective_hamiltonian_mp2(const std::string& obs_name,
 
   // The emitted Hamiltonian's reference energy is the self-consistent F12-HF
   // energy of the dressed mean field (nuclear repulsion vanishes for an atom).
-  const ctf12::DressedHamiltonian dressed =
-      ctf12::build_dressed_hamiltonian(input, /*relax_orbitals=*/true);
+  const ctf12::F12HartreeFockResult f12 = ctf12::run_f12_hf(input);
   const double nuclear_repulsion =
       structure->calculate_nuclear_repulsion_energy();
-  EXPECT_NEAR(reference_energy, dressed.e_f12hf + nuclear_repulsion, 1e-11)
+  EXPECT_NEAR(reference_energy, f12.e_f12hf + nuclear_repulsion, 1e-11)
       << obs_name << ": F12-HF reference energy " << reference_energy;
 
   ::libint2::finalize();
@@ -736,9 +720,8 @@ TEST(CtF12EffectiveHamiltonian, NeonPIndicesDefinePostDressingActiveSpace) {
 
   const ctf12::F12HartreeFockInput input = ctf12::f12_input_from_wavefunction(
       *reference, 1.5, "aug-cc-pvdz-optri", 1);
-  const ctf12::DressedHamiltonian dressed =
-      ctf12::build_dressed_hamiltonian(input, /*relax_orbitals=*/true);
-  EXPECT_NEAR(determinant_energy, dressed.e_f12hf, 1e-11);
+  const ctf12::F12HartreeFockResult f12 = ctf12::run_f12_hf(input);
+  EXPECT_NEAR(determinant_energy, f12.e_f12hf, 1e-11);
 
   auto asci =
       algorithms::MultiConfigurationCalculatorFactory::create("macis_asci");

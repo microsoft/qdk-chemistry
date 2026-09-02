@@ -63,8 +63,6 @@ class TestCtF12Settings:
         s = create("effective_hamiltonian_constructor").settings()
         assert s.get("gamma") == 1.0
         assert s.get("frozen_core") == 0
-        assert s.get("eri_method") == "direct"
-        assert s.get("slater_factor") == "stg"
         assert s.get("orbital_basis") == "relaxed"
         assert s.get("symmetrize_two_body") is False
 
@@ -82,11 +80,6 @@ class TestCtF12Settings:
         s = create("effective_hamiltonian_constructor").settings()
         with pytest.raises(ValueError, match="out of allowed range"):
             s.set("gamma", -1.0)
-
-    def test_slater_factor_choices_enforced(self):
-        s = create("effective_hamiltonian_constructor").settings()
-        with pytest.raises(ValueError, match="out of allowed options"):
-            s.set("slater_factor", "bogus")
 
     def test_orbital_basis_choices_enforced(self):
         s = create("effective_hamiltonian_constructor").settings()

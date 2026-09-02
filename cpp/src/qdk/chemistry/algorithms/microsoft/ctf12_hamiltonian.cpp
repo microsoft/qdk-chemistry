@@ -16,17 +16,37 @@
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
-#include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace qdk::chemistry::algorithms::microsoft {
 
-namespace ctf12 {
+namespace {
 
+using ctf12::F12HartreeFockInput;
+using ctf12::F12HartreeFockResult;
+
+// Dressed CT-F12 Hamiltonian in a molecular-orbital basis. The two-body
+// integrals use the chemists' (pq|rs) convention with the flat layout
+// ((p*n+q)*n+r)*n+s, matching data::CanonicalFourCenterHamiltonianContainer.
+struct DressedHamiltonian {
+  std::size_t n_mo = 0;
+  std::size_t n_occupied = 0;
+  std::size_t n_core = 0;
+  Eigen::MatrixXd mo_coefficients;
+  Eigen::VectorXd orbital_energies;
+  Eigen::MatrixXd one_body;
+  std::vector<double> two_body;
+  double e_hf = 0.0;
+  double e_f12hf = 0.0;
+};
+
+// Runs the F12-HF step and repackages its integrals in the chemists'
+// convention, either in the relaxed F12-HF basis or the reference basis.
 DressedHamiltonian build_dressed_hamiltonian(const F12HartreeFockInput& in,
                                              bool relax_orbitals) {
   QDK_LOG_TRACE_ENTERING();
-  const F12HartreeFockResult r = run_f12_hf(in);
+  F12HartreeFockResult r = ctf12::run_f12_hf(in);
   const std::size_t n = r.n_mo;
 
   DressedHamiltonian out;
@@ -45,7 +65,7 @@ DressedHamiltonian build_dressed_hamiltonian(const F12HartreeFockInput& in,
 
     // Rotate the dressed <pq|rs> into the relaxed basis by four sequential
     // GEMM index transforms, cycling the leading index to the back each step.
-    two_body_phys = r.two_body;
+    two_body_phys = std::move(r.two_body);
     const std::size_t n3 = n * n * n;
     using RowMajorMat =
         Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
@@ -60,7 +80,7 @@ DressedHamiltonian build_dressed_hamiltonian(const F12HartreeFockInput& in,
     out.mo_coefficients = in.mo_coefficients;
     out.orbital_energies = in.orbital_energies;
     out.one_body = r.one_body;
-    two_body_phys = r.two_body;
+    two_body_phys = std::move(r.two_body);
   }
 
   // Convert the dressed integrals from physicists' <pq|rs> to chemists'
@@ -78,10 +98,6 @@ DressedHamiltonian build_dressed_hamiltonian(const F12HartreeFockInput& in,
   return out;
 }
 
-}  // namespace ctf12
-
-namespace {
-
 std::shared_ptr<const data::AuxiliaryBasis> resolve_cabs(
     const std::shared_ptr<const data::AuxiliaryBasisCollection>&
         auxiliary_bases) {
@@ -93,19 +109,6 @@ std::shared_ptr<const data::AuxiliaryBasis> resolve_cabs(
         "transformation folds in");
   }
   return auxiliary_bases->get_auxiliary_basis(data::AuxiliaryBasisRole::CABS);
-}
-
-// Restricted spin-blocked index set over `num_modes` molecular orbitals.
-std::shared_ptr<const data::SymmetryBlockedIndexSet> restricted_index_set(
-    std::size_t num_modes, const std::vector<std::size_t>& indices) {
-  const std::vector<std::uint32_t> selected(indices.begin(), indices.end());
-  return std::make_shared<const data::SymmetryBlockedIndexSet>(
-      std::make_shared<const data::SymmetryProduct>(
-          data::SymmetryProduct({data::axes::spin(1, true)})),
-      std::unordered_map<data::SymmetryLabel, std::size_t>{
-          {data::axes::alpha(), num_modes}, {data::axes::beta(), num_modes}},
-      std::unordered_map<data::SymmetryLabel, std::vector<std::uint32_t>>{
-          {data::axes::alpha(), selected}, {data::axes::beta(), selected}});
 }
 
 }  // namespace
@@ -130,6 +133,12 @@ std::shared_ptr<data::Hamiltonian> CtF12HamiltonianConstructor::_run_impl(
   if (active.empty()) {
     throw std::invalid_argument("CT-F12: the target P-space is empty");
   }
+  if (active.back() >=
+      reference->get_orbitals()->get_num_molecular_orbitals()) {
+    throw std::invalid_argument(
+        "CT-F12: the target P-space contains molecular-orbital indices outside "
+        "the orbital basis");
+  }
 
   const double gamma = _settings->get<double>("gamma");
   const auto frozen_core =
@@ -140,15 +149,9 @@ std::shared_ptr<data::Hamiltonian> CtF12HamiltonianConstructor::_run_impl(
   const ctf12::F12HartreeFockInput input = ctf12::f12_input_from_wavefunction(
       *reference, gamma, /*cabs_basis=*/"", frozen_core,
       resolve_cabs(auxiliary_bases));
-  ctf12::DressedHamiltonian dressed =
-      ctf12::build_dressed_hamiltonian(input, relax);
+  DressedHamiltonian dressed = build_dressed_hamiltonian(input, relax);
 
   const std::size_t n = dressed.n_mo;
-  if (active.back() >= n) {
-    throw std::invalid_argument(
-        "CT-F12: the target P-space contains molecular-orbital indices outside "
-        "the orbital basis");
-  }
 
   // Occupied orbitals left out of P are folded into the constant energy term
   // and the inactive Fock matrix; unoccupied ones are dropped.
@@ -227,8 +230,8 @@ std::shared_ptr<data::Hamiltonian> CtF12HamiltonianConstructor::_run_impl(
 
   auto orbitals = std::make_shared<data::Orbitals>(
       dressed.mo_coefficients, std::make_optional(dressed.orbital_energies),
-      ao_overlap, basis_set, restricted_index_set(n, active),
-      restricted_index_set(n, inactive));
+      ao_overlap, basis_set, ctf12::restricted_index_set(n, active),
+      ctf12::restricted_index_set(n, inactive));
 
   const double core_energy =
       e_inactive +

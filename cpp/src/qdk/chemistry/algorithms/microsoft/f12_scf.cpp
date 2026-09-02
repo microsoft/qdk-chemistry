@@ -13,9 +13,7 @@
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
-#include <stdexcept>
 #include <string>
-#include <tuple>
 #include <vector>
 
 #include "ctf12_f12.hpp"
@@ -61,7 +59,8 @@ CtF12ScfSolver::_run_impl(std::shared_ptr<data::Structure> structure,
   auto orbitals = std::make_shared<data::Orbitals>(
       relaxed_coefficients, std::make_optional(f12.relaxed_energies),
       ao_overlap, reference_orbitals->get_basis_set(),
-      std::make_optional(std::make_tuple(active_indices, inactive_indices)));
+      ctf12::restricted_index_set(n, active_indices),
+      ctf12::restricted_index_set(n, inactive_indices));
 
   // Closed-shell Hartree-Fock determinant over the active space.
   std::string config_str(n - nc, '0');

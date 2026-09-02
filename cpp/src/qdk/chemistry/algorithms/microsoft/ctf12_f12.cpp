@@ -13,16 +13,30 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdint>
 #include <memory>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include "utils.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft::ctf12 {
+
+std::shared_ptr<const data::SymmetryBlockedIndexSet> restricted_index_set(
+    std::size_t num_modes, const std::vector<std::size_t>& indices) {
+  const std::vector<std::uint32_t> selected(indices.begin(), indices.end());
+  return std::make_shared<const data::SymmetryBlockedIndexSet>(
+      std::make_shared<const data::SymmetryProduct>(
+          data::SymmetryProduct({data::axes::spin(1, true)})),
+      std::unordered_map<data::SymmetryLabel, std::size_t>{
+          {data::axes::alpha(), num_modes}, {data::axes::beta(), num_modes}},
+      std::unordered_map<data::SymmetryLabel, std::vector<std::uint32_t>>{
+          {data::axes::alpha(), selected}, {data::axes::beta(), selected}});
+}
 
 F12HartreeFockInput f12_input_from_wavefunction(
     const data::Wavefunction& reference, double gamma,
@@ -55,6 +69,12 @@ F12HartreeFockInput f12_input_from_wavefunction(
     throw std::invalid_argument(
         "CT-F12: number of frozen core orbitals must be smaller than the "
         "number of occupied orbitals");
+  }
+  if (static_cast<std::size_t>(n_alpha) >
+      orbitals->get_num_molecular_orbitals()) {
+    throw std::invalid_argument(
+        "CT-F12: the reference has more occupied orbitals than molecular "
+        "orbitals");
   }
 
   // Derive the CABS auxiliary basis name when none is supplied.
@@ -538,12 +558,6 @@ F12HartreeFockResult run_f12_hf(const F12HartreeFockInput& in) {
   auto gpidx = [&](std::size_t p, std::size_t q, std::size_t r, std::size_t s) {
     return ((p * nbf + q) * nbf + r) * nbf + s;
   };
-  std::vector<double> gp(nbf * nbf * nbf * nbf, 0.0);  // <pq|rs>
-  for (std::size_t p = 0; p < nbf; ++p)
-    for (std::size_t q = 0; q < nbf; ++q)
-      for (std::size_t r = 0; r < nbf; ++r)
-        for (std::size_t s = 0; s < nbf; ++s)
-          gp[gpidx(p, q, r, s)] = CHEM(p, r, q, s);
 
   struct ScfOut {
     double e;
@@ -806,9 +820,15 @@ F12HartreeFockResult run_f12_hf(const F12HartreeFockInput& in) {
           c2[c2idx(nc + k, nocc + av, nc + i, nocc + bv)] += -2.0 * t4;
         }
 
-  // Dressed one- and two-body Hamiltonian (paper Eq. 15-16).
+  // Dressed one- and two-body Hamiltonian (paper Eq. 15-16). The bare term is
+  // the chemist-ordered MO buffer read as <pq|rs> = (pr|qs).
   Eigen::MatrixXd hbar = hmo + 0.5 * (c1 + c1.transpose());
-  std::vector<double> gbar = gp;
+  std::vector<double> gbar(nbf * nbf * nbf * nbf, 0.0);
+  for (std::size_t p = 0; p < nbf; ++p)
+    for (std::size_t q = 0; q < nbf; ++q)
+      for (std::size_t r = 0; r < nbf; ++r)
+        for (std::size_t s = 0; s < nbf; ++s)
+          gbar[gpidx(p, q, r, s)] = CHEM(p, r, q, s);
   for (std::size_t p = 0; p < nbf; ++p)
     for (std::size_t r = 0; r < nbf; ++r)
       for (std::size_t q = 0; q < nbf; ++q)
@@ -821,8 +841,7 @@ F12HartreeFockResult run_f12_hf(const F12HartreeFockInput& in) {
   for (std::size_t i = 0; i < nocc; ++i) {
     reference_hf_energy += 2.0 * hmo(static_cast<int>(i), static_cast<int>(i));
     for (std::size_t j = 0; j < nocc; ++j)
-      reference_hf_energy +=
-          2.0 * gp[gpidx(i, j, i, j)] - gp[gpidx(i, j, j, i)];
+      reference_hf_energy += 2.0 * CHEM(i, i, j, j) - CHEM(i, j, j, i);
   }
   const ScfOut f12 = run_scf(hbar, gbar);
 

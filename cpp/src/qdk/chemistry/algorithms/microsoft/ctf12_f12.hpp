@@ -10,6 +10,7 @@
 #include <libint2.hpp>
 #include <memory>
 #include <qdk/chemistry/data/auxiliary_basis.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <string>
 #include <utility>
@@ -20,6 +21,16 @@ class BasisSet;
 }
 
 namespace qdk::chemistry::algorithms::microsoft::ctf12 {
+
+/**
+ * @brief Build a spin-restricted orbital index set over @p num_modes orbitals.
+ *
+ * @param num_modes Total number of molecular orbitals (the index universe).
+ * @param indices Selected orbital indices, strictly increasing.
+ * @return Index set carrying @p indices in both spin channels.
+ */
+std::shared_ptr<const data::SymmetryBlockedIndexSet> restricted_index_set(
+    std::size_t num_modes, const std::vector<std::size_t>& indices);
 
 /**
  * @brief Inputs describing the F12-HF reference for a closed-shell system.

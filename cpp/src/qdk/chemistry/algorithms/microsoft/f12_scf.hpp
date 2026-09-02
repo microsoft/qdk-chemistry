@@ -28,7 +28,9 @@ class CtF12ScfSettings : public qdk::chemistry::data::Settings {
                         data::BoundConstraint<double>{0.0, 100.0});
     set_default("cabs_basis", std::string(""),
                 "Named OptRI/CABS auxiliary basis; empty derives one from the "
-                "orbital basis set");
+                "orbital basis set. Resolved by name because ScfSolver::run "
+                "takes no auxiliary-basis argument, unlike "
+                "CtF12HamiltonianConstructor which reads it from run()");
     set_default<int64_t>("frozen_core", 0,
                          "Number of frozen core orbitals (formulation (a))",
                          data::BoundConstraint<int64_t>{0});
