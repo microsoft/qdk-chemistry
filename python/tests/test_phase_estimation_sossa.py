@@ -922,6 +922,11 @@ class TestSOSSAResourceEstimation:
         branches deleted the estimate is the executable circuit throughout, and the honest
         cost is higher: the PREPAREs alone went from 1,013 to 2,719 Toffolis per block
         encoding. SELECT moved the other way -- see ``test_sossa_resource_baseline.py``.
+
+        Erasing the inner PREPARE's alias lookup by measurement rather than by running it
+        backwards then took it from 37,873,827 to 31,837,599, a 15.9% cut over the whole
+        estimate. The qubit count is unchanged: the erasure's phase-fixup ancillas fit
+        inside the peak the rest of the walk already sets.
         """
         circuit = _sossa_unary_qpe_circuit(
             10_162,
@@ -939,7 +944,7 @@ class TestSOSSAResourceEstimation:
 
         logical_counts = circuit.estimate().logical_counts
 
-        assert logical_counts["cczCount"] + logical_counts["ccixCount"] == 37_873_827
+        assert logical_counts["cczCount"] + logical_counts["ccixCount"] == 31_837_599
         assert logical_counts["numQubits"] == 470
 
     @pytest.mark.slow

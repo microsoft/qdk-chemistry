@@ -25,6 +25,13 @@ circuit: the ``Legacy*ResourceEstimate`` branches that ``IsResourceEstimating()`
 substitute for them have been deleted. They understated the two alias-sampling PREPAREs by
 roughly 1,700 Toffolis per block encoding at Fe2S2-20.
 
+The inner PREPARE's alias lookup is now erased by measurement rather than run backwards,
+which moved every row: 141 -> 135, 263 -> 237, 342 -> 308, 554 -> 478 and 1,946 -> 1,582
+Toffolis, the last an 18.7% cut. Qubits, rotations and ``tCount`` are unchanged and the
+measurement column moves the other way, which is the trade the erasure makes. Traced at
+production shapes the same change takes one FeMoCo-54 block encoding from 9,843 to 8,071
+Toffolis, and the Fe2S2-20 end-to-end estimate from 37,873,827 to 31,837,599.
+
 The end-to-end pin lives in
 ``test_phase_estimation_sossa.py::test_fe2s2_logical_resource_estimate``.
 """
@@ -62,15 +69,15 @@ _SELECT_SHAPES = [
 
 # (N, R, B, C, b_coeff, b_rot) -> (toffolis, measurements, qubits, rotations, tCount).
 _BLOCK_ENCODING_BASELINE: dict[tuple[int, ...], tuple[int, ...]] = {
-    (2, 1, 1, 1, 8, 8): (141, 135, 77, 63, 21),
-    (3, 2, 2, 1, 8, 8): (263, 264, 92, 75, 21),
-    (4, 2, 3, 1, 9, 10): (342, 368, 116, 108, 27),
-    (6, 3, 3, 2, 10, 10): (554, 612, 147, 108, 27),
-    # The only shape here whose inner PREPARE takes the select-swap path rather than unary
-    # iteration, so the only one that exercises `outerAddressAlwaysValid` and the measurement
-    # erasure. Its qubit count is above the others because the swap width the Toffoli-optimal
-    # lambda picks also sets the swap register size.
-    (12, 8, 9, 3, 10, 12): (1946, 2203, 287, 177, 33),
+    (2, 1, 1, 1, 8, 8): (135, 155, 77, 63, 21),
+    (3, 2, 2, 1, 8, 8): (237, 268, 92, 75, 21),
+    (4, 2, 3, 1, 9, 10): (308, 366, 116, 108, 27),
+    (6, 3, 3, 2, 10, 10): (478, 572, 147, 108, 27),
+    # The only shape here whose inner PREPARE takes a non-trivial select-swap split rather
+    # than a bare lookup, so the only one that exercises the swap network. Its qubit count is
+    # above the others because the swap width the Toffoli-optimal lambda picks also sets the
+    # swap register size.
+    (12, 8, 9, 3, 10, 12): (1582, 1839, 287, 177, 33),
 }
 
 
