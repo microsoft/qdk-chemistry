@@ -573,7 +573,7 @@ class TestTrotter:
 
     @pytest.mark.parametrize("power_strategy", ["repeat", "rescale"])
     def test_eigenvalue_from_phase_roundtrip_with_power(self, power_strategy):
-        """A powered representation inverts against its total evolution time, not the base time."""
+        """A powered representation inverts against its total evolution time, before and after serialization."""
         t = 0.7
         power = 3
         energy = 0.5
@@ -582,32 +582,16 @@ class TestTrotter:
         hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
         builder = Trotter(time=t, power=power, power_strategy=power_strategy)
         container = builder.run(hamiltonian).get_container()
-
-        assert np.isclose(container.scale, t * power, rtol=float_comparison_relative_tolerance)
-        assert np.isclose(
-            container.eigenvalue_from_phase(phi)[0],
-            energy,
-            rtol=float_comparison_relative_tolerance,
-            atol=float_comparison_absolute_tolerance,
-        )
-
-    def test_eigenvalue_from_phase_roundtrip_after_serialization(self):
-        """The total-time metadata of a powered container survives a JSON roundtrip."""
-        t = 0.7
-        power = 3
-        energy = 0.5
-        phi = (-energy * t * power / (2 * np.pi)) % 1.0
-        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
-        container = Trotter(time=t, power=power).run(hamiltonian).get_container()
-
         restored = PauliProductFormulaContainer.from_json(container.to_json())
 
-        assert np.isclose(
-            restored.eigenvalue_from_phase(phi)[0],
-            energy,
-            rtol=float_comparison_relative_tolerance,
-            atol=float_comparison_absolute_tolerance,
-        )
+        assert np.isclose(container.scale, t * power, rtol=float_comparison_relative_tolerance)
+        for inverted in (container, restored):
+            assert np.isclose(
+                inverted.eigenvalue_from_phase(phi)[0],
+                energy,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
 
 
 class TestTrotterAccuracyAware:

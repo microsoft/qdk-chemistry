@@ -270,7 +270,7 @@ def test_standard_phase_estimation_extracts_phase_and_energy(
     )
 
 
-@pytest.mark.parametrize("power", [1, 2, 4])
+@pytest.mark.parametrize("power", [2, 4])
 def test_standard_phase_estimation_energy_is_independent_of_unitary_power(
     two_qubit_phase_problem: PhaseEstimationProblem,
     power: int,

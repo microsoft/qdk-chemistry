@@ -143,7 +143,8 @@ class QpeResult(DataClass):
             QpeResult: Populated :class:`QpeResult` instance reflecting the supplied data.
 
         Raises:
-            ValueError: If ``eigenvalue_from_phase`` or ``branching`` supplies no candidate energy.
+            ValueError: If ``eigenvalue_from_phase`` returns no candidate energy, or if ``branching`` omits the
+                energy recovered from ``canonical_phase_fraction``.
 
         """
         Logger.trace_entering()
@@ -154,21 +155,18 @@ class QpeResult(DataClass):
 
         canonical = normalized_phase if canonical_phase_fraction is None else float(canonical_phase_fraction % 1.0)
         canonical_angle = float(canonical * (2 * np.pi))
-        energies = eigenvalue_from_phase(canonical)
-        if isinstance(energies, np.ndarray) and energies.ndim == 0:
-            branches: tuple[float, ...] = (float(energies),)
-        elif isinstance(energies, (int | float | np.number)):
-            branches = (float(energies),)
-        else:
-            branches = tuple(sorted(float(energy) for energy in energies))
-            if not branches:
-                raise ValueError("eigenvalue_from_phase returned no candidate energies.")
+        branches = tuple(sorted(float(energy) for energy in np.atleast_1d(eigenvalue_from_phase(canonical))))
+        if not branches:
+            raise ValueError("eigenvalue_from_phase returned no candidate energies.")
         raw_energy = branches[0]
 
         if branching is not None:
             branches = tuple(sorted(float(energy) for energy in branching))
-            if not branches:
-                raise ValueError("branching must hold at least one candidate energy.")
+            # The caller may have recomputed the candidate it passes in, so match with slack.
+            if not np.isclose(branches, raw_energy).any():
+                raise ValueError(
+                    f"branching {branches} does not contain raw_energy {raw_energy} recovered from phase {canonical}."
+                )
 
         normalized_bits: tuple[int, ...] | None = None
         bitstring = bitstring_msb_first
