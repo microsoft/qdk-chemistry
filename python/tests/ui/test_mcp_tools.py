@@ -711,7 +711,6 @@ def test_qubit_mapper_returns_companion_core_energy(h2_proj):
     qubit_hamiltonian = MagicMock()
 
     with (
-        patch("qdk_chemistry.ui.tools._prepare_output", return_value=("mapped.qubithamiltonian.json", None)),
         patch(
             "qdk_chemistry.ui.tools._load_or_error",
             side_effect=[(hamiltonian, None), (mapping, None)],
@@ -730,12 +729,36 @@ def test_qubit_mapper_returns_companion_core_energy(h2_proj):
     assert result == {
         "status": "ok",
         "result": {
-            "qubit_hamiltonian_filename": "mapped.qubithamiltonian.json",
+            "qubit_hamiltonian_filename": "mapped.qubit_hamiltonian.json",
             "core_energy": 1.25,
         },
     }
     run_algorithm.assert_called_once()
-    save_data_object.assert_called_once_with(qubit_hamiltonian, "mapped.qubithamiltonian.json")
+    save_data_object.assert_called_once_with(qubit_hamiltonian, "mapped.qubit_hamiltonian.json")
+
+
+def test_spin_model_hamiltonian_validates_qubit_operator_output(h2_proj):
+    qubit_hamiltonian = MagicMock()
+
+    with (
+        patch("qdk_chemistry.ui.tools._build_lattice_graph", return_value=(MagicMock(), None)),
+        patch(
+            "qdk_chemistry.utils.model_hamiltonians.create_ising_hamiltonian",
+            return_value=qubit_hamiltonian,
+        ),
+        patch("qdk_chemistry.ui.tools.save_data_object") as save_data_object,
+    ):
+        result = srv.create_spin_model_hamiltonian(
+            project_name=h2_proj,
+            model="ising",
+            out_qubit_hamiltonian_filename="spin.json",
+            lattice_type="chain",
+            lattice_params={},
+            j=1.0,
+        )
+
+    assert result == {"status": "ok", "result": "spin.qubit_hamiltonian.json"}
+    save_data_object.assert_called_once_with(qubit_hamiltonian, "spin.qubit_hamiltonian.json")
 
 
 @pytest.mark.parametrize("num_bits", [-1, 0])

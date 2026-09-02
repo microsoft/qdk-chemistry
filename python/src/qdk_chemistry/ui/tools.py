@@ -1547,7 +1547,7 @@ def create_spin_model_hamiltonian(
     )
 
     out_qubit_hamiltonian_filename, err = _prepare_output(
-        out_qubit_hamiltonian_filename, "QubitHamiltonian", data.QubitHamiltonian, overwrite=overwrite
+        out_qubit_hamiltonian_filename, "QubitOperator", data.QubitOperator, overwrite=overwrite
     )
     if err:
         return err
@@ -2182,7 +2182,7 @@ def run_qubit_mapper(
     mapping_filename = _strip(mapping_filename)
     out_qubit_hamiltonian_filename = _strip(out_qubit_hamiltonian_filename)
     out_qubit_hamiltonian_filename, _err = _prepare_output(
-        out_qubit_hamiltonian_filename, "QubitHamiltonian", data.QubitHamiltonian, overwrite=overwrite
+        out_qubit_hamiltonian_filename, "QubitOperator", data.QubitOperator, overwrite=overwrite
     )
     if _err:
         return _err
