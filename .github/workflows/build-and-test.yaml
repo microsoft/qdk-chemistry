@@ -331,10 +331,7 @@ jobs:
         QDK_CHEMISTRY_ENABLE_COVERAGE: 1
         CMAKE_BUILD_TYPE: RelWithDebInfo
       run: |
-        # Remove CMake files to build Python package without picking the installed library
-        rm -r ${{ github.workspace }}/install/lib/cmake/qdk
-
-        # Install Python dependencies and build package
+        # Install Python dependencies and build package. Reuse qdk C++ library
         # Use persistent build directory for coverage analysis
         if [ "${{ matrix.python-version }}" = "3.13" ]; then
           python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" -v .[test,docs]
