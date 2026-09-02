@@ -130,8 +130,6 @@ TEST(DoubleFactorizerTest, RejectsInvalidInput) {
   EXPECT_THROW(eigen_decompose_two_body(Eigen::VectorXd::Zero(10), norb),
                std::invalid_argument);
 
-  // The free function is public API and is reachable without the settings
-  // BoundConstraint, so it has to reject these arguments itself.
   EXPECT_THROW(eigen_decompose_two_body(Eigen::VectorXd(), 0),
                std::invalid_argument);
   const Eigen::VectorXd tensor = make_two_body(norb, {1.0}, 31);
@@ -140,14 +138,7 @@ TEST(DoubleFactorizerTest, RejectsInvalidInput) {
   EXPECT_THROW(eigen_decompose_two_body(
                    tensor, norb, std::numeric_limits<double>::quiet_NaN()),
                std::invalid_argument);
-  // A negative or NaN threshold compares false against every eigenvalue, so
-  // without the guard it would silently retain the whole decomposition
-  // rather than fail.
   EXPECT_FALSE(eigen_decompose_two_body(tensor, norb, 0.0).empty());
-
-  // A non-finite entry reaches LAPACK, and NaN makes the sort comparator
-  // |a| > |b| false in both directions, which is undefined behavior in
-  // std::sort.
   Eigen::VectorXd with_nan = make_two_body(norb, {1.0}, 31);
   with_nan[0] = std::numeric_limits<double>::quiet_NaN();
   EXPECT_THROW(eigen_decompose_two_body(with_nan, norb), std::invalid_argument);
@@ -189,37 +180,6 @@ TEST(DoubleFactorizerTest, EigenDecomposeFragmentsReconstructTensor) {
   for (Eigen::Index i = 0; i < two_body.size(); ++i) {
     EXPECT_NEAR(reconstructed[i], two_body[i], kReconstructionTolerance);
   }
-}
-
-TEST(DoubleFactorizerTest, FragmentLambdaMatchesContainerLambda) {
-  // lambda_df is a per-fragment share of the same block-encoding 1-norm that
-  // get_lambda() reports, so the fragments must sum to the container's
-  // two-body part. Asserting lambda_df against its own defining formula would
-  // only restate the code; this pins the shared 1/4 convention (Eq. 33)
-  // across both call sites.
-  constexpr std::size_t norb = 4;
-  const auto two_body = make_two_body(norb, {1.0, -1.0}, 41);
-  const auto fragments = eigen_decompose_two_body(two_body, norb);
-  ASSERT_FALSE(fragments.empty());
-
-  double fragment_lambda_sum = 0.0;
-  for (const auto& fragment : fragments) {
-    fragment_lambda_sum += fragment.lambda_df;
-  }
-
-  auto factorizer = DoubleFactorizerFactory::create("eigen_decomposition");
-  auto factorized = factorizer->run(make_hamiltonian(norb, two_body));
-  ASSERT_NE(factorized, nullptr);
-  const auto& container = as_factorized(factorized);
-
-  // get_lambda() adds the one-body term, which carries no fragment share.
-  const Eigen::MatrixXd h1p = container.get_h1_prime();
-  Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(h1p);
-  ASSERT_EQ(solver.info(), Eigen::Success);
-  const double one_body_norm = solver.eigenvalues().array().abs().sum();
-
-  EXPECT_NEAR(fragment_lambda_sum, container.get_lambda() - one_body_norm,
-              kReconstructionTolerance);
 }
 
 TEST(DoubleFactorizerTest, EigenDecomposeSortsFragmentsByDecreasingWeight) {
@@ -291,8 +251,6 @@ TEST(DoubleFactorizerTest, TruncationDiscardsSmallFragments) {
   EXPECT_LT(truncated_container.get_num_ranks(), num_ranks_exact);
   EXPECT_GT(truncated_container.get_num_ranks(), 0u);
 
-  // Truncation is lossy by construction: the reconstruction must move, but
-  // only by the weight that was thrown away.
   auto [g_aaaa, g_aabb, g_bbbb] =
       truncated_hamiltonian->get_two_body_integrals();
   EXPECT_FALSE(g_aaaa.isApprox(two_body, kReconstructionTolerance));

@@ -18,11 +18,7 @@ namespace qdk::chemistry::data {
 /**
  * @class FactorizedHamiltonianContainer
  * @brief Restricted, spin-free double-factorized tensor hypercontraction(DFTHC)
- *        Hamiltonian container (Low 2025).
- *
- * @note Equation numbers in this file and its .cpp cite the published version:
- * G. H. Low et al., "Fast Quantum Simulation of Electronic Structure by
- * Spectral Amplification", Phys. Rev. X 15, 041016 (2025).
+ *        Hamiltonian container :cite:`Low2025`.
  *
  * @note Consumers that genuinely require a sum of squares must check
  * get_signs().
@@ -35,13 +31,13 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    * @param core_energy Nuclear and inactive-core energy.
    * @param u_matrices U factors, flattened as [R,B,N].
    * @param w_matrices W factors, flattened as [R,B,C].
-   * @param wb_matrix Identity weights in sum of squares w_B [R,C].
+   * @param wb_matrix Identity weights [R,C].
    * @param one_body_integrals One-body integrals [N,N].
    * @param inactive_fock_matrix Inactive Fock matrix.
    * @param orbitals Orbitals with an active space.
    * @param signs Per-rank signs, length R, each exactly +1.0 or -1.0. Pass an
    *        empty vector (the default) for an all-positive factorization.
-   * @param energy_gap E_gap for SOS block encoding.
+   * @param energy_gap Energy-gap metadata.
    * @param type Hamiltonian type.
    * @throws std::invalid_argument if dimensions or required data are invalid,
    *         or if any entry of `signs` is neither +1.0 nor -1.0.
@@ -143,11 +139,11 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
   /** @return Number of copies C, inferred from the WB columns. */
   size_t get_num_copies() const;
 
-  /** @return Energy gap E_gap for SOS block encoding. */
+  /** @return Energy-gap metadata. */
   double get_energy_gap() const;
 
   /**
-   * @brief Compute the block-encoding normalization (Eq. 33).
+   * @brief Compute the factorization normalization (Eq. 33).
    * Λ = Σ|eig(h1_prime)| + 1/4 Σ_{rc} (|WB^{rc}| + Σ_b |W^{rc}_b|)²
    *
    * The per-rank signs do not appear: every two-body term enters through an
@@ -156,7 +152,7 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
   double get_lambda() const;
 
   /**
-   * @brief Compute the effective SOS normalization (Eq. 11).
+   * @brief Compute the effective normalization (Eq. 11).
    * λ_eff = √(E_gap · (2Λ - E_gap))
    *
    * @return The effective normalization, or 0.0 if any factor has a negative
@@ -203,10 +199,10 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
 
   Eigen::VectorXd _u;      ///< Flat U matrices [R*B*N]
   Eigen::VectorXd _w;      ///< Flat W matrices [R*B*C]
-  Eigen::MatrixXd _wb;     ///< Identity-slot weights w_B [R*C]
+  Eigen::MatrixXd _wb;     ///< Identity weights [R*C]
   Eigen::VectorXd _signs;  ///< Per-rank signs [R], each +1.0 or -1.0
 
-  double _energy_gap;  ///< E_gap for SOS block encoding
+  double _energy_gap;  ///< Energy-gap metadata
 
   /// Lazily computed four-center integrals (shared for all channels,
   /// restricted)

@@ -14,6 +14,7 @@ from qdk_chemistry.data import (
     Hamiltonian,
 )
 
+from .test_helpers import create_nontrivial_test_hamiltonian
 
 
 @pytest.fixture

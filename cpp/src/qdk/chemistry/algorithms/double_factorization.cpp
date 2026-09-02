@@ -38,9 +38,7 @@ std::vector<TwoBodyFragment> eigen_decompose_two_body(
     throw std::invalid_argument(
         "eigen_decompose_two_body: norb must be greater than zero.");
   }
-  // NaN is rejected explicitly: it compares false against every eigenvalue
-  // magnitude, so it would silently retain the whole decomposition instead of
-  // truncating.
+
   if (truncation_threshold < 0.0 || std::isnan(truncation_threshold)) {
     throw std::invalid_argument(
         "eigen_decompose_two_body: truncation_threshold must be "
@@ -56,9 +54,7 @@ std::vector<TwoBodyFragment> eigen_decompose_two_body(
         " elements for norb = " + std::to_string(norb) + ", got " +
         std::to_string(two_body_integrals.size()) + ".");
   }
-  // A non-finite entry would otherwise reach LAPACK, and NaN makes the sort
-  // comparator |a| > |b| false in both directions, which is not a strict weak
-  // ordering and is undefined behavior in std::sort.
+
   if (!two_body_integrals.allFinite()) {
     throw std::invalid_argument(
         "eigen_decompose_two_body: two_body_integrals contains a non-finite "
@@ -68,22 +64,19 @@ std::vector<TwoBodyFragment> eigen_decompose_two_body(
   const Eigen::Index pair_size = static_cast<Eigen::Index>(pair_dim);
   const Eigen::Index num_orbitals = static_cast<Eigen::Index>(norb);
 
-  // TODO: Move ERI permutation-symmetry validation to the Hamiltonian data
-  // layer. This decomposition assumes real, eight-fold chemist symmetry.
-
-  // Reshape g_ijkl into the (ij),(kl) supermatrix. syev overwrites its input
-  // with the eigenvectors, so copy the mapped input into its output buffer.
+  // Reshape g_ijkl into the (ij),(kl) supermatrix.
   const Eigen::Map<const RowMajorMatrix> raw_supermatrix(
       two_body_integrals.data(), pair_size, pair_size);
 
-  Eigen::MatrixXd supermatrix_eigenvectors = raw_supermatrix;
-
+  // Assumes chemist permutation symmetry: averaging imposes the (pq)<->(rs)
+  // and p<->q generators rather than checking them, and the rest follow.
+  Eigen::MatrixXd supermatrix_eigenvectors =
+      0.5 * (raw_supermatrix + raw_supermatrix.transpose());
   Eigen::VectorXd supermatrix_eigenvalues(pair_dim);
+
   // Dense diagonalization costs O(norb^6) and materializes all norb^2
   // eigenpairs. An iterative solver that recovers only a limited number of
-  // leading ranks will be added later, for decomposing large-size
-  // Hamiltonians where the full spectrum is neither affordable nor needed.
-  // syev reads only the lower triangle.
+  // leading ranks will be added later.
   const int64_t supermatrix_info = lapack::syev(
       lapack::Job::Vec, lapack::Uplo::Lower, static_cast<int64_t>(pair_dim),
       supermatrix_eigenvectors.data(), static_cast<int64_t>(pair_dim),
@@ -97,9 +90,7 @@ std::vector<TwoBodyFragment> eigen_decompose_two_body(
 
   // Sort by decreasing |eigenvalue| so the largest contributions come first.
   // Within a degenerate block the eigenvector basis LAPACK returns is
-  // arbitrary, so eps and lambda_df are not fixed by the tensor alone. A
-  // stable sort would not change that: the freedom is in the basis, not the
-  // ordering. The reconstructed tensor is invariant either way.
+  // arbitrary, so eps is not fixed by the tensor alone.
   std::vector<std::size_t> order(pair_dim);
   for (std::size_t n = 0; n < pair_dim; ++n) {
     order[n] = n;
@@ -117,12 +108,14 @@ std::vector<TwoBodyFragment> eigen_decompose_two_body(
       continue;
     }
 
-    // Reshape the eigenvector into an norb x norb matrix.
+    // Reshape the eigenvector into an norb x norb matrix. Averaging enforces
+    // the p<->q generator.
     const Eigen::Map<const RowMajorMatrix> raw_fragment(
         supermatrix_eigenvectors.data() +
             static_cast<Eigen::Index>(n) * pair_size,
         num_orbitals, num_orbitals);
-    Eigen::MatrixXd fragment_matrix = raw_fragment;
+    Eigen::MatrixXd fragment_matrix =
+        0.5 * (raw_fragment + raw_fragment.transpose());
 
     Eigen::VectorXd fragment_eigenvalues(norb);
     const int64_t fragment_info =
@@ -140,14 +133,6 @@ std::vector<TwoBodyFragment> eigen_decompose_two_body(
     fragment.sign = (eigenvalue >= 0.0) ? 1.0 : -1.0;
     fragment.eps = std::sqrt(std::abs(eigenvalue)) * fragment_eigenvalues;
     fragment.U = std::move(fragment_matrix);
-
-    // Contribution to the block-encoding 1-norm, 1/4 (sum_b |eps_b|)^2,
-    // matching FactorizedHamiltonianContainer::get_lambda() (Eq. 33) and
-    // von Burg 2021 Eq. 16. Patel 2025 Eq. 17 writes the same quantity as
-    // 1/2 (sum_b |eps_b|)^2, but in a convention whose two-body operator
-    // carries no 1/2, so its coefficients are ours scaled by 1/sqrt(2).
-    const double eps_abs_sum = fragment.eps.array().abs().sum();
-    fragment.lambda_df = 0.25 * eps_abs_sum * eps_abs_sum;
 
     fragments.push_back(std::move(fragment));
   }
@@ -222,7 +207,6 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
                                bases, num_orbitals) = fragment.U.transpose();
   }
 
-  // WB and the energy gap are not produced by the plain factorization.
   const Eigen::MatrixXd wb_matrix =
       Eigen::MatrixXd::Zero(static_cast<Eigen::Index>(num_ranks),
                             static_cast<Eigen::Index>(num_copies));

@@ -19,26 +19,13 @@ using namespace qdk::chemistry::python;
 void bind_double_factorization(py::module &m) {
   py::class_<DoubleFactorizer, py::smart_holder> double_factorizer(
       m, "DoubleFactorizer", R"(
-Exact double factorization of a Hamiltonian by nested eigen-decomposition.
+  Double-factorize a restricted Hamiltonian by nested eigendecomposition.
 
-Rewrites a Hamiltonian's dense four-index two-electron integrals as a signed
-sum of low-rank "perfect square" fragments and returns a new Hamiltonian
-backed by a :class:`qdk_chemistry.data.FactorizedHamiltonianContainer`:
-
-.. math::
-
-    g_{pqrs} = \sum_t s_t \Big(\sum_b \epsilon^t_b U^t_{bp} U^t_{bq}\Big)
-                            \Big(\sum_{b'} \epsilon^t_{b'} U^t_{b'r} U^t_{b's}\Big)
-
-The one-electron integrals, core energy, orbitals, inactive Fock matrix and
-Hamiltonian type are carried over unchanged. Only restricted Hamiltonians are
-currently supported.
-
-Settings:
-    truncation_threshold (float): Drop fragments whose supermatrix eigenvalue
-        magnitude is below this threshold. Must be non-negative; the default
-        of 1e-12 discards only the numerically null fragments. Pass 0.0 to
-        retain every fragment.
+  The result is backed by a
+  :class:`qdk_chemistry.data.FactorizedHamiltonianContainer` containing signed
+  low-rank fragments. Chemist permutation symmetry is imposed by averaging.
+  Modes below the absolute ``truncation_threshold`` are omitted. One-body data,
+  core energy, orbitals, inactive Fock data, and Hamiltonian type are preserved.
 
 See Also:
     :class:`qdk_chemistry.data.FactorizedHamiltonianContainer`
@@ -48,46 +35,47 @@ References:
 )");
 
   double_factorizer.def(py::init<>(), R"(
-Create a DoubleFactorizer instance.
+Create a double factorizer with default settings.
 )");
 
   double_factorizer.def("run", &DoubleFactorizer::run, R"(
 Double-factorize the given Hamiltonian.
 
 Args:
-    hamiltonian (qdk_chemistry.data.Hamiltonian): The Hamiltonian to factorize.
-        Must be restricted and carry two-electron integrals.
+  hamiltonian (qdk_chemistry.data.Hamiltonian): Restricted Hamiltonian containing two-electron integrals.
 
 Returns:
-    qdk_chemistry.data.Hamiltonian: A new Hamiltonian backed by a
-    :class:`qdk_chemistry.data.FactorizedHamiltonianContainer`.
+  qdk_chemistry.data.Hamiltonian: New Hamiltonian backed by a factorized container.
 
 Raises:
-    ValueError: If the Hamiltonian is unrestricted or has no two-electron
-        integrals.
+  ValueError: If the input or its two-electron integrals are invalid, or no fragment survives truncation.
+  RuntimeError: If an eigendecomposition fails.
+
+Note:
+  Calling this method locks the settings.
 )",
                         py::arg("hamiltonian"));
 
   double_factorizer.def("settings", &DoubleFactorizer::settings, R"(
-Access the double factorizer's configuration settings.
+Return this factorizer's settings.
 
 Returns:
-    qdk_chemistry.data.Settings: Reference to the settings object
+  qdk_chemistry.data.Settings: Mutable settings, locked after the first call to :meth:`run`.
 )",
                         py::return_value_policy::reference_internal);
 
   double_factorizer.def("name", &DoubleFactorizer::name, R"(
-The algorithm's name.
+Return the implementation name.
 
 Returns:
-    str: The name of the algorithm
+  str: ``"eigen_decomposition"``.
 )");
 
   double_factorizer.def("type_name", &DoubleFactorizer::type_name, R"(
-The algorithm's type name.
+Return the algorithm type name.
 
 Returns:
-    str: The type name of the algorithm
+  str: ``"double_factorizer"``.
 )");
 
   double_factorizer.def("hash", &DoubleFactorizer::hash,

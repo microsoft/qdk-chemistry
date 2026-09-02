@@ -19,9 +19,7 @@ namespace qdk::chemistry::algorithms {
  * @file
  * @brief Double factorization of a Hamiltonian's two-electron integrals.
  *
- * @note "Low 2025" equation numbers here cite the published version:
- * G. H. Low et al., "Fast Quantum Simulation of Electronic Structure by
- * Spectral Amplification", Phys. Rev. X 15, 041016 (2025).
+ * @note Equation numbers here refer to :cite:`Low2025`.
  */
 
 /// Default eigenvalue threshold for retaining two-body fragments.
@@ -36,24 +34,18 @@ struct TwoBodyFragment {
   Eigen::VectorXd eps;  ///< norb coefficients, scaled by
                         ///< sqrt(|supermatrix eigenvalue|).
   double sign = 1.0;    ///< +1.0 or -1.0.
-
-  /// Contribution to the block-encoding 1-norm,
-  /// 0.25 * (sum_b |eps_b|)^2 (Low 2025 Eq. 33; von Burg 2021 Eq. 16).
-  /// Rescale this by the square of any factor applied to `eps`.
-  double lambda_df = 0.0;
 };
 
 /// Eigen-decompose the spin-free two-electron tensor g_pqrs, flattened as
 /// p*norb^3 + q*norb^2 + r*norb + s, into low-rank fragments.
 ///
 /// @param two_body_integrals Flattened two-electron tensor, size norb^4.
+///        Chemist permutation symmetry is imposed by averaging, not verified.
 /// @param norb Number of (spatial) orbitals.
 /// @param truncation_threshold Fragments whose supermatrix eigenvalue
-///        magnitude falls below this threshold are dropped.0.0 retains every
+///        magnitude falls below this threshold are dropped. 0.0 retains every
 ///        fragment.
 /// @return The retained fragments, sorted by decreasing eigenvalue magnitude.
-///         Within a degenerate eigenvalue block the eigenvector basis is
-///         whatever LAPACK returns.
 /// @throws std::invalid_argument if `norb` is zero, if `truncation_threshold`
 ///         is negative or NaN, or if `two_body_integrals` is not norb^4 long
 ///         or contains a non-finite value.
@@ -64,9 +56,6 @@ std::vector<TwoBodyFragment> eigen_decompose_two_body(
 /**
  * @class DoubleFactorizerSettings
  * @brief Settings container for DoubleFactorizer.
- *
- * Default settings:
- * - truncation_threshold: 1e-12 - discards only numerically null fragments.
  *
  * @see DoubleFactorizer
  */
@@ -90,7 +79,7 @@ class DoubleFactorizerSettings : public qdk::chemistry::data::Settings {
 /**
  * @class DoubleFactorizer
  * @brief Exact double factorization by nested eigen-decomposition
- *        (von Burg 2021).
+ *        :cite:`vonBurg2021`.
  *
  * Maps a Hamiltonian carrying dense four-index two-electron integrals to an
  * equivalent Hamiltonian backed by a
@@ -148,8 +137,6 @@ class DoubleFactorizer
  protected:
   /**
    * @brief Factorize the two-electron tensor.
-   *
-   * Called by run() after settings have been locked.
    *
    * @throws std::invalid_argument if `hamiltonian` is null, unrestricted, or
    *         carries no two-electron integrals, or if `truncation_threshold`
