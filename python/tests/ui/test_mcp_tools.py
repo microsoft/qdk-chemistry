@@ -23,7 +23,7 @@ from qdk_chemistry.remote.backends.base import RemoteBackend, get_mcp_safe_confi
 from qdk_chemistry.remote.job import Job
 from qdk_chemistry.ui import tools as srv
 from qdk_chemistry.ui.config import QDKMCPConfig, config
-from qdk_chemistry.ui.validation import validate_project
+from qdk_chemistry.ui.validation import strip_filename_path, validate_project
 
 
 @pytest.fixture
@@ -75,6 +75,20 @@ def test_convert_energy_bad_unit():
 
 
 # ── Project management ───────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    ("filename", "expected"),
+    [
+        ("../nested/file.json", "file.json"),
+        (r"..\nested\file.json", "file.json"),
+        (r"C:\outside\file.json", "file.json"),
+        (r"\\server\share\file.json", "file.json"),
+        (r"mixed/path\file.json", "file.json"),
+    ],
+)
+def test_strip_filename_path_handles_posix_and_windows_paths(filename, expected):
+    assert strip_filename_path(filename) == expected
 
 
 @pytest.mark.usefixtures("_dirs")
@@ -211,7 +225,7 @@ def test_list_algorithms_filters_by_type():
     assert result["status"] == "ok"
     algorithm_types = result["result"]["algorithm_types"]
     assert list(algorithm_types) == ["nuclear_derivative_calculator"]
-    assert algorithm_types["nuclear_derivative_calculator"]["default"] == "qdk"
+    assert algorithm_types["nuclear_derivative_calculator"]["default"] == "qdk_finite_difference"
     assert "qdk" in algorithm_types["nuclear_derivative_calculator"]["implementations"]
 
 
@@ -256,11 +270,21 @@ def test_describe_algorithm_returns_settings_schema():
     description = result["result"]
     assert description["name"] == "qdk"
     assert description["aliases"] == ["analytical_gradient", "qdk"]
-    assert description["is_default"] is True
+    assert description["is_default"] is False
     assert description["default_settings"]["compute_hessian"] is False
     settings = {setting["name"]: setting for setting in description["settings"]}
     assert settings["compute_hessian"]["type"] == "bool"
     assert settings["compute_hessian"]["default"] is False
+
+
+def test_describe_algorithm_reports_nuclear_derivative_default_aliases():
+    result = srv.describe_algorithm(algorithm_type="nuclear_derivative_calculator")
+
+    assert result["status"] == "ok"
+    description = result["result"]
+    assert description["name"] == "qdk_finite_difference"
+    assert description["aliases"] == ["numeric", "qdk_finite_difference"]
+    assert description["is_default"] is True
 
 
 def test_describe_algorithm_handles_interface_only_type():

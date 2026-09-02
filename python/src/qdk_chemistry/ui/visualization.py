@@ -39,7 +39,7 @@ from mcp.types import CallToolResult, TextContent
 from qdk_chemistry import data
 
 from .io import load_data_object
-from .validation import validate_project
+from .validation import strip_filename_path, validate_project
 
 # ---------------------------------------------------------------------------
 # Check for qsharp_widgets availability
@@ -344,7 +344,7 @@ def register_visualization_tools(app) -> None:
         circuit_filename: str,
     ) -> str | list:
         """Render a saved Circuit in VS Code MCP Apps."""
-        circuit_filename = circuit_filename.rsplit("/", maxsplit=1)[-1]
+        circuit_filename = strip_filename_path(circuit_filename)
 
         try:
             circuit_obj = load_data_object(circuit_filename, data.Circuit)
@@ -408,7 +408,7 @@ def register_visualization_tools(app) -> None:
         mi_threshold: float | None = None,
     ) -> str | list:
         """Render RDM/MI orbital entanglement with absolute indices in VS Code MCP Apps."""
-        wavefunction_filename = wavefunction_filename.rsplit("/", maxsplit=1)[-1]
+        wavefunction_filename = strip_filename_path(wavefunction_filename)
 
         try:
             wavefunction = load_data_object(wavefunction_filename, data.Wavefunction)
@@ -532,7 +532,7 @@ def register_visualization_tools(app) -> None:
         structure_filename: str,
     ) -> str | list:
         """Render a saved Structure in VS Code MCP Apps."""
-        structure_filename = structure_filename.rsplit("/", maxsplit=1)[-1]
+        structure_filename = strip_filename_path(structure_filename)
 
         try:
             structure = load_data_object(structure_filename, data.Structure)
@@ -568,7 +568,7 @@ def register_visualization_tools(app) -> None:
         grid_size: int = 40,
     ) -> str | list:
         """Render saved Wavefunction orbitals in VS Code MCP Apps."""
-        wavefunction_filename = wavefunction_filename.rsplit("/", maxsplit=1)[-1]
+        wavefunction_filename = strip_filename_path(wavefunction_filename)
 
         try:
             wavefunction = load_data_object(wavefunction_filename, data.Wavefunction)

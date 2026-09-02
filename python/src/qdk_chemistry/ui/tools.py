@@ -19,7 +19,7 @@ import itertools
 import json
 import math
 from datetime import datetime, timezone
-from pathlib import Path, PureWindowsPath
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -59,6 +59,7 @@ from .validation import (
     ensure_filename_format,
     resolve_project_file,
     resolve_project_path,
+    strip_filename_path,
     validate_project,
 )
 from .workspace import bind_workspace as _bind_workspace
@@ -228,7 +229,7 @@ def _validate_mcp_remote_config(name: str, remote_config: dict[str, Any]) -> Non
 
 def _strip(filename: str) -> str:
     """Strip directory path from a filename, keeping only the base name."""
-    return PureWindowsPath(filename).name
+    return strip_filename_path(filename)
 
 
 def _prepare_output(

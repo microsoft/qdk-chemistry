@@ -28,6 +28,7 @@ from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LC
 from qdk_chemistry.ui.cli import (
     _deep_merge,
     _parse_set_overrides,
+    cmd_data_convert,
     create_parser,
     format_output,
     main,
@@ -824,8 +825,9 @@ def test_cli_utils_convert_coordinates(capsys):
 # ==================== Data Group Tests ====================
 
 
-@pytest.mark.usefixtures("temp_project_dir")
-def test_cli_data_summary(h2_structure_file, capsys):
+@pytest.mark.usefixtures("temp_project_dir", "h2_structure_file")
+@pytest.mark.parametrize("filename", [r"..\h2.structure.json", r"C:\outside\h2.structure.json"])
+def test_cli_data_summary_normalizes_windows_filename_paths(filename, capsys):
     """Test data summary command."""
     sys.argv = [
         "qc",
@@ -834,7 +836,7 @@ def test_cli_data_summary(h2_structure_file, capsys):
         "--project-name",
         "test_project",
         "--filename",
-        h2_structure_file,
+        filename,
     ]
 
     with contextlib.suppress(SystemExit):
@@ -844,6 +846,37 @@ def test_cli_data_summary(h2_structure_file, capsys):
     result = json.loads(captured.out)
     assert result["success"] is True
     assert result["type"] == "Structure"
+
+
+def test_cli_data_convert_normalizes_windows_filename_paths(temp_project_dir, monkeypatch, capsys):
+    """Confine Windows input and output paths to their base filenames."""
+    (temp_project_dir / "test_project").mkdir()
+    loaded_filenames = []
+    saved_filenames = []
+    data_object = object()
+
+    def load(filename, _data_class):
+        loaded_filenames.append(filename)
+        return data_object
+
+    def save(obj, filename):
+        assert obj is data_object
+        saved_filenames.append(filename)
+
+    monkeypatch.setattr("qdk_chemistry.ui.cli.load_data_object", load)
+    monkeypatch.setattr("qdk_chemistry.ui.cli.save_data_object", save)
+
+    cmd_data_convert(
+        argparse.Namespace(
+            project_name="test_project",
+            filename=r"..\secret.json",
+            out_filename=r"C:\outside\victim.hdf5",
+        )
+    )
+
+    assert loaded_filenames == ["secret.json"]
+    assert saved_filenames == ["victim.hdf5"]
+    assert json.loads(capsys.readouterr().out)["result"] == "victim.hdf5"
 
 
 @pytest.mark.usefixtures("temp_project_dir")

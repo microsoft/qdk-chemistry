@@ -253,6 +253,8 @@ def test_current_environment_requires_mcp_support(monkeypatch: pytest.MonkeyPatc
     def missing_mcp() -> None:
         raise ModuleNotFoundError(plugin_installer.MCP_INSTALL_MESSAGE)
 
+    monkeypatch.setattr(plugin_installer.sys, "prefix", "/venv")
+    monkeypatch.setattr(plugin_installer.sys, "base_prefix", "/usr")
     monkeypatch.setattr(plugin_installer, "require_mcp", missing_mcp)
 
     with pytest.raises(plugin_installer.PluginInstallError, match=r"qdk-chemistry\[mcp\]"):

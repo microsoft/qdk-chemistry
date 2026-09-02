@@ -48,6 +48,7 @@ from .io import load_data_object, save_data_object
 # Imports from the MCP server (shared backend)
 # ---------------------------------------------------------------------------
 from .tools import (
+    _strip,
     create_majorana_mapping,
     create_model_hamiltonian,
     create_spin_model_hamiltonian,
@@ -777,7 +778,7 @@ def _get_data_classes():
 
 def cmd_data_summary(args):
     """Print a human-readable summary of any data file."""
-    filename = args.filename.split("/")[-1]
+    filename = _strip(args.filename)
     project_dir = _resolve_cli_project_path(args.project_name)
     os.chdir(project_dir)
 
@@ -795,8 +796,8 @@ def cmd_data_summary(args):
 
 def cmd_data_convert(args):
     """Convert a data file between JSON and HDF5 formats."""
-    filename = args.filename.split("/")[-1]
-    out_filename = args.out_filename.split("/")[-1]
+    filename = _strip(args.filename)
+    out_filename = _strip(args.out_filename)
     project_dir = _resolve_cli_project_path(args.project_name)
     os.chdir(project_dir)
 
@@ -867,7 +868,7 @@ def cmd_data_create_structure(args):
 
 def cmd_data_get_energy(args):
     """Get energy value from a Wavefunction, QpeResult, or EnergyExpectationResult."""
-    filename = args.filename.split("/")[-1]
+    filename = _strip(args.filename)
     project_dir = _resolve_cli_project_path(args.project_name)
     os.chdir(project_dir)
 
@@ -909,7 +910,7 @@ def cmd_data_get_energy(args):
 
 def cmd_data_get_structure_xyz(args):
     """Export structure as XYZ format string."""
-    filename = args.filename.split("/")[-1]
+    filename = _strip(args.filename)
     project_dir = _resolve_cli_project_path(args.project_name)
     os.chdir(project_dir)
 
@@ -930,7 +931,7 @@ def cmd_data_get_structure_xyz(args):
 
 def cmd_data_get_circuit_qasm(args):
     """Export circuit as OpenQASM string."""
-    filename = args.filename.split("/")[-1]
+    filename = _strip(args.filename)
     project_dir = _resolve_cli_project_path(args.project_name)
     os.chdir(project_dir)
 
@@ -945,7 +946,7 @@ def cmd_data_get_circuit_qasm(args):
 
 def cmd_data_get_circuit_stats(args):
     """Analyze circuit resource profile: gates, depth, qubits."""
-    filename = args.filename.split("/")[-1]
+    filename = _strip(args.filename)
     project_dir = _resolve_cli_project_path(args.project_name)
     os.chdir(project_dir)
 
@@ -968,7 +969,7 @@ def cmd_data_get_circuit_stats(args):
 
 def cmd_data_get_qubit_hamiltonian_info(args):
     """Inspect qubit Hamiltonian: qubits, terms, norm, hermiticity."""
-    filename = args.filename.split("/")[-1]
+    filename = _strip(args.filename)
     project_dir = _resolve_cli_project_path(args.project_name)
     os.chdir(project_dir)
 
@@ -993,7 +994,7 @@ def cmd_data_get_qubit_hamiltonian_info(args):
 
 def cmd_data_get_stability_result(args):
     """Inspect wavefunction stability result."""
-    filename = args.filename.split("/")[-1]
+    filename = _strip(args.filename)
     project_dir = _resolve_cli_project_path(args.project_name)
     os.chdir(project_dir)
 
@@ -1012,7 +1013,7 @@ def cmd_data_get_stability_result(args):
 
 def cmd_data_get_qpe_result(args):
     """Inspect QPE result: energies, phase, bits."""
-    filename = args.filename.split("/")[-1]
+    filename = _strip(args.filename)
     project_dir = _resolve_cli_project_path(args.project_name)
     os.chdir(project_dir)
 
@@ -1135,7 +1136,7 @@ def cmd_utils_convert_energy(args):
 
 def cmd_utils_compute_valence_params(args):
     """Compute valence space parameters (active electrons & orbitals)."""
-    filename = args.wavefunction_filename.split("/")[-1]
+    filename = _strip(args.wavefunction_filename)
     project_dir = _resolve_cli_project_path(args.project_name)
     os.chdir(project_dir)
 
@@ -1159,7 +1160,7 @@ def cmd_utils_compute_valence_params(args):
 
 def cmd_utils_resolve_phase_energy(args):
     """Resolve QPE phase to energy using the unitary's phase mapping."""
-    filename = args.unitary_representation_filename.split("/")[-1]
+    filename = _strip(args.unitary_representation_filename)
     project_dir = _resolve_cli_project_path(args.project_name)
     os.chdir(project_dir)
 

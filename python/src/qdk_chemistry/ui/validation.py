@@ -33,6 +33,11 @@ def current_project_dir() -> Path | None:
     return _CURRENT_PROJECT_DIR.get()
 
 
+def strip_filename_path(filename: str | Path) -> str:
+    """Return only the filename, accepting both POSIX and Windows separators."""
+    return PureWindowsPath(filename).name
+
+
 def resolve_project_file(
     filename: str | Path,
     *,
