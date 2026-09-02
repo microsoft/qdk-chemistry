@@ -24,6 +24,10 @@ namespace qdk::chemistry::algorithms {
 /// magnitude
 inline constexpr double DEFAULT_TRUNCATION_THRESHOLD = 1e-12;
 
+/// Default tolerance for the chemist permutation-symmetry check, relative to
+/// the largest element of the two-electron tensor
+inline constexpr double DEFAULT_SYMMETRY_TOLERANCE = 1e-8;
+
 /// A single low-rank ("perfect square") two-electron fragment:
 ///
 /// g^(f)_pqrs = sign * (sum_b eps_b U_pb U_qb) (sum_b' eps_b' U_rb' U_sb')
@@ -34,26 +38,46 @@ struct TwoBodyFragment {
                         ///< sqrt(|supermatrix eigenvalue|).
   double sign = 1.0;    ///< +1.0 or -1.0.
 
-  /// Fermionic 1-norm, 0.5 * (sum_b |eps_b|)^2 (Patel 2025). Rescale this by
-  /// the square of any factor applied to `eps`.
+  /// Contribution to the block-encoding 1-norm,
+  /// 0.25 * (sum_b |eps_b|)^2 (Low 2025 Eq. 34; von Burg 2021 Eq. 16).
+  /// Rescale this by the square of any factor applied to `eps`.
   double lambda_df = 0.0;
 };
 
 /// Eigen-decompose the spin-free two-electron tensor g_pqrs, flattened as
 /// p*norb^3 + q*norb^2 + r*norb + s, into low-rank fragments.
 ///
-/// @param two_body_integrals Flattened two-electron tensor, size norb^4.
+/// @param two_body_integrals Flattened two-electron tensor, size norb^4. Every
+///        entry must be finite. Must carry the full 8-fold chemist
+///        permutation symmetry of real orbitals; the (pq)<->(rs) and p<->q
+///        generators are validated, and a tensor violating either is rejected
+///        rather than silently replaced by its symmetric projection.
 /// @param norb Number of (spatial) orbitals. Must be greater than zero.
 /// @param truncation_threshold Fragments whose supermatrix eigenvalue
 ///        magnitude falls below this threshold are dropped. Must be
-///        non-negative; 0.0 retains every fragment.
+///        non-negative; 0.0 retains every fragment. Note that 0.0 also retains
+///        the null-space fragments, whose eigenvalues are round-off noise of
+///        either sign, so a positive-semidefinite tensor can come back with
+///        many `sign == -1.0` fragments that carry no weight. Consumers that
+///        branch on the signs should keep the default threshold.
+/// @param symmetry_tolerance Permutation-symmetry tolerance, relative to the
+///        largest element of the tensor. Must be non-negative; 0.0 demands
+///        bitwise symmetry.
 /// @return The retained fragments, sorted by decreasing eigenvalue magnitude.
+///         Within a degenerate eigenvalue block the eigenvector basis is
+///         whatever LAPACK returns, so `eps` (and hence `lambda_df`) is not
+///         determined by the tensor alone; the reconstructed tensor is
+///         unaffected, but 1-norms computed from a degenerate spectrum are not
+///         reproducible across builds or small input perturbations.
 /// @throws std::invalid_argument if `norb` is zero, if `truncation_threshold`
-///         is negative or NaN, or if `two_body_integrals` is not norb^4 long.
+///         or `symmetry_tolerance` is negative or NaN, if `two_body_integrals`
+///         is not norb^4 long, contains a non-finite value, or lacks the
+///         required permutation symmetry.
 /// @throws std::runtime_error if a LAPACK diagonalization fails.
 std::vector<TwoBodyFragment> eigen_decompose_two_body(
     const Eigen::VectorXd& two_body_integrals, std::size_t norb,
-    double truncation_threshold = DEFAULT_TRUNCATION_THRESHOLD);
+    double truncation_threshold = DEFAULT_TRUNCATION_THRESHOLD,
+    double symmetry_tolerance = DEFAULT_SYMMETRY_TOLERANCE);
 
 /**
  * @class DoubleFactorizerSettings
@@ -61,6 +85,8 @@ std::vector<TwoBodyFragment> eigen_decompose_two_body(
  *
  * Default settings:
  * - truncation_threshold: 1e-12 - discards only numerically null fragments.
+ * - symmetry_tolerance: 1e-8 - relative tolerance on the input tensor's
+ *   chemist permutation symmetry.
  *
  * @see DoubleFactorizer
  */
@@ -75,6 +101,13 @@ class DoubleFactorizerSettings : public qdk::chemistry::data::Settings {
         "Drop fragments whose two-electron supermatrix eigenvalue magnitude "
         "is below this threshold. Must be non-negative; 0.0 retains every "
         "fragment, including the numerically null ones.",
+        qdk::chemistry::data::BoundConstraint<double>{
+            0.0, std::numeric_limits<double>::max()});
+    set_default<double>(
+        "symmetry_tolerance", DEFAULT_SYMMETRY_TOLERANCE,
+        "Reject two-electron integrals whose chemist permutation symmetry is "
+        "violated by more than this fraction of the tensor's largest element. "
+        "Must be non-negative; 0.0 demands bitwise symmetry.",
         qdk::chemistry::data::BoundConstraint<double>{
             0.0, std::numeric_limits<double>::max()});
   }
