@@ -342,7 +342,7 @@ def _copy_component_directories(sources: list[Path], destination: Path) -> list[
     copied: list[str] = []
     for source in sources:
         source_root = source.resolve()
-        for source_file in sorted(path for path in source.rglob("*") if path.is_file()):
+        for source_file in sorted(path for path in source.rglob("*") if path.is_file() or path.is_symlink()):
             if not source_file.resolve().is_relative_to(source_root):
                 raise PluginInstallError(
                     f"plugin component file {source_file} resolves outside {source_root} "

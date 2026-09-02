@@ -55,7 +55,7 @@ def test_geometric_optimizer_settings():
     assert isinstance(settings, algorithms.GeometryOptimizerSettings)
     derivative_ref = settings.get("derivative_calculator")
     assert derivative_ref.algorithm_type == "nuclear_derivative_calculator"
-    assert derivative_ref.algorithm_name == "qdk"
+    assert derivative_ref.algorithm_name == "qdk_finite_difference"
 
     assert settings.get("transition_state") is False
     assert settings.get("optimizer") == "tric"
