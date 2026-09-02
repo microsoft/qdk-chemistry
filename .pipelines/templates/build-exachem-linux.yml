@@ -24,6 +24,7 @@ steps:
       "linux-exachem-${{ parameters.march }}-v1" | "${{ parameters.dockerImage }}" |
       cpp/manifest/qdk-chemistry/cgmanifest.json |
       external/macis/manifest/cgmanifest.json |
+      .pipelines/install-scripts/common.sh |
       .pipelines/install-scripts/build-exachem-linux.sh |
       .pipelines/install-scripts/install-blis.sh |
       .pipelines/install-scripts/install-libflame.sh |
