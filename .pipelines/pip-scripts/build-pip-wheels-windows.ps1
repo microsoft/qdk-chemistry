@@ -42,7 +42,7 @@ if (-not $env:CMAKE_BUILD_PARALLEL_LEVEL) {
     $ramPerJobGB = if ($Triplet -like 'arm64-*') { 10 } else { 6 }
     $cpu   = [int]$env:NUMBER_OF_PROCESSORS
     $ramGB = [math]::Floor((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
-    $jobs  = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / $ramPerJobGB)))
+    $jobs  = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 10)))
     Write-Host "CPUs=$cpu  RAM=${ramGB} GB  -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
     $env:CMAKE_BUILD_PARALLEL_LEVEL = $jobs
 }
