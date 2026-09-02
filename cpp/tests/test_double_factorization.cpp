@@ -111,7 +111,6 @@ TEST(DoubleFactorizerTest, MetaDataAndFactoryRegistration) {
   EXPECT_EQ(factorizer->type_name(), "double_factorizer");
   EXPECT_EQ(factorizer->name(), "eigen_decomposition");
   EXPECT_TRUE(factorizer->settings().has("truncation_threshold"));
-  EXPECT_TRUE(factorizer->settings().has("symmetry_tolerance"));
 
   const auto available = DoubleFactorizerFactory::available();
   EXPECT_NE(
@@ -146,9 +145,9 @@ TEST(DoubleFactorizerTest, RejectsInvalidInput) {
   // rather than fail.
   EXPECT_FALSE(eigen_decompose_two_body(tensor, norb, 0.0).empty());
 
-  // A non-finite entry defeats every later guard: NaN compares false against
-  // the symmetry tolerance, and it makes the sort comparator |a| > |b| false
-  // in both directions, which is undefined behavior in std::sort.
+  // A non-finite entry reaches LAPACK, and NaN makes the sort comparator
+  // |a| > |b| false in both directions, which is undefined behavior in
+  // std::sort.
   Eigen::VectorXd with_nan = make_two_body(norb, {1.0}, 31);
   with_nan[0] = std::numeric_limits<double>::quiet_NaN();
   EXPECT_THROW(eigen_decompose_two_body(with_nan, norb), std::invalid_argument);
@@ -162,57 +161,6 @@ TEST(DoubleFactorizerTest, RejectsInvalidInput) {
   auto truncating = DoubleFactorizerFactory::create("eigen_decomposition");
   truncating->settings().set("truncation_threshold", 1e6);
   EXPECT_THROW(truncating->run(hamiltonian), std::invalid_argument);
-}
-
-TEST(DoubleFactorizerTest, RejectsAsymmetricTwoBodyIntegrals) {
-  constexpr std::size_t norb = 4;
-  const auto flat = [](std::size_t p, std::size_t q, std::size_t r,
-                       std::size_t s) {
-    return ((p * norb + q) * norb + r) * norb + s;
-  };
-
-  // A tensor that breaks p<->q only. Perturbing g[0,1,2,2] and its
-  // (pq)<->(rs) image g[2,2,0,1] keeps the supermatrix symmetric, so this is
-  // caught only by the second generator.
-  Eigen::VectorXd pq_broken = make_two_body(norb, {1.0}, 31);
-  pq_broken[flat(0, 1, 2, 2)] += 1.0;
-  pq_broken[flat(2, 2, 0, 1)] += 1.0;
-  EXPECT_THROW(eigen_decompose_two_body(pq_broken, norb),
-               std::invalid_argument);
-
-  // A tensor that breaks (pq)<->(rs) only. Perturbing the four elements of
-  // the p<->q / r<->s orbit of (0,1),(2,3) leaves both index-pair swaps
-  // intact, so this is caught only by the first generator.
-  Eigen::VectorXd rs_broken = make_two_body(norb, {1.0}, 31);
-  rs_broken[flat(0, 1, 2, 3)] += 1.0;
-  rs_broken[flat(1, 0, 2, 3)] += 1.0;
-  rs_broken[flat(0, 1, 3, 2)] += 1.0;
-  rs_broken[flat(1, 0, 3, 2)] += 1.0;
-  EXPECT_THROW(eigen_decompose_two_body(rs_broken, norb),
-               std::invalid_argument);
-
-  // Both are accepted once the tolerance is loosened past the perturbation,
-  // so the rejections above come from the symmetry check and not from some
-  // other guard.
-  EXPECT_NO_THROW(eigen_decompose_two_body(pq_broken, norb,
-                                           DEFAULT_TRUNCATION_THRESHOLD, 1e3));
-  EXPECT_NO_THROW(eigen_decompose_two_body(rs_broken, norb,
-                                           DEFAULT_TRUNCATION_THRESHOLD, 1e3));
-
-  // The tolerance is itself validated, like truncation_threshold.
-  const Eigen::VectorXd symmetric = make_two_body(norb, {1.0}, 31);
-  EXPECT_THROW(eigen_decompose_two_body(symmetric, norb,
-                                        DEFAULT_TRUNCATION_THRESHOLD, -1.0),
-               std::invalid_argument);
-  EXPECT_THROW(
-      eigen_decompose_two_body(symmetric, norb, DEFAULT_TRUNCATION_THRESHOLD,
-                               std::numeric_limits<double>::quiet_NaN()),
-      std::invalid_argument);
-
-  // A tensor assembled from symmetric factors survives a tolerance far
-  // tighter than the default, so the check has real margin on valid input.
-  EXPECT_NO_THROW(eigen_decompose_two_body(
-      symmetric, norb, DEFAULT_TRUNCATION_THRESHOLD, 1e-14));
 }
 
 TEST(DoubleFactorizerTest, EigenDecomposeFragmentsReconstructTensor) {

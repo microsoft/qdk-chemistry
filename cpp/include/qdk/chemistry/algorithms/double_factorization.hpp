@@ -24,9 +24,8 @@ namespace qdk::chemistry::algorithms {
  * Spectral Amplification", Phys. Rev. X 15, 041016 (2025).
  */
 
-/// Default tolerance for the chemist permutation-symmetry check, relative to
-/// the largest element of the two-electron tensor
-inline constexpr double DEFAULT_SYMMETRY_TOLERANCE = 1e-8;
+/// Default eigenvalue threshold for retaining two-body fragments.
+inline constexpr double DEFAULT_TRUNCATION_THRESHOLD = 1e-12;
 
 /// A single low-rank ("perfect square") two-electron fragment:
 ///
@@ -48,34 +47,26 @@ struct TwoBodyFragment {
 /// p*norb^3 + q*norb^2 + r*norb + s, into low-rank fragments.
 ///
 /// @param two_body_integrals Flattened two-electron tensor, size norb^4.
-///        the (pq)<->(rs) and p<->q
-///        generators are validated, and a tensor violating is rejected.
 /// @param norb Number of (spatial) orbitals.
 /// @param truncation_threshold Fragments whose supermatrix eigenvalue
-///        magnitude falls below this threshold are dropped.0.0 retains every fragment. 
-/// @param symmetry_tolerance Permutation-symmetry tolerance, relative to the
-///        largest element of the tensor. Must be non-negative; 0.0 demands
-///        bitwise symmetry.
+///        magnitude falls below this threshold are dropped.0.0 retains every
+///        fragment.
 /// @return The retained fragments, sorted by decreasing eigenvalue magnitude.
 ///         Within a degenerate eigenvalue block the eigenvector basis is
 ///         whatever LAPACK returns.
 /// @throws std::invalid_argument if `norb` is zero, if `truncation_threshold`
-///         or `symmetry_tolerance` is negative or NaN, if `two_body_integrals`
-///         is not norb^4 long, contains a non-finite value, or lacks the
-///         required permutation symmetry.
+///         is negative or NaN, or if `two_body_integrals` is not norb^4 long
+///         or contains a non-finite value.
 /// @throws std::runtime_error if a LAPACK diagonalization fails.
 std::vector<TwoBodyFragment> eigen_decompose_two_body(
     const Eigen::VectorXd& two_body_integrals, std::size_t norb,
-    double truncation_threshold = DEFAULT_TRUNCATION_THRESHOLD,
-    double symmetry_tolerance = DEFAULT_SYMMETRY_TOLERANCE);
+    double truncation_threshold = DEFAULT_TRUNCATION_THRESHOLD);
 /**
  * @class DoubleFactorizerSettings
  * @brief Settings container for DoubleFactorizer.
  *
  * Default settings:
  * - truncation_threshold: 1e-12 - discards only numerically null fragments.
- * - symmetry_tolerance: 1e-8 - relative tolerance on the input tensor's
- *   chemist permutation symmetry.
  *
  * @see DoubleFactorizer
  */
@@ -90,13 +81,6 @@ class DoubleFactorizerSettings : public qdk::chemistry::data::Settings {
         "Drop fragments whose two-electron supermatrix eigenvalue magnitude "
         "is below this threshold. Must be non-negative; 0.0 retains every "
         "fragment, including the numerically null ones.",
-        qdk::chemistry::data::BoundConstraint<double>{
-            0.0, std::numeric_limits<double>::max()});
-    set_default<double>(
-        "symmetry_tolerance", DEFAULT_SYMMETRY_TOLERANCE,
-        "Reject two-electron integrals whose chemist permutation symmetry is "
-        "violated by more than this fraction of the tensor's largest element. "
-        "Must be non-negative; 0.0 demands bitwise symmetry.",
         qdk::chemistry::data::BoundConstraint<double>{
             0.0, std::numeric_limits<double>::max()});
   }
