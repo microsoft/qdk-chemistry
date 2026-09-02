@@ -178,11 +178,10 @@ Returns:
 
   localizer.def("aliases", &Localizer::aliases,
                 R"(
-The algorithm's aliases.
+ The algorithm's aliases.
 
-Returns:
-        list[str]: All registered names for the algorithm
-
+ Returns:
+    list[str]: All registered names for the algorithm
 )");
 
   localizer.def("type_name", &Localizer::type_name,
