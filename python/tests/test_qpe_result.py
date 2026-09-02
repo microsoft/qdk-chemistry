@@ -378,7 +378,7 @@ def test_qpe_result_branching_collects_candidates_and_sorts_a_supplied_set():
 
 def test_qpe_result_rejects_a_branching_without_the_recovered_energy():
     """``branching`` that omits ``raw_energy`` would contradict the field contract."""
-    with pytest.raises(ValueError, match="must contain raw_energy"):
+    with pytest.raises(ValueError, match="does not contain raw_energy"):
         QpeResult.from_phase_fraction(
             method="qubitization_qpe",
             phase_fraction=0.1,
