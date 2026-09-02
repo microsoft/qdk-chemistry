@@ -29,23 +29,14 @@ import pytest
 with suppress(ImportError):
     import nbformat
 
-from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import MajoranaMapping, PauliProductFormulaContainer, Structure
-from qdk_chemistry.data.symmetry import SymmetryLabel, axes
-from qdk_chemistry.utils import Logger, compute_valence_space_parameters
+from qdk_chemistry.data import PauliProductFormulaContainer
+from qdk_chemistry.utils import Logger
 
 from .test_sample_workflow_utils import (
     _HAS_JUPYTER_KERNEL,
     _execute_notebook_skip_visualizations,
     _requires_notebook_deps,
 )
-
-try:
-    import pyscf  # noqa: F401
-
-    PYSCF_AVAILABLE = True
-except ImportError:
-    PYSCF_AVAILABLE = False
 
 # Environment variable to enable slow tests (including notebook e2e tests)
 _RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
@@ -177,7 +168,6 @@ def test_tutorial_module_imports_preserve_global_logging():
     Logger.set_global_level(Logger.LogLevel.warn)
     try:
         for module_name in (
-            "tutorial_orbital_coordinates",
             "tutorial_choose_active_space",
             "tutorial_map_n2_to_qubits",
             "tutorial_prepare_trial_state",
@@ -204,163 +194,6 @@ def test_tutorial_executable_scripts_expose_logging_control():
 
 
 @pytest.mark.tutorial_baseline
-def test_tutorial_ao_anchoring_is_rotation_invariant():
-    """Canonicalize arbitrary orientations of the same degenerate subspace."""
-    tutorial_module = _load_tutorial_module("tutorial_orbital_coordinates")
-    rng = np.random.default_rng(42)
-    block, _ = np.linalg.qr(rng.normal(size=(10, 2)))
-    overlap = np.eye(block.shape[0])
-    expected = tutorial_module._ao_anchor_block(block, overlap)
-
-    for _ in range(8):
-        rotation, _ = np.linalg.qr(rng.normal(size=(2, 2)))
-        rotated = block @ rotation
-        actual = tutorial_module._ao_anchor_block(rotated, overlap)
-        assert actual == pytest.approx(expected, abs=1e-12)
-
-
-@pytest.mark.tutorial_baseline
-def test_tutorial_scalar_refinement_resolves_subgrid_cusp():
-    """Refine a cusp too close to zero for the coarse angular grid to detect."""
-    tutorial_module = _load_tutorial_module("tutorial_orbital_coordinates")
-    expected_angle = 1e-8
-
-    actual_angle, actual_value = tutorial_module._golden_section_minimum(
-        lambda angle: abs(angle - expected_angle),
-        -np.pi / 32,
-        np.pi / 32,
-    )
-
-    assert actual_angle == pytest.approx(expected_angle, abs=1e-12)
-    assert actual_value < 1e-12
-
-
-@pytest.mark.slow
-@pytest.mark.tutorial_baseline
-@pytest.mark.skipif(
-    not _RUN_SLOW_TESTS,
-    reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
-)
-@pytest.mark.parametrize(
-    ("label", "atoms", "use_autocas"),
-    [
-        ("H2 at 0.74 Angstrom", "H 0 0 0\nH 0 0 0.74", False),
-        ("LiH at 1.60 Angstrom", "Li 0 0 0\nH 0 0 1.60", False),
-        ("N2 at 2.20 Angstrom", "N 0 0 0\nN 0 0 2.20", True),
-    ],
-)
-def test_tutorial_orbital_coordinates_transfer_across_diatomics(
-    label,
-    atoms,
-    use_autocas,
-):
-    """Preserve the selected-space energy for other diatomic workflows."""
-    tutorial_module = _load_tutorial_module("tutorial_orbital_coordinates")
-    structure = Structure.from_xyz(f"2\n{label}\n{atoms}\n")
-    _, hartree_fock_wavefunction = create("scf_solver", "qdk").run(
-        structure,
-        charge=0,
-        spin_multiplicity=1,
-        basis_or_guess="cc-pvdz",
-    )
-    num_valence_electrons, num_valence_orbitals = compute_valence_space_parameters(
-        hartree_fock_wavefunction,
-        0,
-    )
-    valence_wavefunction = create(
-        "active_space_selector",
-        "qdk_valence",
-        num_active_electrons=num_valence_electrons,
-        num_active_orbitals=num_valence_orbitals,
-    ).run(hartree_fock_wavefunction)
-
-    alpha_channel = SymmetryLabel([axes.alpha()])
-    valence_indices = list(valence_wavefunction.get_orbitals().active_indices().indices(alpha_channel))
-    num_valence_alpha, num_valence_beta = valence_wavefunction.get_active_num_electrons()
-    hamiltonian_constructor = create("hamiltonian_constructor", "qdk")
-    casci_solver = create(
-        "multi_configuration_calculator",
-        "macis_cas",
-        ci_residual_tolerance=1e-10,
-        calculate_one_rdm=True,
-        calculate_two_rdm=True,
-    )
-    _, valence_casci_wavefunction = casci_solver.run(
-        hamiltonian_constructor.run(valence_wavefunction.get_orbitals()),
-        num_valence_alpha,
-        num_valence_beta,
-    )
-    natural_wavefunction = create(
-        "orbital_localizer",
-        "qdk_natural_orbitals",
-    ).run(
-        valence_casci_wavefunction,
-        valence_indices,
-        valence_indices,
-    )
-    _, natural_casci_wavefunction = casci_solver.run(
-        hamiltonian_constructor.run(natural_wavefunction.get_orbitals()),
-        num_valence_alpha,
-        num_valence_beta,
-    )
-
-    autocas_wavefunction = create(
-        "active_space_selector",
-        "qdk_autocas_eos",
-    ).run(natural_casci_wavefunction)
-    autocas_indices = list(autocas_wavefunction.get_orbitals().active_indices().indices(alpha_channel))
-    selected_wavefunction = natural_wavefunction
-    if use_autocas:
-        assert autocas_indices
-        selected_wavefunction = autocas_wavefunction
-    else:
-        # Weakly correlated H2 and LiH have no autoCAS-selected reduction;
-        # retaining the complete valence space is an explicit test choice.
-        assert not autocas_indices
-    selected_orbitals = selected_wavefunction.get_orbitals()
-    selected_indices = list(selected_orbitals.active_indices().indices(alpha_channel))
-    assert selected_indices
-
-    coordinate_result = tutorial_module.coordinate_minimize_natural_orbital_coefficient_norm(
-        valence_casci_wavefunction,
-        selected_orbitals,
-        valence_indices,
-    )
-    assert coordinate_result.coefficient_norm_after <= coordinate_result.coefficient_norm_before + 1e-10
-    assert coordinate_result.effective_pauli_terms_after <= coordinate_result.effective_pauli_terms_before
-
-    num_selected_alpha, num_selected_beta = selected_wavefunction.get_active_num_electrons()
-    selected_hamiltonian = hamiltonian_constructor.run(coordinate_result.orbitals)
-    selected_energy, _ = casci_solver.run(
-        selected_hamiltonian,
-        num_selected_alpha,
-        num_selected_beta,
-    )
-    mapping = MajoranaMapping.jordan_wigner(num_modes=2 * len(selected_indices))
-    qubit_hamiltonian = create(
-        "qubit_mapper",
-        "qdk",
-        threshold=1e-10,
-        integral_threshold=1e-14,
-    ).run(selected_hamiltonian, mapping)
-    assert len(qubit_hamiltonian.pauli_strings) == (coordinate_result.effective_pauli_terms_after)
-
-    alpha_mask = (1 << len(selected_indices)) - 1
-    fixed_electron_basis = [
-        state
-        for state in range(1 << qubit_hamiltonian.num_qubits)
-        if (state & alpha_mask).bit_count() == num_selected_alpha
-        and (state >> len(selected_indices)).bit_count() == num_selected_beta
-    ]
-    fixed_electron_matrix = qubit_hamiltonian.to_matrix(sparse=True)[fixed_electron_basis][
-        :, fixed_electron_basis
-    ].toarray()
-    mapped_active_energy = float(np.linalg.eigvalsh(fixed_electron_matrix)[0])
-    mapped_total_energy = selected_hamiltonian.get_core_energy() + mapped_active_energy
-    assert mapped_total_energy == pytest.approx(selected_energy, abs=1e-9)
-
-
-@pytest.mark.tutorial_baseline
 def test_tutorial_choose_active_space_results(tmp_path: Path):
     """Check portable active-space invariants and optional reference snapshots."""
     tutorial_module = _load_tutorial_module("tutorial_choose_active_space")
@@ -382,11 +215,6 @@ def test_tutorial_choose_active_space_results(tmp_path: Path):
     assert all(0.0 <= entropy <= log(4.0) for entropy in result.orbital_entropies)
     assert sum(entropy >= 0.5 for entropy in result.orbital_entropies) == 6
     assert result.valence_energy < result.refined_energy < result.hartree_fock_energy
-    coordinate_minimization = result.natural_orbital_coordinate_minimization
-    assert coordinate_minimization.selected_blocks == ((4,), (5, 6), (7, 8), (9,))
-    assert coordinate_minimization.coefficient_norm_after <= coordinate_minimization.coefficient_norm_before + 1e-10
-    assert coordinate_minimization.effective_pauli_terms_after <= coordinate_minimization.effective_pauli_terms_before
-
     entropy_figure = tutorial_module.plot_orbital_entropy_selection(result)
     entropy_axis = entropy_figure.axes[0]
     expected_order = [
@@ -407,8 +235,6 @@ def test_tutorial_choose_active_space_results(tmp_path: Path):
     assert (tmp_path / "orbital_entropy.png").stat().st_size > 0
 
     if _RUN_TUTORIAL_SNAPSHOTS:
-        assert abs(coordinate_minimization.coefficient_norm_after - 19.610172748878) < 1e-7
-        assert coordinate_minimization.effective_pauli_terms_after == 247
         assert result.orbital_entropies == pytest.approx(
             [
                 0.021695655,
@@ -423,59 +249,58 @@ def test_tutorial_choose_active_space_results(tmp_path: Path):
             abs=1e-6,
         )
 
-    if PYSCF_AVAILABLE:
-        structure = tutorial_module.create_stretched_n2_structure()
-        basis_function_cube_data = tutorial_module.generate_basis_function_cube_data(
-            structure,
-            "cc-pvdz",
-            grid_size=(8, 8, 8),
-            margin=3.0,
-        )
-        function_types = [
-            "1s",
-            "2s",
-            "3s",
-            "2px",
-            "2py",
-            "2pz",
-            "3px",
-            "3py",
-            "3pz",
-            "3dxy",
-            "3dyz",
-            "3dz^2",
-            "3dxz",
-            "3dx2-y2",
-        ]
-        expected_basis_functions = [
-            (f"N{atom_index}", function_type) for atom_index in (1, 2) for function_type in function_types
-        ]
-        assert len(expected_basis_functions) == 28
-        assert list(basis_function_cube_data) == [
-            f"Basis function {index}: {center} {function_type}"
-            for index, (center, function_type) in enumerate(expected_basis_functions)
-        ]
-        assert all(basis_function["data"] for basis_function in basis_function_cube_data.values())
-        assert [basis_function["info"] for basis_function in basis_function_cube_data.values()] == [
-            {
-                "Representation": "Basis function",
-                "Function index": str(index),
-                "Center": center,
-                "Function type": function_type,
-            }
-            for index, (center, function_type) in enumerate(expected_basis_functions)
-        ]
+    structure = tutorial_module.create_stretched_n2_structure()
+    basis_function_cube_data = tutorial_module.generate_basis_function_cube_data(
+        structure,
+        "cc-pvdz",
+        grid_size=(8, 8, 8),
+        margin=3.0,
+    )
+    function_types = [
+        "1s",
+        "2s",
+        "3s",
+        "2px",
+        "2py",
+        "2pz",
+        "3px",
+        "3py",
+        "3pz",
+        "3dxy",
+        "3dyz",
+        "3dz^2",
+        "3dxz",
+        "3dx2-y2",
+    ]
+    expected_basis_functions = [
+        (f"N{atom_index}", function_type) for atom_index in (1, 2) for function_type in function_types
+    ]
+    assert len(expected_basis_functions) == 28
+    assert list(basis_function_cube_data) == [
+        f"Basis function {index}: {center} {function_type}"
+        for index, (center, function_type) in enumerate(expected_basis_functions)
+    ]
+    assert all(basis_function["data"] for basis_function in basis_function_cube_data.values())
+    assert [basis_function["info"] for basis_function in basis_function_cube_data.values()] == [
+        {
+            "Representation": "Basis function",
+            "Function index": str(index),
+            "Center": center,
+            "Function type": function_type,
+        }
+        for index, (center, function_type) in enumerate(expected_basis_functions)
+    ]
 
-        cube_data = tutorial_module.generate_active_orbital_cube_data(
-            result,
-            grid_size=(8, 8, 8),
-            margin=4.0,
-        )
-        assert len(cube_data) == 8
-        assert sum(orbital["info"]["Selected by autoCAS"] == "yes" for orbital in cube_data.values()) == 6
-        assert all(
-            set(orbital["info"]) == {"Occupation", "Entropy", "Selected by autoCAS"} for orbital in cube_data.values()
-        )
+    cube_data = tutorial_module.generate_active_orbital_cube_data(
+        result,
+        grid_size=(8, 8, 8),
+        margin=4.0,
+    )
+    assert len(cube_data) == 8
+    assert sum(orbital["info"]["Selected by autoCAS"] == "yes" for orbital in cube_data.values()) == 6
+    assert all(
+        set(orbital["info"]) == {"Occupation", "Entropy", "Selected by autoCAS"} for orbital in cube_data.values()
+    )
 
 
 @pytest.mark.tutorial_baseline
@@ -686,7 +511,6 @@ def test_tutorial_run_iqpe_simulation():
 
 @_requires_notebook_deps
 @pytest.mark.tutorial_baseline
-@pytest.mark.skipif(not PYSCF_AVAILABLE, reason="Orbital cube visualization requires PySCF")
 @pytest.mark.skipif(
     not _HAS_JUPYTER_KERNEL,
     reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
