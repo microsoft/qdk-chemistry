@@ -3,7 +3,7 @@ default_stages: [pre-commit, pre-push]
 # Define the list of directories to lint
 # You can extend this list to include more directories over time
 files: &linted_files .*
-exclude: \.(xyz|fcidump|wfn|qasm)$
+exclude: \.(xyz|fcidump|wfn|qasm|ics)$
 
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks

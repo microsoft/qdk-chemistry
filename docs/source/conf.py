@@ -158,6 +158,7 @@ breathe_default_members = (
 html_theme = "sphinx_rtd_theme"  # Use the ReadTheDocs theme for styling
 templates_path = ["_templates"]  # Path to custom HTML templates
 html_static_path: list[str] = ["_static"]  # Path to static files (CSS, JS, images)
+html_extra_path: list[str] = ["_extra"]  # Files copied verbatim into the output root
 html_css_files = [  # Include custom CSS file for additional styling
     "custom.css",
 ]
