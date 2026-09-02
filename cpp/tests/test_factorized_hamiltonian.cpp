@@ -72,15 +72,15 @@ TEST_F(FactorizedHamiltonianTest, Properties) {
   EXPECT_EQ(container->get_num_bases(), B);
   EXPECT_EQ(container->get_num_copies(), C);
 
-  // Majorana one-body integrals (row-major 2x2).
+  // Adjusted one-body integrals (row-major 2x2).
   const double expected_h1[4] = {0.90379999999999994, 0.26160000000000005,
                                  0.26160000000000005, 0.92620000000000002};
-  Eigen::MatrixXd h1m = container->get_h1_majorana();
-  ASSERT_EQ(h1m.rows(), static_cast<Eigen::Index>(N));
-  ASSERT_EQ(h1m.cols(), static_cast<Eigen::Index>(N));
+  Eigen::MatrixXd h1p = container->get_h1_prime();
+  ASSERT_EQ(h1p.rows(), static_cast<Eigen::Index>(N));
+  ASSERT_EQ(h1p.cols(), static_cast<Eigen::Index>(N));
   for (size_t p = 0; p < N; ++p) {
     for (size_t q = 0; q < N; ++q) {
-      EXPECT_NEAR(h1m(p, q), expected_h1[p * N + q], 1e-12);
+      EXPECT_NEAR(h1p(p, q), expected_h1[p * N + q], 1e-12);
     }
   }
 
@@ -110,16 +110,27 @@ TEST_F(FactorizedHamiltonianTest, Properties) {
   // Block-encoding 1-norm Lambda.
   EXPECT_NEAR(container->get_lambda(), 2.0800000000000001, 1e-12);
 
-  // Effective SOS 1-norm needs a positive energy gap (the fixture uses 0.0).
+  // Effective SOS 1-norm is unavailable without a valid SOS gap.
+  EXPECT_DOUBLE_EQ(container->get_lambda_eff(), 0.0);
+
   FactorizedHamiltonianContainer gapped(core_energy, u, w, wb, one_body,
                                         inactive_fock, orbitals, signs, 0.5);
   EXPECT_NEAR(gapped.get_lambda_eff(), 1.3527749258468684, 1e-12);
+
+  FactorizedHamiltonianContainer gap_at_upper_bound(
+      core_energy, u, w, wb, one_body, inactive_fock, orbitals, signs,
+      2.0 * container->get_lambda());
+  EXPECT_DOUBLE_EQ(gap_at_upper_bound.get_lambda_eff(), 0.0);
+
+  FactorizedHamiltonianContainer signed_factorization(
+      core_energy, u, w, wb, one_body, inactive_fock, orbitals, -signs, 0.5);
+  EXPECT_DOUBLE_EQ(signed_factorization.get_lambda_eff(), 0.0);
 }
 
 TEST_F(FactorizedHamiltonianTest, IdentityWeightIsGaugeForTwoBodyOnly) {
   auto reference = make_container();
   const Eigen::VectorXd h2_ref = reference->reconstruct_two_body_integrals();
-  const Eigen::MatrixXd h1_ref = reference->get_h1_majorana();
+  const Eigen::MatrixXd h1_ref = reference->get_h1_prime();
   const double lambda_ref = reference->get_lambda();
 
   const double wb_values[] = {0.0, -3.5, 7.25};
@@ -138,9 +149,9 @@ TEST_F(FactorizedHamiltonianTest, IdentityWeightIsGaugeForTwoBodyOnly) {
           << "wB=" << wb_value << " moved h2 element " << i;
     }
 
-    // (b) ... but the Majorana one-body shift and Lambda both move.
-    EXPECT_FALSE(shifted.get_h1_majorana().isApprox(h1_ref, 1e-9))
-        << "wB=" << wb_value << " left h1_majorana unchanged";
+    // (b) ... but the adjusted one-body shift and Lambda both move.
+    EXPECT_FALSE(shifted.get_h1_prime().isApprox(h1_ref, 1e-9))
+        << "wB=" << wb_value << " left h1_prime unchanged";
     EXPECT_GT(std::abs(shifted.get_lambda() - lambda_ref), 1e-9)
         << "wB=" << wb_value << " left Lambda unchanged";
   }
@@ -166,7 +177,7 @@ TEST_F(FactorizedHamiltonianTest, NegativeSignNegatesTwoBodyTensor) {
   EXPECT_GT(h2_positive.array().abs().maxCoeff(), 1e-6);
 }
 
-TEST_F(FactorizedHamiltonianTest, NegativeSignPropagatesToAllMajoranaTerms) {
+TEST_F(FactorizedHamiltonianTest, NegativeSignPropagatesToAllH1PrimeTerms) {
   Eigen::MatrixXd m = Eigen::MatrixXd::Zero(N, N);
   for (size_t b = 0; b < B; ++b) {
     Eigen::VectorXd ub(N);
@@ -194,8 +205,8 @@ TEST_F(FactorizedHamiltonianTest, NegativeSignPropagatesToAllMajoranaTerms) {
       expected += sign_value * m.trace() * m;  // (b)
       expected -= sign_value * wb_value * m;   // (c)
 
-      EXPECT_TRUE(container.get_h1_majorana().isApprox(expected, 1e-12))
-          << "signed three-term Eq. 37 model failed at sign=" << sign_value
+      EXPECT_TRUE(container.get_h1_prime().isApprox(expected, 1e-12))
+          << "signed three-term Eq. 36 model failed at sign=" << sign_value
           << ", wB=" << wb_value;
     }
   }
@@ -204,7 +215,7 @@ TEST_F(FactorizedHamiltonianTest, NegativeSignPropagatesToAllMajoranaTerms) {
 TEST_F(FactorizedHamiltonianTest, TwoBodyLambdaIsSignInvariant) {
   auto two_body_lambda = [](const FactorizedHamiltonianContainer& container) {
     Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(
-        container.get_h1_majorana());
+        container.get_h1_prime());
     return container.get_lambda() - solver.eigenvalues().array().abs().sum();
   };
 
@@ -307,6 +318,34 @@ TEST_F(FactorizedHamiltonianTest, HDF5RoundTrip) {
 
     EXPECT_TRUE(loaded->is_restricted());
     EXPECT_TRUE(loaded->is_valid());
+  }
+}
+
+TEST_F(FactorizedHamiltonianTest, NonHermitianTypeSurvivesSerialization) {
+  auto non_hermitian = std::make_unique<FactorizedHamiltonianContainer>(
+      core_energy, u, w, wb, one_body, inactive_fock, orbitals, signs,
+      energy_gap, HamiltonianType::NonHermitian);
+  ASSERT_EQ(non_hermitian->get_type(), HamiltonianType::NonHermitian);
+
+  // Negative control: the type defaults to Hermitian, so a round-trip that
+  // dropped it would still satisfy every other assertion in this file.
+  ASSERT_EQ(make_container()->get_type(), HamiltonianType::Hermitian);
+
+  auto from_json_container =
+      FactorizedHamiltonianContainer::from_json(non_hermitian->to_json());
+  EXPECT_EQ(from_json_container->get_type(), HamiltonianType::NonHermitian);
+
+  std::string filename = "test_factorized.hamiltonian.h5";
+  {
+    H5::H5File file(filename, H5F_ACC_TRUNC);
+    H5::Group group = file.createGroup("container");
+    non_hermitian->to_hdf5(group);
+  }
+  {
+    H5::H5File file(filename, H5F_ACC_RDONLY);
+    H5::Group group = file.openGroup("container");
+    auto loaded = FactorizedHamiltonianContainer::from_hdf5(group);
+    EXPECT_EQ(loaded->get_type(), HamiltonianType::NonHermitian);
   }
 }
 

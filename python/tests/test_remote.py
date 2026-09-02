@@ -501,6 +501,32 @@ def test_worker_force_rerun_bypasses_remote_cache(tmp_path, monkeypatch):
     algorithm.run.assert_called_once_with()
 
 
+def test_worker_cache_transport_skips_output_serialization(tmp_path, monkeypatch):
+    """Shared-cache transport does not create unused output artifacts."""
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    serialize_inputs(
+        input_dir,
+        args=(),
+        kwargs={},
+        algorithm_type="test_algorithm",
+        algorithm_name="plugin",
+        settings={},
+        run_hash="testhash",
+        remote_cache={"name": "shared"},
+        remote_cache_transport=True,
+    )
+    result = 6
+    monkeypatch.setattr(remote_worker, "_load_remote_cache", MagicMock(return_value=(MagicMock(), "testhash", False)))
+    monkeypatch.setattr(remote_worker, "_get_cached_result", MagicMock(return_value=result))
+    serialize = MagicMock()
+    monkeypatch.setattr(serialization_module, "serialize_outputs", serialize)
+
+    assert execute_job(input_dir, output_dir) == result
+    serialize.assert_not_called()
+    assert not output_dir.exists()
+
+
 def test_worker_logs_remote_cache_load_failure(tmp_path, monkeypatch, caplog):
     input_dir = tmp_path / "input"
     input_dir.mkdir()
@@ -584,6 +610,7 @@ def test_worker_cache_hit_skips_input_deserialization(tmp_path, monkeypatch):
         pytest.param((42,), True, id="singleton-tuple"),
         pytest.param((), True, id="empty-tuple"),
         pytest.param((None,), True, id="singleton-none-tuple"),
+        pytest.param((1, (2, 3)), True, id="nested-tuple"),
     ],
 )
 def test_worker_cache_preserves_result_shape(tmp_path, result, output_is_tuple):

@@ -18,11 +18,15 @@ namespace qdk::chemistry::algorithms {
 /**
  * @file
  * @brief Double factorization of a Hamiltonian's two-electron integrals.
+ *
+ * @note "Low 2025" equation numbers here cite the published version:
+ * G. H. Low et al., "Fast Quantum Simulation of Electronic Structure by
+ * Spectral Amplification", Phys. Rev. X 15, 041016 (2025).
  */
 
-/// Default fragment-truncation threshold on the supermatrix eigenvalue
-/// magnitude
-inline constexpr double DEFAULT_TRUNCATION_THRESHOLD = 1e-12;
+/// Default tolerance for the chemist permutation-symmetry check, relative to
+/// the largest element of the two-electron tensor
+inline constexpr double DEFAULT_SYMMETRY_TOLERANCE = 1e-8;
 
 /// A single low-rank ("perfect square") two-electron fragment:
 ///
@@ -34,8 +38,9 @@ struct TwoBodyFragment {
                         ///< sqrt(|supermatrix eigenvalue|).
   double sign = 1.0;    ///< +1.0 or -1.0.
 
-  /// Fermionic 1-norm, 0.5 * (sum_b |eps_b|)^2 (Patel 2025). Rescale this by
-  /// the square of any factor applied to `eps`.
+  /// Contribution to the block-encoding 1-norm,
+  /// 0.25 * (sum_b |eps_b|)^2 (Low 2025 Eq. 33; von Burg 2021 Eq. 16).
+  /// Rescale this by the square of any factor applied to `eps`.
   double lambda_df = 0.0;
 };
 
@@ -43,22 +48,34 @@ struct TwoBodyFragment {
 /// p*norb^3 + q*norb^2 + r*norb + s, into low-rank fragments.
 ///
 /// @param two_body_integrals Flattened two-electron tensor, size norb^4.
+///        the (pq)<->(rs) and p<->q
+///        generators are validated, and a tensor violating is rejected.
 /// @param norb Number of (spatial) orbitals.
 /// @param truncation_threshold Fragments whose supermatrix eigenvalue
-///        magnitude falls below this threshold are dropped.
+///        magnitude falls below this threshold are dropped.0.0 retains every fragment. 
+/// @param symmetry_tolerance Permutation-symmetry tolerance, relative to the
+///        largest element of the tensor. Must be non-negative; 0.0 demands
+///        bitwise symmetry.
 /// @return The retained fragments, sorted by decreasing eigenvalue magnitude.
-/// @throws std::invalid_argument if `two_body_integrals` is not norb^4 long.
+///         Within a degenerate eigenvalue block the eigenvector basis is
+///         whatever LAPACK returns.
+/// @throws std::invalid_argument if `norb` is zero, if `truncation_threshold`
+///         or `symmetry_tolerance` is negative or NaN, if `two_body_integrals`
+///         is not norb^4 long, contains a non-finite value, or lacks the
+///         required permutation symmetry.
 /// @throws std::runtime_error if a LAPACK diagonalization fails.
 std::vector<TwoBodyFragment> eigen_decompose_two_body(
     const Eigen::VectorXd& two_body_integrals, std::size_t norb,
-    double truncation_threshold = DEFAULT_TRUNCATION_THRESHOLD);
-
+    double truncation_threshold = DEFAULT_TRUNCATION_THRESHOLD,
+    double symmetry_tolerance = DEFAULT_SYMMETRY_TOLERANCE);
 /**
  * @class DoubleFactorizerSettings
  * @brief Settings container for DoubleFactorizer.
  *
  * Default settings:
  * - truncation_threshold: 1e-12 - discards only numerically null fragments.
+ * - symmetry_tolerance: 1e-8 - relative tolerance on the input tensor's
+ *   chemist permutation symmetry.
  *
  * @see DoubleFactorizer
  */
@@ -73,6 +90,13 @@ class DoubleFactorizerSettings : public qdk::chemistry::data::Settings {
         "Drop fragments whose two-electron supermatrix eigenvalue magnitude "
         "is below this threshold. Must be non-negative; 0.0 retains every "
         "fragment, including the numerically null ones.",
+        qdk::chemistry::data::BoundConstraint<double>{
+            0.0, std::numeric_limits<double>::max()});
+    set_default<double>(
+        "symmetry_tolerance", DEFAULT_SYMMETRY_TOLERANCE,
+        "Reject two-electron integrals whose chemist permutation symmetry is "
+        "violated by more than this fraction of the tensor's largest element. "
+        "Must be non-negative; 0.0 demands bitwise symmetry.",
         qdk::chemistry::data::BoundConstraint<double>{
             0.0, std::numeric_limits<double>::max()});
   }

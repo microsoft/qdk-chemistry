@@ -9,9 +9,11 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import DoubleFactorizer, create
-from qdk_chemistry.data import FactorizedHamiltonianContainer, Hamiltonian
+from qdk_chemistry.data import (
+    FactorizedHamiltonianContainer,
+    Hamiltonian,
+)
 
-from .test_helpers import create_nontrivial_test_hamiltonian
 
 
 @pytest.fixture

@@ -39,6 +39,11 @@ Settings:
         magnitude is below this threshold. Must be non-negative; the default
         of 1e-12 discards only the numerically null fragments. Pass 0.0 to
         retain every fragment.
+    symmetry_tolerance (float): Reject two-electron integrals whose chemist
+        permutation symmetry is violated by more than this fraction of the
+        tensor's largest element. Must be non-negative; the default of 1e-8
+        leaves several orders of margin over the round-off of a four-index
+        integral transform. Pass 0.0 to demand bitwise symmetry.
 
 See Also:
     :class:`qdk_chemistry.data.FactorizedHamiltonianContainer`
