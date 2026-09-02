@@ -315,10 +315,13 @@ jobs:
     - name: Install C++ library
       run: |
         cmake --install "$BUILD_DIR" --prefix "$CMAKE_INSTALL_PREFIX"
+        echo "CMAKE_PREFIX_PATH=${{ env.CMAKE_INSTALL_PREFIX }}:${CMAKE_PREFIX_PATH}" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=${{ env.CMAKE_INSTALL_PREFIX }}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+        echo "PATH=${{ env.CMAKE_INSTALL_PREFIX }}/bin:${PATH}" >> $GITHUB_ENV
 
     - name: Test C++ installation
       run: |
-        cmake -S examples/language/cpp -B build_example -GNinja -DCMAKE_PREFIX_PATH=${{ github.workspace }}/install
+        cmake -S examples/language/cpp -B build_example -GNinja
         cmake --build build_example --target all
         echo "C++ Example Compiled with Pre-Installed QDK/Chemistry-C++ Libraries!"
 
