@@ -701,14 +701,7 @@ jobs:
       shell: pwsh
       run: |
         cmake --build "cpp/build-${{ matrix.compiler }}"
-        if ($LASTEXITCODE -ne 0) {
-          # See the ARM64 job: a C1060 (compiler out of heap space) on the few
-          # libint2-heavy TUs that peak together is recoverable, and ninja only
-          # redoes what is left.
-          Write-Host "Build failed; retrying the remaining objects with -j 2." -ForegroundColor Yellow
-          cmake --build "cpp/build-${{ matrix.compiler }}" -j 2
-          if ($LASTEXITCODE -ne 0) { throw "CMake build failed ($LASTEXITCODE)" }
-        }
+        if ($LASTEXITCODE -ne 0) { throw "CMake build failed ($LASTEXITCODE)" }
 
     - name: Run C++ tests
       shell: pwsh
@@ -929,16 +922,7 @@ jobs:
       shell: pwsh
       run: |
         cmake --build "cpp/build-${{ matrix.compiler }}"
-        if ($LASTEXITCODE -ne 0) {
-          # The only failure seen here is C1060 (compiler out of heap space) on
-          # the handful of libint2-heavy TUs that happen to peak together. Ninja
-          # picks up where it left off, so retrying just those few serially costs
-          # minutes and turns a memory-pressure miss into a slow success rather
-          # than a red build.
-          Write-Host "Build failed; retrying the remaining objects with -j 2." -ForegroundColor Yellow
-          cmake --build "cpp/build-${{ matrix.compiler }}" -j 2
-          if ($LASTEXITCODE -ne 0) { throw "CMake build failed ($LASTEXITCODE)" }
-        }
+        if ($LASTEXITCODE -ne 0) { throw "CMake build failed ($LASTEXITCODE)" }
 
     # OpenBLAS ARM64 smoke test.
     - name: Verify OpenBLAS on ARM64
