@@ -133,7 +133,7 @@ class QpeResult(DataClass):
             phase_fraction: Measured phase fraction in ``[0, 1)``.
             eigenvalue_from_phase: A callable mapping phase fraction to one eigenvalue or a sequence of candidates.
             canonical_phase_fraction: Alias-resolved phase the energy is computed from. Defaults to ``phase_fraction``.
-            branching: Alias energy candidates considered. Defaults to the candidates returned by the callable.
+            branching: Alias energy candidates considered, sorted on the way in. Defaults to the callable's candidates.
             resolved_energy: Candidate picked by the algorithm's alias-resolution rule, if any.
             bits_msb_first: Optional measured bits ordered from MSB to LSB.
             bitstring_msb_first: Optional string representation of the measured bits.
@@ -141,6 +141,9 @@ class QpeResult(DataClass):
 
         Returns:
             QpeResult: Populated :class:`QpeResult` instance reflecting the supplied data.
+
+        Raises:
+            ValueError: If ``eigenvalue_from_phase`` or ``branching`` supplies no candidate energy.
 
         """
         Logger.trace_entering()
@@ -162,6 +165,11 @@ class QpeResult(DataClass):
                 raise ValueError("eigenvalue_from_phase returned no candidate energies.")
         raw_energy = branches[0]
 
+        if branching is not None:
+            branches = tuple(sorted(float(energy) for energy in branching))
+            if not branches:
+                raise ValueError("branching must hold at least one candidate energy.")
+
         normalized_bits: tuple[int, ...] | None = None
         bitstring = bitstring_msb_first
         if bits_msb_first is not None:
@@ -178,7 +186,7 @@ class QpeResult(DataClass):
             canonical_phase_fraction=canonical,
             canonical_phase_angle=canonical_angle,
             raw_energy=raw_energy,
-            branching=branches if branching is None else tuple(branching),
+            branching=branches,
             resolved_energy=resolved_energy,
             bits_msb_first=normalized_bits,
             bitstring_msb_first=bitstring,
