@@ -9,6 +9,8 @@ import os
 import re
 import shutil
 import sys
+import time
+import urllib.request
 from contextlib import suppress
 from pathlib import Path
 
@@ -175,6 +177,58 @@ intersphinx_mapping = {
     "scipy": ("https://docs.scipy.org/doc/scipy/", None),
     "qiskit": ("https://quantum.cloud.ibm.com/docs/api/qiskit/", None),
 }
+
+# Bound the inventory fetch. Sphinx otherwise passes ``timeout=None`` to
+# requests, so an unresponsive host can stall the whole documentation build.
+intersphinx_timeout = 30
+
+# Inventories that are nice-to-have for cross-linking but whose references are
+# already covered by ``nitpick_ignore_regex`` below. A transient outage of one
+# of these hosts must not fail the warning-free documentation build, so they are
+# dropped from the mapping when unreachable.
+_optional_intersphinx = ("numpy", "scipy", "qiskit")
+_intersphinx_attempts = 3
+
+
+def _inventory_is_reachable(url: str) -> bool:
+    """Probe an ``objects.inv`` URL the same way intersphinx fetches it."""
+    try:
+        import requests
+    except ImportError:
+        requests = None
+
+    for attempt in range(_intersphinx_attempts):
+        with suppress(Exception):
+            if requests is not None:
+                response = requests.get(url, timeout=intersphinx_timeout, stream=True)
+                response.close()
+                if response.ok:
+                    return True
+            else:
+                with urllib.request.urlopen(url, timeout=intersphinx_timeout):
+                    return True
+        if attempt < _intersphinx_attempts - 1:
+            time.sleep(2**attempt)
+    return False
+
+
+def _drop_unreachable_optional_inventories() -> None:
+    for name in _optional_intersphinx:
+        target = intersphinx_mapping.get(name)
+        if target is None:
+            continue
+        inventory_url = target[0].rstrip("/") + "/objects.inv"
+        if _inventory_is_reachable(inventory_url):
+            continue
+        print(
+            f"conf.py: intersphinx inventory {inventory_url} could not be "
+            f"reached; skipping external links for '{name}' in this build.",
+            file=sys.stderr,
+        )
+        del intersphinx_mapping[name]
+
+
+_drop_unreachable_optional_inventories()
 
 # Exclude patterns for documentation build
 exclude_patterns = ["_build"]  # Directories to exclude from build
