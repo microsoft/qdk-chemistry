@@ -921,7 +921,7 @@ class TestSOSSAResourceEstimation:
         unlookup that is not a valid circuit, so the number was never achievable. With the
         branches deleted the estimate is the executable circuit throughout, and the honest
         cost is higher: the PREPAREs alone went from 1,013 to 2,719 Toffolis per block
-        encoding. SELECT moved the other way -- see ``test_sossa_resource_baseline.py``.
+        encoding. SELECT moved the other way.
 
         Erasing the inner PREPARE's alias lookup by measurement rather than by running it
         backwards then took it from 37,873,827 to 31,837,599, a 15.9% cut over the whole
