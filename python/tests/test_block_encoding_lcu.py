@@ -13,8 +13,9 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import registry
+from qdk_chemistry.algorithms.circuit_mapper import PSPMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
-from qdk_chemistry.data import QubitOperator
+from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import BlockEncodingContainer, LCUContainer
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
@@ -159,6 +160,84 @@ class TestLCUBuilder:
         builder = LCUBuilder()
         with pytest.raises(ValueError, match="L1 norm is too small"):
             builder.run(hamiltonian)
+
+    def test_prepare_select_prepare_with_alias_sampling(self):
+        """Verify alias sampling supplies its entangled scratch register to PREPARE."""
+        hamiltonian = QubitOperator(
+            pauli_strings=["XX", "ZZ", "XZ"],
+            coefficients=np.array([0.25, 0.5, 0.1]),
+        )
+        unitary = LCUBuilder().run(hamiltonian)
+        mapper = registry.create(
+            "circuit_mapper",
+            "prepare_select_prepare",
+            prepare=AlgorithmRef("state_prep", "alias_sampling", bits_precision=4),
+        )
+
+        circuit = mapper.run(unitary)
+
+        assert circuit.num_qubits == 15
+        assert circuit._qsharp_factory.parameter["numSelectQubits"] == 2
+        assert circuit._qsharp_factory.parameter["numBlockAncillaQubits"] == 13
+
+
+def _noop_op(_qubits) -> None:
+    """Stand in for a Q# operation the mapper only has to find non-None."""
+
+
+class _StubPrepare:
+    """A PREPARE algorithm handing the mapper a circuit of the test's choosing."""
+
+    def __init__(self, circuit):
+        """Store the circuit to hand back."""
+        self._circuit = circuit
+
+    def name(self) -> str:
+        """Return the name the mapper quotes in its error messages."""
+        return "stub"
+
+    def run(self, _wavefunction) -> Circuit:
+        """Return the circuit under test, ignoring the requested wavefunction."""
+        return self._circuit
+
+
+class TestPSPMapperPrepareGuards:
+    """Tests for PSPMapper's checks on the PREPARE circuit it is handed."""
+
+    @staticmethod
+    def _unitary():
+        """Build a three-term LCU, whose PREPARE indexes two qubits."""
+        hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ", "XZ"], coefficients=np.array([0.25, 0.5, 0.1]))
+        return LCUBuilder().run(hamiltonian)
+
+    @pytest.mark.parametrize(
+        ("prepare_circuit", "match"),
+        [
+            (Circuit(qasm="OPENQASM 3.0;", num_qubits=2), "no Q# operation"),
+            (Circuit(qasm="OPENQASM 3.0;", qsharp_op=_noop_op), "does not declare num_qubits"),
+            (Circuit(qasm="OPENQASM 3.0;", qsharp_op=_noop_op, num_qubits=0), "at least one qubit"),
+            (Circuit(qasm="OPENQASM 3.0;", qsharp_op=_noop_op, num_qubits=1), "SELECT would control"),
+        ],
+    )
+    def test_rejects_a_prepare_circuit_it_cannot_embed(self, monkeypatch, prepare_circuit, match):
+        """Each guard fires on the circuit shape it exists to catch."""
+        monkeypatch.setattr(PSPMapper, "_create_nested", lambda _self, _key: _StubPrepare(prepare_circuit))
+        with pytest.raises(ValueError, match=match):
+            PSPMapper().run(self._unitary())
+
+    def test_rejects_a_prepare_that_wants_a_phase_gradient(self):
+        """QROM state prep declares shared ancilla this mapper never allocates.
+
+        Only when it is asked to share one: left to its default the callable allocates and
+        prepares its own gradient internally, declares none, and embeds fine.
+        """
+        mapper = registry.create(
+            "circuit_mapper",
+            "prepare_select_prepare",
+            prepare=AlgorithmRef("state_prep", "qrom", rotation_bit_precision=4, allocate_phase_gradient=False),
+        )
+        with pytest.raises(ValueError, match="phase gradient ancilla"):
+            mapper.run(self._unitary())
 
 
 class TestLCUContainer:

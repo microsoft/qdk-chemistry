@@ -5,14 +5,15 @@
 namespace QDKChemistry.Utils.UnaryIteration {
 
     import Std.Arrays.MostAndTail;
+    import Std.Arrays.Mapped;
     import Std.Canon.ApplyToEach;
     import Std.Canon.ApplyXorInPlace;
+    import Std.Convert.ResultAsBool;
     import Std.Core.Length;
     import Std.Diagnostics.Fact;
     import Std.Intrinsic.AND;
     import Std.Math.BitSizeI;
-    import Std.ResourceEstimation.BeginEstimateCaching;
-    import Std.ResourceEstimation.EndEstimateCaching;
+    import Std.Measurement.MResetEachZ;
 
 
     /// Unary iteration
@@ -95,33 +96,29 @@ namespace QDKChemistry.Utils.UnaryIteration {
         if numActions == 1 {
             action(actionOffset, ctl);
         } else {
-            if BeginEstimateCaching("QDKChemistry.Utils.UnaryIteration.SinglyControlledUnaryIterationWithControl", numActions) {
-                use helper = Qubit();
+            use helper = Qubit();
 
-                let (most, tail) = MostAndTail(address[...n - 1]);
+            let (most, tail) = MostAndTail(address[...n - 1]);
 
-                within {
-                    X(tail);
-                } apply {
-                    AND(ctl, tail, helper);
-                }
-
-                SinglyControlledUnaryIterationWithControl(helper, most, 2^(n - 1), actionOffset, action);
-
-                CNOT(ctl, helper);
-
-                SinglyControlledUnaryIterationWithControl(
-                    helper,
-                    most,
-                    numActions - 2^(n - 1),
-                    actionOffset + 2^(n - 1),
-                    action,
-                );
-
-                Adjoint AND(ctl, tail, helper);
-
-                EndEstimateCaching();
+            within {
+                X(tail);
+            } apply {
+                AND(ctl, tail, helper);
             }
+
+            SinglyControlledUnaryIterationWithControl(helper, most, 2^(n - 1), actionOffset, action);
+
+            CNOT(ctl, helper);
+
+            SinglyControlledUnaryIterationWithControl(
+                helper,
+                most,
+                numActions - 2^(n - 1),
+                actionOffset + 2^(n - 1),
+                action,
+            );
+
+            Adjoint AND(ctl, tail, helper);
         }
     }
 
@@ -132,18 +129,55 @@ namespace QDKChemistry.Utils.UnaryIteration {
         return BitSizeI(numActions - 1);
     }
 
-    /// Flips `flags[index]` for the single selected address.
-    internal function MakeTestUnaryIterationOneHotOp(numActions : Int, addressValue : Int) : (Qubit[] => Unit) {
-        return qs => {
-            let numAddressQubits = AddressQubits(numActions);
-            let address = qs[0..numAddressQubits - 1];
-            let flags = qs[numAddressQubits...];
-            ApplyXorInPlace(addressValue, address);
-            UnaryIteration(address, numActions, (index) => {
-                X(flags[index]);
-            });
-            ApplyXorInPlace(addressValue, address);
+    /// Returns the action selected by `UnaryIteration` for any fitted address state.
+    ///
+    /// Valid addresses map to themselves. When `numActions` is not a power of two,
+    /// the recursive iteration aliases each unused state onto a valid final subtree.
+    /// Classical unlookup tables use this function to reproduce that routing exactly.
+    internal function UnaryIterationActionIndex(numActions : Int, addressValue : Int) : Int {
+        Fact(numActions > 0, "numActions must be positive");
+        Fact(addressValue >= 0, "addressValue must be nonnegative");
+
+        if numActions == 1 {
+            return 0;
         }
+
+        let n = AddressQubits(numActions);
+        let addressState = addressValue % (1 <<< n);
+        let lowerSubtreeSize = 1 <<< (n - 1);
+        if addressState < lowerSubtreeSize {
+            return addressState;
+        }
+
+        return lowerSubtreeSize + UnaryIterationActionIndex(
+            numActions - lowerSubtreeSize,
+            addressState - lowerSubtreeSize
+        );
+    }
+
+    /// Checks the classical action-index mirror against the circuit on every address state.
+    internal operation TestUnaryIterationActionIndex(numActions : Int) : Bool {
+        let numAddressQubits = AddressQubits(numActions);
+        let numAddressStates = 1 <<< numAddressQubits;
+        use address = Qubit[numAddressQubits];
+        use flags = Qubit[numActions];
+        mutable allCorrect = true;
+
+        for addressValue in 0..numAddressStates - 1 {
+            ApplyXorInPlace(addressValue, address);
+            UnaryIteration(address, numActions, index => X(flags[index]));
+            ApplyXorInPlace(addressValue, address);
+
+            let actual = Mapped(ResultAsBool, MResetEachZ(flags));
+            let expectedIndex = UnaryIterationActionIndex(numActions, addressValue);
+            for index in 0..numActions - 1 {
+                if actual[index] != (index == expectedIndex) {
+                    set allCorrect = false;
+                }
+            }
+        }
+
+        allCorrect
     }
 
     /// Runs the one-hot iteration on a uniform superposition of every address.
