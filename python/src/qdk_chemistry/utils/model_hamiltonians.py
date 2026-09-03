@@ -5,6 +5,9 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from collections.abc import Iterable, Mapping
+from numbers import Integral
+
 import numpy as np
 
 from qdk_chemistry._core.utils.model_hamiltonians import (
@@ -17,7 +20,7 @@ from qdk_chemistry._core.utils.model_hamiltonians import (
     to_pair_param,
     to_site_param,
 )
-from qdk_chemistry.data import LatticeGraph, LayeredPartition, PauliOperator, QubitOperator
+from qdk_chemistry.data import LatticeGraph, LayeredPartition, QubitOperator
 from qdk_chemistry.utils import Logger
 
 __all__ = [
@@ -30,15 +33,6 @@ __all__ = [
     "ohno_potential",
     "pairwise_potential",
 ]
-
-
-def _pauli_expr_to_qubit_hamiltonian(expr, num_qubits: int) -> QubitOperator:
-    """Convert a simplified PauliOperator expression to a QubitOperator."""
-    simplified = expr.simplify()
-    terms = simplified.to_canonical_terms(num_qubits)
-    pauli_strings = [t[1][::-1] for t in terms]
-    coefficients = np.array([complex(t[0]) for t in terms])
-    return QubitOperator(pauli_strings, coefficients)
 
 
 def _build_geometry_grouped_hamiltonian(
@@ -143,9 +137,9 @@ def _build_geometry_grouped_hamiltonian(
 
 def create_heisenberg_hamiltonian(
     graph: LatticeGraph,
-    jx: np.ndarray | float,
-    jy: np.ndarray | float,
-    jz: np.ndarray | float,
+    jx: np.ndarray | float | Mapping[int, np.ndarray | float],
+    jy: np.ndarray | float | Mapping[int, np.ndarray | float],
+    jz: np.ndarray | float | Mapping[int, np.ndarray | float],
     hx: np.ndarray | float = 0.0,
     hy: np.ndarray | float = 0.0,
     hz: np.ndarray | float = 0.0,
@@ -156,30 +150,33 @@ def create_heisenberg_hamiltonian(
 
     .. math::
 
-        H = \sum_{\langle i,j \rangle} w_{ij}\,\bigl[
-                J_x^{ij}\,\sigma_i^x \sigma_j^x
-              + J_y^{ij}\,\sigma_i^y \sigma_j^y
-              + J_z^{ij}\,\sigma_i^z \sigma_j^z
-            \bigr]
+                H = \sum_{i<j} \bigl[
+                                K_x^{ij}\,\sigma_i^x \sigma_j^x
+                            + K_y^{ij}\,\sigma_i^y \sigma_j^y
+                            + K_z^{ij}\,\sigma_i^z \sigma_j^z
+                        \bigr]
           + \sum_i \bigl[
                 h_x^{i}\,\sigma_i^x
               + h_y^{i}\,\sigma_i^y
               + h_z^{i}\,\sigma_i^z
             \bigr]
 
-    where :math:`w_{ij}` is the edge weight from the lattice adjacency matrix.
+    For scalar and array couplings, :math:`K_a^{ij}=w_{ij}J_a^{ij}` on
+    adjacency edges. A mapping from one-based geometric shell indices to
+    couplings instead defines :math:`K_a^{ij}` on those shells independently
+    of adjacency weights.
 
     Each qubit corresponds to a lattice site.
 
     Args:
         graph: Lattice graph defining the connectivity.
-        jx: Coupling constant for XX interactions. Scalar (uniform) or ``(n, n)`` array for per-pair values.
+        jx: XX coupling as a scalar, ``(n, n)`` array, or ``{m: coupling}`` geometric-shell mapping.
         jy: Coupling constant for YY interactions (same format as *jx*).
         jz: Coupling constant for ZZ interactions (same format as *jx*).
         hx: External magnetic field in the x direction. Scalar or length-n array. Defaults to 0.
         hy: External magnetic field in the y direction. Defaults to 0.
         hz: External magnetic field in the z direction. Defaults to 0.
-        include_term_groups: When ``True`` (default), attach a geometry-coloring term partition to the result.
+        include_term_groups: Attach a term partition for adjacency-based couplings when ``True``. Defaults to ``True``.
 
     Returns:
         QubitOperator: The Heisenberg model as a qubit Hamiltonian; carries a ``LayeredPartition`` when grouped.
@@ -188,7 +185,8 @@ def create_heisenberg_hamiltonian(
     if not graph.is_symmetric:
         raise ValueError("Lattice graph must be symmetric for a valid Hamiltonian.")
 
-    if include_term_groups:
+    shell_couplings = any(isinstance(coupling, Mapping) for coupling in (jx, jy, jz))
+    if include_term_groups and not shell_couplings:
         if graph.edge_coloring is not None:
             return _build_geometry_grouped_hamiltonian(
                 graph,
@@ -196,47 +194,103 @@ def create_heisenberg_hamiltonian(
                 fields=[("X", hx), ("Y", hy), ("Z", hz)],
             )
         Logger.debug("No edge coloring on lattice graph; falling back to ungrouped Hamiltonian construction.")
+    elif include_term_groups:
+        Logger.debug("Geometric shell couplings use ungrouped Hamiltonian construction.")
 
     n = graph.num_sites
-    adj = graph.adjacency_matrix()
-
-    jx_mat = to_pair_param(jx, graph, "jx")
-    jy_mat = to_pair_param(jy, graph, "jy")
-    jz_mat = to_pair_param(jz, graph, "jz")
     hx_vec = to_site_param(hx, graph, "hx")
     hy_vec = to_site_param(hy, graph, "hy")
     hz_vec = to_site_param(hz, graph, "hz")
+    pauli_strings: list[str] = []
+    coefficients: list[complex] = []
 
-    h = 0.0 * PauliOperator.I(0)  # seed with zero expression
+    def pair_parameter(value: np.ndarray | float, name: str) -> np.ndarray | float:
+        if isinstance(value, int | float | np.integer | np.floating):
+            return float(value)
+        return to_pair_param(value, graph, name)
 
-    # Two-body interaction terms (each edge counted once: i < j), scaled by the lattice edge weight.
-    for i in range(n):
-        for j in range(i + 1, n):
-            edge_weight = adj[i, j]
-            if edge_weight == 0.0:
+    def append_pair_terms(
+        pauli_char: str,
+        pairs: Iterable[tuple[int, int]],
+        values: np.ndarray | float,
+        weights: np.ndarray | None = None,
+    ) -> None:
+        for i, j in pairs:
+            coefficient = values if isinstance(values, float) else values[i, j]
+            if weights is not None:
+                coefficient *= weights[i, j]
+            if coefficient == 0.0:
                 continue
-            if jx_mat[i, j] != 0.0:
-                h = h + jx_mat[i, j] * edge_weight * PauliOperator.X(i) * PauliOperator.X(j)
-            if jy_mat[i, j] != 0.0:
-                h = h + jy_mat[i, j] * edge_weight * PauliOperator.Y(i) * PauliOperator.Y(j)
-            if jz_mat[i, j] != 0.0:
-                h = h + jz_mat[i, j] * edge_weight * PauliOperator.Z(i) * PauliOperator.Z(j)
+            pauli = ["I"] * n
+            pauli[i] = pauli[j] = pauli_char
+            pauli_strings.append("".join(pauli[::-1]))
+            coefficients.append(complex(coefficient))
 
-    # Single-body field terms
+    coupling_specs = [("X", "jx", jx), ("Y", "jy", jy), ("Z", "jz", jz)]
+    if not shell_couplings:
+        adjacency = graph.adjacency_matrix()
+        coupling_matrices = [to_pair_param(coupling, graph, name) for _, name, coupling in coupling_specs]
+        for i in range(n):
+            for j in range(i + 1, n):
+                edge_weight = adjacency[i, j]
+                if edge_weight == 0.0:
+                    continue
+                for (pauli_char, _, _), coupling_matrix in zip(coupling_specs, coupling_matrices, strict=True):
+                    coefficient = coupling_matrix[i, j] * edge_weight
+                    if coefficient == 0.0:
+                        continue
+                    pauli = ["I"] * n
+                    pauli[i] = pauli[j] = pauli_char
+                    pauli_strings.append("".join(pauli[::-1]))
+                    coefficients.append(complex(coefficient))
+    else:
+        normalized_shell_couplings: dict[str, list[tuple[int, np.ndarray | float]]] = {}
+        requested_shells: set[int] = set()
+        for _, name, coupling in coupling_specs:
+            if not isinstance(coupling, Mapping):
+                continue
+
+            normalized_mapping: list[tuple[int, np.ndarray | float]] = []
+            for shell, shell_coupling in coupling.items():
+                if isinstance(shell, bool) or not isinstance(shell, Integral) or shell < 1:
+                    raise ValueError(f"{name} shell indices must be positive integers; got {shell!r}.")
+                shell_index = int(shell)
+                normalized_mapping.append((shell_index, shell_coupling))
+                requested_shells.add(shell_index)
+            normalized_mapping.sort(key=lambda item: item[0])
+            normalized_shell_couplings[name] = normalized_mapping
+
+        shell_pairs = graph.nearest_neighbor_shells(sorted(requested_shells)) if requested_shells else {}
+        adjacency = graph.adjacency_matrix() if len(normalized_shell_couplings) != len(coupling_specs) else None
+
+        for pauli_char, name, coupling in coupling_specs:
+            if name in normalized_shell_couplings:
+                for shell_index, shell_coupling in normalized_shell_couplings[name]:
+                    values = pair_parameter(shell_coupling, f"{name}[{shell_index}]")
+                    append_pair_terms(pauli_char, shell_pairs[shell_index], values)
+            else:
+                assert adjacency is not None
+                pairs = ((i, j) for i in range(n) for j in range(i + 1, n) if adjacency[i, j] != 0.0)
+                append_pair_terms(pauli_char, pairs, pair_parameter(coupling, name), adjacency)
+
     for i in range(n):
-        if hx_vec[i] != 0.0:
-            h = h + hx_vec[i] * PauliOperator.X(i)
-        if hy_vec[i] != 0.0:
-            h = h + hy_vec[i] * PauliOperator.Y(i)
-        if hz_vec[i] != 0.0:
-            h = h + hz_vec[i] * PauliOperator.Z(i)
+        for pauli_char, field in [("X", hx_vec), ("Y", hy_vec), ("Z", hz_vec)]:
+            if field[i] == 0.0:
+                continue
+            pauli = ["I"] * n
+            pauli[i] = pauli_char
+            pauli_strings.append("".join(pauli[::-1]))
+            coefficients.append(complex(field[i]))
 
-    return _pauli_expr_to_qubit_hamiltonian(h, n)
+    if not pauli_strings:
+        pauli_strings = ["I" * n]
+        coefficients = [0.0 + 0.0j]
+    return QubitOperator(pauli_strings, np.array(coefficients))
 
 
 def create_ising_hamiltonian(
     graph: LatticeGraph,
-    j: np.ndarray | float,
+    j: np.ndarray | float | Mapping[int, np.ndarray | float],
     h: np.ndarray | float = 0.0,
     *,
     include_term_groups: bool = True,
@@ -248,11 +302,13 @@ def create_ising_hamiltonian(
         H = \sum_{\langle i,j \rangle} w_{ij}\,J^{ij}\,\sigma_i^z \sigma_j^z
           + \sum_i h^{i}\,\sigma_i^x
 
-    where :math:`w_{ij}` is the edge weight from the lattice adjacency matrix.
+    Scalar and array couplings use adjacency edges and their weights. A mapping
+    ``{m: coupling}`` instead applies couplings to geometric neighbor shells
+    independently of adjacency weights.
 
     Args:
         graph: Lattice graph defining the connectivity.
-        j: Coupling constant for ZZ interactions. Scalar or ``(n, n)`` array.
+        j: ZZ coupling as a scalar, ``(n, n)`` array, or ``{m: coupling}`` geometric-shell mapping.
         h: Transverse field strength (x direction). Scalar or length-n array.  Defaults to 0.
         include_term_groups: When ``True`` (default), attach a geometry-coloring term partition to the result.
 

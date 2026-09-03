@@ -211,6 +211,41 @@ class LatticeGraph : public DataClass {
   std::uint64_t num_edges() const;
 
   /**
+   * @brief Return all pairs in the m-th geometric neighbor shell.
+   *
+   * The shells are the distinct positive minimum-image distances between
+   * lattice positions, ordered from shortest to longest. Returned pairs are
+   * canonical (i < j).
+   *
+   * @param m One-based shell index.
+   * @param tolerance Relative tolerance used to group equal distances.
+   * @return Canonical site pairs in the requested shell, or an empty vector if
+   *         the finite lattice has fewer than m shells.
+   * @throws std::invalid_argument If m is zero or tolerance is not positive.
+   * @throws std::runtime_error If this graph has no lattice geometry.
+   */
+  std::vector<std::pair<std::uint64_t, std::uint64_t>> mth_nearest_neighbors(
+      std::uint64_t m, double tolerance = 1.0e-9) const;
+
+  /**
+   * @brief Return the pairs in multiple geometric neighbor shells.
+   *
+   * Pair distances are classified once for all requested shell indices.
+   * Returned pairs are canonical (i < j), and unavailable shells map to empty
+   * vectors.
+   *
+   * @param shells One-based shell indices.
+   * @param tolerance Relative tolerance used to group equal distances.
+   * @return Requested shell indices mapped to their canonical site pairs.
+   * @throws std::invalid_argument If any index is zero or tolerance is not
+   * positive.
+   * @throws std::runtime_error If this graph has no lattice geometry.
+   */
+  std::map<std::uint64_t, std::vector<std::pair<std::uint64_t, std::uint64_t>>>
+  nearest_neighbor_shells(const std::vector<std::uint64_t>& shells,
+                          double tolerance = 1.0e-9) const;
+
+  /**
    * @brief Create a one-dimensional chain lattice.
    *
    * Sites are labelled 0 ... n-1 with nearest-neighbour edges.
@@ -229,6 +264,7 @@ class LatticeGraph : public DataClass {
    * @param periodic If true, add an edge between the first and last site
    *                 (ring topology). Requires n > 2. Default: false.
    * @param t        Uniform hopping weight for every edge. Default: 1.0.
+   * @param dfs_ordering If true, reorder sites along a Hamiltonian path.
    * @throws std::invalid_argument If n == 0.
    */
   static LatticeGraph chain(std::uint64_t n, bool periodic = false,
@@ -262,6 +298,7 @@ class LatticeGraph : public DataClass {
    * @param periodic_y If true, apply periodic boundary conditions along y.
    * Requires ny >= 2. Default: false.
    * @param t          Uniform hopping weight. Default: 1.0.
+   * @param dfs_ordering If true, reorder sites along a Hamiltonian path.
    * @throws std::invalid_argument If nx or ny is 0.
    */
   static LatticeGraph square(std::uint64_t nx, std::uint64_t ny,
@@ -300,6 +337,7 @@ class LatticeGraph : public DataClass {
    * Requires ny >= 2. Default: false.
    * @param t          Uniform hopping weight. Default: 1.0.
    * @param coloring_seed PRNG seed for greedy edge coloring. Default: 0.
+   * @param dfs_ordering If true, reorder sites along a Hamiltonian path.
    * @throws std::invalid_argument If nx or ny is 0.
    */
   static LatticeGraph triangular(std::uint64_t nx, std::uint64_t ny,
@@ -341,6 +379,7 @@ class LatticeGraph : public DataClass {
    * @param periodic_y If true, apply periodic boundary conditions along y.
    * Requires ny >= 2. Default: false.
    * @param t          Uniform hopping weight. Default: 1.0.
+   * @param dfs_ordering Reserved for API consistency; currently ignored.
    * @throws std::invalid_argument If nx or ny is 0.
    */
   static LatticeGraph honeycomb(std::uint64_t nx, std::uint64_t ny,
@@ -392,6 +431,7 @@ class LatticeGraph : public DataClass {
    * Requires ny >= 2. Default: false.
    * @param t          Uniform hopping weight. Default: 1.0.
    * @param coloring_seed PRNG seed for greedy edge coloring. Default: 0.
+   * @param dfs_ordering Reserved for API consistency; currently ignored.
    * @throws std::invalid_argument If nx or ny is 0.
    */
   static LatticeGraph kagome(std::uint64_t nx, std::uint64_t ny,
@@ -506,9 +546,17 @@ class LatticeGraph : public DataClass {
    *
    * @param adjacency Sparse square adjacency matrix (moved in).
    * @param coloring  Optional edge coloring (moved in).
+   * @param positions Optional Cartesian site positions (moved in).
+   * @param periods Optional periodic supercell vectors (moved in).
    */
   explicit LatticeGraph(Eigen::SparseMatrix<double> adjacency,
-                        std::optional<EdgeColoring> coloring = std::nullopt);
+                        std::optional<EdgeColoring> coloring = std::nullopt,
+                        std::optional<Eigen::MatrixXd> positions = std::nullopt,
+                        std::optional<Eigen::MatrixXd> periods = std::nullopt);
+
+  static void _validate_geometry(
+      std::uint64_t num_sites, const std::optional<Eigen::MatrixXd>& positions,
+      const std::optional<Eigen::MatrixXd>& periods);
 
   /** @brief Check if a sparse matrix is symmetric within a numerical tolerance.
    */
@@ -524,6 +572,10 @@ class LatticeGraph : public DataClass {
   bool _is_symmetric;
   /// Edge coloring, populated at construction for recognised topologies.
   std::optional<EdgeColoring> _edge_coloring;
+  /// Cartesian site positions used to identify geometric neighbor shells.
+  std::optional<Eigen::MatrixXd> _positions;
+  /// Periodic supercell vectors, with one vector per row.
+  std::optional<Eigen::MatrixXd> _periods;
 };
 
 static_assert(DataClassCompliant<LatticeGraph>,

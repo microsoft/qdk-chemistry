@@ -4,7 +4,9 @@
 
 #include <Eigen/Sparse>
 #include <algorithm>
+#include <array>
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <fstream>
 #include <limits>
@@ -16,7 +18,11 @@
 #include <set>
 #include <sstream>
 #include <stdexcept>
+#include <tuple>
 #include <vector>
+
+#include "hdf5_serialization.hpp"
+#include "json_serialization.hpp"
 
 namespace qdk::chemistry::data {
 
@@ -27,6 +33,39 @@ using Triplet = Eigen::Triplet<double>;
 static void add_edge(std::vector<Triplet>& triplets, int i, int j, double t) {
   triplets.emplace_back(i, j, t);
   triplets.emplace_back(j, i, t);
+}
+
+template <std::size_t NumBasisSites>
+Eigen::MatrixXd lattice_positions(
+    int nx, int ny, const Eigen::RowVector2d& a1, const Eigen::RowVector2d& a2,
+    const std::array<Eigen::RowVector2d, NumBasisSites>& basis) {
+  Eigen::MatrixXd positions(nx * ny * NumBasisSites, 2);
+  for (int y = 0; y < ny; ++y) {
+    for (int x = 0; x < nx; ++x) {
+      for (std::size_t s = 0; s < NumBasisSites; ++s) {
+        auto i = NumBasisSites * (y * nx + x) + s;
+        positions.row(static_cast<Eigen::Index>(i)) =
+            x * a1 + y * a2 + basis[s];
+      }
+    }
+  }
+  return positions;
+}
+
+std::optional<Eigen::MatrixXd> lattice_periods(
+    const Eigen::RowVector2d& period_1 = Eigen::RowVector2d::Zero(),
+    const Eigen::RowVector2d& period_2 = Eigen::RowVector2d::Zero()) {
+  const auto nonzero = [](const Eigen::RowVector2d& vector) {
+    return vector.cwiseAbs().maxCoeff() != 0.0;
+  };
+  const Eigen::Index count = nonzero(period_1) + nonzero(period_2);
+  if (count == 0) return std::nullopt;
+
+  Eigen::MatrixXd periods(count, 2);
+  Eigen::Index row = 0;
+  if (nonzero(period_1)) periods.row(row++) = period_1;
+  if (nonzero(period_2)) periods.row(row) = period_2;
+  return periods;
 }
 
 /**
@@ -128,11 +167,16 @@ LatticeGraph::LatticeGraph(
 }
 
 LatticeGraph::LatticeGraph(Eigen::SparseMatrix<double> adjacency,
-                           std::optional<EdgeColoring> coloring)
+                           std::optional<EdgeColoring> coloring,
+                           std::optional<Eigen::MatrixXd> positions,
+                           std::optional<Eigen::MatrixXd> periods)
     : _num_sites(static_cast<std::uint64_t>(adjacency.rows())),
       adjacency_(std::move(adjacency)),
       _is_symmetric(_check_symmetry(adjacency_)),
-      _edge_coloring(std::move(coloring)) {
+      _edge_coloring(std::move(coloring)),
+      _positions(std::move(positions)),
+      _periods(std::move(periods)) {
+  _validate_geometry(_num_sites, _positions, _periods);
 #ifndef NDEBUG
   if (_edge_coloring.has_value()) {
     // Verify every edge in the coloring exists in the adjacency matrix.
@@ -185,7 +229,8 @@ LatticeGraph LatticeGraph::make_bidirectional(const LatticeGraph& graph) {
       (graph.adjacency_ +
        Eigen::SparseMatrix<double>(graph.adjacency_.transpose()));
   sym.makeCompressed();
-  return LatticeGraph(std::move(sym));
+  return LatticeGraph(std::move(sym), std::nullopt, graph._positions,
+                      graph._periods);
 }
 
 std::uint64_t LatticeGraph::num_sites() const { return _num_sites; }
@@ -225,6 +270,249 @@ std::uint64_t LatticeGraph::num_edges() const {
   return count;
 }
 
+void LatticeGraph::_validate_geometry(
+    std::uint64_t num_sites, const std::optional<Eigen::MatrixXd>& positions,
+    const std::optional<Eigen::MatrixXd>& periods) {
+  if (!positions.has_value()) {
+    if (periods.has_value()) {
+      throw std::invalid_argument(
+          "Periodic vectors require Cartesian site positions.");
+    }
+    return;
+  }
+
+  auto n = static_cast<Eigen::Index>(num_sites);
+  if (positions->rows() != n || positions->cols() != 2 ||
+      !positions->allFinite()) {
+    throw std::invalid_argument(
+        "Lattice positions must be a finite (num_sites, 2) matrix.");
+  }
+
+  if (!periods.has_value()) return;
+  if ((periods->rows() != 1 && periods->rows() != 2) || periods->cols() != 2 ||
+      !periods->allFinite()) {
+    throw std::invalid_argument(
+        "Periodic vectors must be a finite (1, 2) or (2, 2) matrix.");
+  }
+  for (Eigen::Index i = 0; i < periods->rows(); ++i) {
+    if (periods->row(i).cwiseAbs().maxCoeff() == 0.0) {
+      throw std::invalid_argument("Periodic vectors must be nonzero.");
+    }
+    if (!std::isfinite(std::hypot((*periods)(i, 0), (*periods)(i, 1)))) {
+      throw std::invalid_argument("Periodic vector lengths must be finite.");
+    }
+  }
+  if (periods->rows() == 2) {
+    const double period_0_length =
+        std::hypot((*periods)(0, 0), (*periods)(0, 1));
+    const double period_1_length =
+        std::hypot((*periods)(1, 0), (*periods)(1, 1));
+    const double min_period_length = std::min(period_0_length, period_1_length);
+    const double max_period_length = std::max(period_0_length, period_1_length);
+    const double position_span =
+        std::max(positions->col(0).maxCoeff() - positions->col(0).minCoeff(),
+                 positions->col(1).maxCoeff() - positions->col(1).minCoeff());
+    const double geometry_scale = std::max(max_period_length, position_span);
+    if (min_period_length <
+        16.0 * std::numeric_limits<double>::epsilon() * geometry_scale) {
+      throw std::invalid_argument(
+          "Lattice geometry exceeds the supported numerical condition range.");
+    }
+
+    const double p0_scale = periods->row(0).cwiseAbs().maxCoeff();
+    const double p1_scale = periods->row(1).cwiseAbs().maxCoeff();
+    const Eigen::Vector2d p0 = periods->row(0).transpose() / p0_scale;
+    const Eigen::Vector2d p1 = periods->row(1).transpose() / p1_scale;
+    const Eigen::Vector2d u0 = p0 / p0.norm();
+    const Eigen::Vector2d u1 = p1 / p1.norm();
+    const double sine = std::abs(u0.x() * u1.y() - u0.y() * u1.x());
+    if (sine <= 16.0 * std::numeric_limits<double>::epsilon()) {
+      throw std::invalid_argument(
+          "Two periodic vectors must be linearly independent.");
+    }
+  }
+}
+
+std::vector<std::pair<std::uint64_t, std::uint64_t>>
+LatticeGraph::mth_nearest_neighbors(std::uint64_t m, double tolerance) const {
+  return nearest_neighbor_shells({m}, tolerance).at(m);
+}
+
+std::map<std::uint64_t, std::vector<std::pair<std::uint64_t, std::uint64_t>>>
+LatticeGraph::nearest_neighbor_shells(const std::vector<std::uint64_t>& shells,
+                                      double tolerance) const {
+  if (!std::isfinite(tolerance) || tolerance <= 0.0) {
+    throw std::invalid_argument("Neighbor shell tolerance must be positive.");
+  }
+  std::map<std::uint64_t, std::vector<std::pair<std::uint64_t, std::uint64_t>>>
+      results;
+  for (std::uint64_t shell : shells) {
+    if (shell == 0) {
+      throw std::invalid_argument("Neighbor shell index m must be > 0.");
+    }
+    results.try_emplace(shell);
+  }
+  if (!_positions.has_value()) {
+    throw std::runtime_error(
+        "Geometric neighbor shells require lattice positions.");
+  }
+  if (results.empty() || _num_sites < 2) return results;
+
+  struct Vector2 {
+    long double x;
+    long double y;
+  };
+  const auto dot = [](const Vector2& lhs, const Vector2& rhs) {
+    return lhs.x * rhs.x + lhs.y * rhs.y;
+  };
+  const Eigen::Index num_periods = _periods.has_value() ? _periods->rows() : 0;
+  Vector2 period_0{0.0L, 0.0L};
+  Vector2 period_1{0.0L, 0.0L};
+  if (num_periods == 1) {
+    period_0 = {static_cast<long double>((*_periods)(0, 0)),
+                static_cast<long double>((*_periods)(0, 1))};
+  } else if (num_periods == 2) {
+    period_0 = {static_cast<long double>((*_periods)(0, 0)),
+                static_cast<long double>((*_periods)(0, 1))};
+    period_1 = {static_cast<long double>((*_periods)(1, 0)),
+                static_cast<long double>((*_periods)(1, 1))};
+
+    // Gauss reduction preserves the period lattice while making the fixed
+    // 3x3 closest-image search independent of supercell aspect ratio.
+    while (true) {
+      const long double length_0 = std::hypot(period_0.x, period_0.y);
+      const long double length_1 = std::hypot(period_1.x, period_1.y);
+      if (length_1 < length_0) {
+        std::swap(period_0, period_1);
+        continue;
+      }
+      const Vector2 unit_0{period_0.x / length_0, period_0.y / length_0};
+      const Vector2 normal_0{-unit_0.y, unit_0.x};
+      const long double parallel = dot(period_1, unit_0);
+      if (2.0L * std::abs(parallel) <=
+          length_0 *
+              (1.0L + 16.0L * std::numeric_limits<long double>::epsilon())) {
+        break;
+      }
+      const long double perpendicular = dot(period_1, normal_0);
+      const long double reduced_parallel = std::remainder(parallel, length_0);
+      const Vector2 reduced{
+          reduced_parallel * unit_0.x + perpendicular * normal_0.x,
+          reduced_parallel * unit_0.y + perpendicular * normal_0.y};
+      if (reduced.x == period_1.x && reduced.y == period_1.y) {
+        throw std::runtime_error(
+            "Lattice period reduction made no numerical progress.");
+      }
+      period_1 = reduced;
+    }
+  }
+
+  const auto reduce_along = [&dot](const Vector2& vector,
+                                   const Vector2& period) {
+    const long double length = std::hypot(period.x, period.y);
+    const Vector2 unit{period.x / length, period.y / length};
+    const Vector2 normal{-unit.y, unit.x};
+    const long double parallel = dot(vector, unit);
+    const long double perpendicular = dot(vector, normal);
+    const long double reduced_parallel = std::remainder(parallel, length);
+    return Vector2{reduced_parallel * unit.x + perpendicular * normal.x,
+                   reduced_parallel * unit.y + perpendicular * normal.y};
+  };
+
+  auto minimum_image_distance = [&](const Vector2& displacement) {
+    if (num_periods == 0) {
+      return std::hypot(displacement.x, displacement.y);
+    }
+    if (num_periods == 1) {
+      const long double period_length = std::hypot(period_0.x, period_0.y);
+      const long double unit_x = period_0.x / period_length;
+      const long double unit_y = period_0.y / period_length;
+      const long double parallel =
+          displacement.x * unit_x + displacement.y * unit_y;
+      const long double perpendicular =
+          -displacement.x * unit_y + displacement.y * unit_x;
+      return std::hypot(std::remainder(parallel, period_length), perpendicular);
+    }
+
+    const Vector2 diagonal =
+        dot(period_0, period_1) > 0.0L
+            ? Vector2{period_1.x - period_0.x, period_1.y - period_0.y}
+            : Vector2{period_1.x + period_0.x, period_1.y + period_0.y};
+    const std::array<Vector2, 3> relevant_vectors = {period_0, period_1,
+                                                     diagonal};
+    Vector2 image = displacement;
+    for (int iteration = 0; iteration < 64; ++iteration) {
+      bool reduced = false;
+      for (const auto& period : relevant_vectors) {
+        const Vector2 candidate = reduce_along(image, period);
+        const long double current_distance = std::hypot(image.x, image.y);
+        const long double candidate_distance =
+            std::hypot(candidate.x, candidate.y);
+        if (candidate_distance <
+            current_distance *
+                (1.0L - 64.0L * std::numeric_limits<long double>::epsilon())) {
+          image = candidate;
+          reduced = true;
+        }
+      }
+      if (!reduced) return std::hypot(image.x, image.y);
+    }
+    throw std::runtime_error("Minimum-image reduction did not converge.");
+  };
+
+  struct PairDistance {
+    long double distance;
+    std::uint64_t i;
+    std::uint64_t j;
+  };
+  std::vector<PairDistance> pairs;
+  pairs.reserve(static_cast<std::size_t>(_num_sites * (_num_sites - 1) / 2));
+  for (std::uint64_t i = 0; i < _num_sites; ++i) {
+    for (std::uint64_t j = i + 1; j < _num_sites; ++j) {
+      const Vector2 displacement{static_cast<long double>((*_positions)(
+                                     static_cast<Eigen::Index>(j), 0)) -
+                                     static_cast<long double>((*_positions)(
+                                         static_cast<Eigen::Index>(i), 0)),
+                                 static_cast<long double>((*_positions)(
+                                     static_cast<Eigen::Index>(j), 1)) -
+                                     static_cast<long double>((*_positions)(
+                                         static_cast<Eigen::Index>(i), 1))};
+      const long double distance = minimum_image_distance(displacement);
+      if (distance == 0.0L) {
+        continue;
+      }
+      pairs.push_back({distance, i, j});
+    }
+  }
+  std::sort(pairs.begin(), pairs.end(),
+            [](const PairDistance& lhs, const PairDistance& rhs) {
+              if (lhs.distance != rhs.distance) {
+                return lhs.distance < rhs.distance;
+              }
+              return std::tie(lhs.i, lhs.j) < std::tie(rhs.i, rhs.j);
+            });
+
+  const std::uint64_t max_requested_shell = results.rbegin()->first;
+  std::uint64_t shell = 0;
+  long double shell_distance = 0.0L;
+  for (const auto& pair : pairs) {
+    bool same_shell =
+        shell != 0 && std::abs(pair.distance - shell_distance) <=
+                          tolerance * std::max(std::abs(pair.distance),
+                                               std::abs(shell_distance));
+    if (!same_shell) {
+      ++shell;
+      shell_distance = pair.distance;
+      if (shell > max_requested_shell) break;
+    }
+    auto result = results.find(shell);
+    if (result != results.end()) {
+      result->second.emplace_back(pair.i, pair.j);
+    }
+  }
+  return results;
+}
+
 LatticeGraph LatticeGraph::chain(std::uint64_t n, bool periodic, double t,
                                  bool dfs_ordering) {
   if (n == 0) {
@@ -248,8 +536,13 @@ LatticeGraph LatticeGraph::chain(std::uint64_t n, bool periodic, double t,
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
-  LatticeGraph g(std::move(adj),
-                 chain_coloring(static_cast<std::int64_t>(N), periodic));
+  const Eigen::RowVector2d a1(1.0, 0.0);
+  const Eigen::RowVector2d a2 = Eigen::RowVector2d::Zero();
+  const std::array<Eigen::RowVector2d, 1> basis = {Eigen::RowVector2d::Zero()};
+  auto positions = detail::lattice_positions(N, 1, a1, a2, basis);
+  LatticeGraph g(
+      std::move(adj), chain_coloring(static_cast<std::int64_t>(N), periodic),
+      std::move(positions), detail::lattice_periods((periodic ? N : 0) * a1));
   if (dfs_ordering) {
     auto path = detail::find_hamiltonian_path(g.sparse_adjacency_matrix());
     if (!path.empty()) {
@@ -307,8 +600,15 @@ LatticeGraph LatticeGraph::square(std::uint64_t nx, std::uint64_t ny,
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
+  const Eigen::RowVector2d a1(1.0, 0.0);
+  const Eigen::RowVector2d a2(0.0, 1.0);
+  const std::array<Eigen::RowVector2d, 1> basis = {Eigen::RowVector2d::Zero()};
+  auto positions = detail::lattice_positions(Nx, Ny, a1, a2, basis);
   LatticeGraph g(std::move(adj),
-                 square_coloring(Nx, Ny, periodic_x, periodic_y));
+                 square_coloring(Nx, Ny, periodic_x, periodic_y),
+                 std::move(positions),
+                 detail::lattice_periods((periodic_x ? Nx : 0) * a1,
+                                         (periodic_y ? Ny : 0) * a2));
   if (dfs_ordering) {
     auto path = detail::find_hamiltonian_path(g.sparse_adjacency_matrix());
     if (!path.empty()) {
@@ -377,9 +677,19 @@ LatticeGraph LatticeGraph::triangular(std::uint64_t nx, std::uint64_t ny,
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
+  // Guo and Franz, Phys. Rev. B 80, 113102 (2009), define the unit
+  // directions u1=(1,0), u2=(1/2,sqrt(3)/2). The equivalent primitive basis
+  // a1=u1, a2=u2-u1 matches the upper-right bonds used by this factory.
+  const Eigen::RowVector2d a1(1.0, 0.0);
+  const Eigen::RowVector2d a2(-0.5, std::sqrt(3.0) / 2.0);
+  const std::array<Eigen::RowVector2d, 1> basis = {Eigen::RowVector2d::Zero()};
+  auto positions = detail::lattice_positions(Nx, Ny, a1, a2, basis);
   // No known deterministic coloring for triangular lattices with arbitrary
   // periodic boundaries; use greedy with multiple trials instead.
-  LatticeGraph g(std::move(adj), greedy_edge_coloring(adj, coloring_seed, 32));
+  auto coloring = greedy_edge_coloring(adj, coloring_seed, 32);
+  LatticeGraph g(std::move(adj), std::move(coloring), std::move(positions),
+                 detail::lattice_periods((periodic_x ? Nx : 0) * a1,
+                                         (periodic_y ? Ny : 0) * a2));
   if (dfs_ordering) {
     auto path = detail::find_hamiltonian_path(g.sparse_adjacency_matrix());
     if (!path.empty()) {
@@ -442,8 +752,18 @@ LatticeGraph LatticeGraph::honeycomb(std::uint64_t nx, std::uint64_t ny,
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
+  // Castro Neto et al., Rev. Mod. Phys. 81, 109 (2009), Eq. (1), in units
+  // of the nearest-neighbor distance.
+  const Eigen::RowVector2d a1(1.5, std::sqrt(3.0) / 2.0);
+  const Eigen::RowVector2d a2(1.5, -std::sqrt(3.0) / 2.0);
+  const std::array<Eigen::RowVector2d, 2> basis = {
+      Eigen::RowVector2d::Zero(), Eigen::RowVector2d(1.0, 0.0)};
+  auto positions = detail::lattice_positions(Nx, Ny, a1, a2, basis);
   return LatticeGraph(std::move(adj),
-                      honeycomb_coloring(Nx, Ny, periodic_x, periodic_y));
+                      honeycomb_coloring(Nx, Ny, periodic_x, periodic_y),
+                      std::move(positions),
+                      detail::lattice_periods((periodic_x ? Nx : 0) * a1,
+                                              (periodic_y ? Ny : 0) * a2));
 }
 
 LatticeGraph LatticeGraph::kagome(std::uint64_t nx, std::uint64_t ny,
@@ -517,8 +837,18 @@ LatticeGraph LatticeGraph::kagome(std::uint64_t nx, std::uint64_t ny,
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
-  return LatticeGraph(std::move(adj),
-                      greedy_edge_coloring(adj, coloring_seed, 32));
+  // Guo and Franz, Phys. Rev. B 80, 113102 (2009), Fig. 1 and the text
+  // following Eq. (2): the Bravais periods are twice their unit directions.
+  const Eigen::RowVector2d a1(2.0, 0.0);
+  const Eigen::RowVector2d a2(1.0, std::sqrt(3.0));
+  const std::array<Eigen::RowVector2d, 3> basis = {
+      Eigen::RowVector2d(0.0, 0.0), Eigen::RowVector2d(1.0, 0.0),
+      Eigen::RowVector2d(0.5, std::sqrt(3.0) / 2.0)};
+  auto positions = detail::lattice_positions(Nx, Ny, a1, a2, basis);
+  auto coloring = greedy_edge_coloring(adj, coloring_seed, 32);
+  return LatticeGraph(std::move(adj), std::move(coloring), std::move(positions),
+                      detail::lattice_periods((periodic_x ? Nx : 0) * a1,
+                                              (periodic_y ? Ny : 0) * a2));
 }
 
 namespace detail {
@@ -782,6 +1112,13 @@ nlohmann::json LatticeGraph::to_json() const {
     j["edge_coloring"] = coloring_json;
   }
 
+  if (_positions.has_value()) {
+    j["positions"] = matrix_to_json(*_positions);
+  }
+  if (_periods.has_value()) {
+    j["periods"] = matrix_to_json(*_periods);
+  }
+
   return j;
 }
 
@@ -852,6 +1189,13 @@ void LatticeGraph::to_hdf5(H5::Group& group) const {
       H5::DataSet cds = group.createDataSet(
           "edge_coloring", H5::PredType::NATIVE_DOUBLE, cspace);
       cds.write(cbuf.data(), H5::PredType::NATIVE_DOUBLE);
+    }
+
+    if (_positions.has_value()) {
+      save_matrix_to_group(group, "positions", *_positions);
+    }
+    if (_periods.has_value()) {
+      save_matrix_to_group(group, "periods", *_periods);
     }
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error in LatticeGraph::to_hdf5: " +
@@ -945,7 +1289,17 @@ LatticeGraph LatticeGraph::from_json(const nlohmann::json& j) {
     coloring = std::move(c);
   }
 
-  return LatticeGraph(std::move(sparse), std::move(coloring));
+  std::optional<Eigen::MatrixXd> positions;
+  if (j.contains("positions")) {
+    positions = json_to_matrix(j["positions"]);
+  }
+  std::optional<Eigen::MatrixXd> periods;
+  if (j.contains("periods")) {
+    periods = json_to_matrix(j["periods"]);
+  }
+
+  return LatticeGraph(std::move(sparse), std::move(coloring),
+                      std::move(positions), std::move(periods));
 }
 
 LatticeGraph LatticeGraph::from_hdf5_file(const std::string& filename) {
@@ -1034,7 +1388,17 @@ LatticeGraph LatticeGraph::from_hdf5(H5::Group& group) {
     coloring = std::move(c);
   }
 
-  return LatticeGraph(std::move(sparse), std::move(coloring));
+  std::optional<Eigen::MatrixXd> positions;
+  if (group.nameExists("positions")) {
+    positions = load_matrix_from_group(group, "positions");
+  }
+  std::optional<Eigen::MatrixXd> periods;
+  if (group.nameExists("periods")) {
+    periods = load_matrix_from_group(group, "periods");
+  }
+
+  return LatticeGraph(std::move(sparse), std::move(coloring),
+                      std::move(positions), std::move(periods));
 }
 
 void LatticeGraph::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
@@ -1042,6 +1406,14 @@ void LatticeGraph::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
   hash_value(ctx, static_cast<uint64_t>(_num_sites));
   hash_value(ctx, adjacency_);
   hash_value(ctx, _is_symmetric);
+  hash_value(ctx, _positions.has_value());
+  if (_positions.has_value()) {
+    hash_value(ctx, *_positions);
+  }
+  hash_value(ctx, _periods.has_value());
+  if (_periods.has_value()) {
+    hash_value(ctx, *_periods);
+  }
 }
 
 LatticeGraph LatticeGraph::permute(const LatticeGraph& graph,
@@ -1075,7 +1447,17 @@ LatticeGraph LatticeGraph::permute(const LatticeGraph& graph,
     new_coloring = std::move(coloring);
   }
 
-  return LatticeGraph(std::move(new_adj), std::move(new_coloring));
+  std::optional<Eigen::MatrixXd> new_positions;
+  if (graph._positions.has_value()) {
+    new_positions.emplace(static_cast<Eigen::Index>(V), 2);
+    for (std::uint64_t i = 0; i < V; ++i) {
+      new_positions->row(static_cast<Eigen::Index>(i)) =
+          graph._positions->row(static_cast<Eigen::Index>(path[i]));
+    }
+  }
+
+  return LatticeGraph(std::move(new_adj), std::move(new_coloring),
+                      std::move(new_positions), graph._periods);
 }
 
 }  // namespace qdk::chemistry::data

@@ -287,6 +287,9 @@ No manual geometry boilerplate is required at the call site.
 
 Pass ``include_term_groups=False`` to skip this step and obtain a Hamiltonian with ``term_partition is None`` (useful for benchmarking or when a different partition is desired).
 
+Automatic geometry-coloring partitions currently apply to adjacency-based couplings.
+When any spin coupling is specified by geometric neighbor shell, the builder returns an unpartitioned Hamiltonian even if ``include_term_groups=True``.
+
 Parameter flexibility
 ---------------------
 
@@ -300,6 +303,11 @@ Per-site parameters
 Per-pair parameters
    Scalar ``float`` (broadcast to all pairs) or ``(n, n)`` ``numpy.ndarray`` (one value per pair).
    Used for: hopping (:math:`t`), intersite potential (:math:`V`), spin couplings (:math:`J_x, J_y, J_z`).
+
+Geometric-shell spin couplings
+   The Heisenberg and Ising builders also accept a mapping ``{m: coupling}``, where each positive integer ``m`` selects ``LatticeGraph.mth_nearest_neighbors(m)`` and each coupling is a scalar or ``(n, n)`` array.
+   Shell couplings are independent of adjacency edge weights.
+   For example, passing ``{1: J1, 2: J2}`` for each of ``jx``, ``jy``, and ``jz`` constructs an isotropic first- and second-neighbor Heisenberg model.
 
 .. tab:: Python API
 

@@ -201,6 +201,44 @@ Whether the adjacency matrix is symmetric.
 Returns:
     bool: True if the adjacency matrix is symmetric.
 )");
+  lattice_graph.def("mth_nearest_neighbors",
+                    &LatticeGraph::mth_nearest_neighbors, R"(
+Return all pairs in the m-th geometric neighbor shell.
+
+Shells are the distinct positive minimum-image distances between lattice
+positions, ordered from shortest to longest. Returned pairs satisfy ``i < j``.
+
+Args:
+    m (int): One-based shell index.
+    tolerance (float, optional): Relative tolerance used to group equal distances. Defaults to 1e-9.
+
+Returns:
+    list[tuple[int, int]]: Canonical site pairs in the requested shell.
+
+Raises:
+    ValueError: If ``m`` is zero or ``tolerance`` is not positive.
+    RuntimeError: If this graph has no lattice geometry.
+)",
+                    py::arg("m"), py::arg("tolerance") = 1.0e-9);
+  lattice_graph.def("nearest_neighbor_shells",
+                    &LatticeGraph::nearest_neighbor_shells, R"(
+Return the pairs in multiple geometric neighbor shells.
+
+Pair distances are classified once for all requested one-based shell indices.
+Returned pairs satisfy ``i < j``; unavailable shells map to empty lists.
+
+Args:
+    shells (list[int]): One-based shell indices.
+    tolerance (float, optional): Relative tolerance used to group equal distances. Defaults to 1e-9.
+
+Returns:
+    dict[int, list[tuple[int, int]]]: Requested shell indices and their canonical site pairs.
+
+Raises:
+    ValueError: If any shell index is zero or ``tolerance`` is not positive.
+    RuntimeError: If this graph has no lattice geometry.
+)",
+                    py::arg("shells"), py::arg("tolerance") = 1.0e-9);
   lattice_graph.def("adjacency_matrix", &LatticeGraph::adjacency_matrix, R"(
 Return the dense adjacency matrix.
 

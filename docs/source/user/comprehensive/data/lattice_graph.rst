@@ -27,6 +27,9 @@ Adjacency matrix
 Symmetry
    Whether the adjacency matrix is symmetric (required for physical Hamiltonians).
 
+Geometry
+   Optional Cartesian site positions and periodic supercell vectors used to identify geometric neighbor shells.
+
 Usage
 -----
 
@@ -217,6 +220,67 @@ For geometries not covered by the built-in methods, you can construct a :class:`
       :language: cpp
       :start-after: // start-cell-from-matrix
       :end-before: // end-cell-from-matrix
+
+Geometric neighbor shells
+-------------------------
+
+Built-in lattice factories store Cartesian site positions alongside the adjacency matrix, plus up to two supercell vectors for periodic axes.
+The ``mth_nearest_neighbors(m)`` method returns the canonical pairs ``(i, j)`` in the *m*-th distinct geometric distance shell, where ``m=1`` denotes nearest neighbors.
+Distances are computed lazily when shells are requested, using the minimum image under the factory's periodic boundary conditions.
+The ``nearest_neighbor_shells(shells)`` method classifies multiple requested shells in one pass.
+For example, in the bulk or on a sufficiently large open lattice, the first three square-lattice shells have distances :math:`1`, :math:`\sqrt{2}`, and :math:`2`, while the honeycomb-lattice shells have distances :math:`1`, :math:`\sqrt{3}`, and :math:`2` in units of the nearest-neighbor spacing.
+
+Graphs constructed only from adjacency data do not define a geometric embedding, so geometric neighbor shells cannot be queried on them.
+
+Geometric shells contain site pairs only; physical coupling strengths belong to the :doc:`model Hamiltonian <../model_hamiltonians>`.
+
+Built-in lattice embeddings
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The built-in factories use primitive lattice vectors to assign Cartesian positions to sites.
+Those positions are used only to derive geometric neighbor shells: the adjacency matrix continues to define the graph topology.
+For a site in cell :math:`(x,y)` with basis offset :math:`\boldsymbol{b}_s`, its position is
+
+.. math::
+
+   \boldsymbol{r}_{xys}=x\boldsymbol{a}_1+y\boldsymbol{a}_2+\boldsymbol{b}_s.
+
+Lengths are measured in units of the nearest-neighbor spacing.
+The chain uses :math:`\boldsymbol{a}_1=(1,0)`, with
+:math:`\boldsymbol{a}_2=\boldsymbol{b}_0=(0,0)`.
+The square lattice uses
+:math:`\boldsymbol{a}_1=(1,0)`,
+:math:`\boldsymbol{a}_2=(0,1)`, and
+:math:`\boldsymbol{b}_0=(0,0)`.
+
+The triangular factory uses
+:math:`\boldsymbol{a}_1=(1,0)` and
+:math:`\boldsymbol{a}_2=(-1/2,\sqrt{3}/2)`, with
+:math:`\boldsymbol{b}_0=(0,0)`.
+These are the directions :math:`\boldsymbol{u}_1` and
+:math:`\boldsymbol{u}_2-\boldsymbol{u}_1` of Guo and Franz; this unimodular primitive-basis change makes
+:math:`\boldsymbol{a}_1`, :math:`\boldsymbol{a}_2`, and
+:math:`\boldsymbol{a}_1+\boldsymbol{a}_2` the three unit-length bond directions used by the factory. :footcite:p:`GuoFranz2009`
+
+The honeycomb factory uses
+:math:`\boldsymbol{a}_1=(3/2,\sqrt{3}/2)` and
+:math:`\boldsymbol{a}_2=(3/2,-\sqrt{3}/2)`, exactly as in Eq. (1) of Castro Neto *et al.*,
+with basis offsets :math:`\boldsymbol{b}_A=(0,0)` and :math:`\boldsymbol{b}_B=(1,0)`. :footcite:p:`CastroNeto2009`
+The latter is equivalent to the paper's nearest-neighbor vectors up to bond orientation and interchange of the two sublattices.
+
+The kagome factory uses
+:math:`\boldsymbol{a}_1=(2,0)`,
+:math:`\boldsymbol{a}_2=(1,\sqrt{3})`, and basis offsets
+:math:`(0,0)`, :math:`(1,0)`, and :math:`(1/2,\sqrt{3}/2)`.
+This is the triangular Bravais lattice with a three-point basis in Guo and Franz, whose nearest-neighbor directions are half of the two primitive vectors. :footcite:p:`GuoFranz2009`
+
+For a periodic axis, the corresponding supercell period is
+:math:`N_x\boldsymbol{a}_1` or :math:`N_y\boldsymbol{a}_2`.
+The distance calculation minimizes over integer translations by those periods, so sites across a periodic boundary receive their minimum-image distance.
+The vectors therefore cannot be removed without retaining equivalent geometric information, such as a Gram matrix and fractional basis coordinates.
+Keeping the Cartesian vectors is the shorter representation for these two-dimensional factories.
+
+.. footbibliography::
 
 .. _lattice-periodic-boundary-conditions:
 

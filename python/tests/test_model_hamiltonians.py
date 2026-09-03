@@ -254,3 +254,104 @@ class TestModelHamiltonians:
                 ps[3 - 1 - edge[0]] = pauli_char
                 ps[3 - 1 - edge[1]] = pauli_char
                 assert terms_w["".join(ps)] == pytest.approx(2.0, abs=float_comparison_absolute_tolerance)
+
+    def test_heisenberg_geometric_neighbor_shells(self):
+        n = 3
+        j1 = 1.25
+        j2 = -0.4
+        custom = LatticeGraph.from_dense_matrix(np.zeros((3, 3)))
+        with pytest.raises(RuntimeError, match="require lattice positions"):
+            custom.mth_nearest_neighbors(1)
+
+        graph = LatticeGraph.square(n, n, t=7.0)
+        assert graph.mth_nearest_neighbors(99) == []
+        with pytest.raises(ValueError, match="m must be > 0"):
+            graph.mth_nearest_neighbors(0)
+        with pytest.raises(TypeError):
+            graph.mth_nearest_neighbors(-1)
+        with pytest.raises(TypeError):
+            graph.mth_nearest_neighbors(1.5)
+        with pytest.raises(ValueError, match="tolerance must be positive"):
+            graph.mth_nearest_neighbors(1, tolerance=np.inf)
+
+        shells = graph.nearest_neighbor_shells([2, 1, 99])
+        first_neighbors = set(shells[1])
+        second_neighbors = set(shells[2])
+        assert shells[99] == []
+        assert (0, 1) in first_neighbors
+        assert (0, 4) in second_neighbors
+        assert (0, 2) not in second_neighbors
+
+        couplings = {1: j1, 2: j2}
+        hamiltonian = create_heisenberg_hamiltonian(
+            graph,
+            jx=couplings,
+            jy=couplings,
+            jz=couplings,
+        )
+        assert hamiltonian.term_partition is None
+        terms = _get_terms_dict(hamiltonian)
+        assert len(terms) == 3 * (len(first_neighbors) + len(second_neighbors))
+
+        for neighbors, expected_coupling in [(first_neighbors, j1), (second_neighbors, j2)]:
+            for i, j in neighbors:
+                for pauli_char in ["X", "Y", "Z"]:
+                    pauli = ["I"] * (n * n)
+                    pauli[n * n - 1 - i] = pauli_char
+                    pauli[n * n - 1 - j] = pauli_char
+                    assert terms["".join(pauli)] == pytest.approx(
+                        expected_coupling, abs=float_comparison_absolute_tolerance
+                    )
+
+        for pauli_char in ["X", "Y", "Z"]:
+            axial_distance_two = ["I"] * (n * n)
+            axial_distance_two[n * n - 1] = pauli_char
+            axial_distance_two[n * n - 1 - 2] = pauli_char
+            assert "".join(axial_distance_two) not in terms
+
+    def test_heisenberg_ungrouped_legacy_term_order(self):
+        hamiltonian = create_heisenberg_hamiltonian(
+            LatticeGraph.chain(3),
+            jx=1.0,
+            jy=2.0,
+            jz=3.0,
+            hx=4.0,
+            hy=5.0,
+            hz=6.0,
+            include_term_groups=False,
+        )
+
+        assert hamiltonian.pauli_strings == [
+            "IXX",
+            "IYY",
+            "IZZ",
+            "XXI",
+            "YYI",
+            "ZZI",
+            "IIX",
+            "IIY",
+            "IIZ",
+            "IXI",
+            "IYI",
+            "IZI",
+            "XII",
+            "YII",
+            "ZII",
+        ]
+        np.testing.assert_array_equal(
+            hamiltonian.coefficients,
+            np.array([1.0, 2.0, 3.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 4.0, 5.0, 6.0, 4.0, 5.0, 6.0]),
+        )
+        assert hamiltonian.content_hash() == "7283ee88ae88a265"
+
+    def test_shell_mapping_order_is_deterministic(self):
+        graph = LatticeGraph.square(3, 3)
+        forward = {1: 1.25, 2: -0.4}
+        reversed_order = {2: -0.4, 1: 1.25}
+
+        forward_hamiltonian = create_heisenberg_hamiltonian(graph, forward, forward, forward)
+        reversed_hamiltonian = create_heisenberg_hamiltonian(graph, reversed_order, reversed_order, reversed_order)
+
+        assert reversed_hamiltonian.pauli_strings == forward_hamiltonian.pauli_strings
+        np.testing.assert_array_equal(reversed_hamiltonian.coefficients, forward_hamiltonian.coefficients)
+        assert reversed_hamiltonian.content_hash() == forward_hamiltonian.content_hash()
