@@ -277,6 +277,10 @@ See :doc:`qpe_circuit_builder` for configuring:
 - ``unitary_builder`` → ``quantum_walk`` — Required; the unary path has no Trotter equivalent
 - ``circuit_mapper`` — Circuit synthesis strategy, which must expose the block encoding's ancilla reflection
 
+The recursive Q# operation used by unary iteration does not lower to QIR. The
+state-preparation circuit must therefore provide a Q# representation, and the
+configured circuit executor must be ``qdk_sparse_state_simulator``.
+
 .. tab:: Python API (Unary-iteration configuration)
 
    .. literalinclude:: ../../../_static/examples/python/phase_estimation.py

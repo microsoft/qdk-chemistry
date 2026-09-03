@@ -82,7 +82,7 @@ Sparse Isometry
 
 .. rubric:: Factory name: ``"sparse_isometry"``
 
-This method is an optimized approach that leverages sparsity in the target wavefunction. It is a modification of the original sparse isometry work in :cite:`Malvetti2021`, and is native to QDK/Chemistry, described in :cite:`Chen2026`. By working only with the non-zero amplitudes, it substantially reduces circuit depth and gate count compared with dense methods, and is especially efficient for wavefunctions with sparse amplitude structure.
+This method leverages sparsity in the target wavefunction. It is a modification of the original sparse-isometry work in :cite:`Malvetti2021`, and its QDK/Chemistry implementation is described in :cite:`Chen2026`. Its state-loading problem is governed by the determinant support and the width remaining after binary-matrix reduction rather than by the full :math:`2^n`-amplitude Hilbert space.
 
 .. rubric:: How it works
 
@@ -97,19 +97,19 @@ where each :math:`b_j` is the occupation bitstring of one determinant on :math:`
 
 The support is collected into a binary matrix :math:`M \in \mathrm{GF}(2)^{n \times d}` whose columns are the determinant bitstrings. The algorithm then proceeds in four steps:
 
-1. **Reduce.** Gaussian elimination over :math:`\mathrm{GF}(2)` brings :math:`M` to row echelon form of rank :math:`r \le n`. Elimination is preceded by two cheap simplifications: duplicate rows are cancelled against each other, and all-ones rows are cleared. When the reduced matrix is diagonal, an additional cascade removes one further row.
+1. **Reduce.** Gaussian elimination over :math:`\mathrm{GF}(2)` brings :math:`M` to row echelon form of rank :math:`r \le n`. Elimination is preceded by two simplifications: duplicate rows are cancelled against each other, and all-ones rows are cleared. When the reduced matrix is diagonal, an additional cascade removes one further row, so the final reduced width may be smaller than :math:`r`.
 
 2. **Record.** Every row operation used in the reduction is tracked. A row addition over :math:`\mathrm{GF}(2)` is exactly a :term:`CNOT` on the qubit register and a row negation is exactly an ``X`` gate, so the elimination sequence is itself a Clifford circuit :math:`E` satisfying :math:`E \cdot M = M_{\mathrm{ref}}`.
 
-3. **Prepare.** The reduced support occupies only :math:`r` qubits, so the amplitudes :math:`c_j` are loaded onto that smaller register by a nested state preparation algorithm, selected with the ``dense_state_prep`` setting.
+3. **Prepare.** The amplitudes :math:`c_j` are loaded onto the remaining reduced rows by a nested state-preparation algorithm selected with the ``dense_state_prep`` setting.
 
 4. **Recovery.** Replaying the recorded operations in reverse applies :math:`E^{-1}`, mapping the reduced basis states back onto the original determinant bitstrings :math:`b_j`.
 
-The cost is therefore governed by :math:`d` and :math:`r` rather than by :math:`2^{n}`, and step 3 is the only part that is exponential in its (much smaller) register.
+The cost is therefore governed by :math:`d` and the reduced width rather than by :math:`2^{n}`, and step 3 is the only part that is exponential in that smaller register.
 
 .. rubric:: Binary encoding
 
-Setting ``binary_encoding`` to ``True`` replaces step 3 with a tighter encoding. Row echelon form bounds the reduced register at the *rank* :math:`r`, but distinguishing :math:`d` determinants only requires :math:`m = \lceil \log_2 d \rceil` qubits, and :math:`m` is frequently much smaller than :math:`r`. Binary encoding constructs an explicit bijection between the :math:`d` determinants and the integers :math:`0, \ldots, d-1`, written in binary on an :math:`m`-qubit dense register, so the nested preparation runs on :math:`2^{m}` amplitudes instead of :math:`2^{r}`.
+Setting ``binary_encoding`` to ``True`` replaces step 3 when :math:`m = \lceil \log_2 d \rceil` is smaller than the number of rows left after reduction. It constructs a one-to-one map from the :math:`d` determinants into the :math:`2^m` basis states of an :math:`m`-qubit dense register, so the nested preparation runs on that smaller amplitude vector.
 
 The compression circuit is synthesized in two stages:
 
@@ -119,9 +119,9 @@ The compression circuit is synthesized in two stages:
 
 Once both stages complete, every sparse row is guaranteed to hold :math:`\left| 0 \right\rangle`, so the state lives entirely in the dense register. The amplitudes are prepared there, and the whole compression circuit is inverted to scatter back to the full register.
 
-Lookup blocks need helper qubits. Rather than allocating fresh ancillas, the synthesizer first borrows idle system qubits — those absent from the reduced support — and allocates additional qubits only when that pool is exhausted.
+Lookup blocks add CCZ operations and need helper qubits. Rather than allocating fresh ancillas, the synthesizer first borrows idle system qubits — those absent from the reduced support — and allocates additional qubits only when that pool is exhausted. The smaller amplitude-loading register therefore does not imply fewer qubits or non-Clifford gates for the complete circuit.
 
-Binary encoding requires spare rows to compress into. When the state is already dense, meaning :math:`m \ge n_{\mathrm{rows}}`, it does not apply and the algorithm transparently falls back to the standard path described above.
+Binary encoding applies only when :math:`m < n_{\mathrm{rows}}`, where :math:`n_{\mathrm{rows}}` is the width left after reduction. Otherwise the algorithm transparently falls back to the standard path described above.
 
 .. tab:: Python API
 

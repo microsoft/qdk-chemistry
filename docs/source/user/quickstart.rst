@@ -34,10 +34,10 @@ and inside it you follow the Linux instructions.
 
 .. note::
 
-   PySCF is the only package in the ``plugins`` extra and publishes no Windows wheels, so it is
-   skipped on native Windows. This also affects ``jupyter``, ``test``, and ``all``, which depend on
-   ``plugins``. On Windows arm64, Qiskit, PennyLane and RDKit are skipped as well, because they
-   require ``rustworkx``, which publishes no win-arm64 wheels. See :ref:`pyscf-plugin-details` and the
+   PySCF publishes no Windows wheels, so the ``plugins`` extra omits it on native Windows while
+   retaining geomeTRIC. The ``test`` and ``all`` extras include ``plugins`` and likewise omit PySCF;
+   ``jupyter`` does not include third-party chemistry plugins. On Windows arm64, additional optional
+   dependencies are unavailable. See :ref:`pyscf-plugin-details` and the
    `Windows notes <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md#notes-for-windows-users>`_.
 
 End-to-end example
@@ -51,15 +51,15 @@ To run the examples, either clone the repository or download the packaged exampl
 
 .. note::
 
-   If you installed ``qdk-chemistry`` from PyPI, use the ``stable/major.minor`` branch
-   when cloning the repository for examples.
+   If you installed ``qdk-chemistry`` from PyPI, use the release tag matching the
+   exact installed version when cloning the repository for examples.
    The ``main`` branch is the active development branch and may be incompatible with
-   the released pip package. For example, if you have version ``<major>.<minor>.x``
+   the released pip package. For example, if you have version ``<major>.<minor>.<patch>``
    installed (check with ``pip show qdk-chemistry``), use:
 
    .. code-block:: bash
 
-      git clone --branch stable/<major>.<minor> https://github.com/microsoft/qdk-chemistry.git
+      git clone --branch v<major>.<minor>.<patch> https://github.com/microsoft/qdk-chemistry.git
 
    See the `examples README <https://github.com/microsoft/qdk-chemistry/blob/main/examples/README.md>`_ for details.
 

@@ -1,4 +1,4 @@
-"""Discovery SDK backend for QDK/Chemistry remote execution."""
+"""Microsoft Discovery backend for QDK/Chemistry remote execution."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -35,7 +35,7 @@ from qdk_chemistry.remote.serialization import (
 
 
 def _discovery_env_defaults() -> dict[str, Any]:
-    """Read Discovery backend defaults from environment variables."""
+    """Read Microsoft Discovery backend defaults from environment variables."""
     defaults: dict[str, Any] = {}
     mappings = {
         "QDK_DISCOVERY_IMAGE": "image",
@@ -66,7 +66,7 @@ def _discovery_env_defaults() -> dict[str, Any]:
 
 
 class DiscoveryBackend(RemoteBackend):
-    """Run QDK/Chemistry jobs through the Azure AI Discovery SDK."""
+    """Run QDK/Chemistry jobs through Microsoft Discovery."""
 
     name = "discovery"
     mcp_safe_config_options = frozenset({"artifact_retry_attempts", "artifact_retry_delay", "poll_interval", "timeout"})
@@ -95,7 +95,7 @@ class DiscoveryBackend(RemoteBackend):
         poll_interval: float | None = None,
         timeout: float | None = None,
     ):
-        """Initialize the Discovery backend."""
+        """Initialize the Microsoft Discovery backend."""
         env = _discovery_env_defaults()
 
         def resolve(name: str, explicit: Any, default: Any = None) -> Any:
@@ -162,7 +162,7 @@ class DiscoveryBackend(RemoteBackend):
         self._container_client: Any = None
 
     def _validate_config(self) -> None:
-        """Validate settings required for every Discovery tool run."""
+        """Validate settings required for every Microsoft Discovery tool run."""
         required = {
             "workspace_endpoint": self.workspace_endpoint,
             "project_name": self.project_name,
@@ -171,7 +171,7 @@ class DiscoveryBackend(RemoteBackend):
         }
         missing = [name for name, value in required.items() if not value]
         if missing:
-            raise ValueError(f"Discovery backend requires: {', '.join(missing)}")
+            raise ValueError(f"Microsoft Discovery backend requires: {', '.join(missing)}")
 
     def _blob_configured(self, *, required: bool = False) -> bool:
         """Validate and report whether Blob Storage transport is configured."""
@@ -183,11 +183,11 @@ class DiscoveryBackend(RemoteBackend):
         configured = [name for name, value in values.items() if value]
         if not configured:
             if required:
-                raise ValueError(f"Discovery blob transport requires: {', '.join(values)}")
+                raise ValueError(f"Microsoft Discovery blob transport requires: {', '.join(values)}")
             return False
         missing = [name for name, value in values.items() if not value]
         if missing:
-            raise ValueError(f"Incomplete Discovery blob configuration; missing: {', '.join(missing)}")
+            raise ValueError(f"Incomplete Microsoft Discovery blob configuration; missing: {', '.join(missing)}")
         if not self.storage_uri.startswith("discovery://storageassets/"):
             raise ValueError("storage_uri must be a discovery://storageassets/<storage-asset-ARM-ID> URI")
         if "/paths/" in self.storage_uri:
@@ -195,7 +195,7 @@ class DiscoveryBackend(RemoteBackend):
         return True
 
     def connect(self) -> None:
-        """Create authenticated Discovery and optional Blob Storage clients."""
+        """Create authenticated Microsoft Discovery and optional Blob Storage clients."""
         self._validate_config()
         blob_configured = False
         if self.transport != "cache":
@@ -219,11 +219,11 @@ class DiscoveryBackend(RemoteBackend):
         self._credential = None
 
     def _require_connection(self, *, storage: bool = False) -> None:
-        """Require active Discovery and, when requested, storage clients."""
+        """Require active Microsoft Discovery and, when requested, storage clients."""
         if self._client is None:
-            raise RuntimeError("Discovery backend is not connected")
+            raise RuntimeError("Microsoft Discovery backend is not connected")
         if storage and self._container_client is None:
-            raise RuntimeError("Discovery Blob Storage transport is not connected")
+            raise RuntimeError("Microsoft Discovery Blob Storage transport is not connected")
 
     def _relative_path(self, remote_path: str) -> str:
         """Validate and normalize one relative storage path."""
@@ -233,7 +233,7 @@ class DiscoveryBackend(RemoteBackend):
         return path
 
     def _storage_path_uri(self, remote_path: str) -> str:
-        """Build a Discovery Storage Asset path URI."""
+        """Build a Microsoft Discovery Storage Asset path URI."""
         return f"{self.storage_uri}/paths/{self._relative_path(remote_path)}"
 
     def _blob_path(self, remote_path: str) -> str:
@@ -291,14 +291,14 @@ class DiscoveryBackend(RemoteBackend):
                 continue
 
     def cleanup_job(self, backend_state: dict[str, Any]) -> None:
-        """Remove Blob artifacts for one completed Discovery job."""
+        """Remove Blob artifacts for one completed Microsoft Discovery job."""
         if backend_state.get("transport") == "cache":
             return
         self._require_connection(storage=True)
         input_paths = backend_state.get("input_paths", [])
         output_dir = backend_state.get("output_dir")
         if not isinstance(input_paths, list) or not isinstance(output_dir, str):
-            raise ValueError("Discovery job state is missing artifact paths")
+            raise ValueError("Microsoft Discovery job state is missing artifact paths")
         output_prefix = f"{self._blob_path(output_dir).rstrip('/')}/"
         output_paths = [blob.name for blob in self._container_client.list_blobs(name_starts_with=output_prefix)]
         self._delete_remote_files(input_paths)
@@ -316,7 +316,9 @@ class DiscoveryBackend(RemoteBackend):
             cache_config = {key: value for key, value in cache_info.items() if key != "name"}
             cache = get_cache(cache_info["name"], **cache_config)
         if cache is None or not getattr(cache, "is_shared", False):
-            raise ValueError("Discovery cache transport requires a shared cache reachable from the compute node")
+            raise ValueError(
+                "Microsoft Discovery cache transport requires a shared cache reachable from the compute node"
+            )
         return cache
 
     def _serialize_job(
@@ -381,9 +383,9 @@ class DiscoveryBackend(RemoteBackend):
     def _prepare_cache_job(self, payload: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         """Seed a shared cache and prepare an inline input manifest."""
         if not payload.get("run_hash"):
-            raise ValueError("Discovery cache transport requires a deterministic run hash")
+            raise ValueError("Microsoft Discovery cache transport requires a deterministic run hash")
         if not payload.get("remote_cache"):
-            raise ValueError("Discovery cache transport requires serializable shared-cache configuration")
+            raise ValueError("Microsoft Discovery cache transport requires serializable shared-cache configuration")
         cache = self._shared_cache(payload)
         job_id, local_input_dir, input_files = self._serialize_job(
             payload,
@@ -394,7 +396,7 @@ class DiscoveryBackend(RemoteBackend):
             non_manifest_files = [path.name for path in input_files if path.name != "manifest.json"]
             if non_manifest_files:
                 raise ValueError(
-                    "Discovery cache transport could not place every file-backed input in the shared cache: "
+                    "Microsoft Discovery cache transport could not place every file-backed input in the shared cache: "
                     + ", ".join(non_manifest_files)
                 )
             manifest = (local_input_dir / "manifest.json").read_bytes()
@@ -422,10 +424,10 @@ class DiscoveryBackend(RemoteBackend):
             return "cache"
         if self._container_client is not None:
             return "blob"
-        raise ValueError("Discovery requires either a shared cache or complete Blob Storage configuration")
+        raise ValueError("Microsoft Discovery requires either a shared cache or complete Blob Storage configuration")
 
     def _submit(self, payload: dict[str, Any]) -> tuple[str, dict[str, Any]]:
-        """Submit a QDK/Chemistry worker through Azure AI Discovery."""
+        """Submit a QDK/Chemistry worker through Microsoft Discovery."""
         from azure.ai.discovery.models import (  # noqa: PLC0415
             InfraOverrides,
             InlineFile,
@@ -495,7 +497,7 @@ class DiscoveryBackend(RemoteBackend):
                 polling=polling,
             )
             if polling.operation_id is None:
-                raise RuntimeError("Discovery run submission did not expose an operation ID")
+                raise RuntimeError("Microsoft Discovery run submission did not expose an operation ID")
         except BaseException:
             if transport == "blob":
                 self._delete_remote_files(state["input_paths"])
@@ -506,7 +508,7 @@ class DiscoveryBackend(RemoteBackend):
         return job_id, state
 
     def _status_state(self, backend_state: dict[str, Any]) -> dict[str, Any]:
-        """Convert one Azure AI Discovery run status to backend state."""
+        """Convert one Microsoft Discovery run status to backend state."""
         response = self._client.tools.get_run_status(
             backend_state["project_name"],
             backend_state["operation_id"],
@@ -526,7 +528,7 @@ class DiscoveryBackend(RemoteBackend):
         }
 
     def check(self, backend_state: dict[str, Any]) -> JobStatus:
-        """Query the current status of a Discovery job."""
+        """Query the current status of a Microsoft Discovery job."""
         self._require_connection()
         state = self._status_state(backend_state)
         error = state["error"]
@@ -544,7 +546,7 @@ class DiscoveryBackend(RemoteBackend):
         )
 
     def cancel(self, backend_state: dict[str, Any]) -> None:
-        """Cancel a Discovery job."""
+        """Cancel a Microsoft Discovery job."""
         self._require_connection()
         self._client.tools.begin_cancel_run_lro(
             backend_state["project_name"],
@@ -553,7 +555,7 @@ class DiscoveryBackend(RemoteBackend):
         )
 
     def fetch(self, backend_state: dict[str, Any], local_dir: str | Path | None = None) -> Any:
-        """Download and deserialize completed Discovery output."""
+        """Download and deserialize completed Microsoft Discovery output."""
         if backend_state.get("transport") == "cache":
             return self._fetch_cached_result(backend_state)
         output_dir = backend_state["output_dir"]

@@ -5,11 +5,9 @@ keyword arguments on ``run()``.
 
 Usage:
     >>> from qdk_chemistry.algorithms import create
-    >>> from qdk_chemistry.remote import create_remote
     >>>
     >>> scf = create("scf_solver")
-    >>> backend = create_remote("local")
-    >>> energy, wfn = scf.run(structure, 0, 1, "cc-pvdz", remote=backend)
+    >>> energy, wfn = scf.run(structure, 0, 1, "cc-pvdz", remote="local")
 
 """
 
