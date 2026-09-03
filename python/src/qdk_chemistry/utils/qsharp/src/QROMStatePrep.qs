@@ -58,10 +58,10 @@ namespace QDKChemistry.Utils.QROMStatePrep {
 
     /// Core QROM state preparation.
     ///
-    /// Each layer l targets qubit target[l] and uses Reversed(target[0..l-1])
-    /// as the LE address register for SelectSwap QROM lookup.
-    ///
-    /// Qubit ordering: target[0] = MSB (first-allocated = highest bit of state index).
+    /// Qubit ordering: `target` is little-endian, matching `Std.TableLookup.Select` and
+    /// `ApplyControlledOnInt`, so the register can be handed straight to a SELECT oracle
+    /// and coefficient `j` lands on register value `j`. SBM fixes the most significant
+    /// bit first, so the layer loop walks `target` in reverse.
     ///
     /// # Input
     /// ## params
@@ -82,9 +82,11 @@ namespace QDKChemistry.Utils.QROMStatePrep {
         let bRot = params.rotationBitPrecision;
         let angleTree = ComputeSBMAngles(params.amplitudes, n, bRot);
 
-        // Iterate MSB-first: layer l targets target[l].
+        // SBM fixes the most significant bit first, so walk the LE register in reverse.
+        let msbFirst = Reversed(target);
+
         for level in 0..n - 1 {
-            let targetQubit = target[level];
+            let targetQubit = msbFirst[level];
 
             if level == 0 {
                 // Root level: single unconditional rotation Ry(2θ_root).
@@ -95,9 +97,8 @@ namespace QDKChemistry.Utils.QROMStatePrep {
                     RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
                 }
             } else {
-                // Address = previously prepared qubits in LE order.
-                // target[0] = MSB, so Reversed gives LE for Select.
-                let address = Reversed(target[0..level - 1]);
+                // Address = the already-fixed high bits, reversed back into LE for Select.
+                let address = Reversed(msbFirst[0..level - 1]);
 
                 let startIdx = 1 <<< level;
                 let numAngles = 1 <<< level;
@@ -116,9 +117,9 @@ namespace QDKChemistry.Utils.QROMStatePrep {
         let signData = ComputeSignBits(params.amplitudes, n);
         if Any(row -> row[0], signData) {
             use signBit = Qubit[1];
-            // Reversed(target) gives LE address so index j matches coefficient j.
+            // `target` is already LE, which is the address order Select expects.
             within {
-                Select(signData, Reversed(target), signBit);
+                Select(signData, target, signBit);
             } apply {
                 Z(signBit[0]);
             }

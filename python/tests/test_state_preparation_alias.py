@@ -93,26 +93,23 @@ class TestAliasSamplingStatePreparation:
     def test_resource_counts(self):
         """Pin the logical resource counts so a costing regression is visible.
 
-        These are the counts of ``AliasSamplingPrepareLegacyResourceEstimate``, not of the
-        circuit that executes. ``AliasSamplingPrepare`` branches on ``IsResourceEstimating()``
-        to reproduce the archived Fe2S2 headline pinned by
-        ``test_phase_estimation_sossa.py::test_fe2s2_matches_archived_resource_estimate``, and
-        that legacy model omits the comparator and the controlled index swap. Tracing it
-        therefore never touches the flag qubit and reports 14 qubits / 2 CCZ where the
-        executable ``AliasSamplingPreparePhaseCorrect`` needs 17 / 8.
-
-        Retire these numbers together with the legacy branch; they do not describe a runnable
-        circuit and must not be read as the cost of alias sampling.
+        These are now the counts of the circuit that executes. They used to be the counts of
+        ``AliasSamplingPrepareLegacyResourceEstimate``, a branch ``AliasSamplingPrepare`` took
+        under ``IsResourceEstimating()`` to reproduce an archived Fe2S2 headline; it omitted
+        the comparator and the controlled index swap, so tracing it never touched the flag
+        qubit and reported 14 qubits / 2 CCZ. With that branch deleted the trace is the
+        runnable circuit throughout, which needs 17 / 8 -- exactly the figures the old
+        docstring predicted for it.
         """
         prep = AliasSamplingStatePreparation(bits_precision=4)
         circuit = prep.run(_make_wavefunction([0.5, 0.3, 0.7, 0.1]))
 
         lc = circuit.estimate()["logicalCounts"]
-        assert lc["numQubits"] == 14
-        assert lc["cczCount"] == 2
+        assert lc["numQubits"] == 17
+        assert lc["cczCount"] == 8
         assert lc["tCount"] == 0
         assert lc["rotationCount"] == 0
-        assert lc["measurementCount"] == 2
+        assert lc["measurementCount"] == 6
 
     def test_settings_expose_bits_precision(self):
         """The constructor argument is stored in settings so create() can reach it."""

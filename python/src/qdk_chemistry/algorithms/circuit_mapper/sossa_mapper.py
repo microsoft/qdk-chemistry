@@ -101,6 +101,12 @@ class SOSSAMapper(CircuitMapper):
         ref: AlgorithmRef = self._settings.get("outer_prepare")
         if ref.algorithm_name == "alias_sampling":
             prepare_algorithm.settings().set("bits_precision", self._settings.get("coefficient_bit_precision"))
+        elif ref.algorithm_name == "qrom":
+            # The walk allocates one persistent gradient and hands it to every PREPARE and
+            # SELECT, so the outer PREPARE must read that one rather than allocate its own.
+            # `_num_phase_gradient_qubits` sizes the register from this algorithm's
+            # `rotation_bit_precision`, and `_build_walk_oracles` checks the two agree.
+            prepare_algorithm.settings().set("allocate_phase_gradient", False)
         circuit = prepare_algorithm.run(container.outer_prepare)
         return circuit._qsharp_op, circuit.metadata.num_phase_gradient_ancillas  # noqa: SLF001
 
