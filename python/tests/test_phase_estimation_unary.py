@@ -527,7 +527,9 @@ def test_qrom_initial_state_prep_recovers_the_ground_state_energy():
     """
     hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([0.5, 0.5]))
     energies, _ = np.linalg.eigh(hamiltonian.to_matrix())
-    state_preparation = QROMStatePreparation(rotation_bit_precision=8).run(_ground_state_wavefunction(hamiltonian))
+    state_preparation = QROMStatePreparation(rotation_bit_precision=8, allocate_phase_gradient=False).run(
+        _ground_state_wavefunction(hamiltonian)
+    )
 
     qpe = UnaryPhaseEstimation(shots=200)
     qpe.settings().set("qpe_circuit_builder", AlgorithmRef("qpe_circuit_builder", "qdk_unary", num_queries=6))
