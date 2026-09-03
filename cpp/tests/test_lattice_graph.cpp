@@ -195,6 +195,197 @@ TEST_F(LatticeGraphTest, HoneycombGeometricNeighborShells) {
   EXPECT_EQ(degree(third, center), 3);
 }
 
+TEST_F(LatticeGraphTest, GeometricBondClassesAndHoneycombFlavors) {
+  const std::vector<std::pair<LatticeGraph, std::size_t>> lattices = {
+      {LatticeGraph::chain(5), 1},
+      {LatticeGraph::square(5, 5), 2},
+      {LatticeGraph::triangular(5, 5), 3},
+      {LatticeGraph::kagome(4, 4), 3},
+  };
+  for (const auto& [lattice, expected_orientations] : lattices) {
+    const auto connections = lattice.neighbor_connections({1});
+    std::set<std::uint32_t> orientations;
+    for (const auto& connection : connections) {
+      orientations.insert(connection.bond_class.orientation);
+      EXPECT_FALSE(connection.flavor.has_value());
+    }
+    EXPECT_EQ(orientations.size(), expected_orientations);
+  }
+
+  auto square = LatticeGraph::square(5, 5);
+  const auto square_connections = square.neighbor_connections({1, 2});
+  std::map<std::uint64_t, std::set<std::uint32_t>> square_orientations;
+  for (const auto& connection : square_connections) {
+    square_orientations[connection.bond_class.shell].insert(
+        connection.bond_class.orientation);
+    EXPECT_FALSE(connection.flavor.has_value());
+  }
+  EXPECT_EQ(square_orientations.at(1).size(), 2);
+  EXPECT_EQ(square_orientations.at(2).size(), 2);
+
+  auto honeycomb = LatticeGraph::honeycomb(5, 5);
+  const auto connections = honeycomb.neighbor_connections({1, 2, 3});
+  constexpr std::uint64_t center = 24;
+  std::map<std::uint64_t, std::map<BondFlavor, std::size_t>> flavor_degree;
+  std::map<std::uint64_t, std::set<std::pair<std::uint64_t, std::uint64_t>>>
+      projected_pairs;
+  for (const auto& connection : connections) {
+    ASSERT_TRUE(connection.flavor.has_value());
+    projected_pairs[connection.bond_class.shell].emplace(connection.site_i,
+                                                         connection.site_j);
+    if (connection.site_i == center || connection.site_j == center) {
+      ++flavor_degree[connection.bond_class.shell][*connection.flavor];
+    }
+  }
+  for (std::uint64_t shell = 1; shell <= 3; ++shell) {
+    const auto pairs = honeycomb.mth_nearest_neighbors(shell);
+    EXPECT_EQ(projected_pairs.at(shell),
+              (std::set<std::pair<std::uint64_t, std::uint64_t>>(pairs.begin(),
+                                                                 pairs.end())));
+  }
+  for (BondFlavor flavor : {BondFlavor::X, BondFlavor::Y, BondFlavor::Z}) {
+    EXPECT_EQ(flavor_degree.at(1).at(flavor), 1);
+    EXPECT_EQ(flavor_degree.at(2).at(flavor), 2);
+    EXPECT_EQ(flavor_degree.at(3).at(flavor), 1);
+  }
+}
+
+TEST_F(LatticeGraphTest, HoneycombOpenPlaquettePatches) {
+  auto unit_cell = LatticeGraph::honeycomb(1, 1);
+  EXPECT_EQ(unit_cell.num_sites(), 2);
+  EXPECT_EQ(unit_cell.num_edges(), 1);
+
+  auto hexagon = LatticeGraph::honeycomb(
+      1, 1, HoneycombSizeConvention::CompletePlaquettes, false, false, 2.5);
+  EXPECT_EQ(hexagon.num_sites(), 6);
+  EXPECT_EQ(hexagon.num_edges(), 6);
+  EXPECT_TRUE(hexagon.is_symmetric());
+  ASSERT_TRUE(hexagon.positions().has_value());
+  const auto& positions = *hexagon.positions();
+  EXPECT_EQ(positions.rows(), 6);
+  EXPECT_EQ(positions.cols(), 2);
+  for (Eigen::Index site = 0;
+       site < hexagon.sparse_adjacency_matrix().outerSize(); ++site) {
+    EXPECT_EQ(hexagon.sparse_adjacency_matrix().innerVector(site).nonZeros(),
+              2);
+  }
+
+  const auto connections = hexagon.neighbor_connections({1, 2, 3});
+  std::map<std::uint64_t, std::map<BondFlavor, std::size_t>> counts;
+  for (const auto& connection : connections) {
+    ASSERT_TRUE(connection.flavor.has_value());
+    ++counts[connection.bond_class.shell][*connection.flavor];
+  }
+  for (BondFlavor flavor : {BondFlavor::X, BondFlavor::Y, BondFlavor::Z}) {
+    EXPECT_EQ(counts.at(1).at(flavor), 2);
+    EXPECT_EQ(counts.at(2).at(flavor), 2);
+    EXPECT_EQ(counts.at(3).at(flavor), 1);
+  }
+  EXPECT_EQ(hexagon.mth_nearest_neighbors(1).size(), 6);
+  EXPECT_EQ(hexagon.mth_nearest_neighbors(2).size(), 6);
+  EXPECT_EQ(hexagon.mth_nearest_neighbors(3).size(), 3);
+  for (const auto& [shell, expected_distance] :
+       std::vector<std::pair<std::uint64_t, double>>{
+           {1, 1.0}, {2, std::sqrt(3.0)}, {3, 2.0}}) {
+    for (const auto& [site_i, site_j] : hexagon.mth_nearest_neighbors(shell)) {
+      EXPECT_NEAR((positions.row(site_j) - positions.row(site_i)).norm(),
+                  expected_distance, 1.0e-12);
+    }
+  }
+
+  auto patch = LatticeGraph::honeycomb(
+      4, 4, HoneycombSizeConvention::CompletePlaquettes);
+  EXPECT_EQ(patch.num_sites(), 48);
+  EXPECT_EQ(patch.num_edges(), 63);
+  EXPECT_EQ(patch.num_edges() - patch.num_sites() + 1, 16);
+  for (Eigen::Index site = 0;
+       site < patch.sparse_adjacency_matrix().outerSize(); ++site) {
+    EXPECT_GE(patch.sparse_adjacency_matrix().innerVector(site).nonZeros(), 2);
+  }
+}
+
+TEST_F(LatticeGraphTest, PeriodicConnectionsPreserveFlavorMultiplicity) {
+  auto honeycomb = LatticeGraph::honeycomb(2, 2, true, true);
+  const auto all_connections = honeycomb.neighbor_connections({1, 2, 3});
+  for (std::uint64_t shell = 1; shell <= 3; ++shell) {
+    std::set<std::pair<std::uint64_t, std::uint64_t>> projection;
+    for (const auto& connection : all_connections) {
+      if (connection.bond_class.shell == shell) {
+        projection.emplace(connection.site_i, connection.site_j);
+      }
+    }
+    const auto pairs = honeycomb.mth_nearest_neighbors(shell);
+    EXPECT_EQ(projection, (std::set<std::pair<std::uint64_t, std::uint64_t>>(
+                              pairs.begin(), pairs.end())));
+  }
+  std::vector<NeighborConnection> connections;
+  std::copy_if(all_connections.begin(), all_connections.end(),
+               std::back_inserter(connections), [](const auto& connection) {
+                 return connection.bond_class.shell == 3;
+               });
+  std::map<std::pair<std::uint64_t, std::uint64_t>, std::set<BondFlavor>>
+      flavors_by_pair;
+  for (const auto& connection : connections) {
+    ASSERT_TRUE(connection.flavor.has_value());
+    flavors_by_pair[{connection.site_i, connection.site_j}].insert(
+        *connection.flavor);
+  }
+  EXPECT_TRUE(
+      std::any_of(flavors_by_pair.begin(), flavors_by_pair.end(),
+                  [](const auto& item) { return item.second.size() > 1; }));
+  EXPECT_GT(connections.size(), honeycomb.mth_nearest_neighbors(3).size());
+}
+
+TEST_F(LatticeGraphTest, BondFlavorDefinitionsSurviveDataOperations) {
+  auto honeycomb = LatticeGraph::honeycomb(3, 3, true, true);
+  ASSERT_EQ(honeycomb.bond_flavor_definitions().size(), 9);
+
+  auto flavor_signature = [](const LatticeGraph& graph) {
+    std::vector<std::tuple<std::uint64_t, std::uint32_t, std::uint64_t,
+                           std::uint64_t, BondFlavor>>
+        result;
+    for (const auto& connection : graph.neighbor_connections({1, 2, 3})) {
+      EXPECT_TRUE(connection.flavor.has_value());
+      if (!connection.flavor.has_value()) continue;
+      result.emplace_back(connection.bond_class.shell,
+                          connection.bond_class.orientation, connection.site_i,
+                          connection.site_j, *connection.flavor);
+    }
+    return result;
+  };
+
+  auto json_restored = LatticeGraph::from_json(honeycomb.to_json());
+  EXPECT_EQ(flavor_signature(json_restored), flavor_signature(honeycomb));
+  EXPECT_EQ(json_restored.content_hash(), honeycomb.content_hash());
+
+  const std::filesystem::path filename =
+      "test_lattice_graph_bond_flavors.lattice_graph.h5";
+  honeycomb.to_hdf5_file(filename.string());
+  auto hdf5_restored = LatticeGraph::from_hdf5_file(filename.string());
+  EXPECT_EQ(flavor_signature(hdf5_restored), flavor_signature(honeycomb));
+  EXPECT_EQ(hdf5_restored.content_hash(), honeycomb.content_hash());
+  std::filesystem::remove(filename);
+
+  std::vector<std::uint64_t> path(honeycomb.num_sites());
+  std::iota(path.begin(), path.end(), 0);
+  std::rotate(path.begin(), path.begin() + 1, path.end());
+  auto permuted = LatticeGraph::permute(honeycomb, path);
+  EXPECT_EQ(permuted.bond_flavor_definitions().size(), 9);
+  EXPECT_EQ(permuted.neighbor_connections({1, 2, 3}).size(),
+            honeycomb.neighbor_connections({1, 2, 3}).size());
+
+  auto square = LatticeGraph::square(3, 3).with_bond_flavors(
+      {{1, {1.0, 0.0}, BondFlavor::X}});
+  const auto square_connections = square.neighbor_connections({1});
+  EXPECT_TRUE(std::any_of(square_connections.begin(), square_connections.end(),
+                          [](const auto& connection) {
+                            return connection.flavor == BondFlavor::X;
+                          }));
+  EXPECT_TRUE(std::any_of(
+      square_connections.begin(), square_connections.end(),
+      [](const auto& connection) { return !connection.flavor.has_value(); }));
+}
+
 TEST_F(LatticeGraphTest, BoundaryConditionsAffectGeometricNeighborShells) {
   auto degrees = [](const LatticeGraph& graph, std::uint64_t site) {
     std::array<std::size_t, 3> result{};
@@ -469,7 +660,7 @@ TEST_F(LatticeGraphTest, TriangularConstructor) {
 }
 
 TEST_F(LatticeGraphTest, HoneycombConstructor) {
-  // 3x4 honeycomb lattice (24 sites)
+  // Fully periodic 3x4 honeycomb lattice (24 sites)
   //
   //           18-19-20-21-22-23
   //            |     |     |
@@ -528,15 +719,15 @@ TEST_F(LatticeGraphTest, HoneycombConstructor) {
   // periodic_y only: vertical wraps
   {
     std::map<Edge, double> py_edges = expected_edges;
-    py_edges[{0, 19}] = 1.0;  // vertical wrap
-    py_edges[{2, 21}] = 1.0;  // vertical wrap
-    py_edges[{4, 23}] = 1.0;  // vertical wrap
+    py_edges[{0, 19}] = 1.0;
+    py_edges[{2, 21}] = 1.0;
+    py_edges[{4, 23}] = 1.0;
     auto expected_py =
         LatticeGraph::make_bidirectional(LatticeGraph(py_edges, 24));
 
     auto hc_py = LatticeGraph::honeycomb(3, 4, false, true);
     EXPECT_EQ(hc_py.num_sites(), 24);
-    EXPECT_EQ(hc_py.num_edges(), 32);  // 29 + 3
+    EXPECT_EQ(hc_py.num_edges(), 32);
     EXPECT_TRUE(hc_py.is_symmetric());
     EXPECT_TRUE(
         hc_py.adjacency_matrix().isApprox(expected_py.adjacency_matrix()));
@@ -545,16 +736,16 @@ TEST_F(LatticeGraphTest, HoneycombConstructor) {
   // periodic_x only: horizontal wraps
   {
     std::map<Edge, double> px_edges = expected_edges;
-    px_edges[{0, 5}] = 1.0;    // horizontal wrap
-    px_edges[{6, 11}] = 1.0;   // horizontal wrap
-    px_edges[{12, 17}] = 1.0;  // horizontal wrap
-    px_edges[{18, 23}] = 1.0;  // horizontal wrap
+    px_edges[{0, 5}] = 1.0;
+    px_edges[{6, 11}] = 1.0;
+    px_edges[{12, 17}] = 1.0;
+    px_edges[{18, 23}] = 1.0;
     auto expected_px =
         LatticeGraph::make_bidirectional(LatticeGraph(px_edges, 24));
 
     auto hc_px = LatticeGraph::honeycomb(3, 4, true, false);
     EXPECT_EQ(hc_px.num_sites(), 24);
-    EXPECT_EQ(hc_px.num_edges(), 33);  // 29 + 4
+    EXPECT_EQ(hc_px.num_edges(), 33);
     EXPECT_TRUE(hc_px.is_symmetric());
     EXPECT_TRUE(
         hc_px.adjacency_matrix().isApprox(expected_px.adjacency_matrix()));

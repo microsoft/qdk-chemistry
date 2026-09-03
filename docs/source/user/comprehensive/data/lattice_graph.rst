@@ -169,6 +169,27 @@ With periodic boundary conditions, the inter-cell bonds between the B and A subl
          |     |     |
       0--1--2--3--4--5
 
+To size a honeycomb patch by complete hexagonal plaquettes, set
+``size_convention=HoneycombSizeConvention.COMPLETE_PLAQUETTES``. Open directions
+then include the boundary sites needed to complete those plaquettes. A fully open
+patch contains ``2 * (nx + 1) * (ny + 1) - 2`` sites; both size conventions
+produce the same lattice when both axes are periodic.
+
+.. code-block:: text
+
+   1x1 open complete-plaquette lattice:
+
+       1---2
+      /     \
+     0       5
+      \     /
+       3---4
+
+The ``1 x 1`` patch has six perimeter bonds. Its geometric first-, second-, and
+third-neighbor shells contain 6, 6, and 3 pairs, respectively, with the standard
+honeycomb ``X``, ``Y``, and ``Z`` flavor definitions. A ``4 x 4`` open patch
+contains 16 complete plaquettes and 48 sites.
+
 Kagome lattice
 ^^^^^^^^^^^^^^
 
@@ -225,6 +246,7 @@ Geometric neighbor shells
 -------------------------
 
 Built-in lattice factories store Cartesian site positions alongside the adjacency matrix, plus up to two supercell vectors for periodic axes.
+The read-only ``positions`` property returns a copy of the factory-generated ``(num_sites, 2)`` Cartesian position matrix.
 The ``mth_nearest_neighbors(m)`` method returns the canonical pairs ``(i, j)`` in the *m*-th distinct geometric distance shell, where ``m=1`` denotes nearest neighbors.
 Distances are computed lazily when shells are requested, using the minimum image under the factory's periodic boundary conditions.
 The ``nearest_neighbor_shells(shells)`` method classifies multiple requested shells in one pass.
@@ -233,6 +255,33 @@ For example, in the bulk or on a sufficiently large open lattice, the first thre
 Graphs constructed only from adjacency data do not define a geometric embedding, so geometric neighbor shells cannot be queried on them.
 
 Geometric shells contain site pairs only; physical coupling strengths belong to the :doc:`model Hamiltonian <../model_hamiltonians>`.
+
+Geometric bond classes
+~~~~~~~~~~~~~~~~~~~~~~
+
+The ``neighbor_connections(shells)`` method retains more geometric information than the pair-only shell methods.
+Each :class:`~qdk_chemistry.data.NeighborConnection` identifies a physical connection by its two finite-lattice sites, periodic image shift, Cartesian displacement, and :class:`~qdk_chemistry.data.BondClass`.
+A bond class combines the radial shell with an unoriented displacement axis, so vectors :math:`\boldsymbol{d}` and :math:`-\boldsymbol{d}` share one orientation class.
+
+This classification is available for every built-in lattice embedding.
+The number of orientations depends on the geometry: a chain has one orientation per shell, while square, triangular, honeycomb, and kagome lattices generally have several.
+Distinct periodic-image connections remain distinct even when they project onto the same canonical finite-lattice site pair.
+By contrast, ``mth_nearest_neighbors()`` and ``nearest_neighbor_shells()`` intentionally deduplicate those connections and continue to return canonical pairs.
+
+Semantic bond flavors are optional labels on geometric shell-axis classes.
+Use :class:`~qdk_chemistry.data.BondFlavorDefinition` and ``with_bond_flavors()`` to label classes on another embedded lattice.
+Unlabeled lattices retain all shell and orientation functionality, and their connection ``flavor`` properties are ``None``.
+
+The honeycomb factory predefines :class:`~qdk_chemistry.data.BondFlavor` labels ``X``, ``Y``, and ``Z`` for its first three shells.
+Thus each honeycomb shell decomposes as
+
+.. math::
+
+   N_m = X_m \cup Y_m \cup Z_m,
+
+with shell distances :math:`1`, :math:`\sqrt{3}`, and :math:`2` for :math:`m=1,2,3`.
+An interior site has one connection of each flavor in shells 1 and 3, and two connections of each flavor in shell 2.
+These labels are physical model metadata and remain distinct from ``edge_coloring``, whose colors describe conflict-free scheduling layers.
 
 Built-in lattice embeddings
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

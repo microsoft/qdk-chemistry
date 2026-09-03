@@ -20,7 +20,7 @@ from qdk_chemistry._core.utils.model_hamiltonians import (
     to_pair_param,
     to_site_param,
 )
-from qdk_chemistry.data import LatticeGraph, LayeredPartition, QubitOperator
+from qdk_chemistry.data import BondFlavor, LatticeGraph, LayeredPartition, QubitOperator
 from qdk_chemistry.utils import Logger
 
 __all__ = [
@@ -28,6 +28,7 @@ __all__ = [
     "create_hubbard_hamiltonian",
     "create_huckel_hamiltonian",
     "create_ising_hamiltonian",
+    "create_kitaev_hamiltonian",
     "create_ppp_hamiltonian",
     "mataga_nishimoto_potential",
     "ohno_potential",
@@ -41,6 +42,7 @@ def _build_geometry_grouped_hamiltonian(
     couplings: list[tuple[str, np.ndarray | float]],
     fields: list[tuple[str, np.ndarray | float]],
     coloring: dict[tuple[int, int], int] | None = None,
+    apply_edge_weights: bool = True,
 ) -> QubitOperator:
     r"""Assemble a Heisenberg-like Hamiltonian with a populated ``term_partition``.
 
@@ -64,6 +66,7 @@ def _build_geometry_grouped_hamiltonian(
         couplings: ``[(label, value), ...]`` for two-body terms (e.g. ``[(\"XX\", jx)]``).
         fields: ``[(char, value), ...]`` for single-body terms (e.g. ``[(\"X\", hx)]``).
         coloring: Optional edge coloring ``{(i, j): color}`` (``i < j``). Reads ``graph.edge_coloring`` when ``None``.
+        apply_edge_weights: Multiply coupling matrices by adjacency weights when ``True``. Defaults to ``True``.
 
     Returns:
         QubitOperator: The assembled Hamiltonian carrying a ``LayeredPartition``
@@ -104,7 +107,7 @@ def _build_geometry_grouped_hamiltonian(
         coupling_mat = to_pair_param(coupling, graph, "coupling")
         color_to_indices: dict[int, list[int]] = {}
         for (i, j), c in coloring.items():
-            edge_weight = graph.weight(i, j)
+            edge_weight = graph.weight(i, j) if apply_edge_weights else 1.0
             if edge_weight == 0.0:
                 continue
             coeff_val = coupling_mat[i, j] * edge_weight
@@ -284,6 +287,264 @@ def create_heisenberg_hamiltonian(
 
     if not pauli_strings:
         pauli_strings = ["I" * n]
+        coefficients = [0.0 + 0.0j]
+    return QubitOperator(pauli_strings, np.array(coefficients))
+
+
+def create_kitaev_hamiltonian(
+    graph: LatticeGraph,
+    kx: np.ndarray | float | Mapping[int, np.ndarray | float],
+    ky: np.ndarray | float | Mapping[int, np.ndarray | float],
+    kz: np.ndarray | float | Mapping[int, np.ndarray | float],
+    j: np.ndarray | float | Mapping[int, np.ndarray | float] = 0.0,
+    gamma: np.ndarray | float = 0.0,
+    gamma_prime: np.ndarray | float = 0.0,
+    *,
+    gamma_x: np.ndarray | float | None = None,
+    gamma_y: np.ndarray | float | None = None,
+    gamma_z: np.ndarray | float | None = None,
+    gamma_prime_x: np.ndarray | float | None = None,
+    gamma_prime_y: np.ndarray | float | None = None,
+    gamma_prime_z: np.ndarray | float | None = None,
+    magnetic_field_abc: np.ndarray | tuple[float, float, float] = (0.0, 0.0, 0.0),
+    g_factors_abc: np.ndarray | tuple[float, float, float] = (1.0, 1.0, 1.0),
+    bohr_magneton: float = 1.0,
+    crystallographic_transform: np.ndarray | None = None,
+    spin_basis_transform: np.ndarray | None = None,
+    include_term_groups: bool = True,
+) -> QubitOperator:
+    r"""Create a flavored Kitaev-Heisenberg-Gamma model on a lattice.
+
+    For a connection of flavor :math:`\gamma`, with :math:`(\alpha,\beta)` denoting the other two spin components,
+
+    .. math::
+
+        H_{ij,\gamma} = J\,\mathbf{S}_i\cdot\mathbf{S}_j
+        + K_\gamma S_i^\gamma S_j^\gamma
+        + \Gamma_\gamma(S_i^\alpha S_j^\beta + S_i^\beta S_j^\alpha)
+        + \Gamma'_\gamma(S_i^\alpha S_j^\gamma + S_i^\gamma S_j^\alpha
+        + S_i^\beta S_j^\gamma + S_i^\gamma S_j^\beta).
+
+    Scalars and arrays retain the nearest-neighbor behavior and adjacency weighting. A mapping ``{m: coupling}``
+    applies ``kx``, ``ky``, ``kz``, or ``j`` to geometric shell ``m`` independently of adjacency weights.
+    ``gamma_x``, ``gamma_y``, ``gamma_z`` and their primed counterparts apply to first-neighbor bonds; omitted
+    flavor-specific values fall back to ``gamma`` or ``gamma_prime``. Distinct periodic-image connections are
+    accumulated when they collapse onto the same finite-lattice site pair.
+
+    The magnetic field is specified in the crystallographic :math:`(a,b,c)` frame and contributes
+
+    .. math::
+
+        \mu_B \sum_i (g_a H_a S_i^a + g_b H_b S_i^b + g_c H_c S_i^c).
+
+    ``bohr_magneton`` converts the field units to the energy units used by the exchange parameters and defaults to
+    one for reduced-unit calculations. ``crystallographic_transform`` must be supplied for a nonzero field and
+    defines :math:`\mathbf{S}_{abc}=D\mathbf{S}_{xyz}` for the lattice-specific crystallographic frame.
+    The returned operator uses Pauli matrices, so two-body coefficients include
+    :math:`S_i^\mu S_j^\nu=\sigma_i^\mu\sigma_j^\nu/4`, while field coefficients include
+    :math:`S_i^\mu=\sigma_i^\mu/2`.
+
+    Args:
+        graph: Lattice graph with complete X, Y, and Z flavor metadata for every requested geometric connection.
+        kx: Kitaev coupling on X-flavor bonds as a scalar, ``(n, n)`` array, or shell mapping.
+        ky: Kitaev coupling on Y-flavor bonds in the same format as ``kx``.
+        kz: Kitaev coupling on Z-flavor bonds in the same format as ``kx``.
+        j: Heisenberg coupling in the same format as ``kx``. Defaults to 0.
+        gamma: Shared nearest-neighbor Gamma coupling used when a flavor-specific value is omitted. Defaults to 0.
+        gamma_prime: Shared nearest-neighbor Gamma-prime coupling used when no flavor-specific value is given.
+        gamma_x: Gamma coupling on X-flavor nearest-neighbor bonds. Defaults to ``gamma``.
+        gamma_y: Gamma coupling on Y-flavor nearest-neighbor bonds. Defaults to ``gamma``.
+        gamma_z: Gamma coupling on Z-flavor nearest-neighbor bonds. Defaults to ``gamma``.
+        gamma_prime_x: Gamma-prime coupling on X-flavor nearest-neighbor bonds. Defaults to ``gamma_prime``.
+        gamma_prime_y: Gamma-prime coupling on Y-flavor nearest-neighbor bonds. Defaults to ``gamma_prime``.
+        gamma_prime_z: Gamma-prime coupling on Z-flavor nearest-neighbor bonds. Defaults to ``gamma_prime``.
+        magnetic_field_abc: Magnetic-field vector ``(H_a, H_b, H_c)`` in the crystallographic frame. Defaults to zero.
+        g_factors_abc: Diagonal ``(g_a, g_b, g_c)`` factors in the crystallographic frame. Defaults to one.
+        bohr_magneton: Factor converting magnetic-field units to exchange-energy units. Defaults to 1.
+        crystallographic_transform: Proper rotation ``D`` from cubic spin components to crystallographic components.
+        spin_basis_transform: Proper rotation from Cartesian to output spin components. Defaults to identity.
+        include_term_groups: Attach an adjacency coloring partition for nearest-neighbor inputs. Defaults to ``True``.
+
+    Returns:
+        QubitOperator: The flavored spin model represented in the requested spin basis.
+
+    Raises:
+        ValueError: If the graph lacks required flavors, a shell index is invalid, or the basis transform is invalid.
+
+    """
+    if not graph.is_symmetric:
+        raise ValueError("Lattice graph must be symmetric for a valid Hamiltonian.")
+
+    def validate_transform(value: np.ndarray, name: str) -> np.ndarray:
+        matrix = np.asarray(value, dtype=float)
+        if matrix.shape != (3, 3):
+            raise ValueError(f"{name} must have shape (3, 3).")
+        if not np.all(np.isfinite(matrix)):
+            raise ValueError(f"{name} must contain only finite values.")
+        if not np.allclose(matrix @ matrix.T, np.eye(3), rtol=1e-12, atol=1e-12):
+            raise ValueError(f"{name} must be orthogonal.")
+        if not np.isclose(np.linalg.det(matrix), 1.0, rtol=1e-12, atol=1e-12):
+            raise ValueError(f"{name} must be right-handed with determinant +1.")
+        return matrix
+
+    transform = (
+        np.eye(3) if spin_basis_transform is None else validate_transform(spin_basis_transform, "spin_basis_transform")
+    )
+
+    def pair_parameter(value: np.ndarray | float, name: str) -> np.ndarray | float:
+        if isinstance(value, int | float | np.integer | np.floating):
+            return float(value)
+        return to_pair_param(value, graph, name)
+
+    parameters = {"j": j, "kx": kx, "ky": ky, "kz": kz}
+    mapped_parameters = {name for name, value in parameters.items() if isinstance(value, Mapping)}
+    prepared: dict[str, dict[int, np.ndarray | float]] = {}
+    requested_shells: set[int] = set()
+    for name, parameter in parameters.items():
+        shell_values = parameter.items() if isinstance(parameter, Mapping) else [(1, parameter)]
+        normalized: dict[int, np.ndarray | float] = {}
+        for shell, value in shell_values:
+            if isinstance(shell, bool) or not isinstance(shell, Integral) or shell < 1:
+                raise ValueError(f"{name} shell indices must be positive integers; got {shell!r}.")
+            shell_index = int(shell)
+            normalized[shell_index] = pair_parameter(value, f"{name}[{shell_index}]")
+            if np.any(normalized[shell_index] != 0.0):
+                requested_shells.add(shell_index)
+        prepared[name] = normalized
+
+    gamma_parameters = {
+        BondFlavor.X: pair_parameter(gamma if gamma_x is None else gamma_x, "gamma_x"),
+        BondFlavor.Y: pair_parameter(gamma if gamma_y is None else gamma_y, "gamma_y"),
+        BondFlavor.Z: pair_parameter(gamma if gamma_z is None else gamma_z, "gamma_z"),
+    }
+    gamma_prime_parameters = {
+        BondFlavor.X: pair_parameter(gamma_prime if gamma_prime_x is None else gamma_prime_x, "gamma_prime_x"),
+        BondFlavor.Y: pair_parameter(gamma_prime if gamma_prime_y is None else gamma_prime_y, "gamma_prime_y"),
+        BondFlavor.Z: pair_parameter(gamma_prime if gamma_prime_z is None else gamma_prime_z, "gamma_prime_z"),
+    }
+    if any(np.any(value != 0.0) for value in (*gamma_parameters.values(), *gamma_prime_parameters.values())):
+        requested_shells.add(1)
+
+    magnetic_field = np.asarray(magnetic_field_abc, dtype=float)
+    g_factors = np.asarray(g_factors_abc, dtype=float)
+    if magnetic_field.shape != (3,) or g_factors.shape != (3,):
+        raise ValueError("magnetic_field_abc and g_factors_abc must have shape (3,).")
+    if not np.all(np.isfinite(magnetic_field)) or not np.all(np.isfinite(g_factors)):
+        raise ValueError("magnetic_field_abc and g_factors_abc must contain only finite values.")
+    if not np.isfinite(bohr_magneton):
+        raise ValueError("bohr_magneton must be finite.")
+    if np.any(magnetic_field != 0.0) and crystallographic_transform is None:
+        raise ValueError("crystallographic_transform is required for a nonzero magnetic_field_abc.")
+    if crystallographic_transform is None:
+        output_field = np.zeros(3)
+    else:
+        crystal_transform = validate_transform(crystallographic_transform, "crystallographic_transform")
+        weighted_field_abc = g_factors * magnetic_field
+        # S_abc = D S_xyz and S_out = C S_xyz, hence
+        # h_abc^T S_abc = (C D^T h_abc)^T S_out.
+        weighted_field_xyz = crystal_transform.T @ weighted_field_abc
+        output_field = bohr_magneton * transform @ weighted_field_xyz / 2.0
+
+    connections = graph.neighbor_connections(sorted(requested_shells))
+    if any(connection.flavor is None for connection in connections):
+        raise ValueError("The Kitaev Hamiltonian requires bond flavors for every requested geometric connection.")
+    if any(connection.site_i == connection.site_j for connection in connections):
+        raise ValueError("Kitaev interactions cannot connect a site to its own periodic image.")
+
+    shell_one_multiplicity: dict[tuple[int, int], int] = {}
+    for connection in connections:
+        if connection.bond_class.shell == 1:
+            pair = (connection.site_i, connection.site_j)
+            shell_one_multiplicity[pair] = shell_one_multiplicity.get(pair, 0) + 1
+
+    def parameter_value(name: str, connection) -> float:
+        shell = connection.bond_class.shell
+        if shell not in prepared[name]:
+            return 0.0
+        value = prepared[name][shell]
+        result = value if isinstance(value, float) else value[connection.site_i, connection.site_j]
+        if name not in mapped_parameters:
+            pair = (connection.site_i, connection.site_j)
+            result *= graph.weight(*pair) / shell_one_multiplicity[pair]
+        return float(result)
+
+    def nearest_neighbor_value(values: dict[BondFlavor, np.ndarray | float], connection) -> float:
+        if connection.bond_class.shell != 1:
+            return 0.0
+        assert connection.flavor is not None
+        value = values[connection.flavor]
+        result = value if isinstance(value, float) else value[connection.site_i, connection.site_j]
+        pair = (connection.site_i, connection.site_j)
+        return float(result * graph.weight(*pair) / shell_one_multiplicity[pair])
+
+    flavor_indices = {BondFlavor.X: 0, BondFlavor.Y: 1, BondFlavor.Z: 2}
+    exchange_by_pair: dict[tuple[int, int], np.ndarray] = {}
+    for connection in connections:
+        assert connection.flavor is not None
+        flavor_index = flavor_indices[connection.flavor]
+        other_indices = tuple(index for index in range(3) if index != flavor_index)
+        exchange = np.eye(3) * parameter_value("j", connection)
+        exchange[flavor_index, flavor_index] += parameter_value("k" + connection.flavor.name.lower(), connection)
+        gamma_value = nearest_neighbor_value(gamma_parameters, connection)
+        gamma_prime_value = nearest_neighbor_value(gamma_prime_parameters, connection)
+        exchange[other_indices[0], other_indices[1]] = gamma_value
+        exchange[other_indices[1], other_indices[0]] = gamma_value
+        for other_index in other_indices:
+            exchange[flavor_index, other_index] = gamma_prime_value
+            exchange[other_index, flavor_index] = gamma_prime_value
+        transformed = transform @ exchange @ transform.T / 4.0
+        scale = np.max(np.abs(transformed))
+        if scale != 0.0:
+            transformed[np.abs(transformed) < 100 * np.finfo(float).eps * scale] = 0.0
+        pair = (connection.site_i, connection.site_j)
+        exchange_by_pair.setdefault(pair, np.zeros((3, 3)))
+        exchange_by_pair[pair] += transformed
+
+    pauli_components = ("X", "Y", "Z")
+    coupling_matrices = {
+        first + second: np.zeros((graph.num_sites, graph.num_sites))
+        for first in pauli_components
+        for second in pauli_components
+    }
+    for (site_i, site_j), exchange in exchange_by_pair.items():
+        for first_index, first in enumerate(pauli_components):
+            for second_index, second in enumerate(pauli_components):
+                coupling_matrices[first + second][site_i, site_j] = exchange[first_index, second_index]
+
+    couplings = list(coupling_matrices.items())
+    if include_term_groups and not mapped_parameters and graph.edge_coloring is not None:
+        return _build_geometry_grouped_hamiltonian(
+            graph,
+            couplings=couplings,
+            fields=list(zip(pauli_components, output_field, strict=True)),
+            apply_edge_weights=False,
+        )
+    if include_term_groups and mapped_parameters:
+        Logger.debug("Geometric shell couplings use ungrouped Hamiltonian construction.")
+
+    pauli_strings: list[str] = []
+    coefficients: list[complex] = []
+    for (site_i, site_j), exchange in sorted(exchange_by_pair.items()):
+        for first_index, first in enumerate(pauli_components):
+            for second_index, second in enumerate(pauli_components):
+                coefficient = exchange[first_index, second_index]
+                if coefficient == 0.0:
+                    continue
+                pauli = ["I"] * graph.num_sites
+                pauli[site_i] = first
+                pauli[site_j] = second
+                pauli_strings.append("".join(pauli[::-1]))
+                coefficients.append(complex(coefficient))
+    for site in range(graph.num_sites):
+        for component, coefficient in zip(pauli_components, output_field, strict=True):
+            if coefficient == 0.0:
+                continue
+            pauli = ["I"] * graph.num_sites
+            pauli[site] = component
+            pauli_strings.append("".join(pauli[::-1]))
+            coefficients.append(complex(coefficient))
+    if not pauli_strings:
+        pauli_strings = ["I" * graph.num_sites]
         coefficients = [0.0 + 0.0j]
     return QubitOperator(pauli_strings, np.array(coefficients))
 

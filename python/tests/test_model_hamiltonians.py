@@ -8,12 +8,20 @@
 import numpy as np
 import pytest
 
-from qdk_chemistry.data import Hamiltonian, LatticeGraph, QubitOperator
+from qdk_chemistry.data import (
+    BondFlavor,
+    BondFlavorDefinition,
+    Hamiltonian,
+    HoneycombSizeConvention,
+    LatticeGraph,
+    QubitOperator,
+)
 from qdk_chemistry.utils.model_hamiltonians import (
     create_heisenberg_hamiltonian,
     create_hubbard_hamiltonian,
     create_huckel_hamiltonian,
     create_ising_hamiltonian,
+    create_kitaev_hamiltonian,
     create_ppp_hamiltonian,
     mataga_nishimoto_potential,
     ohno_potential,
@@ -309,6 +317,27 @@ class TestModelHamiltonians:
             axial_distance_two[n * n - 1 - 2] = pauli_char
             assert "".join(axial_distance_two) not in terms
 
+    def test_honeycomb_positions_define_one_cell_shells(self):
+        unit_cell = LatticeGraph.honeycomb(1, 1)
+        assert unit_cell.num_sites == 2
+        assert unit_cell.num_edges == 1
+
+        graph = LatticeGraph.honeycomb(
+            1,
+            1,
+            size_convention=HoneycombSizeConvention.COMPLETE_PLAQUETTES,
+        )
+        positions = graph.positions
+        assert positions.shape == (6, 2)
+
+        shells = graph.nearest_neighbor_shells([1, 2, 3])
+        for shell, expected_distance in ((1, 1.0), (2, np.sqrt(3.0)), (3, 2.0)):
+            distances = [np.linalg.norm(positions[site_j] - positions[site_i]) for site_i, site_j in shells[shell]]
+            assert distances == pytest.approx(
+                [expected_distance] * len(distances),
+                abs=float_comparison_absolute_tolerance,
+            )
+
     def test_heisenberg_ungrouped_legacy_term_order(self):
         hamiltonian = create_heisenberg_hamiltonian(
             LatticeGraph.chain(3),
@@ -355,3 +384,525 @@ class TestModelHamiltonians:
         assert reversed_hamiltonian.pauli_strings == forward_hamiltonian.pauli_strings
         np.testing.assert_array_equal(reversed_hamiltonian.coefficients, forward_hamiltonian.coefficients)
         assert reversed_hamiltonian.content_hash() == forward_hamiltonian.content_hash()
+
+    def test_kitaev_nearest_neighbor_components(self):
+        graph = LatticeGraph.honeycomb(2, 2, periodic_x=True, periodic_y=True)
+        cases = (
+            (
+                {"j": 4.0},
+                {
+                    BondFlavor.X: {"XX": 1.0, "YY": 1.0, "ZZ": 1.0},
+                    BondFlavor.Y: {"XX": 1.0, "YY": 1.0, "ZZ": 1.0},
+                    BondFlavor.Z: {"XX": 1.0, "YY": 1.0, "ZZ": 1.0},
+                },
+            ),
+            (
+                {"kx": 8.0, "ky": 12.0, "kz": 16.0},
+                {
+                    BondFlavor.X: {"XX": 2.0},
+                    BondFlavor.Y: {"YY": 3.0},
+                    BondFlavor.Z: {"ZZ": 4.0},
+                },
+            ),
+            (
+                {"gamma": 20.0},
+                {
+                    BondFlavor.X: {"YZ": 5.0, "ZY": 5.0},
+                    BondFlavor.Y: {"XZ": 5.0, "ZX": 5.0},
+                    BondFlavor.Z: {"XY": 5.0, "YX": 5.0},
+                },
+            ),
+            (
+                {"gamma_prime": 24.0},
+                {
+                    BondFlavor.X: {"XY": 6.0, "YX": 6.0, "XZ": 6.0, "ZX": 6.0},
+                    BondFlavor.Y: {"XY": 6.0, "YX": 6.0, "YZ": 6.0, "ZY": 6.0},
+                    BondFlavor.Z: {"XZ": 6.0, "ZX": 6.0, "YZ": 6.0, "ZY": 6.0},
+                },
+            ),
+        )
+
+        connections = graph.neighbor_connections([1])
+        for overrides, expected_by_flavor in cases:
+            parameters = {"kx": 0.0, "ky": 0.0, "kz": 0.0, "j": 0.0, "gamma": 0.0, "gamma_prime": 0.0}
+            parameters.update(overrides)
+            hamiltonian = create_kitaev_hamiltonian(graph, **parameters)
+            assert hamiltonian.term_partition is not None
+            terms = _get_terms_dict(hamiltonian)
+            expected: dict[str, float] = {}
+            for connection in connections:
+                assert connection.flavor is not None
+                for pauli_label, coefficient in expected_by_flavor[connection.flavor].items():
+                    pauli = ["I"] * graph.num_sites
+                    pauli[graph.num_sites - 1 - connection.site_i] = pauli_label[0]
+                    pauli[graph.num_sites - 1 - connection.site_j] = pauli_label[1]
+                    expected["".join(pauli)] = coefficient
+            assert terms == pytest.approx(expected, abs=float_comparison_absolute_tolerance)
+
+    def test_kitaev_flavored_geometric_shells(self):
+        graph = LatticeGraph.honeycomb(5, 5)
+        shell_couplings = {1: 4.0, 2: 8.0, 3: 12.0}
+        zero_couplings = {1: 0.0, 2: 0.0, 3: 0.0}
+        hamiltonian = create_kitaev_hamiltonian(
+            graph,
+            kx=shell_couplings,
+            ky=zero_couplings,
+            kz=zero_couplings,
+        )
+        assert hamiltonian.term_partition is None
+        terms = _get_terms_dict(hamiltonian)
+        expected: dict[str, float] = {}
+        for connection in graph.neighbor_connections([1, 2, 3]):
+            if connection.flavor != BondFlavor.X:
+                continue
+            pauli = ["I"] * graph.num_sites
+            pauli[graph.num_sites - 1 - connection.site_i] = "X"
+            pauli[graph.num_sites - 1 - connection.site_j] = "X"
+            expected["".join(pauli)] = shell_couplings[connection.bond_class.shell] / 4.0
+        assert terms == pytest.approx(expected, abs=float_comparison_absolute_tolerance)
+
+        heisenberg = create_kitaev_hamiltonian(
+            graph,
+            kx=zero_couplings,
+            ky=zero_couplings,
+            kz=zero_couplings,
+            j=shell_couplings,
+        )
+        heisenberg_terms = _get_terms_dict(heisenberg)
+        expected_heisenberg: dict[str, float] = {}
+        for connection in graph.neighbor_connections([1, 2, 3]):
+            for component in "XYZ":
+                pauli = ["I"] * graph.num_sites
+                pauli[graph.num_sites - 1 - connection.site_i] = component
+                pauli[graph.num_sites - 1 - connection.site_j] = component
+                expected_heisenberg["".join(pauli)] = shell_couplings[connection.bond_class.shell] / 4.0
+        assert heisenberg_terms == pytest.approx(expected_heisenberg, abs=float_comparison_absolute_tolerance)
+
+    def test_geometric_flavors_are_optional_and_configurable(self):
+        square = LatticeGraph.square(3, 3)
+        assert all(connection.flavor is None for connection in square.neighbor_connections([1]))
+
+        flavored = square.with_bond_flavors(
+            [BondFlavorDefinition(shell=1, axis=np.array([1.0, 0.0]), flavor=BondFlavor.X)]
+        )
+        connections = flavored.neighbor_connections([1])
+        assert any(connection.flavor == BondFlavor.X for connection in connections)
+        assert any(connection.flavor is None for connection in connections)
+
+    def test_kitaev_flavor_specific_gamma_terms(self):
+        graph = LatticeGraph.honeycomb(3, 3)
+        gamma = {BondFlavor.X: 4.0, BondFlavor.Y: 8.0, BondFlavor.Z: 12.0}
+        gamma_prime = {BondFlavor.X: 16.0, BondFlavor.Y: 20.0, BondFlavor.Z: 24.0}
+        hamiltonian = create_kitaev_hamiltonian(
+            graph,
+            kx=0.0,
+            ky=0.0,
+            kz=0.0,
+            gamma_x=gamma[BondFlavor.X],
+            gamma_y=gamma[BondFlavor.Y],
+            gamma_z=gamma[BondFlavor.Z],
+            gamma_prime_x=gamma_prime[BondFlavor.X],
+            gamma_prime_y=gamma_prime[BondFlavor.Y],
+            gamma_prime_z=gamma_prime[BondFlavor.Z],
+            include_term_groups=False,
+        )
+        terms = _get_terms_dict(hamiltonian)
+        flavor_index = {BondFlavor.X: 0, BondFlavor.Y: 1, BondFlavor.Z: 2}
+        components = "XYZ"
+        expected: dict[str, float] = {}
+        for connection in graph.neighbor_connections([1]):
+            assert connection.flavor is not None
+            selected = flavor_index[connection.flavor]
+            other = tuple(index for index in range(3) if index != selected)
+            matrix = np.zeros((3, 3))
+            matrix[other[0], other[1]] = matrix[other[1], other[0]] = gamma[connection.flavor] / 4.0
+            for index in other:
+                matrix[selected, index] = matrix[index, selected] = gamma_prime[connection.flavor] / 4.0
+            for first in range(3):
+                for second in range(3):
+                    if matrix[first, second] == 0.0:
+                        continue
+                    pauli = ["I"] * graph.num_sites
+                    pauli[graph.num_sites - 1 - connection.site_i] = components[first]
+                    pauli[graph.num_sites - 1 - connection.site_j] = components[second]
+                    expected["".join(pauli)] = matrix[first, second]
+        assert terms == pytest.approx(expected, abs=float_comparison_absolute_tolerance)
+
+    def test_kitaev_crystallographic_magnetic_field(self):
+        graph = LatticeGraph.honeycomb(2, 2)
+        field_abc = np.array([2.0, -3.0, 5.0])
+        g_abc = np.array([1.5, 2.0, 0.5])
+        bohr_magneton = 0.25
+        transform = np.array(
+            [
+                [1 / np.sqrt(6), 1 / np.sqrt(6), -2 / np.sqrt(6)],
+                [-1 / np.sqrt(2), 1 / np.sqrt(2), 0.0],
+                [1 / np.sqrt(3), 1 / np.sqrt(3), 1 / np.sqrt(3)],
+            ]
+        )
+
+        def expected_field_terms(coefficients: np.ndarray) -> dict[str, float]:
+            expected: dict[str, float] = {}
+            for site in range(graph.num_sites):
+                for component, coefficient in zip("XYZ", coefficients, strict=True):
+                    pauli = ["I"] * graph.num_sites
+                    pauli[graph.num_sites - 1 - site] = component
+                    expected["".join(pauli)] = coefficient
+            return expected
+
+        cubic = create_kitaev_hamiltonian(
+            graph,
+            0.0,
+            0.0,
+            0.0,
+            magnetic_field_abc=field_abc,
+            g_factors_abc=g_abc,
+            bohr_magneton=bohr_magneton,
+            crystallographic_transform=transform,
+            include_term_groups=False,
+        )
+        cubic_coefficients = bohr_magneton * transform.T @ (g_abc * field_abc) / 2.0
+        assert _get_terms_dict(cubic) == pytest.approx(
+            expected_field_terms(cubic_coefficients), abs=float_comparison_absolute_tolerance
+        )
+
+        crystallographic = create_kitaev_hamiltonian(
+            graph,
+            0.0,
+            0.0,
+            0.0,
+            magnetic_field_abc=field_abc,
+            g_factors_abc=g_abc,
+            bohr_magneton=bohr_magneton,
+            crystallographic_transform=transform,
+            spin_basis_transform=transform,
+            include_term_groups=False,
+        )
+        abc_coefficients = bohr_magneton * g_abc * field_abc / 2.0
+        assert _get_terms_dict(crystallographic) == pytest.approx(
+            expected_field_terms(abc_coefficients), abs=float_comparison_absolute_tolerance
+        )
+
+        identity_crystal_frame = create_kitaev_hamiltonian(
+            graph,
+            0.0,
+            0.0,
+            0.0,
+            magnetic_field_abc=field_abc,
+            g_factors_abc=g_abc,
+            bohr_magneton=bohr_magneton,
+            crystallographic_transform=np.eye(3),
+            include_term_groups=False,
+        )
+        assert _get_terms_dict(identity_crystal_frame) == pytest.approx(
+            expected_field_terms(abc_coefficients), abs=float_comparison_absolute_tolerance
+        )
+
+        grouped = create_kitaev_hamiltonian(
+            graph,
+            0.0,
+            0.0,
+            0.0,
+            magnetic_field_abc=field_abc,
+            g_factors_abc=g_abc,
+            bohr_magneton=bohr_magneton,
+            crystallographic_transform=transform,
+        )
+        assert grouped.term_partition is not None
+        assert _get_terms_dict(grouped) == pytest.approx(
+            expected_field_terms(cubic_coefficients), abs=float_comparison_absolute_tolerance
+        )
+
+    def test_kitaev_field_matches_explicit_crystallographic_spin_operators(self):
+        field_abc = np.array([2.0, -3.0, 5.0])
+        g_abc = np.array([1.5, 2.0, 0.5])
+        bohr_magneton = 0.25
+        transform = np.array(
+            [
+                [1 / np.sqrt(6), 1 / np.sqrt(6), -2 / np.sqrt(6)],
+                [-1 / np.sqrt(2), 1 / np.sqrt(2), 0.0],
+                [1 / np.sqrt(3), 1 / np.sqrt(3), 1 / np.sqrt(3)],
+            ]
+        )
+        spin_xyz = np.array(
+            [
+                [[0.0, 0.5], [0.5, 0.0]],
+                [[0.0, -0.5j], [0.5j, 0.0]],
+                [[0.5, 0.0], [0.0, -0.5]],
+            ],
+            dtype=complex,
+        )
+        spin_abc = np.einsum("ai,ijk->ajk", transform, spin_xyz)
+        expected = bohr_magneton * np.einsum("a,aij->ij", g_abc * field_abc, spin_abc)
+
+        actual = create_kitaev_hamiltonian(
+            LatticeGraph.chain(1),
+            0.0,
+            0.0,
+            0.0,
+            magnetic_field_abc=field_abc,
+            g_factors_abc=g_abc,
+            bohr_magneton=bohr_magneton,
+            crystallographic_transform=transform,
+            include_term_groups=False,
+        )
+
+        np.testing.assert_allclose(actual.to_matrix(), expected, atol=1e-15)
+
+    def test_kitaev_crystallographic_transform(self):
+        graph = LatticeGraph.honeycomb(3, 3)
+        j = 1.1
+        k = -2.3
+        gamma = 0.7
+        gamma_prime = -0.2
+        transform = np.array(
+            [
+                [1 / np.sqrt(6), 1 / np.sqrt(6), -2 / np.sqrt(6)],
+                [-1 / np.sqrt(2), 1 / np.sqrt(2), 0.0],
+                [1 / np.sqrt(3), 1 / np.sqrt(3), 1 / np.sqrt(3)],
+            ]
+        )
+        actual = _get_terms_dict(
+            create_kitaev_hamiltonian(
+                graph,
+                kx=k,
+                ky=k,
+                kz=k,
+                j=j,
+                gamma=gamma,
+                gamma_prime=gamma_prime,
+                spin_basis_transform=transform,
+                include_term_groups=False,
+            )
+        )
+
+        coefficient_a = k / 3 + 2 * (gamma - gamma_prime) / 3
+        coefficient_b = k / 3 - (gamma - gamma_prime) / 3
+        j_ab = j + coefficient_b - gamma_prime
+        j_c = j + coefficient_a + 2 * gamma_prime
+        phases = {BondFlavor.Z: 0.0, BondFlavor.X: 2 * np.pi / 3, BondFlavor.Y: 4 * np.pi / 3}
+        expected: dict[str, float] = {}
+        components = ("X", "Y", "Z")
+        for connection in graph.neighbor_connections([1]):
+            assert connection.flavor is not None
+            cosine = np.cos(phases[connection.flavor])
+            sine = np.sin(phases[connection.flavor])
+            exchange = np.array(
+                [
+                    [j_ab + coefficient_a * cosine, -coefficient_a * sine, -np.sqrt(2) * coefficient_b * cosine],
+                    [-coefficient_a * sine, j_ab - coefficient_a * cosine, -np.sqrt(2) * coefficient_b * sine],
+                    [-np.sqrt(2) * coefficient_b * cosine, -np.sqrt(2) * coefficient_b * sine, j_c],
+                ]
+            )
+            exchange[np.abs(exchange) < 100 * np.finfo(float).eps * np.max(np.abs(exchange))] = 0.0
+            for first_index, first in enumerate(components):
+                for second_index, second in enumerate(components):
+                    coefficient = exchange[first_index, second_index] / 4.0
+                    if coefficient == 0.0:
+                        continue
+                    pauli = ["I"] * graph.num_sites
+                    pauli[graph.num_sites - 1 - connection.site_i] = first
+                    pauli[graph.num_sites - 1 - connection.site_j] = second
+                    expected["".join(pauli)] = coefficient
+        assert actual == pytest.approx(expected, abs=float_comparison_absolute_tolerance)
+
+    def test_kitaev_crystallographic_transform_preserves_spin_algebra(self):
+        transform = np.array(
+            [
+                [1 / np.sqrt(6), 1 / np.sqrt(6), -2 / np.sqrt(6)],
+                [-1 / np.sqrt(2), 1 / np.sqrt(2), 0.0],
+                [1 / np.sqrt(3), 1 / np.sqrt(3), 1 / np.sqrt(3)],
+            ]
+        )
+        spin_xyz = np.array(
+            [
+                [[0.0, 0.5], [0.5, 0.0]],
+                [[0.0, -0.5j], [0.5j, 0.0]],
+                [[0.5, 0.0], [0.0, -0.5]],
+            ],
+            dtype=complex,
+        )
+        spin_abc = np.einsum("ai,ijk->ajk", transform, spin_xyz)
+
+        np.testing.assert_allclose(transform @ transform.T, np.eye(3), atol=1e-15)
+        assert np.linalg.det(transform) == pytest.approx(1.0, abs=1e-15)
+        for first, second, third in ((0, 1, 2), (1, 2, 0), (2, 0, 1)):
+            commutator = spin_abc[first] @ spin_abc[second] - spin_abc[second] @ spin_abc[first]
+            np.testing.assert_allclose(commutator, 1.0j * spin_abc[third], atol=1e-15)
+
+    def test_kitaev_accumulates_periodic_flavor_collisions(self):
+        graph = LatticeGraph.honeycomb(2, 2, periodic_x=True, periodic_y=True)
+        couplings = {BondFlavor.X: 4.0, BondFlavor.Y: 8.0, BondFlavor.Z: 12.0}
+        hamiltonian = create_kitaev_hamiltonian(
+            graph,
+            kx={3: couplings[BondFlavor.X]},
+            ky={3: couplings[BondFlavor.Y]},
+            kz={3: couplings[BondFlavor.Z]},
+        )
+        terms = _get_terms_dict(hamiltonian)
+        expected: dict[str, float] = {}
+        pauli_for_flavor = {BondFlavor.X: "X", BondFlavor.Y: "Y", BondFlavor.Z: "Z"}
+        for connection in graph.neighbor_connections([3]):
+            assert connection.flavor is not None
+            pauli_char = pauli_for_flavor[connection.flavor]
+            pauli = ["I"] * graph.num_sites
+            pauli[graph.num_sites - 1 - connection.site_i] = pauli_char
+            pauli[graph.num_sites - 1 - connection.site_j] = pauli_char
+            pauli_string = "".join(pauli)
+            expected[pauli_string] = expected.get(pauli_string, 0.0) + couplings[connection.flavor] / 4.0
+        assert terms == pytest.approx(expected, abs=float_comparison_absolute_tolerance)
+
+    def test_kitaev_requires_flavored_connections(self):
+        with pytest.raises(ValueError, match="requires bond flavors"):
+            create_kitaev_hamiltonian(LatticeGraph.square(3, 3), kx=1.0, ky=1.0, kz=1.0)
+
+        graph = LatticeGraph.honeycomb(3, 3)
+        invalid_transforms = (
+            (np.eye(2), "shape"),
+            (np.array([[np.nan, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]), "finite"),
+            (np.diag([2.0, 1.0, 1.0]), "orthogonal"),
+            (np.diag([-1.0, 1.0, 1.0]), "right-handed"),
+        )
+        for transform, message in invalid_transforms:
+            with pytest.raises(ValueError, match=message):
+                create_kitaev_hamiltonian(graph, 1.0, 1.0, 1.0, spin_basis_transform=transform)
+            with pytest.raises(ValueError, match=message):
+                create_kitaev_hamiltonian(
+                    graph,
+                    0.0,
+                    0.0,
+                    0.0,
+                    magnetic_field_abc=np.ones(3),
+                    crystallographic_transform=transform,
+                )
+
+        with pytest.raises(ValueError, match="shape"):
+            create_kitaev_hamiltonian(graph, 0.0, 0.0, 0.0, magnetic_field_abc=np.zeros(2))
+        with pytest.raises(ValueError, match="crystallographic_transform"):
+            create_kitaev_hamiltonian(graph, 0.0, 0.0, 0.0, magnetic_field_abc=np.ones(3))
+        with pytest.raises(ValueError, match="finite"):
+            create_kitaev_hamiltonian(graph, 0.0, 0.0, 0.0, g_factors_abc=np.array([1.0, np.nan, 1.0]))
+        with pytest.raises(ValueError, match="bohr_magneton"):
+            create_kitaev_hamiltonian(graph, 0.0, 0.0, 0.0, bohr_magneton=np.inf)
+
+    def test_kitaev_shell_mapping_order_is_deterministic(self):
+        graph = LatticeGraph.honeycomb(3, 3)
+        forward = {1: 1.0, 2: -0.5, 3: 0.25}
+        reversed_order = {3: 0.25, 2: -0.5, 1: 1.0}
+        forward_hamiltonian = create_kitaev_hamiltonian(graph, forward, forward, forward)
+        reversed_hamiltonian = create_kitaev_hamiltonian(graph, reversed_order, reversed_order, reversed_order)
+        assert reversed_hamiltonian.pauli_strings == forward_hamiltonian.pauli_strings
+        np.testing.assert_array_equal(reversed_hamiltonian.coefficients, forward_hamiltonian.coefficients)
+        assert reversed_hamiltonian.content_hash() == forward_hamiltonian.content_hash()
+
+    def test_kitaev_open_hexagon_matches_explicit_matrix(self):
+        graph = LatticeGraph.honeycomb(
+            1,
+            1,
+            size_convention=HoneycombSizeConvention.COMPLETE_PLAQUETTES,
+        )
+        bonds = {
+            (1, BondFlavor.X): {(0, 1), (4, 5)},
+            (1, BondFlavor.Y): {(0, 3), (2, 5)},
+            (1, BondFlavor.Z): {(1, 2), (3, 4)},
+            (2, BondFlavor.X): {(0, 4), (1, 5)},
+            (2, BondFlavor.Y): {(0, 2), (3, 5)},
+            (2, BondFlavor.Z): {(1, 3), (2, 4)},
+            (3, BondFlavor.X): {(2, 3)},
+            (3, BondFlavor.Y): {(1, 4)},
+            (3, BondFlavor.Z): {(0, 5)},
+        }
+        actual_bonds: dict[tuple[int, BondFlavor], set[tuple[int, int]]] = {}
+        for connection in graph.neighbor_connections([1, 2, 3]):
+            assert connection.flavor is not None
+            key = (connection.bond_class.shell, connection.flavor)
+            actual_bonds.setdefault(key, set()).add((connection.site_i, connection.site_j))
+        assert actual_bonds == bonds
+
+        transform = np.array(
+            [
+                [1 / np.sqrt(6), 1 / np.sqrt(6), -2 / np.sqrt(6)],
+                [-1 / np.sqrt(2), 1 / np.sqrt(2), 0.0],
+                [1 / np.sqrt(3), 1 / np.sqrt(3), 1 / np.sqrt(3)],
+            ]
+        )
+        kitaev = {1: -13.3, 2: -0.67, 3: 0.1}
+        heisenberg = {1: -1.3, 2: 0.0, 3: 1.0}
+        gamma = 9.4
+        gamma_prime = -2.3
+        field_abc = np.array([0.0, 10.0, 0.0])
+        g_factors = np.array([2.3, 2.3, 1.3])
+        bohr_magneton = 5.988e-2
+
+        actual = create_kitaev_hamiltonian(
+            graph,
+            kx=kitaev,
+            ky=kitaev,
+            kz=kitaev,
+            j={1: heisenberg[1], 3: heisenberg[3]},
+            gamma=gamma,
+            gamma_prime=gamma_prime,
+            magnetic_field_abc=field_abc,
+            g_factors_abc=g_factors,
+            bohr_magneton=bohr_magneton,
+            crystallographic_transform=transform,
+            include_term_groups=False,
+        )
+        explicit_zero_j2 = create_kitaev_hamiltonian(
+            graph,
+            kx=kitaev,
+            ky=kitaev,
+            kz=kitaev,
+            j=heisenberg,
+            gamma=gamma,
+            gamma_prime=gamma_prime,
+            magnetic_field_abc=field_abc,
+            g_factors_abc=g_factors,
+            bohr_magneton=bohr_magneton,
+            crystallographic_transform=transform,
+            include_term_groups=False,
+        )
+        np.testing.assert_allclose(actual.to_matrix(), explicit_zero_j2.to_matrix(), atol=0.0, rtol=0.0)
+
+        pauli = {
+            "X": np.array([[0.0, 1.0], [1.0, 0.0]], dtype=complex),
+            "Y": np.array([[0.0, -1.0j], [1.0j, 0.0]], dtype=complex),
+            "Z": np.array([[1.0, 0.0], [0.0, -1.0]], dtype=complex),
+        }
+        identity = np.eye(2, dtype=complex)
+
+        def term_matrix(operators: dict[int, str]) -> np.ndarray:
+            result = np.array([[1.0 + 0.0j]])
+            for site in reversed(range(6)):
+                result = np.kron(result, pauli[operators[site]] if site in operators else identity)
+            return result
+
+        expected = np.zeros((64, 64), dtype=complex)
+        flavor_index = {BondFlavor.X: 0, BondFlavor.Y: 1, BondFlavor.Z: 2}
+        components = "XYZ"
+        for (shell, flavor), pairs in bonds.items():
+            selected = flavor_index[flavor]
+            other = tuple(index for index in range(3) if index != selected)
+            exchange = np.eye(3) * heisenberg[shell]
+            exchange[selected, selected] += kitaev[shell]
+            if shell == 1:
+                exchange[other[0], other[1]] = exchange[other[1], other[0]] = gamma
+                for index in other:
+                    exchange[selected, index] = exchange[index, selected] = gamma_prime
+            for site_i, site_j in pairs:
+                for first in range(3):
+                    for second in range(3):
+                        expected += (
+                            exchange[first, second]
+                            / 4.0
+                            * term_matrix({site_i: components[first], site_j: components[second]})
+                        )
+        field_xyz = bohr_magneton * transform.T @ (g_factors * field_abc) / 2.0
+        for site in range(6):
+            for index, component in enumerate(components):
+                expected += field_xyz[index] * term_matrix({site: component})
+
+        np.testing.assert_allclose(actual.to_matrix(), expected, atol=1e-12, rtol=0.0)
+        eigenvalues = np.linalg.eigvalsh(expected)
+        assert eigenvalues[0] == pytest.approx(-31.590058786230344, abs=1e-12)
+        assert eigenvalues[1] - eigenvalues[0] == pytest.approx(4.214007173911412, abs=1e-12)

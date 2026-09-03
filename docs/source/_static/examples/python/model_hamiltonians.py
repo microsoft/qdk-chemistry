@@ -13,6 +13,7 @@ from qdk_chemistry.utils.model_hamiltonians import (
     create_hubbard_hamiltonian,
     create_huckel_hamiltonian,
     create_ising_hamiltonian,
+    create_kitaev_hamiltonian,
     create_ppp_hamiltonian,
     mataga_nishimoto_potential,
     ohno_potential,
@@ -110,6 +111,41 @@ print(f"Heisenberg Hamiltonian ({lattice.num_sites} qubits):")
 print(f"  Number of Pauli terms: {len(qubit_hamiltonian.pauli_strings)}")
 print(f"  Is Hermitian: {qubit_hamiltonian.is_hermitian()}")
 # end-cell-create-heisenberg
+################################################################################
+
+################################################################################
+# start-cell-create-kitaev
+# Honeycomb X/Y/Z flavor classes are defined for geometric shells 1, 2, and 3.
+lattice = LatticeGraph.honeycomb(4, 4, periodic_x=True, periodic_y=True)
+honeycomb_crystallographic_transform = np.array(
+    [
+        [1 / np.sqrt(6), 1 / np.sqrt(6), -2 / np.sqrt(6)],
+        [-1 / np.sqrt(2), 1 / np.sqrt(2), 0.0],
+        [1 / np.sqrt(3), 1 / np.sqrt(3), 1 / np.sqrt(3)],
+    ]
+)
+qubit_hamiltonian = create_kitaev_hamiltonian(
+    lattice,
+    kx={1: -1.0, 2: -0.2, 3: -0.1},
+    ky={1: -1.0, 2: -0.2, 3: -0.1},
+    kz={1: -1.0, 2: -0.2, 3: -0.1},
+    j={1: 0.1, 2: 0.02, 3: 0.05},
+    gamma_x=0.03,
+    gamma_y=0.04,
+    gamma_z=0.05,
+    gamma_prime_x=0.01,
+    gamma_prime_y=0.015,
+    gamma_prime_z=0.02,
+    magnetic_field_abc=np.array([0.0, 0.0, 0.1]),
+    g_factors_abc=np.array([2.3, 2.3, 1.3]),
+    bohr_magneton=1.0,  # Reduced units; provide the conversion factor for physical field units.
+    crystallographic_transform=honeycomb_crystallographic_transform,
+)
+
+print(f"Kitaev Hamiltonian ({lattice.num_sites} qubits):")
+print(f"  Number of Pauli terms: {len(qubit_hamiltonian.pauli_strings)}")
+print(f"  Is Hermitian: {qubit_hamiltonian.is_hermitian()}")
+# end-cell-create-kitaev
 ################################################################################
 
 ################################################################################

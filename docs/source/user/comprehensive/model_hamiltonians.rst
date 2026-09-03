@@ -24,6 +24,7 @@ Spin models
 
    * **Heisenberg** — anisotropic spin-spin coupling with external magnetic fields
    * **Ising** — special case of Heisenberg with ZZ coupling and transverse X field
+   * **Kitaev-Heisenberg-Gamma** — flavor-dependent diagonal and off-diagonal spin interactions
 
 All model Hamiltonian builders take a :doc:`LatticeGraph <data/lattice_graph>` as their first argument, which defines the site connectivity and hopping structure.
 For a brief description of the available model Hamiltonian builders, see the table below.
@@ -57,6 +58,10 @@ For a more detailed description of each model Hamiltonian and their parameters, 
      - Spin
      - QubitOperator
      - ZZ coupling + transverse X field
+   * - ``create_kitaev_hamiltonian``
+     - Spin
+     - QubitOperator
+     - Flavor-dependent Kitaev, Heisenberg, Gamma, and Gamma-prime interactions
 
 Fermionic models
 ----------------
@@ -271,6 +276,95 @@ The transverse-field Ising model is a special case of the Heisenberg model with 
       :start-after: # start-cell-create-ising
       :end-before: # end-cell-create-ising
 
+.. _model-kitaev:
+
+Kitaev-Heisenberg-Gamma model
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The flavored Kitaev builder assigns an exchange matrix to each physical lattice connection.
+For the first three geometric shells, let :math:`X_m`, :math:`Y_m`, and :math:`Z_m` denote the three flavored bond-axis classes and :math:`N_m=X_m\cup Y_m\cup Z_m`.
+The extended model is
+
+.. math::
+
+   H_K={}&\sum_{m=1}^3\left[
+      K_{x,m}\sum_{ij\in X_m}S_i^xS_j^x+
+      K_{y,m}\sum_{ij\in Y_m}S_i^yS_j^y+
+      K_{z,m}\sum_{ij\in Z_m}S_i^zS_j^z\right]\\
+   &+\sum_{m=1}^3J_m\sum_{ij\in N_m}
+      \left(S_i^xS_j^x+S_i^yS_j^y+S_i^zS_j^z\right)\\
+   &+\sum_{\gamma\in\{x,y,z\}}\Gamma_\gamma
+      \sum_{ij\in \mathcal B_{\gamma,1}}
+      \left(S_i^\alpha S_j^\beta+S_i^\beta S_j^\alpha\right)\\
+   &+\sum_{\gamma\in\{x,y,z\}}\Gamma'_\gamma
+      \sum_{ij\in \mathcal B_{\gamma,1}}\left(
+      S_i^\gamma S_j^\alpha+S_i^\alpha S_j^\gamma+
+      S_i^\gamma S_j^\beta+S_i^\beta S_j^\gamma\right)\\
+   &+\mu_B\sum_i\left(g_aH_aS_i^a+g_bH_bS_i^b+g_cH_cS_i^c\right),
+
+where :math:`\mathcal B_{x,m}=X_m`, :math:`\mathcal B_{y,m}=Y_m`, :math:`\mathcal B_{z,m}=Z_m`, and :math:`(\alpha,\beta,\gamma)` is :math:`(y,z,x)`, :math:`(z,x,y)`, or :math:`(x,y,z)` on an X-, Y-, or Z-flavor bond, respectively.
+The off-diagonal :math:`\Gamma_\gamma` and :math:`\Gamma'_\gamma` interactions apply to first-neighbor bonds.
+
+Here :math:`S_i^\mu=\sigma_i^\mu/2` is a spin-1/2 operator.
+The returned :class:`~qdk_chemistry.data.QubitOperator` is expressed in Pauli matrices, so every two-body exchange coefficient is divided by four and every magnetic-field coefficient is divided by two.
+Scalar and array parameters retain adjacency-based nearest-neighbor behavior and multiply edge weights.
+A mapping ``{m: coupling}`` selects geometric shell :math:`m` independently of adjacency weights.
+The shared ``gamma`` and ``gamma_prime`` arguments provide isotropic defaults; ``gamma_x``, ``gamma_y``, ``gamma_z`` and their primed counterparts override individual flavors.
+
+The lattice must provide semantic flavors for every selected :class:`~qdk_chemistry.data.NeighborConnection`.
+The honeycomb factory supplies ``X``, ``Y``, and ``Z`` labels for shells 1–3, producing the nine classes :math:`X_m`, :math:`Y_m`, and :math:`Z_m` depicted by the standard extended-honeycomb convention.
+When distinct periodic images collapse onto one finite-lattice pair, their exchange contributions are accumulated rather than discarded.
+
+The magnetic field and diagonal g factors are supplied in a crystallographic :math:`(a,b,c)` frame.
+Because its orientation is lattice-dependent, the caller supplies ``crystallographic_transform`` as the proper rotation :math:`D` satisfying
+
+.. math::
+
+   \begin{pmatrix}S^a\\S^b\\S^c\end{pmatrix}
+   =D\begin{pmatrix}S^x\\S^y\\S^z\end{pmatrix}.
+
+For the honeycomb convention used in the accompanying example, one possible transform is
+
+.. math::
+
+   D=\begin{pmatrix}
+   1/\sqrt6&1/\sqrt6&-2/\sqrt6\\
+   -1/\sqrt2&1/\sqrt2&0\\
+   1/\sqrt3&1/\sqrt3&1/\sqrt3
+   \end{pmatrix}.
+
+For a nonzero ``magnetic_field_abc``, ``crystallographic_transform`` is required.
+The implementation transforms the spin operators through the rows of :math:`D`:
+
+.. math::
+
+   S^a=\sum_\mu D_{a\mu}S^\mu,
+   \qquad
+   S^b=\sum_\mu D_{b\mu}S^\mu,
+   \qquad
+   S^c=\sum_\mu D_{c\mu}S^\mu.
+
+When the result is stored in the fixed cubic Pauli basis, substituting those transformed operators gives the exactly equivalent coefficient representation
+
+.. math::
+
+   \boldsymbol{h}_{abc}^{\mathsf T}\boldsymbol{S}_{abc}
+   =\boldsymbol{h}_{abc}^{\mathsf T}D\boldsymbol{S}_{xyz}
+   =\left(D^{\mathsf T}\boldsymbol{h}_{abc}\right)^{\mathsf T}\boldsymbol{S}_{xyz},
+
+where :math:`\boldsymbol{h}_{abc}=\mu_B(g_aH_a,g_bH_b,g_cH_c)^{\mathsf T}`.
+Thus applying :math:`D^{\mathsf T}` to the coefficients is not a transformation of the field alone; it is the expansion of :math:`S^a`, :math:`S^b`, and :math:`S^c` in the cubic Pauli-operator basis.
+More generally, if ``spin_basis_transform`` is :math:`C` with :math:`\boldsymbol{S}_{\mathrm{out}}=C\boldsymbol{S}_{xyz}`, the emitted coefficient vector is :math:`CD^{\mathsf T}\boldsymbol{h}_{abc}/2` because :math:`S^\mu=\sigma^\mu/2`.
+Passing :math:`C=D` expresses both exchange and field terms directly in the crystallographic frame.
+``bohr_magneton`` converts the supplied field units into the energy units of the exchange parameters and defaults to one for reduced-unit calculations.
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../_static/examples/python/model_hamiltonians.py
+      :language: python
+      :start-after: # start-cell-create-kitaev
+      :end-before: # end-cell-create-kitaev
+
 .. _model-term-partition:
 
 Geometry-aware term grouping
@@ -305,9 +399,10 @@ Per-pair parameters
    Used for: hopping (:math:`t`), intersite potential (:math:`V`), spin couplings (:math:`J_x, J_y, J_z`).
 
 Geometric-shell spin couplings
-   The Heisenberg and Ising builders also accept a mapping ``{m: coupling}``, where each positive integer ``m`` selects ``LatticeGraph.mth_nearest_neighbors(m)`` and each coupling is a scalar or ``(n, n)`` array.
+   The Heisenberg, Ising, and Kitaev builders also accept a mapping ``{m: coupling}``, where each positive integer ``m`` selects geometric shell :math:`m` and each coupling is a scalar or ``(n, n)`` array.
    Shell couplings are independent of adjacency edge weights.
    For example, passing ``{1: J1, 2: J2}`` for each of ``jx``, ``jy``, and ``jz`` constructs an isotropic first- and second-neighbor Heisenberg model.
+   For the Kitaev builder, ``kx``, ``ky``, and ``kz`` select the corresponding semantic flavor within each requested shell.
 
 .. tab:: Python API
 
