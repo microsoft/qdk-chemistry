@@ -34,10 +34,6 @@ FactorizedHamiltonianContainer::FactorizedHamiltonianContainer(
       _energy_gap(energy_gap) {
   QDK_LOG_TRACE_ENTERING();
 
-  // An empty `signs` is the documented shorthand for an all-positive
-  // factorization, so it is filled in above. Any other length is a caller or
-  // payload error: silently padding or truncating it would misassign signs
-  // across fragments and flip the sign of a two-body term.
   if (_signs.size() != _wb.rows()) {
     throw std::invalid_argument(
         "Factorized Hamiltonian expects one sign per rank, but got " +
