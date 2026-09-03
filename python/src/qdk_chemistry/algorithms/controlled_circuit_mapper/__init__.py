@@ -8,6 +8,10 @@
 from .base import ControlledCircuitMapperFactory, ControlledCircuitMapperSettings
 from .controlled_pauli_sequence_mapper import ControlledPauliSequenceMapper
 from .controlled_psp_mapper import ControlledPSPMapper, ControlledPSPMapperSettings
+from .controlled_swap_pauli_sequence_mapper import (
+    ControlledSwapPauliSequenceMapper,
+    ControlledSwapPauliSequenceMapperSettings,
+)
 from .foqcs_mapper import FoqcsMapper
 
 __all__ = [
@@ -16,5 +20,7 @@ __all__ = [
     "ControlledPSPMapper",
     "ControlledPSPMapperSettings",
     "ControlledPauliSequenceMapper",
+    "ControlledSwapPauliSequenceMapper",
+    "ControlledSwapPauliSequenceMapperSettings",
     "FoqcsMapper",
 ]

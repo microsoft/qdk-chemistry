@@ -25,11 +25,11 @@ After completing this chapter, you will be able to:
    Record trial-state fidelity and state-preparation logical circuit statistics as separate quantities.
    Explain how determinant truncation changes the ground-state weight, its influence on phase-estimation outcomes, and the cost of preparing the trial state.
 
-Example download
-================
+Example files
+=============
 
-Download :download:`tutorial_prepare_trial_state.py <../../_static/examples/python/tutorial_prepare_trial_state.py>` and :download:`tutorial_prepare_trial_state.ipynb <../../_static/examples/python/tutorial_prepare_trial_state.ipynb>`, and save both files in the tutorial working directory that contains ``tutorial_choose_active_space.py`` and ``tutorial_orbital_coordinates.py``.
-Open the files in Visual Studio Code and review the complete trial-state script, including imports and helper functions omitted from the excerpts below.
+Add :download:`tutorial_prepare_trial_state.py <../../_static/examples/python/tutorial_prepare_trial_state.py>` and :download:`tutorial_prepare_trial_state.ipynb <../../_static/examples/python/tutorial_prepare_trial_state.ipynb>` to your tutorial working folder.
+Open the new files in Visual Studio Code and review the complete trial-state script, including imports and helper functions omitted from the excerpts below.
 The script imports the tested active-space workflow so that this chapter uses the same selected Hamiltonian and :term:`CASCI` reference.
 The Jupyter notebook runs that workflow, renders the one-, two-, and four-determinant logical circuits, and validates their reported structure and gate statistics.
 
@@ -167,8 +167,7 @@ This does not make the qubit unnecessary: every compute qubit represents an acti
 The later controlled time evolution in :term:`QPE` therefore requires the complete compute register and can couple the prepared determinant support to other configurations in the same sector.
 Removing a gate-free preparation wire would change the Hamiltonian representation and the molecular problem, rather than merely simplify state preparation.
 
-Before answering the next question, download and open :download:`tutorial_prepare_trial_state.ipynb <../../_static/examples/python/tutorial_prepare_trial_state.ipynb>` in Visual Studio Code.
-Save it in the tutorial working directory alongside ``tutorial_prepare_trial_state.py``, ``tutorial_choose_active_space.py``, and ``tutorial_orbital_coordinates.py``.
+Before answering the next question, open :download:`tutorial_prepare_trial_state.ipynb <../../_static/examples/python/tutorial_prepare_trial_state.ipynb>` in Visual Studio Code.
 Choose **Select Kernel**, select **Python Environments**, and choose the ``.venv`` environment created in :doc:`Before you begin <00_before_you_begin>`.
 Then select **Run All** to execute the shared trial-state workflow and render the one-, two-, and four-determinant logical circuits.
 Compare the gate types and circuit structure before revealing the answer below.
