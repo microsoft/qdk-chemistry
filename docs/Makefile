@@ -123,9 +123,6 @@ SPHINX_REGEX_FILE = ignore-sphinx-regex.txt
 SPHINX_SUMMARY_OPTIONS = -T -v -j 1 -n -w $(SPHINX_SUMMARY_WARNINGS)
 # Extra options for Sphinx command (can be specified in environment)
 SPHINX_SUMMARY_EXTRA_OPTIONS ?=
-# Ignore transient network failures when fetching intersphinx inventories;
-# these are environment issues, not documentation defects.
-SPHINX_NETWORK_IGNORE_PATTERN = failed to reach any of the inventories|not fetchable due to
 
 sphinx-autosummary: breathe sphinx-api $(SOURCE_DIR)/conf.py $(SOURCE_DIR)/index.rst
 	@echo "** Building Sphinx autosummary documentation..."
@@ -134,7 +131,7 @@ sphinx-autosummary: breathe sphinx-api $(SOURCE_DIR)/conf.py $(SOURCE_DIR)/index
 	@echo "** Sphinx autosummary documentation generated."
 	@echo "** Saved output to $(SPHINX_SUMMARY_DEBUG)."
 	@echo "** Warnings saved to $(SPHINX_SUMMARY_WARNINGS)."
-	@count=$$(grep -E "(^|: )(WARNING|ERROR|CRITICAL)(:| )" $(SPHINX_SUMMARY_DEBUG) | grep -v -E "$(SPHINX_NETWORK_IGNORE_PATTERN)" | wc -l); \
+	@count=$$(grep -E "(^|: )(WARNING|ERROR|CRITICAL)(:| )" $(SPHINX_SUMMARY_DEBUG) | wc -l); \
 	echo "** Found $$count warnings/errors in the Sphinx autosummary output."; \
 	if [ "$$count" -ne 0 ]; then \
 	    echo "** ERROR: Autosummary warnings detected. Failing build."; \
@@ -142,7 +139,7 @@ sphinx-autosummary: breathe sphinx-api $(SOURCE_DIR)/conf.py $(SOURCE_DIR)/index
 	    exit 1; \
 	fi
 	@if [ -s $(SPHINX_SUMMARY_WARNINGS) ]; then \
-	    filtered_count=$$(grep -E "(^|: )(WARNING|ERROR|CRITICAL)(:| )" $(SPHINX_SUMMARY_WARNINGS) | grep -v -E "$(SPHINX_NETWORK_IGNORE_PATTERN)" | wc -l); \
+	    filtered_count=$$(grep -E "(^|: )(WARNING|ERROR|CRITICAL)(:| )" $(SPHINX_SUMMARY_WARNINGS) | wc -l); \
 	    echo "** Found $$filtered_count autosummary warnings. Failing build."; \
 	    echo "** See $(SPHINX_SUMMARY_WARNINGS) for more information."; \
 	    exit 1; \
@@ -174,7 +171,7 @@ sphinx-docs: sphinx-autosummary
 	@echo "** Sphinx documentation generated."
 	@echo "** Saved output to $(SPHINX_DOCS_DEBUG)."
 	@echo "** Warnings saved to $(SPHINX_DOCS_WARNINGS)."
-	@count=$$(grep -E "(^|: )(WARNING|ERROR|CRITICAL)(:| )" $(SPHINX_DOCS_DEBUG) | grep -v -E "$(SPHINX_NETWORK_IGNORE_PATTERN)" | wc -l); \
+	@count=$$(grep -E "(^|: )(WARNING|ERROR|CRITICAL)(:| )" $(SPHINX_DOCS_DEBUG) | wc -l); \
 	echo "** Found $$count warnings/errors in the Sphinx documentation output."; \
 	if [ "$$count" -ne 0 ]; then \
 	    echo "** ERROR: Documentation warnings detected. Failing build."; \
@@ -189,3 +186,4 @@ clean-sphinx-docs: check
 	rm -f $(SPHINX_DOCS_DEBUG)
 	rm -f $(SPHINX_DOCS_WARNINGS)
 	@echo
+
