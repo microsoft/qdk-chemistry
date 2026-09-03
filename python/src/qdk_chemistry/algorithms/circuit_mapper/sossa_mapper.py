@@ -24,7 +24,6 @@ __all__: list[str] = [
 # Two SELECT calls, each conjugated by the inner PREPARE, so the alias table is read four times.
 _INNER_LOOKUPS_PER_BLOCK_ENCODING = 4
 
-
 class SOSSAMapperSettings(Settings):
     """Settings for the SOSSAMapper."""
 
@@ -228,8 +227,7 @@ class SOSSAMapper(CircuitMapper):
         if outer_bits and select_bits and outer_bits != select_bits:
             raise ValueError(
                 "The outer PREPARE and SELECT share one phase gradient register and must agree "
-                f"on its width, but the outer PREPARE asks for {outer_bits} qubits and SELECT for "
-                f"{select_bits}. Set the same rotation_bit_precision on both."
+                f"on its width. Now, the outer PREPARE: {outer_bits} and SELECT: {select_bits}."
             )
         return max(outer_bits, select_bits)
 
@@ -285,11 +283,11 @@ class SOSSAMapper(CircuitMapper):
             numSystemQubits=regs["num_system_qubits"],
             numOuterQubits=regs["num_outer_qubits"],
             numOuterIndexQubits=regs["num_outer_index_qubits"],
+            numOuterPrepareGradientQubits=regs["num_outer_prepare_gradient_qubits"],
             numInnerQubits=regs["num_inner_qubits"],
             numReflectInner=regs["num_reflect_inner"],
-            numPhaseGradientQubits=regs["num_phase_gradient_qubits"],
-            numOuterPrepareGradientQubits=regs["num_outer_prepare_gradient_qubits"],
             numFreeRiderQubits=num_free_rider_bits,
+            numPhaseGradientQubits=regs["num_phase_gradient_qubits"],
         )
         return regs, walk_layout
 
@@ -306,8 +304,7 @@ class SOSSAMapper(CircuitMapper):
         if outer_gradient_qubits != reserved:
             raise ValueError(
                 f"The outer PREPARE circuit declares {outer_gradient_qubits} phase gradient ancillas "
-                f"but the walk layout reserves {reserved} for it, so the register handed to it would "
-                "be the wrong width."
+                f"but the walk layout reserves {reserved} for it."
             )
         return (
             outer_prepare_op,

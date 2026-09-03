@@ -19,7 +19,7 @@ import h5py
 import numpy as np
 
 from qdk_chemistry.data._hashing import _hash_arg, _hash_str
-from qdk_chemistry.data.qubit_operator.containers.sossa import FactorizedHamiltonianMetadata
+from qdk_chemistry.data.qubit_operator.containers.sos import FactorizedHamiltonianMetadata
 
 from .block_encoding import _wavefunction_from_hdf5, _wavefunction_to_hdf5
 from .quantum_walk import QuantumWalkContainer
@@ -180,6 +180,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         select: SOSSASelect,
         metadata: FactorizedHamiltonianMetadata,
         layout: SOSSARegisterLayout,
+        normalization: float,
         power: int = 1,
     ) -> None:
         r"""Initialize a SOSSAWalkContainer.
@@ -191,21 +192,17 @@ class SOSSAWalkContainer(QuantumWalkContainer):
             select: The SELECT oracle data (Givens rotations + Spin swap + Majorana).
             metadata: Dimensions and scalar constants carried from the SOS qubit operator.
             layout: Ancilla register widths the builder derived from those dimensions.
+            normalization: Block-encoding normalization :math:`\Lambda = \tfrac12\sum_\alpha c_\alpha^2`.
             power: Number of times to apply the walk operator.
 
-        Raises:
-            ValueError: If ``metadata.normalization`` is unset.
-
         """
-        if metadata.normalization is None:
-            raise ValueError("metadata.normalization is unset; the block encoding stage must supply it.")
-
         self._power = power
         self.outer_prepare = outer_prepare
         self.inner_prepare = inner_prepare
         self.select = select
         self.metadata = metadata
         self.layout = layout
+        self.normalization = normalization
 
         super().__init__()
 
@@ -234,6 +231,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         data: dict[str, Any] = {
             "container_type": self.type,
             "power": self.power,
+            "normalization": self.normalization,
             "metadata": self.metadata.to_json(),
             "layout": self.layout.to_json(),
             "outer_prepare": self.outer_prepare.to_json(),
@@ -247,6 +245,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         self._add_hdf5_version(group)
         group.attrs["container_type"] = self.type
         group.attrs["power"] = self.power
+        group.attrs["normalization"] = self.normalization
         group.attrs["metadata"] = json.dumps(self.metadata.to_json())
         group.attrs["layout"] = json.dumps(self.layout.to_json())
         _wavefunction_to_hdf5(self.outer_prepare, group.create_group("outer_prepare"))
@@ -270,6 +269,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
             select=select,
             metadata=FactorizedHamiltonianMetadata.from_json(json_data["metadata"]),
             layout=SOSSARegisterLayout.from_json(json_data["layout"]),
+            normalization=float(json_data["normalization"]),
             power=json_data.get("power", 1),
         )
 
@@ -285,6 +285,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
             select=select,
             metadata=FactorizedHamiltonianMetadata.from_json(json.loads(group.attrs["metadata"])),
             layout=SOSSARegisterLayout.from_json(json.loads(group.attrs["layout"])),
+            normalization=float(group.attrs["normalization"]),
             power=int(group.attrs["power"]),
         )
 
@@ -298,7 +299,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
             f"SOSSA Container (DFTHC block encoding):\n"
             f"  Power: {self.power}\n"
             f"  Orbitals N={n}, Ranks R={r}, Bases B={b}, Copies C={c}\n"
-            f"  Normalization Lambda = {self.metadata.normalization:.6f}\n"
+            f"  Normalization Lambda = {self.normalization:.6f}\n"
             f"  Outer PREPARE: {self.outer_prepare.get_orbitals().num_modes()} qubits\n"
             f"  Inner PREPARE: {self.layout.inner_prep_bits} qubits, {b + 1} basis entries\n"
             f"  System: {2 * n} spin-orbitals\n"
@@ -326,7 +327,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
 
         """
         phi = phase_fraction % 1.0
-        return float(2.0 * self.metadata.normalization * np.cos(np.pi * phi) ** 2 + self.metadata.energy_shift)
+        return float(2.0 * self.normalization * np.cos(np.pi * phi) ** 2 + self.metadata.energy_shift)
 
     def combine(self, other: "SOSSAWalkContainer") -> "SOSSAWalkContainer":  # type: ignore[override]
         """Not supported for SOSSA containers.

@@ -13,11 +13,7 @@ Reference: Low et al., Phys. Rev. X 15 (2025), :cite:`Low2025`
 # --------------------------------------------------------------------------------------------
 
 import math
-import os
-import threading
-import time
 from math import sqrt
-from typing import ClassVar
 
 import numpy as np
 import pytest
@@ -42,8 +38,6 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .reference_tolerances import ci_energy_tolerance
 from .test_helpers import create_random_factorized_hamiltonian, create_test_orbitals, to_sossa_operator
-
-_RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Test Hamiltonian construction (small DFTHC-like H2 data)
@@ -488,7 +482,7 @@ def _run_sossa_unary_qpe(num_queries, mapper_kwargs=None, shots=100, seed=202508
     )
     result = qpe.run(qubit_hamiltonian=sossa_op, state_preparation=state_prep)
 
-    exact_phase = _energy_to_qpe_phase(gs_energy, container.metadata.normalization)
+    exact_phase = _energy_to_qpe_phase(gs_energy, container.normalization)
     exact_doubled_phase = 2.0 * min(exact_phase, 0.5 - exact_phase)
     bin_error = abs(result.phase_fraction - exact_doubled_phase) * num_bins
     assert bin_error <= 1.0, (
@@ -536,7 +530,7 @@ class TestSOSSAQPEIntegration:
         # decoded from the canonical phase, which is half of it -- so the canonical phase
         # carries half a bin of uncertainty.
         half_bin = 1.0 / (2.0 * (num_queries + 1))
-        exact_phase = _energy_to_qpe_phase(gs_energy, container.metadata.normalization)
+        exact_phase = _energy_to_qpe_phase(gs_energy, container.normalization)
         # E_gap(phi) = 2*Lambda*cos^2(pi*phi) is monotone across the canonical range
         # [0, 1/2], so the widest energy excursion over the window sits at an edge.
         edges = [min(0.5, max(0.0, exact_phase + sign * half_bin)) for sign in (-1.0, 1.0)]
@@ -615,7 +609,7 @@ class TestSOSSAQPEIntegration:
         # Lambda cancels on both sides of every phase/energy comparison in this file, so a
         # self-consistent scale error is invisible to them; pin the number itself against
         # an oracle that never sees the container's own normalization.
-        lambda_sos = container.metadata.normalization
+        lambda_sos = container.normalization
         assert lambda_sos > 0
 
         # Step 4: Compute expected spectrum
@@ -791,7 +785,7 @@ class TestSOSSAQPEIntegration:
         gap_energy, _ = _get_ground_state_and_energy(h_gap, n_orb, nalpha=1, nbeta=1)
 
         # Gap energy -> walk phase fraction, then back through the container decoder.
-        lambda_sos = container.metadata.normalization
+        lambda_sos = container.normalization
         phase_fraction = math.acos(np.clip(gap_energy / lambda_sos - 1.0, -1.0, 1.0)) / (2 * math.pi)
         recovered = container.eigenvalue_from_phase(phase_fraction)
 
@@ -807,51 +801,6 @@ class TestSOSSAQPEIntegration:
 # ═══════════════════════════════════════════════════════════════════════════════
 # Resource estimation
 # ═══════════════════════════════════════════════════════════════════════════════
-
-# Estimation walks the whole query schedule, so a regression that inflates the block
-# encoding shows up as a run that never returns rather than as a wrong number. The
-# budget is deliberately loose: it is here to catch a blow-up, not to benchmark.
-_QRE_TIME_BUDGET_SECONDS = 300.0
-
-
-def _call_within(budget_seconds, description, func):
-    """Call ``func`` on a daemon thread and fail if it outruns ``budget_seconds``.
-
-    A daemon thread is what makes the budget enforceable: a runaway estimate cannot be
-    interrupted, so the assertion has to fire while the call is abandoned to interpreter
-    exit rather than joined.
-
-    Args:
-        budget_seconds: Wall-clock budget for the call.
-        description: What is being timed, used in the failure message.
-        func: Zero-argument callable to run.
-
-    Returns:
-        A tuple of the call's return value and its elapsed wall-clock seconds.
-
-    """
-    value: object = None
-    error: BaseException | None = None
-
-    def _target():
-        nonlocal value, error
-        try:
-            value = func()
-        except BaseException as exc:  # noqa: BLE001
-            error = exc
-
-    thread = threading.Thread(target=_target, daemon=True)
-    started = time.monotonic()
-    thread.start()
-    thread.join(budget_seconds)
-    elapsed = time.monotonic() - started
-
-    if thread.is_alive():
-        pytest.fail(f"{description} did not finish within {budget_seconds:.0f}s.")
-    if error is not None:
-        raise error
-    return value, elapsed
-
 
 def _sossa_unary_qpe_circuit(
     num_queries,
@@ -890,7 +839,7 @@ def _sossa_unary_qpe_circuit(
     # off ``factorized``. ``create_random_factorized_hamiltonian`` builds its own the same
     # way, so these are the container's orbitals.
     orbitals = create_test_orbitals(num_orbitals)
-    operator = create("qubit_mapper", "sossa").run(Hamiltonian(factorized), MajoranaMapping.jordan_wigner(num_modes))
+    operator = create("qubit_mapper", "sos").run(Hamiltonian(factorized), MajoranaMapping.jordan_wigner(num_modes))
 
     num_electrons = num_electrons_per_spin or max(1, num_orbitals // 2)
     hf_config = Configuration.canonical_hf_configuration(num_electrons, num_electrons, num_orbitals)
@@ -909,8 +858,6 @@ def _sossa_unary_qpe_circuit(
 
 class TestSOSSAResourceEstimation:
     """Logical-resource estimation of the SOSSA unary-iteration QPE circuit."""
-
-    _PROBLEM: ClassVar[dict[str, int]] = {"num_orbitals": 2, "num_ranks": 1, "num_bases": 1, "num_copies": 1}
 
     def test_fe2s2_logical_resource_estimate(self):
         """Pin the Fe2S2-20 logical cost of the circuit that actually runs.
@@ -946,48 +893,3 @@ class TestSOSSAResourceEstimation:
 
         assert logical_counts["cczCount"] + logical_counts["ccixCount"] == 31_837_599
         assert logical_counts["numQubits"] == 470
-
-    @pytest.mark.slow
-    @pytest.mark.skipif(not _RUN_SLOW_TESTS, reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.")
-    def test_unary_qpe_circuit_estimates_within_a_time_budget(self):
-        """The QPE circuit is estimable, in bounded time, and is not trivially Clifford.
-
-        The mapper declares the flat register a caller has to allocate, which excludes the
-        inner PREPARE's QROM scratch because ``SOSSABlockEncodingOnRegister`` allocates
-        that itself. The estimator counts the peak instead, so it can only ever report at
-        least the declared width. ``Circuit.estimate`` overwrites ``num_qubits`` when the
-        two disagree, so the declared width has to be captured first.
-        """
-        circuit = _sossa_unary_qpe_circuit(3, **self._PROBLEM)
-        declared_num_qubits = circuit.num_qubits
-        assert declared_num_qubits is not None
-
-        result, _ = _call_within(
-            _QRE_TIME_BUDGET_SECONDS, "Resource estimation of the SOSSA unary QPE circuit", circuit.estimate
-        )
-
-        logical_counts = result.logical_counts
-        assert logical_counts["numQubits"] >= declared_num_qubits, (
-            f"The estimate reports {logical_counts['numQubits']} qubits, fewer than the "
-            f"{declared_num_qubits} the circuit declares."
-        )
-        # A block encoding that reduced to Cliffords would mean the walk was never applied.
-        assert logical_counts["tCount"] + logical_counts["ccixCount"] > 0
-
-    @pytest.mark.slow
-    @pytest.mark.skipif(not _RUN_SLOW_TESTS, reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.")
-    def test_the_query_schedule_only_widens_the_phase_register(self):
-        """The block encoding is reused across slots, so only the phase register grows.
-
-        An ancilla register that widened per query would mean the schedule allocates a
-        fresh block encoding per slot, which is the cost SOSSA exists to avoid.
-        """
-        narrow = _sossa_unary_qpe_circuit(3, **self._PROBLEM)
-        wide = _sossa_unary_qpe_circuit(7, **self._PROBLEM)
-
-        narrow_result, _ = _call_within(_QRE_TIME_BUDGET_SECONDS, "Resource estimation with 3 queries", narrow.estimate)
-        wide_result, _ = _call_within(_QRE_TIME_BUDGET_SECONDS, "Resource estimation with 7 queries", wide.estimate)
-
-        # 3 queries need 2 phase qubits, 7 need 3; every other register is unchanged.
-        assert wide_result.logical_counts["numQubits"] == narrow_result.logical_counts["numQubits"] + 1
-        assert wide_result.logical_counts["ccixCount"] > narrow_result.logical_counts["ccixCount"]

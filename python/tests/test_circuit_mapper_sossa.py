@@ -137,8 +137,6 @@ class TestOuterPrep:
             _with_prepared_gradient(op, num_gradient), num_qubits + num_gradient
         )
         state = qdk_ctx.dump_machine()
-        # The gradient is restored by the wrapper, so the state register is the |0..0⟩
-        # gradient column of the dump.
         full_sv = np.array(state.as_dense_state())
         actual_sv = full_sv.reshape(2**num_qubits, 2**num_gradient)[:, 0]
 
@@ -178,8 +176,6 @@ class TestOuterPrep:
         state = qdk_ctx.dump_machine()
         full_sv = np.array(state.as_dense_state())
 
-        # Marginal over the index register (top bits of the big-endian dump), so the
-        # little-endian index l shows up at the bit-reversed position.
         n_index = 2**num_index_qubits
         shift = total_qubits - num_index_qubits
         probs = np.zeros(n_index)
@@ -283,12 +279,6 @@ class TestInnerPrep:
                 probs[:n_coeffs], expected_probs, atol=atol, err_msg=f"outer={ell}, algorithm={algorithm}"
             )
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Main SOSSAMapper tests
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
 class TestSOSSAMapper:
     """Tests for the SOSSA block-encoding circuit mapper."""
 
@@ -380,12 +370,6 @@ class TestSOSSAMapper:
         assert isinstance(circuit, Circuit)
         assert circuit._qsharp_op is not None
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# SELECT fidelity tests
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
 def _vector_to_givens_angles(vec: np.ndarray) -> list[float]:
     """Convert a unit vector to Givens rotation angles (same as SOSSABuilder)."""
     N = len(vec)  # noqa: N806
@@ -459,19 +443,7 @@ class TestSelectFullFidelity:
     @pytest.mark.parametrize("rotation_bit_precision", [8, 12])
     @pytest.mark.parametrize("N", [2, 3])
     def test_select_dq_rotation_backends_agree(self, N, rotation_bit_precision):  # noqa: N803
-        """The QROM/phase-gradient rotation path must match the direct-rotation path.
-
-        ``qrom_phase_gradient`` is the mapper's default SELECT backend, but the end-to-end
-        energy tests pin ``select_algorithm="direct"``, so nothing else checks that the
-        production path is correct -- only that it is cheap. This closes that gap: the direct
-        path is the reference (it is what the energy tests validate), and the QROM path
-        implements the same Givens basis change, so agreement here plus those tests covers
-        the production configuration.
-
-        Agreement holds only up to the QROM's angle quantization, hence the tolerance
-        scaling with ``rotation_bit_precision``. That scaling is the point: a structural
-        error shows up as a ``b_rot``-independent floor, which no tolerance here would admit.
-        """
+        """The QROM/phase-gradient rotation path must match the direct-rotation path."""
         select_data = self._select_data(N, rotation_bit_precision)
 
         direct = self._run_select(select_data, use_phase_gradient=False)
@@ -481,20 +453,7 @@ class TestSelectFullFidelity:
 
     @pytest.mark.parametrize("N", [2, 3])
     def test_select_sf_rotation_backends_agree(self, N):  # noqa: N803
-        """The same agreement, on a spin-free entry with b and r both nonzero.
-
-        ``BuildSFBulkRotationData`` packs the SF angle table under whichever of
-        ``bReg ++ rBits`` / ``rBits ++ bReg`` is the smaller address space, and
-        ``WithGivensRotationsQROM`` has to concatenate the registers the same way. At
-        b = r = 0 -- which is all the DQ test above reaches -- both layouts give address 0,
-        so a build/address mismatch is invisible. R=2, B=2 selects the rank-first layout
-        (``(B+1)*2^rankBits = 6 < R*2^bBits = 8``), and b = r = 1 lands on address 3 there
-        against 5 in the other layout, so the two disagree on which angles to load.
-
-        The direct backend reaches the same angles through an independent route: it indexes
-        ``TwoBodyRotationAngles`` by ``b*R + r`` with r derived from x_o, never touching the
-        packed table.
-        """
+        """The same agreement, on a spin-free entry with b and r both nonzero."""
         select_data = self._select_data(N, 8, num_ranks=2, num_bases=2, num_copies=1)
         # x_o = N + 1 is the second SF generator, so r = 1; b = 1 is a non-identity basis.
         xo_value, b_value = N + 1, 1
@@ -507,9 +466,6 @@ class TestSelectFullFidelity:
     @staticmethod
     def _assert_backends_agree(direct: np.ndarray, qrom: np.ndarray, N: int, rotation_bit_precision: int) -> None:  # noqa: N803
         """Compare the two rotation backends up to angle quantization and a global phase."""
-        # The QROM path additionally allocates the phase gradient register, which is
-        # conjugated back to |0...0>. Those qubits are allocated last and so are the least
-        # significant index bits, making the gradient=|0...0> subspace every stride-th entry.
         stride = len(qrom) // len(direct)
         subspace = qrom[::stride]
         leaked = 1.0 - float(np.vdot(subspace, subspace).real)

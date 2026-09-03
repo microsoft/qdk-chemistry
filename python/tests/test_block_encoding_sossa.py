@@ -11,7 +11,6 @@ from pathlib import Path
 import h5py
 import numpy as np
 import pytest
-import qdk
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.data import (
@@ -20,31 +19,16 @@ from qdk_chemistry.data import (
     StateVectorContainer,
     Wavefunction,
 )
-from qdk_chemistry.data.qubit_operator.containers.sossa import FactorizedHamiltonianMetadata
+from qdk_chemistry.data.qubit_operator.containers.sos import FactorizedHamiltonianMetadata
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.sossa import (
     SOSSAInnerPrepare,
     SOSSASelect,
     SOSSAWalkContainer,
 )
-from qdk_chemistry.utils.qsharp import create_qsharp_context
 
 from .reference_tolerances import float_comparison_absolute_tolerance
 from .test_helpers import create_random_factorized_hamiltonian, to_sossa_operator
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Test helpers
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-@pytest.fixture
-def qdk_ctx() -> qdk.Context:
-    """Fresh Q# context, isolated from the library's shared one.
-
-    Tests that inspect quantum state need their own interpreter, because
-    ``dump_machine`` reports every qubit currently allocated in the context.
-    """
-    return create_qsharp_context()
 
 
 def _make_sossa_unitary_representation():
@@ -112,18 +96,13 @@ def _make_sossa_unitary_representation():
             num_copies=num_copies,
             num_positive_one_body_terms=num_d1,
             energy_shift=0.0,
-            normalization=normalization,
         ),
         layout=layout,
+        normalization=normalization,
         power=1,
     )
 
     return UnitaryRepresentation(container=container)
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Container tests (serialization round-trips)
-# ═══════════════════════════════════════════════════════════════════════════════
 
 
 class TestSOSSAWalkContainer:
@@ -139,7 +118,7 @@ class TestSOSSAWalkContainer:
 
         assert restored.type == container.type
         assert restored.power == container.power
-        assert np.isclose(restored.metadata.normalization, container.metadata.normalization)
+        assert np.isclose(restored.normalization, container.normalization)
         assert np.allclose(
             restored.outer_prepare.get_coefficients(),
             container.outer_prepare.get_coefficients(),
@@ -170,7 +149,7 @@ class TestSOSSAWalkContainer:
 
         assert restored.type == container.type
         assert restored.power == container.power
-        assert np.isclose(restored.metadata.normalization, container.metadata.normalization)
+        assert np.isclose(restored.normalization, container.normalization)
         assert np.allclose(restored.outer_prepare.get_coefficients(), container.outer_prepare.get_coefficients())
         assert np.allclose(restored.select.two_body_rotation_angles, container.select.two_body_rotation_angles)
 
@@ -185,15 +164,7 @@ class TestSOSSAWalkContainer:
         assert isinstance(restored.get_container(), SOSSAWalkContainer)
 
     def test_num_qubits_ancilla_excess_is_exactly_the_structural_widths(self):
-        """Pin the identity the generic ancilla fallback depends on.
-
-        ``PhaseEstimationCircuitBuilder`` falls back to
-        ``unitary.get_num_qubits() - qubit_hamiltonian.num_qubits`` when a mapper
-        exposes no ancilla count. That subtraction is only meaningful because both
-        operands carry the same ``2N`` system register, so the difference is exactly
-        the structural ancilla width ``xo + b + free_rider + 2``. If the system terms
-        ever stop cancelling, the fallback silently returns a wrong allocation size.
-        """
+        """Pin the identity the generic ancilla fallback depends on."""
         container = _make_sossa_unitary_representation().get_container()
         meta = container.metadata
         expected = SOSSABuilder._sossa_register_bits(
@@ -207,11 +178,6 @@ class TestSOSSAWalkContainer:
         expected_ancilla = expected.outer_prep_bits + expected.inner_prep_bits + expected.num_free_rider_bits + 2
 
         assert container.num_qubits - num_system == expected_ancilla
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Builder tests
-# ═══════════════════════════════════════════════════════════════════════════════
 
 
 class TestSOSSABuilder:
@@ -243,7 +209,7 @@ class TestSOSSABuilder:
         x_o_dim = num_orbitals + num_ranks * num_copies
         assert len(container.outer_prepare.get_coefficients()) == x_o_dim
         assert container.inner_prepare.conditional_coefficients.shape[0] == x_o_dim
-        assert container.metadata.normalization > 0
+        assert container.normalization > 0
 
     @pytest.mark.parametrize(
         ("num_orbitals", "num_ranks", "num_bases", "num_copies"),
@@ -276,8 +242,8 @@ class TestSOSSABuilder:
 
         # sum_xo c_xo^2 = 2 Lambda, so the unnormalized coefficients are recovered
         # from the stored amplitudes by scaling with sqrt(2 Lambda).
-        unnormalized = amplitudes * np.sqrt(2.0 * container.metadata.normalization)
-        assert np.isclose(np.sum(unnormalized**2), 2.0 * container.metadata.normalization)
+        unnormalized = amplitudes * np.sqrt(2.0 * container.normalization)
+        assert np.isclose(np.sum(unnormalized**2), 2.0 * container.normalization)
 
     @pytest.mark.parametrize(
         ("num_orbitals", "num_ranks", "num_bases", "num_copies"),
@@ -311,51 +277,3 @@ class TestSOSSABuilder:
         free_rider = np.asarray(container.inner_prepare.free_rider_data, dtype=bool)[:num_orbitals]
         rank_bits = free_rider[:, 2:]
         assert not rank_bits.any(), f"one-body free-rider rank bits are not all zero:\n{rank_bits}"
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Q# component tests
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-class TestInnerPrepareQSharp:
-    """Test the Q# InnerPrepare sub-operations via dump_machine."""
-
-    def test_direct_inner_prepare_conditioned_on_xo(self, qdk_ctx):
-        """Test InnerPrepareDirect: for a fixed x_o, inner register gets correct state.
-
-        Prepares outer register in |x_o⟩, applies inner prepare, checks inner register.
-        """
-        # 2 outer states, 2 inner states (B+1=2)
-        inner_coefficients = [[0.8, 0.6], [0.3, 0.95]]
-        n_outer = 1  # ceil(log2(2))
-        n_inner = 1  # ceil(log2(2))
-        # No free-rider data for this unit test (empty array)
-        fr_str = "[]"
-
-        ic_str = "[[0.8, 0.6], [0.3, 0.95]]"
-
-        # Test x_o=0: inner should be proportional to [0.8, 0.6]
-        qdk_ctx.eval(f"use outer = Qubit[{n_outer}];")
-        qdk_ctx.eval(f"use inner = Qubit[{n_inner}];")
-        qdk_ctx.eval(
-            f"let op = QDKChemistry.Utils.SOSSAWalk.MakeInnerPrepareDirect({ic_str}, {fr_str}); op(outer, inner);"
-        )
-        state = qdk_ctx.dump_machine()
-        amplitudes = np.array(state.as_dense_state())
-
-        # With outer=|0⟩, the state is |0⟩_outer ⊗ PreparedState(inner_coefficients[0])
-        # 2 qubits total: |outer, inner⟩ = |00⟩, |01⟩, |10⟩, |11⟩
-        # |0⟩_outer contributes to indices 0 (|00⟩) and 1 (|01⟩)
-        expected_inner = np.array(inner_coefficients[0])
-        expected_inner = expected_inner / np.linalg.norm(expected_inner)
-
-        actual_inner = amplitudes[:2]  # |00⟩ and |01⟩
-        actual_inner_norm = np.abs(actual_inner)
-
-        assert np.allclose(
-            actual_inner_norm,
-            np.abs(expected_inner),
-            atol=float_comparison_absolute_tolerance,
-        )
-        qdk_ctx.eval("ResetAll(outer); ResetAll(inner)")

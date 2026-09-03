@@ -1,4 +1,4 @@
-"""Sum-of-squares (SOSSA) qubit operator container."""
+"""Sum-of-squares (SOS) qubit operator container."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -71,9 +71,6 @@ class FactorizedHamiltonianMetadata:
     energy_shift: float
     r"""Constant offset :math:`E_{\text{SOS}} + E_{\text{nuc}}`."""
 
-    normalization: float | None = None
-    r"""Block-encoding normalization :math:`\Lambda`, or ``None`` before it is built."""
-
     def __post_init__(self) -> None:
         """Coerce the shift and reject dimensions no register width can be built from."""
         object.__setattr__(self, "energy_shift", float(self.energy_shift))
@@ -94,23 +91,23 @@ class SOSContainer(QubitOperatorContainer):
     """Container for a sum-of-squares qubit operator.
 
     The one-body and two-body generators are each a
-    :class:`~qdk_chemistry.data.qubit_operator.containers.sossa.RotatedPaulis` block
+    :class:`~qdk_chemistry.data.qubit_operator.containers.sos.RotatedPaulis` block
     (``angles``, ``coeffs``, ``paulis``). ``one_body`` uses ``(X +/- iY) / 2``
     with the first ``metadata.num_positive_one_body_terms`` rows the D1 (particle)
     generators and the rest Q1 (hole); ``two_body`` uses ``Z`` with one
     ``[R * C, B + 1]`` coefficient row per ``(rank, copy)`` (columns ``0..B-1``
     rotated-``Z``, column ``B`` identity). Dimensions and scalar constants live in
-    :class:`FactorizedHamiltonianMetadata`; the builder derives the inner-PREPARE distribution, outer
-    coefficients, and normalization from these blocks.
+    :class:`FactorizedHamiltonianMetadata`; the builder derives the inner-PREPARE distribution and
+    the outer coefficients from these blocks, and the block-encoding normalization from those.
     """
 
-    _data_type_name = "sossa_container"
+    _data_type_name = "sos_container"
     _serialization_version = "0.2.0"
 
     @staticmethod
     def data_type_name() -> str:
-        """Return the wire-format identifier for SOSSA containers."""
-        return "sossa_container"
+        """Return the wire-format identifier for SOS containers."""
+        return "sos_container"
 
     def __init__(
         self,
@@ -136,7 +133,7 @@ class SOSContainer(QubitOperatorContainer):
     @property
     def type(self) -> str:
         """Return the container type."""
-        return "sossa"
+        return "sos"
 
     @property
     def num_qubits(self) -> int:

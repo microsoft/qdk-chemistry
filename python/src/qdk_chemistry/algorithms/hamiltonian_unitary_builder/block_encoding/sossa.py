@@ -5,7 +5,6 @@ r"""QDK/Chemistry implementation of the SOSSA (Sum of Squares Spectral Amplifica
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from dataclasses import replace
 from math import ceil, log2, sqrt
 
 import numpy as np
@@ -22,7 +21,7 @@ from qdk_chemistry.data import (
     UnitaryRepresentation,
     Wavefunction,
 )
-from qdk_chemistry.data.qubit_operator.containers.sossa import SOSContainer
+from qdk_chemistry.data.qubit_operator.containers.sos import SOSContainer
 from qdk_chemistry.data.unitary_representation.containers.sossa import (
     SOSSAInnerPrepare,
     SOSSARegisterLayout,
@@ -88,7 +87,7 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         num_positive = meta.num_positive_one_body_terms
 
         outer_coefficients = self._outer_coefficients(sossa)
-        normalization = 0.5 * float(np.sum(outer_coefficients**2))
+        normalization = 0.5 * float(np.sum(a=outer_coefficients**2))
 
         one_body_rotation_angles = sossa.one_body.angles
         two_body_rotation_angles = self._two_body_rotation_angles(
@@ -112,8 +111,9 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
                 one_body_rotation_angles=one_body_rotation_angles,
                 two_body_rotation_angles=two_body_rotation_angles,
             ),
-            metadata=replace(meta, normalization=normalization),
+            metadata=meta,
             layout=reg_bits,
+            normalization=normalization,
             power=self._settings.get("power"),
         )
 

@@ -16,7 +16,7 @@ from qdk_chemistry.data._hashing import _hash_str
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorContainer
 from qdk_chemistry.data.qubit_operator.containers.pauli_lcu import PauliLCUContainer
-from qdk_chemistry.data.qubit_operator.containers.sossa import SOSContainer
+from qdk_chemistry.data.qubit_operator.containers.sos import SOSContainer
 
 if TYPE_CHECKING:
     import h5py
@@ -141,33 +141,6 @@ class QubitOperator(DataClass):
                 f"the {container.type!r} representation does not provide it."
             ) from None
 
-    def equiv(self, other: QubitOperator, atol: float = 1e-12) -> bool:
-        """Check mathematical equivalence with another Pauli-LCU operator."""
-        if not isinstance(other, QubitOperator):
-            return False
-        return self._container.equiv(other._container, atol=atol)
-
-    def to_interleaved(self, n_spatial: int) -> QubitOperator:
-        """Convert a Pauli-LCU operator from blocked to interleaved ordering."""
-        return QubitOperator(self._container.to_interleaved(n_spatial))
-
-    def __add__(self, other: QubitOperator) -> QubitOperator:
-        """Add two Pauli-LCU operators."""
-        if not isinstance(other, QubitOperator):
-            return NotImplemented
-        return QubitOperator(self._container + other._container)
-
-    def __mul__(self, scalar: Any) -> QubitOperator:
-        """Scale a Pauli-LCU operator."""
-        result = self._container * scalar
-        if result is NotImplemented:
-            return NotImplemented
-        return QubitOperator(result)
-
-    def __rmul__(self, scalar: Any) -> QubitOperator:
-        """Support scalar multiplication of a Pauli-LCU operator."""
-        return self.__mul__(scalar)
-
     def get_container_type(self) -> str:
         """Return the concrete container type."""
         return self._container.type
@@ -200,7 +173,7 @@ class QubitOperator(DataClass):
         container_type = json_data.get("container_type", "pauli_lcu")
         if container_type == "pauli_lcu":
             container = PauliLCUContainer.from_json(json_data)
-        elif container_type == "sossa":
+        elif container_type == "sos":
             container = SOSContainer.from_json(json_data)
         else:
             raise ValueError(f"Unsupported qubit operator container type: {container_type}")
@@ -216,7 +189,7 @@ class QubitOperator(DataClass):
         container_type = group.attrs.get("container_type", "pauli_lcu")
         if container_type == "pauli_lcu":
             container = PauliLCUContainer.from_hdf5(group)
-        elif container_type == "sossa":
+        elif container_type == "sos":
             container = SOSContainer.from_hdf5(group)
         else:
             raise ValueError(f"Unsupported qubit operator container type: {container_type}")

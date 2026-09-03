@@ -10,7 +10,7 @@ import numpy as np
 from qdk_chemistry._core.data import sparse_pauli_word_to_label
 from qdk_chemistry.algorithms.qubit_mapper.qubit_mapper import QubitMapper
 from qdk_chemistry.data import FactorizedHamiltonianContainer, Hamiltonian, MajoranaMapping, QubitOperator
-from qdk_chemistry.data.qubit_operator.containers.sossa import (
+from qdk_chemistry.data.qubit_operator.containers.sos import (
     FactorizedHamiltonianMetadata,
     RotatedPaulis,
     SOSContainer,
@@ -25,7 +25,7 @@ class SOSQubitMapper(QubitMapper):
 
     def name(self) -> str:
         """Return the algorithm variant name."""
-        return "sossa"
+        return "sos"
 
     def _run_impl(self, hamiltonian: Hamiltonian, _mapping: MajoranaMapping) -> QubitOperator:
         """Convert a factorized Hamiltonian to a structured SOS qubit operator."""

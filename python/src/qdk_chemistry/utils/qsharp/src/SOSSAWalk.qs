@@ -384,32 +384,25 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             []
         };
 
-        outerPrepareOp(outerPrepareReg);
-        H(spinReg[0]);
-        // The free-rider word depends only on x_o, which is fixed for the whole block, so it
-        // is loaded once around both SELECT calls. It sits past `numReflectInner`, so holding
-        // it live across the reflection does not disturb it.
         within {
-            freeRiderOp(outerIndexReg, freeRiderReg);
+            outerPrepareOp(outerPrepareReg);
+            H(spinReg[0]);
         } apply {
             within {
-                innerPrepareOp(outerIndexReg, innerReg);
-                H(spinReg[1]);
+                freeRiderOp(outerIndexReg, freeRiderReg);
             } apply {
-                selectOp(outerIndexReg, innerReg, spinReg, systemReg, phaseGradientReg);
-            }
-
-            Reflect(innerReg[0..numReflectInner - 1] + [spinReg[1]]);
-
-            within {
-                innerPrepareOp(outerIndexReg, innerReg);
-                H(spinReg[1]);
-            } apply {
-                Adjoint selectOp(outerIndexReg, innerReg, spinReg, systemReg, phaseGradientReg);
+                within {
+                    within {
+                        innerPrepareOp(outerIndexReg, innerReg);
+                        H(spinReg[1]);
+                    } apply {
+                        selectOp(outerIndexReg, innerReg, spinReg, systemReg, phaseGradientReg);
+                    }
+                } apply {
+                    Reflect(innerReg[0..numReflectInner - 1] + [spinReg[1]]);
+                }
             }
         }
-        H(spinReg[0]);
-        Adjoint outerPrepareOp(outerPrepareReg);
     }
 
     /// Apply the SOSSA block encoding to a flat target register.
@@ -589,15 +582,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         // Allocate rotation target register: (N-1)*bRot rotation bits + 1 bEqB flag bit.
         use rotTarget = Qubit[nRotBits + 1];
 
-        // The two table loads are conjugated around their consumers so `rotTarget` is
-        // uncomputed and released in |0⟩, matching how every other QROM read in this
-        // project is written (QROMStatePrep.qs, SelectSwap.qs).
-        //
-        // Order matters: the SF load is outermost so that its uncompute runs last, when
-        // `rotTarget` again holds exactly `sfData[address]` and nothing else. Reordering it
-        // inside the DQ load leaves the DQ word on the register at that point, and the
-        // measurement-based unlookup would then apply the phase fixup for a word the target
-        // does not hold.
         within {
             // SF load: uncontrolled, addressed by `sfAddress`. Dropping the control is
             // what makes the uncompute `Adjoint Select`, a measurement-based unlookup costing
@@ -634,19 +618,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                 // Cost: 1 CNOT (vs ⌈log₂(B+1)⌉ Toffoli for ApplyControlledOnInt).
                 CNOT(rotTarget[nRotBits], bEqBQubit);
 
-                // Apply all Givens rotations from the loaded register.
-                // Uses DFTHC-style conjugation: CNOT(j→j+1) + S†H converts Rz→Ry
-                // and conditions on particle-number subspace, all with an uncontrolled
-                // adder (n Toffoli) instead of a controlled adder (2n Toffoli).
-                // Reference: Sanders et al. (arXiv:2007.07391, §IIA1, Figure 4a).
-                //
-                // The CNOT control must be sysRegDown[j], matching
-                // ApplyMultiControlledRotations: it maps the one-excitation states
-                // |1_j 0_{j+1}⟩ and |0_j 1_{j+1}⟩ onto |11⟩ and |01⟩, which differ only in
-                // qubit j, so the Ry on qubit j rotates between them. Reversing the control
-                // maps them onto |10⟩ and |11⟩, which differ only in qubit j+1, and the Ry
-                // then mixes the one-excitation sector into the zero-excitation sector
-                // instead of performing the Givens rotation.
                 for j in 0..numRotAngles - 1 {
                     within {
                         CNOT(sysRegDown[j], sysRegDown[j + 1]);
