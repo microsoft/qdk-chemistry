@@ -760,6 +760,7 @@ def _register_cpp_factories():
     """
     from qdk_chemistry._core._algorithms import (  # noqa: PLC0415
         ActiveSpaceSelectorFactory,
+        DoubleFactorizerFactory,
         DynamicalCorrelationCalculatorFactory,
         EffectiveHamiltonianConstructorFactory,
         GeometryOptimizerFactory,
@@ -775,6 +776,7 @@ def _register_cpp_factories():
     )
 
     register_factory(ActiveSpaceSelectorFactory)
+    register_factory(DoubleFactorizerFactory)
     register_factory(DynamicalCorrelationCalculatorFactory)
     register_factory(EffectiveHamiltonianConstructorFactory)
     register_factory(GeometryOptimizerFactory)

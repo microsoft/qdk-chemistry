@@ -25,6 +25,7 @@ from qdk_chemistry.algorithms.amplitude_amplification.amplitude_amplification im
 from qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace import QPESubspaceMarking
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.controlled_circuit_mapper.base import ControlledCircuitMapper
+from qdk_chemistry.algorithms.double_factorization import DoubleFactorizer
 from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator, QdkMP2Calculator
 from qdk_chemistry.algorithms.effective_hamiltonian_constructor import EffectiveHamiltonianConstructor
 from qdk_chemistry.algorithms.expectation_estimator.expectation_estimator import ExpectationEstimator
@@ -77,6 +78,7 @@ __all__ = [
     "AmplitudeAmplification",
     "CircuitExecutor",
     "ControlledCircuitMapper",
+    "DoubleFactorizer",
     "DynamicalCorrelationCalculator",
     "EffectiveHamiltonianConstructor",
     "ExpectationEstimator",
