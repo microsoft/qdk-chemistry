@@ -256,6 +256,7 @@ class AlgorithmFactory {
    * factory.
    *
    * @param name The name to identify the desired algorithm implementation.
+   * @param suppress_warnings Whether to suppress creation-time warnings.
    * @return A unique pointer to the created algorithm instance.
    * @throws std::runtime_error if the name is not found in the registry.
    */
