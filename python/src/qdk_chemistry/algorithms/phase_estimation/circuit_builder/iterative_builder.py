@@ -25,33 +25,6 @@ __all__: list[str] = [
 ]
 
 
-def _require_adaptive_profile() -> None:
-    """Ensure the active Q# target profile supports mid-circuit measurement and classical control.
-
-    The single-circuit IQPE relies on in-circuit classical feedback, which does not compile
-    under the Base profile. This raises a clear error instead of surfacing a cryptic Q# compile
-    failure when the profile is Base.
-
-    Raises:
-        RuntimeError: If the active Q# target profile is Base.
-
-    """
-    try:
-        from qdk._interpreter import get_config  # noqa: PLC0415
-    except ImportError:
-        from qsharp._qsharp import get_config  # noqa: PLC0415
-
-    profile = get_config().get_target_profile().lower()
-    if profile == "base":
-        raise RuntimeError(
-            "Single-circuit IQPE requires a Q# target profile that supports mid-circuit measurement "
-            "and classical feedback (e.g. Adaptive_RI), but the active profile is 'Base'. "
-            "Set an adaptive profile before importing qdk_chemistry, e.g. "
-            "`import qsharp; qsharp.init(target_profile=qsharp.TargetProfile.Adaptive_RI)`, "
-            "or use the default per-bit IQPE (combine_iterations=False)."
-        )
-
-
 class QdkIterativeQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
     """Settings for the Iterative Phase Estimation Builder."""
 
@@ -282,7 +255,20 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
                 "For Qiskit support, use QiskitIterativeQpeCircuitBuilder from the qiskit plugin."
             )
 
-        _require_adaptive_profile()
+        try:
+            from qdk._interpreter import get_config  # noqa: PLC0415
+        except ImportError:
+            from qsharp._qsharp import get_config  # noqa: PLC0415
+
+        # Base profile has no mid-circuit measurement, so fail clearly instead of on a Q# compile error.
+        if get_config().get_target_profile().lower() == "base":
+            raise RuntimeError(
+                "Single-circuit IQPE requires a Q# target profile that supports mid-circuit measurement "
+                "and classical feedback (e.g. Adaptive_RI), but the active profile is 'Base'. "
+                "Set an adaptive profile before importing qdk_chemistry, e.g. "
+                "`import qsharp; qsharp.init(target_profile=qsharp.TargetProfile.Adaptive_RI)`, "
+                "or use the default per-bit IQPE (combine_iterations=False)."
+            )
 
         iterative_parameters = {
             "numBits": num_bits,
