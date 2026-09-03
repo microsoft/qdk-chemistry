@@ -13,7 +13,7 @@ from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.state_preparation.alias_sampling import AliasSamplingStatePreparation
 from qdk_chemistry.data import Configuration, ModelOrbitals, StateVectorContainer, Wavefunction
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, get_qsharp_context
 
 
 def _run_alias_sampling_and_dump(
@@ -100,6 +100,10 @@ class TestAliasSamplingStatePreparation:
         qubit and reported 14 qubits / 2 CCZ. With that branch deleted the trace is the
         runnable circuit throughout, which needs 17 / 8 -- exactly the figures the old
         docstring predicted for it.
+
+        The conditional lookup pins the SOSSA inner-PREPARE shape: 90 conditions, 16 slots,
+        and 21-bit words. At the optimal three swap bits, measurement erasure reduces its
+        adjoint from 408 to 83 CCZ gates and its round trip from 816 to 491.
         """
         prep = AliasSamplingStatePreparation(bits_precision=4)
         circuit = prep.run(_make_wavefunction([0.5, 0.3, 0.7, 0.1]))
@@ -110,6 +114,56 @@ class TestAliasSamplingStatePreparation:
         assert lc["tCount"] == 0
         assert lc["rotationCount"] == 0
         assert lc["measurementCount"] == 6
+
+        context = create_qsharp_context()
+        select_swap = context.code.QDKChemistry.Utils.SelectSwap
+        lookup_data = [
+            [[bool((17 * outer + 5 * inner + bit) % 7 < 3) for bit in range(21)] for inner in range(16)]
+            for outer in range(90)
+        ]
+        num_swap_bits = select_swap.ComputeOptimalLambda2D(90, 16, 21, True)
+        assert num_swap_bits == 3, f"expected three swap bits, got {num_swap_bits}"
+        expected_lookup_counts = {
+            "forward": (
+                (True, False),
+                {
+                    "numQubits": 283,
+                    "cczCount": 408,
+                    "ccixCount": 0,
+                    "tCount": 0,
+                    "rotationCount": 0,
+                    "measurementCount": 429,
+                },
+            ),
+            "adjoint": (
+                (False, True),
+                {
+                    "numQubits": 115,
+                    "cczCount": 83,
+                    "ccixCount": 0,
+                    "tCount": 0,
+                    "rotationCount": 0,
+                    "measurementCount": 104,
+                },
+            ),
+            "round_trip": (
+                (True, True),
+                {
+                    "numQubits": 283,
+                    "cczCount": 491,
+                    "ccixCount": 0,
+                    "tCount": 0,
+                    "rotationCount": 0,
+                    "measurementCount": 533,
+                },
+            ),
+        }
+        for direction, (flags, expected) in expected_lookup_counts.items():
+            counts = context.logical_counts(
+                select_swap.TestSelect2DLoadWordResourceProbe, lookup_data, num_swap_bits, True, *flags
+            )
+            actual = {name: counts[name] for name in expected}
+            assert actual == expected, f"conditional alias lookup {direction}: {actual} != {expected}"
 
     def test_settings_expose_bits_precision(self):
         """The constructor argument is stored in settings so create() can reach it."""

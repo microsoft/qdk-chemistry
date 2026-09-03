@@ -42,99 +42,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // Inner PREPARE
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    /// Build an inner PREPARE using conditional alias sampling (2D QROM).
-    ///
-    /// Uses ConditionalAliasSamplingPrepareWithFreeRider to prepare:
-    ///   |x_o⟩|0⟩ → |x_o⟩ Σ_b √(p̃_{x_o,b}) e^{iπ·sign} |b⟩|garbage⟩
-    ///
-    /// Pass `freeRiderData = []` to leave the free-rider word to `MakeFreeRiderLoadOp`. That
-    /// pays off only when the lookup takes the select-swap path, where the word widens the
-    /// QROAM output the swap network is charged for, four times per block encoding. On the
-    /// unary-iteration path the cost does not depend on the output width, so carrying it here
-    /// is free and a separate load would be pure overhead.
-    ///
-    /// The returned callable expects:
-    ///   outerReg — conditional address register (x_o)
-    ///   innerReg — target register layout: indexReg[nIdx] + uniformReg[μ]
-    ///              + flagQubit[1] + qromOutput[μ + nIdx + 2] + freeRiderReg[nFR]
-    function MakeInnerPrepareAliasSampling(
-        innerCoefficients : Double[][],
-        freeRiderData : Bool[][],
-        coefficientBitPrecision : Int,
-    ) : (Qubit[], Qubit[]) => Unit is Adj {
-        let nCoeffs = Length(innerCoefficients[0]);
-        let nIndexBits = BitSizeI(nCoeffs - 1);
-        let mu = coefficientBitPrecision;
-        let nFreeRider = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
-        let qromEnd = 2 * nIndexBits + 2 * mu + 2;
-        (outerReg, innerReg) => {
-            let indexReg = innerReg[0..nIndexBits - 1];
-            let uniformReg = innerReg[nIndexBits..nIndexBits + mu - 1];
-            let flagQubit = innerReg[nIndexBits + mu];
-            let qromOut = innerReg[nIndexBits + mu + 1..qromEnd];
-            let freeRiderReg = if nFreeRider > 0 {
-                innerReg[qromEnd + 1..qromEnd + nFreeRider]
-            } else {
-                []
-            };
-            ConditionalAliasSamplingPrepareWithFreeRider(
-                innerCoefficients,
-                freeRiderData,
-                mu,
-                outerReg,
-                indexReg,
-                uniformReg,
-                flagQubit,
-                qromOut,
-                freeRiderReg, -1
-            );
-        }
-    }
-
-    /// Load the free-rider word (G, r) for the current x_o.
-    ///
-    /// It is a function of x_o alone, so the block encoding loads it once around both SELECT
-    /// calls rather than letting each inner PREPARE carry it: one `Select` round trip against
-    /// four widened QROAM round trips.
-    function MakeFreeRiderLoadOp(freeRiderData : Bool[][]) : (Qubit[], Qubit[]) => Unit is Adj + Ctl {
-        (outerReg, freeRiderReg) => {
-            if Length(freeRiderData) > 0 and Length(freeRiderReg) > 0 {
-                Select(freeRiderData, outerReg, freeRiderReg);
-            }
-        }
-    }
-
-    /// Build an inner PREPARE using direct controlled preparation.
-    /// Prepares the b superposition via controlled PreparePureStateD. The free-rider word is
-    /// loaded by `MakeFreeRiderLoadOp`, hoisted out of the block encoding's inner loop.
-    function MakeInnerPrepareDirect(
-        innerCoefficients : Double[][],
-        freeRiderData : Bool[][]
-    ) : (Qubit[], Qubit[]) => Unit is Adj + Ctl {
-        let nCoeffs = Length(innerCoefficients[0]);
-        let nIndexBits = BitSizeI((if nCoeffs > 1 { nCoeffs } else { 2 }) - 1);
-        // innerReg layout: bReg[nIndexBits] + freeRiderReg[nFR]
-        (outerReg, innerReg) => {
-            let bReg = innerReg[0..nIndexBits - 1];
-
-            let xo = Length(innerCoefficients);
-            for i in 0..xo - 1 {
-                let nPadded = 1 <<< nIndexBits;
-                let paddedAmps = Padded(-nPadded, 0.0, innerCoefficients[i]);
-                ApplyControlledOnInt(
-                    i,
-                    PreparePureStateD(paddedAmps, _),
-                    outerReg,
-                    Reversed(bReg),
-                );
-            }
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
     // SELECT
     // ═══════════════════════════════════════════════════════════════════════════
 
@@ -152,31 +59,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         /// Layout: [sf_vs_dq(1), d_vs_q(1), r_bits(⌈log₂ R⌉)].
         /// When > 0, SelectImpl reads isSF and dvsq from innerReg instead of computing them.
         numFreeRiderBits : Int,
-    }
-
-    /// Build a SELECT using QROM + phase gradient rotation.
-    ///
-    /// Givens rotations are applied via split OneBody/TwoBody Select QROM + RyViaPhaseGradient.
-    /// The phase gradient register is allocated and prepared externally by QPE.
-    function MakeSelectPhaseGradient(
-        params : SelectParams
-    ) : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl {
-        (outerReg, innerReg, spinReg, systemReg, phaseGradientReg) => {
-            SelectImpl(params, true, outerReg, innerReg, spinReg, systemReg, phaseGradientReg);
-        }
-    }
-
-    /// Build a SELECT using direct rotation synthesis.
-    ///
-    /// Givens rotations are applied via multi-controlled Ry gates.
-    /// Useful for simulation and testing (no ancilla overhead).
-    /// The phaseGradientReg argument is accepted but ignored.
-    function MakeSelectDirectRotation(
-        params : SelectParams
-    ) : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl {
-        (outerReg, innerReg, spinReg, systemReg, phaseGradientReg) => {
-            SelectImpl(params, false, outerReg, innerReg, spinReg, systemReg, phaseGradientReg);
-        }
     }
 
     /// SELECT implementation (arXiv:2502.15882v1, Appendix B.3, B.5-B.6).
@@ -387,20 +269,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         );
     }
 
-    /// The SOSSA block encoding B as the `Qubit[] => Unit is Adj` callable QPE consumes.
-    ///
-    /// The register it takes is `[systemReg | outerReg | innerReg | spinReg | phaseGradientReg]`;
-    /// the gradient tail is only present when `layout.numPhaseGradientQubits > 0`.
-    function MakeSOSSABlockEncodingOp(
-        outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
-        freeRiderOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
-        innerPrepareOp : (Qubit[], Qubit[]) => Unit is Adj,
-        selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
-        layout : SOSSAWalkLayout,
-    ) : (Qubit[] => Unit is Adj) {
-        SOSSABlockEncodingOnRegister(outerPrepareOp, freeRiderOp, innerPrepareOp, selectOp, layout, _)
-    }
-
     // ═══════════════════════════════════════════════════════════════════════════
     // Register layout
     // ═══════════════════════════════════════════════════════════════════════════
@@ -475,28 +343,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                 []
             }
         }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // QPE-facing entry point
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    /// Circuit entry point: allocates the flat register and applies the block encoding once.
-    /// Register layout: [systemReg | outerReg | innerReg | spinReg | phaseGradientReg].
-    operation MakeSOSSABlockEncodingCircuit(
-        outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
-        freeRiderOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
-        innerPrepareOp : (Qubit[], Qubit[]) => Unit is Adj,
-        selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
-        layout : SOSSAWalkLayout,
-    ) : Unit {
-        use allQubits = Qubit[layout.numSystemQubits + SOSSAWalkAncillaCount(layout)];
-        if layout.numPhaseGradientQubits > 0 {
-            let gradientStart = Length(allQubits) - layout.numPhaseGradientQubits;
-            PreparePhaseGradientState(allQubits[gradientStart...]);
-        }
-        SOSSABlockEncodingOnRegister(outerPrepareOp, freeRiderOp, innerPrepareOp, selectOp, layout, allQubits);
-        ResetAll(allQubits);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -841,6 +687,157 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         within { X(sf_vs_dq); } apply {
             Controlled Z([sf_vs_dq, d_vs_q], spin);
         }
+    }
+
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Factories and circuit entry points
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Build an inner PREPARE using conditional alias sampling (2D QROM).
+    ///
+    /// Uses ConditionalAliasSamplingPrepareWithFreeRider to prepare:
+    ///   |x_o⟩|0⟩ → |x_o⟩ Σ_b √(p̃_{x_o,b}) e^{iπ·sign} |b⟩|garbage⟩
+    ///
+    /// Pass `freeRiderData = []` to leave the free-rider word to `MakeFreeRiderLoadOp`. That
+    /// pays off only when the lookup takes the select-swap path, where the word widens the
+    /// QROAM output the swap network is charged for, four times per block encoding. On the
+    /// unary-iteration path the cost does not depend on the output width, so carrying it here
+    /// is free and a separate load would be pure overhead.
+    ///
+    /// The returned callable expects:
+    ///   outerReg — conditional address register (x_o)
+    ///   innerReg — target register layout: indexReg[nIdx] + uniformReg[μ]
+    ///              + flagQubit[1] + qromOutput[μ + nIdx + 2] + freeRiderReg[nFR]
+    function MakeInnerPrepareAliasSampling(
+        innerCoefficients : Double[][],
+        freeRiderData : Bool[][],
+        coefficientBitPrecision : Int,
+    ) : (Qubit[], Qubit[]) => Unit is Adj {
+        let nCoeffs = Length(innerCoefficients[0]);
+        let nIndexBits = BitSizeI(nCoeffs - 1);
+        let mu = coefficientBitPrecision;
+        let nFreeRider = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
+        let qromEnd = 2 * nIndexBits + 2 * mu + 2;
+        (outerReg, innerReg) => {
+            let indexReg = innerReg[0..nIndexBits - 1];
+            let uniformReg = innerReg[nIndexBits..nIndexBits + mu - 1];
+            let flagQubit = innerReg[nIndexBits + mu];
+            let qromOut = innerReg[nIndexBits + mu + 1..qromEnd];
+            let freeRiderReg = if nFreeRider > 0 {
+                innerReg[qromEnd + 1..qromEnd + nFreeRider]
+            } else {
+                []
+            };
+            ConditionalAliasSamplingPrepareWithFreeRider(
+                innerCoefficients,
+                freeRiderData,
+                mu,
+                outerReg,
+                indexReg,
+                uniformReg,
+                flagQubit,
+                qromOut,
+                freeRiderReg, -1
+            );
+        }
+    }
+
+    /// Load the free-rider word (G, r) for the current x_o.
+    ///
+    /// It is a function of x_o alone, so the block encoding loads it once around both SELECT
+    /// calls rather than letting each inner PREPARE carry it: one `Select` round trip against
+    /// four widened QROAM round trips.
+    function MakeFreeRiderLoadOp(freeRiderData : Bool[][]) : (Qubit[], Qubit[]) => Unit is Adj + Ctl {
+        (outerReg, freeRiderReg) => {
+            if Length(freeRiderData) > 0 and Length(freeRiderReg) > 0 {
+                Select(freeRiderData, outerReg, freeRiderReg);
+            }
+        }
+    }
+
+    /// Build an inner PREPARE using direct controlled preparation.
+    /// Prepares the b superposition via controlled PreparePureStateD. The free-rider word is
+    /// loaded by `MakeFreeRiderLoadOp`, hoisted out of the block encoding's inner loop.
+    function MakeInnerPrepareDirect(
+        innerCoefficients : Double[][],
+        freeRiderData : Bool[][]
+    ) : (Qubit[], Qubit[]) => Unit is Adj + Ctl {
+        let nCoeffs = Length(innerCoefficients[0]);
+        let nIndexBits = BitSizeI((if nCoeffs > 1 { nCoeffs } else { 2 }) - 1);
+        // innerReg layout: bReg[nIndexBits] + freeRiderReg[nFR]
+        (outerReg, innerReg) => {
+            let bReg = innerReg[0..nIndexBits - 1];
+
+            let xo = Length(innerCoefficients);
+            for i in 0..xo - 1 {
+                let nPadded = 1 <<< nIndexBits;
+                let paddedAmps = Padded(-nPadded, 0.0, innerCoefficients[i]);
+                ApplyControlledOnInt(
+                    i,
+                    PreparePureStateD(paddedAmps, _),
+                    outerReg,
+                    Reversed(bReg),
+                );
+            }
+        }
+    }
+
+    /// Build a SELECT using QROM + phase gradient rotation.
+    ///
+    /// Givens rotations are applied via split OneBody/TwoBody Select QROM + RyViaPhaseGradient.
+    /// The phase gradient register is allocated and prepared externally by QPE.
+    function MakeSelectPhaseGradient(
+        params : SelectParams
+    ) : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl {
+        (outerReg, innerReg, spinReg, systemReg, phaseGradientReg) => {
+            SelectImpl(params, true, outerReg, innerReg, spinReg, systemReg, phaseGradientReg);
+        }
+    }
+
+    /// Build a SELECT using direct rotation synthesis.
+    ///
+    /// Givens rotations are applied via multi-controlled Ry gates.
+    /// Useful for simulation and testing (no ancilla overhead).
+    /// The phaseGradientReg argument is accepted but ignored.
+    function MakeSelectDirectRotation(
+        params : SelectParams
+    ) : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl {
+        (outerReg, innerReg, spinReg, systemReg, phaseGradientReg) => {
+            SelectImpl(params, false, outerReg, innerReg, spinReg, systemReg, phaseGradientReg);
+        }
+    }
+
+    /// The SOSSA block encoding B as the `Qubit[] => Unit is Adj` callable QPE consumes.
+    ///
+    /// The register it takes is `[systemReg | outerReg | innerReg | spinReg | phaseGradientReg]`;
+    /// the gradient tail is only present when `layout.numPhaseGradientQubits > 0`.
+    function MakeSOSSABlockEncodingOp(
+        outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
+        freeRiderOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        innerPrepareOp : (Qubit[], Qubit[]) => Unit is Adj,
+        selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        layout : SOSSAWalkLayout,
+    ) : (Qubit[] => Unit is Adj) {
+        SOSSABlockEncodingOnRegister(outerPrepareOp, freeRiderOp, innerPrepareOp, selectOp, layout, _)
+    }
+
+    /// Circuit entry point: allocates the flat register and applies the block encoding once.
+    /// Register layout: [systemReg | outerReg | innerReg | spinReg | phaseGradientReg].
+    operation MakeSOSSABlockEncodingCircuit(
+        outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
+        freeRiderOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        innerPrepareOp : (Qubit[], Qubit[]) => Unit is Adj,
+        selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        layout : SOSSAWalkLayout,
+    ) : Unit {
+        use allQubits = Qubit[layout.numSystemQubits + SOSSAWalkAncillaCount(layout)];
+        if layout.numPhaseGradientQubits > 0 {
+            let gradientStart = Length(allQubits) - layout.numPhaseGradientQubits;
+            PreparePhaseGradientState(allQubits[gradientStart...]);
+        }
+        SOSSABlockEncodingOnRegister(outerPrepareOp, freeRiderOp, innerPrepareOp, selectOp, layout, allQubits);
+        ResetAll(allQubits);
     }
 
 

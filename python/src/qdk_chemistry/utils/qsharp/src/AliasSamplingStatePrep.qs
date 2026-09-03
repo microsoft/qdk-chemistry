@@ -131,6 +131,48 @@ namespace QDKChemistry.Utils.AliasSampling {
         return (keepCoeff, altIndex);
     }
 
+    /// Build 3D QROM table for conditional alias sampling with sign bits and
+    /// optional free-rider data.
+    ///
+    /// Returns Bool[][][] of shape [nCond][nPaddedIdx][dataBits], suitable for
+    /// Select2DLoadWord with outerAddress=conditionalRegister, innerAddress=indexRegister.
+    ///
+    /// Each row encodes: keepCoeff[μ] + altIndex[nIdx] + signOrig[1] + signAlt[1] + freeRider[*].
+    function BuildConditionalAliasTable3D(
+        coefficients : Double[][],
+        freeRiderData : Bool[][],
+        bitsPrecision : Int,
+        nIndexBits : Int
+    ) : Bool[][][] {
+        let nCond = Length(coefficients);
+        let nCoeffs = Length(coefficients[0]);
+        let nPaddedIdx = 1 <<< nIndexBits;
+        let nFreeRiderBits = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
+        let maxKeep = (1 <<< bitsPrecision) - 1;
+
+        mutable result : Bool[][][] = [];
+        for c in 0..nCond - 1 {
+            let squaredCoeffs = Mapped(x -> x * x, coefficients[c]);
+            let (keepCoeff, altIndex) = DiscretizedProbabilityDistribution(bitsPrecision, squaredCoeffs);
+            mutable innerData : Bool[][] = [];
+            for b in 0..nPaddedIdx - 1 {
+                if b < nCoeffs {
+                    let signBit = coefficients[c][b] < 0.0;
+                    let signAltBit = coefficients[c][altIndex[b]] < 0.0;
+                    set innerData += [
+                        IntAsBoolArray(keepCoeff[b], bitsPrecision) + IntAsBoolArray(altIndex[b], nIndexBits) + [signBit, signAltBit] + (if nFreeRiderBits > 0 { freeRiderData[c] } else { [] })
+                    ];
+                } else {
+                    set innerData += [
+                        IntAsBoolArray(maxKeep, bitsPrecision) + IntAsBoolArray(b, nIndexBits) + [false, false] + (if nFreeRiderBits > 0 { freeRiderData[c] } else { [] })
+                    ];
+                }
+            }
+            set result += [innerData];
+        }
+        return result;
+    }
+
     /// Alias sampling state preparation.
     ///
     /// Prepares: |0⟩ → Σ_ℓ √(p̃_ℓ) |ℓ⟩|garbage_ℓ⟩
@@ -195,70 +237,6 @@ namespace QDKChemistry.Utils.AliasSampling {
         for i in 0..nIndexQubits - 1 {
             Controlled SWAP([flagQubit], (indexRegister[i], altLoaded[i]));
         }
-    }
-
-    /// Create an alias sampling state preparation callable.
-    function MakeAliasSamplingOp(params : AliasSamplingParams) : Qubit[] => Unit is Adj + Ctl {
-        AliasSamplingPrepare(params, _)
-    }
-
-    /// Circuit entry point for alias sampling.
-    operation MakeAliasSamplingCircuit(
-        coefficients : Double[],
-        bitsPrecision : Int,
-        numIndexQubits : Int,
-        numQubits : Int,
-    ) : Unit {
-        let params = new AliasSamplingParams {
-            coefficients = coefficients,
-            bitsPrecision = bitsPrecision,
-            numIndexQubits = numIndexQubits,
-            numQubits = numQubits,
-        };
-        use qs = Qubit[numQubits];
-        AliasSamplingPrepare(params, qs);
-    }
-
-    /// Build 3D QROM table for conditional alias sampling with sign bits and
-    /// optional free-rider data.
-    ///
-    /// Returns Bool[][][] of shape [nCond][nPaddedIdx][dataBits], suitable for
-    /// Select2DLoadWord with outerAddress=conditionalRegister, innerAddress=indexRegister.
-    ///
-    /// Each row encodes: keepCoeff[μ] + altIndex[nIdx] + signOrig[1] + signAlt[1] + freeRider[*].
-    function BuildConditionalAliasTable3D(
-        coefficients : Double[][],
-        freeRiderData : Bool[][],
-        bitsPrecision : Int,
-        nIndexBits : Int
-    ) : Bool[][][] {
-        let nCond = Length(coefficients);
-        let nCoeffs = Length(coefficients[0]);
-        let nPaddedIdx = 1 <<< nIndexBits;
-        let nFreeRiderBits = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
-        let maxKeep = (1 <<< bitsPrecision) - 1;
-
-        mutable result : Bool[][][] = [];
-        for c in 0..nCond - 1 {
-            let squaredCoeffs = Mapped(x -> x * x, coefficients[c]);
-            let (keepCoeff, altIndex) = DiscretizedProbabilityDistribution(bitsPrecision, squaredCoeffs);
-            mutable innerData : Bool[][] = [];
-            for b in 0..nPaddedIdx - 1 {
-                if b < nCoeffs {
-                    let signBit = coefficients[c][b] < 0.0;
-                    let signAltBit = coefficients[c][altIndex[b]] < 0.0;
-                    set innerData += [
-                        IntAsBoolArray(keepCoeff[b], bitsPrecision) + IntAsBoolArray(altIndex[b], nIndexBits) + [signBit, signAltBit] + (if nFreeRiderBits > 0 { freeRiderData[c] } else { [] })
-                    ];
-                } else {
-                    set innerData += [
-                        IntAsBoolArray(maxKeep, bitsPrecision) + IntAsBoolArray(b, nIndexBits) + [false, false] + (if nFreeRiderBits > 0 { freeRiderData[c] } else { [] })
-                    ];
-                }
-            }
-            set result += [innerData];
-        }
-        return result;
     }
 
     /// Conditional alias sampling PREPARE (2D) — prepares
@@ -374,6 +352,32 @@ namespace QDKChemistry.Utils.AliasSampling {
         // Sign encoding (Von Burg arXiv:2011.03494, Def. 1)
         Controlled SWAP([flagQubit], (signOrigQubit, signAltQubit));
         Z(signOrigQubit);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Factories and circuit entry points
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Create an alias sampling state preparation callable.
+    function MakeAliasSamplingOp(params : AliasSamplingParams) : Qubit[] => Unit is Adj + Ctl {
+        AliasSamplingPrepare(params, _)
+    }
+
+    /// Circuit entry point for alias sampling.
+    operation MakeAliasSamplingCircuit(
+        coefficients : Double[],
+        bitsPrecision : Int,
+        numIndexQubits : Int,
+        numQubits : Int,
+    ) : Unit {
+        let params = new AliasSamplingParams {
+            coefficients = coefficients,
+            bitsPrecision = bitsPrecision,
+            numIndexQubits = numIndexQubits,
+            numQubits = numQubits,
+        };
+        use qs = Qubit[numQubits];
+        AliasSamplingPrepare(params, qs);
     }
 
     /// Test wrapper: conditional alias sampling on `[condition | index | uniform | flag | qrom]`.

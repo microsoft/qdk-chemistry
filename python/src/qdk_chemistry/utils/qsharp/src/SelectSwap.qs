@@ -641,4 +641,30 @@ namespace QDKChemistry.Utils.SelectSwap {
 
         All(r -> r == Zero, MResetEachZ(outerAddr + innerAddr))
     }
+
+    /// Traces `Select2DLoadWord` in one or both directions for a costing regression.
+    ///
+    /// The load and its erasure are selectable separately because the erasure is written by
+    /// hand rather than derived from the body, so the two costs move independently.
+    internal operation TestSelect2DLoadWordResourceProbe(
+        data : Bool[][][],
+        numSwapBits : Int,
+        outerAddressAlwaysValid : Bool,
+        applyForward : Bool,
+        applyAdjoint : Bool
+    ) : Unit {
+        let nOuterAddr = Ceiling(Lg(IntAsDouble(Length(data))));
+        let nInnerAddr = Ceiling(Lg(IntAsDouble(Length(data[0]))));
+
+        use outerAddr = Qubit[nOuterAddr];
+        use innerAddr = Qubit[nInnerAddr];
+        use target = Qubit[Length(data[0][0])];
+
+        if applyForward {
+            Select2DLoadWord(data, outerAddr, innerAddr, numSwapBits, outerAddressAlwaysValid, target);
+        }
+        if applyAdjoint {
+            Adjoint Select2DLoadWord(data, outerAddr, innerAddr, numSwapBits, outerAddressAlwaysValid, target);
+        }
+    }
 }
