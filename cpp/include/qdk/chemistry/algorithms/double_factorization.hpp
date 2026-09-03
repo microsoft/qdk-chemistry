@@ -22,8 +22,31 @@ namespace qdk::chemistry::algorithms {
  * @note Equation numbers here refer to :cite:`Low2025`.
  */
 
-/// Default eigenvalue threshold for retaining two-body fragments.
-inline constexpr double DEFAULT_TRUNCATION_THRESHOLD = 1e-12;
+/**
+ * @class DoubleFactorizerSettings
+ * @brief Settings container for DoubleFactorizer.
+ *
+ * @see DoubleFactorizer
+ */
+class DoubleFactorizerSettings : public qdk::chemistry::data::Settings {
+ public:
+  /// Default eigenvalue threshold for retaining two-body fragments.
+  static constexpr double DEFAULT_TRUNCATION_THRESHOLD = 1e-12;
+
+  /**
+   * @brief Constructor that initializes the default settings.
+   */
+  DoubleFactorizerSettings() {
+    set_default<double>(
+        "truncation_threshold", DEFAULT_TRUNCATION_THRESHOLD,
+        "Drop fragments whose two-electron supermatrix eigenvalue magnitude "
+        "is below this threshold. Must be non-negative; 0.0 retains every "
+        "fragment, including the numerically null ones.",
+        qdk::chemistry::data::BoundConstraint<double>{
+            0.0, std::numeric_limits<double>::max()});
+  }
+  ~DoubleFactorizerSettings() override = default;
+};
 
 /// A single low-rank ("perfect square") two-electron fragment:
 ///
@@ -52,29 +75,8 @@ struct TwoBodyFragment {
 /// @throws std::runtime_error if a LAPACK diagonalization fails.
 std::vector<TwoBodyFragment> eigen_decompose_two_body(
     const Eigen::VectorXd& two_body_integrals, std::size_t norb,
-    double truncation_threshold = DEFAULT_TRUNCATION_THRESHOLD);
-/**
- * @class DoubleFactorizerSettings
- * @brief Settings container for DoubleFactorizer.
- *
- * @see DoubleFactorizer
- */
-class DoubleFactorizerSettings : public qdk::chemistry::data::Settings {
- public:
-  /**
-   * @brief Constructor that initializes the default settings.
-   */
-  DoubleFactorizerSettings() {
-    set_default<double>(
-        "truncation_threshold", DEFAULT_TRUNCATION_THRESHOLD,
-        "Drop fragments whose two-electron supermatrix eigenvalue magnitude "
-        "is below this threshold. Must be non-negative; 0.0 retains every "
-        "fragment, including the numerically null ones.",
-        qdk::chemistry::data::BoundConstraint<double>{
-            0.0, std::numeric_limits<double>::max()});
-  }
-  ~DoubleFactorizerSettings() override = default;
-};
+    double truncation_threshold =
+        DoubleFactorizerSettings::DEFAULT_TRUNCATION_THRESHOLD);
 
 /**
  * @class DoubleFactorizer
