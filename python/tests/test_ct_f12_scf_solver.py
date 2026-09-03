@@ -64,6 +64,8 @@ class TestCtF12ScfSettings:
         s = create("scf_solver", "qdk_ct_f12").settings()
         with pytest.raises(ValueError, match="out of allowed range"):
             s.set("gamma", -1.0)
+        with pytest.raises(ValueError, match="out of allowed range"):
+            s.set("gamma", 0.0)
 
 
 class TestCtF12ScfRun:

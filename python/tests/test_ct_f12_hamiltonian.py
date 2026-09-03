@@ -80,6 +80,8 @@ class TestCtF12Settings:
         s = create("effective_hamiltonian_constructor").settings()
         with pytest.raises(ValueError, match="out of allowed range"):
             s.set("gamma", -1.0)
+        with pytest.raises(ValueError, match="out of allowed range"):
+            s.set("gamma", 0.0)
 
     def test_orbital_basis_choices_enforced(self):
         s = create("effective_hamiltonian_constructor").settings()

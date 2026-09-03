@@ -10,6 +10,7 @@
 
 #include <Eigen/Dense>
 #include <cmath>
+#include <limits>
 #include <memory>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <string>
@@ -46,12 +47,14 @@ ctf12::F12HartreeFockInput neon_input(const std::string& obs_name,
   ctf12::F12HartreeFockInput input;
   input.scf_basis_set = obs_scf;
   input.obs = obs_libint;
-  input.mo_coefficients = orbitals->get_coefficients_alpha();
-  input.orbital_energies = orbitals->get_energies_alpha();
+  input.mo_coefficients = orbitals->coefficients()->block(
+      {data::axes::alpha(), data::axes::alpha()});
+  input.orbital_energies = orbitals->energies()->block({data::axes::alpha()});
   input.n_occupied = 5;  // Ne: 1s 2s 2p
   input.n_core = 1;      // frozen 1s (formulation a)
   input.cabs_ri_basis = cabs.ri_basis;
   input.cabs_coefficients = cabs.cabs_coeff;
+  // The published neon benchmarks use gamma=1.5 rather than the API default.
   input.gamma = 1.5;
   for (std::size_t a = 0; a < mol->n_atoms; ++a)
     input.nuclei.emplace_back(static_cast<double>(mol->atomic_charges[a]),
@@ -109,6 +112,19 @@ void run_neon_mp2(const std::string& obs_name, const std::string& cabs_name,
 }
 
 }  // namespace
+
+TEST(CtF12InputValidation, RejectsInvalidGamma) {
+  ctf12::F12HartreeFockInput input;
+
+  input.gamma = 0.0;
+  EXPECT_THROW(ctf12::build_f12_hamiltonian(input), std::invalid_argument);
+
+  input.gamma = -1.0;
+  EXPECT_THROW(ctf12::build_f12_hamiltonian(input), std::invalid_argument);
+
+  input.gamma = std::numeric_limits<double>::infinity();
+  EXPECT_THROW(ctf12::build_f12_hamiltonian(input), std::invalid_argument);
+}
 
 TEST(CtF12HartreeFock, NeonAugCcPvdz) {
   run_neon_f12_hf("aug-cc-pvdz", "aug-cc-pvdz-optri", -0.111555079, 1e-8,

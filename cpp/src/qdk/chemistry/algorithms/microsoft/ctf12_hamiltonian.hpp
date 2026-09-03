@@ -5,6 +5,7 @@
 #pragma once
 
 #include <cstdint>
+#include <limits>
 #include <qdk/chemistry/algorithms/effective_hamiltonian.hpp>
 #include <qdk/chemistry/data/auxiliary_basis.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
@@ -29,7 +30,8 @@ class CtF12HamiltonianSettings : public qdk::chemistry::data::Settings {
   CtF12HamiltonianSettings() {
     set_default<double>("gamma", 1.0,
                         "Slater geminal exponent gamma (atomic units)",
-                        data::BoundConstraint<double>{0.0, 100.0});
+                        data::BoundConstraint<double>{
+                            std::numeric_limits<double>::min(), 100.0});
     set_default<int64_t>("frozen_core", 0,
                          "Number of frozen core orbitals (formulation (a))",
                          data::BoundConstraint<int64_t>{0});
@@ -72,10 +74,16 @@ class CtF12HamiltonianSettings : public qdk::chemistry::data::Settings {
  * mandatory and is read from the @c AuxiliaryBasisRole::CABS entry of the
  * auxiliary bases passed to @c run().
  *
- * @c frozen_core and @c p_indices control different things and may disagree:
- * @c frozen_core selects the geminal-generating occupied set (formulation
- * (a)), while @c p_indices selects the emitted active space. An occupied
- * orbital may therefore generate geminals and still be frozen in the output.
+ * The geminal amplitudes are carried by pairs of @em occupied OBS orbitals,
+ * the contiguous block @f$[n_{core}, n_{occ})@f$ fixed by @c frozen_core, while
+ * the external index of the generator is always the whole CABS plus OBS virtual
+ * space. @c frozen_core is therefore independent of @c p_indices: it selects
+ * which electrons are correlated at the F12 level, whereas @c p_indices selects
+ * which orbitals the emitted Hamiltonian acts on. An occupied orbital left out
+ * of P still carries geminal amplitudes unless it is also in the frozen core;
+ * either way it is folded into the inactive Fock matrix and the constant energy
+ * term, and @c data::Orbitals has no frozen class to tell the two apart in the
+ * emitted @c inactive_indices().
  *
  * @warning Under @c orbital_basis="relaxed" the emitted orbitals are the
  * F12-HF-relaxed ones, so @c p_indices select positions in the @em relaxed

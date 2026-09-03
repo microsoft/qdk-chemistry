@@ -53,7 +53,7 @@ struct F12HartreeFockInput {
   Eigen::MatrixXd cabs_coefficients;  ///< CABS coefficients, @c [n_ri, n_cabs].
   std::vector<std::pair<double, std::array<double, 3>>>
       nuclei;          ///< Nuclear charges and positions (atomic units).
-  double gamma = 1.5;  ///< Slater geminal exponent.
+  double gamma = 1.0;  ///< Positive Slater geminal exponent; default 1.0.
 };
 
 /**
@@ -104,6 +104,21 @@ struct F12HartreeFockResult {
   Eigen::MatrixXd relaxation;        ///< Original-MO to relaxed-MO rotation.
   Eigen::VectorXd relaxed_energies;  ///< Dressed-Fock eigenvalues, @c [n_mo].
 };
+
+/**
+ * @brief Build the dressed CT-F12 Hamiltonian without relaxing its orbitals.
+ *
+ * Constructs the same dressed one- and two-body integrals as @ref run_f12_hf,
+ * but does not run the dressed mean-field SCF. The returned relaxation is the
+ * identity and the returned orbital energies are the input reference values.
+ * This is the production path for an effective Hamiltonian requested in the
+ * reference orbital basis.
+ *
+ * @param input The F12-HF reference description.
+ * @return Dressed integrals in the original MO basis without orbital
+ *         relaxation.
+ */
+F12HartreeFockResult build_f12_hamiltonian(const F12HartreeFockInput& input);
 
 /**
  * @brief Build the dressed CT-F12 Hamiltonian and relax the orbitals in it.

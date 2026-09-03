@@ -91,6 +91,9 @@ Available implementations
 QDK/Chemistry provides :class:`~qdk_chemistry.algorithms.QdkCtF12HamiltonianConstructor` (``"qdk_ct_f12"``), the default choice for this algorithm type.
 It applies an approximate canonical (unitary) similarity transformation of the molecular Hamiltonian with a fixed-amplitude Slater-type geminal generator, producing an a priori Hermitian two-body effective Hamiltonian over :math:`P`.
 Its complementary auxiliary basis (CABS) is the external space the transformation folds in, so it is required: pass it as the ``AuxiliaryBasisRole.CABS`` entry of ``auxiliary_bases``.
+Its ``frozen_core`` setting is independent of ``p_indices``: it selects which electrons are correlated at the F12 level, whereas ``p_indices`` selects which orbitals the emitted Hamiltonian acts on.
+The Slater exponent ``gamma`` defaults to ``1.0`` and must satisfy ``0 < gamma <= 100``.
+The example below sets ``gamma=1.5`` explicitly because that value is used by the published neon CT-F12 benchmarks.
 
 .. code-block:: python
 

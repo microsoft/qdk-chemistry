@@ -44,6 +44,10 @@ F12HartreeFockInput f12_input_from_wavefunction(
     const std::shared_ptr<const data::AuxiliaryBasis>& cabs_auxiliary_basis) {
   QDK_LOG_TRACE_ENTERING();
 
+  if (!std::isfinite(gamma) || gamma <= 0.0) {
+    throw std::invalid_argument("CT-F12: gamma must be finite and positive");
+  }
+
   auto orbitals = reference.get_orbitals();
   if (!orbitals) {
     throw std::invalid_argument(
@@ -111,8 +115,9 @@ F12HartreeFockInput f12_input_from_wavefunction(
   F12HartreeFockInput input;
   input.scf_basis_set = obs_scf;
   input.obs = obs_libint;
-  input.mo_coefficients = orbitals->get_coefficients_alpha();
-  input.orbital_energies = orbitals->get_energies_alpha();
+  input.mo_coefficients = orbitals->coefficients()->block(
+      {data::axes::alpha(), data::axes::alpha()});
+  input.orbital_energies = orbitals->energies()->block({data::axes::alpha()});
   input.n_occupied = static_cast<std::size_t>(n_alpha);
   input.n_core = frozen_core;
   input.cabs_ri_basis = cabs.ri_basis;
@@ -196,7 +201,14 @@ struct Workspace {
   double occ_idx(std::size_t k) const { return n_core + k; }
 };
 
+// TODO: Replace the materialized O(N^4) AO integral tensors below with a
+// shell-driven Libint2 implementation that screens shell quartets and
+// transforms/accumulates only the MO blocks required by CT-F12.
 Workspace build_workspace(const F12HartreeFockInput& in) {
+  if (!std::isfinite(in.gamma) || in.gamma <= 0.0) {
+    throw std::invalid_argument("CT-F12: gamma must be finite and positive");
+  }
+
   Workspace w;
   w.n_ao_obs = static_cast<std::size_t>(in.obs.nbf());
   w.n_ri = static_cast<std::size_t>(in.cabs_ri_basis.nbf());
@@ -535,7 +547,8 @@ double mp2_energy(const F12HartreeFockInput& in) {
   return energy;
 }
 
-F12HartreeFockResult run_f12_hf(const F12HartreeFockInput& in) {
+static F12HartreeFockResult compute_f12_hf(const F12HartreeFockInput& in,
+                                           bool relax_orbitals) {
   QDK_LOG_TRACE_ENTERING();
   Workspace w = build_workspace(in);
   VXB vxb = compute_vxb(w);
@@ -843,7 +856,20 @@ F12HartreeFockResult run_f12_hf(const F12HartreeFockInput& in) {
     for (std::size_t j = 0; j < nocc; ++j)
       reference_hf_energy += 2.0 * CHEM(i, i, j, j) - CHEM(i, j, j, i);
   }
-  const ScfOut f12 = run_scf(hbar, gbar);
+  ScfOut f12;
+  if (relax_orbitals) {
+    f12 = run_scf(hbar, gbar);
+  } else {
+    f12.e = 0.0;
+    for (std::size_t i = 0; i < nocc; ++i) {
+      f12.e += 2.0 * hbar(static_cast<int>(i), static_cast<int>(i));
+      for (std::size_t j = 0; j < nocc; ++j)
+        f12.e += 2.0 * gbar[gpidx(i, j, i, j)] - gbar[gpidx(i, j, j, i)];
+    }
+    f12.c = Eigen::MatrixXd::Identity(static_cast<Eigen::Index>(nbf),
+                                      static_cast<Eigen::Index>(nbf));
+    f12.eps = in.orbital_energies;
+  }
 
   F12HartreeFockResult out;
   out.n_mo = nbf;
@@ -856,6 +882,14 @@ F12HartreeFockResult run_f12_hf(const F12HartreeFockInput& in) {
   out.relaxation = f12.c;
   out.relaxed_energies = f12.eps;
   return out;
+}
+
+F12HartreeFockResult build_f12_hamiltonian(const F12HartreeFockInput& in) {
+  return compute_f12_hf(in, false);
+}
+
+F12HartreeFockResult run_f12_hf(const F12HartreeFockInput& in) {
+  return compute_f12_hf(in, true);
 }
 
 double f12_hf_scf_energy(const F12HartreeFockInput& in) {

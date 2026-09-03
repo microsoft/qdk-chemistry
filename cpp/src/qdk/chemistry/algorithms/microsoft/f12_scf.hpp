@@ -5,6 +5,7 @@
 #pragma once
 
 #include <cstdint>
+#include <limits>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/settings.hpp>
 #include <string>
@@ -25,7 +26,8 @@ class CtF12ScfSettings : public qdk::chemistry::data::Settings {
   CtF12ScfSettings() {
     set_default<double>("gamma", 1.0,
                         "Slater geminal exponent gamma (atomic units)",
-                        data::BoundConstraint<double>{0.0, 100.0});
+                        data::BoundConstraint<double>{
+                            std::numeric_limits<double>::min(), 100.0});
     set_default("cabs_basis", std::string(""),
                 "Named OptRI/CABS auxiliary basis; empty derives one from the "
                 "orbital basis set. Resolved by name because ScfSolver::run "

@@ -250,6 +250,8 @@ and relaxes the closed-shell orbitals in the dressed mean field. The returned
 wavefunction carries the relaxed orbital coefficients and the dressed-Fock
 orbital energies, with the frozen core marked inactive, so its conventional MP2
 yields the F12-MP2 energy.
+The Slater exponent ``gamma`` defaults to ``1.0`` and must be positive. The
+example sets it to ``1.5`` explicitly to match the published neon benchmarks.
 
 Typical usage:
 

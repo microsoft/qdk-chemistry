@@ -30,6 +30,7 @@
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
@@ -96,10 +97,14 @@ std::shared_ptr<data::Hamiltonian> restrict_dressed_virtual_space(
   }
 
   const auto orbitals = hamiltonian->get_orbitals();
-  const auto [full_active_alpha, full_active_beta] =
-      orbitals->get_active_space_indices();
-  const auto [inactive_alpha, inactive_beta] =
-      orbitals->get_inactive_space_indices();
+  const auto full_active_alpha = data::spin_channel_indices(
+      orbitals->active_indices(), data::axes::alpha());
+  const auto full_active_beta = data::spin_channel_indices(
+      orbitals->active_indices(), data::axes::beta());
+  const auto inactive_alpha = data::spin_channel_indices(
+      orbitals->inactive_indices(), data::axes::alpha());
+  const auto inactive_beta = data::spin_channel_indices(
+      orbitals->inactive_indices(), data::axes::beta());
   if (full_active_alpha != full_active_beta ||
       inactive_alpha != inactive_beta) {
     throw std::invalid_argument(
@@ -151,7 +156,10 @@ std::shared_ptr<data::Wavefunction> closed_shell_determinant(
     const std::shared_ptr<data::Hamiltonian>& hamiltonian,
     std::size_t n_active_occupied) {
   const auto orbitals = hamiltonian->get_orbitals();
-  const auto [active_alpha, active_beta] = orbitals->get_active_space_indices();
+  const auto active_alpha = data::spin_channel_indices(
+      orbitals->active_indices(), data::axes::alpha());
+  const auto active_beta = data::spin_channel_indices(
+      orbitals->active_indices(), data::axes::beta());
   if (active_alpha != active_beta || n_active_occupied > active_alpha.size()) {
     throw std::invalid_argument(
         "CT-F12 determinant requires matching closed-shell active spaces");
@@ -235,17 +243,19 @@ TEST(CtF12ActiveSpace, NeonAugCcPvdzAsci) {
       reference, bare_hamiltonian(reference), valence_p_space(reference, 1),
       cabs_bases(reference, "aug-cc-pvdz-optri"));
 
-  const auto full_valence_indices =
-      dressed_hamiltonian->get_orbitals()->get_active_space_indices().first;
+  const auto full_valence_indices = data::spin_channel_indices(
+      dressed_hamiltonian->get_orbitals()->active_indices(),
+      data::axes::alpha());
   ASSERT_GE(full_valence_indices.size(), 5u);
   const std::vector<std::size_t> selected_active_indices(
       full_valence_indices.begin(), full_valence_indices.begin() + 5);
   const auto active_hamiltonian = restrict_dressed_virtual_space(
       dressed_hamiltonian, selected_active_indices);
 
-  EXPECT_EQ(
-      active_hamiltonian->get_orbitals()->get_active_space_indices().first,
-      selected_active_indices);
+  EXPECT_EQ(data::spin_channel_indices(
+                active_hamiltonian->get_orbitals()->active_indices(),
+                data::axes::alpha()),
+            selected_active_indices);
   EXPECT_EQ(std::get<0>(active_hamiltonian->get_one_body_integrals()).rows(),
             5);
   EXPECT_EQ(std::get<0>(active_hamiltonian->get_two_body_integrals()).size(),
@@ -258,9 +268,11 @@ TEST(CtF12ActiveSpace, NeonAugCcPvdzAsci) {
                    dressed_hamiltonian->get_two_body_element(0, 1, 3, 4));
 
   const auto [n_alpha, n_beta] = reference->get_total_num_electrons();
-  const std::size_t n_inactive = active_hamiltonian->get_orbitals()
-                                     ->get_inactive_space_indices()
-                                     .first.size();
+  const std::size_t n_inactive =
+      data::spin_channel_indices(
+          active_hamiltonian->get_orbitals()->inactive_indices(),
+          data::axes::alpha())
+          .size();
   ASSERT_GE(n_alpha, n_inactive);
   ASSERT_GE(n_beta, n_inactive);
   const auto n_active_alpha = static_cast<unsigned int>(n_alpha - n_inactive);
@@ -300,9 +312,9 @@ TEST(CtF12ActiveSpace, NeonAugCcPvdzAsci) {
   EXPECT_LE(active_space_asci_energy, native_active_hf_energy + 1e-10);
   ASSERT_NE(active_space_wavefunction, nullptr);
   EXPECT_GT(active_space_wavefunction->size(), 0u);
-  EXPECT_EQ(active_space_wavefunction->get_orbitals()
-                ->get_active_space_indices()
-                .first,
+  EXPECT_EQ(data::spin_channel_indices(
+                active_space_wavefunction->get_orbitals()->active_indices(),
+                data::axes::alpha()),
             selected_active_indices);
   EXPECT_EQ(active_space_wavefunction->get_active_num_electrons().first, 4u);
   EXPECT_EQ(active_space_wavefunction->get_active_num_electrons().second, 4u);
@@ -317,9 +329,9 @@ TEST(CtF12ActiveSpace, NeonAugCcPvdzAsci) {
   EXPECT_LE(full_valence_asci_energy, native_full_hf_energy + 1e-10);
   ASSERT_NE(full_valence_wavefunction, nullptr);
   EXPECT_GT(full_valence_wavefunction->size(), 0u);
-  EXPECT_EQ(full_valence_wavefunction->get_orbitals()
-                ->get_active_space_indices()
-                .first,
+  EXPECT_EQ(data::spin_channel_indices(
+                full_valence_wavefunction->get_orbitals()->active_indices(),
+                data::axes::alpha()),
             full_valence_indices);
   EXPECT_EQ(full_valence_wavefunction->get_active_num_electrons().first, 4u);
   EXPECT_EQ(full_valence_wavefunction->get_active_num_electrons().second, 4u);
@@ -524,8 +536,9 @@ TEST(CtF12ActiveSpace, StretchedN2CcPvdzAsci) {
   const double symmetrized_f12_mp2_energy =
       mp2_energy(symmetrized_hamiltonian, n_active_alpha);
 
-  const auto full_valence_indices =
-      native_hamiltonian->get_orbitals()->get_active_space_indices().first;
+  const auto full_valence_indices = data::spin_channel_indices(
+      native_hamiltonian->get_orbitals()->active_indices(),
+      data::axes::alpha());
   ASSERT_GE(full_valence_indices.size(), cas_orbitals);
   const std::vector<std::size_t> cas_indices(
       full_valence_indices.begin(),
@@ -620,7 +633,9 @@ void run_neon_effective_hamiltonian_mp2(const std::string& obs_name,
   // relaxed F12-HF orbitals carried by the emitted Hamiltonian.
   auto orbitals = dressed_hamiltonian->get_orbitals();
   const std::size_t n_active =
-      orbitals->get_active_space_indices().first.size();
+      data::spin_channel_indices(orbitals->active_indices(),
+                                 data::axes::alpha())
+          .size();
   const std::size_t n_occupied = reference->get_total_num_electrons().first;
   const std::size_t n_active_occupied =
       n_occupied - static_cast<std::size_t>(frozen_core);
@@ -692,9 +707,14 @@ TEST(CtF12EffectiveHamiltonian, NeonPIndicesDefinePostDressingActiveSpace) {
       cabs_bases(reference, "aug-cc-pvdz-optri"));
 
   const auto orbitals = dressed_hamiltonian->get_orbitals();
-  const auto [active_alpha, active_beta] = orbitals->get_active_space_indices();
-  const auto [inactive_alpha, inactive_beta] =
-      orbitals->get_inactive_space_indices();
+  const auto active_alpha = data::spin_channel_indices(
+      orbitals->active_indices(), data::axes::alpha());
+  const auto active_beta = data::spin_channel_indices(
+      orbitals->active_indices(), data::axes::beta());
+  const auto inactive_alpha = data::spin_channel_indices(
+      orbitals->inactive_indices(), data::axes::alpha());
+  const auto inactive_beta = data::spin_channel_indices(
+      orbitals->inactive_indices(), data::axes::beta());
   const std::vector<std::size_t> expected_active{1, 2, 3, 4, 5};
   const std::vector<std::size_t> expected_inactive{0};
 

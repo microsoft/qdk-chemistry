@@ -46,7 +46,8 @@ struct DressedHamiltonian {
 DressedHamiltonian build_dressed_hamiltonian(const F12HartreeFockInput& in,
                                              bool relax_orbitals) {
   QDK_LOG_TRACE_ENTERING();
-  F12HartreeFockResult r = ctf12::run_f12_hf(in);
+  F12HartreeFockResult r =
+      relax_orbitals ? ctf12::run_f12_hf(in) : ctf12::build_f12_hamiltonian(in);
   const std::size_t n = r.n_mo;
 
   DressedHamiltonian out;
