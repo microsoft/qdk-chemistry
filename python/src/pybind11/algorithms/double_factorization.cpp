@@ -72,10 +72,10 @@ Returns:
 )");
 
   double_factorizer.def("aliases", &DoubleFactorizer::aliases, R"(
-Return the algorithm's aliases.
+Return all registered names for the implementation.
 
 Returns:
-  list[str]: All registered names for the algorithm, including the primary one.
+  list[str]: Every lookup name, including the canonical one.
 )");
 
   double_factorizer.def("type_name", &DoubleFactorizer::type_name, R"(

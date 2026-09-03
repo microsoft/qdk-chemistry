@@ -101,9 +101,10 @@ class TestAliasSamplingStatePreparation:
         runnable circuit throughout, which needs 17 / 8 -- exactly the figures the old
         docstring predicted for it.
 
-        The conditional lookup pins the SOSSA inner-PREPARE shape: 90 conditions, 16 slots,
-        and 21-bit words. At the optimal three swap bits, measurement erasure reduces its
-        adjoint from 408 to 83 CCZ gates and its round trip from 816 to 491.
+        The conditional lookup is pinned at a representative shape: 90 conditions, 16 slots,
+        and 21-bit words. At the optimal three swap bits, erasing the load by measurement
+        rather than running it backwards takes its adjoint from 408 to 83 CCZ gates, and its
+        round trip from 816 to 491.
         """
         prep = AliasSamplingStatePreparation(bits_precision=4)
         circuit = prep.run(_make_wavefunction([0.5, 0.3, 0.7, 0.1]))
