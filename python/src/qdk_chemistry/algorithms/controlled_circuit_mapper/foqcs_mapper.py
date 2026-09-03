@@ -118,39 +118,37 @@ class FoqcsMapper(ControlledCircuitMapper):
         params = self._build_foqcs_params(block)
         phases = [family.phase for family in block.families]
 
-        # PREPARE axis — forward loads the family phases; the conjugate un-PREP
-        # negates them so the block encoding supplies the FOQCS Y-term phase.
-        prepare_op = QSHARP_UTILS.Foqcs.MakeFoqcsPrepareOp(params, phases)
-        prepare_conj_op = QSHARP_UTILS.Foqcs.MakeFoqcsPrepareOp(params, [-p for p in phases])
-
-        # Transversal CX/CZ SELECT — self-gated, so the outer control drives PREPARE.
-        select_op = QSHARP_UTILS.Foqcs.MakeFoqcsSelectOp(block.num_families)
-        control_prepare = True
-
         num_system = block.num_target_qubits
         num_ancilla = block.num_prepare_ancillas
 
-        if use_quantum_walk:
-            make_circuit = QSHARP_UTILS.PrepSelPrep.MakeControlledPSPWalkCircuit
-            make_op = QSHARP_UTILS.PrepSelPrep.MakeControlledPSPWalkOp
-        else:
-            make_circuit = QSHARP_UTILS.PrepSelPrep.MakeControlledPrepSelPrepCircuit
-            make_op = QSHARP_UTILS.PrepSelPrep.MakeControlledPrepSelPrepOp
+        # FOQCS step on a flat [system | ancilla] register.  Composing via
+        # Controlled routes the outer control onto the PREPARE pair (the
+        # transversal SELECT is self-gated by the ancilla one-hot pattern).
+        step_op = QSHARP_UTILS.Foqcs.MakeFoqcsStepOp(params, phases, num_system, use_quantum_walk)
 
-        psp_parameters = {
-            "prepareOp": prepare_op,
-            "prepareConjOp": prepare_conj_op,
-            "selectOp": select_op,
-            "controlPrepare": control_prepare,
-            "numSystemQubits": num_system,
-            "numAncillaQubits": num_ancilla,
-            "power": power,
-        }
+        controlled_op = QSHARP_UTILS.CircuitComposition.MakeControlledOp(step_op)
+        repeated_op = QSHARP_UTILS.CircuitComposition.MakeRepeatedOp(
+            "ControlledFoqcsWalk" if use_quantum_walk else "ControlledFoqcs",
+            controlled_op,
+            power,
+        )
 
-        qsharp_factory = QsharpFactoryData(program=make_circuit, parameter=psp_parameters)
-        qsharp_op = make_op(prepare_op, prepare_conj_op, select_op, control_prepare, num_system, num_ancilla, power)
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.Foqcs.MakeControlledFoqcsCircuit,
+            parameter={
+                "params": params,
+                "phases": phases,
+                "numSystemQubits": num_system,
+                "numAncillaQubits": num_ancilla,
+                "power": power,
+                "useWalk": use_quantum_walk,
+            },
+        )
 
-        return Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
+        return Circuit(
+            qsharp_factory=qsharp_factory,
+            qsharp_op=QSHARP_UTILS.CircuitComposition.MakeSingleControlOp(repeated_op),
+        )
 
     @staticmethod
     def _build_foqcs_params(container: FoqcsContainer):

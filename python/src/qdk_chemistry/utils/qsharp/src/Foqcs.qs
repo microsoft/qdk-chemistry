@@ -30,6 +30,10 @@ namespace QDKChemistry.Utils.Foqcs {
     import Std.Math.AbsD;
     import Std.Math.ArcCos;
     import Std.Math.Sqrt;
+    import Std.ResourceEstimation.BeginEstimateCaching;
+    import Std.ResourceEstimation.EndEstimateCaching;
+    import Std.ResourceEstimation.SingleVariant;
+    import QDKChemistry.Utils.PrepSelPrep.Reflect;
 
     // ===================================================================
     // 1. Parameter struct
@@ -38,10 +42,11 @@ namespace QDKChemistry.Utils.Foqcs {
     /// Fully-resolved description of a FOQCS-LCU block encoding.
     ///
     /// Each family ``f`` contributes one sub-PREP qubit.  ``paulisPerFamily[f]``
-    /// is the homogeneous Pauli pattern (length 1 for a field term, length 2 for
-    /// a coupling term); ``offsets[f]`` is the nearest-neighbour separation ``k``
-    /// for 2-body families (ignored for 1-body).  ``absCoeffs`` are the
-    /// normalized sub-PREP amplitudes.
+    /// is the homogeneous Pauli pattern (empty for the identity/constant-shift
+    /// family, length 1 for a field term, length 2 for a coupling term);
+    /// ``offsets[f]`` is the nearest-neighbour separation ``k`` for 2-body
+    /// families (ignored otherwise).  ``absCoeffs`` are the normalized sub-PREP
+    /// amplitudes.
     ///
     /// Phases are supplied per call rather than stored here, since the forward
     /// PREP and the un-PREP require conjugate phase vectors.
@@ -274,6 +279,9 @@ namespace QDKChemistry.Utils.Foqcs {
     /// `ctl` is the single sub-PREP control qubit for this family.  The routing
     /// is self-gated by the one-hot sub-PREP pattern, so callers apply it
     /// unconditionally even inside a controlled PREP.
+    ///
+    /// An empty `paulis` denotes the identity (constant-shift) family: it leaves
+    /// `xReg`/`zReg` untouched so SELECT acts as the identity on that branch.
     operation ApplyFamilyDicke(
         paulis : Pauli[],
         k : Int,
@@ -282,7 +290,9 @@ namespace QDKChemistry.Utils.Foqcs {
         zReg : Qubit[]
     ) : Unit is Adj + Ctl {
         let width = Length(paulis);
-        if width == 1 {
+        if width == 0 {
+            // Identity family - nothing to prepare.
+        } elif width == 1 {
             let p = paulis[0];
             if p == PauliX {
                 Controlled BalancedDicke1Excitation(ctl, (xReg, true, 0));
@@ -305,7 +315,7 @@ namespace QDKChemistry.Utils.Foqcs {
                 fail "FOQCS: unsupported 2-body Pauli (must be XX, YY, or ZZ).";
             }
         } else {
-            fail "FOQCS: only 1-body and 2-body homogeneous families are supported.";
+            fail "FOQCS: only identity, 1-body and 2-body homogeneous families are supported.";
         }
     }
 
@@ -355,30 +365,92 @@ namespace QDKChemistry.Utils.Foqcs {
     }
 
     // ===================================================================
-    // 5. Interop factories (PREPARE / SELECT callables)
+    // 5. Block encoding
     // ===================================================================
 
-    /// Build the FOQCS PREPARE callable for a given phase vector.
+    /// FOQCS block encoding on the system and ancilla registers.
     ///
-    /// Partially applies :code:`FoqcsPrepare` over the ancilla register so it can
-    /// be composed by the generic ``PrepSelPrep`` block-encoding framework.  The
-    /// forward preparation passes the family phases; the un-preparation passes
-    /// the conjugated (negated) phases via :code:`NegatePhases`.
-    function MakeFoqcsPrepareOp(
+    /// Implements ``B[H] = PREP(c*)^dag . SELECT . PREP(c)``, encoding
+    /// ``H / lambda`` in the ``ancilla = |0>`` subspace.  The un-preparation uses
+    /// the conjugated (negated) phases, so the two PREPARE halves are asymmetric.
+    ///
+    /// FOQCS uses a control strategy that differs from the Babbush-style
+    /// ``PrepSelPrep`` framework: when the operation is controlled, the control
+    /// drives the PREPARE pair while the transversal SELECT runs unconditionally.
+    /// SELECT is self-gated by the one-hot ancilla pattern — with
+    /// ``ancilla = |0>`` its CX/CZ controls are inactive, so an un-triggered
+    /// PREPARE leaves SELECT acting as the identity.
+    operation FoqcsBlockEncoding(
         params : FoqcsParams,
-        phases : Double[]
-    ) : (Qubit[] => Unit is Adj + Ctl) {
-        FoqcsPrepare(params, phases, _)
+        phases : Double[],
+        systemReg : Qubit[],
+        ancilla : Qubit[]
+    ) : Unit is Adj + Ctl {
+        body ... {
+            FoqcsPrepare(params, phases, ancilla);
+            SelectFoqcs(Length(params.absCoeffs), ancilla, systemReg);
+            Adjoint FoqcsPrepare(params, NegatePhases(phases), ancilla);
+        }
+        adjoint auto;
+        controlled (ctls, ...) {
+            Controlled FoqcsPrepare(ctls, (params, phases, ancilla));
+            SelectFoqcs(Length(params.absCoeffs), ancilla, systemReg);
+            Controlled Adjoint FoqcsPrepare(ctls, (params, NegatePhases(phases), ancilla));
+        }
+        controlled adjoint auto;
     }
 
-    /// Build the FOQCS SELECT callable.
+    /// One FOQCS step: the block encoding, optionally followed by the ancilla
+    /// reflection that turns it into the quantum-walk operator.
+    operation FoqcsStep(
+        params : FoqcsParams,
+        phases : Double[],
+        numSystemQubits : Int,
+        useWalk : Bool,
+        allQubits : Qubit[]
+    ) : Unit is Adj + Ctl {
+        let systemReg = allQubits[0..numSystemQubits - 1];
+        let ancilla = allQubits[numSystemQubits...];
+        FoqcsBlockEncoding(params, phases, systemReg, ancilla);
+        if useWalk {
+            Reflect(ancilla);
+        }
+    }
+
+    /// FOQCS step callable on a flat ``[systemReg | ancillaReg]`` register.
     ///
-    /// Partially applies :code:`SelectFoqcs` over the ancilla and system
-    /// registers so it matches the ``(Qubit[], Qubit[]) => Unit`` signature
-    /// expected by the generic ``PrepSelPrep`` framework.
-    function MakeFoqcsSelectOp(
-        numSubPrep : Int
-    ) : ((Qubit[], Qubit[]) => Unit is Adj + Ctl) {
-        SelectFoqcs(numSubPrep, _, _)
+    /// The first ``numSystemQubits`` qubits are the system register; the rest are
+    /// the FOQCS ancilla register ``[subPrepReg | xReg | zReg]``.  Composing via
+    /// ``Controlled`` preserves the FOQCS control-on-PREPARE strategy.
+    function MakeFoqcsStepOp(
+        params : FoqcsParams,
+        phases : Double[],
+        numSystemQubits : Int,
+        useWalk : Bool
+    ) : (Qubit[] => Unit is Adj + Ctl) {
+        FoqcsStep(params, phases, numSystemQubits, useWalk, _)
+    }
+
+    /// Circuit entry point for the singly-controlled FOQCS block encoding.
+    ///
+    /// Allocates one control qubit followed by the system and ancilla registers,
+    /// then applies the controlled step ``power`` times.
+    operation MakeControlledFoqcsCircuit(
+        params : FoqcsParams,
+        phases : Double[],
+        numSystemQubits : Int,
+        numAncillaQubits : Int,
+        power : Int,
+        useWalk : Bool
+    ) : Unit {
+        use control = Qubit();
+        use register = Qubit[numSystemQubits + numAncillaQubits];
+        let stepOp = MakeFoqcsStepOp(params, phases, numSystemQubits, useWalk);
+        for _ in 1..power {
+            if BeginEstimateCaching(useWalk ? "ControlledFoqcsWalk" | "ControlledFoqcs", SingleVariant()) {
+                Controlled stepOp([control], register);
+                EndEstimateCaching();
+            }
+        }
     }
 }

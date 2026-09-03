@@ -21,10 +21,9 @@ __all__ = ["FoqcsContainer", "FoqcsFamily"]
 class FoqcsFamily:
     """A homogeneous family of Pauli terms in a FOQCS-LCU block encoding.
 
-    A family groups translationally-equivalent terms that share a single Pauli
-    pattern (a field direction for 1-body terms or a homogeneous coupling for
-    2-body terms).  All terms in a family carry the same Hamiltonian coefficient
-    and are prepared by a single balanced Dicke state.
+    A family groups translationally-equivalent terms that share a single Pauli pattern
+    (a field direction for 1-body terms or a homogeneous coupling for 2-body terms).
+    All terms in a family carry the same Hamiltonian coefficient and are prepared by a single balanced Dicke state.
 
     Attributes:
         paulis: The Pauli pattern, e.g. ``("X",)`` for a field or ``("Z", "Z")`` for a coupling.
@@ -44,10 +43,9 @@ class FoqcsContainer(BlockEncodingContainer):
     r"""Container for a FOQCS-LCU block encoding of a spin-model Hamiltonian.
 
     FOQCS-LCU (Fast One-Qubit-Controlled Select - Linear Combination of Unitaries)
-    block-encodes a translationally-structured spin Hamiltonian by grouping its
-    terms into homogeneous :class:`FoqcsFamily` blocks.  Each family is loaded
-    with a balanced Dicke state and selected transversally, giving the block
-    encoding
+    block-encodes a translationally-structured spin Hamiltonian by grouping its terms into
+    homogeneous :class:`FoqcsFamily` blocks.  Each family is loaded with a balanced Dicke state
+    and selected transversally, giving the block encoding
 
     .. math::
 

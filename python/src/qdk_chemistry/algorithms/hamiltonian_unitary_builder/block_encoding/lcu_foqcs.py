@@ -59,26 +59,25 @@ class LCUFoqcsSettings(HamiltonianUnitaryBuilderSettings):
 class LCUFoqcsBuilder(HamiltonianUnitaryBuilder):
     r"""Fast One-Qubit-Controlled Select LCU block encoding builder for translationally-structured spin models.
 
-    Block-encodes a spin Hamiltonian by grouping its terms into homogeneous
-    Pauli-term *families*.  Each family is a single Pauli letter (``X``/``Y``/``Z``)
-    acting either on every site (1-body field) or on every nearest-neighbour pair
-    at a fixed offset ``k`` (2-body coupling).  The block encoding is
+    Block-encodes a spin Hamiltonian by grouping its terms into homogeneous Pauli-term *families*.
+    Each family is a single Pauli letter (``X``/``Y``/``Z``) acting either on every site (1-body field)
+    or on every nearest-neighbour pair at a fixed offset ``k`` (2-body coupling).
+
+    The block encoding is
 
     .. math::
 
         B[H] = \mathrm{PREP}(c^*)^\dagger \cdot \mathrm{SELECT} \cdot \mathrm{PREP}(c)
 
-    which encodes :math:`H / \lambda` in the ancilla-``|0>`` subspace, using
-    balanced Dicke states for the family preparations and a transversal CX/CZ
-    SELECT.
+    which encodes :math:`H / \lambda` in the ancilla-``|0>`` subspace, using balanced Dicke states for
+    the family preparations and a transversal CX/CZ  SELECT.
 
-    **Scope (v1).** Only Hamiltonians whose terms decompose into homogeneous,
-    translationally-invariant 1-body (full-chain) and 2-body (fixed-offset,
-    nearest-neighbour) families are supported.  This covers the transverse-field
-    Ising and anisotropic Heisenberg chains exactly.  Hamiltonians with
-    inhomogeneous families, terms of weight > 2, mixed 2-body Pauli strings
-    (e.g. ``XZ``), or families that do not span the expected geometry are
-    rejected with a :class:`ValueError`.
+    Only Hamiltonians whose terms decompose into homogeneous, translationally-invariant 1-body (full-chain)
+    and 2-body (fixed-offset, nearest-neighbour) families are supported.  This covers the transverse-field
+    Ising and anisotropic Heisenberg chains exactly.  An identity (constant-shift) term is also supported and
+    is carried as a degenerate family that applies no Pauli.  Hamiltonians with inhomogeneous families,
+    terms of weight > 2, mixed 2-body Pauli strings (e.g. ``XZ``), or families that do not span the
+    expected geometry are rejected with a :class:`ValueError`.
     """
 
     def __init__(
@@ -90,9 +89,8 @@ class LCUFoqcsBuilder(HamiltonianUnitaryBuilder):
 
         Args:
             power: The power to raise the block encoding to. Defaults to 1.
-            quantum_walk: If True, the circuit mapper wraps the block encoding with
-                a quantum walk operator (use with QPE). If False, use the plain
-                block encoding (use with Hadamard test). Defaults to False.
+            quantum_walk: If True, the circuit mapper wraps the block encoding with a quantum walk operator
+                (use with QPE). If False, use the plain block encoding (use with Hadamard test). Defaults to False.
 
         """
         super().__init__()
@@ -121,9 +119,8 @@ class LCUFoqcsBuilder(HamiltonianUnitaryBuilder):
     def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
         r"""Construct the FOQCS-LCU unitary representation.
 
-        Groups the Hamiltonian terms into homogeneous families, computes the
-        normalized sub-PREP amplitudes and phase corrections, and packages the
-        result into a :class:`FoqcsContainer`.
+        Groups the Hamiltonian terms into homogeneous families, computes the normalized sub-PREP amplitudes
+        and phase corrections, and packages the result into a :class:`FoqcsContainer`.
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to block-encode.
@@ -195,8 +192,8 @@ class LCUFoqcsBuilder(HamiltonianUnitaryBuilder):
             tolerance: Coefficient-comparison tolerance.
 
         Returns:
-            A list of ``(letter, weight, offset, coeff, count)`` tuples,
-            ordered fields-first (X, Y, Z) then couplings by ``(letter, offset)``.
+            A list of ``(letter, weight, offset, coeff, count)`` tuples, with the identity family (if any) first,
+            then fields (X, Y, Z), then couplings by ``(letter, offset)``.
 
         Raises:
             ValueError: If any term violates the FOQCS v1 scope.
@@ -204,15 +201,12 @@ class LCUFoqcsBuilder(HamiltonianUnitaryBuilder):
         """
         # Accumulate terms into families keyed by (letter, weight, offset).
         acc: dict[tuple[str, int, int], list[tuple[float, tuple[int, ...]]]] = {}
+        constant = 0.0
         for label, coeff in qubit_hamiltonian.get_real_coefficients():
             support = self._pauli_label_to_map(label)
             weight = len(support)
             if weight == 0:
-                if abs(coeff) > tolerance:
-                    raise ValueError(
-                        "FOQCS block encoding does not support identity (constant-shift) terms. "
-                        "Subtract the constant from the Hamiltonian first."
-                    )
+                constant += float(coeff)
                 continue
             if weight > 2:
                 raise ValueError(
@@ -256,6 +250,10 @@ class LCUFoqcsBuilder(HamiltonianUnitaryBuilder):
             self._validate_geometry(letter, weight, offset, positions, count, num_sites)
             grouped.append((letter, weight, offset, float(coeffs[0]), count))
 
+        # The identity family applies no Pauli, so SELECT is already the identity on its branch.
+        if abs(constant) > tolerance:
+            grouped.insert(0, ("I", 0, 0, constant, 1))
+
         return grouped
 
     @staticmethod
@@ -281,6 +279,7 @@ class LCUFoqcsBuilder(HamiltonianUnitaryBuilder):
             ValueError: If the family does not span the expected chain geometry.
 
         """
+        expected: set[tuple[int, ...]]
         if weight == 1:
             expected = {(s,) for s in range(num_sites)}
             if positions != expected:
