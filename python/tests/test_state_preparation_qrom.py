@@ -31,7 +31,7 @@ def _run_qrom_state_prep_and_dump(amplitudes: list[float], num_qubits: int, bits
         numStateQubits=num_qubits,
     )
     op = QSHARP_UTILS.CircuitComposition.MakeSharedAncillaOp(
-        QSHARP_UTILS.QROMStatePrep.MakeQROMStatePrepOpWithSharedGradient(params),
+        QSHARP_UTILS.QROMStatePrep.MakeQROMStatePrepOpWithPhaseGradient(params),
         QSHARP_UTILS.PhaseGradient.PreparePhaseGradientState,
         bits,
     )
@@ -86,14 +86,23 @@ class TestQROMStatePreparation:
     """Tests for the QROM-based state preparation algorithm."""
 
     def test_run_returns_circuit(self):
-        """Test that run() returns a Circuit with ops set."""
+        """By default the gradient is internal, so the callable takes only the state."""
         prep = QROMStatePreparation(rotation_bit_precision=4)
         wf = _make_wavefunction([0.5, 0.3, 0.7, 0.1])
         circuit = prep.run(wf)
         assert circuit is not None
         assert circuit._qsharp_op is not None
         assert circuit._qsharp_factory is not None
+        assert circuit.num_qubits == 2
+        assert circuit.metadata.num_phase_gradient_ancillas == 0
+
+    def test_shared_gradient_widens_the_register_it_declares(self):
+        """Opting out of internal allocation appends a gradient the caller must own."""
+        prep = QROMStatePreparation(rotation_bit_precision=4, allocate_phase_gradient=False)
+        circuit = prep.run(_make_wavefunction([0.5, 0.3, 0.7, 0.1]))
+
         assert circuit.num_qubits == 6
+        assert circuit.metadata.num_phase_gradient_ancillas == 4
 
     def test_resource_counts(self):
         """Pin the logical resource counts so a costing regression is visible."""
