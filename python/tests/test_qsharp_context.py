@@ -47,9 +47,11 @@ _ADAPTIVE_ONLY_MODULES = (
     "UnaryIteration",
     "UnaryPhaseEstimation",
     "SelectSwap",
+    "SkewTreeLookup",
     "AliasSamplingStatePrep",
     "QROMStatePrep",
     "PhaseGradient",
+    "ParallelGivens",
     "SOSSAWalk",
 )
 
