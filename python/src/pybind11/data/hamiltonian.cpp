@@ -1122,7 +1122,7 @@ Raises:
 Compute the effective SOS normalization.
 
 Returns:
-    float: ``sqrt(E_gap * (2 * Lambda - E_gap))``, or 0.0 for a negative rank or invalid gap.
+    float: ``sqrt(E_gap * (2 * Lambda - E_gap))``, or 0.0 if any rank carries a negative sign or the gap is outside ``(0, 2 * Lambda)``.
 
 Raises:
     RuntimeError: If the adjusted one-body matrix cannot be diagonalized.
