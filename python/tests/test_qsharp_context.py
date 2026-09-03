@@ -190,3 +190,26 @@ class TestTargetProfiles:
 
         pauli_exp = utils.ControlledPauliExp.MakeRepControlledPauliExpCircuit
         assert "define" in str(base_context.compile(pauli_exp, [[Pauli.X, Pauli.Z]], [0.5], 2, 0, [1, 2]))
+
+
+class TestTestOnlySourcesAreNotShipped:
+    """Q# that only tests call lives under ``QDKChemistry.TestUtils``, outside the package.
+
+    Anything vendored under ``qdk_chemistry/utils/qsharp/src`` is compiled into every
+    context a user creates, so a helper no production code path calls has no business
+    being there.
+    """
+
+    def test_the_shipped_sources_declare_no_test_namespace(self) -> None:
+        """The vendored project must not contain the test-only namespace."""
+        sources = (Path(qsharp_package.__file__).parent / "src").glob("*.qs")
+        offenders = [path.name for path in sources if "QDKChemistry.TestUtils" in path.read_text(encoding="utf-8")]
+        assert offenders == []
+
+    def test_a_default_context_cannot_reach_the_test_helpers(self) -> None:
+        """A user context must not pay for, or be able to call, the test drivers."""
+        assert not hasattr(get_qsharp_context().code.QDKChemistry, "TestUtils")
+
+    def test_the_staged_test_context_can_reach_them(self, qsharp_test_context: qdk.Context) -> None:
+        """The staged project is what makes the drivers available to the Python tests."""
+        assert hasattr(qsharp_test_context.code.QDKChemistry, "TestUtils")

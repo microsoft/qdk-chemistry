@@ -5,8 +5,6 @@
 namespace QDKChemistry.Utils.UnaryIteration {
 
     import Std.Arrays.MostAndTail;
-    import Std.Canon.ApplyToEach;
-    import Std.Canon.ApplyXorInPlace;
     import Std.Core.Length;
     import Std.Diagnostics.Fact;
     import Std.Intrinsic.AND;
@@ -130,45 +128,5 @@ namespace QDKChemistry.Utils.UnaryIteration {
     function AddressQubits(numActions : Int) : Int {
         Fact(numActions > 0, "numActions must be positive");
         return BitSizeI(numActions - 1);
-    }
-
-    /// Flips `flags[index]` for the single selected address.
-    internal function MakeTestUnaryIterationOneHotOp(numActions : Int, addressValue : Int) : (Qubit[] => Unit) {
-        return qs => {
-            let numAddressQubits = AddressQubits(numActions);
-            let address = qs[0..numAddressQubits - 1];
-            let flags = qs[numAddressQubits...];
-            ApplyXorInPlace(addressValue, address);
-            UnaryIteration(address, numActions, (index) => {
-                X(flags[index]);
-            });
-            ApplyXorInPlace(addressValue, address);
-        }
-    }
-
-    /// Runs the one-hot iteration on a uniform superposition of every address.
-    internal function MakeTestUnaryIterationSuperposedAddressOp(numActions : Int) : (Qubit[] => Unit) {
-        return qs => {
-            let numAddressQubits = AddressQubits(numActions);
-            Fact(2^numAddressQubits == numActions, "numActions must be a power of two");
-            let address = qs[0..numAddressQubits - 1];
-            let flags = qs[numAddressQubits...];
-            ApplyToEach(H, address);
-            UnaryIteration(address, numActions, (index) => {
-                X(flags[index]);
-            });
-        };
-    }
-
-    /// Applies `Z` to the exposed unary control for every index flagged in `data`.
-    internal function MakeTestUnaryIterationControlPhasesOp(numActions : Int, data : Bool[]) : (Qubit[] => Unit) {
-        return address => {
-            ApplyToEach(H, address);
-            UnaryIterationWithControl(address, numActions, (index, control) => {
-                if data[index] {
-                    Z(control);
-                }
-            });
-        };
     }
 }

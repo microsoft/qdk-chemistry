@@ -41,6 +41,7 @@ from qdk_chemistry.data import (
     Wavefunction,
 )
 
+from .qsharp_test_project import create_test_qsharp_context
 from .test_helpers import create_test_orbitals
 
 # Dynamically add the build directory to Python path
@@ -73,6 +74,16 @@ if build_dir.exists():
                 break
         if lib_dir_found:
             break
+
+
+@pytest.fixture(scope="session")
+def qsharp_test_context():
+    """Q# context that also carries the test-only Q# sources in ``tests/qsharp``.
+
+    Ops resolved from a context can only be composed with ops from that same
+    context, so a test mixing library and test-only Q# must take both from here.
+    """
+    return create_test_qsharp_context()
 
 
 @pytest.fixture
