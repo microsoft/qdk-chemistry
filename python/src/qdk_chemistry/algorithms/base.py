@@ -334,7 +334,7 @@ class AlgorithmFactory(ABC):
 
         """
 
-    def create(self, name: str | None = None) -> Algorithm:
+    def create(self, name: str | None = None, *, suppress_warnings: bool = False) -> Algorithm:
         """Create an algorithm instance by name.
 
         Creates and returns a new instance of the requested algorithm. If no name
@@ -344,6 +344,8 @@ class AlgorithmFactory(ABC):
             name (Optional[str]): The name of the algorithm to create.
 
                 If None or empty, creates the default algorithm.
+
+            suppress_warnings (bool): Whether to suppress creation-time warnings.
 
         Returns:
             Algorithm: A new instance of the requested algorithm.
@@ -359,6 +361,7 @@ class AlgorithmFactory(ABC):
             >>> pyscf_solver = factory.create("pyscf")
 
         """
+        del suppress_warnings
         if name is None or name == "":
             name = self.default_algorithm_name()
         generator = self._registry.get(self._aliases.get(name, name))
