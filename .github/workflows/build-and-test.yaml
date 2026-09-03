@@ -37,33 +37,6 @@ permissions:
   statuses: write
 
 jobs:
-  check-up-to-date:
-    name: Check if branch is up to date with main
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v6
-      with:
-        fetch-depth: 0
-        submodules: recursive
-
-    - name: Check if branch is up to date with main (Pull Request)
-      run: |
-        # Ensure origin/main is present
-        git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
-
-        # Check if the current commit is ahead of main
-        # Kills pipeline if branch is not up to date with main
-        # For pull requests, we use github.event.pull_request.sha to get the commit SHA,
-        # as GitHub treats the current commit as one that would be produced by merging into main
-        if ! git merge-base --is-ancestor origin/main "${{ github.event.pull_request.head.sha }}"; then
-          echo "This branch is not up to date with main. Please merge the latest changes from main into your branch to continue."
-          exit 1
-        fi
-
-        echo "Branch is up to date, starting Build and Test workflow."
-
   coverage:
     name: ${{ matrix.os-name }} Build, Test, and Coverage Analysis
     runs-on: ${{ matrix.runner }}
@@ -132,7 +105,7 @@ jobs:
         df -h "${{ github.workspace }}"
 
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         submodules: recursive
 
@@ -143,10 +116,11 @@ jobs:
         echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
     - name: Set up Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
       with:
         python-version: ${{ matrix.python-version }}
         cache: pip
+        cache-dependency-path: python/pyproject.toml
 
     - name: Install Linux system packages
       if: matrix.os-name == 'Linux'
@@ -203,7 +177,7 @@ jobs:
     - name: Cache Doxygen (macOS)
       if: matrix.os-name == 'macOS'
       id: cache-doxygen
-      uses: actions/cache@v5
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           ${{ github.workspace }}/doxygen_install
@@ -235,7 +209,7 @@ jobs:
     - name: Cache C++ dependency install # Checks if manifest files or build script have changed to rebuild dependencies
       id: cache-cpp-deps
       if: ${{ !inputs.rebuild_dep_cache }}
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           ${{ env.CPP_DEPS_PREFIX }}
@@ -262,7 +236,7 @@ jobs:
 
     - name: Save C++ dependency cache
       if: steps.cache-cpp-deps.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v5
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           ${{ env.CPP_DEPS_PREFIX }}
@@ -588,7 +562,7 @@ jobs:
       DEPS_CACHE_VERSION: v2
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         submodules: recursive
 
@@ -602,39 +576,66 @@ jobs:
         "cxx-path=$env:CXX_PATH"   >> $env:GITHUB_OUTPUT
 
     - name: Set up Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
       with:
         python-version: '3.13'
+        cache: pip
+        cache-dependency-path: python/pyproject.toml
 
     - name: Set memory-aware build parallelism
       shell: pwsh
       id: env2
       run: |
         # qdk TUs that include libint2 engine.impl.h peak at several GB under MSVC;
-        # cap concurrency by available RAM (~4 GB/job) to avoid C1060 (compiler out
+        # cap concurrency by available RAM (~8 GB/job) to avoid C1060 (compiler out
         # of heap space). Scales up automatically on a larger runner.
         $cpu = [int]$env:NUMBER_OF_PROCESSORS
         $ramGB = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
-        $jobs = [math]::Min($cpu, [math]::Max(1, [math]::Round($ramGB / 4)))
+        $jobs = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 8)))
         Write-Host "CPUs=$cpu RAM=${ramGB}GB -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
         "CMAKE_BUILD_PARALLEL_LEVEL=$jobs" >> $env:GITHUB_ENV
+
+    # The dependency cache key uses a hash of the build plan rather than of the
+    # build script. Hashing the script meant any edit to it -- even one that only
+    # touched a comment or a diagnostic -- discarded the cache and forced a cold
+    # rebuild, which on the ARM64 runner takes over five hours against a six hour
+    # ceiling. The fingerprint is produced by the same script that performs the
+    # build, from the same plan object the build consumes, so it moves when the
+    # build would actually differ and stays put otherwise.
+    - name: Compute dependency build plan fingerprint
+      id: deps-fp
+      shell: pwsh
+      run: |
+        $fp = & "${{ github.workspace }}\.pipelines\install-scripts\install-cpp-deps-windows.ps1" `
+            -SrcDir    "${{ github.workspace }}" `
+            -ClPath    "${{ steps.env.outputs.cxx-path }}" `
+            -BuildType RelWithDebInfo `
+            -Triplet   "${{ env.VCPKG_TRIPLET }}" `
+            -EmitFingerprint | Select-Object -Last 1
+        if (-not $fp) { throw "The build plan fingerprint came back empty." }
+        Write-Host "deps build plan fingerprint: $fp"
+        "fingerprint=$fp" >> $env:GITHUB_OUTPUT
 
     - name: Restore vcpkg cache
       id: cache-vcpkg
       if: ${{ !inputs.rebuild_dep_cache }}
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: vcpkg_installed
-        key: windows-vcpkg-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', '.pipelines/install-scripts/install-cpp-deps-windows.ps1') }}
+        key: windows-vcpkg-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
 
     - name: Restore deps-install cache
       id: cache-deps
       if: ${{ !inputs.rebuild_dep_cache }}
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: deps-install-${{ matrix.compiler }}
+        # libint2's CMakeLists.txt bakes the absolute CMAKE_INSTALL_PREFIX into its
+        # exported target (INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/include, not the
+        # relocatable ${_IMPORT_PREFIX} form), so runners on this pool that mount the
+        # workspace under different drives cannot share a deps-install cache entry.
         key: >-
-          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/install-scripts/install-cpp-deps-windows.ps1', '.pipelines/toolchains/windows.cmake') }}
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ github.workspace }}-${{ steps.deps-fp.outputs.fingerprint }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/toolchains/windows.cmake', 'vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
 
     - name: Install C++ dependencies
       if: steps.cache-vcpkg.outputs.cache-hit != 'true' || steps.cache-deps.outputs.cache-hit != 'true'
@@ -649,18 +650,18 @@ jobs:
 
     - name: Save vcpkg cache
       if: steps.cache-vcpkg.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v5
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: vcpkg_installed
-        key: windows-vcpkg-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**', '.pipelines/install-scripts/install-cpp-deps-windows.ps1') }}
+        key: windows-vcpkg-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
 
     - name: Save deps-install cache
       if: steps.cache-deps.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v5
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: deps-install-${{ matrix.compiler }}
         key: >-
-          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/install-scripts/install-cpp-deps-windows.ps1', '.pipelines/toolchains/windows.cmake') }}
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ github.workspace }}-${{ steps.deps-fp.outputs.fingerprint }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/toolchains/windows.cmake', 'vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
 
     - name: Configure CMake
       shell: pwsh
@@ -705,13 +706,11 @@ jobs:
         OMP_NUM_THREADS: '2'
       run: |
         Push-Location "cpp/build-${{ matrix.compiler }}"
-        # Exclude MACIS_SERIAL_TEST (as on Linux) and libint2's own unit tests:
-        # libint2/unit/build is a compile-at-test-time meta-test of the vendored
-        # libint2 dependency that exceeds the ctest timeout under MSVC. qdk's own
-        # tests still run.
+        # Skip the vendored libint2's own tests: they build the dependency at
+        # test time rather than exercising qdk. MACIS_SERIAL_TEST is excluded as on Linux.
         ctest --output-on-failure --verbose --timeout 400 `
           --output-junit ctest_results.xml `
-          -E "MACIS_SERIAL_TEST|libint2/unit"
+          -E "MACIS_SERIAL_TEST|libint2/unit|libint2/eritest"
         $code = $LASTEXITCODE
         Pop-Location
         if ($code -ne 0) { throw "ctest failed ($code)" }
@@ -759,6 +758,258 @@ jobs:
         Pop-Location
         if ($code -ne 0) { throw "pytest failed ($code)" }
 
+  coverage-windows-arm64:
+    name: ${{ matrix.compiler }} - Build & test (Windows ARM64)
+    runs-on: [self-hosted, 1ES.Pool=1es-gh-Dpsd_v6-arm-pool, 1ES.ImageOverride=windows-2025-arm64-1espt, 'JobId=qdk_chemistry-win-arm64-${{ strategy.job-index }}-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
+    timeout-minutes: 480
+    permissions:
+      contents: read
+      actions: write
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [msvc, clang-cl]
+    env:
+      VCPKG_TRIPLET: arm64-windows-static-md
+      # Leave QDK_UARCH unset: MSVC has no generic ARM64 /arch value, and
+      # clang-cl auto-detects armv8-a.
+      # Bump to force a rebuild of the cached dependencies.
+      DEPS_CACHE_VERSION: v2
+      CMAKE_POLICY_VERSION_MINIMUM: '3.5'
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        submodules: recursive
+
+    - name: Set up ${{ matrix.compiler }} environment (ARM64)
+      id: env
+      shell: pwsh
+      run: |
+        & "${{ github.workspace }}\.pipelines\install-scripts\setup-msvc-env.ps1" `
+            -Compiler "${{ matrix.compiler }}" -Arch arm64
+        if ($LASTEXITCODE -ne 0) { throw "setup-msvc-env.ps1 failed ($LASTEXITCODE)" }
+        "toolset=$env:MSVC_TOOLSET" >> $env:GITHUB_OUTPUT
+        "cxx-path=$env:CXX_PATH"    >> $env:GITHUB_OUTPUT
+
+    - name: Set up Python
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      with:
+        python-version: '3.13'
+        architecture: arm64
+        cache: pip
+        cache-dependency-path: python/pyproject.toml
+
+    - name: Verify the interpreter is native ARM64
+      shell: pwsh
+      run: |
+        $machine = python -c "import platform; print(platform.machine())"
+        Write-Host "python  : $((Get-Command python).Source)"
+        Write-Host "machine : $machine"
+        if ($machine -ne 'ARM64') {
+          throw "Expected a native ARM64 interpreter but got '$machine'. An x64 interpreter cannot load the ARM64 extension module this job builds."
+        }
+
+    - name: Set memory-aware build parallelism
+      shell: pwsh
+      run: |
+        # Match the x86_64 job: cap concurrency by available RAM (~8 GB/job) so
+        # that memory-hungry translation units don't exhaust the heap.
+        $cpu = [int]$env:NUMBER_OF_PROCESSORS
+        $ramGB = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
+        $jobs = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 8)))
+        Write-Host "CPUs=$cpu RAM=${ramGB}GB -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
+        "CMAKE_BUILD_PARALLEL_LEVEL=$jobs" >> $env:GITHUB_ENV
+        Get-PSDrive -PSProvider FileSystem | Format-Table Name, Used, Free
+
+    # Hash the dependency build plan, not the script text, for cache keys.
+    - name: Compute dependency build plan fingerprint
+      id: deps-fp
+      shell: pwsh
+      run: |
+        $fp = & "${{ github.workspace }}\.pipelines\install-scripts\install-cpp-deps-windows.ps1" `
+            -SrcDir    "${{ github.workspace }}" `
+            -ClPath    "${{ steps.env.outputs.cxx-path }}" `
+            -BuildType RelWithDebInfo `
+            -Triplet   "${{ env.VCPKG_TRIPLET }}" `
+            -EmitFingerprint | Select-Object -Last 1
+        if (-not $fp) { throw "The build plan fingerprint came back empty." }
+        Write-Host "deps build plan fingerprint: $fp"
+        "fingerprint=$fp" >> $env:GITHUB_OUTPUT
+
+    - name: Restore vcpkg cache
+      id: cache-vcpkg
+      if: ${{ !inputs.rebuild_dep_cache }}
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: vcpkg_installed
+        key: windows-vcpkg-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
+
+    - name: Restore deps-install cache
+      id: cache-deps
+      if: ${{ !inputs.rebuild_dep_cache }}
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: deps-install-${{ matrix.compiler }}
+        # libint2's CMakeLists.txt bakes the absolute CMAKE_INSTALL_PREFIX into its
+        # exported target (INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/include, not the
+        # relocatable ${_IMPORT_PREFIX} form), so runners on this pool that mount the
+        # workspace under different drives cannot share a deps-install cache entry.
+        key: >-
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ github.workspace }}-${{ steps.deps-fp.outputs.fingerprint }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/toolchains/windows.cmake', 'vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
+
+    - name: Install C++ dependencies
+      if: steps.cache-vcpkg.outputs.cache-hit != 'true' || steps.cache-deps.outputs.cache-hit != 'true'
+      shell: pwsh
+      run: |
+        & "${{ github.workspace }}\.pipelines\install-scripts\install-cpp-deps-windows.ps1" `
+            -SrcDir        "${{ github.workspace }}" `
+            -ClPath        "${{ steps.env.outputs.cxx-path }}" `
+            -BuildType     RelWithDebInfo `
+            -Triplet       "${{ env.VCPKG_TRIPLET }}" `
+            -DepsInstallDir "${{ github.workspace }}\deps-install-${{ matrix.compiler }}"
+        if ($LASTEXITCODE -ne 0) { throw "Dependency install failed ($LASTEXITCODE)" }
+
+    - name: Save vcpkg cache
+      if: steps.cache-vcpkg.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: vcpkg_installed
+        key: windows-vcpkg-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
+
+    - name: Save deps-install cache
+      if: steps.cache-deps.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: deps-install-${{ matrix.compiler }}
+        key: >-
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ github.workspace }}-${{ steps.deps-fp.outputs.fingerprint }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/toolchains/windows.cmake', 'vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
+
+    - name: Configure CMake
+      shell: pwsh
+      run: |
+        # Pre-installed deps are found via CMAKE_PREFIX_PATH; FetchContent is disabled.
+        $vcpkg = $env:VCPKG_INSTALLATION_ROOT
+        if (-not $vcpkg) { $vcpkg = 'C:\vcpkg' }
+        $depsInstall = "${{ github.workspace }}\deps-install-${{ matrix.compiler }}"
+        $vcpkgInstalled = "${{ github.workspace }}\vcpkg_installed\${{ env.VCPKG_TRIPLET }}"
+        cmake -S cpp -B "cpp/build-${{ matrix.compiler }}" -GNinja `
+          -DQDK_CHEMISTRY_ENABLE_COVERAGE=OFF `
+          -DQDK_CHEMISTRY_ENABLE_MPI=OFF `
+          -DMACIS_ENABLE_TESTS=OFF `
+          -DBUILD_SHARED_LIBS=OFF `
+          -DBUILD_TESTING=ON `
+          -DCMAKE_GTEST_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST `
+          -DVCPKG_APPLOCAL_DEPS=OFF `
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo `
+          -DCMAKE_C_COMPILER="${{ steps.env.outputs.cxx-path }}" `
+          -DCMAKE_CXX_COMPILER="${{ steps.env.outputs.cxx-path }}" `
+          -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}\install-${{ matrix.compiler }}" `
+          "-DCMAKE_PREFIX_PATH=$depsInstall;$vcpkgInstalled" `
+          -DCMAKE_TOOLCHAIN_FILE="$vcpkg\scripts\buildsystems\vcpkg.cmake" `
+          -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE="${{ github.workspace }}\.pipelines\toolchains\windows.cmake" `
+          -DVCPKG_TARGET_TRIPLET=${{ env.VCPKG_TRIPLET }} `
+          -DVCPKG_INSTALLED_DIR="${{ github.workspace }}\vcpkg_installed" `
+          -DQDK_ALLOW_DEPENDENCY_FETCH=OFF `
+          -DQDK_ENABLE_OPENMP=OFF `
+          -DFETCHCONTENT_QUIET=OFF
+        if ($LASTEXITCODE -ne 0) { throw "CMake configure failed ($LASTEXITCODE)" }
+
+    - name: Build C++ library
+      shell: pwsh
+      run: |
+        cmake --build "cpp/build-${{ matrix.compiler }}"
+        if ($LASTEXITCODE -ne 0) { throw "CMake build failed ($LASTEXITCODE)" }
+
+    # OpenBLAS ARM64 smoke test.
+    - name: Verify OpenBLAS on ARM64
+      shell: pwsh
+      timeout-minutes: 15
+      run: |
+        $lib = "${{ github.workspace }}\vcpkg_installed\${{ env.VCPKG_TRIPLET }}\lib\openblas.lib"
+        Write-Host "lib: $lib (exists: $(Test-Path $lib))"
+        $srcPath = "${{ github.workspace }}\.pipelines\checks\openblas-smoke.c"
+
+        Push-Location $env:RUNNER_TEMP
+        cl /nologo $srcPath "$lib" /Fe:ob_smoke.exe
+        if ($LASTEXITCODE -ne 0) { Pop-Location; throw "OpenBLAS probe failed to compile" }
+
+        $p = Start-Process -FilePath (Join-Path $env:RUNNER_TEMP 'ob_smoke.exe') `
+          -PassThru -NoNewWindow `
+          -RedirectStandardOutput (Join-Path $env:RUNNER_TEMP 'ob.out') `
+          -RedirectStandardError  (Join-Path $env:RUNNER_TEMP 'ob.err')
+        $hung = -not $p.WaitForExit(120000)
+        if ($hung) { $p.Kill(); $p.WaitForExit() }
+        $out = Get-Content (Join-Path $env:RUNNER_TEMP 'ob.out') -Raw -EA SilentlyContinue
+        Write-Host "--- stdout ---"; Write-Host $out
+        Write-Host "--- stderr ---"; Get-Content (Join-Path $env:RUNNER_TEMP 'ob.err') -EA SilentlyContinue
+        Pop-Location
+
+        if ($hung) { throw "OpenBLAS hung: the ARM64 build is not usable (see output above)" }
+        if ($out -notmatch 'ALL OPENBLAS CALLS COMPLETED') { throw "OpenBLAS probe did not run to completion" }
+        # GENERIC is the fallback whose blocking parameters hang getrf.
+        if ($out -match 'corename = generic') { throw "OpenBLAS selected the GENERIC kernel set on ARM64" }
+        Write-Host "OpenBLAS ARM64 verification passed."
+
+    - name: Run C++ tests
+      shell: pwsh
+      timeout-minutes: 75
+      env:
+        OMP_NUM_THREADS: '2'
+      run: |
+        Push-Location "cpp/build-${{ matrix.compiler }}"
+        # Same exclusions as the x86_64 Windows job.
+        ctest --output-on-failure --verbose --timeout 400 `
+          --output-junit ctest_results.xml `
+          -E "MACIS_SERIAL_TEST|libint2/unit"
+        $code = $LASTEXITCODE
+        Pop-Location
+        if ($code -ne 0) { throw "ctest failed ($code)" }
+
+    - name: Install C++ library
+      shell: pwsh
+      run: |
+        cmake --install "cpp/build-${{ matrix.compiler }}"
+        if ($LASTEXITCODE -ne 0) { throw "CMake install failed ($LASTEXITCODE)" }
+
+    - name: Build & install Python package
+      shell: pwsh
+      env:
+        CMAKE_BUILD_TYPE: RelWithDebInfo
+      run: |
+        $vcpkg = $env:VCPKG_INSTALLATION_ROOT
+        if (-not $vcpkg) { $vcpkg = 'C:\vcpkg' }
+        $prefix = "${{ github.workspace }}\vcpkg_installed\${{ env.VCPKG_TRIPLET }};${{ github.workspace }}\install-${{ matrix.compiler }};${{ github.workspace }}\deps-install-${{ matrix.compiler }}"
+        Push-Location python
+        # plugins (pyscf) do not build on Windows; install the test extra only.
+        python -m pip install -v ".[test]" `
+          --config-settings=cmake.args="-GNinja" `
+          --config-settings=cmake.define.CMAKE_PREFIX_PATH="$prefix" `
+          --config-settings=cmake.define.QDK_ALLOW_DEPENDENCY_FETCH=OFF `
+          --config-settings=cmake.define.CMAKE_C_COMPILER="${{ steps.env.outputs.cxx-path }}" `
+          --config-settings=cmake.define.CMAKE_CXX_COMPILER="${{ steps.env.outputs.cxx-path }}" `
+          --config-settings=cmake.define.CMAKE_TOOLCHAIN_FILE="$vcpkg\scripts\buildsystems\vcpkg.cmake" `
+          --config-settings=cmake.define.VCPKG_CHAINLOAD_TOOLCHAIN_FILE="${{ github.workspace }}\.pipelines\toolchains\windows.cmake" `
+          --config-settings=cmake.define.VCPKG_TARGET_TRIPLET="${{ env.VCPKG_TRIPLET }}" `
+          --config-settings=cmake.define.VCPKG_INSTALLED_DIR="${{ github.workspace }}\vcpkg_installed"
+        if ($LASTEXITCODE -ne 0) { Pop-Location; throw "Python package install failed ($LASTEXITCODE)" }
+        python -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
+        if ($LASTEXITCODE -ne 0) { Pop-Location; throw "Python import check failed ($LASTEXITCODE)" }
+        Pop-Location
+
+    - name: Run Python tests
+      shell: pwsh
+      timeout-minutes: 90
+      env:
+        OMP_NUM_THREADS: '2'
+        QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
+      run: |
+        Push-Location python
+        pytest -v --tb=short
+        $code = $LASTEXITCODE
+        Pop-Location
+        if ($code -ne 0) { throw "pytest failed ($code)" }
+
   test-with-qdk-branch:
     name: Full Test with QDK Branch
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_with_qdk_branch }}
@@ -783,7 +1034,7 @@ jobs:
         sudo apt-get clean || true
 
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         submodules: recursive
 
@@ -794,10 +1045,11 @@ jobs:
         echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
     - name: Set up Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
       with:
         python-version: '3.13'
         cache: pip
+        cache-dependency-path: python/pyproject.toml
 
     - name: Install Linux system packages
       run: |
@@ -828,7 +1080,7 @@ jobs:
 
     - name: Cache C++ dependency install
       id: cache-cpp-deps
-      uses: actions/cache@v5
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           ${{ env.CPP_DEPS_PREFIX }}
@@ -882,8 +1134,7 @@ jobs:
       run: |
         git clone --depth 1 --branch "${QDK_BRANCH}" https://github.com/microsoft/qdk.git "${{ runner.temp }}/qdk"
         echo "QDK commit: $(git -C "${{ runner.temp }}/qdk" rev-parse HEAD)"
-        pip install --force-reinstall "${{ runner.temp }}/qdk/source/widgets" "${{ runner.temp }}/qdk/source/jupyterlab"
-        pip install --force-reinstall "${{ runner.temp }}/qdk/source/qdk_package"
+        pip install --force-reinstall --no-deps "${{ runner.temp }}/qdk/source/qdk_package"
         echo "Installed qdk from branch: ${QDK_BRANCH}"
         python -m pip show qdk
 
@@ -902,7 +1153,7 @@ jobs:
 
     - name: Upload test results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: qdk-branch-test-results
         path: test-results/

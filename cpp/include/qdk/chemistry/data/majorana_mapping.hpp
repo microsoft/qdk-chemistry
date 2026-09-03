@@ -126,8 +126,15 @@ class MajoranaMapping : public DataClass {
    */
   MajoranaMapping without_tapering() const;
 
-  /// @brief Get the data type name for serialization.
-  std::string get_data_type_name() const override { return "majorana_mapping"; }
+  /// @brief Get the static data type name for serialization.
+  /// @return "majorana_mapping"
+  static std::string data_type_name() {
+    return DATACLASS_TO_SNAKE_CASE(MajoranaMapping);
+  }
+
+  /// @brief Get the data type name for this instance.
+  /// @return "majorana_mapping"
+  std::string get_data_type_name() const override { return data_type_name(); }
 
   /// @brief Get a human-readable summary of the mapping.
   std::string get_summary() const override;

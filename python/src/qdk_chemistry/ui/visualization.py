@@ -1,0 +1,783 @@
+"""MCP Apps visualisation tools for qdk-chemistry.
+
+This module conditionally registers ``ui://`` resources backed by
+the JavaScript components shipped with ``qsharp_widgets`` and
+exposes interactive MCP tools:
+
+* ``visualize_circuit``  - interactive quantum-circuit diagram
+* ``visualize_orbital_entanglement`` - orbital-entanglement chord diagram
+* ``visualize_molecule`` - interactive 3D molecule viewer
+* ``visualize_orbitals`` - 3D molecule viewer with orbital isosurfaces
+
+These tools are only registered when ``qsharp_widgets`` is installed.
+The tools follow the same conventions as the rest of ``tools.py``:
+they accept a ``project_name`` / filename pair, load a qdk/chemistry
+data object, and return either an error string or a list of
+``TextContent`` items with JSON data for the MCP Apps host.
+"""
+
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
+# ruff: noqa: ARG001, E501
+# MCP tool functions accept ``project_name`` consumed by the
+# ``@validate_project`` decorator.
+
+from __future__ import annotations
+
+import json
+import pathlib
+import re
+import secrets
+import threading
+import time
+
+from mcp.types import CallToolResult, TextContent
+
+from qdk_chemistry import data
+
+from .io import load_data_object
+from .validation import strip_filename_path, validate_project
+
+# ---------------------------------------------------------------------------
+# Check for qsharp_widgets availability
+# ---------------------------------------------------------------------------
+
+try:
+    import qsharp_widgets as _qsharp_widgets
+
+    _WIDGETS_AVAILABLE = True
+except ImportError:
+    _WIDGETS_AVAILABLE = False
+
+# ---------------------------------------------------------------------------
+# Locate the JavaScript / CSS bundle shipped with qsharp_widgets
+# ---------------------------------------------------------------------------
+
+_WIDGETS_CACHE: dict[str, pathlib.Path] = {}
+
+
+def _widgets_static_dir() -> pathlib.Path:
+    """Return the ``qsharp_widgets/static`` directory, raising if missing."""
+    if "static" not in _WIDGETS_CACHE:
+        _WIDGETS_CACHE["static"] = pathlib.Path(_qsharp_widgets.__file__).parent / "static"
+    return _WIDGETS_CACHE["static"]
+
+
+def _json_script(identifier: str, value: object) -> str:
+    """Return *value* as an inert, HTML-safe JSON script element."""
+    serialized = (
+        json.dumps(value, ensure_ascii=True).replace("<", r"\u003c").replace(">", r"\u003e").replace("&", r"\u0026")
+    )
+    return f'<script id="{identifier}" type="application/json">{serialized}</script>'
+
+
+# ---------------------------------------------------------------------------
+# HTML builder (uses MCP Apps SDK + patched widget bundle)
+# ---------------------------------------------------------------------------
+
+
+def _build_html(
+    *,
+    title: str,
+    component_name: str,
+    app_name: str,
+    embedded_data: dict | None = None,
+    min_height: int = 500,
+) -> str:
+    """Build a self-contained HTML page for a qsharp-widgets component."""
+    static = _widgets_static_dir()
+    js_text = (static / "index.js").read_text(encoding="utf-8")
+    css_text = (static / "index.css").read_text(encoding="utf-8")
+
+    m = re.search(r"export\{(\w+) as default,(\w+) as mdRenderer\}", js_text)
+    if m:
+        default_var, md_var = m.group(1), m.group(2)
+        js_patched = js_text.replace(
+            m.group(0),
+            f"window.__qdk_widget={{default:{default_var},mdRenderer:{md_var}}}",
+        )
+    else:
+        js_patched = js_text
+
+    return (
+        "<!DOCTYPE html>\n"
+        '<html lang="en">\n'
+        "<head>\n"
+        '<meta charset="utf-8" />\n'
+        '<meta name="viewport" content="width=device-width, initial-scale=1" />\n'
+        "<title></title>\n"
+        "<style>\n"
+        "  :root { color-scheme: light dark; }\n"
+        "  html, body {\n"
+        "    margin: 0; padding: 0;\n"
+        "    font-family: system-ui, -apple-system, sans-serif;\n"
+        "  }\n"
+        "  #widget-root {\n"
+        "    width: 100%;\n"
+        "  }\n"
+        "  #loading { text-align: center; padding: 2em; opacity: 0.6; }\n"
+        "  .widget-error { padding: 16px; background: #3a1a1a; color: #f88;\n"
+        "    border: 1px solid #f44; border-radius: 8px; font-family: monospace;\n"
+        "    font-size: 13px; white-space: pre-wrap; word-break: break-word; }\n" + css_text + "\n</style>\n"
+        "</head>\n"
+        "<body>\n"
+        '  <div id="widget-root"><div id="loading">Loading widget\u2026</div></div>\n'
+        "\n"
+        '  <script type="module">\n' + js_patched + "\n  </script>\n"
+        "\n"
+        '  <script type="module">\n'
+        "    try {\n"
+        '    const config = JSON.parse(document.getElementById("widget-config").textContent);\n'
+        "    document.title = config.title;\n"
+        "    async function waitForWidget(ms = 5000) {\n"
+        "      const t0 = Date.now();\n"
+        "      while (!window.__qdk_widget && Date.now() - t0 < ms)\n"
+        "        await new Promise(r => setTimeout(r, 50));\n"
+        "      return window.__qdk_widget;\n"
+        "    }\n"
+        "\n"
+        "    const widgetModule = await waitForWidget();\n"
+        "    if (!widgetModule) {\n"
+        '      document.getElementById("loading").textContent = "Failed to load widget JS";\n'
+        '      throw new Error("widget bundle did not load");\n'
+        "    }\n"
+        "\n"
+        "    function renderToolData(data) {\n"
+        "      const widgetType = data.__widget_type || config.componentName;\n"
+        "      let stateKeys;\n"
+        '      if (widgetType === "MoleculeViewer") {\n'
+        "        stateKeys = {\n"
+        '          comp: "MoleculeViewer",\n'
+        "          molecule_data: data.molecule_data,\n"
+        "          cube_data: data.cube_data ?? {},\n"
+        "          isoval: data.isoval ?? 0.02,\n"
+        "        };\n"
+        '      } else if (widgetType === "Circuit") {\n'
+        "        stateKeys = {\n"
+        '          comp: "Circuit",\n'
+        "          ...data,\n"
+        "        };\n"
+        "      } else {\n"
+        "        stateKeys = {\n"
+        "          comp: widgetType,\n"
+        "          ...data,\n"
+        "        };\n"
+        "      }\n"
+        "\n"
+        "      const model = {\n"
+        "        get(key) { return stateKeys[key]; },\n"
+        "        set(key, val) { stateKeys[key] = val; },\n"
+        "        save_changes() {},\n"
+        "        on() {},\n"
+        "        send() {},\n"
+        "      };\n"
+        "\n"
+        '      const el = document.getElementById("widget-root");\n'
+        '      el.innerHTML = "";\n'
+        '      if (widgetType === "MoleculeViewer") {\n'
+        '        el.style.minHeight = "400px";\n'
+        "      }\n"
+        "      widgetModule.default.render({ model, el });\n"
+        "    }\n"
+        "\n"
+        + (
+            "    renderToolData(config.embeddedData);\n"
+            if embedded_data is not None
+            else '    document.getElementById("loading")?.remove();\n'
+        )
+        + "    } catch(e) {\n"
+        '      const el = document.getElementById("loading") || document.getElementById("widget-root");\n'
+        "      if (el) {\n"
+        '        const error = document.createElement("div");\n'
+        '        error.className = "widget-error";\n'
+        '        error.textContent = "Error: " + e.message + "\\n\\n" + e.stack;\n'
+        "        el.replaceChildren(error);\n"
+        "      }\n"
+        "    }\n"
+        "  </script>\n"
+        "</body>\n"
+        "</html>".replace(
+            "</body>",
+            _json_script(
+                "widget-config", {"title": title, "componentName": component_name, "embeddedData": embedded_data}
+            )
+            + "\n</body>",
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
+# Widget data bridge: sync tool data → resource HTML
+# ---------------------------------------------------------------------------
+
+
+class _WidgetBridge:
+    """Store tool payloads for unique, single-use ``ui://`` resources.
+
+    Each call to :meth:`send` receives an unguessable resource URI. The
+    matching resource handler removes the payload before rendering it, so
+    concurrent clients cannot overwrite or retrieve each other's data.
+    """
+
+    def __init__(
+        self,
+        *,
+        resource_uri: str,
+        component_name: str,
+        app_name: str,
+        title: str,
+        min_height: int = 500,
+        payload_ttl: float = 300,
+    ) -> None:
+        self.resource_uri_template = f"{resource_uri}/{{token}}"
+        self._resource_uri = resource_uri
+        self._component_name = component_name
+        self._app_name = app_name
+        self._title = title
+        self._min_height = min_height
+        self._payload_ttl = payload_ttl
+        self._payloads: dict[str, tuple[float, dict]] = {}
+        self._lock = threading.Lock()
+
+    def _discard_expired(self, now: float) -> None:
+        expired = [token for token, (created, _) in self._payloads.items() if now - created >= self._payload_ttl]
+        for token in expired:
+            del self._payloads[token]
+
+    # Called by the tool
+    def send(self, payload: dict) -> CallToolResult:
+        """Store *payload* and return its unique resource URI."""
+        token = secrets.token_urlsafe(32)
+        now = time.monotonic()
+        with self._lock:
+            self._discard_expired(now)
+            self._payloads[token] = (now, dict(payload))
+        resource_uri = f"{self._resource_uri}/{token}"
+        return CallToolResult(
+            content=[TextContent(type="text", text=json.dumps(payload))],
+            structuredContent=payload,
+            meta={
+                "ui": {"resourceUri": resource_uri},
+                "ui/resourceUri": resource_uri,
+            },
+        )
+
+    def receive(self, token: str) -> dict | None:
+        """Remove and return the payload for *token*, if it is still valid."""
+        now = time.monotonic()
+        with self._lock:
+            self._discard_expired(now)
+            entry = self._payloads.pop(token, None)
+        return entry[1] if entry is not None else None
+
+    # Called by the resource handler
+    def receive_html(self, token: str) -> str:
+        """Consume *token* and return self-contained HTML for its payload."""
+        payload = self.receive(token)
+        if payload is None:
+            return _expired_visualization_html()
+        return _build_html(
+            title=self._title,
+            component_name=self._component_name,
+            app_name=self._app_name,
+            embedded_data=payload,
+            min_height=self._min_height,
+        )
+
+
+def _expired_visualization_html() -> str:
+    """Return a non-sensitive response for an expired or consumed URI."""
+    return "<html><body><p>This visualization has expired or was already opened.</p></body></html>"
+
+
+# ---------------------------------------------------------------------------
+# Public API: register resources and tools on the MCPServer app
+# ---------------------------------------------------------------------------
+
+
+def register_visualization_tools(app) -> None:
+    """Register interactive widget-based visualization tools on an MCP server.
+
+    Tools are registered only when ``qsharp_widgets`` is installed. Otherwise,
+    this function is a no-op.
+
+    Args:
+        app: MCP server application that receives the widget resources and
+            tools.
+
+    """
+    if not _WIDGETS_AVAILABLE:
+        return
+
+    # ── Circuit viewer ────────────────────────────────────────────
+    _circuit_bridge = _WidgetBridge(
+        resource_uri="ui://qdk-chem-mcp/circuit-viewer",
+        component_name="Circuit",
+        app_name="qdk-circuit-viewer",
+        title="Circuit Viewer",
+        min_height=600,
+    )
+
+    @app.resource(
+        _circuit_bridge.resource_uri_template,
+        name="circuit_viewer",
+        description="Interactive quantum-circuit diagram (qsharp-widgets Circuit component)",
+        mime_type="text/html;profile=mcp-app",
+    )
+    def circuit_viewer_resource(token: str) -> str:
+        return _circuit_bridge.receive_html(token)
+
+    @app.tool(
+        description="Render a saved Circuit in VS Code MCP Apps.",
+        meta={
+            "ui": {"resourceUri": _circuit_bridge.resource_uri_template},
+            "ui/resourceUri": _circuit_bridge.resource_uri_template,
+        },
+        structured_output=False,
+    )
+    @validate_project
+    def visualize_circuit(
+        project_name: str,
+        circuit_filename: str,
+    ) -> str | list:
+        """Render a saved Circuit in VS Code MCP Apps."""
+        circuit_filename = strip_filename_path(circuit_filename)
+
+        try:
+            circuit_obj = load_data_object(circuit_filename, data.Circuit)
+        except (RuntimeError, ValueError) as e:
+            return f"Failed to load circuit from {circuit_filename}: {e!s}"
+
+        # Convert the qdk-chemistry Circuit to the widget-compatible format:
+        #   1. Extract QASM via circuit_obj.get_qasm()
+        #   2. Convert to a qsharp Circuit via qdk.openqasm.circuit()
+        #   3. Serialise with .json() → widget-compatible JSON string
+        from qdk.openqasm import circuit as openqasm_circuit  # noqa: PLC0415
+
+        try:
+            qasm_str = circuit_obj.get_qasm()
+            qsharp_circuit = openqasm_circuit(qasm_str)
+            circuit_json_str = qsharp_circuit.json()
+        except Exception as e:  # noqa: BLE001
+            return (
+                f"Cannot build circuit visualisation from {circuit_filename}: {e!s}. "
+                f"Make sure the file contains a valid qdk/chemistry Circuit object."
+            )
+
+        circuit_data = {
+            "circuit_json": circuit_json_str,
+        }
+
+        return _circuit_bridge.send(circuit_data)
+
+    # ── Orbital-entanglement chord diagram ────────────────────────
+    _entanglement_bridge = _WidgetBridge(
+        resource_uri="ui://qdk-chem-mcp/orbital-entanglement",
+        component_name="Entanglement",
+        app_name="qdk-orbital-entanglement",
+        title="Orbital Entanglement",
+        min_height=700,
+    )
+
+    @app.resource(
+        _entanglement_bridge.resource_uri_template,
+        name="orbital_entanglement",
+        description="Interactive orbital-entanglement chord diagram (qsharp-widgets Entanglement component)",
+        mime_type="text/html;profile=mcp-app",
+    )
+    def orbital_entanglement_resource(token: str) -> str:
+        return _entanglement_bridge.receive_html(token)
+
+    @app.tool(
+        description="Render RDM/MI orbital entanglement with absolute indices in VS Code MCP Apps.",
+        meta={
+            "ui": {"resourceUri": _entanglement_bridge.resource_uri_template},
+            "ui/resourceUri": _entanglement_bridge.resource_uri_template,
+        },
+        structured_output=False,
+    )
+    @validate_project
+    def visualize_orbital_entanglement(
+        project_name: str,
+        wavefunction_filename: str,
+        selected_indices: list[int] | None = None,
+        group_selected: bool = False,
+        mi_threshold: float | None = None,
+    ) -> str | list:
+        """Render RDM/MI orbital entanglement with absolute indices in VS Code MCP Apps."""
+        wavefunction_filename = strip_filename_path(wavefunction_filename)
+
+        try:
+            wavefunction = load_data_object(wavefunction_filename, data.Wavefunction)
+        except (RuntimeError, ValueError) as e:
+            return f"Failed to load wavefunction from {wavefunction_filename}: {e!s}"
+
+        # ── Convert absolute orbital indices to diagram-relative positions ──
+        # The widget labels arcs with absolute orbital indices (e.g., 6..11)
+        # but its selected_indices parameter expects 0-based positions into
+        # the diagram (0 = first arc, 1 = second arc, ...).
+        #
+        # We build the label list first, then map the caller's absolute
+        # indices to their positions in that list.
+        diagram_selected = None
+        if selected_indices is not None:
+            try:
+                import numpy as _np  # noqa: PLC0415
+
+                n_entropies = len(_np.asarray(wavefunction.get_single_orbital_entropies()))
+                # Build the same label list the widget would generate
+                try:
+                    orbitals = wavefunction.get_orbitals()
+                    if orbitals.has_active_space():
+                        active_indices = list(orbitals.get_active_space_indices()[0])
+                    else:
+                        active_indices = list(range(n_entropies))
+                except (AttributeError, TypeError, IndexError):
+                    active_indices = list(range(n_entropies))
+
+                # Map absolute indices → diagram positions
+                abs_to_pos = {abs_idx: pos for pos, abs_idx in enumerate(active_indices)}
+                diagram_selected = []
+                bad_indices = []
+                for idx in selected_indices:
+                    if idx in abs_to_pos:
+                        diagram_selected.append(abs_to_pos[idx])
+                    else:
+                        bad_indices.append(idx)
+
+                if bad_indices:
+                    return (
+                        f"selected_indices {bad_indices} are not valid absolute orbital indices "
+                        f"for this wavefunction.  Valid absolute indices are: {active_indices}"
+                    )
+            except (RuntimeError, ValueError, AttributeError):
+                # Fall back to treating them as-is (diagram-relative)
+                diagram_selected = selected_indices
+
+        # Use the Entanglement widget to extract all data from the
+        # wavefunction.  The widget is a Python-side convenience that maps
+        # wavefunction data onto ChordDiagram traitlets — it handles
+        # entropy/MI extraction, orbital labels, and default options.
+        from qsharp_widgets import Entanglement  # noqa: PLC0415
+
+        opts: dict = {}
+        if group_selected:
+            opts["group_selected"] = group_selected
+        if mi_threshold is not None:
+            opts["mi_threshold"] = mi_threshold
+
+        try:
+            widget = Entanglement(
+                wavefunction=wavefunction,
+                selected_indices=diagram_selected,
+                **opts,
+            )
+        except (RuntimeError, ValueError, AttributeError) as e:
+            return (
+                f"Cannot build orbital-entanglement diagram from {wavefunction_filename}: {e!s}. "
+                f"Make sure the wavefunction was produced by a multi-configurational calculation "
+                f"with calculate_one_rdm=True, calculate_two_rdm=True, and "
+                f"calculate_mutual_information=True."
+            )
+
+        # Read the traitlet values the widget computed
+        s1_entropies = list(widget.s1_entropies)
+        mutual_info = [list(row) for row in widget.mutual_information]
+        labels = list(widget.labels)
+        options = dict(widget.options)
+
+        entanglement_data = {
+            "s1_entropies": s1_entropies,
+            "mutual_information": mutual_info,
+            "labels": labels,
+            "selected_indices": list(widget.selected_indices) if widget.selected_indices else None,
+            "options": options,
+        }
+
+        return _entanglement_bridge.send(entanglement_data)
+
+    # ── Molecule viewer ───────────────────────────────────────────
+    molecule_viewer_uri = "ui://qdk-chem-mcp/molecule-viewer"
+    _molecule_bridge = _WidgetBridge(
+        resource_uri=molecule_viewer_uri,
+        component_name="MoleculeViewer",
+        app_name="qdk-molecule-viewer",
+        title="Molecule Viewer",
+        min_height=550,
+    )
+
+    @app.resource(
+        _molecule_bridge.resource_uri_template,
+        name="molecule_viewer",
+        description="Interactive 3D molecule viewer (qsharp-widgets MoleculeViewer component)",
+        mime_type="text/html;profile=mcp-app",
+    )
+    def molecule_viewer_resource(token: str) -> str:
+        return _molecule_bridge.receive_html(token)
+
+    @app.tool(
+        description="Render a saved Structure in VS Code MCP Apps.",
+        meta={
+            "ui": {"resourceUri": _molecule_bridge.resource_uri_template},
+            "ui/resourceUri": _molecule_bridge.resource_uri_template,
+        },
+        structured_output=False,
+    )
+    @validate_project
+    def visualize_molecule(
+        project_name: str,
+        structure_filename: str,
+    ) -> str | list:
+        """Render a saved Structure in VS Code MCP Apps."""
+        structure_filename = strip_filename_path(structure_filename)
+
+        try:
+            structure = load_data_object(structure_filename, data.Structure)
+        except (RuntimeError, ValueError) as e:
+            return f"Failed to load structure from {structure_filename}: {e!s}"
+
+        xyz_str = structure.to_xyz()
+
+        payload = {
+            "__widget_type": "MoleculeViewer",
+            "molecule_data": xyz_str,
+            "cube_data": {},
+            "isoval": 0.02,
+        }
+
+        return _molecule_bridge.send(payload)
+
+    # ── Orbital viewer (molecule + orbital isosurfaces) ───────────
+    @app.tool(
+        description="Render saved Wavefunction orbitals in VS Code MCP Apps.",
+        meta={
+            "ui": {"resourceUri": _molecule_bridge.resource_uri_template},
+            "ui/resourceUri": _molecule_bridge.resource_uri_template,
+        },
+        structured_output=False,
+    )
+    @validate_project
+    def visualize_orbitals(
+        project_name: str,
+        wavefunction_filename: str,
+        orbital_indices: list[int] | None = None,
+        isoval: float = 0.02,
+        grid_size: int = 40,
+    ) -> str | list:
+        """Render saved Wavefunction orbitals in VS Code MCP Apps."""
+        wavefunction_filename = strip_filename_path(wavefunction_filename)
+
+        try:
+            wavefunction = load_data_object(wavefunction_filename, data.Wavefunction)
+        except (RuntimeError, ValueError) as e:
+            return f"Failed to load wavefunction from {wavefunction_filename}: {e!s}"
+
+        # Extract orbitals and structure from the wavefunction
+        try:
+            orbitals = wavefunction.get_orbitals()
+            structure = orbitals.get_basis_set().get_structure()
+        except (RuntimeError, AttributeError) as e:
+            return f"Cannot extract structure/orbitals from {wavefunction_filename}: {e!s}"
+
+        # Generate XYZ string for the molecule
+        xyz_str = structure.to_xyz()
+
+        # Generate cube data for the requested orbitals
+        from qdk_chemistry.utils.cubegen import generate_cubefiles_from_orbitals  # noqa: PLC0415
+
+        try:
+            cube_data = generate_cubefiles_from_orbitals(
+                orbitals,
+                output_folder=None,  # return dict[label, cube_content]
+                indices=orbital_indices,
+                grid_size=(grid_size, grid_size, grid_size),
+            )
+        except (RuntimeError, ValueError) as e:
+            return f"Failed to generate cube data: {e!s}"
+
+        payload = {
+            "__widget_type": "MoleculeViewer",
+            "molecule_data": xyz_str,
+            "cube_data": cube_data,
+            "isoval": isoval,
+        }
+
+        return _molecule_bridge.send(payload)
+
+    # ── Scatter plot (inline SVG) ─────────────────────────────────
+
+    def _build_plotly_html(payload: dict) -> str:
+        """Build a self-contained HTML page with an inline SVG scatter plot.
+
+        Uses pure SVG + vanilla JS (no CDN) so it works in VS Code
+        webview sandboxed iframes.
+        """
+        import math  # noqa: PLC0415
+
+        title = payload.get("title", "Scatter Plot")
+        x_label = payload.get("x_label", "X")
+        y_label = payload.get("y_label", "Y")
+        log_x = payload.get("log_x", False)
+        log_y = payload.get("log_y", False)
+        series_list = payload.get("series", [])
+
+        # Collect all x/y values to compute axis ranges
+        all_x: list[float] = []
+        all_y: list[float] = []
+        for s in series_list:
+            all_x.extend(s.get("x", []))
+            all_y.extend(s.get("y", []))
+
+        if not all_x or not all_y:
+            return "<html><body><p>No data to plot.</p></body></html>"
+
+        if log_x:
+            all_x = [math.log10(v) if v > 0 else 0 for v in all_x]
+        if log_y:
+            all_y = [math.log10(v) if v > 0 else 0 for v in all_y]
+
+        x_min, x_max = min(all_x), max(all_x)
+        y_min, y_max = min(all_y), max(all_y)
+        x_pad = (x_max - x_min) * 0.08 or 1
+        y_pad = (y_max - y_min) * 0.08 or 1
+        x_min -= x_pad
+        x_max += x_pad
+        y_min -= y_pad
+        y_max += y_pad
+
+        # SVG layout
+        w, h = 700, 450
+        ml, mr, mt, mb = 80, 30, 50, 60  # margins
+        pw = w - ml - mr
+        ph = h - mt - mb
+
+        colors = ["#89b4fa", "#f38ba8", "#a6e3a1", "#fab387", "#cba6f7", "#94e2d5", "#f9e2af", "#74c7ec"]
+
+        def _nice_ticks(lo: float, hi: float, n: int = 5) -> list[float]:
+            rng = hi - lo
+            if rng <= 0:
+                return [lo]
+            raw = rng / n
+            mag = 10 ** math.floor(math.log10(raw))
+            for step in (1, 2, 5, 10):
+                s = step * mag
+                if rng / s <= n + 1:
+                    break
+            start = math.ceil(lo / s) * s
+            ticks = []
+            v = start
+            while v <= hi + s * 0.01:
+                ticks.append(round(v, 10))
+                v += s
+            return ticks
+
+        x_ticks = _nice_ticks(x_min, x_max)
+        y_ticks = _nice_ticks(y_min, y_max)
+
+        chart = {
+            "title": title,
+            "xLabel": x_label,
+            "yLabel": y_label,
+            "logX": log_x,
+            "logY": log_y,
+            "series": series_list,
+            "layout": {"width": w, "height": h, "marginLeft": ml, "marginTop": mt, "plotWidth": pw, "plotHeight": ph},
+            "xRange": [x_min, x_max],
+            "yRange": [y_min, y_max],
+            "xTicks": x_ticks,
+            "yTicks": y_ticks,
+            "colors": colors,
+        }
+
+        return (
+            "<!DOCTYPE html>\n"
+            '<html lang="en">\n'
+            "<head>\n"
+            '<meta charset="utf-8"/>\n'
+            '<meta name="viewport" content="width=device-width,initial-scale=1"/>\n'
+            "<title></title>\n"
+            "<style>\n"
+            "  html, body { margin:0; padding:0; background:#1e1e2e;\n"
+            "    width:100%; height:100%; overflow:hidden; }\n"
+            "  svg { display:block; width:100%; height:100%; }\n"
+            "  #tooltip { position:fixed; pointer-events:none; display:none;\n"
+            "    background:#313244; color:#cdd6f4; padding:8px 12px;\n"
+            "    border-radius:6px; font-size:12px; font-family:system-ui,sans-serif;\n"
+            "    box-shadow:0 2px 8px rgba(0,0,0,0.4); z-index:100;\n"
+            "    max-width:260px; line-height:1.5; }\n"
+            "</style>\n"
+            "</head>\n"
+            "<body>\n"
+            '<div id="tooltip"></div>\n' + _json_script("scatter-plot-data", chart) + "\n<script>\n"
+            "const chart=JSON.parse(document.getElementById('scatter-plot-data').textContent);\n"
+            "document.title=chart.title;\n"
+            "const svgNs='http://www.w3.org/2000/svg', svg=document.createElementNS(svgNs,'svg');\n"
+            "const tip=document.getElementById('tooltip');\n"
+            "const {width:w,height:h,marginLeft:ml,marginTop:mt,plotWidth:pw,plotHeight:ph}=chart.layout;\n"
+            "const [xMin,xMax]=chart.xRange,[yMin,yMax]=chart.yRange;\n"
+            "svg.setAttribute('viewBox',`0 0 ${w} ${h}`); svg.setAttribute('preserveAspectRatio','xMidYMid meet');\n"
+            "function node(name,attrs={},text){const el=document.createElementNS(svgNs,name);for(const [key,value] of Object.entries(attrs))el.setAttribute(key,String(value));if(text!==undefined)el.textContent=text;svg.append(el);return el;}\n"
+            "function tx(value){return ml+(value-xMin)/(xMax-xMin)*pw;} function ty(value){return mt+ph-(value-yMin)/(yMax-yMin)*ph;}\n"
+            "function xText(value){return chart.logX ? (10**value).toFixed(0) : String(value);} function yText(value){return chart.logY ? (10**value).toExponential(1) : String(value);}\n"
+            "node('rect',{width:w,height:h,fill:'#1e1e2e'}); node('rect',{x:ml,y:mt,width:pw,height:ph,fill:'#181825',stroke:'#45475a','stroke-width':1});\n"
+            "for(const value of chart.xTicks){const x=tx(value);if(x>=ml&&x<=ml+pw){node('line',{x1:x,y1:mt,x2:x,y2:mt+ph,stroke:'#313244','stroke-width':.5});node('text',{x,y:mt+ph+16,'text-anchor':'middle',fill:'#a6adc8','font-size':11},xText(value));}}\n"
+            "for(const value of chart.yTicks){const y=ty(value);if(y>=mt&&y<=mt+ph){node('line',{x1:ml,y1:y,x2:ml+pw,y2:y,stroke:'#313244','stroke-width':.5});node('text',{x:ml-8,y:y+4,'text-anchor':'end',fill:'#a6adc8','font-size':11},yText(value));}}\n"
+            "node('text',{x:w/2,y:28,'text-anchor':'middle',fill:'#cdd6f4','font-size':15,'font-weight':600},chart.title);\n"
+            "node('text',{x:ml+pw/2,y:h-8,'text-anchor':'middle',fill:'#a6adc8','font-size':12},chart.xLabel);\n"
+            "node('text',{x:16,y:mt+ph/2,'text-anchor':'middle',fill:'#a6adc8','font-size':12,transform:`rotate(-90,16,${mt+ph/2})`},chart.yLabel);\n"
+            "let activePt; const xH=node('line',{x1:ml,y1:0,x2:ml+pw,y2:0,stroke:'#585b70','stroke-width':.5,'stroke-dasharray':'4,3',visibility:'hidden'}),xV=node('line',{x1:0,y1:mt,x2:0,y2:mt+ph,stroke:'#585b70','stroke-width':.5,'stroke-dasharray':'4,3',visibility:'hidden'});\n"
+            "function tooltip(point){tip.replaceChildren();const label=document.createElement('b');label.textContent=point.label;tip.append(label,document.createElement('br'),document.createTextNode(`${chart.xLabel}: ${point.x}`),document.createElement('br'),document.createTextNode(`${chart.yLabel}: ${point.y}`));}\n"
+            "for(const [index,series] of chart.series.entries()){const color=chart.colors[index%chart.colors.length],points=[];for(let i=0;i<Math.min(series.x.length,series.y.length);i++){const x=series.x[i],y=series.y[i],px=tx(chart.logX&&x>0?Math.log10(x):x),py=ty(chart.logY&&y>0?Math.log10(y):y);points.push({x,y,px,py,label:series.text?.[i]||`${x}, ${y}`});}if(series.mode?.includes('lines')&&points.length>1)node('path',{d:points.map((point,i)=>`${i?'L':'M'}${point.px.toFixed(1)},${point.py.toFixed(1)}`).join(' '),fill:'none',stroke:color,'stroke-width':2,opacity:.7});if(series.mode?.includes('markers')??true)for(const point of points){const circle=node('circle',{cx:point.px.toFixed(1),cy:point.py.toFixed(1),r:(series.marker_size??8)/2,fill:color,opacity:.9});circle.style.cursor='pointer';circle.addEventListener('mouseenter',()=>{if(activePt)activePt.setAttribute('r',activePt.dataset.origR);activePt=circle;circle.dataset.origR=circle.getAttribute('r');circle.setAttribute('r',String(Number(circle.dataset.origR)*1.8));circle.setAttribute('opacity','1');tooltip(point);tip.style.display='block';xH.setAttribute('y1',String(point.py));xH.setAttribute('y2',String(point.py));xH.setAttribute('visibility','visible');xV.setAttribute('x1',String(point.px));xV.setAttribute('x2',String(point.px));xV.setAttribute('visibility','visible');});circle.addEventListener('mousemove',event=>{tip.style.left=`${event.clientX+16}px`;tip.style.top=`${event.clientY-12}px`;});circle.addEventListener('mouseleave',()=>{circle.setAttribute('r',circle.dataset.origR);circle.setAttribute('opacity','.9');tip.style.display='none';xH.setAttribute('visibility','hidden');xV.setAttribute('visibility','hidden');activePt=null;});}}\n"
+            "if(chart.series.length>1||chart.series[0]?.name){let y=mt+12;for(const [index,series] of chart.series.entries()){const color=chart.colors[index%chart.colors.length];node('rect',{x:ml+pw-140,y,width:10,height:10,fill:color,rx:2});node('text',{x:ml+pw-125,y:y+9,fill:'#cdd6f4','font-size':11},series.name||`Series ${index+1}`);y+=18;}}\n"
+            "document.body.prepend(svg);\n"
+            "</script>\n"
+            "</body>\n"
+            "</html>"
+        )
+
+    _scatter_bridge = _WidgetBridge(
+        resource_uri="ui://qdk-chem-mcp/scatter-plot",
+        component_name="ScatterPlot",
+        app_name="qdk-scatter-plot",
+        title="Scatter Plot",
+    )
+
+    @app.resource(
+        _scatter_bridge.resource_uri_template,
+        name="scatter_plot",
+        description="Interactive Plotly scatter plot with optional log axes and multiple series",
+        mime_type="text/html;profile=mcp-app",
+    )
+    def scatter_plot_resource(token: str) -> str:
+        payload = _scatter_bridge.receive(token)
+        return _build_plotly_html(payload) if payload is not None else _expired_visualization_html()
+
+    @app.tool(
+        description="Render numeric series as an SVG scatter plot in VS Code MCP Apps.",
+        meta={
+            "ui": {"resourceUri": _scatter_bridge.resource_uri_template},
+            "ui/resourceUri": _scatter_bridge.resource_uri_template,
+        },
+        structured_output=False,
+    )
+    def visualize_scatter_plot(
+        series: list[dict],
+        title: str = "Scatter Plot",
+        x_label: str = "X",
+        y_label: str = "Y",
+        log_x: bool = False,
+        log_y: bool = False,
+    ) -> CallToolResult:
+        """Render numeric series as an SVG scatter plot in VS Code MCP Apps."""
+        payload = {
+            "title": title,
+            "x_label": x_label,
+            "y_label": y_label,
+            "log_x": log_x,
+            "log_y": log_y,
+            "series": series,
+        }
+        return _scatter_bridge.send(payload)

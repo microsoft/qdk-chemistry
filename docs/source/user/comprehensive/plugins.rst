@@ -84,6 +84,28 @@ In addition to the native implementations packaged within QDK/Chemistry, plugins
 
 These plugins are enabled automatically when the corresponding package is installed.
 
+.. _pyscf-plugin-details:
+
+PySCF plugin details
+^^^^^^^^^^^^^^^^^^^^
+
+The PySCF plugin is installed via the ``plugins`` extra:
+
+.. code-block:: bash
+
+   pip install 'qdk-chemistry[plugins]'
+
+.. note::
+
+   PySCF is the only package in the ``plugins`` extra and publishes no Windows wheels, so the PySCF
+   plugin is unavailable on native Windows. Because ``jupyter``, ``test``, and ``all`` depend on
+   ``plugins``, this applies to those extras as well — they install successfully on Windows, but
+   without PySCF.
+
+   The native QDK/Chemistry implementations are unaffected and remain available on Windows.
+   To use the PySCF plugin on a Windows machine, work inside
+   `WSL <https://learn.microsoft.com/windows/wsl/install>`_.
+
 .. _qiskit-plugin-details:
 
 Qiskit plugin details
@@ -190,12 +212,151 @@ Community-developed plugins are also welcome. See :ref:`adding-plugins` for guid
 Creating plugins
 ----------------
 
-QDK/Chemistry supports two extension mechanisms:
+An installed Python package can contribute any combination of:
 
-1. Implementing a new backend for an existing algorithm type (e.g., integrating an external quantum chemistry package)
-2. Defining an entirely new algorithm type with its own factory and implementations
+- Implementations of existing algorithm types
+- New algorithm types and their implementations
+- :class:`~qdk_chemistry.data.DataClass` types used in algorithm inputs or outputs
+- Remote execution backends
+- Cache backends
 
-The following sections provide comprehensive examples of each approach.
+The following sections provide complete remote backend and algorithm examples. The same plugin object can register multiple capabilities through :class:`~qdk_chemistry.plugins.PluginRegistrar`.
+
+Registration names must be unique within their registry. Registering a second algorithm, algorithm type, data class, remote backend, or cache backend under an existing name raises :class:`~qdk_chemistry.plugins.DuplicateRegistrationError`, a :class:`ValueError` subclass. The rejected registration does not replace the existing implementation.
+
+Automatic discovery
+~~~~~~~~~~~~~~~~~~~
+
+The plugin contract is a :class:`~qdk_chemistry.plugins.base.QdkChemistryPlugin` subclass exposed through the ``qdk_chemistry.plugins`` entry-point group. A plugin package declares this in its ``pyproject.toml``:
+
+.. code-block:: toml
+
+   [project.entry-points."qdk_chemistry.plugins"]
+   custom = "custom_package.plugin:CustomScfPlugin"
+
+Importing ``qdk_chemistry`` discovers the installed package and calls its ``register`` method; users do not need to import the plugin module themselves. A plugin registers its capabilities through the supplied registrar:
+
+.. code-block:: python
+
+   from qdk_chemistry.plugins import PluginRegistrar, QdkChemistryPlugin
+
+   class CustomPlugin(QdkChemistryPlugin):
+       def register(self, registrar: PluginRegistrar) -> None:
+           registrar.register_algorithm(lambda: CustomAlgorithm())
+           registrar.register_dataclass(CustomResult)
+           registrar.register_remote_backend("custom", CustomRemoteBackend)
+           registrar.register_cache_backend("custom", CustomCacheBackend)
+
+Each plugin-defined ``DataClass`` used in algorithm inputs or outputs must declare a non-empty wire-format identifier in its own class body:
+
+.. code-block:: python
+
+   from qdk_chemistry.data import DataClass
+
+   class CustomResult(DataClass):
+       @staticmethod
+       def data_type_name() -> str:
+           return "custom_result"
+       ...
+
+The value returned by ``data_type_name()`` identifies the serialized format during remote and cache deserialization. A canonical loader must declare this static method directly and return a non-empty string. A subclass must declare a unique identifier and register as its own loader. Registration raises ``TypeError`` when the declaration is missing or empty, and :class:`~qdk_chemistry.plugins.DuplicateRegistrationError` when another loader already owns the identifier.
+
+Register these classes with :meth:`~qdk_chemistry.plugins.base.PluginRegistrar.register_dataclass` or pass them through the ``data_classes`` argument of :meth:`~qdk_chemistry.plugins.base.PluginRegistrar.register_algorithm`. Python return annotations are not used for discovery.
+
+Remote backend MCP configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Remote backends expose no constructor options to MCP clients by default. To allow a client-controlled option, declare ``mcp_safe_config_options`` directly on the concrete backend class. Registration validates that it is a ``frozenset`` of non-empty constructor parameter names.
+
+.. code-block:: python
+
+   class CustomRemoteBackend(RemoteBackend):
+      mcp_safe_config_options = frozenset({"poll_interval", "timeout"})
+
+      def __init__(self, *, endpoint, poll_interval=5.0, timeout=3600.0):
+         ...
+
+Do not declare executable paths, credentials, endpoint selection, storage locations, or other options that can redirect execution or access. These remain backend- or server-owned.
+
+.. rubric:: Naming and call order
+
+An algorithm implementation name must be unique within its algorithm type; remote backend and cache backend names must be unique within their respective registries. Third-party plugins should use package- or organization-prefixed names to avoid collisions with built-in implementations and other plugins.
+
+Registration is first come, first served and does not override an existing name. Core built-ins are registered before external registrations reach each registry. Unified plugin entry points are called in the order returned by Python's entry-point discovery, followed by bundled optional integrations. If a plugin reuses an existing name, registration raises :class:`~qdk_chemistry.plugins.DuplicateRegistrationError` and keeps the earlier implementation unchanged. During entry-point discovery, QDK/Chemistry catches that exception, emits a ``UserWarning`` identifying the plugin that failed to register, and continues loading other plugins. Because entry-point order can vary between environments, plugins must not rely on discovery order to override another implementation.
+
+.. _adding-remote-backends:
+
+Implementing a remote backend
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A remote backend implements the transport and job lifecycle required to execute a serialized QDK/Chemistry request outside the calling process. The following example uses the system ``ssh`` and ``scp`` commands to transfer files and launch a background process.
+
+.. note::
+
+   This example targets a directly SSH-accessible machine with ``python3`` and QDK/Chemistry available in its default environment. It does not submit through a queue scheduler such as SLURM or PBS. Queue-managed systems should provide a backend designed for their scheduler and site policy.
+
+   The example retains each remote job directory, including its inputs, outputs,
+   PID file, and logs, after the job reaches a terminal state. Applications are
+   responsible for removing these artifacts through job cleanup. That cleanup
+   does not remove caller-owned local job records or result directories.
+
+.. rubric:: Backend implementation
+
+Implement :class:`~qdk_chemistry.remote.backends.base.RemoteBackend` for the target transport and execution environment:
+
+.. literalinclude:: ../../_static/examples/python/custom_remote_backend.py
+   :language: python
+   :start-after: # start-cell-custom-remote-backend
+   :end-before: # end-cell-custom-remote-backend
+
+.. rubric:: Registration and discovery
+
+Register the backend through :class:`~qdk_chemistry.plugins.base.PluginRegistrar` from a :class:`~qdk_chemistry.plugins.base.QdkChemistryPlugin`:
+
+.. literalinclude:: ../../_static/examples/python/custom_remote_backend.py
+   :language: python
+   :start-after: # start-cell-custom-remote-registration
+   :end-before: # end-cell-custom-remote-registration
+
+Expose that plugin class through the unified entry-point group in the plugin package's ``pyproject.toml``:
+
+.. code-block:: toml
+
+   [project.entry-points."qdk_chemistry.plugins"]
+   ssh = "custom_package.ssh_backend:SSHRemoteBackendPlugin"
+
+After the package is installed, importing ``qdk_chemistry`` discovers the entry point and registers the backend. Application code does not import the plugin module explicitly.
+
+.. rubric:: Usage
+
+The discovered backend is available through the standard remote backend registry:
+
+.. literalinclude:: ../../_static/examples/python/custom_remote_backend.py
+   :language: python
+   :start-after: # start-cell-custom-remote-usage
+   :end-before: # end-cell-custom-remote-usage
+
+Algorithms created through :func:`qdk_chemistry.algorithms.create` accept ``remote`` and ``cache`` keyword arguments on ``run``. :func:`~qdk_chemistry.remote.backends.base.create_remote` returns a connected backend, which the caller disconnects when it is no longer needed:
+
+.. literalinclude:: ../../_static/examples/python/custom_remote_backend.py
+   :language: python
+   :start-after: # start-cell-custom-remote-run
+   :end-before: # end-cell-custom-remote-run
+
+Remote argument and result values support QDK Chemistry data classes, NumPy arrays with non-object and non-structured data types, ``None``, booleans, integers, floats, strings, NumPy scalar equivalents, and lists or tuples recursively containing supported values. :class:`~qdk_chemistry.data.AlgorithmRef` values are also supported in arguments and settings, including nested algorithm-reference settings. Generic dictionaries are not supported as argument or result values. Keyword arguments and algorithm settings remain mappings because the protocol serializes their entries separately; use a QDK Chemistry data class for other structured values.
+
+Disconnecting closes connection-scoped resources but does not remove artifacts belonging to submitted jobs. For an asynchronous :class:`~qdk_chemistry.remote.job.Job`, pass ``cleanup=True`` to :meth:`~qdk_chemistry.remote.job.Job.fetch` to remove backend artifacts after the result is successfully retrieved and persisted. Call :meth:`~qdk_chemistry.remote.job.Job.cleanup` to remove artifacts separately for any terminal job. Cleanup is idempotent; failed retrieval leaves artifacts available for inspection or retry.
+
+Passing a path as ``cache`` creates a local :class:`~qdk_chemistry.remote.cache.folder.FolderCache`. On a completed cache hit, ``run`` reconstructs and returns the result without submitting another remote job. If the cache contains an in-flight job for the same algorithm, settings, and inputs, polling resumes instead of creating a duplicate. Pass ``force_rerun=True`` to bypass the lookup and execute again.
+
+By default, a cache is local to the calling machine. Set ``is_shared=True`` only when the same backing store is reachable from both the calling machine and remote compute node, such as a network-mounted directory:
+
+.. literalinclude:: ../../_static/examples/python/custom_remote_backend.py
+   :language: python
+   :start-after: # start-cell-custom-remote-shared-cache
+   :end-before: # end-cell-custom-remote-shared-cache
+
+A shared cache lets the remote worker reuse content-addressed inputs already present there and publish results without transferring those files through the backend. Do not mark a caller-local directory as shared; the remote worker must be able to recreate and access the configured cache.
 
 .. _adding-implementations:
 
@@ -256,7 +417,7 @@ The ``_run_impl()`` method is responsible for:
 .. rubric:: Registration
 
 Implementations are registered with the algorithm factory to enable discovery and instantiation by name.
-Registration is typically performed during module initialization:
+The plugin registrar delegates to that existing factory registry:
 
 .. tab:: Python API
 
@@ -412,6 +573,7 @@ Further reading
 ---------------
 
 - Custom plugin examples: `C++ source <../../_static/examples/cpp/custom_plugin.cpp>`__ | `Python source <../../_static/examples/python/custom_plugin.py>`__
+- `SSH remote backend plugin example <../../_static/examples/python/custom_remote_backend.py>`__
 - Plugin usage examples: `C++ example <../../_static/examples/cpp/interfaces.cpp>`__ | `Python example <../../_static/examples/python/interfaces.py>`__
 - :doc:`Factory pattern <algorithms/factory_pattern>`
 - :doc:`Settings <algorithms/settings>`

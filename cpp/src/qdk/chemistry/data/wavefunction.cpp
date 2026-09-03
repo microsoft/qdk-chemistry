@@ -16,7 +16,6 @@
 #include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <sstream>
 #include <stdexcept>
 #include <tuple>
@@ -26,6 +25,7 @@
 #include "hdf5_error_handling.hpp"
 #include "hdf5_serialization.hpp"
 #include "json_serialization.hpp"
+#include "orbital_entropy.hpp"
 
 namespace qdk::chemistry::data {
 namespace detail {
@@ -601,31 +601,11 @@ Eigen::VectorXd WavefunctionContainer::get_single_orbital_entropies() const {
   };
 
   // Source: Boguslawski & Tecmer (2015). doi:10.1002/qua.24832
-  // s1_i  = - \sum_alpha \omega_i,alpha * ln(omega_i,alpha)
   Eigen::VectorXd s1_entropies = Eigen::VectorXd::Zero(norbs);
   for (std::size_t i = 0; i < norbs; ++i) {
-    // omega_1 = 1 - \gamma_{ii} - \gamma_{\bar{i}\bar{i}} +
-    // \Gamma_{i\bar{i}i\bar{i}}
-    auto ordm1 = 1 - one_rdm_aa(i, i) - one_rdm_bb(i, i) +
-                 get_active_two_rdm_element(i, i, i, i);
-    if (ordm1 > 0) {
-      s1_entropies(i) -= ordm1 * std::log(ordm1);
-    }
-    // omega_2 = \gamma_{ii} - \Gamma_{i\bar{i}i\bar{i}}
-    auto ordm2 = one_rdm_aa(i, i) - get_active_two_rdm_element(i, i, i, i);
-    if (ordm2 > 0) {
-      s1_entropies(i) -= ordm2 * std::log(ordm2);
-    }
-    // omega_3 = \gamma_{\bar{i}\bar{i}} - \Gamma_{i\bar{i}i\bar{i}}
-    auto ordm3 = one_rdm_bb(i, i) - get_active_two_rdm_element(i, i, i, i);
-    if (ordm3 > 0) {
-      s1_entropies(i) -= ordm3 * std::log(ordm3);
-    }
-    // omega_4 = \Gamma_{i\bar{i}i\bar{i}}
-    auto ordm4 = get_active_two_rdm_element(i, i, i, i);
-    if (ordm4 > 0) {
-      s1_entropies(i) -= ordm4 * std::log(ordm4);
-    }
+    s1_entropies(i) =
+        detail::single_orbital_entropy(one_rdm_aa(i, i), one_rdm_bb(i, i),
+                                       get_active_two_rdm_element(i, i, i, i));
   }
   // Cache the result
   _entropies.single_orbital = s1_entropies;
@@ -1552,8 +1532,8 @@ void Wavefunction::to_json_file(const std::string& filename) const {
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_write_suffix(
-      filename, DATACLASS_TO_SNAKE_CASE(Wavefunction));
+  DataTypeFilename::validate_write_suffix(filename,
+                                          Wavefunction::data_type_name());
   _to_json_file(filename);
 }
 
@@ -1563,7 +1543,8 @@ std::shared_ptr<Wavefunction> Wavefunction::from_json_file(
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_read_suffix(filename, "wavefunction");
+  DataTypeFilename::validate_read_suffix(filename,
+                                         Wavefunction::data_type_name());
   return _from_json_file(filename);
 }
 
@@ -1646,8 +1627,8 @@ void Wavefunction::to_hdf5_file(const std::string& filename) const {
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_write_suffix(
-      filename, DATACLASS_TO_SNAKE_CASE(Wavefunction));
+  DataTypeFilename::validate_write_suffix(filename,
+                                          Wavefunction::data_type_name());
   _to_hdf5_file(filename);
 }
 
@@ -1657,7 +1638,8 @@ std::shared_ptr<Wavefunction> Wavefunction::from_hdf5_file(
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_read_suffix(filename, "wavefunction");
+  DataTypeFilename::validate_read_suffix(filename,
+                                         Wavefunction::data_type_name());
   return _from_hdf5_file(filename);
 }
 

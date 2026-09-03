@@ -38,7 +38,7 @@ except _PackageNotFoundError:
         # VERSION file not reachable or unreadable (e.g. vendored copy without repo root)
         __version__ = "0.0.0+local"
 
-import contextlib
+import importlib
 import os
 import shutil
 import subprocess
@@ -47,6 +47,7 @@ import warnings
 
 # Import some tools for convenience
 import qdk_chemistry.constants
+from qdk_chemistry._core import DuplicateRegistrationError as _DuplicateRegistrationError
 from qdk_chemistry._core import QDKChemistryConfig
 from qdk_chemistry.utils import Logger, telemetry_events
 from qdk_chemistry.utils.telemetry import TELEMETRY_ENABLED
@@ -55,6 +56,15 @@ if TELEMETRY_ENABLED:
     telemetry_events.on_qdk_chemistry_import()
 
 _DOCS_MODE = os.getenv("QDK_CHEMISTRY_DOCS", "0") == "1"
+_TRUE_ENV_VALUES = frozenset({"1", "true", "yes", "on"})
+_BUNDLED_PLUGIN_AUTOLOAD = (
+    ("discovery", "QDK_CHEMISTRY_DISABLE_DISCOVERY_AUTOLOAD"),
+    ("pyscf", "QDK_CHEMISTRY_DISABLE_PYSCF_AUTOLOAD"),
+    ("qiskit", "QDK_CHEMISTRY_DISABLE_QISKIT_AUTOLOAD"),
+    ("openfermion", "QDK_CHEMISTRY_DISABLE_OPENFERMION_AUTOLOAD"),
+    ("networkx", "QDK_CHEMISTRY_DISABLE_NETWORKX_AUTOLOAD"),
+    ("geometric", "QDK_CHEMISTRY_DISABLE_GEOMETRIC_AUTOLOAD"),
+)
 _STUBGEN_BLOCK_MARKER = Path(__file__).parent / "_core" / ".no-stubgen"
 
 
@@ -114,29 +124,35 @@ def _setup_resources() -> None:
 _setup_resources()
 
 
+def _load_bundled_plugin(plugin_name: str, disable_env_var: str) -> None:
+    """Load a bundled plugin unless its automatic loading is disabled."""
+    if os.getenv(disable_env_var, "").strip().lower() in _TRUE_ENV_VALUES:
+        return
+
+    try:
+        plugin = importlib.import_module(f"qdk_chemistry.plugins.{plugin_name}")
+        plugin.load()
+    except ImportError:
+        return
+    except _DuplicateRegistrationError as exc:
+        warnings.warn(
+            f"Automatic loading of bundled plugin {plugin_name!r} failed due to a duplicate registration: {exc}. "
+            f"Set {disable_env_var}=1 before importing qdk_chemistry to disable automatic loading of this plugin.",
+            UserWarning,
+            stacklevel=2,
+        )
+        raise
+
+
 # Defer plugin imports until after module initialization
 def _import_plugins() -> None:
     """Import pre-packaged plugins after module initialization."""
-    with contextlib.suppress(ImportError):
-        import qdk_chemistry.plugins.pyscf as pyscf_plugin  # noqa: PLC0415
+    import qdk_chemistry.remote.cache  # noqa: PLC0415
+    from qdk_chemistry.plugins import _load_plugins  # noqa: PLC0415
 
-        pyscf_plugin.load()
-    with contextlib.suppress(ImportError):
-        import qdk_chemistry.plugins.qiskit as qiskit_plugin  # noqa: PLC0415
-
-        qiskit_plugin.load()
-    with contextlib.suppress(ImportError):
-        import qdk_chemistry.plugins.openfermion as openfermion_plugin  # noqa: PLC0415
-
-        openfermion_plugin.load()
-    with contextlib.suppress(ImportError):
-        import qdk_chemistry.plugins.networkx as networkx_plugin  # noqa: PLC0415
-
-        networkx_plugin.load()
-    with contextlib.suppress(ImportError):
-        import qdk_chemistry.plugins.geometric as geometric_plugin  # noqa: PLC0415
-
-        geometric_plugin.load()
+    _load_plugins()
+    for plugin_name, disable_env_var in _BUNDLED_PLUGIN_AUTOLOAD:
+        _load_bundled_plugin(plugin_name, disable_env_var)
 
 
 def _is_placeholder_stub(stub_file: Path) -> bool:
@@ -211,6 +227,15 @@ def _update_stub_references(stub_file: Path) -> None:
             stub_file.write_text(content, encoding="utf-8")
     except (OSError, PermissionError):
         pass  # Skip files that can't be read/written
+
+
+def __getattr__(name: str):
+    """Load compatibility exports on first access."""
+    if name == "DuplicateRegistrationError":
+        from qdk_chemistry.plugins import DuplicateRegistrationError  # noqa: PLC0415
+
+        return DuplicateRegistrationError
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def _generate_stubs_on_first_import() -> None:
@@ -315,9 +340,9 @@ def _generate_registry_stubs() -> None:
         for algorithm_type, algorithm_names in all_algorithms.items():
             for algorithm_name in algorithm_names:
                 try:
-                    settings = reg_module.inspect_settings(algorithm_type, algorithm_name)
-                    instance = reg_module.create(algorithm_type, algorithm_name)
-                    class_type = type(instance)
+                    instance = reg_module.create(algorithm_type, algorithm_name, True)
+                    settings = reg_module._inspect_instance_settings(instance)  # noqa: SLF001
+                    class_type = instance.__class__
                     class_name = class_type.__name__
                     class_module = class_type.__module__
 
@@ -335,8 +360,11 @@ def _generate_registry_stubs() -> None:
                     overload_lines.append("def create(")
                     overload_lines.append(f"    algorithm_type: Literal['{algorithm_type}'],")
                     overload_lines.append(f"    algorithm_name: Literal['{algorithm_name}'] | None = None,")
+                    overload_lines.append("    *suppress_warnings: bool,")
 
                     for setting_name, setting_type, default, _, _ in settings:
+                        if setting_name == "suppress_warnings":
+                            continue
                         if setting_type == "str":
                             overload_lines.append(f'    {setting_name}: {setting_type} = "{default}",')
                         elif "int" in setting_type:
@@ -373,6 +401,7 @@ def _generate_registry_stubs() -> None:
                 "def create(",
                 "    algorithm_type: str,",
                 "    algorithm_name: str | None = None,",
+                "    *suppress_warnings: bool,",
                 "    **kwargs,",
                 f") -> Union[{all_return_types_str}]: ...",
             ]

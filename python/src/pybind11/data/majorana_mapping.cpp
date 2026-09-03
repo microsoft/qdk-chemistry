@@ -125,6 +125,15 @@ Immutable specification for post-mapping qubit tapering.
           },
           py::arg("filename"));
 
+  tapering.def_static("data_type_name", &TaperingSpecification::data_type_name,
+                      R"(
+Return the wire-format identifier for tapering specifications.
+
+Returns:
+    str: ``"tapering_specification"``
+
+)");
+
   py::class_<MajoranaMapping, DataClass, py::smart_holder> mapping(
       data, "MajoranaMapping", R"(
 Fermion-to-qubit encoding.
@@ -223,7 +232,8 @@ bilinear(j, k) is available on both forms.
             return MajoranaMapping::parity(num_modes, n_alpha, n_beta);
           },
           py::arg("num_modes"), py::arg("symmetries"),
-          "Construct a parity encoding with two-qubit reduction metadata.")
+          "Construct a parity encoding with two-qubit reduction "
+          "metadata.")
       .def_static(
           "symmetry_conserving_bravyi_kitaev",
           [](std::size_t num_modes, const py::object& symmetries) {
@@ -298,6 +308,14 @@ bilinear(j, k) is available on both forms.
           },
           py::arg("filename"));
 
+  mapping.def_static("data_type_name", &MajoranaMapping::data_type_name, R"(
+Return the wire-format identifier for Majorana mappings.
+
+Returns:
+    str: ``"majorana_mapping"``
+
+)");
+
   data.def(
       "majorana_map_hamiltonian",
       [](const MajoranaMapping& mapping, double core_energy,
@@ -334,8 +352,8 @@ Returns ``(words, coefficients)`` where ``words`` is a list of sparse
 Pauli words.
 )");
 
-  // Overload taking a Hamiltonian directly.  Container dispatch and sparse
-  // index marshalling live in the C++ library overload.
+  // Overload taking a Hamiltonian directly.  Container dispatch and
+  // sparse index marshalling live in the C++ library overload.
   data.def(
       "majorana_map_hamiltonian",
       [](const MajoranaMapping& mapping, const Hamiltonian& hamiltonian,
