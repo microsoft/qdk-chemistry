@@ -1,0 +1,453 @@
+"""Tests for the bundled Azure AI Discovery backend."""
+
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
+from __future__ import annotations
+
+import base64
+import gzip
+import json
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
+from unittest.mock import MagicMock
+
+import pytest
+
+pytest.importorskip("azure.ai.discovery", reason="azure-ai-discovery is not installed")
+
+from azure.ai.discovery.models import InputDataMount, OutputDataMount
+
+import qdk_chemistry.algorithms as algorithms_module
+import qdk_chemistry.remote.serialization as serialization_module
+import qdk_chemistry.remote.worker as remote_worker
+from qdk_chemistry.plugins.discovery.backend import DiscoveryBackend
+from qdk_chemistry.remote.worker import execute_job
+
+
+class _SharedCache:
+    """Minimal shared cache used by transport tests."""
+
+    name = "test-shared"
+    is_shared = True
+
+    def __init__(self) -> None:
+        """Initialize in-memory data and job stores."""
+        self.data: dict[str, Any] = {}
+        self.jobs: dict[str, Any] = {}
+
+    def has_data(self, content_hash: str, *, shared_only: bool = False) -> bool:
+        """Return whether a content hash is stored."""
+        del shared_only
+        return content_hash in self.data
+
+    def put_data(self, content_hash: str, value: Any, *, shared_only: bool = False) -> None:
+        """Store a value by content hash."""
+        del shared_only
+        self.data[content_hash] = value
+
+    def get_data(self, content_hash: str) -> Any:
+        """Retrieve a value by content hash."""
+        return self.data.get(content_hash)
+
+    def get_job(self, run_hash: str) -> Any:
+        """Retrieve a job by run hash."""
+        return self.jobs.get(run_hash)
+
+
+class _Tools:
+    """Capture one Discovery tool submission."""
+
+    def __init__(self) -> None:
+        """Initialize without a captured submission."""
+        self.run: dict[str, Any] | None = None
+
+    def begin_run(self, **kwargs: Any) -> None:
+        """Capture submission arguments and assign an operation ID."""
+        self.run = kwargs
+        kwargs["polling"].operation_id = "operation-1"
+
+
+class _Container:
+    """Capture Blob Storage operations."""
+
+    def __init__(self) -> None:
+        """Initialize empty Blob Storage operation lists."""
+        self.uploads: list[str] = []
+        self.blobs: list[str] = []
+        self.deletions: list[str] = []
+
+    def upload_blob(self, *, name: str, data: Any, overwrite: bool) -> None:
+        """Record one non-empty overwrite upload."""
+        assert data.read()
+        assert overwrite
+        self.uploads.append(name)
+
+    def list_blobs(self, *, name_starts_with: str) -> list[SimpleNamespace]:
+        """Return captured blobs matching a prefix."""
+        return [SimpleNamespace(name=name) for name in self.blobs if name.startswith(name_starts_with)]
+
+    def delete_blob(self, name: str) -> None:
+        """Record one deleted blob."""
+        self.deletions.append(name)
+
+
+def _backend(**kwargs: Any) -> DiscoveryBackend:
+    """Create a backend with required Discovery identifiers."""
+    config = {
+        "workspace_endpoint": "https://workspace.discovery.azure.com",
+        "project_name": "project",
+        "tool_id": "tool",
+        "node_pool_id": "pool",
+        **kwargs,
+    }
+    return DiscoveryBackend(**config)
+
+
+def _payload() -> dict[str, Any]:
+    """Create a deterministic remote execution payload."""
+    return {
+        "algorithm_type": "test_algorithm",
+        "algorithm_name": "test",
+        "settings": {},
+        "args": ([1, 2],),
+        "kwargs": {},
+        "run_hash": "run-hash",
+        "job_cache_key": "owner.run-hash",
+        "input_hashes": {"args.arg_0": "input-hash"},
+    }
+
+
+def test_constructor_arguments_override_qdk_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Explicit constructor arguments override environment defaults."""
+    monkeypatch.setenv("QDK_DISCOVERY_PROJECT_NAME", "environment-project")
+    monkeypatch.setenv("QDK_DISCOVERY_TRANSPORT", "blob")
+    monkeypatch.setenv("QDK_DISCOVERY_CPUS", "8")
+
+    backend = _backend(project_name="argument-project", transport="cache", cpus=4)
+
+    assert backend.project_name == "argument-project"
+    assert backend.transport == "cache"
+    assert backend.cpus == 4
+
+    restored = DiscoveryBackend(**backend._backend_args)
+    assert restored.project_name == "argument-project"
+    assert restored.transport == "cache"
+    assert restored.remote_workdir == "qdk_chemistry"
+
+
+def test_cache_transport_seeds_inputs_and_submits_inline_manifest() -> None:
+    """Auto mode prefers a shared cache and sends only an inline manifest."""
+    cache = _SharedCache()
+    container = _Container()
+    payload = _payload()
+    payload["remote_cache"] = {"name": cache.name}
+    payload["remote_cache_backend"] = cache
+    tools = _Tools()
+    backend = _backend(
+        storage_uri="discovery://storageassets/subscriptions/example/storageAssets/data",
+        storage_account_url="https://storage.blob.core.windows.net",
+        storage_container="container",
+    )
+    backend._client = SimpleNamespace(tools=tools)
+    backend._container_client = container
+
+    _, state = backend._submit(payload)
+
+    assert cache.data["input-hash"] == [1, 2]
+    assert container.uploads == []
+    assert state["transport"] == "cache"
+    assert "input_dir" not in state
+    assert tools.run is not None
+    assert tools.run["input_data"] == []
+    assert tools.run["output_data"] == []
+    assert len(tools.run["inline_files"]) == 1
+    inline_file = tools.run["inline_files"][0]
+    manifest = json.loads(gzip.decompress(base64.b64decode(inline_file.encoded_file)))
+    assert inline_file.mount_path == "/qdk/input/manifest.json"
+    assert manifest["remote_cache_transport"] is True
+    assert manifest["job_cache_key"] == "owner.run-hash"
+    assert manifest["args"][0] == {
+        "type": "cached",
+        "dataclass_type": "list",
+        "content_hash": "input-hash",
+    }
+
+
+def test_blob_transport_submits_discovery_storage_mounts() -> None:
+    """Blob mode requests input and output mounts from Discovery."""
+    tools = _Tools()
+    container = _Container()
+    backend = _backend(
+        transport="blob",
+        storage_uri="discovery://storageassets/subscriptions/example/storageAssets/data",
+        storage_account_url="https://storage.blob.core.windows.net",
+        storage_container="container",
+    )
+    backend._client = SimpleNamespace(tools=tools)
+    backend._container_client = container
+
+    _, state = backend._submit(_payload())
+
+    assert state["transport"] == "blob"
+    assert container.uploads == [f"{state['input_dir']}/manifest.json"]
+    assert tools.run is not None
+    assert tools.run["inline_files"] == []
+    assert len(tools.run["input_data"]) == 1
+    assert len(tools.run["output_data"]) == 1
+    assert isinstance(tools.run["input_data"][0], InputDataMount)
+    assert isinstance(tools.run["output_data"][0], OutputDataMount)
+    assert tools.run["input_data"][0].mount_path == "/qdk/input"
+    assert tools.run["output_data"][0].mount_path == "/qdk/output"
+
+
+def test_serialization_failure_removes_staging_directory(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A failed serialization does not leave its temporary input directory behind."""
+    staging_dir = tmp_path / "qdk_input_failed"
+    monkeypatch.setattr("qdk_chemistry.plugins.discovery.backend.tempfile.mkdtemp", lambda **_kwargs: str(staging_dir))
+    monkeypatch.setattr(
+        "qdk_chemistry.plugins.discovery.backend.serialize_inputs",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("serialization failed")),
+    )
+
+    with pytest.raises(RuntimeError, match="serialization failed"):
+        _backend()._serialize_job(_payload())
+
+    assert not staging_dir.exists()
+
+
+def test_partial_upload_failure_removes_uploaded_inputs(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A failed input upload rolls back every preceding Blob upload."""
+    container = _Container()
+    backend = _backend()
+    backend._client = SimpleNamespace()
+    backend._container_client = container
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    input_files = [input_dir / "first", input_dir / "second"]
+    for input_file in input_files:
+        input_file.write_text("input")
+    monkeypatch.setattr(backend, "_serialize_job", lambda *_args, **_kwargs: ("job", input_dir, input_files))
+
+    def upload(_local_path: Path, remote_path: str) -> None:
+        if remote_path.endswith("second"):
+            raise RuntimeError("upload failed")
+
+    monkeypatch.setattr(backend, "upload", upload)
+
+    with pytest.raises(RuntimeError, match="upload failed"):
+        backend._prepare_blob_job(_payload())
+
+    assert container.deletions == ["qdk_chemistry/job_job/input/first"]
+    assert not input_dir.exists()
+
+
+def test_submission_failure_removes_uploaded_inputs() -> None:
+    """A failed Discovery submission removes inputs before job state is returned."""
+    container = _Container()
+    backend = _backend(
+        transport="blob",
+        storage_uri="discovery://storageassets/subscriptions/example/storageAssets/data",
+        storage_account_url="https://storage.blob.core.windows.net",
+        storage_container="container",
+    )
+    backend._client = SimpleNamespace(
+        tools=SimpleNamespace(begin_run=lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("submit failed")))
+    )
+    backend._container_client = container
+
+    with pytest.raises(RuntimeError, match="submit failed"):
+        backend._submit(_payload())
+
+    assert container.deletions == container.uploads
+
+
+def test_cleanup_job_removes_only_job_artifacts() -> None:
+    """Cleanup removes known inputs and only the submitted job's outputs."""
+    container = _Container()
+    container.blobs = [
+        "qdk_chemistry/job/output/manifest.json",
+        "qdk_chemistry/job/output/result.npy",
+        "qdk_chemistry/other/output/manifest.json",
+    ]
+    backend = _backend()
+    backend._client = SimpleNamespace()
+    backend._container_client = container
+    state = {
+        "transport": "blob",
+        "input_paths": ["qdk_chemistry/job/input/manifest.json"],
+        "output_dir": "qdk_chemistry/job/output",
+    }
+
+    backend.cleanup_job(state)
+    backend.cleanup_job(state)
+
+    assert container.deletions == [
+        "qdk_chemistry/job/input/manifest.json",
+        "qdk_chemistry/job/output/manifest.json",
+        "qdk_chemistry/job/output/result.npy",
+        "qdk_chemistry/job/input/manifest.json",
+        "qdk_chemistry/job/output/manifest.json",
+        "qdk_chemistry/job/output/result.npy",
+    ]
+
+
+def test_cache_transport_fetches_result_without_blob(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Cache transport reconstructs results without Blob Storage."""
+    cache = _SharedCache()
+    cache.data["output-hash"] = [1, 2]
+    cache.jobs["owner.run-hash"] = SimpleNamespace(
+        output_hashes=[{"value": -1.5}, {"hash": "output-hash"}],
+        output_is_tuple=True,
+    )
+    monkeypatch.setattr("qdk_chemistry.remote.cache.get_cache", lambda _name, **_config: cache)
+    backend = _backend()
+
+    result = backend.fetch(
+        {
+            "transport": "cache",
+            "remote_cache": {"name": cache.name},
+            "run_hash": "run-hash",
+            "job_cache_key": "owner.run-hash",
+        }
+    )
+
+    assert result == (-1.5, [1, 2])
+
+
+@pytest.mark.parametrize(
+    ("output_hashes", "output_is_tuple", "expected"),
+    [
+        ([{"value": 42}], False, 42),
+        ([{"value": 42}], True, (42,)),
+        ([], True, ()),
+    ],
+)
+def test_cache_transport_preserves_result_shape(
+    monkeypatch: pytest.MonkeyPatch,
+    output_hashes: list[dict[str, Any]],
+    output_is_tuple: bool,
+    expected: Any,
+) -> None:
+    """Cache transport uses the persisted result shape."""
+    cache = _SharedCache()
+    cache.jobs["owner.run-hash"] = SimpleNamespace(
+        output_hashes=output_hashes,
+        output_is_tuple=output_is_tuple,
+    )
+    monkeypatch.setattr("qdk_chemistry.remote.cache.get_cache", lambda _name, **_config: cache)
+
+    result = _backend().fetch(
+        {
+            "transport": "cache",
+            "remote_cache": {"name": cache.name},
+            "run_hash": "run-hash",
+            "job_cache_key": "owner.run-hash",
+        }
+    )
+
+    assert result == expected
+
+
+def test_cache_transport_fails_after_cache_write_failure(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Cache transport fails when its only result transport cannot persist output."""
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    serialization_module.serialize_inputs(
+        input_dir,
+        args=(),
+        kwargs={},
+        algorithm_type="test_algorithm",
+        algorithm_name="plugin",
+        settings={},
+        run_hash="testhash",
+        remote_cache={"name": "shared"},
+        remote_cache_transport=True,
+    )
+    algorithm = MagicMock()
+    algorithm.run.return_value = 6
+    monkeypatch.setattr(
+        remote_worker,
+        "_load_remote_cache",
+        MagicMock(return_value=(MagicMock(), "testhash", "testhash", False)),
+    )
+    monkeypatch.setattr(remote_worker, "_get_cached_result", MagicMock(return_value=remote_worker._CACHE_MISS))
+    monkeypatch.setattr(remote_worker, "_store_cached_result", MagicMock(return_value=False))
+    monkeypatch.setattr(algorithms_module, "create", MagicMock(return_value=algorithm))
+    serialize = MagicMock()
+    monkeypatch.setattr(serialization_module, "serialize_outputs", serialize)
+
+    with pytest.raises(RuntimeError, match="remote_cache_transport"):
+        execute_job(input_dir, output_dir)
+    serialize.assert_not_called()
+
+
+def test_fetch_rejects_output_file_outside_destination(tmp_path) -> None:
+    """Artifact names cannot cause downloads outside the requested destination."""
+    backend = _backend()
+    downloads: list[tuple[str, Any]] = []
+
+    def download(remote_path: str, local_path: Any) -> None:
+        downloads.append((remote_path, local_path))
+        Path(local_path).write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "is_tuple": False,
+                    "results": [{"type": "ndarray", "file": "/outside"}],
+                }
+            )
+        )
+
+    backend.download = download
+
+    with pytest.raises(ValueError, match="outside the serialization directory"):
+        backend.fetch({"output_dir": "qdk_chemistry/job/output"}, tmp_path / "outputs")
+
+    assert downloads == [("qdk_chemistry/job/output/manifest.json", tmp_path / "outputs" / "manifest.json")]
+
+
+def test_fetch_downloads_nested_output_files(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fetch downloads files recursively referenced by list and tuple results."""
+    backend = _backend()
+    downloads: list[str] = []
+
+    def download(remote_path: str, local_path: Any) -> None:
+        downloads.append(remote_path)
+        Path(local_path).parent.mkdir(parents=True, exist_ok=True)
+        if remote_path.endswith("manifest.json"):
+            Path(local_path).write_text(
+                json.dumps(
+                    {
+                        "results": [
+                            {
+                                "type": "tuple",
+                                "items": [{"type": "list", "items": [{"type": "ndarray", "file": "nested.npy"}]}],
+                            }
+                        ]
+                    }
+                )
+            )
+        else:
+            Path(local_path).write_bytes(b"not read")
+
+    backend.download = download
+    monkeypatch.setattr("qdk_chemistry.plugins.discovery.backend.deserialize_outputs", lambda _directory: "result")
+    assert backend.fetch({"output_dir": "qdk_chemistry/job/output"}, tmp_path / "outputs") == "result"
+
+    assert downloads == [
+        "qdk_chemistry/job/output/manifest.json",
+        "qdk_chemistry/job/output/nested.npy",
+    ]
+
+
+def test_auto_transport_requires_cache_or_blob() -> None:
+    """Auto mode rejects submissions with no usable artifact transport."""
+    backend = _backend()
+    backend._client = SimpleNamespace(tools=_Tools())
+
+    with pytest.raises(ValueError, match="shared cache or complete Blob Storage"):
+        backend._submit(_payload())

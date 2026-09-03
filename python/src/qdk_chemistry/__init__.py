@@ -58,6 +58,7 @@ if TELEMETRY_ENABLED:
 _DOCS_MODE = os.getenv("QDK_CHEMISTRY_DOCS", "0") == "1"
 _TRUE_ENV_VALUES = frozenset({"1", "true", "yes", "on"})
 _BUNDLED_PLUGIN_AUTOLOAD = (
+    ("discovery", "QDK_CHEMISTRY_DISABLE_DISCOVERY_AUTOLOAD"),
     ("pyscf", "QDK_CHEMISTRY_DISABLE_PYSCF_AUTOLOAD"),
     ("qiskit", "QDK_CHEMISTRY_DISABLE_QISKIT_AUTOLOAD"),
     ("openfermion", "QDK_CHEMISTRY_DISABLE_OPENFERMION_AUTOLOAD"),
@@ -146,6 +147,7 @@ def _load_bundled_plugin(plugin_name: str, disable_env_var: str) -> None:
 # Defer plugin imports until after module initialization
 def _import_plugins() -> None:
     """Import pre-packaged plugins after module initialization."""
+    import qdk_chemistry.remote.cache  # noqa: PLC0415
     from qdk_chemistry.plugins import _load_plugins  # noqa: PLC0415
 
     _load_plugins()
@@ -225,6 +227,15 @@ def _update_stub_references(stub_file: Path) -> None:
             stub_file.write_text(content, encoding="utf-8")
     except (OSError, PermissionError):
         pass  # Skip files that can't be read/written
+
+
+def __getattr__(name: str):
+    """Load compatibility exports on first access."""
+    if name == "DuplicateRegistrationError":
+        from qdk_chemistry.plugins import DuplicateRegistrationError  # noqa: PLC0415
+
+        return DuplicateRegistrationError
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def _generate_stubs_on_first_import() -> None:

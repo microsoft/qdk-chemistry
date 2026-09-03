@@ -22,6 +22,9 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
   "Programming Language :: C++",
+  "Operating System :: POSIX :: Linux",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
   "Topic :: Scientific/Engineering",
   "Topic :: Scientific/Engineering :: Quantum Computing",
   "Topic :: Scientific/Engineering :: Physics",
@@ -34,6 +37,7 @@ dependencies = [
   "numpy>=2.0.0,<2.4.0",
   "scipy>=1.7.0",
   "matplotlib>=3.10.0",
+  "argcomplete>=3.0.0",
   "ruamel-yaml>=0.18.10",
   "qdk[jupyter]>=1.30.0",
   "pybind11-stubgen>=2.5.1",
@@ -46,15 +50,26 @@ name = "qdk-chemistry"
 readme = "README.md"
 requires-python = ">=3.10"
 
+[project.scripts]
+qc = "qdk_chemistry.ui.cli:main"
+qcmcp = "qdk_chemistry.ui.mcp:main"
+
 [project.optional-dependencies]
 all = [
-  "qdk-chemistry[coverage,dev,docs,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre,test]"
+  "qdk-chemistry[coverage,dev,discovery,docs,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre,test]",
+  "qdk-chemistry[mcp]; sys_platform != 'win32' or platform_machine != 'ARM64'"
 ]
 coverage = [
   "coverage",
   "pytest",
   "pytest-cov",
   "gcovr"
+]
+discovery = [
+  # azure-identity (via msal) and azure-storage-blob both pull in cryptography, which publishes no win-arm64 wheel
+  "azure-ai-discovery==1.0.0; sys_platform != 'win32' or platform_machine != 'ARM64'",
+  "azure-identity>=1.19.0,<2; sys_platform != 'win32' or platform_machine != 'ARM64'",
+  "azure-storage-blob>=12.25.0,<13; sys_platform != 'win32' or platform_machine != 'ARM64'"
 ]
 dev = [
   "coverage",
@@ -82,6 +97,9 @@ jupyter = [
   "pandas>=2.0.0",
   "qdk[jupyter]>=1.30.0",
 ]
+mcp = [
+  "mcp>=2,<3"
+]
 networkx-extras = [
   "networkx>=3.0; python_full_version != '3.14.1'",  # due to incompatibility with Python 3.14.1
 ]
@@ -93,11 +111,13 @@ plugins = [
   "pyscf>=2.9.0,<2.12.1; sys_platform != 'win32'"
 ]
 qiskit-extras = [
-  "qiskit[qasm3-import]>=2.2.0",
-  "qiskit-aer; python_version < '3.14' or platform_machine != 'aarch64' or sys_platform != 'linux'",  # cp314 manylinux aarch64 wheel not available
-  "qiskit-ibm-runtime>=0.46.1",
-  "qiskit-nature",
-  "qiskit-qasm3-import",
+  # The qiskit stack and pennylane both require rustworkx, which publishes no win-arm64 wheels
+  "qiskit[qasm3-import]>=2.2.0; sys_platform != 'win32' or platform_machine != 'ARM64'",
+  # cp314 manylinux aarch64 wheel not available
+  "qiskit-aer; (python_version < '3.14' or platform_machine != 'aarch64' or sys_platform != 'linux') and (sys_platform != 'win32' or platform_machine != 'ARM64')",
+  "qiskit-ibm-runtime>=0.46.1; sys_platform != 'win32' or platform_machine != 'ARM64'",
+  "qiskit-nature; sys_platform != 'win32' or platform_machine != 'ARM64'",
+  "qiskit-qasm3-import; sys_platform != 'win32' or platform_machine != 'ARM64'",
   "pylatexenc==2.10",
   "requests>=2.33.0"
 ]
@@ -105,11 +125,14 @@ qre = [
   "qdk[qre,jupyter]>=1.30.0"
 ]
 test = [
-  "qdk-chemistry[coverage,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre]",
+  "qdk-chemistry[coverage,discovery,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre]",
+  "qdk-chemistry[mcp]; sys_platform != 'win32' or platform_machine != 'ARM64'",
   "nbclient",
   "nbformat",
-  "pennylane",
-  "rdkit",
+  # pennylane also requires rustworkx (see qiskit-extras); the sample test skips when it is absent.
+  "pennylane; sys_platform != 'win32' or platform_machine != 'ARM64'",
+  # rdkit publishes no win-arm64 wheels; the sample test skips when it is absent.
+  "rdkit; sys_platform != 'win32' or platform_machine != 'ARM64'",
   "requests>=2.33.0",
   "setuptools>=64",
   "wheel"

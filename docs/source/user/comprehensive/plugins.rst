@@ -84,6 +84,28 @@ In addition to the native implementations packaged within QDK/Chemistry, plugins
 
 These plugins are enabled automatically when the corresponding package is installed.
 
+.. _pyscf-plugin-details:
+
+PySCF plugin details
+^^^^^^^^^^^^^^^^^^^^
+
+The PySCF plugin is installed via the ``plugins`` extra:
+
+.. code-block:: bash
+
+   pip install 'qdk-chemistry[plugins]'
+
+.. note::
+
+   PySCF is the only package in the ``plugins`` extra and publishes no Windows wheels, so the PySCF
+   plugin is unavailable on native Windows. Because ``jupyter``, ``test``, and ``all`` depend on
+   ``plugins``, this applies to those extras as well — they install successfully on Windows, but
+   without PySCF.
+
+   The native QDK/Chemistry implementations are unaffected and remain available on Windows.
+   To use the PySCF plugin on a Windows machine, work inside
+   `WSL <https://learn.microsoft.com/windows/wsl/install>`_.
+
 .. _qiskit-plugin-details:
 
 Qiskit plugin details
@@ -240,6 +262,21 @@ Each plugin-defined ``DataClass`` used in algorithm inputs or outputs must decla
 The value returned by ``data_type_name()`` identifies the serialized format during remote and cache deserialization. A canonical loader must declare this static method directly and return a non-empty string. A subclass must declare a unique identifier and register as its own loader. Registration raises ``TypeError`` when the declaration is missing or empty, and :class:`~qdk_chemistry.plugins.DuplicateRegistrationError` when another loader already owns the identifier.
 
 Register these classes with :meth:`~qdk_chemistry.plugins.base.PluginRegistrar.register_dataclass` or pass them through the ``data_classes`` argument of :meth:`~qdk_chemistry.plugins.base.PluginRegistrar.register_algorithm`. Python return annotations are not used for discovery.
+
+Remote backend MCP configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Remote backends expose no constructor options to MCP clients by default. To allow a client-controlled option, declare ``mcp_safe_config_options`` directly on the concrete backend class. Registration validates that it is a ``frozenset`` of non-empty constructor parameter names.
+
+.. code-block:: python
+
+   class CustomRemoteBackend(RemoteBackend):
+      mcp_safe_config_options = frozenset({"poll_interval", "timeout"})
+
+      def __init__(self, *, endpoint, poll_interval=5.0, timeout=3600.0):
+         ...
+
+Do not declare executable paths, credentials, endpoint selection, storage locations, or other options that can redirect execution or access. These remain backend- or server-owned.
 
 .. rubric:: Naming and call order
 

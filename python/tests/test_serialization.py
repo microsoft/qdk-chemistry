@@ -134,7 +134,7 @@ def test_numpy_array_rejects_structured_dtype(tmp_path):
         ([object()], False),
         (np.array([1.0]), True),
         (np.array([object()], dtype=object), False),
-        ((1, 2), False),
+        ((1, 2), True),
     ],
 )
 def test_cacheable_matches_supported_cache_value_graph(value, expected):
@@ -259,6 +259,7 @@ def test_input_round_trip(tmp_path, h2_structure):
         algorithm_name="qdk",
         settings={"max_iterations": 100},
         run_hash="run-hash",
+        owner={"workspace_root": "/workspace", "project_name": "project"},
         input_hashes={"args.arg_0": "structure-hash"},
         remote_cache={"name": "shared"},
     )
@@ -272,6 +273,7 @@ def test_input_round_trip(tmp_path, h2_structure):
     assert restored["kwargs"] == {"basis": "cc-pvdz"}
     assert restored["settings"] == {"max_iterations": 100}
     assert restored["run_hash"] == "run-hash"
+    assert restored["owner"] == {"workspace_root": "/workspace", "project_name": "project"}
     assert restored["input_hashes"] == {"args.arg_0": "structure-hash"}
     assert restored["remote_cache"] == {"name": "shared"}
     assert restored["remote_cache_transport"] is False
