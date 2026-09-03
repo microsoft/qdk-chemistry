@@ -154,12 +154,12 @@ class TestLCUFoqcsBuilder:
         assert isinstance(container, LCUWalkContainer)
         assert isinstance(container.block_encoding, FoqcsContainer)
 
-    def test_lambda_matches_one_norm(self):
-        """Test that lambda equals the 1-norm of the Hamiltonian coefficients."""
+    def test_scale_matches_one_norm(self):
+        """Test that the scale equals the 1-norm of the Hamiltonian coefficients."""
         coefficients = [0.5, 0.5, -0.3, -0.3, -0.3]
         unitary_rep = _build_unitary_rep(["ZZI", "IZZ", "XII", "IXI", "IIX"], coefficients)
 
-        assert unitary_rep.get_container().lambda_ == pytest.approx(np.sum(np.abs(coefficients)))
+        assert unitary_rep.get_container().scale == pytest.approx(np.sum(np.abs(coefficients)))
 
     def test_identity_term_adds_a_family(self):
         """Test that a constant shift is carried as a degenerate identity family."""
@@ -169,7 +169,7 @@ class TestLCUFoqcsBuilder:
         assert with_shift.num_families == without_shift.num_families + 1
         identity_family = next(f for f in with_shift.families if f.paulis == ())
         assert identity_family.offset == 0
-        assert with_shift.lambda_ == pytest.approx(without_shift.lambda_ + 0.25)
+        assert with_shift.scale == pytest.approx(without_shift.scale + 0.25)
 
     def test_negligible_identity_term_is_dropped(self):
         """Test that an identity term below tolerance does not create a family."""
@@ -266,7 +266,7 @@ class TestFoqcsMapper:
         num_ancilla = qc.num_qubits - 1 - num_target
         block = _extract_block_encoding_submatrix(full_u, num_target=num_target, num_ancilla=num_ancilla)
 
-        lam = unitary_rep.get_container().lambda_
+        lam = unitary_rep.get_container().scale
         expected = hamiltonian.to_matrix() / lam
 
         block_phase = _assert_matches_up_to_global_phase(block, expected, description)
@@ -309,7 +309,7 @@ class TestFoqcsMapper:
         num_ancilla = qc.num_qubits - 1 - num_target
         block = _extract_block_encoding_submatrix(full_u, num_target=num_target, num_ancilla=num_ancilla)
 
-        lam = shifted_rep.get_container().lambda_
+        lam = shifted_rep.get_container().scale
         base_matrix = QubitOperator(
             pauli_strings=base_strings, coefficients=np.array(base_coeffs, dtype=float)
         ).to_matrix()
@@ -361,7 +361,7 @@ class TestFoqcsMapper:
 
         walk_phases = np.angle(np.linalg.eigvals(walk_u))
 
-        lam = block.lambda_
+        lam = block.scale
         hamiltonian = QubitOperator(pauli_strings=pauli_strings, coefficients=coefficients)
         energies = np.linalg.eigvalsh(hamiltonian.to_matrix())
 

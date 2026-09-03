@@ -148,7 +148,7 @@ class LCUFoqcsBuilder(HamiltonianUnitaryBuilder):
         if norm_sq <= tolerance:
             raise ValueError("FOQCS block encoding requires a Hamiltonian with a positive 1-norm.")
         norm = math.sqrt(norm_sq)
-        lambda_ = norm_sq
+        scale = norm_sq
 
         families: list[FoqcsFamily] = []
         for (letter, weight, offset, coeff, _count), mag in zip(grouped, mags, strict=True):
@@ -166,12 +166,12 @@ class LCUFoqcsBuilder(HamiltonianUnitaryBuilder):
         foqcs_container = FoqcsContainer(
             num_sites=num_sites,
             families=families,
-            lambda_=lambda_,
+            scale=scale,
             power=power,
         )
 
         container = (
-            LCUWalkContainer(block_encoding=foqcs_container, power=power, scale=lambda_)
+            LCUWalkContainer(block_encoding=foqcs_container, power=power, scale=scale)
             if quantum_walk
             else foqcs_container
         )

@@ -11,6 +11,8 @@ import h5py
 import numpy as np
 import pytest
 
+from qdk_chemistry.data._type_name import class_data_type_name, declares_data_type_name
+from qdk_chemistry.data.unitary_representation.containers.foqcs import FoqcsContainer, FoqcsFamily
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
@@ -37,6 +39,21 @@ def container(step_terms):
         step_reps=4,
         num_qubits=2,
     )
+
+
+@pytest.fixture
+def foqcs_families():
+    """Create FOQCS families for an Ising-like chain: an X field and a ZZ coupling."""
+    return [
+        FoqcsFamily(paulis=("X",), offset=0, abs_coeff=0.6, phase=0.0),
+        FoqcsFamily(paulis=("Z", "Z"), offset=1, abs_coeff=0.8, phase=-0.7853981633974483),
+    ]
+
+
+@pytest.fixture
+def foqcs_container(foqcs_families):
+    """Create a FoqcsContainer instance for testing."""
+    return FoqcsContainer(num_sites=3, families=foqcs_families, scale=1.9, power=2)
 
 
 class TestExponentiatedPauliTerm:
@@ -219,3 +236,157 @@ class TestPauliProductFormulaContainer:
         assert "Number of qubits: 2" in summary
         assert "Number of step terms: 3" in summary
         assert "Step repetitions: 4" in summary
+
+
+class TestFoqcsFamily:
+    """Tests for the FoqcsFamily dataclass."""
+
+    def test_attributes(self):
+        """Test the attributes of FoqcsFamily."""
+        family = FoqcsFamily(paulis=("Z", "Z"), offset=2, abs_coeff=0.5, phase=1.25)
+
+        assert family.paulis == ("Z", "Z")
+        assert family.offset == 2
+        assert np.isclose(
+            family.abs_coeff, 0.5, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
+        assert np.isclose(
+            family.phase, 1.25, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
+
+    def test_frozen(self):
+        """Test that FoqcsFamily is immutable."""
+        family = FoqcsFamily(paulis=("X",), offset=0, abs_coeff=1.0, phase=0.0)
+        with pytest.raises(Exception, match="cannot assign to field 'phase'"):
+            family.phase = 0.2
+
+    def test_identity_family_has_empty_pattern(self):
+        """A constant shift is carried as a degenerate family that applies no Pauli."""
+        family = FoqcsFamily(paulis=(), offset=0, abs_coeff=0.3, phase=np.pi / 2)
+
+        assert family.paulis == ()
+
+
+class TestFoqcsContainer:
+    """Tests for the FoqcsContainer class."""
+
+    def test_basic_properties(self, foqcs_container):
+        """Test basic properties of the container."""
+        assert foqcs_container.type == "foqcs"
+        assert foqcs_container.num_sites == 3
+        assert foqcs_container.num_families == 2
+        assert foqcs_container.power == 2
+        assert np.isclose(
+            foqcs_container.scale,
+            1.9,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+
+    def test_qubit_layout(self, foqcs_container):
+        """The ancilla layout is [subPrepReg | xReg | zReg]: one qubit per family plus two site registers."""
+        assert foqcs_container.num_target_qubits == 3
+        assert foqcs_container.num_prepare_ancillas == 2 + 2 * 3
+        assert foqcs_container.num_qubits == 3 + (2 + 2 * 3)
+
+    def test_declares_its_own_data_type_name(self):
+        """Regression: the container must declare its own wire-format identifier.
+
+        A stale ``_data_type_name`` class attribute silently inherited
+        ``"block_encoding_container"`` from the base, which mis-validates
+        filename suffixes on save and load.
+        """
+        assert declares_data_type_name(FoqcsContainer)
+        assert class_data_type_name(FoqcsContainer) == "foqcs_container"
+
+    def test_attributes_are_immutable_after_construction(self, foqcs_container):
+        """The public attributes are plain fields, but DataClass freezes them post-construction."""
+        with pytest.raises(AttributeError):
+            foqcs_container.num_sites = 5
+        with pytest.raises(AttributeError):
+            foqcs_container.scale = 1.0
+
+    def test_families_are_copied_from_the_caller(self, foqcs_families):
+        """Mutating the caller's list must not reach into the constructed container."""
+        constructed = FoqcsContainer(num_sites=3, families=foqcs_families, scale=1.9)
+        foqcs_families.append(FoqcsFamily(paulis=("Y",), offset=0, abs_coeff=0.1, phase=0.0))
+
+        assert constructed.num_families == 2
+
+    def test_to_json_roundtrip(self, foqcs_container):
+        """Test JSON serialization and deserialization roundtrip."""
+        json_data = foqcs_container.to_json()
+        restored = FoqcsContainer.from_json(json.loads(json.dumps(json_data)))
+
+        assert restored.type == foqcs_container.type
+        assert restored.num_sites == foqcs_container.num_sites
+        assert restored.power == foqcs_container.power
+        assert restored.content_hash() == foqcs_container.content_hash()
+
+        for restored_family, original in zip(restored.families, foqcs_container.families, strict=True):
+            assert restored_family.paulis == original.paulis
+            assert restored_family.offset == original.offset
+
+    def test_to_hdf5_roundtrip(self, foqcs_container, tmp_path):
+        """Test HDF5 serialization and deserialization roundtrip."""
+        file_path = tmp_path / "foqcs_container.h5"
+
+        with h5py.File(file_path, "w") as f:
+            foqcs_container.to_hdf5(f.create_group("container"))
+
+        with h5py.File(file_path, "r") as f:
+            restored = FoqcsContainer.from_hdf5(f["container"])
+
+        assert restored.content_hash() == foqcs_container.content_hash()
+
+    def test_identity_family_survives_roundtrip(self):
+        """An empty Pauli pattern must not be corrupted by serialization."""
+        original = FoqcsContainer(
+            num_sites=2,
+            families=[
+                FoqcsFamily(paulis=(), offset=0, abs_coeff=0.4, phase=np.pi / 2),
+                FoqcsFamily(paulis=("X",), offset=0, abs_coeff=0.9, phase=0.0),
+            ],
+            scale=1.1,
+        )
+
+        restored = FoqcsContainer.from_json(json.loads(json.dumps(original.to_json())))
+
+        assert restored.families[0].paulis == ()
+        assert restored.content_hash() == original.content_hash()
+
+    def test_content_hash_distinguishes_containers(self, foqcs_families):
+        """Containers differing in any identifying field must hash differently."""
+        base = FoqcsContainer(num_sites=3, families=foqcs_families, scale=1.9, power=2)
+
+        assert (
+            base.content_hash()
+            != FoqcsContainer(num_sites=3, families=foqcs_families, scale=1.9, power=3).content_hash()
+        )
+        assert (
+            base.content_hash()
+            != FoqcsContainer(num_sites=4, families=foqcs_families, scale=1.9, power=2).content_hash()
+        )
+        assert (
+            base.content_hash()
+            != FoqcsContainer(num_sites=3, families=foqcs_families[:1], scale=1.9, power=2).content_hash()
+        )
+
+    def test_summary(self, foqcs_container):
+        """Test the summary generation of the container."""
+        summary = foqcs_container.get_summary()
+
+        assert "FOQCS Container" in summary
+        assert "Power: 2" in summary
+        assert "Families (2)" in summary
+        assert "ZZ (offset 1)" in summary
+
+    def test_eigenvalue_from_phase_is_not_supported(self, foqcs_container):
+        """A raw block encoding has no eigenvalue-phase relation; the walk container does."""
+        with pytest.raises(NotImplementedError, match="LCUWalkContainer"):
+            foqcs_container.eigenvalue_from_phase(0.25)
+
+    def test_combine_is_not_supported(self, foqcs_container):
+        """Combining FOQCS block encodings is not defined."""
+        with pytest.raises(NotImplementedError, match="does not support combination"):
+            foqcs_container.combine(foqcs_container)

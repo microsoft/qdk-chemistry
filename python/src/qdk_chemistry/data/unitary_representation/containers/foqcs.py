@@ -64,8 +64,15 @@ class FoqcsContainer(BlockEncodingContainer):
 
     """
 
-    # Class attribute for filename validation
-    _data_type_name = "foqcs_container"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for FOQCS containers.
+
+        Returns:
+            ``"foqcs_container"``.
+
+        """
+        return "foqcs_container"
 
     # Serialization version for this class
     _serialization_version = "0.1.0"
@@ -74,7 +81,7 @@ class FoqcsContainer(BlockEncodingContainer):
         self,
         num_sites: int,
         families: list[FoqcsFamily],
-        lambda_: float,
+        scale: float,
         power: int = 1,
     ) -> None:
         r"""Initialize a FoqcsContainer.
@@ -82,13 +89,20 @@ class FoqcsContainer(BlockEncodingContainer):
         Args:
             num_sites: Number of spin sites (system qubits) ``L``.
             families: The homogeneous Pauli-term families defining the block encoding.
-            lambda_: The 1-norm :math:`\lambda` used for eigenvalue-phase conversion.
+            scale: The 1-norm :math:`\lambda` used for eigenvalue-phase conversion.
             power: Number of times to apply the block encoding (for :math:`B[H]^\mathrm{power}`).
 
         """
-        self._num_sites = num_sites
-        self._families = list(families)
-        self._lambda = lambda_
+        self.num_sites = num_sites
+        """Number of spin sites (system qubits) ``L``."""
+
+        self.families = list(families)
+        """The homogeneous Pauli-term families defining the block encoding."""
+
+        self.scale = scale
+        r"""The 1-norm :math:`\lambda` of the block-encoded Hamiltonian."""
+
+        # `power` is an abstract property on BlockEncodingContainer, so it needs a backing field.
         self._power = power
         super().__init__()
 
@@ -103,26 +117,6 @@ class FoqcsContainer(BlockEncodingContainer):
         return self._power
 
     @property
-    def num_sites(self) -> int:
-        """Number of spin sites (system qubits).
-
-        Returns:
-            int: The site count ``L``.
-
-        """
-        return self._num_sites
-
-    @property
-    def families(self) -> list[FoqcsFamily]:
-        """The homogeneous Pauli-term families.
-
-        Returns:
-            list[FoqcsFamily]: The families defining the block encoding.
-
-        """
-        return self._families
-
-    @property
     def num_families(self) -> int:
         """Number of Pauli-term families (sub-PREP qubits).
 
@@ -130,17 +124,7 @@ class FoqcsContainer(BlockEncodingContainer):
             int: The family count.
 
         """
-        return len(self._families)
-
-    @property
-    def lambda_(self) -> float:
-        r"""The 1-norm :math:`\lambda` of the block-encoded Hamiltonian.
-
-        Returns:
-            float: The normalization factor.
-
-        """
-        return self._lambda
+        return len(self.families)
 
     @property
     def num_target_qubits(self) -> int:
@@ -150,7 +134,7 @@ class FoqcsContainer(BlockEncodingContainer):
             int: Equal to ``num_sites``.
 
         """
-        return self._num_sites
+        return self.num_sites
 
     @property
     def num_prepare_ancillas(self) -> int:
@@ -163,7 +147,7 @@ class FoqcsContainer(BlockEncodingContainer):
             int: ``num_families + 2 * num_sites``.
 
         """
-        return self.num_families + 2 * self._num_sites
+        return self.num_families + 2 * self.num_sites
 
     @property
     def num_qubits(self) -> int:
@@ -196,8 +180,8 @@ class FoqcsContainer(BlockEncodingContainer):
         data: dict[str, Any] = {
             "container_type": self.type,
             "power": self.power,
-            "num_sites": self._num_sites,
-            "lambda": self._lambda,
+            "num_sites": self.num_sites,
+            "scale": self.scale,
             "families": [
                 {
                     "paulis": list(f.paulis),
@@ -205,7 +189,7 @@ class FoqcsContainer(BlockEncodingContainer):
                     "abs_coeff": f.abs_coeff,
                     "phase": f.phase,
                 }
-                for f in self._families
+                for f in self.families
             ],
         }
         return self._add_json_version(data)
@@ -220,10 +204,10 @@ class FoqcsContainer(BlockEncodingContainer):
         self._add_hdf5_version(group)
         group.attrs["container_type"] = self.type
         group.attrs["power"] = self.power
-        group.attrs["num_sites"] = self._num_sites
-        group.attrs["lambda"] = self._lambda
+        group.attrs["num_sites"] = self.num_sites
+        group.attrs["scale"] = self.scale
         families_group = group.create_group("families")
-        for i, f in enumerate(self._families):
+        for i, f in enumerate(self.families):
             fam_group = families_group.create_group(f"family_{i}")
             fam_group.attrs["paulis"] = list(f.paulis)
             fam_group.attrs["offset"] = f.offset
@@ -254,7 +238,7 @@ class FoqcsContainer(BlockEncodingContainer):
         return cls(
             num_sites=int(json_data["num_sites"]),
             families=families,
-            lambda_=float(json_data["lambda"]),
+            scale=float(json_data["scale"]),
             power=int(json_data.get("power", 1)),
         )
 
@@ -284,7 +268,7 @@ class FoqcsContainer(BlockEncodingContainer):
         return cls(
             num_sites=int(group.attrs["num_sites"]),
             families=families,
-            lambda_=float(group.attrs["lambda"]),
+            scale=float(group.attrs["scale"]),
             power=int(group.attrs["power"]),
         )
 
@@ -297,13 +281,13 @@ class FoqcsContainer(BlockEncodingContainer):
         """
         family_lines = "\n".join(
             f"    {''.join(f.paulis)} (offset {f.offset}): |c|={f.abs_coeff:.4f}, phase={f.phase:.4f}"
-            for f in self._families
+            for f in self.families
         )
         return (
             f"FOQCS Container:\n"
             f"  Power: {self.power}\n"
-            f"  Sites: {self._num_sites}, ancilla: {self.num_prepare_ancillas} qubits\n"
-            f"  Lambda: {self._lambda:.6f}\n"
+            f"  Sites: {self.num_sites}, ancilla: {self.num_prepare_ancillas} qubits\n"
+            f"  Scale (lambda): {self.scale:.6f}\n"
             f"  Families ({self.num_families}):\n{family_lines}"
         )
 
@@ -311,9 +295,9 @@ class FoqcsContainer(BlockEncodingContainer):
         """Feed identifying data into the hasher."""
         _hash_str(h, "foqcs_container")
         _hash_int(h, self._power)
-        _hash_int(h, self._num_sites)
-        _hash_float(h, self._lambda)
-        for f in self._families:
+        _hash_int(h, self.num_sites)
+        _hash_float(h, self.scale)
+        for f in self.families:
             _hash_str(h, "".join(f.paulis))
             _hash_int(h, f.offset)
             _hash_float(h, f.abs_coeff)
