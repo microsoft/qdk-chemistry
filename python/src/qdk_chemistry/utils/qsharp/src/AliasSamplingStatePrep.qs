@@ -20,8 +20,6 @@ namespace QDKChemistry.Utils.AliasSampling {
     import Std.Math.Lg;
     import Std.StatePreparation.PrepareUniformSuperposition;
     import Std.Arrays.Mapped;
-    import Std.Arrays.Padded;
-    import Std.TableLookup.Select;
     import QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D;
     import QDKChemistry.Utils.SelectSwap.Select2DLoadWord;
     import QDKChemistry.Utils.SelectSwap.SelectSwap;
@@ -351,15 +349,6 @@ namespace QDKChemistry.Utils.AliasSampling {
         } else {
             0
         };
-        // The conditional register is an outer PREPARE's index register, which only ever holds
-        // a value below the number of conditions: its uniform superposition spans exactly
-        // [0, nCond) and alias sampling can only swap one such index for another. That lets the
-        // lookup skip the padding out to a power of two in the outer index.
-        //
-        // `Select2DLoadWord` owns the select-swap copy-out, so the uncompute this operation's
-        // adjoint reaches is a phase fixup over the (condition, index) address rather than a
-        // second lookup. The alias garbage is live across SELECT, so the load is uncomputed by
-        // that adjoint rather than here.
         Select2DLoadWord(
             table3D,
             conditionalRegister,

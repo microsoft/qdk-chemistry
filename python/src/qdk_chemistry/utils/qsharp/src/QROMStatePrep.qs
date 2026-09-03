@@ -43,9 +43,6 @@ namespace QDKChemistry.Utils.QROMStatePrep {
     /// QROM state preparation using SBM decomposition.
     ///
     /// Prepares: |0⟩^n → Σ_j c_j |j⟩ using n layers of multiplexed Ry rotations.
-    ///
-    /// The phase gradient register must be initialized by the caller. The angle
-    /// ancilla register is allocated internally and returned to |0⟩.
     operation QROMStatePrepare(
         params : QROMStatePrepParams,
         target : Qubit[],
@@ -266,40 +263,5 @@ namespace QDKChemistry.Utils.QROMStatePrep {
             }
         }
         return signTable;
-    }
-
-    /// Test wrapper: run QROM state preparation and leave state for dump_machine.
-    internal operation RunQROMStatePrep(
-        amplitudes : Double[],
-        rotationBitPrecision : Int,
-        numStateQubits : Int,
-    ) : Unit {
-        let qs = QIR.Runtime.AllocateQubitArray(numStateQubits);
-        let params = new QROMStatePrepParams {
-            amplitudes = amplitudes,
-            rotationBitPrecision = rotationBitPrecision,
-            numStateQubits = numStateQubits,
-        };
-        use phaseGradient = Qubit[rotationBitPrecision];
-        within {
-            PreparePhaseGradientState(phaseGradient);
-        } apply {
-            QROMStatePrepare(params, qs, phaseGradient);
-        }
-    }
-
-    /// Test wrapper: run the self-contained callable and leave state for dump_machine.
-    internal operation RunQROMStatePrepViaOp(
-        amplitudes : Double[],
-        rotationBitPrecision : Int,
-        numStateQubits : Int,
-    ) : Unit {
-        let qs = QIR.Runtime.AllocateQubitArray(numStateQubits);
-        let params = new QROMStatePrepParams {
-            amplitudes = amplitudes,
-            rotationBitPrecision = rotationBitPrecision,
-            numStateQubits = numStateQubits,
-        };
-        MakeQROMStatePrepOp(params)(qs);
     }
 }

@@ -77,20 +77,6 @@ class TestSelectSwapLoadsCorrectValues:
 
     @pytest.mark.parametrize("outer_always_valid", [False, True])
     @pytest.mark.parametrize("num_swap_bits", [0, 1, 2])
-    def test_2d_loads_every_address(self, num_swap_bits, outer_always_valid):
-        assert get_qsharp_context().code.QDKChemistry.Utils.SelectSwap.TestSelect2DLoadCorrectness(
-            _DATA_2D, num_swap_bits, outer_always_valid
-        )
-
-    @pytest.mark.parametrize("outer_always_valid", [False, True])
-    @pytest.mark.parametrize("num_swap_bits", [0, 1, 2])
-    def test_2d_loads_every_address_when_outer_length_is_not_a_power_of_two(self, num_swap_bits, outer_always_valid):
-        assert get_qsharp_context().code.QDKChemistry.Utils.SelectSwap.TestSelect2DLoadCorrectness(
-            _DATA_2D_RAGGED_OUTER, num_swap_bits, outer_always_valid
-        )
-
-    @pytest.mark.parametrize("outer_always_valid", [False, True])
-    @pytest.mark.parametrize("num_swap_bits", [0, 1, 2])
     def test_2d_word_loads_every_address(self, num_swap_bits, outer_always_valid):
         assert get_qsharp_context().code.QDKChemistry.Utils.SelectSwap.TestSelect2DLoadWordCorrectness(
             _DATA_2D, num_swap_bits, outer_always_valid
@@ -113,9 +99,8 @@ class TestSelectSwapPreservesAddressPhases:
     plain-select path, or that uncomputes incorrectly, still passes every value test above:
     the damage lands on the phase of the address register, where only these tests see it.
 
-    The 2D sweeps include ``num_swap_bits == 0``. That case is no longer the unary-iteration
-    reference it compares against -- it is the same select-swap construction with an empty
-    butterfly -- so it needs the same check as any other split.
+    The 2D sweeps include ``num_swap_bits == 0`` because the combined flattened lookup with
+    an empty butterfly must preserve the same phases as the unary-iteration reference.
     """
 
     @pytest.mark.parametrize("num_swap_bits", [1, 2, 3])
@@ -125,20 +110,6 @@ class TestSelectSwapPreservesAddressPhases:
     @pytest.mark.parametrize("num_swap_bits", [1, 2])
     def test_1d_swap_path_matches_plain_select_when_length_is_not_a_power_of_two(self, num_swap_bits):
         _assert_phase_agreement("TestSelectSwap1DPhaseAgreement", _DATA_1D_RAGGED, num_swap_bits)
-
-    @pytest.mark.parametrize("outer_always_valid", [False, True])
-    @pytest.mark.parametrize("num_swap_bits", [0, 1, 2])
-    def test_2d_swap_path_matches_plain_select(self, num_swap_bits, outer_always_valid):
-        _assert_phase_agreement("TestSelect2DLoadPhaseAgreement", _DATA_2D, num_swap_bits, outer_always_valid)
-
-    @pytest.mark.parametrize("outer_always_valid", [False, True])
-    @pytest.mark.parametrize("num_swap_bits", [0, 1, 2])
-    def test_2d_swap_path_matches_plain_select_when_outer_length_is_not_a_power_of_two(
-        self, num_swap_bits, outer_always_valid
-    ):
-        _assert_phase_agreement(
-            "TestSelect2DLoadPhaseAgreement", _DATA_2D_RAGGED_OUTER, num_swap_bits, outer_always_valid
-        )
 
     @pytest.mark.parametrize("outer_always_valid", [False, True])
     @pytest.mark.parametrize("num_swap_bits", [0, 1, 2])

@@ -655,9 +655,10 @@ class TestSelectSwapCorrectness:
         ],
     )
     def test_2d_all_addresses(self, n_outer, n_inner, n_bits, num_swap_bits, qdk_ctx):
-        """For each (i, j), Select2DLoad should load data[i][j] into target."""
+        """For each (i, j), Select2DLoadWord should load data[i][j] into target."""
         data = _make_random_data_2d(n_outer, n_inner, n_bits)
-        result = qdk_ctx.eval(f"{_NS}.TestSelect2DLoadCorrectness({_bools_to_qs(data)}, {num_swap_bits}, false)")
+        result = qdk_ctx.eval(f"{_NS}.TestSelect2DLoadWordCorrectness({_bools_to_qs(data)}, {num_swap_bits}, false)")
         assert result, (
-            f"Select2DLoad failed: n_outer={n_outer}, n_inner={n_inner}, n_bits={n_bits}, num_swap_bits={num_swap_bits}"
+            f"Select2DLoadWord failed: n_outer={n_outer}, n_inner={n_inner}, n_bits={n_bits}, "
+            f"num_swap_bits={num_swap_bits}"
         )

@@ -67,10 +67,7 @@ class SOSSAMapper(CircuitMapper):
 
     Emits :math:`B = U^\dagger \cdot \mathrm{Ref}_B \cdot U` on the flat register
     ``[system | ancillas | phase gradient]``. The
-    walk :math:`W = \mathrm{Ref}_{a,B} \cdot B` is left to the caller, which reflects about
-    the ancillas ahead of the phase gradient; that reflection is the generic
-    ``MakeAncillaReflectionOp`` because the ancillas the all-zero state flags are the
-    leading contiguous block.
+    walk :math:`W = \mathrm{Ref}_{a,B} \cdot B` is left to the caller.
     """
 
     def __init__(self):
@@ -104,19 +101,12 @@ class SOSSAMapper(CircuitMapper):
         elif ref.algorithm_name == "qrom":
             # The walk allocates one persistent gradient and hands it to every PREPARE and
             # SELECT, so the outer PREPARE must read that one rather than allocate its own.
-            # `_num_phase_gradient_qubits` sizes the register from this algorithm's
-            # `rotation_bit_precision`, and `_build_walk_oracles` checks the two agree.
             prepare_algorithm.settings().set("allocate_phase_gradient", False)
         circuit = prepare_algorithm.run(container.outer_prepare)
         return circuit._qsharp_op, circuit.metadata.num_phase_gradient_ancillas  # noqa: SLF001
 
     def _hoist_free_rider(self, container: SOSSAWalkContainer) -> bool:
         r"""Whether the free-rider word is loaded once per block encoding rather than per PREPARE.
-
-        Carrying it in the alias table widens the QROAM output word, which the swap network is
-        charged for on each of the four lookups a block encoding performs; hoisting replaces
-        that with one ``Select`` round trip over the conditions. Which wins depends on the
-        shape, so the comparison is left to ``SeparateWordLoadPays``.
 
         Args:
             container: The SOSSA walk container describing the block encoding.

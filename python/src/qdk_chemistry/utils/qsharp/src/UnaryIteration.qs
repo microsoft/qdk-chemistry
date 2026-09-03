@@ -155,20 +155,6 @@ namespace QDKChemistry.Utils.UnaryIteration {
         );
     }
 
-    /// Flips `flags[index]` for the single selected address.
-    internal function MakeTestUnaryIterationOneHotOp(numActions : Int, addressValue : Int) : (Qubit[] => Unit) {
-        return qs => {
-            let numAddressQubits = AddressQubits(numActions);
-            let address = qs[0..numAddressQubits - 1];
-            let flags = qs[numAddressQubits...];
-            ApplyXorInPlace(addressValue, address);
-            UnaryIteration(address, numActions, (index) => {
-                X(flags[index]);
-            });
-            ApplyXorInPlace(addressValue, address);
-        }
-    }
-
     /// Checks the classical action-index mirror against the circuit on every address state.
     internal operation TestUnaryIterationActionIndex(numActions : Int) : Bool {
         let numAddressQubits = AddressQubits(numActions);
