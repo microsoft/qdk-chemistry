@@ -315,7 +315,12 @@ def _resolve_algorithm_name(algorithm_type: str, algorithm_name: str) -> str:
     return algorithm_name
 
 
-def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> Algorithm:
+def create(
+    algorithm_type: str,
+    algorithm_name: str | None = None,
+    *suppress_warnings: bool,
+    **kwargs: Any,
+) -> Algorithm:
     """Create an algorithm instance by type and name.
 
     This function creates an algorithm instance from the registry using the specified
@@ -334,6 +339,8 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
         algorithm_name (str | None): The specific name of the algorithm implementation to create.
 
             If None or empty string, creates the default algorithm for that type.
+
+        suppress_warnings (bool): Positional-only flag that suppresses creation-time warnings.
 
         kwargs: Optional keyword arguments (passed via ``**kwargs``).
 
@@ -361,6 +368,17 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
         >>> default_calc = registry.create("dynamical_correlation_calculator")
 
     """
+    if len(suppress_warnings) > 1:
+        raise TypeError(f"create() takes at most 3 positional arguments ({len(suppress_warnings) + 2} given)")
+    if "suppress_warnings" in kwargs:
+        raise TypeError(
+            "'suppress_warnings' is positional-only to avoid colliding with algorithm Settings. "
+            "Configure a setting with this name on the returned instance."
+        )
+    suppress_warnings_flag = suppress_warnings[0] if suppress_warnings else False
+    if not isinstance(suppress_warnings_flag, bool):
+        raise TypeError("'suppress_warnings' must be a bool")
+
     algorithm_type = _resolve_algorithm_type(algorithm_type)
     if algorithm_name is None:
         algorithm_name = ""
@@ -368,7 +386,7 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             try:
-                instance = factory.create(algorithm_name)
+                instance = factory.create(algorithm_name, suppress_warnings=suppress_warnings_flag)
             except (KeyError, RuntimeError, ValueError) as e:
                 available_algorithms = factory.available()
                 if not available_algorithms:
@@ -498,22 +516,25 @@ def inspect_settings(algorithm_type: str, algorithm_name: str) -> list[tuple[str
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             instance = factory.create(algorithm_name)
-            settings = instance.settings().to_dict()
-            result = []
-            for name, default in settings.items():
-                python_type = instance.settings().get_expected_python_type(name)
-                description = (
-                    instance.settings().get_description(name) if instance.settings().has_description(name) else None
-                )
-                limits = instance.settings().get_limits(name) if instance.settings().has_limits(name) else None
-                result.append((name, python_type, default, description, limits))
-            return result
+            return _inspect_instance_settings(instance)
     available_types = [factory.algorithm_type_name() for factory in __factories]
     raise KeyError(
         f"Algorithm type '{algorithm_type}' is not registered. Available algorithm types: {', '.join(available_types)}"
         "Available algorithm types are influenced by loaded plugins and registered custom algorithms. "
         "Please ensure the relevant plugins are loaded or custom algorithms are registered ahead of calling create()."
     )
+
+
+def _inspect_instance_settings(instance: Algorithm) -> list[tuple[str, str, Any, str | None, Any | None]]:
+    """Inspect settings for an existing algorithm instance."""
+    settings = instance.settings().to_dict()
+    result = []
+    for name, default in settings.items():
+        python_type = instance.settings().get_expected_python_type(name)
+        description = instance.settings().get_description(name) if instance.settings().has_description(name) else None
+        limits = instance.settings().get_limits(name) if instance.settings().has_limits(name) else None
+        result.append((name, python_type, default, description, limits))
+    return result
 
 
 def register(generator: Callable[[], Algorithm]) -> None:

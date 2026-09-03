@@ -257,10 +257,23 @@ class AlgorithmFactory {
    * factory.
    *
    * @param name The name to identify the desired algorithm implementation.
+   * @param suppress_warnings Whether to suppress creation-time warnings.
    * @return A unique pointer to the created algorithm instance.
    * @throws std::runtime_error if the name is not found in the registry.
    */
-  static return_type create(const std::string& name = "") {
+  static return_type create(const std::string& name = "",
+                            bool suppress_warnings = false) {
+    auto instance = create_impl(name);
+    if (!suppress_warnings) {
+      if (const auto message = detail::DeprecationAccess::message(*instance)) {
+        QDK_LOGGER().warn(*message);
+      }
+    }
+    return instance;
+  }
+
+ private:
+  static return_type create_impl(const std::string& name) {
     std::string key = name;
     if (key.empty()) {
       key = Derived::default_algorithm_name();
@@ -295,12 +308,10 @@ class AlgorithmFactory {
           "Algorithm factory for " + Derived::algorithm_type_name() +
           ": Algorithm with name '" + key + "' returned nullptr");
     }
-    if (const auto message = detail::DeprecationAccess::message(*instance)) {
-      QDK_LOGGER().warn(*message);
-    }
     return instance;
   }
 
+ public:
   /**
    * @brief Register a new algorithm implementation.
    *
