@@ -430,8 +430,8 @@ TEST_F(BasisSetTest, Summary) {
 
 TEST_F(BasisSetTest, JSONSerialization) {
   std::vector<Shell> shells;
-  shells.emplace_back(
-      Shell(0, OrbitalType::S, std::vector{1.0}, std::vector{2.0}));
+  shells.emplace_back(0, OrbitalType::S, std::vector{1.0}, std::vector{2.0},
+                      std::vector{0});
   shells.emplace_back(
       Shell(0, OrbitalType::P, std::vector{0.5}, std::vector{1.0}));
 
@@ -440,6 +440,7 @@ TEST_F(BasisSetTest, JSONSerialization) {
   // Test JSON conversion
   auto json_data = basis.to_json();
   EXPECT_FALSE(json_data.empty());
+  EXPECT_FALSE(json_data["atoms"][0]["shells"][0].contains("rpowers"));
 
   // Test round-trip
   auto basis2 = BasisSet::from_json(json_data);

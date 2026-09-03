@@ -375,7 +375,7 @@ class MockEffectiveHamiltonianConstructor(EffectiveHamiltonianConstructor):
         """Return the algorithm name."""
         return "mock_effective_hamiltonian_constructor"
 
-    def _run_impl(self, reference, hamiltonian, p_indices):
+    def _run_impl(self, reference, hamiltonian, p_indices, auxiliary_bases):  # noqa: ARG002
         """Validate the inputs and echo the Hamiltonian for the inheritance test."""
         self._validate_inputs(reference, hamiltonian, p_indices)
         return hamiltonian

@@ -9,6 +9,7 @@
 
 #include <cstdint>
 #include <libint2.hpp>  // for Shell class
+#include <qdk/chemistry/data/auxiliary_basis.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 
@@ -98,6 +99,16 @@ nlohmann::ordered_json convert_to_json(
     const qdk::chemistry::data::BasisSet& basis_set);
 
 /**
+ * @brief Convert a qdk::chemistry::data::AuxiliaryBasis to JSON format
+ *
+ * @param auxiliary_basis The qdk::chemistry::data::AuxiliaryBasis object to
+ * convert.
+ * @return A nlohmann::ordered_json object representing the auxiliary basis.
+ */
+nlohmann::ordered_json convert_to_json(
+    const qdk::chemistry::data::AuxiliaryBasis& auxiliary_basis);
+
+/**
  * @brief Convert a qdk::chemistry::data::Shell to JSON format
  *
  * This function converts a qdk::chemistry::data::Shell object into a JSON
@@ -141,6 +152,24 @@ qdk::chemistry::data::BasisSet convert_basis_set_to_qdk(
  */
 std::shared_ptr<qcs::BasisSet> convert_basis_set_from_qdk(
     const qdk::chemistry::data::BasisSet& qdk_basis_set, bool normalize = true);
+
+/**
+ * @brief Convert a qdk::chemistry::data::AuxiliaryBasis to the internal library
+ * BasisSet
+ *
+ * Auxiliary bases carry no ECP data, so the internal basis set is built from
+ * the auxiliary shells and the structure alone.
+ *
+ * @param qdk_auxiliary_basis The qdk::chemistry::data::AuxiliaryBasis object to
+ * convert.
+ * @param normalize Whether to normalize the basis set after conversion.
+ * Default is true.
+ * @return A std::shared_ptr<BasisSet> representing the same basis set data.
+ * @throws std::runtime_error If the auxiliary basis is not spherical (pure)
+ */
+std::shared_ptr<qcs::BasisSet> convert_auxiliary_basis_from_qdk(
+    const qdk::chemistry::data::AuxiliaryBasis& qdk_auxiliary_basis,
+    bool normalize = true);
 
 /**
  * @brief Compute a mapping between QDK and internal basis set shells

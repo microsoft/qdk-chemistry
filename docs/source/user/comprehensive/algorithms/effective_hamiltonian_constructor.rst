@@ -43,7 +43,7 @@ The interface does not prescribe how the coupling blocks :math:`H_{PQ}` and :mat
 Using the EffectiveHamiltonianConstructor
 -----------------------------------------
 
-The ``run`` method takes a reference wavefunction, a full-window Hamiltonian, and the target-space indices and returns the effective Hamiltonian acting in :math:`P`.
+The ``run`` method takes a reference wavefunction, a full-window Hamiltonian, the target-space indices, and optionally a collection of auxiliary bases, and returns the effective Hamiltonian acting in :math:`P`.
 
 Input requirements
 ~~~~~~~~~~~~~~~~~~
@@ -59,6 +59,10 @@ Input Hamiltonian
 Target-space indices
    A :class:`~qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet` containing the indices of :math:`P`.
    These are absolute molecular-orbital indices, drawn from the same index universe as ``Orbitals.active_indices()``, and must lie within the active space of :math:`W`.
+
+Auxiliary bases (optional)
+   An :class:`~qdk_chemistry.data.AuxiliaryBasisCollection` carrying the secondary Gaussian bases a method may need, such as the complementary auxiliary basis set (CABS) of an explicitly correlated method.
+   Implementations that do not need one ignore this argument.
 
 Output contract
 ~~~~~~~~~~~~~~~
@@ -84,8 +88,23 @@ See :doc:`Settings <settings>` for a general treatment of algorithm settings in 
 Available implementations
 -------------------------
 
-QDK/Chemistry currently provides the :class:`~qdk_chemistry.algorithms.EffectiveHamiltonianConstructor` interface but no concrete implementation or default factory choice.
-Creation, configuration, and execution examples will be added with the first concrete implementation.
+QDK/Chemistry provides :class:`~qdk_chemistry.algorithms.QdkCtF12HamiltonianConstructor` (``"qdk_ct_f12"``), the default choice for this algorithm type.
+It applies an approximate canonical (unitary) similarity transformation of the molecular Hamiltonian with a fixed-amplitude Slater-type geminal generator, producing an a priori Hermitian two-body effective Hamiltonian over :math:`P`.
+Its complementary auxiliary basis (CABS) is the external space the transformation folds in, so it is required: pass it as the ``AuxiliaryBasisRole.CABS`` entry of ``auxiliary_bases``.
+Its ``frozen_core`` setting is independent of ``p_indices``: it selects which electrons are correlated at the F12 level, whereas ``p_indices`` selects which orbitals the emitted Hamiltonian acts on.
+The Slater exponent ``gamma`` defaults to ``1.0`` and must satisfy ``0 < gamma <= 100``.
+The example below sets ``gamma=1.5`` explicitly because that value is used by the published neon CT-F12 benchmarks.
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+    from qdk_chemistry.data import AuxiliaryBasis, AuxiliaryBasisCollection, AuxiliaryBasisRole
+
+    cabs = AuxiliaryBasisCollection(
+        {AuxiliaryBasisRole.CABS: AuxiliaryBasis.from_basis_name("aug-cc-pvdz-optri", structure)}
+    )
+    constructor = alg.create("effective_hamiltonian_constructor", gamma=1.5, frozen_core=1)
+    dressed = constructor.run(reference, hamiltonian, p_indices, cabs)
 
 Related classes
 ---------------
@@ -93,6 +112,7 @@ Related classes
 - :class:`~qdk_chemistry.data.Wavefunction`: Provides the reference state
 - :class:`~qdk_chemistry.data.Hamiltonian`: Represents the full-window input and target-space output Hamiltonians
 - :class:`~qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet`: Identifies the target orbital space while preserving symmetry blocks
+- :class:`~qdk_chemistry.data.AuxiliaryBasisCollection`: Carries the optional auxiliary bases
 - :doc:`HamiltonianConstructor <hamiltonian_constructor>`: Builds the input Hamiltonian over the orbital window
 
 Further reading

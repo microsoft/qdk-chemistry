@@ -33,7 +33,8 @@ class TestEffectiveHamiltonianConstructor
  protected:
   std::shared_ptr<Hamiltonian> _run_impl(
       std::shared_ptr<Wavefunction>, std::shared_ptr<Hamiltonian> hamiltonian,
-      std::shared_ptr<const SymmetryBlockedIndexSet>) const override {
+      std::shared_ptr<const SymmetryBlockedIndexSet>,
+      std::shared_ptr<const AuxiliaryBasisCollection>) const override {
     return hamiltonian;
   }
 };
@@ -86,7 +87,9 @@ TEST(EffectiveHamiltonianConstructorTest, MetaData) {
 }
 
 TEST(EffectiveHamiltonianConstructorTest, Factory) {
-  EXPECT_TRUE(EffectiveHamiltonianConstructorFactory::available().empty());
+  EXPECT_TRUE(EffectiveHamiltonianConstructorFactory::has("qdk_ct_f12"));
+  EXPECT_EQ(EffectiveHamiltonianConstructorFactory::create()->name(),
+            "qdk_ct_f12");
   EXPECT_THROW(
       EffectiveHamiltonianConstructorFactory::create("nonexistent_constructor"),
       std::runtime_error);
