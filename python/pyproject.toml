@@ -92,6 +92,11 @@ docs = [
   "sphinxcontrib-bibtex",
   "sphinx_copybutton"
 ]
+fuzz = [
+  "hypothesis>=6",
+  "hypothesis-jsonschema>=0.23",
+  "pytest"
+]
 jupyter = [
   "ipykernel>=6.0",
   "pandas>=2.0.0",
@@ -126,6 +131,7 @@ qre = [
 ]
 test = [
   "qdk-chemistry[coverage,discovery,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre]",
+  "qdk-chemistry[fuzz]",
   "qdk-chemistry[mcp]; sys_platform != 'win32' or platform_machine != 'ARM64'",
   "nbclient",
   "nbformat",
