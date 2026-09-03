@@ -17,45 +17,6 @@
 
 namespace qdk::chemistry::data {
 
-namespace {
-
-/// Cross-check the rank/basis/copy recorded in a serialized payload
-/// against the buffers. Shared by the JSON and HDF5 readers.
-void validate_stored_shape(std::size_t num_ranks, std::size_t num_bases,
-                           std::size_t num_copies, Eigen::Index u_size,
-                           Eigen::Index w_size, const Eigen::MatrixXd& wb) {
-  const auto mismatch = [](const std::string& what, std::size_t expected,
-                           std::size_t found) {
-    throw std::invalid_argument("FactorizedHamiltonianContainer: serialized " +
-                                what + " is " + std::to_string(found) +
-                                " but the stored buffers imply " +
-                                std::to_string(expected) + ".");
-  };
-
-  if (static_cast<std::size_t>(wb.rows()) != num_ranks) {
-    mismatch("num_ranks", static_cast<std::size_t>(wb.rows()), num_ranks);
-  }
-  if (static_cast<std::size_t>(wb.cols()) != num_copies) {
-    mismatch("num_copies", static_cast<std::size_t>(wb.cols()), num_copies);
-  }
-  if (num_ranks == 0 || num_bases == 0) {
-    throw std::invalid_argument(
-        "FactorizedHamiltonianContainer: serialized num_ranks and num_bases "
-        "must both be non-zero.");
-  }
-  const std::size_t expected_w = num_ranks * num_bases * num_copies;
-  if (static_cast<std::size_t>(w_size) != expected_w) {
-    mismatch("w_matrices length", expected_w, static_cast<std::size_t>(w_size));
-  }
-  if (static_cast<std::size_t>(u_size) % (num_ranks * num_bases) != 0) {
-    throw std::invalid_argument(
-        "FactorizedHamiltonianContainer: serialized u_matrices length " +
-        std::to_string(u_size) + " is not a multiple of num_ranks*num_bases.");
-  }
-}
-
-}  // namespace
-
 FactorizedHamiltonianContainer::FactorizedHamiltonianContainer(
     double core_energy, const Eigen::VectorXd& u_matrices,
     const Eigen::VectorXd& w_matrices, const Eigen::MatrixXd& wb_matrix,
@@ -253,14 +214,64 @@ double FactorizedHamiltonianContainer::get_energy_gap() const {
   return _energy_gap;
 }
 
-double FactorizedHamiltonianContainer::get_lambda() const {
-  // norm (Eq. 34):
-  // Λ = Σ|eig(h1_prime)| + 1/4 Σ_{rc} (|WB^{rc}| + Σ_b |W^{rc}_b|)^2.
+double FactorizedHamiltonianContainer::get_lambda_eff() const {
+  // :cite:`Low2025` (Eq. 11): λ_eff = √(E_gap·(2Λ - E_gap)).
+  if ((_signs.array() < 0.0).any() || !(_energy_gap > 0.0)) return 0.0;
+
+  const double lambda = get_lambda();
+  if (!(_energy_gap < 2.0 * lambda)) return 0.0;
+
+  return std::sqrt(_energy_gap * (2.0 * lambda - _energy_gap));
+}
+
+Eigen::MatrixXd FactorizedHamiltonianContainer::get_h1_prime() const {
+  // Adjusted one-body matrix h^(1)' :cite:`Low2025` (Eq. 36).
+  // Writing the rank-r copy-c leaf as
+  //   M^{rc}_{pq} = Σ_{b∈[B]} w_b^{rc} u^r_{b,p} u^r_{b,q},
+  // the three accumulated corrections are
+  //   h1'_{pq} = h1_{pq} - ½ Σ_{rc} s_r (M^{rc} M^{rc})_{pq}  (a) normal-order
+  //                      + Σ_{rc} s_r tr(M^{rc}) M^{rc}_{pq}  (b)
+  //                      - Σ_{rc} s_r wB^{rc} M^{rc}_{pq}     (c)
   //
-  // The per-rank signs are absent on purpose: every two-body contribution
-  // enters through an absolute value and |s_r| = 1, so a negated fragment has
-  // exactly the same 1-norm. They do still reach this function indirectly,
-  // through get_h1_prime().
+  // Term (a) has no counterpart in Eq. 36 as printed, because the paper writes
+  // the two-body term as a plain product of E operators while this container
+  // stores h2 = (pq|rs) normal-ordered, i.e.
+  //   H = E_core + Σ h1_{pq} E_pq + ½ Σ h2_{pqrs} (E_pq E_rs - δ_qr E_ps).
+  // Unpacking that -½ δ_qr E_ps piece leaves the one-body remainder
+  // -½ Σ_s h2_{pssq} = -½ Σ_{rc} s_r (M^{rc} M^{rc})_{pq}.
+  size_t norb = get_num_orbitals();
+  size_t R = get_num_ranks();
+  size_t B = get_num_bases();
+  size_t C = get_num_copies();
+
+  auto [h1_alpha, h1_beta] = get_one_body_integrals();
+  Eigen::MatrixXd h1 = 0.5 * (h1_alpha + h1_beta);
+
+  for (size_t r = 0; r < R; ++r) {
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
+                                   Eigen::RowMajor>>
+        Ur(_u.data() + r * B * norb, B, norb);
+
+    const double sign = _signs(r);
+
+    for (size_t c = 0; c < C; ++c) {
+      Eigen::MatrixXd scaled(B, norb);
+      for (size_t b = 0; b < B; ++b) {
+        double w_rbc = _w(r * B * C + b * C + c);
+        scaled.row(b) = w_rbc * Ur.row(b);
+      }
+
+      Eigen::MatrixXd Mrc = Ur.transpose() * scaled;
+      h1.noalias() -= 0.5 * sign * (Mrc * Mrc);
+      h1 += sign * Mrc.trace() * Mrc;
+      h1 -= sign * _wb(r, c) * Mrc;
+    }
+  }
+
+  return h1;
+}
+
+double FactorizedHamiltonianContainer::get_lambda() const {
   Eigen::MatrixXd h1p = get_h1_prime();
   Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(h1p);
   if (solver.info() != Eigen::Success) {
@@ -292,84 +303,6 @@ double FactorizedHamiltonianContainer::get_lambda() const {
 
   return one_body_norm + 0.25 * two_body_norm;
 }
-
-double FactorizedHamiltonianContainer::get_lambda_eff() const {
-  // Effective SOS-walk normalization (Eq. 12): λ_eff = √(E_gap·(2Λ - E_gap)).
-  double lambda = get_lambda();
-  if (_energy_gap <= 0.0) {
-    throw std::runtime_error("E_gap must be positive for a valid SOS walk");
-  }
-  if (_energy_gap >= 2.0 * lambda) {
-    throw std::runtime_error(
-        "E_gap must be less than 2*Lambda for a valid SOS walk");
-  }
-  return std::sqrt(_energy_gap * (2.0 * lambda - _energy_gap));
-}
-
-Eigen::MatrixXd FactorizedHamiltonianContainer::get_h1_prime() const {
-  // Adjusted one-body matrix h^(1)' (Eq. 37). Writing the rank-r copy-c leaf as
-  //   M^{rc}_{pq} = Σ_{b∈[B]} w_b^{rc} u^r_{b,p} u^r_{b,q},
-  // the three accumulated corrections are
-  //   h1'_{pq} = h1_{pq} - ½ Σ_{rc} s_r (M^{rc} M^{rc})_{pq}  (a) normal-order
-  //                      + Σ_{rc} s_r tr(M^{rc}) M^{rc}_{pq}  (b)
-  //                      - Σ_{rc} s_r wB^{rc} M^{rc}_{pq}     (c)
-  //
-  // All three carry the rank's sign s_r: they are the one-body residue of the
-  // single fragment operator s_r (Σ_b w_b n_b - wB)², so negating the fragment
-  // negates the square, the cross term and the trace correction together.
-  //
-  // Term (a) has no counterpart in Eq. 37 as printed, because the paper writes
-  // the two-body term as a plain product of E operators while this container
-  // stores h2 = (pq|rs) normal-ordered, i.e.
-  //   H = E_core + Σ h1_{pq} E_pq + ½ Σ h2_{pqrs} (E_pq E_rs - δ_qr E_ps).
-  // Unpacking that -½ δ_qr E_ps piece leaves the one-body remainder
-  // -½ Σ_s h2_{pssq} = -½ Σ_{rc} s_r (M^{rc} M^{rc})_{pq}. Dropping it would
-  // make h1' -- and hence Λ -- silently wrong. See also the docstring in
-  // factorized.hpp, which lists all three terms.
-  size_t norb = get_num_orbitals();
-  size_t R = get_num_ranks();
-  size_t B = get_num_bases();
-  size_t C = get_num_copies();
-
-  auto [h1_alpha, h1_beta] = get_one_body_integrals();
-  Eigen::MatrixXd h1 = 0.5 * (h1_alpha + h1_beta);
-
-  // h2[p,q,r,s] = Σ_rank Σ_c s_rank * M_rc[p,q] * M_rc[r,s]
-  // where M_rc[p,q] = Σ_b W[rank,b,c] * U[rank,b,p] * U[rank,b,q]
-  //                  = (U_r^T * diag(w_c) * U_r)[p,q]
-  for (size_t r = 0; r < R; ++r) {
-    // Map U_r as [B x norb] row-major: _u[r*B*norb + b*norb + p]
-    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
-                                   Eigen::RowMajor>>
-        Ur(_u.data() + r * B * norb, B, norb);
-
-    const double sign = _signs(r);
-
-    for (size_t c = 0; c < C; ++c) {
-      // Build scaled = diag(w[r,:,c]) * U_r,  shape [B x norb]
-      Eigen::MatrixXd scaled(B, norb);
-      for (size_t b = 0; b < B; ++b) {
-        double w_rbc = _w(r * B * C + b * C + c);
-        scaled.row(b) = w_rbc * Ur.row(b);
-      }
-
-      // M_rc = U_r^T * scaled = U_r^T * diag(w_c) * U_r,  shape [N x N]
-      Eigen::MatrixXd Mrc = Ur.transpose() * scaled;
-
-      // h1 -= 0.5 * s_r * M_rc^2  (contraction of einsum "prrq")
-      h1.noalias() -= 0.5 * sign * (Mrc * Mrc);
-
-      // h1 += s_r * tr(M_rc) * M_rc  (contraction of einsum "pqrr")
-      h1 += sign * Mrc.trace() * Mrc;
-
-      // h1 -= s_r * wb[r,c] * M_rc  (wb term)
-      h1 -= sign * _wb(r, c) * Mrc;
-    }
-  }
-
-  return h1;
-}
-
 // === Serialization ===
 
 nlohmann::json FactorizedHamiltonianContainer::to_json() const {
@@ -393,8 +326,7 @@ nlohmann::json FactorizedHamiltonianContainer::to_json() const {
       (_type == HamiltonianType::Hermitian) ? "Hermitian" : "NonHermitian";
   j["is_restricted"] = is_restricted();
 
-  // Orbitals are guaranteed non-null by the base container constructor, so
-  // this is unconditional and from_json() can read it back the same way.
+  // Orbitals are guaranteed non-null by the base container constructor.
   j["orbitals"] = _orbitals->to_json();
 
   if (has_inactive_fock_matrix()) {
@@ -414,25 +346,18 @@ FactorizedHamiltonianContainer::from_json(const nlohmann::json& j) {
   auto u = json_to_vector(j.at("u_matrices"));
   auto w = json_to_vector(j.at("w_matrices"));
   auto wb = json_to_matrix(j.at("wb_matrix"));
-  // Optional: an absent sign vector reads as an all-positive factorization,
-  // matching the constructor's default.
-  Eigen::VectorXd signs;
-  if (j.contains("signs")) {
-    signs = json_to_vector(j.at("signs"));
-  }
+  auto signs = json_to_vector(j.at("signs"));
   double core_energy = j.at("core_energy");
   double energy_gap = j.at("energy_gap");
+  const std::size_t num_ranks = j.at("num_ranks").get<std::size_t>();
+  const std::size_t num_bases = j.at("num_bases").get<std::size_t>();
+  const std::size_t num_copies = j.at("num_copies").get<std::size_t>();
 
   // Optional: an absent "type" key defaults to Hermitian.
   HamiltonianType type = HamiltonianType::Hermitian;
   if (j.contains("type") && j.at("type").get<std::string>() == "NonHermitian") {
     type = HamiltonianType::NonHermitian;
   }
-
-  validate_stored_shape(j.at("num_ranks").get<std::size_t>(),
-                        j.at("num_bases").get<std::size_t>(),
-                        j.at("num_copies").get<std::size_t>(), u.size(),
-                        w.size(), wb);
 
   auto orbitals = Orbitals::from_json(j.at("orbitals"));
 
@@ -441,8 +366,16 @@ FactorizedHamiltonianContainer::from_json(const nlohmann::json& j) {
     fock = json_to_matrix(j.at("inactive_fock_matrix"));
   }
 
-  return std::make_unique<FactorizedHamiltonianContainer>(
+  auto container = std::make_unique<FactorizedHamiltonianContainer>(
       core_energy, u, w, wb, h1, fock, orbitals, signs, energy_gap, type);
+  if (container->get_num_ranks() != num_ranks ||
+      container->get_num_bases() != num_bases ||
+      container->get_num_copies() != num_copies) {
+    throw std::invalid_argument(
+        "FactorizedHamiltonianContainer: serialized shape does not match the "
+        "factor buffers.");
+  }
+  return container;
 }
 
 void FactorizedHamiltonianContainer::to_hdf5(H5::Group& group) const {
@@ -557,14 +490,7 @@ FactorizedHamiltonianContainer::from_hdf5(H5::Group& group) {
   auto u = load_vector_from_group(group, "u_matrices");
   auto w = load_vector_from_group(group, "w_matrices");
   auto wb = load_matrix_from_group(group, "wb_matrix");
-  // Optional: an absent sign vector means an all-positive factorization.
-  Eigen::VectorXd signs;
-  if (group.nameExists("signs")) {
-    signs = load_vector_from_group(group, "signs");
-  }
-
-  validate_stored_shape(num_ranks, num_bases, num_copies, u.size(), w.size(),
-                        wb);
+  auto signs = load_vector_from_group(group, "signs");
 
   H5::Group orb_group = group.openGroup("orbitals");
   std::shared_ptr<Orbitals> orbitals = Orbitals::from_hdf5(orb_group);
@@ -574,8 +500,16 @@ FactorizedHamiltonianContainer::from_hdf5(H5::Group& group) {
     fock = load_matrix_from_group(group, "inactive_fock_matrix");
   }
 
-  return std::make_unique<FactorizedHamiltonianContainer>(
+  auto container = std::make_unique<FactorizedHamiltonianContainer>(
       core_energy, u, w, wb, h1, fock, orbitals, signs, energy_gap, type);
+  if (container->get_num_ranks() != num_ranks ||
+      container->get_num_bases() != num_bases ||
+      container->get_num_copies() != num_copies) {
+    throw std::invalid_argument(
+        "FactorizedHamiltonianContainer: serialized shape does not match the "
+        "factor buffers.");
+  }
+  return container;
 }
 
 // === Validation ===
@@ -587,14 +521,13 @@ void FactorizedHamiltonianContainer::validate_integral_dimensions() const {
   size_t norb = get_num_orbitals();
   size_t R = get_num_ranks();
   size_t C = get_num_copies();
-
   if (R == 0) {
     throw std::invalid_argument(
-        "WB matrix must have at least one rank (row), got 0.");
+        "Factorized Hamiltonian must have at least one rank, got 0.");
   }
   if (C == 0) {
     throw std::invalid_argument(
-        "WB matrix must have at least one copy (column), got 0.");
+        "Factorized Hamiltonian must have at least one copy, got 0.");
   }
   if (norb == 0) {
     throw std::invalid_argument("Number of active orbitals must be positive.");
@@ -606,6 +539,10 @@ void FactorizedHamiltonianContainer::validate_integral_dimensions() const {
         " (R=" + std::to_string(R) + ", N=" + std::to_string(norb) + ").");
   }
   size_t B = static_cast<size_t>(_u.size()) / (R * norb);
+  if (B == 0) {
+    throw std::invalid_argument(
+        "Factorized Hamiltonian must have at least one basis, got 0.");
+  }
   size_t expected_w = R * B * C;
   if (static_cast<size_t>(_w.size()) != expected_w) {
     throw std::invalid_argument(

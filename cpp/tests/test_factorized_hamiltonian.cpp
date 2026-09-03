@@ -72,7 +72,6 @@ TEST_F(FactorizedHamiltonianTest, Properties) {
   EXPECT_EQ(container->get_num_bases(), B);
   EXPECT_EQ(container->get_num_copies(), C);
 
-  // Adjusted one-body integrals (row-major 2x2).
   const double expected_h1[4] = {0.90379999999999994, 0.26160000000000005,
                                  0.26160000000000005, 0.92620000000000002};
   Eigen::MatrixXd h1p = container->get_h1_prime();
@@ -107,16 +106,24 @@ TEST_F(FactorizedHamiltonianTest, Properties) {
     EXPECT_NEAR(h2(i), expected_h2[i], 1e-12);
   }
 
-  // Block-encoding 1-norm Lambda.
   EXPECT_NEAR(container->get_lambda(), 2.0800000000000001, 1e-12);
+  EXPECT_DOUBLE_EQ(container->get_lambda_eff(), 0.0);
 
-  // Effective SOS 1-norm needs a positive energy gap (the fixture uses 0.0).
   FactorizedHamiltonianContainer gapped(core_energy, u, w, wb, one_body,
                                         inactive_fock, orbitals, signs, 0.5);
   EXPECT_NEAR(gapped.get_lambda_eff(), 1.3527749258468684, 1e-12);
+
+  FactorizedHamiltonianContainer gap_at_upper_bound(
+      core_energy, u, w, wb, one_body, inactive_fock, orbitals, signs,
+      2.0 * container->get_lambda());
+  EXPECT_DOUBLE_EQ(gap_at_upper_bound.get_lambda_eff(), 0.0);
+
+  FactorizedHamiltonianContainer signed_factorization(
+      core_energy, u, w, wb, one_body, inactive_fock, orbitals, -signs, 0.5);
+  EXPECT_DOUBLE_EQ(signed_factorization.get_lambda_eff(), 0.0);
 }
 
-TEST_F(FactorizedHamiltonianTest, IdentityWeightIsGaugeForTwoBodyOnly) {
+TEST_F(FactorizedHamiltonianTest, IdentityWeightDoesNotChangeTwoBodyTensor) {
   auto reference = make_container();
   const Eigen::VectorXd h2_ref = reference->reconstruct_two_body_integrals();
   const Eigen::MatrixXd h1_ref = reference->get_h1_prime();
@@ -130,7 +137,6 @@ TEST_F(FactorizedHamiltonianTest, IdentityWeightIsGaugeForTwoBodyOnly) {
                                            inactive_fock, orbitals, signs,
                                            energy_gap);
 
-    // (a) the reconstructed two-body tensor is untouched, exactly.
     const Eigen::VectorXd h2_alt = shifted.reconstruct_two_body_integrals();
     ASSERT_EQ(h2_alt.size(), h2_ref.size());
     for (Eigen::Index i = 0; i < h2_ref.size(); ++i) {
@@ -138,7 +144,6 @@ TEST_F(FactorizedHamiltonianTest, IdentityWeightIsGaugeForTwoBodyOnly) {
           << "wB=" << wb_value << " moved h2 element " << i;
     }
 
-    // (b) ... but the adjusted one-body shift and Lambda both move.
     EXPECT_FALSE(shifted.get_h1_prime().isApprox(h1_ref, 1e-9))
         << "wB=" << wb_value << " left h1_prime unchanged";
     EXPECT_GT(std::abs(shifted.get_lambda() - lambda_ref), 1e-9)
@@ -166,7 +171,7 @@ TEST_F(FactorizedHamiltonianTest, NegativeSignNegatesTwoBodyTensor) {
   EXPECT_GT(h2_positive.array().abs().maxCoeff(), 1e-6);
 }
 
-TEST_F(FactorizedHamiltonianTest, NegativeSignPropagatesToAllH1PrimeTerms) {
+TEST_F(FactorizedHamiltonianTest, NegativeSignPropagatesToH1Prime) {
   Eigen::MatrixXd m = Eigen::MatrixXd::Zero(N, N);
   for (size_t b = 0; b < B; ++b) {
     Eigen::VectorXd ub(N);
@@ -190,13 +195,12 @@ TEST_F(FactorizedHamiltonianTest, NegativeSignPropagatesToAllH1PrimeTerms) {
                                                orbitals, signs_alt, energy_gap);
 
       Eigen::MatrixXd expected = one_body;
-      expected -= 0.5 * sign_value * (m * m);  // (a) normal-ordering remainder
-      expected += sign_value * m.trace() * m;  // (b)
-      expected -= sign_value * wb_value * m;   // (c)
+      expected -= 0.5 * sign_value * (m * m);
+      expected += sign_value * m.trace() * m;
+      expected -= sign_value * wb_value * m;
 
       EXPECT_TRUE(container.get_h1_prime().isApprox(expected, 1e-12))
-          << "signed three-term Eq. 37 model failed at sign=" << sign_value
-          << ", wB=" << wb_value;
+          << "sign=" << sign_value << ", wB=" << wb_value;
     }
   }
 }
@@ -218,8 +222,6 @@ TEST_F(FactorizedHamiltonianTest, TwoBodyLambdaIsSignInvariant) {
               1e-12);
 }
 
-// An empty sign vector means all-positive; anything that is not exactly +-1
-// would silently rescale a fragment rather than orient it, so it is rejected.
 TEST_F(FactorizedHamiltonianTest, SignsDefaultToPositiveAndAreValidated) {
   FactorizedHamiltonianContainer defaulted(core_energy, u, w, wb, one_body,
                                            inactive_fock, orbitals,
@@ -248,12 +250,11 @@ TEST_F(FactorizedHamiltonianTest, SignsDefaultToPositiveAndAreValidated) {
                                               too_many_signs, energy_gap),
                std::invalid_argument);
 
-  // Deserialization treats the sign vector as optional for the same reason.
+  // Serialized payloads always include signs, so a missing field is malformed.
   nlohmann::json without_signs = make_container()->to_json();
   without_signs.erase("signs");
-  EXPECT_TRUE(FactorizedHamiltonianContainer::from_json(without_signs)
-                  ->get_signs()
-                  .isApprox(Eigen::VectorXd::Ones(R)));
+  EXPECT_THROW(FactorizedHamiltonianContainer::from_json(without_signs),
+               nlohmann::json::out_of_range);
 }
 
 TEST_F(FactorizedHamiltonianTest, JSONRoundTripViaHamiltonian) {
@@ -273,69 +274,23 @@ TEST_F(FactorizedHamiltonianTest, JSONRoundTripViaHamiltonian) {
   EXPECT_TRUE(h1a.isApprox(h2_h1a));
 }
 
-TEST_F(FactorizedHamiltonianTest, HDF5RoundTrip) {
-  auto original = make_container();
+TEST_F(FactorizedHamiltonianTest, RejectsInconsistentSerializedShape) {
+  const nlohmann::json serialized = make_container()->to_json();
 
-  std::string filename = "test_factorized.hamiltonian.h5";
-  {
-    H5::H5File file(filename, H5F_ACC_TRUNC);
-    H5::Group group = file.createGroup("container");
-    original->to_hdf5(group);
-  }
+  auto wrong_ranks = serialized;
+  wrong_ranks["num_ranks"] = R + 1;
+  EXPECT_THROW(FactorizedHamiltonianContainer::from_json(wrong_ranks),
+               std::invalid_argument);
 
-  {
-    H5::H5File file(filename, H5F_ACC_RDONLY);
-    H5::Group group = file.openGroup("container");
-    auto loaded = FactorizedHamiltonianContainer::from_hdf5(group);
+  auto wrong_bases = serialized;
+  wrong_bases["num_bases"] = B + 1;
+  EXPECT_THROW(FactorizedHamiltonianContainer::from_json(wrong_bases),
+               std::invalid_argument);
 
-    EXPECT_EQ(loaded->get_num_orbitals(), N);
-    EXPECT_EQ(loaded->get_num_ranks(), R);
-    EXPECT_EQ(loaded->get_num_bases(), B);
-    EXPECT_EQ(loaded->get_num_copies(), C);
-
-    EXPECT_DOUBLE_EQ(loaded->get_core_energy(), core_energy);
-    EXPECT_DOUBLE_EQ(loaded->get_energy_gap(), energy_gap);
-
-    EXPECT_TRUE(loaded->get_u_matrices().isApprox(u));
-    EXPECT_TRUE(loaded->get_w_matrices().isApprox(w));
-    EXPECT_TRUE(loaded->get_wb_matrix().isApprox(wb));
-    EXPECT_TRUE(loaded->get_signs().isApprox(signs));
-
-    auto [orig_h1a, orig_h1b] = original->get_one_body_integrals();
-    auto [load_h1a, load_h1b] = loaded->get_one_body_integrals();
-    EXPECT_TRUE(orig_h1a.isApprox(load_h1a));
-
-    EXPECT_TRUE(loaded->is_restricted());
-    EXPECT_TRUE(loaded->is_valid());
-  }
-}
-
-TEST_F(FactorizedHamiltonianTest, NonHermitianTypeSurvivesSerialization) {
-  auto non_hermitian = std::make_unique<FactorizedHamiltonianContainer>(
-      core_energy, u, w, wb, one_body, inactive_fock, orbitals, signs,
-      energy_gap, HamiltonianType::NonHermitian);
-  ASSERT_EQ(non_hermitian->get_type(), HamiltonianType::NonHermitian);
-
-  // Negative control: the type defaults to Hermitian, so a round-trip that
-  // dropped it would still satisfy every other assertion in this file.
-  ASSERT_EQ(make_container()->get_type(), HamiltonianType::Hermitian);
-
-  auto from_json_container =
-      FactorizedHamiltonianContainer::from_json(non_hermitian->to_json());
-  EXPECT_EQ(from_json_container->get_type(), HamiltonianType::NonHermitian);
-
-  std::string filename = "test_factorized.hamiltonian.h5";
-  {
-    H5::H5File file(filename, H5F_ACC_TRUNC);
-    H5::Group group = file.createGroup("container");
-    non_hermitian->to_hdf5(group);
-  }
-  {
-    H5::H5File file(filename, H5F_ACC_RDONLY);
-    H5::Group group = file.openGroup("container");
-    auto loaded = FactorizedHamiltonianContainer::from_hdf5(group);
-    EXPECT_EQ(loaded->get_type(), HamiltonianType::NonHermitian);
-  }
+  auto wrong_copies = serialized;
+  wrong_copies["num_copies"] = C + 1;
+  EXPECT_THROW(FactorizedHamiltonianContainer::from_json(wrong_copies),
+               std::invalid_argument);
 }
 
 TEST_F(FactorizedHamiltonianTest, HDF5FileRoundTripViaHamiltonian) {

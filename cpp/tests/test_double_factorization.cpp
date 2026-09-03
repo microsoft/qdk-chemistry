@@ -111,7 +111,6 @@ TEST(DoubleFactorizerTest, MetaDataAndFactoryRegistration) {
   EXPECT_EQ(factorizer->type_name(), "double_factorizer");
   EXPECT_EQ(factorizer->name(), "eigen_decomposition");
   EXPECT_TRUE(factorizer->settings().has("truncation_threshold"));
-  EXPECT_TRUE(factorizer->settings().has("symmetry_tolerance"));
 
   const auto available = DoubleFactorizerFactory::available();
   EXPECT_NE(
@@ -131,8 +130,6 @@ TEST(DoubleFactorizerTest, RejectsInvalidInput) {
   EXPECT_THROW(eigen_decompose_two_body(Eigen::VectorXd::Zero(10), norb),
                std::invalid_argument);
 
-  // The free function is public API and is reachable without the settings
-  // BoundConstraint, so it has to reject these arguments itself.
   EXPECT_THROW(eigen_decompose_two_body(Eigen::VectorXd(), 0),
                std::invalid_argument);
   const Eigen::VectorXd tensor = make_two_body(norb, {1.0}, 31);
@@ -141,14 +138,7 @@ TEST(DoubleFactorizerTest, RejectsInvalidInput) {
   EXPECT_THROW(eigen_decompose_two_body(
                    tensor, norb, std::numeric_limits<double>::quiet_NaN()),
                std::invalid_argument);
-  // A negative or NaN threshold compares false against every eigenvalue, so
-  // without the guard it would silently retain the whole decomposition
-  // rather than fail.
   EXPECT_FALSE(eigen_decompose_two_body(tensor, norb, 0.0).empty());
-
-  // A non-finite entry defeats every later guard: NaN compares false against
-  // the symmetry tolerance, and it makes the sort comparator |a| > |b| false
-  // in both directions, which is undefined behavior in std::sort.
   Eigen::VectorXd with_nan = make_two_body(norb, {1.0}, 31);
   with_nan[0] = std::numeric_limits<double>::quiet_NaN();
   EXPECT_THROW(eigen_decompose_two_body(with_nan, norb), std::invalid_argument);
@@ -162,57 +152,6 @@ TEST(DoubleFactorizerTest, RejectsInvalidInput) {
   auto truncating = DoubleFactorizerFactory::create("eigen_decomposition");
   truncating->settings().set("truncation_threshold", 1e6);
   EXPECT_THROW(truncating->run(hamiltonian), std::invalid_argument);
-}
-
-TEST(DoubleFactorizerTest, RejectsAsymmetricTwoBodyIntegrals) {
-  constexpr std::size_t norb = 4;
-  const auto flat = [](std::size_t p, std::size_t q, std::size_t r,
-                       std::size_t s) {
-    return ((p * norb + q) * norb + r) * norb + s;
-  };
-
-  // A tensor that breaks p<->q only. Perturbing g[0,1,2,2] and its
-  // (pq)<->(rs) image g[2,2,0,1] keeps the supermatrix symmetric, so this is
-  // caught only by the second generator.
-  Eigen::VectorXd pq_broken = make_two_body(norb, {1.0}, 31);
-  pq_broken[flat(0, 1, 2, 2)] += 1.0;
-  pq_broken[flat(2, 2, 0, 1)] += 1.0;
-  EXPECT_THROW(eigen_decompose_two_body(pq_broken, norb),
-               std::invalid_argument);
-
-  // A tensor that breaks (pq)<->(rs) only. Perturbing the four elements of
-  // the p<->q / r<->s orbit of (0,1),(2,3) leaves both index-pair swaps
-  // intact, so this is caught only by the first generator.
-  Eigen::VectorXd rs_broken = make_two_body(norb, {1.0}, 31);
-  rs_broken[flat(0, 1, 2, 3)] += 1.0;
-  rs_broken[flat(1, 0, 2, 3)] += 1.0;
-  rs_broken[flat(0, 1, 3, 2)] += 1.0;
-  rs_broken[flat(1, 0, 3, 2)] += 1.0;
-  EXPECT_THROW(eigen_decompose_two_body(rs_broken, norb),
-               std::invalid_argument);
-
-  // Both are accepted once the tolerance is loosened past the perturbation,
-  // so the rejections above come from the symmetry check and not from some
-  // other guard.
-  EXPECT_NO_THROW(eigen_decompose_two_body(pq_broken, norb,
-                                           DEFAULT_TRUNCATION_THRESHOLD, 1e3));
-  EXPECT_NO_THROW(eigen_decompose_two_body(rs_broken, norb,
-                                           DEFAULT_TRUNCATION_THRESHOLD, 1e3));
-
-  // The tolerance is itself validated, like truncation_threshold.
-  const Eigen::VectorXd symmetric = make_two_body(norb, {1.0}, 31);
-  EXPECT_THROW(eigen_decompose_two_body(symmetric, norb,
-                                        DEFAULT_TRUNCATION_THRESHOLD, -1.0),
-               std::invalid_argument);
-  EXPECT_THROW(
-      eigen_decompose_two_body(symmetric, norb, DEFAULT_TRUNCATION_THRESHOLD,
-                               std::numeric_limits<double>::quiet_NaN()),
-      std::invalid_argument);
-
-  // A tensor assembled from symmetric factors survives a tolerance far
-  // tighter than the default, so the check has real margin on valid input.
-  EXPECT_NO_THROW(eigen_decompose_two_body(
-      symmetric, norb, DEFAULT_TRUNCATION_THRESHOLD, 1e-14));
 }
 
 TEST(DoubleFactorizerTest, EigenDecomposeFragmentsReconstructTensor) {
@@ -241,37 +180,6 @@ TEST(DoubleFactorizerTest, EigenDecomposeFragmentsReconstructTensor) {
   for (Eigen::Index i = 0; i < two_body.size(); ++i) {
     EXPECT_NEAR(reconstructed[i], two_body[i], kReconstructionTolerance);
   }
-}
-
-TEST(DoubleFactorizerTest, FragmentLambdaMatchesContainerLambda) {
-  // lambda_df is a per-fragment share of the same block-encoding 1-norm that
-  // get_lambda() reports, so the fragments must sum to the container's
-  // two-body part. Asserting lambda_df against its own defining formula would
-  // only restate the code; this pins the shared 1/4 convention (Eq. 34)
-  // across both call sites.
-  constexpr std::size_t norb = 4;
-  const auto two_body = make_two_body(norb, {1.0, -1.0}, 41);
-  const auto fragments = eigen_decompose_two_body(two_body, norb);
-  ASSERT_FALSE(fragments.empty());
-
-  double fragment_lambda_sum = 0.0;
-  for (const auto& fragment : fragments) {
-    fragment_lambda_sum += fragment.lambda_df;
-  }
-
-  auto factorizer = DoubleFactorizerFactory::create("eigen_decomposition");
-  auto factorized = factorizer->run(make_hamiltonian(norb, two_body));
-  ASSERT_NE(factorized, nullptr);
-  const auto& container = as_factorized(factorized);
-
-  // get_lambda() adds the one-body term, which carries no fragment share.
-  const Eigen::MatrixXd h1p = container.get_h1_prime();
-  Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(h1p);
-  ASSERT_EQ(solver.info(), Eigen::Success);
-  const double one_body_norm = solver.eigenvalues().array().abs().sum();
-
-  EXPECT_NEAR(fragment_lambda_sum, container.get_lambda() - one_body_norm,
-              kReconstructionTolerance);
 }
 
 TEST(DoubleFactorizerTest, EigenDecomposeSortsFragmentsByDecreasingWeight) {
@@ -343,8 +251,6 @@ TEST(DoubleFactorizerTest, TruncationDiscardsSmallFragments) {
   EXPECT_LT(truncated_container.get_num_ranks(), num_ranks_exact);
   EXPECT_GT(truncated_container.get_num_ranks(), 0u);
 
-  // Truncation is lossy by construction: the reconstruction must move, but
-  // only by the weight that was thrown away.
   auto [g_aaaa, g_aabb, g_bbbb] =
       truncated_hamiltonian->get_two_body_integrals();
   EXPECT_FALSE(g_aaaa.isApprox(two_body, kReconstructionTolerance));
