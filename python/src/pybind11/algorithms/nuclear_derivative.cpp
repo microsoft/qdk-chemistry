@@ -81,17 +81,10 @@ Returns:
     tuple: ``(energy, gradients, hessian, wavefunction)``.
 )");
   calculator.def(
-      "hash",
-      [](const NuclearDerivativeCalculator& self,
-         std::shared_ptr<Structure> structure, int charge,
-         int spin_multiplicity, NuclearDerivativeSeedType seed,
-         unsigned int n_inactive_orbitals) {
-        return self.hash(structure, charge, spin_multiplicity, seed,
-                         n_inactive_orbitals);
-      },
-      py::arg("structure"), py::arg("charge"), py::arg("spin_multiplicity"),
-      py::arg("seed_or_basis"), py::arg("n_inactive_orbitals") = 0,
-      R"(Compute a deterministic content hash for a derivative run.)");
+      "hash", &NuclearDerivativeCalculator::hash, py::arg("structure"),
+      py::arg("charge"), py::arg("spin_multiplicity"), py::arg("seed_or_basis"),
+      py::arg("n_inactive_orbitals") = 0,
+      R"(Compute a deterministic content hash for a nuclear derivative run.)");
   calculator.def("settings", &NuclearDerivativeCalculator::settings,
                  py::return_value_policy::reference_internal,
                  R"(Return the calculator settings.)");

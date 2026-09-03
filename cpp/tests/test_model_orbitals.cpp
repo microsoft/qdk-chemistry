@@ -7,6 +7,7 @@
 #include <Eigen/Dense>
 #include <cmath>
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
@@ -368,6 +369,28 @@ TEST_F(ModelOrbitalsTest, SimpleRestrictedJSONRoundTrip) {
   EXPECT_EQ(original.get_num_molecular_orbitals(),
             reconstructed->get_num_molecular_orbitals());
   EXPECT_EQ(original.is_restricted(), reconstructed->is_restricted());
+}
+
+TEST_F(ModelOrbitalsTest, EmptyActiveSpaceHDF5RoundTrip) {
+  const size_t basis_size = 3;
+  const std::vector<size_t> inactive_indices = {0, 1};
+  const std::string filename = "test_model.orbitals.h5";
+  ModelOrbitals original(trivial_iset(basis_size, {}),
+                         trivial_iset(basis_size, inactive_indices));
+
+  original.to_hdf5_file(filename);
+  auto reconstructed = Orbitals::from_hdf5_file(filename);
+
+  EXPECT_NE(std::dynamic_pointer_cast<ModelOrbitals>(reconstructed), nullptr);
+  EXPECT_TRUE(reconstructed->has_active_space());
+  EXPECT_TRUE(reconstructed->get_active_space_indices().first.empty());
+  EXPECT_TRUE(reconstructed->get_active_space_indices().second.empty());
+  EXPECT_EQ(inactive_indices,
+            reconstructed->get_inactive_space_indices().first);
+  EXPECT_EQ(inactive_indices,
+            reconstructed->get_inactive_space_indices().second);
+
+  std::filesystem::remove(filename);
 }
 
 TEST_F(ModelOrbitalsTest, EdgeCaseEmptySpaces) {

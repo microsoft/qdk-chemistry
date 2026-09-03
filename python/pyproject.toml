@@ -37,6 +37,7 @@ dependencies = [
   "numpy>=2.0.0,<2.4.0",
   "scipy>=1.7.0",
   "matplotlib>=3.10.0",
+  "argcomplete>=3.0.0",
   "ruamel-yaml>=0.18.10",
   "qdk[jupyter]>=1.30.0",
   "pybind11-stubgen>=2.5.1",
@@ -49,9 +50,14 @@ name = "qdk-chemistry"
 readme = "README.md"
 requires-python = ">=3.10"
 
+[project.scripts]
+qc = "qdk_chemistry.ui.cli:main"
+qcmcp = "qdk_chemistry.ui.mcp:main"
+
 [project.optional-dependencies]
 all = [
-  "qdk-chemistry[coverage,dev,discovery,docs,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre,test]"
+  "qdk-chemistry[coverage,dev,discovery,docs,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre,test]",
+  "qdk-chemistry[mcp]; sys_platform != 'win32' or platform_machine != 'ARM64'"
 ]
 coverage = [
   "coverage",
@@ -91,6 +97,9 @@ jupyter = [
   "pandas>=2.0.0",
   "qdk[jupyter]>=1.30.0",
 ]
+mcp = [
+  "mcp>=2,<3"
+]
 networkx-extras = [
   "networkx>=3.0; python_full_version != '3.14.1'",  # due to incompatibility with Python 3.14.1
 ]
@@ -117,6 +126,7 @@ qre = [
 ]
 test = [
   "qdk-chemistry[coverage,discovery,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre]",
+  "qdk-chemistry[mcp]; sys_platform != 'win32' or platform_machine != 'ARM64'",
   "nbclient",
   "nbformat",
   # pennylane also requires rustworkx (see qiskit-extras); the sample test skips when it is absent.

@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -265,8 +266,13 @@ class AlgorithmFactory {
       key = Derived::default_algorithm_name();
     }
 
-    auto it = registry().find(key);
-    if (it == registry().end()) {
+    auto& reg = registry();
+    const auto alias_it = alias_registry().find(key);
+    if (alias_it != alias_registry().end()) {
+      key = alias_it->second;
+    }
+    auto it = reg.find(key);
+    if (it == reg.end()) {
       throw std::runtime_error(
           "Algorithm factory for " + Derived::algorithm_type_name() +
           ": Algorithm with name '" + key +
@@ -320,22 +326,62 @@ class AlgorithmFactory {
           " expected is: " + Derived::algorithm_type_name());
     }
 
-    // Get all aliases (includes primary name)
-    auto aliases = tmp->aliases();
+    const auto name = tmp->name();
+    const auto aliases = tmp->aliases();
+    auto& alias_reg = alias_registry();
 
-    // Check for name clashes first
+    if (name.empty()) {
+      throw std::invalid_argument("Algorithm factory for " +
+                                  Derived::algorithm_type_name() +
+                                  ": algorithm name must not be empty");
+    }
+    if (reg.find(name) != reg.end() ||
+        alias_reg.find(name) != alias_reg.end()) {
+      throw DuplicateRegistrationError("Algorithm factory for " +
+                                       Derived::algorithm_type_name() +
+                                       ": algorithm with name/alias '" + name +
+                                       "' already exists in registry");
+    }
+
+    // Check the alias contract and all lookup-key clashes first.
+    std::unordered_set<std::string> unique_aliases;
+    bool contains_name = false;
     for (const auto& alias : aliases) {
-      if (reg.find(alias) != reg.end()) {
+      if (alias.empty()) {
+        throw std::invalid_argument("Algorithm factory for " +
+                                    Derived::algorithm_type_name() +
+                                    ": aliases must not contain an empty name");
+      }
+      if (!unique_aliases.emplace(alias).second) {
+        throw DuplicateRegistrationError(
+            "Algorithm factory for " + Derived::algorithm_type_name() +
+            ": algorithm with name/alias '" + alias +
+            "' already exists in registry");
+      }
+      if (alias == name) {
+        contains_name = true;
+        continue;
+      }
+      if (reg.find(alias) != reg.end() ||
+          alias_reg.find(alias) != alias_reg.end()) {
         throw DuplicateRegistrationError(
             "Algorithm factory for " + Derived::algorithm_type_name() +
             ": algorithm with name/alias '" + alias +
             "' already exists in registry");
       }
     }
+    if (!contains_name) {
+      throw std::invalid_argument(
+          "Algorithm factory for " + Derived::algorithm_type_name() +
+          ": algorithm '" + name +
+          "' must include its canonical name in aliases");
+    }
 
-    // Register under all aliases
+    reg.emplace(name, std::move(func));
     for (const auto& alias : aliases) {
-      reg[alias] = func;
+      if (alias != name) {
+        alias_reg.emplace(alias, name);
+      }
     }
   }
 
@@ -353,6 +399,14 @@ class AlgorithmFactory {
     auto it = reg.find(key);
     if (it != reg.end()) {
       reg.erase(it);
+      auto& aliases = alias_registry();
+      for (auto alias_it = aliases.begin(); alias_it != aliases.end();) {
+        if (alias_it->second == key) {
+          alias_it = aliases.erase(alias_it);
+        } else {
+          ++alias_it;
+        }
+      }
       return true;
     }
     return false;
@@ -383,7 +437,8 @@ class AlgorithmFactory {
    * @return true if the key exists, false otherwise.
    */
   static bool has(const std::string& key) {
-    return registry().find(key) != registry().end();
+    return registry().find(key) != registry().end() ||
+           alias_registry().find(key) != alias_registry().end();
   }
 
   /**
@@ -391,7 +446,10 @@ class AlgorithmFactory {
    *
    * This method removes all entries from the registry. Use with caution.
    */
-  static void clear() { registry().clear(); }
+  static void clear() {
+    registry().clear();
+    alias_registry().clear();
+  }
 
  protected:
   /**
@@ -411,6 +469,16 @@ class AlgorithmFactory {
       initialized = true;
       Derived::register_default_instances();
     }
+    return instance;
+  }
+
+  /**
+   * @brief Get the lookup-only alias-to-canonical-name mapping.
+   *
+   * @return Reference to the alias registry.
+   */
+  static std::unordered_map<std::string, std::string>& alias_registry() {
+    static std::unordered_map<std::string, std::string> instance;
     return instance;
   }
 };
