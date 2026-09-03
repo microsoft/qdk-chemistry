@@ -71,6 +71,13 @@ Returns:
   str: ``"eigen_decomposition"``.
 )");
 
+  double_factorizer.def("aliases", &DoubleFactorizer::aliases, R"(
+Return the algorithm's aliases.
+
+Returns:
+  list[str]: All registered names for the algorithm, including the primary one.
+)");
+
   double_factorizer.def("type_name", &DoubleFactorizer::type_name, R"(
 Return the algorithm type name.
 
