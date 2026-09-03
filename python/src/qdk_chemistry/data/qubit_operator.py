@@ -128,7 +128,10 @@ class QubitOperator(DataClass):
                 or if the Pauli strings or coefficients are invalid.
 
         """
-        # Logger.trace_entering()
+        # No trace_entering() here: the logger resolves the calling frame with
+        # inspect.stack() before it consults the log level, which costs more than
+        # the rest of this constructor. Term-wise grouping builds one QubitOperator
+        # per Pauli term, so on a large lattice that dominates the build.
         if len(pauli_strings) != len(coefficients):
             raise ValueError("Mismatch between number of Pauli strings and coefficients.")
 

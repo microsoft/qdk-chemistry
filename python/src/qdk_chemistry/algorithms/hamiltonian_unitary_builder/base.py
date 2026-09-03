@@ -20,6 +20,7 @@ from qdk_chemistry.data import (
     UnitaryRepresentation,
 )
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import ExponentiatedPauliTerm
+from qdk_chemistry.utils import Logger
 
 __all__: list[str] = [
     "HamiltonianUnitaryBuilder",
@@ -152,15 +153,15 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
         """Group Hamiltonian terms for decomposition."""
         partition = qubit_hamiltonian.term_partition
         if partition is not None:
-            # Logger.debug(
-            #     f"{self.name().capitalize()}: consuming QubitOperator.term_partition "
-            #     f"(strategy={partition.strategy!r}, num_groups={partition.num_groups})."
-            # )
+            Logger.debug(
+                f"{self.name().capitalize()}: consuming QubitOperator.term_partition "
+                f"(strategy={partition.strategy!r}, num_groups={partition.num_groups})."
+            )
             return self._groups_from_partition(qubit_hamiltonian, partition)
 
-        # Logger.debug(
-        #     f"{self.name().capitalize()}: no term_partition present; treating each Pauli term as its own group."
-        # )
+        Logger.debug(
+            f"{self.name().capitalize()}: no term_partition present; treating each Pauli term as its own group."
+        )
         return [
             [
                 QubitOperator(
