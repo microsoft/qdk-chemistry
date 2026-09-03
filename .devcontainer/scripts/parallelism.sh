@@ -8,7 +8,7 @@
 #
 # parallel_jobs_for_memory <memory_per_job_gb>
 #
-# Compute a safe parallel job count based on total RAM and CPU cores.
+# Compute a safe parallel job count based on available RAM and CPU cores.
 #
 # Result:
 #   min(cpu_cores, floor(total_ram_gb / memory_per_job_gb))
