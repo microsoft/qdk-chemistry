@@ -279,6 +279,7 @@ class TestInnerPrep:
                 probs[:n_coeffs], expected_probs, atol=atol, err_msg=f"outer={ell}, algorithm={algorithm}"
             )
 
+
 class TestSOSSAMapper:
     """Tests for the SOSSA block-encoding circuit mapper."""
 
@@ -369,6 +370,7 @@ class TestSOSSAMapper:
 
         assert isinstance(circuit, Circuit)
         assert circuit._qsharp_op is not None
+
 
 def _vector_to_givens_angles(vec: np.ndarray) -> list[float]:
     """Convert a unit vector to Givens rotation angles (same as SOSSABuilder)."""

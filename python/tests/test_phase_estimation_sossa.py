@@ -802,6 +802,7 @@ class TestSOSSAQPEIntegration:
 # Resource estimation
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def _sossa_unary_qpe_circuit(
     num_queries,
     *,

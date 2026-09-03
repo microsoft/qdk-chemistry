@@ -24,6 +24,7 @@ __all__: list[str] = [
 # Two SELECT calls, each conjugated by the inner PREPARE, so the alias table is read four times.
 _INNER_LOOKUPS_PER_BLOCK_ENCODING = 4
 
+
 class SOSSAMapperSettings(Settings):
     """Settings for the SOSSAMapper."""
 

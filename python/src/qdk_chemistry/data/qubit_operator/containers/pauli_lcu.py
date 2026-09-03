@@ -22,6 +22,9 @@ if TYPE_CHECKING:
     import h5py
     import scipy
 
+    import qdk_chemistry.data.enums.fermion_mode_order
+    import qdk_chemistry.data.term_partition
+
 from qdk_chemistry._core.data import TaperingSpecification
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
