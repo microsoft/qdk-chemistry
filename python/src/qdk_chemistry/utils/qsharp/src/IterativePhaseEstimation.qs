@@ -5,8 +5,6 @@
 namespace QDKChemistry.Utils.IterativePhaseEstimation {
 
     import Std.Arrays.Subarray;
-    import Std.Convert.IntAsDouble;
-    import Std.Math.PI;
 
     /// A struct to hold parameters for iterative Quantum Phase Estimation (IQPE).
     /// - `statePrep`: A function to prepare the initial quantum state.
