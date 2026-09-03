@@ -43,6 +43,11 @@ class QubitOperator(DataClass):
     operator wraps a :class:`~qdk_chemistry.data.qubit_operator.containers.pauli_lcu.PauliLCUContainer`,
     and raise :exc:`AttributeError` otherwise.
 
+    Operations taking another operator -- :meth:`equiv` and the arithmetic operators -- are
+    defined here rather than forwarded, because the container's versions are typed
+    container-to-container. They unwrap the operand and rewrap the result, so an operator
+    stays an operator across arithmetic.
+
     Attributes:
         pauli_strings (list[str]): List of Pauli strings representing the ``QubitOperator``.
         term_partition (~qdk_chemistry.data.term_partition.TermPartition | None): Optional index-based partition of
@@ -140,6 +145,54 @@ class QubitOperator(DataClass):
                 f"'{name}' is not available on this qubit operator; "
                 f"the {container.type!r} representation does not provide it."
             ) from None
+
+    def _forward(self, name: str) -> Any:
+        """Return a container method, or raise the same error ``__getattr__`` would.
+
+        Binary operations cannot go through ``__getattr__``: Python looks special methods up
+        on the type, and forwarding one unchanged would hand the container a ``QubitOperator``
+        where its signature says container. Each operation below therefore unwraps its operand
+        and rewraps the result, and uses this to reach the container method.
+        """
+        try:
+            return getattr(self._container, name)
+        except AttributeError:
+            raise AttributeError(
+                f"{name!r} is not available on this qubit operator; "
+                f"the {self._container.type!r} representation does not provide it."
+            ) from None
+
+    def equiv(self, other: Any, atol: float = 1e-12) -> bool:
+        """Check mathematical equivalence with another qubit operator.
+
+        Args:
+            other: The operator to compare against, wrapped or as a bare container.
+            atol: Absolute tolerance for coefficient comparison. Defaults to 1e-12.
+
+        Returns:
+            ``True`` if the two operators are mathematically equivalent.
+
+        Raises:
+            AttributeError: If the wrapped representation does not define equivalence.
+
+        """
+        return self._forward("equiv")(other.get_container() if isinstance(other, QubitOperator) else other, atol)
+
+    def __add__(self, other: Any) -> QubitOperator:
+        """Return the sum of two qubit operators, rewrapped."""
+        if not isinstance(other, QubitOperator):
+            return NotImplemented
+        return QubitOperator(self._forward("__add__")(other.get_container()))
+
+    def __mul__(self, scalar: Any) -> QubitOperator:
+        """Return the operator with all coefficients scaled by *scalar*."""
+        # The container owns which scalars it accepts, so ask it rather than restating the set.
+        scaled = self._forward("__mul__")(scalar)
+        return NotImplemented if scaled is NotImplemented else QubitOperator(scaled)
+
+    def __rmul__(self, scalar: Any) -> QubitOperator:
+        """Support ``scalar * operator``."""
+        return self.__mul__(scalar)
 
     def get_container_type(self) -> str:
         """Return the concrete container type."""
