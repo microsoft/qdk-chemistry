@@ -263,6 +263,21 @@ The value returned by ``data_type_name()`` identifies the serialized format duri
 
 Register these classes with :meth:`~qdk_chemistry.plugins.base.PluginRegistrar.register_dataclass` or pass them through the ``data_classes`` argument of :meth:`~qdk_chemistry.plugins.base.PluginRegistrar.register_algorithm`. Python return annotations are not used for discovery.
 
+Remote backend MCP configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Remote backends expose no constructor options to MCP clients by default. To allow a client-controlled option, declare ``mcp_safe_config_options`` directly on the concrete backend class. Registration validates that it is a ``frozenset`` of non-empty constructor parameter names.
+
+.. code-block:: python
+
+   class CustomRemoteBackend(RemoteBackend):
+      mcp_safe_config_options = frozenset({"poll_interval", "timeout"})
+
+      def __init__(self, *, endpoint, poll_interval=5.0, timeout=3600.0):
+         ...
+
+Do not declare executable paths, credentials, endpoint selection, storage locations, or other options that can redirect execution or access. These remain backend- or server-owned.
+
 .. rubric:: Naming and call order
 
 An algorithm implementation name must be unique within its algorithm type; remote backend and cache backend names must be unique within their respective registries. Third-party plugins should use package- or organization-prefixed names to avoid collisions with built-in implementations and other plugins.
