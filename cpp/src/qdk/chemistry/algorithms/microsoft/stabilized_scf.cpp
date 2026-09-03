@@ -70,7 +70,9 @@ StabilizedScfSolver::StabilizedScfSolver() {
 std::pair<double, std::shared_ptr<data::Wavefunction>>
 StabilizedScfSolver::_run_impl(std::shared_ptr<data::Structure> structure,
                                int charge, int spin_multiplicity,
-                               BasisOrGuessType basis_or_guess) const {
+                               BasisOrGuessType basis_or_guess,
+                               std::shared_ptr<data::AuxiliaryBasisCollection>
+                                   auxiliary_basis_collection) const {
   const int64_t max_stability_iterations =
       _settings->get<int64_t>("max_stability_iterations");
   const bool check_internal = _settings->get<bool>("check_internal");
@@ -105,7 +107,8 @@ StabilizedScfSolver::_run_impl(std::shared_ptr<data::Structure> structure,
   std::string scf_type_override;
   auto scf_solver = create_scf_solver();
   auto [energy, wavefunction] =
-      scf_solver->run(structure, charge, spin_multiplicity, basis_or_guess);
+      scf_solver->run(structure, charge, spin_multiplicity, basis_or_guess,
+                      auxiliary_basis_collection);
   bool is_stable = true;
 
   for (int64_t iteration = 0; iteration < max_stability_iterations;
@@ -147,7 +150,8 @@ StabilizedScfSolver::_run_impl(std::shared_ptr<data::Structure> structure,
 
     scf_solver = create_scf_solver(scf_type_override);
     std::tie(energy, wavefunction) =
-        scf_solver->run(structure, charge, spin_multiplicity, rotated_orbitals);
+        scf_solver->run(structure, charge, spin_multiplicity, rotated_orbitals,
+                        auxiliary_basis_collection);
   }
 
   if (max_stability_iterations > 0) {

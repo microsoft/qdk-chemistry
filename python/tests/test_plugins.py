@@ -221,7 +221,7 @@ def test_plugin_registrar_validates_dataclasses_before_registering_algorithm(mon
             """Return the unique test registry name."""
             return "failed_plugin_algorithm"
 
-        def _run_impl(self, structure, charge, spin_multiplicity):
+        def _run_impl(self, structure, charge, spin_multiplicity, basis_or_guess, auxiliary_bases):
             """Provide the minimal implementation required by the base class."""
 
     class FirstPluginData(DataClass):

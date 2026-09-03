@@ -36,6 +36,7 @@ class CustomScfSettings(ElectronicStructureSettings):
 # start-cell-custom-scf-solver
 from qdk_chemistry.algorithms import ScfSolver
 from qdk_chemistry.data import (
+    AuxiliaryBasisCollection,
     BasisSet,
     Orbitals,
     Structure,
@@ -59,6 +60,7 @@ class CustomScfSolver(ScfSolver):
         charge: int,
         spin_multiplicity: int,
         basis_or_guess: Orbitals | BasisSet | str | None = None,
+        auxiliary_bases: AuxiliaryBasisCollection | None = None,
     ) -> tuple[float, Wavefunction]:
         """Perform a self-consistent field (SCF) calculation using a custom backend.
 
@@ -75,6 +77,7 @@ class CustomScfSolver(ScfSolver):
                 - A BasisSet object
                 - A string specifying the basis set name
                 - None (use default from settings)
+            auxiliary_bases: Optional role-keyed auxiliary bases.
 
         Returns:
             Tuple of (energy, wavefunction)

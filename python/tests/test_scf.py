@@ -12,7 +12,13 @@ import pytest
 
 from qdk_chemistry import algorithms
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
-from qdk_chemistry.data import BasisSet, Structure
+from qdk_chemistry.data import (
+    AuxiliaryBasis,
+    AuxiliaryBasisCollection,
+    AuxiliaryBasisRole,
+    BasisSet,
+    Structure,
+)
 from qdk_chemistry.utils import Logger
 
 from .reference_tolerances import (
@@ -526,30 +532,44 @@ def _create_bf_structure():
     return Structure(["F", "B"], coords)
 
 
+def _create_dfj_auxiliary_bases(structure, role=AuxiliaryBasisRole.JFIT):
+    auxiliary_basis = AuxiliaryBasis.from_basis_name("def2-universal-jfit", structure)
+    return AuxiliaryBasisCollection({role: auxiliary_basis})
+
+
 class TestScfSolverDfj:
     """DFJ (Density-Fitted Coulomb) SCF tests."""
+
+    def test_auxiliary_bases_participate_in_hash(self):
+        water = _create_h2o_dfj_structure()
+        scf_solver = algorithms.create("scf_solver")
+        basis = BasisSet.from_basis_name("def2-svp", water)
+        auxiliary_bases = _create_dfj_auxiliary_bases(water)
+
+        assert scf_solver.hash(water, 0, 1, basis) != scf_solver.hash(water, 0, 1, basis, auxiliary_bases)
 
     def test_water_rhf_dfj(self):
         """Test RHF-DFJ on water with def2-svp / def2-universal-jfit."""
         water = _create_h2o_dfj_structure()
         scf_solver = algorithms.create("scf_solver")
         scf_solver.settings().set("method", "hf")
-        scf_solver.settings().set("eri_method", "incore")
 
-        basis = BasisSet.from_basis_name("def2-svp", "def2-universal-jfit", water)
-        energy, wfn = scf_solver.run(water, 0, 1, basis)
+        basis = BasisSet.from_basis_name("def2-svp", water)
+        auxiliary_bases = _create_dfj_auxiliary_bases(water)
+        energy, wfn = scf_solver.run(water, 0, 1, basis, auxiliary_bases)
 
         assert abs(energy - (-75.955848898587732)) < scf_energy_tolerance
 
     def test_water_rks_dfj_pbe_m06_2x(self):
-        """Test RKS-DFJ/PBE then use it as guess for RKS-DFJ/M06-2X on water with def2-svp / def2-universal-jfit."""
+        """Test RKS-DFJ/PBE and an RKS-DFJ/M06-2X orbital restart."""
         water = _create_h2o_dfj_structure()
         scf_solver = algorithms.create("scf_solver")
         scf_solver.settings().set("method", "pbe")
         scf_solver.settings().set("eri_method", "incore")
 
-        basis = BasisSet.from_basis_name("def2-svp", "def2-universal-jfit", water)
-        energy, wfn = scf_solver.run(water, 0, 1, basis)
+        basis = BasisSet.from_basis_name("def2-svp", water)
+        auxiliary_bases = _create_dfj_auxiliary_bases(water, AuxiliaryBasisRole.JKFIT)
+        energy, wfn = scf_solver.run(water, 0, 1, basis, auxiliary_bases)
 
         assert abs(energy - (-76.271464794036)) < scf_energy_tolerance
 
@@ -557,7 +577,7 @@ class TestScfSolverDfj:
         m06_solver = algorithms.create("scf_solver")
         m06_solver.settings().set("method", "m06-2x")
         m06_solver.settings().set("eri_method", "incore")
-        energy, m06_wfn = m06_solver.run(water, 0, 1, wfn.get_orbitals())
+        energy, m06_wfn = m06_solver.run(water, 0, 1, wfn.get_orbitals(), auxiliary_bases)
 
         assert abs(energy - (-76.320941901587)) < scf_energy_tolerance
 
@@ -568,8 +588,9 @@ class TestScfSolverDfj:
         scf_solver.settings().set("method", "hf")
         scf_solver.settings().set("eri_method", "incore")
 
-        basis = BasisSet.from_basis_name("def2-svp", "def2-universal-jfit", o2)
-        energy, wfn = scf_solver.run(o2, 0, 3, basis)
+        basis = BasisSet.from_basis_name("def2-svp", o2)
+        auxiliary_bases = _create_dfj_auxiliary_bases(o2)
+        energy, wfn = scf_solver.run(o2, 0, 3, basis, auxiliary_bases)
 
         assert abs(energy - (-149.489993170463)) < scf_energy_tolerance
 
@@ -581,22 +602,28 @@ class TestScfSolverDfj:
         scf_solver.settings().set("scf_type", "unrestricted")
         scf_solver.settings().set("eri_method", "incore")
 
-        basis = BasisSet.from_basis_name("sto-3g", "def2-universal-jfit", bf)
-        energy, wfn = scf_solver.run(bf, 0, 1, basis)
+        basis = BasisSet.from_basis_name("sto-3g", bf)
+        auxiliary_bases = _create_dfj_auxiliary_bases(bf)
+        energy, wfn = scf_solver.run(bf, 0, 1, basis, auxiliary_bases)
 
         assert abs(energy - (-122.732943463018)) < scf_energy_tolerance
 
-    def test_dfj_without_aux_basis_raises(self):
-        """Test that requesting DFJ without an auxiliary basis raises ValueError."""
+    def test_non_jfit_auxiliary_basis_does_not_enable_dfj(self):
+        """Test that an unrelated auxiliary-basis role leaves four-center SCF enabled."""
+        water = create_water_structure()
+        scf_solver = algorithms.create("scf_solver")
+        basis = BasisSet.from_basis_name("def2-svp", water)
+        ri_only = _create_dfj_auxiliary_bases(water, AuxiliaryBasisRole.RIFIT)
+        energy, wfn = scf_solver.run(water, 0, 1, basis, ri_only)
+
+        assert abs(energy - (-75.9229032345009)) < scf_energy_tolerance
+
+    def test_dfj_auxiliary_basis_must_match_structure(self):
+        """Test that an automatically detected DFJ basis matches the SCF structure."""
         water = _create_h2o_dfj_structure()
         scf_solver = algorithms.create("scf_solver")
-        scf_solver.settings().set("method", "hf")
-        scf_solver.settings().set("eri_method", "incore")
-        scf_solver.settings().set("integral_type", "dfj")
-
-        # Basis without auxiliary shells
         basis = BasisSet.from_basis_name("def2-svp", water)
-        with pytest.raises(ValueError, match="DFJ requested but no auxiliary"):
-            scf_solver.run(water, 0, 1, basis)
-        with pytest.raises(ValueError, match="DFJ requested but no auxiliary"):
-            scf_solver.run(water, 0, 1, "def2-svp")
+
+        mismatched = _create_dfj_auxiliary_bases(_create_o2_dfj_structure())
+        with pytest.raises(ValueError, match="must describe the SCF structure"):
+            scf_solver.run(water, 0, 1, basis, mismatched)

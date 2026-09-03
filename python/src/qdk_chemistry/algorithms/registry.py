@@ -518,7 +518,10 @@ def register(generator: Callable[[], Algorithm]) -> None:
         >>> class MyCustomScf(ScfSolver):
         ...     def name(self):
         ...         return "my_custom_scf"
-        ...     def _run_impl(self, structure, charge, spin_multiplicity):
+        ...     def _run_impl(
+        ...         self, structure, charge, spin_multiplicity,
+        ...         basis_or_guess, auxiliary_bases
+        ...     ):
         ...         # Custom implementation
         ...         pass
         >>> # Register the custom algorithm

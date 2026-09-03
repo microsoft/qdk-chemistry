@@ -11,6 +11,7 @@
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/algorithms/stability.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
+#include <qdk/chemistry/data/auxiliary_basis.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/orbital_rotation.hpp>
@@ -41,10 +42,9 @@ class TestSCF : public ScfSolver {
  protected:
   std::pair<double, std::shared_ptr<Wavefunction>> _run_impl(
       std::shared_ptr<Structure> /*structure*/, int charge, int multiplicity,
-      std::variant<std::shared_ptr<Orbitals>, std::shared_ptr<BasisSet>,
-                   std::string>
-      /*basis_or_guess*/
-  ) const override {
+      BasisOrGuessType /*basis_or_guess*/,
+      std::shared_ptr<AuxiliaryBasisCollection> /*auxiliary_bases*/)
+      const override {
     // Dummy implementation for testing
     Eigen::MatrixXd coefficients = Eigen::MatrixXd::Zero(3, 3);
     Eigen::VectorXd energies = Eigen::VectorXd::Zero(3);
@@ -1022,9 +1022,8 @@ TEST_F(ScfTest, AgHBasisSetEcpJsonRoundTrip) {
   auto orbitals = wfn->get_orbitals();
   auto basis_set = orbitals->get_basis_set();
 
-  // Serialize to JSON using convert_to_json_primary
-  auto json =
-      qdk::chemistry::utils::microsoft::convert_to_json_primary(*basis_set);
+  // Serialize to JSON using convert_to_json
+  auto json = qdk::chemistry::utils::microsoft::convert_to_json(*basis_set);
 
   // Verify ECP shells are present in JSON
   EXPECT_TRUE(json.contains("ecp_shells"));
@@ -1364,30 +1363,57 @@ TEST_F(ScfTest, HydrogenIon_CCPVDZ_SCF) {
 /* ==================== DFJ (Density-Fitted Coulomb) Tests ====================
  */
 
+namespace {
+std::shared_ptr<AuxiliaryBasisCollection> make_dfj_auxiliary_bases(
+    const std::shared_ptr<Structure>& structure,
+    AuxiliaryBasisRole role = AuxiliaryBasisRole::JFit) {
+  auto auxiliary_basis =
+      AuxiliaryBasis::from_basis_name("def2-universal-jfit", structure);
+  return std::make_shared<AuxiliaryBasisCollection>(
+      AuxiliaryBasisCollection::Map{{role, auxiliary_basis}});
+}
+}  // namespace
+
+TEST_F(ScfTest, AuxiliaryBasisConversionPreservesCartesianRepresentation) {
+  auto water = testing::create_h2o_dfj_structure();
+  auto auxiliary_basis = AuxiliaryBasis::from_basis_name(
+      "def2-universal-jfit", water, AOType::Cartesian);
+
+  auto internal_basis =
+      qdk::chemistry::utils::microsoft::convert_auxiliary_basis_from_qdk(
+          *auxiliary_basis);
+
+  EXPECT_FALSE(internal_basis->pure);
+  EXPECT_EQ(internal_basis->num_atomic_orbitals,
+            auxiliary_basis->get_num_auxiliary_orbitals());
+  EXPECT_EQ(internal_basis->atom_ecp_electrons,
+            std::vector<int>(water->get_num_atoms(), 0));
+}
+
 TEST_F(ScfTest, WaterRhfDfj) {
   auto water = testing::create_h2o_dfj_structure();
   auto scf_solver = ScfSolverFactory::create();
   scf_solver->settings().set("method", "hf");
-  scf_solver->settings().set("eri_method", "incore");
 
-  auto basis =
-      BasisSet::from_basis_name("def2-svp", "def2-universal-jfit", water);
-  auto [energy, wfn] = scf_solver->run(water, 0, 1, basis);
+  auto basis = BasisSet::from_basis_name("def2-svp", water);
+  auto auxiliary_bases = make_dfj_auxiliary_bases(water);
+  auto [energy, wfn] = scf_solver->run(water, 0, 1, basis, auxiliary_bases);
 
   EXPECT_NEAR(energy, -75.955848898587732, testing::scf_energy_tolerance);
   // TODO: test this when Hamiltonian and orbital restrictness are consistent
   // EXPECT_TRUE(wfn->get_orbitals()->is_restricted());
 }
 
-TEST_F(ScfTest, WaterRksDfjPbe) {
+TEST_F(ScfTest, WaterRksDfjPbeAcceptsJkFit) {
   auto water = testing::create_h2o_dfj_structure();
   auto scf_solver = ScfSolverFactory::create();
   scf_solver->settings().set("method", "pbe");
   scf_solver->settings().set("eri_method", "incore");
 
-  auto basis =
-      BasisSet::from_basis_name("def2-svp", "def2-universal-jfit", water);
-  auto [energy, wfn] = scf_solver->run(water, 0, 1, basis);
+  auto basis = BasisSet::from_basis_name("def2-svp", water);
+  auto auxiliary_bases =
+      make_dfj_auxiliary_bases(water, AuxiliaryBasisRole::JKFit);
+  auto [energy, wfn] = scf_solver->run(water, 0, 1, basis, auxiliary_bases);
 
   EXPECT_NEAR(energy, -76.271464794036, testing::scf_energy_tolerance);
   // TODO: test this when Hamiltonian and orbital restrictness are consistent
@@ -1400,9 +1426,9 @@ TEST_F(ScfTest, WaterRksDfjM062x) {
   scf_solver->settings().set("method", "m06-2x");
   scf_solver->settings().set("eri_method", "incore");
 
-  auto basis =
-      BasisSet::from_basis_name("def2-svp", "def2-universal-jfit", water);
-  auto [energy, wfn] = scf_solver->run(water, 0, 1, basis);
+  auto basis = BasisSet::from_basis_name("def2-svp", water);
+  auto auxiliary_bases = make_dfj_auxiliary_bases(water);
+  auto [energy, wfn] = scf_solver->run(water, 0, 1, basis, auxiliary_bases);
 
   EXPECT_NEAR(energy, -76.320941901587, testing::scf_energy_tolerance);
   // TODO: test this when Hamiltonian and orbital restrictness are consistent
@@ -1415,8 +1441,9 @@ TEST_F(ScfTest, OxygenTripletUhfDfj) {
   scf_solver->settings().set("method", "hf");
   scf_solver->settings().set("eri_method", "incore");
 
-  auto basis = BasisSet::from_basis_name("def2-svp", "def2-universal-jfit", o2);
-  auto [energy, wfn] = scf_solver->run(o2, 0, 3, basis);
+  auto basis = BasisSet::from_basis_name("def2-svp", o2);
+  auto auxiliary_bases = make_dfj_auxiliary_bases(o2);
+  auto [energy, wfn] = scf_solver->run(o2, 0, 3, basis, auxiliary_bases);
 
   EXPECT_NEAR(energy, -149.489993170463, testing::scf_energy_tolerance);
   // TODO: test this when Hamiltonian and orbital restrictness are consistent
@@ -1430,23 +1457,33 @@ TEST_F(ScfTest, BfUksDfjPbe) {
   scf_solver->settings().set("scf_type", "unrestricted");
   scf_solver->settings().set("eri_method", "incore");
 
-  auto basis = BasisSet::from_basis_name("sto-3g", "def2-universal-jfit", bf);
-  auto [energy, wfn] = scf_solver->run(bf, 0, 1, basis);
+  auto basis = BasisSet::from_basis_name("sto-3g", bf);
+  auto auxiliary_bases = make_dfj_auxiliary_bases(bf);
+  auto [energy, wfn] = scf_solver->run(bf, 0, 1, basis, auxiliary_bases);
 
   EXPECT_NEAR(energy, -122.732943463018, testing::scf_energy_tolerance);
   // TODO: test this when Hamiltonian and orbital restrictness are consistent
   // EXPECT_FALSE(wfn->get_orbitals()->is_restricted());
 }
 
-TEST_F(ScfTest, DfjWithoutAuxBasisThrows) {
+TEST_F(ScfTest, NonJfitAuxiliaryBasisDoesNotEnableDfj) {
+  auto water = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+
+  auto basis = BasisSet::from_basis_name("def2-svp", water);
+  auto ri_only = make_dfj_auxiliary_bases(water, AuxiliaryBasisRole::RIFit);
+  auto [energy, wfn] = scf_solver->run(water, 0, 1, basis, ri_only);
+
+  EXPECT_NEAR(energy, -75.9229032345009, testing::scf_energy_tolerance);
+}
+
+TEST_F(ScfTest, DfjAuxiliaryBasisMustMatchStructure) {
   auto water = testing::create_h2o_dfj_structure();
   auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("method", "hf");
-  scf_solver->settings().set("eri_method", "incore");
-  scf_solver->settings().set("integral_type", "dfj");
-
-  // Basis without auxiliary shells
   auto basis = BasisSet::from_basis_name("def2-svp", water);
-  EXPECT_THROW(scf_solver->run(water, 0, 1, basis), std::invalid_argument);
-  EXPECT_THROW(scf_solver->run(water, 0, 1, "def2-svp"), std::invalid_argument);
+  auto mismatched =
+      make_dfj_auxiliary_bases(testing::create_o2_dfj_structure());
+
+  EXPECT_THROW(scf_solver->run(water, 0, 1, basis, mismatched),
+               std::invalid_argument);
 }

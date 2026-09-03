@@ -75,21 +75,6 @@ class ScfSettings
     set_default("nthreads", static_cast<int64_t>(-1),
                 "Number of OpenMP threads to use for SCF calculation. "
                 "Set to -1 to use all available threads.");
-    set_default(
-        "integral_type", std::string("auto"),
-        "How to calculate integrals: 'four_center' for standard four-center "
-        "integrals, 'dfj' for density fitting for Coulomb (J) integrals, or "
-        "'auto' to select automatically based on whether an auxiliary basis "
-        "is available. "
-        "When 'dfj' is used, an auxiliary basis set must be provided either "
-        "embedded in the BasisSet object or via the 'aux_basis' setting. "
-        "If the BasisSet object already contains an auxiliary basis, it takes "
-        "precedence over the 'aux_basis' setting.");
-    set_default("aux_basis", std::string(""),
-                "Auxiliary basis set name for density-fitted Coulomb (J) "
-                "integrals (e.g., 'def2-universal-jfit'). Only used when "
-                "'integral_type' is 'dfj'. Ignored if the BasisSet object "
-                "already contains an auxiliary basis.");
   }
 };
 
@@ -159,7 +144,9 @@ class ScfSolver : public qdk::chemistry::algorithms::ScfSolver {
    */
   ScfCalculationResult run_with_analytic_gradient(
       std::shared_ptr<data::Structure> structure, int charge,
-      int spin_multiplicity, BasisOrGuessType basis_or_guess) const;
+      int spin_multiplicity, BasisOrGuessType basis_or_guess,
+      std::shared_ptr<data::AuxiliaryBasisCollection> auxiliary_bases =
+          nullptr) const;
 
  protected:
   /**
@@ -192,12 +179,15 @@ class ScfSolver : public qdk::chemistry::algorithms::ScfSolver {
    */
   std::pair<double, std::shared_ptr<data::Wavefunction>> _run_impl(
       std::shared_ptr<data::Structure> structure, int charge,
-      int spin_multiplicity, BasisOrGuessType basis_or_guess) const override;
+      int spin_multiplicity, BasisOrGuessType basis_or_guess,
+      std::shared_ptr<data::AuxiliaryBasisCollection> auxiliary_bases)
+      const override;
 
  private:
   ScfCalculationResult _run_with_options(
       std::shared_ptr<data::Structure> structure, int charge,
       int spin_multiplicity, BasisOrGuessType basis_or_guess,
+      std::shared_ptr<data::AuxiliaryBasisCollection> auxiliary_bases,
       bool require_gradient) const;
 };
 

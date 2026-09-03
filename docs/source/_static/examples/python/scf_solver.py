@@ -9,7 +9,7 @@
 # start-cell-create
 import numpy as np
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Structure, BasisSet
+from qdk_chemistry.data import BasisSet, Structure
 
 # Create the default ScfSolver instance
 scf_solver = create("scf_solver")
@@ -92,23 +92,33 @@ energy, wfn = solver.run(water, charge=0, spin_multiplicity=1, basis_or_guess="c
 # start-cell-dfj
 import numpy as np
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import BasisSet, Structure
+from qdk_chemistry.data import (
+    AuxiliaryBasis,
+    AuxiliaryBasisCollection,
+    AuxiliaryBasisRole,
+    BasisSet,
+    Structure,
+)
 
 # Run SCF with density-fitted Coulomb integrals (DF-J)
 # Build a small molecule for the example
 water_coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.76, 0.59], [0.0, -0.76, 0.59]])
 water = Structure(water_coords, symbols=["O", "H", "H"])
 
-# Create a basis set with an auxiliary basis for density fitting
-dfj_basis = BasisSet.from_basis_name("def2-svp", "def2-universal-jfit", water)
+# Create the primary orbital basis
+dfj_basis = BasisSet.from_basis_name("def2-svp", water)
+jfit_basis = AuxiliaryBasis.from_basis_name("def2-universal-jfit", water)
+auxiliary_bases = AuxiliaryBasisCollection({AuxiliaryBasisRole.JFIT: jfit_basis})
 
-# Configure the solver to use incore ERIs (required for DF-J)
 dfj_solver = create("scf_solver")
-dfj_solver.settings().set("eri_method", "incore")
 
-# Run - DF-J is automatically enabled when auxiliary basis is detected
+# Supplying JFIT automatically enables DF-J; JKFIT is also accepted
 E_dfj, wfn_dfj = dfj_solver.run(
-    water, charge=0, spin_multiplicity=1, basis_or_guess=dfj_basis
+    water,
+    charge=0,
+    spin_multiplicity=1,
+    basis_or_guess=dfj_basis,
+    auxiliary_bases=auxiliary_bases,
 )
 print(f"DF-J SCF Energy: {E_dfj:.10f} Hartree")
 # end-cell-dfj

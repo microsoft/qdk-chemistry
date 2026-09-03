@@ -144,7 +144,7 @@ Density Functional Theory (:term:`DFT`)
    Kohn-Sham methods: :term:`RKS`, :term:`UKS`, :term:`ROKS`
 
 Density-Fitted Coulomb Integrals (DF-J)
-   Accelerated evaluation of Coulomb (J) integrals via resolution-of-the-identity with auxiliary basis sets (e.g., ``def2-universal-jfit``), compatible with all :term:`HF` and :term:`DFT` methods above.
+   Accelerated evaluation of Coulomb (J) integrals via resolution-of-the-identity with a role-keyed auxiliary-basis collection. A ``JFit`` basis is preferred and ``JKFit`` is accepted as a fallback. DF-J is compatible with :term:`RHF`, :term:`UHF`, :term:`RKS`, and :term:`UKS`.
 
 See :doc:`comprehensive/algorithms/scf_solver` for further details about available :term:`SCF` methods and implementations.
 

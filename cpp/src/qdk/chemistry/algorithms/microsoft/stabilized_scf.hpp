@@ -30,7 +30,9 @@ class StabilizedScfSolver : public qdk::chemistry::algorithms::ScfSolver {
  protected:
   std::pair<double, std::shared_ptr<data::Wavefunction>> _run_impl(
       std::shared_ptr<data::Structure> structure, int charge,
-      int spin_multiplicity, BasisOrGuessType basis_or_guess) const override;
+      int spin_multiplicity, BasisOrGuessType basis_or_guess,
+      std::shared_ptr<data::AuxiliaryBasisCollection> auxiliary_bases)
+      const override;
 };
 
 }  // namespace qdk::chemistry::algorithms::microsoft

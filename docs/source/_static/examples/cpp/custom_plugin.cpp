@@ -41,8 +41,9 @@ class CustomScfSolver : public qdk::chemistry::algorithms::ScfSolver {
   std::pair<double, std::shared_ptr<qdk::chemistry::data::Wavefunction>>
   _run_impl(std::shared_ptr<qdk::chemistry::data::Structure> structure,
             int charge, int spin_multiplicity,
-            std::optional<std::shared_ptr<qdk::chemistry::data::Orbitals>>
-                initial_guess) override {
+            qdk::chemistry::algorithms::BasisOrGuessType basis_or_guess,
+            std::shared_ptr<qdk::chemistry::data::AuxiliaryBasisCollection>
+                auxiliary_bases) const override {
     // Convert to external format
     auto external_mol = convert_to_external_format(structure);
 

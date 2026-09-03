@@ -43,6 +43,7 @@ from pyscf.lib.exceptions import BasisNotFoundError
 
 from qdk_chemistry.algorithms import ScfSolver
 from qdk_chemistry.data import (
+    AuxiliaryBasisCollection,
     BasisSet,
     Configuration,
     ElectronicStructureSettings,
@@ -155,7 +156,12 @@ class PyscfScfSolver(ScfSolver):
         self._settings = PyscfScfSettings()
 
     def _run_impl(
-        self, structure: Structure, charge: int, spin_multiplicity: int, basis_or_guess: Orbitals | BasisSet | str
+        self,
+        structure: Structure,
+        charge: int,
+        spin_multiplicity: int,
+        basis_or_guess: Orbitals | BasisSet | str,
+        auxiliary_bases: AuxiliaryBasisCollection | None,
     ) -> tuple[float, Wavefunction]:
         """Perform a self-consistent field (SCF) calculation using PySCF.
 
@@ -179,6 +185,8 @@ class PyscfScfSolver(ScfSolver):
                 - A ``qdk_chemistry.data.BasisSet`` object
                 - A string specifying the name of a standard basis set (e.g., "sto-3g")
                 - A ``qdk_chemistry.data.Orbitals`` object to be used as an initial guess
+            auxiliary_bases: Optional role-keyed auxiliary bases. PySCF
+                integration does not currently consume this input.
 
         Returns:
             * The electronic energy of the system in atomic units (Hartree), excluding nuclear repulsion energy
@@ -191,6 +199,8 @@ class PyscfScfSolver(ScfSolver):
 
         """
         Logger.trace_entering()
+        if auxiliary_bases is not None and auxiliary_bases.get_auxiliary_bases():
+            raise NotImplementedError("PyscfScfSolver does not support AuxiliaryBasisCollection input.")
         mf, scf_type, basis_name, _ = self._build_scf(structure, charge, spin_multiplicity, basis_or_guess)
         energy = self._run_scf(mf, scf_type, basis_or_guess)
         return self._to_wavefunction(mf, structure, basis_name, scf_type, energy)
@@ -391,10 +401,17 @@ class PyscfStabilizedScfSolver(PyscfScfSolver):
         self._settings = PyscfStabilizedScfSettings()
 
     def _run_impl(
-        self, structure: Structure, charge: int, spin_multiplicity: int, basis_or_guess: Orbitals | BasisSet | str
+        self,
+        structure: Structure,
+        charge: int,
+        spin_multiplicity: int,
+        basis_or_guess: Orbitals | BasisSet | str,
+        auxiliary_bases: AuxiliaryBasisCollection | None,
     ) -> tuple[float, Wavefunction]:
         """Run SCF and iterate PySCF stability-driven reruns until stable or exhausted."""
         Logger.trace_entering()
+        if auxiliary_bases is not None and auxiliary_bases.get_auxiliary_bases():
+            raise NotImplementedError("PyscfStabilizedScfSolver does not support AuxiliaryBasisCollection input.")
         mf, scf_type, basis_name, _ = self._build_scf(structure, charge, spin_multiplicity, basis_or_guess)
         energy = self._run_scf(mf, scf_type, basis_or_guess)
 

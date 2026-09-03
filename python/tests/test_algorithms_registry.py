@@ -566,7 +566,7 @@ class TestRegistryRegisterUnregister:
             def name(self):
                 return "custom_test_scf_v1"
 
-            def _run_impl(self, structure, charge, spin_multiplicity):
+            def _run_impl(self, structure, charge, spin_multiplicity, basis_or_guess, auxiliary_bases):
                 # Minimal implementation for testing
                 pass
 
@@ -588,7 +588,7 @@ class TestRegistryRegisterUnregister:
             def name(self):
                 return "custom_test_scf_v2"
 
-            def _run_impl(self, structure, charge, spin_multiplicity):
+            def _run_impl(self, structure, charge, spin_multiplicity, basis_or_guess, auxiliary_bases):
                 pass
 
         # Register
@@ -613,7 +613,7 @@ class TestRegistryRegisterUnregister:
                 """Return the shared test name."""
                 return "duplicate_custom_test_scf"
 
-            def _run_impl(self, structure, charge, spin_multiplicity):
+            def _run_impl(self, structure, charge, spin_multiplicity, basis_or_guess, auxiliary_bases):
                 """Provide the minimal implementation required by the base class."""
 
         class SecondCustomTestScf(ScfSolver):
@@ -625,7 +625,7 @@ class TestRegistryRegisterUnregister:
                 """Return the shared test name."""
                 return "duplicate_custom_test_scf"
 
-            def _run_impl(self, structure, charge, spin_multiplicity):
+            def _run_impl(self, structure, charge, spin_multiplicity, basis_or_guess, auxiliary_bases):
                 """Provide the minimal implementation required by the base class."""
 
         registry.register(FirstCustomTestScf)
@@ -832,7 +832,7 @@ class TestRegistryRegisterUnregister:
             def name(self):
                 return "custom_test_scf_v3"
 
-            def _run_impl(self, structure, charge, spin_multiplicity):
+            def _run_impl(self, structure, charge, spin_multiplicity, basis_or_guess, auxiliary_bases):
                 pass
 
         # Register and verify it exists

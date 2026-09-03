@@ -39,10 +39,11 @@ class ScfSolverBase : public ScfSolver,
 
  protected:
   ReturnType _run_impl(std::shared_ptr<Structure> structure, int charge,
-                       int spin_multiplicity,
-                       BasisOrGuessType basis_or_guess) const override {
+                       int spin_multiplicity, BasisOrGuessType basis_or_guess,
+                       std::shared_ptr<AuxiliaryBasisCollection>
+                           auxiliary_bases) const override {
     PYBIND11_OVERRIDE_PURE(ReturnType, ScfSolver, _run_impl, structure, charge,
-                           spin_multiplicity, basis_or_guess);
+                           spin_multiplicity, basis_or_guess, auxiliary_bases);
   }
 };
 
@@ -63,7 +64,8 @@ Examples:
     ...     def __init__(self):
     ...         super().__init__()  # Call the base class constructor
     ...     # Implement the _run_impl method
-    ...     def _run_impl(self, structure: data.Structure, charge: int, spin_multiplicity: int, initial_guess=None) -> tuple[float, data.Wavefunction]:
+    ...     def _run_impl(self, structure, charge, spin_multiplicity,
+    ...                   basis_or_guess, auxiliary_bases):
     ...         # Custom SCF implementation
     ...         return energy, wavefunction
 
@@ -87,8 +89,10 @@ Examples:
       "run",
       [](const ScfSolver &solver,
          std::shared_ptr<qdk::chemistry::data::Structure> structure, int charge,
-         int spin_multiplicity, BasisOrGuessType basis_or_guess) {
-        return solver.run(structure, charge, spin_multiplicity, basis_or_guess);
+         int spin_multiplicity, BasisOrGuessType primary_basis_or_guess,
+         std::shared_ptr<AuxiliaryBasisCollection> auxiliary_basis_collection) {
+        return solver.run(structure, charge, spin_multiplicity,
+                          primary_basis_or_guess, auxiliary_basis_collection);
       },
       R"(
 Perform SCF calculation on the given molecular structure.
@@ -105,13 +109,16 @@ Args:
         - A ``qdk_chemistry.data.BasisSet`` object
         - A string specifying the name of a standard basis set (e.g., "sto-3g")
         - A ``qdk_chemistry.data.Orbitals`` object to be used as an initial guess
+    auxiliary_bases (qdk_chemistry.data.AuxiliaryBasisCollection | None):
+        Optional role-keyed auxiliary bases. DF-J requests JFIT and accepts
+        JKFIT as a compatible fallback.
 
 Returns:
     tuple[float, qdk_chemistry.data.Wavefunction]: Converged total energy (nuclear + electronic) and the resulting wavefunction.
 
 )",
       py::arg("structure"), py::arg("charge"), py::arg("spin_multiplicity"),
-      py::arg("basis_or_guess"));
+      py::arg("basis_or_guess"), py::arg("auxiliary_bases") = py::none());
 
   scf_solver.def("settings", &ScfSolver::settings,
                  R"(
@@ -168,12 +175,13 @@ Returns:
       "hash",
       [](const ScfSolver &solver,
          std::shared_ptr<qdk::chemistry::data::Structure> structure, int charge,
-         int spin_multiplicity, BasisOrGuessType basis_or_guess) {
+         int spin_multiplicity, BasisOrGuessType primary_basis_or_guess,
+         std::shared_ptr<AuxiliaryBasisCollection> auxiliary_basis_collection) {
         return solver.hash(structure, charge, spin_multiplicity,
-                           basis_or_guess);
+                           primary_basis_or_guess, auxiliary_basis_collection);
       },
       py::arg("structure"), py::arg("charge"), py::arg("spin_multiplicity"),
-      py::arg("basis_or_guess"));
+      py::arg("basis_or_guess"), py::arg("auxiliary_bases") = py::none());
 
   // Factory class binding - creates ScfSolverFactory class with static methods
   bind_algorithm_factory<ScfSolverFactory, ScfSolver, ScfSolverBase>(

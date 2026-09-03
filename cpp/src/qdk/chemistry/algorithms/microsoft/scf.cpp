@@ -43,7 +43,9 @@ std::pair<int, int> calculate_electron_counts(
 
 ScfCalculationResult ScfSolver::_run_with_options(
     std::shared_ptr<data::Structure> structure, int charge, int multiplicity,
-    BasisOrGuessType basis_or_guess, bool require_gradient) const {
+    BasisOrGuessType basis_or_guess,
+    std::shared_ptr<data::AuxiliaryBasisCollection> auxiliary_bases,
+    bool require_gradient) const {
   QDK_LOG_TRACE_ENTERING();
   // Initialize the backend if not already done
   utils::microsoft::initialize_backend();
@@ -99,8 +101,6 @@ ScfCalculationResult ScfSolver::_run_with_options(
   } else {
     throw std::logic_error("Unhandled basis_or_guess alternative.");
   }
-  std::transform(basis_set_name.begin(), basis_set_name.end(),
-                 basis_set_name.begin(), ::tolower);
 
   // Extract geometry from structure object
   std::vector<double> geometry(3 * structure->get_num_atoms());
@@ -229,57 +229,48 @@ ScfCalculationResult ScfSolver::_run_with_options(
   ms_scf_config->k_eri = ms_scf_config->eri;
   ms_scf_config->grad_eri = ms_scf_config->eri;
 
-  // Configure density-fitted Coulomb (DFJ)
-  std::string integral_type = _settings->get<std::string>("integral_type");
-  std::transform(integral_type.begin(), integral_type.end(),
-                 integral_type.begin(), ::tolower);
-  if (integral_type != "auto" && integral_type != "four_center" &&
-      integral_type != "dfj") {
-    throw std::invalid_argument(
-        "integral_type must be one of: auto, four_center, dfj");
+  // A JFit basis enables density-fitted Coulomb automatically. By the
+  // collection contract, JKFit is a valid fallback for a JFit requirement.
+  std::shared_ptr<data::AuxiliaryBasis> dfj_auxiliary_basis;
+  if (auxiliary_bases &&
+      (auxiliary_bases->has_auxiliary_basis(data::AuxiliaryBasisRole::JFit) ||
+       auxiliary_bases->has_auxiliary_basis(data::AuxiliaryBasisRole::JKFit))) {
+    // Exact JFit takes precedence; the collection contract permits JKFit to
+    // satisfy a JFit requirement when no exact association exists.
+    dfj_auxiliary_basis = auxiliary_bases->resolve_auxiliary_basis(
+        data::AuxiliaryBasisRole::JFit);
   }
-  std::string aux_basis_name_setting = _settings->get<std::string>("aux_basis");
-  bool has_embedded_aux_basis = qdk_raw_basis_set->has_aux_basis();
-  // Auto-detect: if the BasisSet carries an auxiliary basis, enable DFJ for
-  // "auto" and "dfj". If both an embedded auxiliary basis and the
-  // 'aux_basis' setting are present, the embedded auxiliary basis takes
-  // precedence downstream.
-  bool use_dfj = (integral_type == "dfj");
-  if ((integral_type == "auto" || integral_type == "dfj") &&
-      has_embedded_aux_basis) {
-    use_dfj = true;
-    if (aux_basis_name_setting.empty()) {
-      aux_basis_name_setting = qdk_raw_basis_set->get_aux_name();
-    }
-  }
+
+  const bool use_dfj = dfj_auxiliary_basis != nullptr;
   if (use_dfj) {
-    if (!has_embedded_aux_basis && aux_basis_name_setting.empty()) {
+    if (dfj_auxiliary_basis->get_structure()->content_hash() !=
+        structure->content_hash()) {
       throw std::invalid_argument(
-          "DFJ requested but no auxiliary basis set provided. "
-          "Set 'aux_basis' or use a BasisSet with an auxiliary basis.");
-    }
-    bool dfj_eri_supported =
-        (ms_scf_config->eri.method == qcs::ERIMethod::Incore);
-#ifdef QDK_CHEMISTRY_ENABLE_LIBINTX
-    dfj_eri_supported = dfj_eri_supported ||
-                        (ms_scf_config->eri.method == qcs::ERIMethod::LibintX);
-#endif
-    if (!dfj_eri_supported) {
-      throw std::invalid_argument(
-          "Density-fitted Coulomb (DFJ) is only supported with the 'incore' "
-#ifdef QDK_CHEMISTRY_ENABLE_LIBINTX
-          "or 'LibintX' "
-#endif
-          "ERI method. Set eri_method='incore' (or remove the explicit "
-          "'direct' setting) when using DFJ.");
+          "The DFJ auxiliary basis must describe the SCF structure.");
     }
     ms_scf_config->do_dfj = true;
-    if (!aux_basis_name_setting.empty()) {
-      ms_scf_config->aux_basis = aux_basis_name_setting;
-      std::transform(ms_scf_config->aux_basis.begin(),
-                     ms_scf_config->aux_basis.end(),
-                     ms_scf_config->aux_basis.begin(), ::tolower);
+    ms_scf_config->aux_basis = dfj_auxiliary_basis->get_name();
+    ms_scf_config->eri.method = qcs::ERIMethod::Incore;
+    ms_scf_config->grad_eri.method = qcs::ERIMethod::Incore;
+
+    // DF-J replaces only the Coulomb build. Keep exchange out of the in-core
+    // four-center backend when a gradient-capable alternative is available.
+#ifdef QDK_CHEMISTRY_ENABLE_HGP
+    if (ms_scf_config->k_eri.method == qcs::ERIMethod::Incore ||
+        ms_scf_config->mpi.world_size > 1) {
+      ms_scf_config->k_eri.method = qcs::ERIMethod::HGP;
     }
+#else
+    if (ms_scf_config->mpi.world_size == 1) {
+      ms_scf_config->k_eri.method = qcs::ERIMethod::Libint2Direct;
+    } else {
+      ms_scf_config->k_eri.method = qcs::ERIMethod::Incore;
+      if (require_gradient) {
+        throw std::invalid_argument(
+            "DFJ analytic gradients with MPI require the HGP ERI backend.");
+      }
+    }
+#endif
   }
 
   ms_scf_config->fock_reset_steps = _settings->get<int64_t>("fock_reset_steps");
@@ -326,10 +317,10 @@ ScfCalculationResult ScfSolver::_run_with_options(
   // Convert QDK basis set to internal format
   auto ms_basis_set =
       utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set);
-  auto ms_aux_basis_set =
-      use_dfj
-          ? utils::microsoft::convert_aux_basis_set_from_qdk(*qdk_raw_basis_set)
-          : nullptr;
+  auto internal_auxiliary_basis =
+      use_dfj ? utils::microsoft::convert_auxiliary_basis_from_qdk(
+                    *dfj_auxiliary_basis)
+              : nullptr;
   auto ms_raw_basis_set =
       utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set, false);
 
@@ -337,10 +328,10 @@ ScfCalculationResult ScfSolver::_run_with_options(
   std::shared_ptr<qcs::SCF> scf;
   if (method == "hf") {
     scf = qcs::SCF::make_hf_solver(ms_mol, *ms_scf_config, ms_basis_set,
-                                   ms_raw_basis_set, ms_aux_basis_set);
+                                   ms_raw_basis_set, internal_auxiliary_basis);
   } else {
     scf = qcs::SCF::make_ks_solver(ms_mol, *ms_scf_config, ms_basis_set,
-                                   ms_raw_basis_set, ms_aux_basis_set);
+                                   ms_raw_basis_set, internal_auxiliary_basis);
   }
 
   // Compute map from QDK shells to internal representation
@@ -361,7 +352,8 @@ ScfCalculationResult ScfSolver::_run_with_options(
 
   for (size_t i = 0, ibf = 0; i < qdk_raw_basis_set->get_num_shells(); ++i) {
     const auto& shell = shells[i];
-    const auto sh_sz = shell.get_num_atomic_orbitals();
+    const auto sh_sz = shell.get_num_atomic_orbitals(
+        qdk_raw_basis_set->get_atomic_orbital_type());
     size_t jbf = libint_sh2bf[qdk_to_internal_shells[i]];
 
     qdk_raw_basis_map.block(ibf, jbf, sh_sz, sh_sz) =
@@ -456,10 +448,10 @@ ScfCalculationResult ScfSolver::_run_with_options(
         (method == "hf")
             ? qcs::SCF::make_hf_solver(ms_mol, *ms_scf_config, density_matrix,
                                        ms_basis_set, ms_raw_basis_set,
-                                       ms_aux_basis_set)
+                                       internal_auxiliary_basis)
             : qcs::SCF::make_ks_solver(ms_mol, *ms_scf_config, density_matrix,
                                        ms_basis_set, ms_raw_basis_set,
-                                       ms_aux_basis_set);
+                                       internal_auxiliary_basis);
 
     // Replace the original scf with the initial guess version
     scf = std::move(initial_guess_scf);
@@ -561,17 +553,19 @@ ScfCalculationResult ScfSolver::_run_with_options(
 
 ScfCalculationResult ScfSolver::run_with_analytic_gradient(
     std::shared_ptr<data::Structure> structure, int charge, int multiplicity,
-    BasisOrGuessType basis_or_guess) const {
+    BasisOrGuessType basis_or_guess,
+    std::shared_ptr<data::AuxiliaryBasisCollection> auxiliary_bases) const {
   this->lock_settings();
   return _run_with_options(structure, charge, multiplicity, basis_or_guess,
-                           true);
+                           auxiliary_bases, true);
 }
 
 std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     std::shared_ptr<data::Structure> structure, int charge, int multiplicity,
-    BasisOrGuessType basis_or_guess) const {
-  auto result =
-      _run_with_options(structure, charge, multiplicity, basis_or_guess, false);
+    BasisOrGuessType basis_or_guess,
+    std::shared_ptr<data::AuxiliaryBasisCollection> auxiliary_bases) const {
+  auto result = _run_with_options(structure, charge, multiplicity,
+                                  basis_or_guess, auxiliary_bases, false);
   return {result.energy, result.wavefunction};
 }
 }  // namespace qdk::chemistry::algorithms::microsoft

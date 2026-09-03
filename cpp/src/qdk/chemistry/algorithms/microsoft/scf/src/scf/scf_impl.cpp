@@ -67,12 +67,12 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
     ctx_.basis_set = basis_set;
   }
   if (cfg.do_dfj) {
-    if (aux_basis_set == nullptr) {
+    if (aux_basis_set) {
+      ctx_.aux_basis_set = aux_basis_set;
+    } else {
       ctx_.aux_basis_set =
           BasisSet::from_database_json(mol_ptr, cfg.aux_basis, cfg.basis_mode,
                                        !cfg.cartesian /*pure*/, true /*sort*/);
-    } else {
-      ctx_.aux_basis_set = aux_basis_set;
     }
   }
   if (cfg.output_basis_mode == BasisMode::RAW) {
