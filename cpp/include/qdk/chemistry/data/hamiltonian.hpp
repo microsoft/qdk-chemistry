@@ -296,6 +296,8 @@ class HamiltonianContainer {
    * @param nbeta Number of beta electrons
    * @throws std::runtime_error if I/O error occurs, the Hamiltonian is
    * unrestricted, or its two-body integrals lack 8-fold permutation symmetry
+   * @throws std::invalid_argument if the active space has differing alpha and
+   * beta sizes
    */
   virtual void to_fcidump_file(const std::string& filename, size_t nalpha,
                                size_t nbeta) const;
@@ -634,6 +636,8 @@ class Hamiltonian : public DataClass,
    * @param nbeta Number of beta electrons
    * @throws std::runtime_error if I/O error occurs, the Hamiltonian is
    * unrestricted, or its two-body integrals lack 8-fold permutation symmetry
+   * @throws std::invalid_argument if the active space has differing alpha and
+   * beta sizes
    */
   void to_fcidump_file(const std::string& filename, size_t nalpha,
                        size_t nbeta) const;

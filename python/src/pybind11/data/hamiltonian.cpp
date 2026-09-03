@@ -542,6 +542,7 @@ Raises:
     RuntimeError: If I/O error occurs, the Hamiltonian is unrestricted, or its
         two-body integrals lack the 8-fold permutation symmetry that FCIDUMP
         readers reconstruct.
+    ValueError: If the active space has differing alpha and beta sizes.
 )",
       py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
 
@@ -770,6 +771,7 @@ Raises:
     RuntimeError: If I/O error occurs, the Hamiltonian is unrestricted, or its
         two-body integrals lack the 8-fold permutation symmetry that FCIDUMP
         readers reconstruct.
+    ValueError: If the active space has differing alpha and beta sizes.
 )",
       py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
 
@@ -1356,6 +1358,7 @@ Raises:
     RuntimeError: If I/O error occurs, the Hamiltonian is unrestricted, or its
         two-body integrals lack the 8-fold permutation symmetry that FCIDUMP
         readers reconstruct.
+    ValueError: If the active space has differing alpha and beta sizes.
 
 Examples:
     >>> hamiltonian.to_fcidump_file("water.fcidump", 5, 5)
