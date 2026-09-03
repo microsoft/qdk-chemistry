@@ -451,67 +451,6 @@ void settings_to_hdf5_file_wrapper(qdk::chemistry::data::Settings &self,
   self.to_hdf5_file(qdk::chemistry::python::utils::to_string_path(filename));
 }
 
-// Settings::has / Settings::set are non-virtual, so a Settings subclass written
-// in Python (e.g. a plugin slot holding a live client object) is invisible to
-// C++ calls. These helpers go through the Python object so such overrides are
-// honoured, while plain C++ Settings keep their existing typed behaviour.
-bool settings_has_key(const std::shared_ptr<Settings> &settings,
-                      const std::string &key) {
-  if (!settings) {
-    return false;
-  }
-  if (settings->has(key)) {
-    return true;
-  }
-  return py::cast<bool>(py::cast(settings).attr("has")(key));
-}
-
-void settings_set_key(const std::shared_ptr<Settings> &settings,
-                      const std::string &key, const py::object &value) {
-  if (!settings) {
-    throw SettingNotFound(key);
-  }
-  if (settings->has(key)) {
-    settings->set(key, python_to_setting_value_with_type(
-                           value, settings->get_type_name(key), key));
-    return;
-  }
-  py::object py_settings = py::cast(settings);
-  if (!py::cast<bool>(py_settings.attr("has")(key))) {
-    throw SettingNotFound(key);
-  }
-  py_settings.attr("set")(key, value);
-}
-
-py::object settings_get_key(const std::shared_ptr<Settings> &settings,
-                            const std::string &key) {
-  if (!settings) {
-    throw SettingNotFound(key);
-  }
-  if (settings->has(key)) {
-    return setting_value_to_python(settings->get(key));
-  }
-  py::object py_settings = py::cast(settings);
-  if (!py::cast<bool>(py_settings.attr("has")(key))) {
-    throw SettingNotFound(key);
-  }
-  return py_settings.attr("get")(key);
-}
-
-// Shared implementation for AlgorithmRef.set / __setattr__ / __setitem__.
-void algorithm_ref_set(AlgorithmRef &ref, const std::string &key,
-                       const py::object &value) {
-  if (key == "algorithm_type") {
-    throw std::invalid_argument(
-        "algorithm_type is immutable after construction");
-  }
-  if (key == "algorithm_name") {
-    ref.set("algorithm_name", SettingValue(value.cast<std::string>()));
-    return;
-  }
-  settings_set_key(ref.get_settings(), key, value);
-}
-
 void bind_settings(pybind11::module &data) {
   using namespace qdk::chemistry::algorithms;
 
@@ -570,8 +509,9 @@ Attributes:
                  py::object instance =
                      reg.attr("create")(algorithm_type, algorithm_name);
                  py::object py_settings = instance.attr("settings")();
-                 // Adopt the Python object so Settings subclasses survive.
-                 resolved = py_settings.cast<std::shared_ptr<Settings>>();
+                 // Deep-copy via JSON round-trip
+                 auto json_obj = py_settings.cast<Settings &>().to_json();
+                 resolved = Settings::from_json(json_obj);
                } catch (...) {
                  // Registry not available yet; leave settings unresolved
                }
@@ -591,7 +531,13 @@ Attributes:
                    const auto key = py::cast<std::string>(
                        py::reinterpret_borrow<py::object>(item.first));
                    auto value = py::reinterpret_borrow<py::object>(item.second);
-                   settings_set_key(ref.get_settings(), key, value);
+                   if (!ref.get_settings()->has(key)) {
+                     throw SettingNotFound(key);
+                   }
+                   ref.get_settings()->set(
+                       key,
+                       python_to_setting_value_with_type(
+                           value, ref.get_settings()->get_type_name(key), key));
                  }
                } else {
                  throw py::value_error(
@@ -626,7 +572,8 @@ Examples:
             if (key == "algorithm_name")
               return py::cast(ref.get_algorithm_name());
             if (key == "settings") return py::cast(ref.get_settings());
-            return settings_get_key(ref.get_settings(), key);
+            if (!ref.get_settings()) throw SettingNotFound(key);
+            return setting_value_to_python(ref.get_settings()->get(key));
           },
           py::arg("key"),
           R"(
@@ -642,7 +589,7 @@ Args:
       .def(
           "set",
           [](AlgorithmRef &ref, const std::string &key,
-             const py::object &value) { algorithm_ref_set(ref, key, value); },
+             const SettingValue &value) { ref.set(key, value); },
           py::arg("key"), py::arg("value"),
           R"(
 Set a field or nested setting.
@@ -660,8 +607,9 @@ Args:
           "update",
           [](AlgorithmRef &ref, py::kwargs kwargs) {
             for (auto &[k, v] : kwargs) {
-              algorithm_ref_set(ref, k.cast<std::string>(),
-                                py::reinterpret_borrow<py::object>(v));
+              std::string key = k.cast<std::string>();
+              SettingValue sv = v.cast<SettingValue>();
+              ref.set(key, sv);
             }
           },
           R"(
@@ -681,8 +629,8 @@ Examples:
             if (key == "algorithm_name")
               return py::cast(ref.get_algorithm_name());
             if (key == "settings") return py::cast(ref.get_settings());
-            if (settings_has_key(ref.get_settings(), key))
-              return settings_get_key(ref.get_settings(), key);
+            if (ref.get_settings() && ref.get_settings()->has(key))
+              return setting_value_to_python(ref.get_settings()->get(key));
             throw py::attribute_error("AlgorithmRef has no attribute '" + key +
                                       "'");
           },
@@ -706,7 +654,9 @@ Examples:
                   "Direct assignment to 'settings' is not supported. "
                   "Use set() or update() to modify individual settings.");
             }
-            settings_set_key(ref.get_settings(), key, value);
+            if (!ref.get_settings()) throw SettingNotFound(key);
+            SettingValue sv = value.cast<SettingValue>();
+            ref.get_settings()->set(key, sv);
           },
           py::arg("key"), py::arg("value"))
       // --- [] / in ----------------------------------------------------------
@@ -718,13 +668,14 @@ Examples:
             if (key == "algorithm_name")
               return py::cast(ref.get_algorithm_name());
             if (key == "settings") return py::cast(ref.get_settings());
-            return settings_get_key(ref.get_settings(), key);
+            if (!ref.get_settings()) throw SettingNotFound(key);
+            return setting_value_to_python(ref.get_settings()->get(key));
           },
           py::arg("key"))
       .def(
           "__setitem__",
           [](AlgorithmRef &ref, const std::string &key,
-             const py::object &value) { algorithm_ref_set(ref, key, value); },
+             const SettingValue &value) { ref.set(key, value); },
           py::arg("key"), py::arg("value"))
       .def(
           "__contains__",
@@ -732,7 +683,7 @@ Examples:
             if (key == "algorithm_type" || key == "algorithm_name" ||
                 key == "settings")
               return true;
-            return settings_has_key(ref.get_settings(), key);
+            return ref.get_settings() && ref.get_settings()->has(key);
           },
           py::arg("key"))
       .def("__repr__", [](const AlgorithmRef &ref) {

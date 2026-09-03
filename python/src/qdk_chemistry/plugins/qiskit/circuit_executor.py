@@ -121,6 +121,7 @@ class QiskitAerSimulator(CircuitExecutor):
             circuit: The quantum circuit to execute.
             shots: The number of shots to execute the circuit.
             noise: Optional noise profile to apply during execution.
+            **kwargs: Reserved for forward compatibility.
 
         Returns:
             CircuitExecutorData: Object containing the results of the circuit execution.
