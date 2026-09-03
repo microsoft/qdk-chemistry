@@ -21,7 +21,7 @@ namespace QDKChemistry.TestUtils.UnaryPhaseEstimationTests {
     import QDKChemistry.Utils.UnaryPhaseEstimation.PhaseRegisterSize;
 
     /// Checks the generic schedule against the explicit walk power.
-    function MakeSignedPowerScheduleAgainstWalkOp(
+    function TestMakeSignedPowerScheduleAgainstWalkOp(
         applyBlockEncoding : (Qubit[] => Unit is Adj),
         applyReflection : (Qubit[] => Unit is Adj + Ctl),
         numQueries : Int,
@@ -56,7 +56,7 @@ namespace QDKChemistry.TestUtils.UnaryPhaseEstimationTests {
     }
 
     /// Runs `MakeUnaryQPECircuit` on a synthetic one-qubit walk with an exact eigenphase.
-    operation RunSyntheticWalkQpe(numQueries : Int, theta : Double, systemAngle : Double) : Result[] {
+    operation TestRunSyntheticWalkQpe(numQueries : Int, theta : Double, systemAngle : Double) : Result[] {
         Fact(
             2^PhaseRegisterSize(numQueries) == numQueries + 1,
             "numQueries must be one less than a power of two",

@@ -69,7 +69,7 @@ class TestUnaryIterationQsharp:
         """A basis-state address must fire the matching action and only that one."""
         num_address_qubits = _address_qubits(num_actions)
         for address_value in range(num_actions):
-            op = _test_utils(qsharp_test_context, "UnaryIterationTests").MakeOneHotOp(num_actions, address_value)
+            op = _test_utils(qsharp_test_context, "UnaryIterationTests").TestMakeOneHotOp(num_actions, address_value)
             state = _dump_op(op, num_address_qubits + num_actions, qsharp_test_context)
 
             expected = np.zeros(1 << (num_address_qubits + num_actions), dtype=complex)
@@ -80,7 +80,7 @@ class TestUnaryIterationQsharp:
     def test_superposed_address_stays_coherent(self, qsharp_test_context, num_actions):
         """A superposed address must produce sum_a |a>|onehot(a)> with no ancilla residue."""
         num_address_qubits = _address_qubits(num_actions)
-        op = _test_utils(qsharp_test_context, "UnaryIterationTests").MakeSuperposedAddressOp(num_actions)
+        op = _test_utils(qsharp_test_context, "UnaryIterationTests").TestMakeSuperposedAddressOp(num_actions)
         state = _dump_op(op, num_address_qubits + num_actions, qsharp_test_context)
 
         expected = np.zeros(1 << (num_address_qubits + num_actions), dtype=complex)
@@ -100,7 +100,7 @@ class TestUnaryIterationQsharp:
     def test_exposed_control_is_an_equality_predicate(self, qsharp_test_context, num_actions, data):
         """Phasing the exposed control must imprint exactly the flagged sign pattern."""
         num_address_qubits = _address_qubits(num_actions)
-        op = _test_utils(qsharp_test_context, "UnaryIterationTests").MakeControlPhasesOp(num_actions, data)
+        op = _test_utils(qsharp_test_context, "UnaryIterationTests").TestMakeControlPhasesOp(num_actions, data)
         state = _dump_op(op, num_address_qubits, qsharp_test_context)
 
         # Addresses at or above num_actions are outside the iteration's promise: the last
@@ -121,8 +121,8 @@ class TestBlockEncodingAgnosticSchedule:
     def test_psp_schedule_matches_the_explicit_walk_power(self, qsharp_test_context, num_queries, address_value):
         """A PREPARE-SELECT-PREPARE walk must obey the same ``W^(p - 2t)`` contract."""
         psp = qsharp_test_context.code.QDKChemistry.Utils.PrepSelPrep
-        op = _test_utils(qsharp_test_context, "UnaryPhaseEstimationTests").MakeSignedPowerScheduleAgainstWalkOp(
-            _test_utils(qsharp_test_context, "PrepSelPrepTests").MakeBlockEncodingOp(0.7),
+        op = _test_utils(qsharp_test_context, "UnaryPhaseEstimationTests").TestMakeSignedPowerScheduleAgainstWalkOp(
+            _test_utils(qsharp_test_context, "PrepSelPrepTests").TestMakeBlockEncodingOp(0.7),
             psp.MakeAncillaReflectionOp(1),
             num_queries,
             address_value,
@@ -140,8 +140,8 @@ class TestBlockEncodingAgnosticSchedule:
     def test_psp_schedule_holds_for_every_encoded_eigenvalue(self, qsharp_test_context, theta):
         """The contract must not depend on what the block encoding encodes."""
         psp = qsharp_test_context.code.QDKChemistry.Utils.PrepSelPrep
-        op = _test_utils(qsharp_test_context, "UnaryPhaseEstimationTests").MakeSignedPowerScheduleAgainstWalkOp(
-            _test_utils(qsharp_test_context, "PrepSelPrepTests").MakeBlockEncodingOp(theta),
+        op = _test_utils(qsharp_test_context, "UnaryPhaseEstimationTests").TestMakeSignedPowerScheduleAgainstWalkOp(
+            _test_utils(qsharp_test_context, "PrepSelPrepTests").TestMakeBlockEncodingOp(theta),
             psp.MakeAncillaReflectionOp(1),
             3,
             1,
@@ -387,7 +387,7 @@ class TestUnaryQpeEndToEnd:
         """Run the synthetic-walk QPE circuit from ``Ry(system_angle)|0>`` and decode the phase register."""
         num_states = num_queries + 1
         theta = -np.pi * k / num_states
-        results = _test_utils(context, "UnaryPhaseEstimationTests").RunSyntheticWalkQpe(
+        results = _test_utils(context, "UnaryPhaseEstimationTests").TestRunSyntheticWalkQpe(
             num_queries, theta, system_angle
         )
         return int("".join("1" if str(bit) == "One" else "0" for bit in reversed(results)), 2)

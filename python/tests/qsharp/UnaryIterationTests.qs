@@ -17,7 +17,7 @@ namespace QDKChemistry.TestUtils.UnaryIterationTests {
     import QDKChemistry.Utils.UnaryIteration.UnaryIterationWithControl;
 
     /// Flips `flags[index]` for the single selected address.
-    function MakeOneHotOp(numActions : Int, addressValue : Int) : (Qubit[] => Unit) {
+    function TestMakeOneHotOp(numActions : Int, addressValue : Int) : (Qubit[] => Unit) {
         return qs => {
             let numAddressQubits = AddressQubits(numActions);
             let address = qs[0..numAddressQubits - 1];
@@ -31,7 +31,7 @@ namespace QDKChemistry.TestUtils.UnaryIterationTests {
     }
 
     /// Runs the one-hot iteration on a uniform superposition of every address.
-    function MakeSuperposedAddressOp(numActions : Int) : (Qubit[] => Unit) {
+    function TestMakeSuperposedAddressOp(numActions : Int) : (Qubit[] => Unit) {
         return qs => {
             let numAddressQubits = AddressQubits(numActions);
             Fact(2^numAddressQubits == numActions, "numActions must be a power of two");
@@ -45,7 +45,7 @@ namespace QDKChemistry.TestUtils.UnaryIterationTests {
     }
 
     /// Applies `Z` to the exposed unary control for every index flagged in `data`.
-    function MakeControlPhasesOp(numActions : Int, data : Bool[]) : (Qubit[] => Unit) {
+    function TestMakeControlPhasesOp(numActions : Int, data : Bool[]) : (Qubit[] => Unit) {
         return address => {
             ApplyToEach(H, address);
             UnaryIterationWithControl(address, numActions, (index, control) => {
