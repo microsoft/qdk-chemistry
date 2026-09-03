@@ -12,6 +12,7 @@ status, and retrieve serialized outputs.
 
 from __future__ import annotations
 
+import inspect
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -40,6 +41,7 @@ __all__ = [
     "available_backends",
     "create_remote",
     "get_backend",
+    "get_mcp_safe_config_options",
     "register_backend",
 ]
 
@@ -177,11 +179,14 @@ class RemoteBackend(ABC):
     1. Subclass RemoteBackend
     2. Implement the methods above
     3. Register it from a QdkChemistryPlugin
+    4. Optionally declare ``mcp_safe_config_options`` for constructor options
+       that MCP clients may control. The default is deny-all.
 
     Example:
         >>> from qdk_chemistry.plugins import PluginRegistrar, QdkChemistryPlugin
         >>> class SlurmBackend(RemoteBackend):
         ...     name = "slurm"
+        ...     mcp_safe_config_options = frozenset({"poll_interval", "timeout"})
         ...
         ...     def __init__(self, *, host, partition="default", poll_interval=5.0, timeout=3600.0):
         ...         super().__init__(
@@ -212,6 +217,12 @@ class RemoteBackend(ABC):
     """
 
     name: str  # Backend name (e.g., "scheduler", "local")
+    mcp_safe_config_options: ClassVar[frozenset[str]] = frozenset()
+    """Constructor options that MCP clients may control.
+
+    Concrete backends must declare this attribute directly on the class to
+    expose any options through MCP. The default is deny-all.
+    """
 
     def __init__(self, **backend_args: Any) -> None:
         """Store the arguments needed to recreate the concrete backend.
@@ -307,6 +318,7 @@ class RemoteBackend(ABC):
         )
         run_hash = _prepare_persisted_value(payload.get("run_hash"), "run_hash")
         input_hashes = _prepare_persisted_value(payload.get("input_hashes"), "input_hashes")
+        owner = _prepare_persisted_value(payload.get("owner"), "owner")
 
         job_id, backend_state = self._submit(payload)
         try:
@@ -333,6 +345,7 @@ class RemoteBackend(ABC):
             algorithm_info=algorithm_info,
             run_hash=run_hash,
             input_hashes=input_hashes,
+            owner=owner,
         )
         job.attach_backend(self)
 
@@ -426,6 +439,40 @@ class RemoteBackend(ABC):
 _BACKENDS: dict[str, type[RemoteBackend]] = {}
 
 
+def _declared_mcp_safe_config_options(cls: type[RemoteBackend]) -> frozenset[str]:
+    """Return MCP-safe options declared directly by a backend class.
+
+    Args:
+        cls: Concrete backend class to inspect.
+
+    Returns:
+        The class's declared MCP-safe constructor options, or an empty set
+        when the class does not declare any.
+
+    """
+    return cls.__dict__.get("mcp_safe_config_options", frozenset())
+
+
+def get_mcp_safe_config_options(name: str) -> frozenset[str]:
+    """Return MCP-safe constructor options for a registered backend.
+
+    Unknown backends and those without a direct declaration expose no
+    configurable options to MCP clients.
+
+    Args:
+        name: Registered backend name.
+
+    Returns:
+        The explicitly declared MCP-safe constructor options. Returns an empty
+        set when the backend is unknown or has no direct declaration.
+
+    """
+    cls = _BACKENDS.get(name)
+    if cls is None:
+        return frozenset()
+    return _declared_mcp_safe_config_options(cls)
+
+
 def _register_backend(name: str, cls: Type[RemoteBackend]) -> Type[RemoteBackend]:  # noqa: UP006
     """Register one backend class after validating registry ownership.
 
@@ -442,6 +489,32 @@ def _register_backend(name: str, cls: Type[RemoteBackend]) -> Type[RemoteBackend
                 f"Remote backend class '{cls.__module__}.{cls.__qualname__}' is already registered "
                 f"with name '{registered_name}'"
             )
+
+    # Declarations are intentionally not inherited: a subclass may change the
+    # meaning of constructor parameters and must make its own trust decision.
+    safe_options = _declared_mcp_safe_config_options(cls)
+    if not isinstance(safe_options, frozenset) or not all(
+        isinstance(option, str) and option for option in safe_options
+    ):
+        raise TypeError(
+            f"Remote backend '{cls.__module__}.{cls.__qualname__}' must declare "
+            "mcp_safe_config_options as a frozenset of non-empty strings"
+        )
+
+    constructor_parameters = inspect.signature(cls.__init__).parameters
+    keyword_parameters = {
+        parameter_name
+        for parameter_name, parameter in constructor_parameters.items()
+        if parameter_name != "self"
+        and parameter.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
+    }
+    unknown_options = safe_options - keyword_parameters
+    if unknown_options:
+        raise TypeError(
+            f"Remote backend '{cls.__module__}.{cls.__qualname__}' declares MCP-safe options that are not "
+            f"named constructor parameters: {', '.join(sorted(unknown_options))}"
+        )
+
     cls.name = name
     _BACKENDS[name] = cls
     return cls
