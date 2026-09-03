@@ -25,7 +25,6 @@ namespace QDKChemistry.Utils.QROMStatePrep {
     import Std.Math.PI;
     import Std.Math.Round;
     import Std.Math.Sqrt;
-    import QDKChemistry.Utils.CircuitComposition.MakeSharedAncillaOp;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
     import QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient;
     import QDKChemistry.Utils.SelectSwap.SelectSwap;
@@ -39,110 +38,6 @@ namespace QDKChemistry.Utils.QROMStatePrep {
         rotationBitPrecision : Int,
         /// Number of qubits for the state register: ⌈log₂ L⌉.
         numStateQubits : Int,
-    }
-
-    /// QROM state preparation using SBM decomposition.
-    ///
-    /// Prepares: |0⟩^n → Σ_j c_j |j⟩ using n layers of multiplexed Ry rotations.
-    ///
-    /// Qubit ordering: `target` is little-endian, matching `Std.TableLookup.Select` and
-    /// `ApplyControlledOnInt`, so the register can be handed straight to a SELECT oracle.
-    /// SBM splits on the most significant bit first, so the body works through `Reversed(target)`.
-    ///
-    /// # Input
-    /// ## params
-    /// State preparation parameters.
-    /// ## target
-    /// State register (n qubits), initialized to |0...0⟩.
-    /// ## phaseGradient
-    /// Phase gradient ancilla (bRot qubits), pre-initialized by the caller.
-    operation QROMStatePrepare(
-        params : QROMStatePrepParams,
-        target : Qubit[],
-        phaseGradient : Qubit[],
-    ) : Unit is Adj + Ctl {
-        let n = params.numStateQubits;
-        let bRot = params.rotationBitPrecision;
-        let angleTree = ComputeSBMAngles(params.amplitudes, n, bRot);
-
-        // SBM fixes the most significant bit first, so walk the LE register in reverse.
-        let msbFirst = Reversed(target);
-
-        // Angle scratch register; each layer uncomputes it back to |0...0⟩.
-        use angleReg = Qubit[bRot];
-
-        for level in 0..n - 1 {
-            let targetQubit = msbFirst[level];
-
-            if level == 0 {
-                // Root level: single unconditional rotation Ry(2θ_root).
-                let angleBits = IntAsBoolArray(angleTree[1], bRot);
-                within {
-                    ApplyPauliFromBitString(PauliX, true, angleBits, angleReg);
-                } apply {
-                    RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
-                }
-            } else {
-                // Address = the already-fixed high bits, reversed into LE for Select.
-                let address = Reversed(msbFirst[0..level - 1]);
-
-                let startIdx = 1 <<< level;
-                let numAngles = 1 <<< level;
-                let data = ComputeQROMData(angleTree, startIdx, numAngles, bRot);
-
-                within {
-                    SelectSwap(-1, data, address, angleReg);
-                } apply {
-                    RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
-                }
-            }
-        }
-
-        // Sign correction: Ry rotations produce |α_j| (positive amplitudes).
-        // For negative coefficients, flip the phase via QROM-loaded Z.
-        let signData = ComputeSignBits(params.amplitudes, n);
-        if Any(row -> row[0], signData) {
-            use signBit = Qubit[1];
-            // `target` is already LE, which is the address order Select expects.
-            within {
-                Select(signData, target, signBit);
-            } apply {
-                Z(signBit[0]);
-            }
-        }
-    }
-
-    /// Create a QROM state preparation callable that reuses an externally prepared gradient.
-    ///
-    /// The caller owns `qs[n..n + bRot - 1]`: it must already hold the phase gradient state and is
-    /// left in it, so a walk invoking PREPARE many times pays for the gradient once. It must
-    /// therefore be excluded from any reflection about |0⟩. A single-shot caller can wrap this in
-    /// `CircuitComposition.MakeSharedAncillaOp`.
-    function MakeQROMStatePrepOpWithSharedGradient(params : QROMStatePrepParams) : Qubit[] => Unit is Adj + Ctl {
-        let n = params.numStateQubits;
-        let bRot = params.rotationBitPrecision;
-        (qs) => QROMStatePrepare(params, qs[0..n - 1], qs[n..n + bRot - 1])
-    }
-
-    /// Circuit entry point for QROM state preparation (allocates qubits).
-    ///
-    /// Standalone, so this is the caller that owns the shared gradient and prepares it.
-    operation MakeQROMStatePrepCircuit(
-        amplitudes : Double[],
-        rotationBitPrecision : Int,
-        numStateQubits : Int,
-    ) : Unit {
-        let params = new QROMStatePrepParams {
-            amplitudes = amplitudes,
-            rotationBitPrecision = rotationBitPrecision,
-            numStateQubits = numStateQubits,
-        };
-        use qs = Qubit[numStateQubits + rotationBitPrecision];
-        MakeSharedAncillaOp(
-            MakeQROMStatePrepOpWithSharedGradient(params),
-            PreparePhaseGradientState,
-            rotationBitPrecision
-        )(qs);
     }
 
     /// Compute the SBM rotation angles as quantized integers in a binary heap.
@@ -242,5 +137,135 @@ namespace QDKChemistry.Utils.QROMStatePrep {
             }
         }
         return signTable;
+    }
+
+    /// QROM state preparation using SBM decomposition.
+    ///
+    /// Prepares: |0⟩^n → Σ_j c_j |j⟩ using n layers of multiplexed Ry rotations.
+    operation QROMStatePrepare(
+        params : QROMStatePrepParams,
+        target : Qubit[],
+        phaseGradient : Qubit[],
+    ) : Unit is Adj + Ctl {
+        let bRot = params.rotationBitPrecision;
+        use angleReg = Qubit[bRot];
+        QROMStatePrepareCore(params, target, phaseGradient, angleReg);
+    }
+
+    /// Core QROM state preparation.
+    ///
+    /// Qubit ordering: `target` is little-endian, matching `Std.TableLookup.Select` and
+    /// `ApplyControlledOnInt`, so the register can be handed straight to a SELECT oracle
+    /// and coefficient `j` lands on register value `j`. SBM fixes the most significant
+    /// bit first, so the layer loop walks `target` in reverse.
+    ///
+    /// # Input
+    /// ## params
+    /// State preparation parameters.
+    /// ## target
+    /// State register (n qubits), initialized to |0...0⟩.
+    /// ## phaseGradient
+    /// Phase gradient ancilla (bRot qubits), pre-initialized.
+    /// ## angleReg
+    /// Angle scratch register (bRot qubits), initialized to |0...0⟩.
+    internal operation QROMStatePrepareCore(
+        params : QROMStatePrepParams,
+        target : Qubit[],
+        phaseGradient : Qubit[],
+        angleReg : Qubit[],
+    ) : Unit is Adj + Ctl {
+        let n = params.numStateQubits;
+        let bRot = params.rotationBitPrecision;
+        let angleTree = ComputeSBMAngles(params.amplitudes, n, bRot);
+
+        // SBM fixes the most significant bit first, so walk the LE register in reverse.
+        let msbFirst = Reversed(target);
+
+        for level in 0..n - 1 {
+            let targetQubit = msbFirst[level];
+
+            if level == 0 {
+                // Root level: single unconditional rotation Ry(2θ_root).
+                let angleBits = IntAsBoolArray(angleTree[1], bRot);
+                within {
+                    ApplyPauliFromBitString(PauliX, true, angleBits, angleReg);
+                } apply {
+                    RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
+                }
+            } else {
+                // Address = the already-fixed high bits, reversed back into LE for Select.
+                let address = Reversed(msbFirst[0..level - 1]);
+
+                let startIdx = 1 <<< level;
+                let numAngles = 1 <<< level;
+                let data = ComputeQROMData(angleTree, startIdx, numAngles, bRot);
+
+                within {
+                    SelectSwap(-1, data, address, angleReg);
+                } apply {
+                    RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
+                }
+            }
+        }
+
+        // Sign correction: Ry rotations produce |α_j| (positive amplitudes).
+        // For negative coefficients, flip the phase via QROM-loaded Z.
+        let signData = ComputeSignBits(params.amplitudes, n);
+        if Any(row -> row[0], signData) {
+            use signBit = Qubit[1];
+            // `target` is already LE, which is the address order Select expects.
+            within {
+                Select(signData, target, signBit);
+            } apply {
+                Z(signBit[0]);
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Factories and circuit entry points
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Create a self-contained QROM state preparation callable.
+    function MakeQROMStatePrepOp(params : QROMStatePrepParams) : Qubit[] => Unit is Adj + Ctl {
+        (qs) => {
+            use phaseGradient = Qubit[params.rotationBitPrecision];
+            within {
+                PreparePhaseGradientState(phaseGradient);
+            } apply {
+                QROMStatePrepare(params, qs, phaseGradient);
+            }
+        }
+    }
+
+    /// Create a QROM state preparation callable using a caller-owned phase gradient register.
+    function MakeQROMStatePrepOpWithPhaseGradient(params : QROMStatePrepParams) : Qubit[] => Unit is Adj + Ctl {
+        let n = params.numStateQubits;
+        let bRot = params.rotationBitPrecision;
+        (qs) => QROMStatePrepare(
+            params,
+            qs[0..n - 1],
+            qs[n..n + bRot - 1]
+        )
+    }
+
+    /// Circuit entry point for QROM state preparation (allocates qubits).
+    operation MakeQROMStatePrepCircuit(
+        amplitudes : Double[],
+        rotationBitPrecision : Int,
+        numStateQubits : Int,
+    ) : Unit {
+        let params = new QROMStatePrepParams {
+            amplitudes = amplitudes,
+            rotationBitPrecision = rotationBitPrecision,
+            numStateQubits = numStateQubits,
+        };
+        use state = Qubit[numStateQubits];
+        use phaseGradient = Qubit[rotationBitPrecision];
+        within {
+            PreparePhaseGradientState(phaseGradient);
+        } apply {
+            QROMStatePrepare(params, state, phaseGradient);
+        }
     }
 }
