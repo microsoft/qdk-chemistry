@@ -42,7 +42,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // SELECT
+    // Parameters
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// Parameters for SELECT factory functions.
@@ -60,6 +60,186 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         /// When > 0, SelectImpl reads isSF and dvsq from innerReg instead of computing them.
         numFreeRiderBits : Int,
     }
+
+    /// Sizes of the registers packed into the target register handed to a walk callable.
+    ///
+    /// Layout: allQubits = [systemReg | outerReg | innerReg | spinReg | phaseGradientReg].
+    ///
+    /// `numInnerQubits` is the full width the inner PREPARE acts on. Only its first
+    /// `numReflectInner` qubits — the index, uniform and inequality-flag registers that
+    /// carry the success flag — sit in `allQubits`; the QROM output and free-rider bits
+    /// behind them are scratch that `SOSSABlockEncodingOnRegister` allocates itself.
+    ///
+    /// `numOuterPrepareGradientQubits` is the prefix of the phase-gradient register the outer
+    /// PREPARE reads; it is shared with SELECT rather than added to the total width.
+    struct SOSSAWalkLayout {
+        numSystemQubits : Int,
+        numOuterQubits : Int,
+        numOuterIndexQubits : Int,
+        numInnerQubits : Int,
+        numReflectInner : Int,
+        numPhaseGradientQubits : Int,
+        numOuterPrepareGradientQubits : Int,
+        numFreeRiderQubits : Int,
+    }
+
+    /// The individual registers sliced out of the target register.
+    struct SOSSAWalkRegisters {
+        systemReg : Qubit[],
+        outerReg : Qubit[],
+        innerReg : Qubit[],
+        spinReg : Qubit[],
+        phaseGradientReg : Qubit[],
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Classical helpers
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Number of spin qubits in the block encoding: spinReg = [spinDQ, spinSF].
+    function NumSOSSASpinQubits() : Int {
+        2
+    }
+
+    /// Width of the inner-PREPARE scratch that is allocated rather than passed in.
+    function SOSSAInnerScratchCount(layout : SOSSAWalkLayout) : Int {
+        layout.numInnerQubits - layout.numReflectInner
+    }
+
+    /// Number of block-encoding ancillas (everything except the system register).
+    ///
+    /// The reflected ancillas come first and the persistent phase gradient last, so a caller
+    /// reflects about `SOSSAWalkAncillaCount(layout) - layout.numPhaseGradientQubits` qubits
+    /// starting at `layout.numSystemQubits`.
+    function SOSSAWalkAncillaCount(layout : SOSSAWalkLayout) : Int {
+        layout.numOuterQubits + layout.numReflectInner + NumSOSSASpinQubits() + layout.numPhaseGradientQubits
+    }
+
+    /// Slice a flat target register into the SOSSA block-encoding registers.
+    ///
+    /// `innerReg` is only the reflected prefix; `SOSSABlockEncodingOnRegister` appends the
+    /// scratch it allocates before handing the register to the inner PREPARE and SELECT.
+    function SplitSOSSAWalkRegisters(layout : SOSSAWalkLayout, allQubits : Qubit[]) : SOSSAWalkRegisters {
+        let outerStart = layout.numSystemQubits;
+        let innerStart = outerStart + layout.numOuterQubits;
+        let spinStart = innerStart + layout.numReflectInner;
+        let gradientStart = spinStart + NumSOSSASpinQubits();
+        new SOSSAWalkRegisters {
+            systemReg = allQubits[0..outerStart - 1],
+            outerReg = allQubits[outerStart..innerStart - 1],
+            innerReg = allQubits[innerStart..spinStart - 1],
+            spinReg = allQubits[spinStart..gradientStart - 1],
+            phaseGradientReg = if layout.numPhaseGradientQubits > 0 {
+                allQubits[gradientStart..gradientStart + layout.numPhaseGradientQubits - 1]
+            } else {
+                []
+            }
+        }
+    }
+
+    /// Build DQ bulk rotation data: N entries, each containing all (N-1) quantized angles.
+    /// Addressed by xoReg[0..⌈log₂N⌉-1] (the orbital index for one-body terms).
+    internal function BuildDQBulkRotationData(
+        params : SelectParams,
+        N : Int,
+        numRotAngles : Int,
+        bRot : Int,
+    ) : Bool[][] {
+        mutable table : Bool[][] = [];
+        for xo in 0..N - 1 {
+            mutable bits : Bool[] = [];
+            for j in 0..numRotAngles - 1 {
+                let angle = if j < Length(params.OneBodyRotationAngles[xo]) {
+                    params.OneBodyRotationAngles[xo][j]
+                } else {
+                    0.0
+                };
+                set bits += IntAsBoolArray(QuantizeGivensAngle(angle, bRot), bRot);
+            }
+            set table += [bits];
+        }
+        return table;
+    }
+
+    /// Whether the SF rotation table is cheaper addressed `rBits ++ bReg` than `bReg ++ rBits`.
+    ///
+    /// `Select`'s address is the integer value of the register, so the *low* register is padded
+    /// out to its full power of two while the high one is not: `b` low costs `R * 2^bBits`
+    /// entries and `r` low costs `(B+1) * 2^rankBits`. Neither dominates -- which is smaller
+    /// depends only on how close `R` and `B+1` sit to a power of two -- so take the smaller.
+    /// Both orderings put (b=0, r=0) at address 0, which the one-body cancellation relies on.
+    ///
+    /// Reaching the paper's `R*B` needs an address with a non-power-of-two stride, which
+    /// `Select` cannot express; it would take a nested unary iteration over b then r, whose
+    /// uncompute would no longer be the measurement-based unlookup.
+    internal function SFTableRankAddressedFirst(
+        numRanks : Int,
+        numBases : Int,
+        bBits : Int,
+        rankBits : Int,
+    ) : Bool {
+        (numBases + 1) * (1 <<< rankBits) < numRanks * (1 <<< bBits)
+    }
+
+    /// Build SF bulk rotation data: all (N-1) quantized angles per entry, plus a 1-bit bEqB
+    /// flag indicating b == numBases.
+    ///
+    /// `rankFirst` selects the address layout, and must match the register order the caller
+    /// hands to `Select`: `addr = r + b * 2^rankBits` when true, `addr = b + r * 2^bBits`
+    /// otherwise. The table is sized to exactly cover the reachable addresses of that layout.
+    internal function BuildSFBulkRotationData(
+        params : SelectParams,
+        R : Int,
+        numRotAngles : Int,
+        bRot : Int,
+        bBits : Int,
+        rankBits : Int,
+        rankFirst : Bool,
+    ) : Bool[][] {
+        let bSlots = 1 <<< bBits;
+        let rSlots = 1 <<< rankBits;
+        let tableSize = if rankFirst { (params.numBases + 1) * rSlots } else { R * bSlots };
+
+        mutable table : Bool[][] = [];
+        for idx in 0..tableSize - 1 {
+            let b = if rankFirst { idx / rSlots } else { idx % bSlots };
+            let r = if rankFirst { idx % rSlots } else { idx / bSlots };
+
+            mutable bits : Bool[] = [];
+            for j in 0..numRotAngles - 1 {
+                let angleIdx = b * params.numRanks + r;
+                let angle = if r < R and angleIdx < Length(params.TwoBodyRotationAngles) and j < Length(params.TwoBodyRotationAngles[angleIdx]) {
+                    params.TwoBodyRotationAngles[angleIdx][j]
+                } else {
+                    0.0
+                };
+                set bits += IntAsBoolArray(QuantizeGivensAngle(angle, bRot), bRot);
+            }
+            // Append bEqB flag: true when b == numBases (the identity term)
+            set bits += [b == params.numBases];
+            set table += [bits];
+        }
+        return table;
+    }
+
+    /// Quantize a Givens rotation angle for phase gradient application.
+    ///
+    /// RyViaPhaseGradient applies Ry(4π·x/2^b). To achieve Ry(-2θ):
+    ///   4π·x/2^b = -2θ  →  x = -2^b · θ / (2π)  (mod 2^b)
+    internal function QuantizeGivensAngle(angle : Double, bRot : Int) : Int {
+        // Rejects NaN and ±∞ as well as absurd magnitudes: the comparison is false for
+        // NaN, so this fails loudly instead of silently folding a non-finite angle into
+        // an in-range bit pattern (NaN and +∞ both quantize to 2^bRot-1, -∞ to 0).
+        // Givens angles come from Atan2/hypot and are in [-π, π].
+        Fact(AbsD(angle) <= 4.0 * PI(), "QuantizeGivensAngle: angle must be finite and within [-4π, 4π]");
+        let scale = IntAsDouble(1 <<< bRot);
+        let raw = Round(-scale * angle / (2.0 * PI()));
+        ((raw % (1 <<< bRot)) + (1 <<< bRot)) % (1 <<< bRot)
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Quantum operations
+    // ═══════════════════════════════════════════════════════════════════════════
 
     /// SELECT implementation (arXiv:2502.15882v1, Appendix B.3, B.5-B.6).
     ///
@@ -268,86 +448,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             regs.phaseGradientReg,
         );
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Register layout
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    /// Number of spin qubits in the block encoding: spinReg = [spinDQ, spinSF].
-    function NumSOSSASpinQubits() : Int {
-        2
-    }
-
-    /// Sizes of the registers packed into the target register handed to a walk callable.
-    ///
-    /// Layout: allQubits = [systemReg | outerReg | innerReg | spinReg | phaseGradientReg].
-    ///
-    /// `numInnerQubits` is the full width the inner PREPARE acts on. Only its first
-    /// `numReflectInner` qubits — the index, uniform and inequality-flag registers that
-    /// carry the success flag — sit in `allQubits`; the QROM output and free-rider bits
-    /// behind them are scratch that `SOSSABlockEncodingOnRegister` allocates itself.
-    ///
-    /// `numOuterPrepareGradientQubits` is the prefix of the phase-gradient register the outer
-    /// PREPARE reads; it is shared with SELECT rather than added to the total width.
-    struct SOSSAWalkLayout {
-        numSystemQubits : Int,
-        numOuterQubits : Int,
-        numOuterIndexQubits : Int,
-        numInnerQubits : Int,
-        numReflectInner : Int,
-        numPhaseGradientQubits : Int,
-        numOuterPrepareGradientQubits : Int,
-        numFreeRiderQubits : Int,
-    }
-
-    /// The individual registers sliced out of the target register.
-    struct SOSSAWalkRegisters {
-        systemReg : Qubit[],
-        outerReg : Qubit[],
-        innerReg : Qubit[],
-        spinReg : Qubit[],
-        phaseGradientReg : Qubit[],
-    }
-
-    /// Width of the inner-PREPARE scratch that is allocated rather than passed in.
-    function SOSSAInnerScratchCount(layout : SOSSAWalkLayout) : Int {
-        layout.numInnerQubits - layout.numReflectInner
-    }
-
-    /// Number of block-encoding ancillas (everything except the system register).
-    ///
-    /// The reflected ancillas come first and the persistent phase gradient last, so a caller
-    /// reflects about `SOSSAWalkAncillaCount(layout) - layout.numPhaseGradientQubits` qubits
-    /// starting at `layout.numSystemQubits`.
-    function SOSSAWalkAncillaCount(layout : SOSSAWalkLayout) : Int {
-        layout.numOuterQubits + layout.numReflectInner + NumSOSSASpinQubits() + layout.numPhaseGradientQubits
-    }
-
-    /// Slice a flat target register into the SOSSA block-encoding registers.
-    ///
-    /// `innerReg` is only the reflected prefix; `SOSSABlockEncodingOnRegister` appends the
-    /// scratch it allocates before handing the register to the inner PREPARE and SELECT.
-    function SplitSOSSAWalkRegisters(layout : SOSSAWalkLayout, allQubits : Qubit[]) : SOSSAWalkRegisters {
-        let outerStart = layout.numSystemQubits;
-        let innerStart = outerStart + layout.numOuterQubits;
-        let spinStart = innerStart + layout.numReflectInner;
-        let gradientStart = spinStart + NumSOSSASpinQubits();
-        new SOSSAWalkRegisters {
-            systemReg = allQubits[0..outerStart - 1],
-            outerReg = allQubits[outerStart..innerStart - 1],
-            innerReg = allQubits[innerStart..spinStart - 1],
-            spinReg = allQubits[spinStart..gradientStart - 1],
-            phaseGradientReg = if layout.numPhaseGradientQubits > 0 {
-                allQubits[gradientStart..gradientStart + layout.numPhaseGradientQubits - 1]
-            } else {
-                []
-            }
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Helpers
-    // ═══════════════════════════════════════════════════════════════════════════
 
     /// Select spin qubit and SWAP up/down registers (arXiv:2502.15882v1, Step 4).
     ///
@@ -558,106 +658,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                 action();
             }
         }
-    }
-
-    /// Build DQ bulk rotation data: N entries, each containing all (N-1) quantized angles.
-    /// Addressed by xoReg[0..⌈log₂N⌉-1] (the orbital index for one-body terms).
-    internal function BuildDQBulkRotationData(
-        params : SelectParams,
-        N : Int,
-        numRotAngles : Int,
-        bRot : Int,
-    ) : Bool[][] {
-        mutable table : Bool[][] = [];
-        for xo in 0..N - 1 {
-            mutable bits : Bool[] = [];
-            for j in 0..numRotAngles - 1 {
-                let angle = if j < Length(params.OneBodyRotationAngles[xo]) {
-                    params.OneBodyRotationAngles[xo][j]
-                } else {
-                    0.0
-                };
-                set bits += IntAsBoolArray(QuantizeGivensAngle(angle, bRot), bRot);
-            }
-            set table += [bits];
-        }
-        return table;
-    }
-
-    /// Whether the SF rotation table is cheaper addressed `rBits ++ bReg` than `bReg ++ rBits`.
-    ///
-    /// `Select`'s address is the integer value of the register, so the *low* register is padded
-    /// out to its full power of two while the high one is not: `b` low costs `R * 2^bBits`
-    /// entries and `r` low costs `(B+1) * 2^rankBits`. Neither dominates -- which is smaller
-    /// depends only on how close `R` and `B+1` sit to a power of two -- so take the smaller.
-    /// Both orderings put (b=0, r=0) at address 0, which the one-body cancellation relies on.
-    ///
-    /// Reaching the paper's `R*B` needs an address with a non-power-of-two stride, which
-    /// `Select` cannot express; it would take a nested unary iteration over b then r, whose
-    /// uncompute would no longer be the measurement-based unlookup.
-    internal function SFTableRankAddressedFirst(
-        numRanks : Int,
-        numBases : Int,
-        bBits : Int,
-        rankBits : Int,
-    ) : Bool {
-        (numBases + 1) * (1 <<< rankBits) < numRanks * (1 <<< bBits)
-    }
-
-    /// Build SF bulk rotation data: all (N-1) quantized angles per entry, plus a 1-bit bEqB
-    /// flag indicating b == numBases.
-    ///
-    /// `rankFirst` selects the address layout, and must match the register order the caller
-    /// hands to `Select`: `addr = r + b * 2^rankBits` when true, `addr = b + r * 2^bBits`
-    /// otherwise. The table is sized to exactly cover the reachable addresses of that layout.
-    internal function BuildSFBulkRotationData(
-        params : SelectParams,
-        R : Int,
-        numRotAngles : Int,
-        bRot : Int,
-        bBits : Int,
-        rankBits : Int,
-        rankFirst : Bool,
-    ) : Bool[][] {
-        let bSlots = 1 <<< bBits;
-        let rSlots = 1 <<< rankBits;
-        let tableSize = if rankFirst { (params.numBases + 1) * rSlots } else { R * bSlots };
-
-        mutable table : Bool[][] = [];
-        for idx in 0..tableSize - 1 {
-            let b = if rankFirst { idx / rSlots } else { idx % bSlots };
-            let r = if rankFirst { idx % rSlots } else { idx / bSlots };
-
-            mutable bits : Bool[] = [];
-            for j in 0..numRotAngles - 1 {
-                let angleIdx = b * params.numRanks + r;
-                let angle = if r < R and angleIdx < Length(params.TwoBodyRotationAngles) and j < Length(params.TwoBodyRotationAngles[angleIdx]) {
-                    params.TwoBodyRotationAngles[angleIdx][j]
-                } else {
-                    0.0
-                };
-                set bits += IntAsBoolArray(QuantizeGivensAngle(angle, bRot), bRot);
-            }
-            // Append bEqB flag: true when b == numBases (the identity term)
-            set bits += [b == params.numBases];
-            set table += [bits];
-        }
-        return table;
-    }
-
-    /// Quantize a Givens rotation angle for phase gradient application.
-    ///
-    /// RyViaPhaseGradient applies Ry(4π·x/2^b). To achieve Ry(-2θ):
-    ///   4π·x/2^b = -2θ  →  x = -2^b · θ / (2π)  (mod 2^b)
-    internal function QuantizeGivensAngle(angle : Double, bRot : Int) : Int {
-        // Rejects NaN and ±∞ as well as absurd magnitudes: the comparison is false for
-        // NaN, so this fails loudly instead of silently folding a non-finite angle into
-        // an in-range bit pattern (NaN and +∞ both quantize to 2^bRot-1, -∞ to 0).
-        // Givens angles come from Atan2/hypot and are in [-π, π].
-        Fact(AbsD(angle) <= 4.0 * PI(), "QuantizeGivensAngle: angle must be finite and within [-4π, 4π]");
-        let scale = IntAsDouble(1 <<< bRot);
-        let raw = Round(-scale * angle / (2.0 * PI()));
-        ((raw % (1 <<< bRot)) + (1 <<< bRot)) % (1 <<< bRot)
     }
 
     /// Controlled Majorana Operator on single qubit (arXiv:2502.15882v1, Fig. 4 / Appendix B.6).

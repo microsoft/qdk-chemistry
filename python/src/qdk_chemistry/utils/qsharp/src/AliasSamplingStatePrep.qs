@@ -21,7 +21,7 @@ namespace QDKChemistry.Utils.AliasSampling {
     import Std.StatePreparation.PrepareUniformSuperposition;
     import Std.Arrays.Mapped;
     import QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D;
-    import QDKChemistry.Utils.SelectSwap.Select2DLoadWord;
+    import QDKChemistry.Utils.SelectSwap.SelectSwap2D;
     import QDKChemistry.Utils.SelectSwap.SelectSwap;
 
     /// Parameters for alias sampling state preparation.
@@ -135,7 +135,7 @@ namespace QDKChemistry.Utils.AliasSampling {
     /// optional free-rider data.
     ///
     /// Returns Bool[][][] of shape [nCond][nPaddedIdx][dataBits], suitable for
-    /// Select2DLoadWord with outerAddress=conditionalRegister, innerAddress=indexRegister.
+    /// SelectSwap2D with outerAddress=conditionalRegister, innerAddress=indexRegister.
     ///
     /// Each row encodes: keepCoeff[μ] + altIndex[nIdx] + signOrig[1] + signAlt[1] + freeRider[*].
     function BuildConditionalAliasTable3D(
@@ -242,7 +242,7 @@ namespace QDKChemistry.Utils.AliasSampling {
     /// Conditional alias sampling PREPARE (2D) — prepares
     /// |c⟩|0⟩ → |c⟩ Σ_ℓ √(p̃_{c,ℓ}) e^{iπ·sign_{c,ℓ}} |ℓ⟩|garbage⟩.
     ///
-    /// Uses Select2DLoadWord to load per-condition alias tables in a single QROM pass.
+    /// Uses SelectSwap2D to load per-condition alias tables in a single QROM pass.
     /// Sign bits encode negative amplitudes via Z phase (Von Burg arXiv:2011.03494, Def. 1).
     ///
     /// Register layout:
@@ -285,7 +285,7 @@ namespace QDKChemistry.Utils.AliasSampling {
     /// Circuit (arXiv:2502.15882v1, Table A):
     ///   1. PrepareUniformSuperposition on indexRegister
     ///   2. H⊗μ on uniformRegister
-    ///   3. Select2DLoadWord: (cond, idx) → (keep, alt, signOrig, signAlt, freeRider)
+    ///   3. SelectSwap2D: (cond, idx) → (keep, alt, signOrig, signAlt, freeRider)
     ///   4. Compare σ ≥ keep → set flag
     ///   5. Conditional swap index ↔ alt
     ///   6. Conditional swap signOrig ↔ signAlt
@@ -327,7 +327,7 @@ namespace QDKChemistry.Utils.AliasSampling {
         } else {
             0
         };
-        Select2DLoadWord(
+        SelectSwap2D(
             table3D,
             conditionalRegister,
             indexRegister,

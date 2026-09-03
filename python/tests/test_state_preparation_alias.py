@@ -160,7 +160,7 @@ class TestAliasSamplingStatePreparation:
         }
         for direction, (flags, expected) in expected_lookup_counts.items():
             counts = context.logical_counts(
-                select_swap.TestSelect2DLoadWordResourceProbe, lookup_data, num_swap_bits, True, *flags
+                select_swap.TestSelectSwap2DResourceProbe, lookup_data, num_swap_bits, True, *flags
             )
             actual = {name: counts[name] for name in expected}
             assert actual == expected, f"conditional alias lookup {direction}: {actual} != {expected}"
