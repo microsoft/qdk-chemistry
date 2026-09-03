@@ -11,6 +11,7 @@
 
 #include "factory_bindings.hpp"
 #include "qdk/chemistry/algorithms/microsoft/cholesky_hamiltonian.hpp"
+#include "qdk/chemistry/algorithms/microsoft/hamiltonian_basis_transformer.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::algorithms;
@@ -44,7 +45,34 @@ class HamiltonianConstructorBase
   }
 };
 
-void bind_hamiltonian_constructor(py::module &m) {
+class HamiltonianBasisTransformerBase
+    : public HamiltonianBasisTransformer,
+      public py::trampoline_self_life_support {
+ public:
+  std::string name() const override {
+    PYBIND11_OVERRIDE_PURE(std::string, HamiltonianBasisTransformer, name);
+  }
+
+  std::vector<std::string> aliases() const override {
+    PYBIND11_OVERRIDE(std::vector<std::string>, HamiltonianBasisTransformer,
+                      aliases);
+  }
+
+  void replace_settings(std::unique_ptr<Settings> settings) {
+    _settings = std::move(settings);
+  }
+
+ protected:
+  std::shared_ptr<Hamiltonian> _run_impl(
+      std::shared_ptr<Hamiltonian> hamiltonian,
+      std::shared_ptr<Orbitals> target_orbitals) const override {
+    PYBIND11_OVERRIDE_PURE(std::shared_ptr<Hamiltonian>,
+                           HamiltonianBasisTransformer, _run_impl, hamiltonian,
+                           target_orbitals);
+  }
+};
+
+void bind_hamiltonian_algorithms(py::module &m) {
   // HamiltonianConstructor abstract base class
   py::class_<HamiltonianConstructor, HamiltonianConstructorBase,
              py::smart_holder>
@@ -257,4 +285,58 @@ Default constructor.
 Initializes a Cholesky Hamiltonian constructor with default settings.
 
 )");
+
+  py::class_<HamiltonianBasisTransformer, HamiltonianBasisTransformerBase,
+             py::smart_holder>
+      transformer(m, "HamiltonianBasisTransformer", R"(
+Abstract algorithm for expressing a Hamiltonian in a target orbital basis.
+)");
+  // Keep the GIL for the abstract binding because Python subclasses may
+  // implement the virtual call in Python.
+  transformer.def(py::init<>())
+      .def("run", &HamiltonianBasisTransformer::run, py::arg("hamiltonian"),
+           py::arg("target_orbitals"))
+      .def("settings", &HamiltonianBasisTransformer::settings,
+           py::return_value_policy::reference_internal)
+      .def_property(
+          "_settings",
+          [](HamiltonianBasisTransformerBase &self) -> Settings & {
+            return self.settings();
+          },
+          [](HamiltonianBasisTransformerBase &self,
+             std::unique_ptr<Settings> settings) {
+            self.replace_settings(std::move(settings));
+          },
+          py::return_value_policy::reference_internal)
+      .def("name", &HamiltonianBasisTransformer::name)
+      .def("type_name", &HamiltonianBasisTransformer::type_name)
+      .def("hash", &HamiltonianBasisTransformer::hash, py::arg("hamiltonian"),
+           py::arg("target_orbitals"))
+      .def("__repr__", [](const HamiltonianBasisTransformer &) {
+        return "<qdk_chemistry.algorithms.HamiltonianBasisTransformer>";
+      });
+
+  qdk::chemistry::python::bind_algorithm_factory<
+      HamiltonianBasisTransformerFactory, HamiltonianBasisTransformer,
+      HamiltonianBasisTransformerBase>(m, "HamiltonianBasisTransformerFactory");
+  qdk::chemistry::python::bind_create_nested(transformer);
+
+  py::class_<microsoft::QdkHamiltonianBasisTransformer,
+             HamiltonianBasisTransformer, py::smart_holder>(
+      m, "QdkHamiltonianBasisTransformer", R"(
+QDK basis transformer for restricted Cholesky Hamiltonians.
+)")
+      .def(py::init<>())
+      .def(
+          "run",
+          [](microsoft::QdkHamiltonianBasisTransformer &self,
+             std::shared_ptr<Hamiltonian> hamiltonian,
+             std::shared_ptr<Orbitals> target_orbitals) {
+            // Freeze settings while the GIL still serializes Python access,
+            // then release it for the synchronized native transformation.
+            self.settings().lock();
+            py::gil_scoped_release release;
+            return self.run(std::move(hamiltonian), std::move(target_orbitals));
+          },
+          py::arg("hamiltonian"), py::arg("target_orbitals"));
 }

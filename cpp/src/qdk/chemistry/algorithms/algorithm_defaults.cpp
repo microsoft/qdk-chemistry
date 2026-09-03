@@ -41,6 +41,7 @@ std::shared_ptr<data::Settings> resolve_algorithm_defaults(
   REGISTER_FACTORY_SETTINGS_INIT(ScfSolverFactory)
   REGISTER_FACTORY_SETTINGS_INIT(ActiveSpaceSelectorFactory)
   REGISTER_FACTORY_SETTINGS_INIT(HamiltonianConstructorFactory)
+  REGISTER_FACTORY_SETTINGS_INIT(HamiltonianBasisTransformerFactory)
   REGISTER_FACTORY_SETTINGS_INIT(PopulationAnalyzerFactory)
   REGISTER_FACTORY_SETTINGS_INIT(MultiConfigurationCalculatorFactory)
   REGISTER_FACTORY_SETTINGS_INIT(ProjectedMultiConfigurationCalculatorFactory)

@@ -4,6 +4,17 @@ Changelog
 
 For detailed release notes with code examples and feature walkthroughs, see the :doc:`release-notes/index` section.
 
+Unreleased
+==========
+
+- Restricted Cholesky Hamiltonians can be transformed to another orthonormal
+  basis of the same active orbital subspace with the
+  ``HamiltonianBasisTransformer`` algorithm, reusing the existing three-center
+  factors instead of repeating AO integral evaluation and Cholesky
+  decomposition. Target-metric validation bounds numerical null-mode
+  amplification, and Python execution freezes settings before releasing the
+  GIL.
+
 Version 2.1.0
 =============
 
