@@ -1767,6 +1767,114 @@ TEST_F(HamiltonianTest, FCIDUMPSerialization) {
   EXPECT_TRUE(fcidump_content == reference_fcidump_contents);
 }
 
+TEST_F(HamiltonianTest, FCIDUMPAcceptsNumericallyEightfoldTwoBodySymmetry) {
+  // Integral transformations leave round-off proportional to the integral
+  // magnitude, so the symmetry test has to scale with the tensor rather than
+  // compare against an absolute floor.
+  const double magnitude = 1.0e6;
+  Eigen::VectorXd near_symmetric_two_body = magnitude * two_body;
+  near_symmetric_two_body(1) += 1e-9 * magnitude;
+
+  Hamiltonian h(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+      one_body, near_symmetric_two_body, orbitals, core_energy, inactive_fock));
+
+  EXPECT_NO_THROW(h.to_fcidump_file("test.hamiltonian.fcidump", 1, 1));
+}
+
+TEST_F(HamiltonianTest, FCIDUMPRejectsFourFoldTwoBodySymmetry) {
+  Eigen::VectorXd fourfold_two_body = Eigen::VectorXd::Zero(16);
+  auto idx = [](size_t p, size_t q, size_t r, size_t s) {
+    return ((p * 2 + q) * 2 + r) * 2 + s;
+  };
+  fourfold_two_body(idx(0, 1, 0, 1)) = 0.7;
+  fourfold_two_body(idx(1, 0, 1, 0)) = 0.7;
+  fourfold_two_body(idx(1, 0, 0, 1)) = -0.2;
+  fourfold_two_body(idx(0, 1, 1, 0)) = -0.2;
+
+  Hamiltonian h(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+      one_body, fourfold_two_body, orbitals, core_energy, inactive_fock));
+
+  const std::string filename = "test.hamiltonian.fcidump";
+  {
+    std::ofstream file(filename);
+    file << "existing content";
+  }
+
+  try {
+    h.to_fcidump_file(filename, 1, 1);
+    FAIL() << "Expected four-fold-symmetric FCIDUMP export to be rejected";
+  } catch (const std::runtime_error& error) {
+    EXPECT_NE(std::string(error.what()).find("8-fold"), std::string::npos);
+  }
+
+  std::ifstream file(filename);
+  std::stringstream buffer;
+  buffer << file.rdbuf();
+  EXPECT_EQ(buffer.str(), "existing content");
+}
+
+TEST_F(HamiltonianTest, FCIDUMPRejectsBraKetAsymmetricTwoBody) {
+  // Symmetric under (pq|rs) = (qp|rs) = (pq|sr) but not under (pq|rs) =
+  // (rs|pq), so the writer's ij <= kl record loop would drop the distinction.
+  Eigen::VectorXd asymmetric_two_body = Eigen::VectorXd::Zero(16);
+  auto idx = [](size_t p, size_t q, size_t r, size_t s) {
+    return ((p * 2 + q) * 2 + r) * 2 + s;
+  };
+  asymmetric_two_body(idx(0, 0, 1, 1)) = 0.4;
+  asymmetric_two_body(idx(1, 1, 0, 0)) = 0.9;
+
+  Hamiltonian h(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+      one_body, asymmetric_two_body, orbitals, core_energy, inactive_fock));
+
+  EXPECT_THROW(h.to_fcidump_file("test.hamiltonian.fcidump", 1, 1),
+               std::runtime_error);
+}
+
+TEST_F(HamiltonianTest, SparseContainerFCIDUMPRejectsFourFoldTwoBodySymmetry) {
+  Eigen::SparseMatrix<double> sparse_one_body(2, 2);
+  sparse_one_body.insert(0, 0) = 1.0;
+  sparse_one_body.insert(1, 1) = 1.0;
+  sparse_one_body.makeCompressed();
+
+  // (01|01) and (10|01) share a permutation class but disagree, so ordinary
+  // FCIDUMP readers would expand contradictory records.
+  SparseHamiltonianContainer::TwoBodyMap two_body_map;
+  two_body_map[{0, 1, 0, 1}] = 0.7;
+  two_body_map[{1, 0, 0, 1}] = -0.2;
+
+  Hamiltonian h(std::make_unique<SparseHamiltonianContainer>(
+      sparse_one_body, two_body_map, core_energy));
+
+  const std::string filename = "test.sparse.hamiltonian.fcidump";
+  std::filesystem::remove(filename);
+
+  EXPECT_THROW(h.to_fcidump_file(filename, 1, 1), std::runtime_error);
+  EXPECT_FALSE(std::filesystem::exists(filename));
+}
+
+TEST_F(HamiltonianTest, SparseContainerFCIDUMPRejectsPartialPermutationClass) {
+  Eigen::SparseMatrix<double> sparse_one_body(2, 2);
+  sparse_one_body.insert(0, 0) = 1.0;
+  sparse_one_body.insert(1, 1) = 1.0;
+  sparse_one_body.makeCompressed();
+
+  // Two of the four distinct members of one class, with (10|01) and (01|10)
+  // left implicitly zero.  The records agree, but a reader that reconstructs
+  // all eight permutations would fill in those zeros with 0.7.
+  SparseHamiltonianContainer::TwoBodyMap two_body_map;
+  two_body_map[{0, 1, 0, 1}] = 0.7;
+  two_body_map[{1, 0, 1, 0}] = 0.7;
+
+  Hamiltonian h(std::make_unique<SparseHamiltonianContainer>(
+      sparse_one_body, two_body_map, core_energy));
+
+  const std::string filename = "test.sparse.hamiltonian.fcidump";
+  std::filesystem::remove(filename);
+
+  EXPECT_THROW(h.to_fcidump_file(filename, 1, 1), std::runtime_error);
+  EXPECT_FALSE(std::filesystem::exists(filename));
+}
+
 TEST_F(HamiltonianTest, FCIDUMPSerializationUnrestrictedThrowsError) {
   // Create unrestricted orbitals for this test
   auto unrestricted_orbitals =
