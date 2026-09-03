@@ -40,7 +40,7 @@ class Configuration : public DataClass {
 
   /**
    * @brief Construct from a spin-½ string representation.
-   * @param str String with alphabet @c '0', @c 'u', @c 'd', and @c '2'.
+   * @param str String with alphabet @c '0'/@c 'u'/@c 'd'/@c '2'.
    * @return Configuration with bits_per_mode() == 2.
    * @throws std::invalid_argument If the string contains invalid characters.
    */
@@ -48,7 +48,7 @@ class Configuration : public DataClass {
 
   /**
    * @brief Construct from a bitstring (1 bit per mode).
-   * @param str String with alphabet @c '0' and @c '1'.
+   * @param str String with alphabet @c '0'/@c '1'.
    * @return Configuration with bits_per_mode() == 1.
    * @throws std::invalid_argument If the string contains invalid characters.
    */
@@ -164,8 +164,8 @@ class Configuration : public DataClass {
 
   /**
    * @brief Convert the configuration to a string representation.
-   * @return For spin-½ (2 bits/mode): @c '0', @c 'u', @c 'd', or @c '2'.
-   *         For bitstring (1 bit/mode): @c '0' or @c '1'.
+   * @return For spin-½ (2 bits/mode): @c '0'/@c 'u'/@c 'd'/@c '2'.
+   *         For bitstring (1 bit/mode): @c '0'/@c '1'.
    */
   std::string to_string() const;
 

@@ -229,8 +229,6 @@ class LatticeGraph : public DataClass {
    * @param periodic If true, add an edge between the first and last site
    *                 (ring topology). Requires n > 2. Default: false.
    * @param t        Uniform hopping weight for every edge. Default: 1.0.
-   * @param dfs_ordering If true, reorder sites along a Hamiltonian path found
-   *                     by depth-first search. Default: false.
    * @throws std::invalid_argument If n == 0.
    */
   static LatticeGraph chain(std::uint64_t n, bool periodic = false,
@@ -264,8 +262,6 @@ class LatticeGraph : public DataClass {
    * @param periodic_y If true, apply periodic boundary conditions along y.
    * Requires ny >= 2. Default: false.
    * @param t          Uniform hopping weight. Default: 1.0.
-   * @param dfs_ordering If true, reorder sites along a Hamiltonian path found
-   *                     by depth-first search. Default: false.
    * @throws std::invalid_argument If nx or ny is 0.
    */
   static LatticeGraph square(std::uint64_t nx, std::uint64_t ny,
@@ -304,8 +300,6 @@ class LatticeGraph : public DataClass {
    * Requires ny >= 2. Default: false.
    * @param t          Uniform hopping weight. Default: 1.0.
    * @param coloring_seed PRNG seed for greedy edge coloring. Default: 0.
-   * @param dfs_ordering If true, reorder sites along a Hamiltonian path found
-   *                     by depth-first search. Default: false.
    * @throws std::invalid_argument If nx or ny is 0.
    */
   static LatticeGraph triangular(std::uint64_t nx, std::uint64_t ny,
@@ -347,8 +341,6 @@ class LatticeGraph : public DataClass {
    * @param periodic_y If true, apply periodic boundary conditions along y.
    * Requires ny >= 2. Default: false.
    * @param t          Uniform hopping weight. Default: 1.0.
-   * @param dfs_ordering Reserved for DFS site ordering; currently unused.
-   *                     Default: false.
    * @throws std::invalid_argument If nx or ny is 0.
    */
   static LatticeGraph honeycomb(std::uint64_t nx, std::uint64_t ny,
@@ -400,8 +392,6 @@ class LatticeGraph : public DataClass {
    * Requires ny >= 2. Default: false.
    * @param t          Uniform hopping weight. Default: 1.0.
    * @param coloring_seed PRNG seed for greedy edge coloring. Default: 0.
-   * @param dfs_ordering Reserved for DFS site ordering; currently unused.
-   *                     Default: false.
    * @throws std::invalid_argument If nx or ny is 0.
    */
   static LatticeGraph kagome(std::uint64_t nx, std::uint64_t ny,
