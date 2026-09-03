@@ -558,7 +558,7 @@ class TestGetQreApplication:
     """Test cases for Circuit.get_qre_application method."""
 
     def test_get_qre_application_from_factory(self):
-        """Test that Q# factory data retains its context-bound callable when producing a trace."""
+        """Test that get_qre_application works with Q# factory data."""
         from qdk.qre.application import QSharpApplication  # noqa: PLC0415
 
         state_prep_params = {
