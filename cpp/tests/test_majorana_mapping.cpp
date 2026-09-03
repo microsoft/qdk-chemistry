@@ -205,6 +205,113 @@ TEST(MajoranaMapEngineTest, MultiWordDispatchDoesNotCrash) {
   EXPECT_GE(terms.size(), 1u);
 }
 
+namespace {
+
+// Single-orbital Hamiltonian embedded in an n_spatial-orbital problem: only
+// orbital 0 carries integrals, so the operator is identical for every
+// n_spatial apart from where the beta block starts.
+MajoranaMapResult map_single_orbital(std::size_t n_spatial) {
+  auto mapping = MajoranaMapping::jordan_wigner(2 * n_spatial);
+  std::vector<double> h1(n_spatial * n_spatial, 0.0);
+  h1[0] = 1.0;
+  const int indices[4] = {0, 0, 0, 0};
+  const double values[1] = {0.75};
+
+  return majorana_map_hamiltonian_sparse(
+      mapping, 0.5, h1.data(), h1.data(), indices, values, /*num_entries=*/1,
+      n_spatial, /*spin_symmetric=*/true, /*threshold=*/1e-12,
+      /*integral_threshold=*/1e-12);
+}
+
+// Key each term by which spin block its Paulis act on rather than by raw
+// qubit index, so results for different n_spatial are comparable.
+std::unordered_map<std::string, std::complex<double>> spin_block_terms(
+    const MajoranaMapResult& result, std::size_t n_spatial) {
+  std::unordered_map<std::string, std::complex<double>> terms;
+  for (std::size_t i = 0; i < result.words.size(); ++i) {
+    std::string key;
+    for (const auto& [qubit, op] : result.words[i]) {
+      EXPECT_TRUE(qubit == 0 || qubit == n_spatial)
+          << "term touches qubit " << qubit << " outside orbital 0";
+      key += (qubit == 0) ? 'a' : 'b';
+      key += static_cast<char>('0' + op);
+    }
+    terms[key.empty() ? std::string("I") : key] += result.coefficients[i];
+  }
+  return terms;
+}
+
+}  // namespace
+
+TEST(MajoranaMapEngineTest, OnDemandEngineMatchesEagerEngineAboveTheWordCap) {
+  // 4 orbitals → 8 qubits → eager engine; 520 orbitals → 1040 qubits → the
+  // on-demand engine, which is the only path available above 1024 qubits.
+  const auto eager = map_single_orbital(4);
+  const auto on_demand = map_single_orbital(520);
+
+  const auto eager_terms = spin_block_terms(eager, 4);
+  const auto on_demand_terms = spin_block_terms(on_demand, 520);
+
+  ASSERT_FALSE(eager_terms.empty());
+  ASSERT_EQ(eager_terms.size(), on_demand_terms.size());
+  for (const auto& [label, coeff] : eager_terms) {
+    auto it = on_demand_terms.find(label);
+    ASSERT_NE(it, on_demand_terms.end()) << "Missing term " << label;
+    EXPECT_NEAR(coeff.real(), it->second.real(), 1e-12) << label;
+    EXPECT_NEAR(coeff.imag(), it->second.imag(), 1e-12) << label;
+  }
+}
+
+TEST(MajoranaMapEngineTest, RejectsDenseIntegralsAboveTheWordCap) {
+  constexpr std::size_t n_spatial = 520;
+  auto mapping = MajoranaMapping::jordan_wigner(2 * n_spatial);
+  std::vector<double> h1(n_spatial * n_spatial, 0.0);
+  const double eri[1] = {0.0};
+
+  // The dense and Cholesky two-body loops are O(N^4); only the sparse
+  // container reaches the on-demand engine.
+  EXPECT_THROW(majorana_map_hamiltonian(mapping, 0.0, h1.data(), h1.data(), eri,
+                                        eri, eri, n_spatial,
+                                        /*spin_symmetric=*/true,
+                                        /*threshold=*/1e-12,
+                                        /*integral_threshold=*/1e-12),
+               std::invalid_argument);
+}
+
+TEST(MajoranaMappingTest, BilinearProductMatchesCachedBilinear) {
+  auto mapping = MajoranaMapping::jordan_wigner(6);
+  const std::size_t majoranas = 2 * mapping.num_modes();
+
+  for (std::size_t j = 0; j < majoranas; ++j) {
+    for (std::size_t k = 0; k < majoranas; ++k) {
+      if (j == k) continue;
+      auto [cached_coeff, cached_word] = mapping.bilinear(j, k);
+      auto [coeff, word] = mapping.bilinear_product(j, k);
+      EXPECT_EQ(coeff, cached_coeff) << "at (" << j << ", " << k << ")";
+      EXPECT_EQ(word, cached_word) << "at (" << j << ", " << k << ")";
+    }
+  }
+}
+
+TEST(MajoranaMappingTest, UncachedBilinearsMatchTheCachedEncoding) {
+  auto cached = MajoranaMapping::jordan_wigner(8);
+  // Above the cap the upper-triangle cache is skipped and bilinears are
+  // derived from the Majorana table on demand.
+  auto uncached = MajoranaMapping::jordan_wigner(
+      MajoranaMapping::kMaxCachedBilinearQubits + 8);
+  EXPECT_THROW(uncached.bilinear(0, 1), std::logic_error);
+
+  for (std::size_t j = 0; j < 16; ++j) {
+    for (std::size_t k = 0; k < 16; ++k) {
+      if (j == k) continue;
+      auto [cached_coeff, cached_word] = cached.bilinear_product(j, k);
+      auto [coeff, word] = uncached.bilinear_product(j, k);
+      EXPECT_EQ(coeff, cached_coeff) << "at (" << j << ", " << k << ")";
+      EXPECT_EQ(word, cached_word) << "at (" << j << ", " << k << ")";
+    }
+  }
+}
+
 TEST(MajoranaMapEngineTest, RejectsZeroQubitMappings) {
   std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears = {
       {{1.0, 0.0}, {}}};

@@ -31,6 +31,14 @@ class LatticeGraph;
  */
 class MajoranaMapping : public DataClass {
  public:
+  /// Qubit count above which the upper-triangle bilinear cache is skipped.
+  /// The cache holds one Pauli word per pair of the M = 2 * num_modes
+  /// Majorana operators, each of O(num_qubits) weight, so it grows as
+  /// O(num_qubits^3).  Above the cap bilinear_product() derives entries from
+  /// the Majorana table instead, at no extra multiplication count for a
+  /// single mapping pass.
+  static constexpr std::size_t kMaxCachedBilinearQubits = 128;
+
   /**
    * @brief Construct a Majorana-atomic mapping from a 2N-entry table.
    *
@@ -83,8 +91,22 @@ class MajoranaMapping : public DataClass {
    *
    * @throws std::out_of_range if j or k >= 2N.
    * @throws std::invalid_argument if j == k.
+   * @throws std::logic_error if the mapping exceeds
+   *         ::kMaxCachedBilinearQubits, so no cache exists to reference.
    */
   std::pair<std::complex<double>, const SparsePauliWord&> bilinear(
+      std::size_t j, std::size_t k) const;
+
+  /**
+   * @brief Pauli image of i*gamma_j*gamma_k, returned by value.
+   *
+   * Reads the cache when present and multiplies the two Majorana table
+   * entries otherwise, so it works for mappings of any size.
+   *
+   * @throws std::out_of_range if j or k >= 2N.
+   * @throws std::invalid_argument if j == k.
+   */
+  std::pair<std::complex<double>, SparsePauliWord> bilinear_product(
       std::size_t j, std::size_t k) const;
 
   /// Whether individual Majoranas have a Pauli image.
@@ -287,7 +309,8 @@ class MajoranaMapping : public DataClass {
   /// Majorana-to-Pauli table (empty for bilinear-only mappings).
   std::vector<SparsePauliWord> table_;
 
-  /// Cached bilinear table, upper triangle row-major. Always populated.
+  /// Cached bilinear table, upper triangle row-major. Empty for mappings
+  /// above ::kMaxCachedBilinearQubits.
   std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears_;
 
   /// Human-readable encoding name.
