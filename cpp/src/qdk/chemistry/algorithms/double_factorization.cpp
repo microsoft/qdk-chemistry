@@ -162,8 +162,6 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
   const double truncation_threshold =
       _settings->get<double>("truncation_threshold");
 
-  // Both accessors return tuples of references into the container, so binding
-  // the alpha element alone leaves it valid after the tuple expires.
   const Eigen::MatrixXd& h_alpha =
       std::get<0>(hamiltonian->get_one_body_integrals());
   const Eigen::VectorXd& g_aaaa =
@@ -186,14 +184,6 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
   }
 
   // R = number of fragments, B = norb bases, C = 1.
-  //
-  // Every fragment keeps all norb bases even when some fragment eigenvalues in
-  // `eps` are negligible. The container stores `u_matrices` as a rectangular
-  // R x B x norb tensor, so B has to be uniform across ranks; dropping bases
-  // per fragment would need either padding, which saves nothing, or ragged
-  // storage, which the container does not support. Zero-weight bases
-  // contribute nothing to the reconstructed tensor or to Lambda, so the only
-  // cost is storage.
   const std::size_t num_ranks = fragments.size();
   const std::size_t num_bases = norb;
   const std::size_t num_copies = 1;
