@@ -30,15 +30,12 @@ namespace qdk::chemistry::algorithms {
  */
 class DoubleFactorizerSettings : public qdk::chemistry::data::Settings {
  public:
-  /// Default eigenvalue threshold for retaining two-body fragments.
-  static constexpr double DEFAULT_TRUNCATION_THRESHOLD = 1e-12;
-
   /**
    * @brief Constructor that initializes the default settings.
    */
   DoubleFactorizerSettings() {
     set_default<double>(
-        "truncation_threshold", DEFAULT_TRUNCATION_THRESHOLD,
+        "truncation_threshold", 1e-12,
         "Drop fragments whose two-electron supermatrix eigenvalue magnitude "
         "is below this threshold. Must be non-negative; 0.0 retains every "
         "fragment, including the numerically null ones.",
@@ -75,8 +72,7 @@ struct TwoBodyFragment {
 /// @throws std::runtime_error if a LAPACK diagonalization fails.
 std::vector<TwoBodyFragment> eigen_decompose_two_body(
     const Eigen::VectorXd& two_body_integrals, std::size_t norb,
-    double truncation_threshold =
-        DoubleFactorizerSettings::DEFAULT_TRUNCATION_THRESHOLD);
+    double truncation_threshold = 1e-12);
 
 /**
  * @class DoubleFactorizer
