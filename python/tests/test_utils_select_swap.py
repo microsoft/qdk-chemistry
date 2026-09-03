@@ -5,9 +5,11 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import math
+
 import pytest
 
-from qdk_chemistry.utils.qsharp import get_qsharp_context
+from qdk_chemistry.utils.qsharp import create_qsharp_context, get_qsharp_context
 
 _DATA_1D = [
     [True, False, True],
@@ -129,3 +131,56 @@ class TestSelectSwapPreservesAddressPhases:
         _assert_phase_agreement(
             "TestSelectSwap2DPhaseAgreement", _DATA_2D_RAGGED_OUTER, num_swap_bits, outer_always_valid
         )
+
+
+def _unlookup_toffolis(num_entries: int) -> int:
+    """Toffolis of ``Adjoint Select`` over *num_entries*, the measurement-based unlookup.
+
+    ``Std.TableLookup.Select`` erases by measuring the target and applying a phase fixup over
+    the address, which costs ``2**ceil(n/2) + 2**floor(n/2) - n - 2`` on ``n`` address qubits
+    rather than repeating the load. That is what makes the erasure sublinear in the table.
+    """
+    address_bits = max(1, math.ceil(math.log2(num_entries)))
+    return 2 ** math.ceil(address_bits / 2) + 2 ** (address_bits // 2) - address_bits - 2
+
+
+def _probe_toffolis(ctx, data, num_swap_bits, *, forward, adjoint):
+    """Trace ``TestSelectSwap2DResourceProbe`` and return its Toffoli count."""
+    counts = ctx.logical_counts(
+        ctx.code.QDKChemistry.Utils.SelectSwap.TestSelectSwap2DResourceProbe,
+        data,
+        num_swap_bits,
+        True,
+        forward,
+        adjoint,
+    )
+    return counts["cczCount"] + counts["ccixCount"]
+
+
+class TestSelectSwap2DErasesByMeasurement:
+    """The 2D word load's adjoint is a phase fixup over the flat address, not a second lookup."""
+
+    @pytest.mark.parametrize(
+        ("num_outer", "num_inner", "width"),
+        [(4, 4, 5), (8, 4, 6), (6, 8, 7), (16, 8, 4)],
+    )
+    def test_adjoint_costs_the_unlookup_whatever_the_swap_width(self, num_outer, num_inner, width):
+        """Erasure cost follows the table size alone, and undercuts the load it undoes.
+
+        The forward pass varies with the swap width, but the adjoint resolves to a single
+        ``Adjoint Select`` over ``outer x inner`` entries however the word was loaded, so its
+        cost is the closed form above for every width. Running the load backwards instead
+        would track the forward cost.
+        """
+        ctx = create_qsharp_context()
+        data = [
+            [[(o * 31 + i * 7 + b) % 2 == 0 for b in range(width)] for i in range(num_inner)] for o in range(num_outer)
+        ]
+        expected = _unlookup_toffolis(num_outer * num_inner)
+
+        for num_swap_bits in (0, 1, 2):
+            forward = _probe_toffolis(ctx, data, num_swap_bits, forward=True, adjoint=False)
+            round_trip = _probe_toffolis(ctx, data, num_swap_bits, forward=True, adjoint=True)
+
+            assert round_trip - forward == expected
+            assert expected < forward
