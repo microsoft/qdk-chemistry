@@ -218,23 +218,31 @@ compressed form:
   the zero entries are ever touched. Stored entries are canonicalized under the
   8-fold integral symmetry before mapping, so the result does not depend on
   which symmetry-related permutations of an integral the container stores, nor
-  on their order.
+  on their order. Because one representative is expanded over its whole
+  permutation class, each class must be stored exactly once or in full; a
+  partially stored class raises, since the expansion would overwrite the zeros
+  implied at its missing positions.
 - :class:`~qdk_chemistry.data.CholeskyHamiltonianContainer` — the three-center
   (Cholesky / density-fitted) factors are kept in their
   :math:`O(N^2 \cdot n_\text{aux})` form and the auxiliary index is contracted
   in integral space, one ``(pq|.)`` row at a time (a vectorized matrix-vector
   product per orbital pair). The dense four-center tensor is never built and
   peak additional memory is a single :math:`N^2`-length row, making this path
-  suitable for systems whose dense ERI tensor does not fit in memory.
+  suitable for systems whose dense ERI tensor does not fit in memory. The
+  reconstruction :math:`\sum_Q L^Q_{pq} L^Q_{rs}` carries the 8-fold symmetry
+  only when every factor is symmetric in its orbital pair, which is validated.
 
 In all cases the result is a :class:`~qdk_chemistry.data.QubitOperator` that
 is numerically equivalent — term-by-term, to within ``1e-12`` — to the dense
 :class:`~qdk_chemistry.data.CanonicalFourCenterHamiltonianContainer` path for
-the same integrals. The behaviour of ``run()`` and the shape of the returned
-operator are unchanged, and the selection is fully automatic based on the
-container type. The
+integrals the container can represent. The behaviour of ``run()`` and the shape
+of the returned operator are unchanged, and the selection is fully automatic
+based on the container type. The
 :class:`~qdk_chemistry.data.CanonicalFourCenterHamiltonianContainer` continues
-to use the dense path.
+to use the dense path, which additionally accepts two-body tensors carrying
+only the 4-fold subgroup :math:`(pq|rs) = (qp|sr) = (rs|pq)` -- the general
+Hermitian two-body operator, as produced by downfolding. Electron-repulsion
+integrals over real orbitals always satisfy the full 8-fold symmetry.
 
 .. rubric:: Settings
 
