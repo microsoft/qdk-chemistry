@@ -88,6 +88,7 @@ python3 -m pip install qdk-chemistry
 > **NOTE:** On Python 3.14, `qiskit-aer` is omitted from the `qiskit-extras` and `all` extras on Linux ARM64 (aarch64), because Qiskit does not yet publish a Python 3.14 wheel for that platform. See the [Optional Extras](#optional-extras) table below for details.
 >
 > **NOTE:** On Windows, PySCF is skipped from the `plugins` extra because it publishes no Windows wheels; on Windows arm64 the Qiskit stack, PennyLane, RDKit and the Discovery backend are skipped as well. See [Notes for Windows users](#notes-for-windows-users).
+> The MCP extra is also omitted from `[all]` and `[test]` on Windows arm64.
 
 ### Step 3: Verify the installation
 
@@ -118,6 +119,7 @@ If you chose the minimal `pip install qdk-chemistry` above, you can add specific
 |-------|-------------|-------------------|
 | `coverage` | Coverage reporting tools | coverage, pytest, pytest-cov, gcovr |
 | `jupyter` | Jupyter notebook support | ipykernel, pandas |
+| `mcp` | MCP server, transports, workspace binding, and MCP Apps integration | mcp |
 | `plugins` | Third-party quantum chemistry backends | PySCF (no Windows wheels) |
 | `qiskit-extras` | Qiskit ecosystem packages | qiskit, qiskit-aer, qiskit-nature |
 | `openfermion-extras` | OpenFermion ecosystem packages | openfermion |
@@ -125,8 +127,8 @@ If you chose the minimal `pip install qdk-chemistry` above, you can add specific
 | `docs` | [Sphinx documentation build tools](docs/README.md) | sphinx, sphinx-rtd-theme, myst-parser, breathe, sphinx-autodoc-typehints, sphinx-inline-tabs, sphinxcontrib-napoleon, sphinxcontrib-bibtex, sphinx_copybutton |
 | `qre` | Quantum Resource Estimator support | qdk[qre,jupyter]>=1.30.0 |
 | `dev` | Development and testing tools | pytest, ruff, mypy, and related tooling |
-| `test` | Testing tools and optional runtime dependencies; does not include `docs` | qdk-chemistry[coverage,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre], nbclient, nbformat, pennylane, rdkit, requests>=2.33.0 |
-| `all` | Union of all defined extras | coverage, dev, docs, jupyter, networkx-extras, openfermion-extras, plugins, qiskit-extras, qre, test |
+| `test` | Testing tools and optional runtime dependencies; does not include `docs` | qdk-chemistry[coverage,jupyter,mcp,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre], nbclient, nbformat, pennylane, rdkit, requests>=2.33.0 |
+| `all` | Union of all defined extras | coverage, dev, docs, jupyter, mcp, networkx-extras, openfermion-extras, plugins, qiskit-extras, qre, test |
 
 To build the documentation, install the `docs` extra (for example,
 `python3 -m pip install 'qdk-chemistry[docs]'`), install the Doxygen system
@@ -168,7 +170,7 @@ to native Windows installs; none of them apply under
 | Topic | Detail |
 |-------|--------|
 | PySCF plugin | PySCF publishes no Windows wheels, so the `plugins` extra installs no PySCF and the PySCF plugin is unavailable. The native implementations are unaffected. |
-| arm64 extras | Qiskit (and Qiskit Aer, Nature, IBM Runtime), PennyLane and RDKit are skipped on arm64: they require `rustworkx`, which publishes no win-arm64 wheels. The Discovery backend (`azure-ai-discovery`, `azure-identity`, `azure-storage-blob`) is skipped as well: it requires `cryptography`, which publishes no win-arm64 wheel and needs a Rust toolchain plus OpenSSL to build from source. The features that depend on them are unavailable; everything else is unaffected. |
+| arm64 dependencies and extras | MCP is omitted from the `all` and `test` extras because its `cryptography` dependency publishes no win-arm64 wheel. A base, `all`, or `test` install therefore needs neither Rust nor a source build of `cryptography`; installing the `mcp` extra explicitly may require an ARM64 Rust toolchain, MSVC C/C++ build tools, and ARM64 OpenSSL development libraries. Qiskit (and Qiskit Aer, Nature, IBM Runtime), PennyLane and RDKit are skipped because they require `rustworkx`, which also publishes no win-arm64 wheel. The Discovery backend (`azure-ai-discovery`, `azure-identity`, `azure-storage-blob`) is skipped as well. The features that depend on those skipped extras are unavailable. |
 | OpenMP | Shared-memory threading via OpenMP is disabled on Windows. |
 
 ---
