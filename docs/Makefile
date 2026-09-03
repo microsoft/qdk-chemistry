@@ -186,4 +186,3 @@ clean-sphinx-docs: check
 	rm -f $(SPHINX_DOCS_DEBUG)
 	rm -f $(SPHINX_DOCS_WARNINGS)
 	@echo
-

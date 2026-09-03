@@ -816,24 +816,21 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     // Test wrappers
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /// Generic wrapper: applies an operation to a freshly allocated register.
-    operation TestApplyOuterPrep(op : (Qubit[]) => Unit is Adj + Ctl, n : Int) : Unit {
-        let qs = QIR.Runtime.AllocateQubitArray(n);
-        op(qs);
-    }
-
-    /// Wrapper: applies outer prep then inner prep on separate registers.
-    operation TestApplyOuterInnerPrep(
+    /// Adapter: outer PREPARE then inner PREPARE, over one flat register.
+    ///
+    /// The two PREPAREs take separate registers, so they cannot be handed straight to a
+    /// harness that applies a single `Qubit[] => Unit`. This splits one register instead of
+    /// allocating its own, which lets the caller own the qubits and release them.
+    function MakeOuterInnerPrepOp(
         outerOp : (Qubit[]) => Unit is Adj + Ctl,
         innerOp : (Qubit[], Qubit[]) => Unit is Adj,
         nOuter : Int,
-        nInner : Int,
-    ) : Unit {
-        let qs = QIR.Runtime.AllocateQubitArray(nOuter + nInner);
-        let outerReg = qs[0..nOuter - 1];
-        let innerReg = qs[nOuter..nOuter + nInner - 1];
-        outerOp(outerReg);
-        innerOp(outerReg, innerReg);
+    ) : Qubit[] => Unit {
+        (qs) => {
+            let outerReg = qs[0..nOuter - 1];
+            outerOp(outerReg);
+            innerOp(outerReg, qs[nOuter...]);
+        }
     }
 
 

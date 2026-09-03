@@ -9,25 +9,15 @@ import math
 
 import numpy as np
 import pytest
-import qdk
+from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.circuit_mapper import SOSSAMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.data import AlgorithmRef, Circuit
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, get_qsharp_context
 
 from .test_helpers import create_random_factorized_hamiltonian, to_sossa_operator
-
-
-@pytest.fixture
-def qdk_ctx() -> qdk.Context:
-    """Fresh Q# context, isolated from the library's shared one.
-
-    Tests that inspect quantum state need their own interpreter, because
-    ``dump_machine`` reports every qubit currently allocated in the context.
-    """
-    return create_qsharp_context()
 
 
 def _reverse_bits(x: int, n: int) -> int:
@@ -113,7 +103,7 @@ class TestOuterPrep:
         assert num_gradient == (10 if algorithm == "qrom" else 0)
 
     @pytest.mark.parametrize("algorithm", ["dense_pure_state", "qrom"])
-    def test_build_outer_prep_fidelity(self, algorithm, qdk_ctx):
+    def test_build_outer_prep_fidelity(self, algorithm):
         """Verify _build_outer_prep's callable prepares the correct statevector.
 
         Simulates the Q# callable in the global Q# session and checks fidelity
@@ -122,7 +112,7 @@ class TestOuterPrep:
 
         Every backend writes the outer index register little-endian, which is how SELECT
         reads it back, so the backend a caller picks cannot change which generator an
-        amplitude belongs to. ``dump_machine()`` reports big-endian, so coefficient ``j``
+        amplitude belongs to. ``DumpRegister`` reports big-endian, so coefficient ``j``
         is expected at the bit-reversed dump index for all of them.
         """
         sossa_unitary = _build_sossa_unitary()
@@ -133,11 +123,13 @@ class TestOuterPrep:
         coefficients = np.asarray(container.outer_prepare.get_coefficients())
         num_qubits = math.ceil(math.log2(len(coefficients))) if len(coefficients) > 1 else 1
 
-        qdk_ctx.code.QDKChemistry.Utils.SOSSAWalk.TestApplyOuterPrep(
-            _with_prepared_gradient(op, num_gradient), num_qubits + num_gradient
+        full_sv = np.array(
+            dump_operation_on_state(
+                _with_prepared_gradient(op, num_gradient),
+                num_qubits + num_gradient,
+                context=get_qsharp_context(),
+            )
         )
-        state = qdk_ctx.dump_machine()
-        full_sv = np.array(state.as_dense_state())
         actual_sv = full_sv.reshape(2**num_qubits, 2**num_gradient)[:, 0]
 
         n_states = 2**num_qubits
@@ -150,7 +142,7 @@ class TestOuterPrep:
         fidelity = abs(np.dot(np.conj(actual_sv), expected))
         assert np.isclose(fidelity, 1.0, atol=1e-3)
 
-    def test_build_outer_prep_alias_sampling_marginal_probs(self, qdk_ctx):
+    def test_build_outer_prep_alias_sampling_marginal_probs(self):
         r"""Verify alias sampling prepares the SOS outer distribution, not its square root.
 
         The SOS block encoding needs amplitudes proportional to the generator one-norms
@@ -172,9 +164,7 @@ class TestOuterPrep:
         num_index_qubits = math.ceil(math.log2(len(coefficients))) if len(coefficients) > 1 else 1
         total_qubits = 2 * num_index_qubits + 2 * bit_precision + 1
 
-        qdk_ctx.code.QDKChemistry.Utils.SOSSAWalk.TestApplyOuterPrep(op, total_qubits)
-        state = qdk_ctx.dump_machine()
-        full_sv = np.array(state.as_dense_state())
+        full_sv = np.array(dump_operation_on_state(op, total_qubits, context=get_qsharp_context()))
 
         n_index = 2**num_index_qubits
         shift = total_qubits - num_index_qubits
@@ -195,7 +185,7 @@ class TestInnerPrep:
     """Tests for SOSSAMapper._build_inner_prep."""
 
     @pytest.mark.parametrize("algorithm", ["controlled_alias_sampling", "direct"])
-    def test_build_inner_prep_fidelity(self, algorithm, qdk_ctx):
+    def test_build_inner_prep_fidelity(self, algorithm):
         """Verify inner prep conditional marginals when combined with outer prep.
 
         Applies outer prep (dense_pure, exact) then inner prep on the combined
@@ -235,11 +225,13 @@ class TestInnerPrep:
             num_inner_qubits = n_index_bits + n_fr
 
         # Apply outer + inner prep
-        qdk_ctx.code.QDKChemistry.Utils.SOSSAWalk.TestApplyOuterInnerPrep(
-            outer_op, inner_op, num_outer_qubits, num_inner_qubits
+        full_sv = np.array(
+            dump_operation_on_state(
+                QSHARP_UTILS.SOSSAWalk.MakeOuterInnerPrepOp(outer_op, inner_op, num_outer_qubits),
+                num_outer_qubits + num_inner_qubits,
+                context=get_qsharp_context(),
+            )
         )
-        state = qdk_ctx.dump_machine()
-        full_sv = np.array(state.as_dense_state())
 
         # Check conditional marginals for each outer value l
         total_qubits = num_outer_qubits + num_inner_qubits
@@ -427,13 +419,11 @@ class TestSelectFullFidelity:
         return np.array(ctx.dump_machine().as_dense_state())
 
     @pytest.mark.parametrize("N", [2, 3])
-    def test_select_dq_givens_fidelity(self, N, qdk_ctx):  # noqa: N803
+    def test_select_dq_givens_fidelity(self, N):  # noqa: N803
         """Verify SELECT with a DQ entry produces a non-trivial rotation."""
         select_data = self._select_data(N, rotation_bit_precision=10)
 
-        qdk_ctx.code.QDKChemistry.Utils.SOSSAWalk.TestSelectDQ(select_data, 0, 0, False)
-        state = qdk_ctx.dump_machine()
-        sv = np.array(state.as_dense_state())
+        sv = self._run_select(select_data, use_phase_gradient=False)
 
         assert np.sum(np.abs(sv) ** 2) > 0.99, "State normalization check failed"
 
@@ -592,16 +582,18 @@ class TestSelectSwapCorrectness:
             (8, 4, 2),  # 8 entries, 2 swap bits
         ],
     )
-    def test_1d_all_addresses(self, n_data, n_bits, num_swap_bits, qdk_ctx):
+    def test_1d_all_addresses(self, n_data, n_bits, num_swap_bits):
         """For each address |i⟩, SelectSwap should load data[i] into output."""
         data = _make_random_data_1d(n_data, n_bits)
-        result = qdk_ctx.eval(f"{_NS}.TestSelectSwap1DCorrectness({_bools_to_qs(data)}, {num_swap_bits})")
+        result = create_qsharp_context().eval(
+            f"{_NS}.TestSelectSwap1DCorrectness({_bools_to_qs(data)}, {num_swap_bits})"
+        )
         assert result, f"SelectSwap 1D failed: n_data={n_data}, n_bits={n_bits}, num_swap_bits={num_swap_bits}"
 
-    def test_1d_auto_lambda(self, qdk_ctx):
+    def test_1d_auto_lambda(self):
         """SelectSwap with numSwapBits=-1 (auto-optimal) should produce correct results."""
         data = _make_random_data_1d(8, 4)
-        result = qdk_ctx.eval(f"{_NS}.TestSelectSwap1DCorrectness({_bools_to_qs(data)}, -1)")
+        result = create_qsharp_context().eval(f"{_NS}.TestSelectSwap1DCorrectness({_bools_to_qs(data)}, -1)")
         assert result, "SelectSwap 1D with auto lambda failed"
 
     @pytest.mark.parametrize(
@@ -612,10 +604,12 @@ class TestSelectSwapCorrectness:
             (3, 4, 4, 0),  # non-power-of-2 outer
         ],
     )
-    def test_2d_all_addresses(self, n_outer, n_inner, n_bits, num_swap_bits, qdk_ctx):
+    def test_2d_all_addresses(self, n_outer, n_inner, n_bits, num_swap_bits):
         """For each (i, j), SelectSwap2D should load data[i][j] into target."""
         data = _make_random_data_2d(n_outer, n_inner, n_bits)
-        result = qdk_ctx.eval(f"{_NS}.TestSelectSwap2DCorrectness({_bools_to_qs(data)}, {num_swap_bits}, false)")
+        result = create_qsharp_context().eval(
+            f"{_NS}.TestSelectSwap2DCorrectness({_bools_to_qs(data)}, {num_swap_bits}, false)"
+        )
         assert result, (
             f"SelectSwap2D failed: n_outer={n_outer}, n_inner={n_inner}, n_bits={n_bits}, num_swap_bits={num_swap_bits}"
         )
