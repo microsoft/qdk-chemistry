@@ -209,6 +209,7 @@ class SparseIsometryStatePreparation(StatePreparation):
     Key References:
 
         * Sparse isometry: Malvetti, Iten, and Colbeck (arXiv:2006.00016) :cite:`Malvetti2021`
+        * GF(2) affine compression and binary encoding: Chen et al. (arXiv:2608.20593) :cite:`Chen2026`
 
     """
 

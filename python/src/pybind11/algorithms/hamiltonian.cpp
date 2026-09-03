@@ -147,6 +147,15 @@ Returns:
 
 )");
 
+  hamiltonian_constructor.def("aliases", &HamiltonianConstructor::aliases,
+                              R"(
+The algorithm's aliases.
+
+Returns:
+    list[str]: All registered names for the algorithm
+
+)");
+
   hamiltonian_constructor.def("type_name", &HamiltonianConstructor::type_name,
                               R"(
 The algorithm's type name.
