@@ -1,6 +1,7 @@
 target_sources(chemistry PRIVATE
     active_space.cpp
     algorithm_defaults.cpp
+    double_factorization.cpp
     finite_difference_nuclear_derivative.cpp
     hamiltonian.cpp
     localization.cpp
