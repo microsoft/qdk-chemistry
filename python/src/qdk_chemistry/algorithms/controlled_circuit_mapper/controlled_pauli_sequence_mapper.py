@@ -78,17 +78,22 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
 
         target_indices = self._get_target_indices(unitary)
 
-        pauli_terms: list[list[qsharp.Pauli]] = []
+        pauli_indices: list[list[int]] = []
+        pauli_ops: list[list[qsharp.Pauli]] = []
         angles: list[float] = []
         for term in unitary_container.step_terms:
-            base_terms = [qsharp.Pauli.I] * unitary_container.num_qubits
+            indices = []
+            ops = []
             for index, pauli in term.pauli_term.items():
-                base_terms[index] = getattr(qsharp.Pauli, pauli)
-            pauli_terms.append(base_terms.copy())
+                indices.append(index)
+                ops.append(getattr(qsharp.Pauli, pauli))
+            pauli_indices.append(indices)
+            pauli_ops.append(ops)
             angles.append(term.angle)
 
-        controlled_evo_params = QSHARP_UTILS.ControlledPauliExp.RepControlledPauliExpParams(
-            pauliExponents=pauli_terms,
+        controlled_evo_params = QSHARP_UTILS.ControlledPauliExp.SparseRepControlledPauliExpParams(
+            pauliIndices=pauli_indices,
+            pauliOps=pauli_ops,
             pauliCoefficients=angles,
             repetitions=unitary_container.step_reps,
             control=control_indices[0],
@@ -96,10 +101,10 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
         )
 
         qsharp_factory = QsharpFactoryData(
-            program=QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit,
+            program=QSHARP_UTILS.ControlledPauliExp.MakeSparseRepControlledPauliExpCircuit,
             parameter=vars(controlled_evo_params),
         )
 
-        controlled_unitary_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(controlled_evo_params)
+        controlled_unitary_op = QSHARP_UTILS.ControlledPauliExp.MakeSparseRepControlledPauliExpOp(controlled_evo_params)
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=controlled_unitary_op)

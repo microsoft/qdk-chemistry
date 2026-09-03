@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import re
 from abc import abstractmethod
 
 import numpy as np
@@ -19,7 +20,6 @@ from qdk_chemistry.data import (
     UnitaryRepresentation,
 )
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import ExponentiatedPauliTerm
-from qdk_chemistry.utils import Logger
 
 __all__: list[str] = [
     "HamiltonianUnitaryBuilder",
@@ -28,6 +28,8 @@ __all__: list[str] = [
     "TimeEvolutionBuilder",
     "TimeEvolutionSettings",
 ]
+
+_NON_IDENTITY = re.compile(r"[^I]")
 
 
 class HamiltonianUnitaryBuilder(Algorithm):
@@ -60,11 +62,10 @@ class HamiltonianUnitaryBuilder(Algorithm):
             Dictionary assigning each non-identity qubit index to its Pauli axis.
 
         """
-        mapping: dict[int, str] = {}
-        for index, char in enumerate(reversed(label)):  # reversed: right-most char -> qubit 0
-            if char != "I":
-                mapping[index] = char
-        return mapping
+        # Labels are dense but Pauli strings are not, so let the regex engine skip
+        # the identity runs instead of stepping over them in Python.
+        last = len(label) - 1
+        return {last - m.start(): m[0] for m in reversed(list(_NON_IDENTITY.finditer(label)))}
 
 
 class HamiltonianUnitaryBuilderSettings(Settings):
@@ -151,15 +152,15 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
         """Group Hamiltonian terms for decomposition."""
         partition = qubit_hamiltonian.term_partition
         if partition is not None:
-            Logger.debug(
-                f"{self.name().capitalize()}: consuming QubitOperator.term_partition "
-                f"(strategy={partition.strategy!r}, num_groups={partition.num_groups})."
-            )
+            # Logger.debug(
+            #     f"{self.name().capitalize()}: consuming QubitOperator.term_partition "
+            #     f"(strategy={partition.strategy!r}, num_groups={partition.num_groups})."
+            # )
             return self._groups_from_partition(qubit_hamiltonian, partition)
 
-        Logger.debug(
-            f"{self.name().capitalize()}: no term_partition present; treating each Pauli term as its own group."
-        )
+        # Logger.debug(
+        #     f"{self.name().capitalize()}: no term_partition present; treating each Pauli term as its own group."
+        # )
         return [
             [
                 QubitOperator(
@@ -234,11 +235,24 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
 
         """
         terms: list[ExponentiatedPauliTerm] = []
-        for label, coeff in group.get_real_coefficients(tolerance=atol):
-            mapping = self._pauli_label_to_map(label)
-            angle = coeff * time
-            terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
+        for mapping, coeff in self._commuting_pauli_maps(group, atol=atol):
+            terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=coeff * time))
         return terms
+
+    def _commuting_pauli_maps(
+        self,
+        group: QubitOperator,
+        *,
+        atol: float = 1e-12,
+    ) -> list[tuple[dict[int, str], float]]:
+        """Return ``(non-identity Pauli map, coefficient)`` for each term of a group.
+
+        Separated from :meth:`_exponentiate_commuting` so a caller that visits the
+        same group at several time fractions decodes its labels only once.
+        """
+        return [
+            (self._pauli_label_to_map(label), coeff) for label, coeff in group.get_real_coefficients(tolerance=atol)
+        ]
 
 
 class HamiltonianUnitaryBuilderFactory(AlgorithmFactory):

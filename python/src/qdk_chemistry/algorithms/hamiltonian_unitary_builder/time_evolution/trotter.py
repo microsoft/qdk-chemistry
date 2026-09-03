@@ -295,15 +295,17 @@ class Trotter(TimeEvolutionBuilder):
             Logger.warn("Term partition produced no groups; returning empty term list.")
             return terms
 
+        # The order-2 schedule revisits each group at several time fractions, and only
+        # the angle changes, so decode every group's Pauli labels once up front.
+        decomposed = [
+            [self._commuting_pauli_maps(subgroup, atol=atol) for subgroup in group] for group in grouped_hamiltonians
+        ]
+
         if order == 1:
-            for group in grouped_hamiltonians:
+            for group in decomposed:
                 for subgroup in group:
                     terms.extend(
-                        self._exponentiate_commuting(
-                            subgroup,
-                            time=time,
-                            atol=atol,
-                        )
+                        ExponentiatedPauliTerm(pauli_term=mapping, angle=coeff * time) for mapping, coeff in subgroup
                     )
 
         # order = 2 or order = 2k with k>1
@@ -347,13 +349,10 @@ class Trotter(TimeEvolutionBuilder):
 
             # Expand the schedule into exponentiated Pauli terms
             for frac, g in schedule:
-                for subgroup in grouped_hamiltonians[g]:
+                for subgroup in decomposed[g]:
                     terms.extend(
-                        self._exponentiate_commuting(
-                            subgroup,
-                            time=time * frac,
-                            atol=atol,
-                        )
+                        ExponentiatedPauliTerm(pauli_term=mapping, angle=coeff * time * frac)
+                        for mapping, coeff in subgroup
                     )
 
         return terms
