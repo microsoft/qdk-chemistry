@@ -37,7 +37,7 @@ class TestProcessRawResults:
         assert loss == {}
 
     def test_sequence_outcomes_with_loss(self):
-        """Sequence outcomes retain the existing bit and loss conversion."""
+        """Sequence outcomes are reversed to qubit-0-rightmost order, with loss marked 'L'."""
         raw_results = {
             "[0, 1]": {"outcome": [0, 1], "count": 3},
             "[1, -]": {"outcome": [1, "-"], "count": 2},
@@ -45,8 +45,8 @@ class TestProcessRawResults:
 
         counts, loss = _process_raw_results(raw_results)
 
-        assert counts == {"01": 3}
-        assert loss == {"1L": 2}
+        assert counts == {"10": 3}
+        assert loss == {"L1": 2}
 
 
 @pytest.fixture

@@ -280,7 +280,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         }
         return Circuit(
             qsharp_factory=QsharpFactoryData(
-                program=QSHARP_UTILS.IterativePhaseEstimation.RunFullIQPE,
+                program=QSHARP_UTILS.CombinedIterationPhaseEstimation.RunFullIQPE,
                 parameter=iterative_parameters,
             )
         )
