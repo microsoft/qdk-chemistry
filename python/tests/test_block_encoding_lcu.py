@@ -226,11 +226,15 @@ class TestPSPMapperPrepareGuards:
             PSPMapper().run(self._unitary())
 
     def test_rejects_a_prepare_that_wants_a_phase_gradient(self):
-        """QROM state prep declares shared ancilla this mapper never allocates."""
+        """QROM state prep declares shared ancilla this mapper never allocates.
+
+        Only when it is asked to share one: left to its default the callable allocates and
+        prepares its own gradient internally, declares none, and embeds fine.
+        """
         mapper = registry.create(
             "circuit_mapper",
             "prepare_select_prepare",
-            prepare=AlgorithmRef("state_prep", "qrom", rotation_bit_precision=4),
+            prepare=AlgorithmRef("state_prep", "qrom", rotation_bit_precision=4, allocate_phase_gradient=False),
         )
         with pytest.raises(ValueError, match="phase gradient ancilla"):
             mapper.run(self._unitary())
