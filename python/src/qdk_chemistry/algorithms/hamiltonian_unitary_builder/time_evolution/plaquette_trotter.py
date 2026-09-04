@@ -89,7 +89,10 @@ def plaquette_sections(width: int, height: int) -> tuple[list[tuple[int, ...]], 
         )
 
     def cycle(row: int, col: int) -> tuple[int, ...]:
+        """Return the four corners of the plaquette anchored at *(row, col)*, in cycle order."""
+
         def site(r: int, c: int) -> int:
+            """Wrap a lattice coordinate onto its row-major site index."""
             return (r % height) * width + (c % width)
 
         return (site(row, col), site(row, col + 1), site(row + 1, col + 1), site(row + 1, col))
@@ -205,7 +208,6 @@ class PlaquetteTrotter(Trotter):
         target_accuracy: float = 0.0,
         num_divisions: int = 0,
         error_bound: str = "commutator",
-        accuracy_metric: str = "unitary",
         weight_threshold: float = 1e-12,
         power: int = 1,
         power_strategy: str = "repeat",
@@ -220,7 +222,6 @@ class PlaquetteTrotter(Trotter):
             target_accuracy: Target accuracy for auto step computation. Use 0.0 to disable.
             num_divisions: Divisions per Trotter step. Max of this and the auto value is used.
             error_bound: Error bound strategy: ``"commutator"`` (default) or ``"naive"``.
-            accuracy_metric: What *target_accuracy* measures, ``"unitary"`` or ``"energy"``.
             weight_threshold: Threshold for filtering small coefficients.
             power: The power to raise the unitary to. Defaults to 1.
             power_strategy: Strategy for ``U^power``: ``"rescale"`` or ``"repeat"``.
@@ -232,7 +233,6 @@ class PlaquetteTrotter(Trotter):
             target_accuracy=target_accuracy,
             num_divisions=num_divisions,
             error_bound=error_bound,
-            accuracy_metric=accuracy_metric,
             weight_threshold=weight_threshold,
             power=power,
             power_strategy=power_strategy,
@@ -245,7 +245,6 @@ class PlaquetteTrotter(Trotter):
         settings.set("target_accuracy", target_accuracy)
         settings.set("num_divisions", num_divisions)
         settings.set("error_bound", error_bound)
-        settings.set("accuracy_metric", accuracy_metric)
         settings.set("weight_threshold", weight_threshold)
         settings.set("lattice_width", lattice_width)
         settings.set("lattice_height", lattice_height)
@@ -296,6 +295,7 @@ class PlaquetteTrotter(Trotter):
         order = self._settings.get("order")
 
         def hop_layer(section, fraction):
+            """Evolve every plaquette of *section*, for both spins, for *fraction* of the step."""
             terms: list[ExponentiatedPauliTerm] = []
             for spin_offset in (0, num_sites):
                 for cycle in section:
@@ -304,6 +304,7 @@ class PlaquetteTrotter(Trotter):
             return terms
 
         def diagonal_layer(fraction):
+            """Rescale the untouched diagonal terms to *fraction* of unit time."""
             return [
                 ExponentiatedPauliTerm(pauli_term=dict(term.pauli_term), angle=term.angle * fraction)
                 for term in diagonal
