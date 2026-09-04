@@ -183,19 +183,33 @@ silently incorrect circuit.
    interleaved mode ordering, a non-uniform hopping, or a bond graph that is not the
    declared lattice raises rather than being approximated.
 
-.. warning::
-   The rotation saving is only realized when the Givens network is applied
-   **uncontrolled**. Controlling a fixed-angle rotation costs the same as controlling
-   an arbitrary one, so a controlled mapper that treats every emitted term uniformly
-   makes this scheme *more* expensive than the term-by-term path. Measured on one
-   four-site sandwich: 16 rotations term-by-term, 28 with the whole sandwich
-   controlled, and 4 with the network left uncontrolled.
+Controlling a rotation costs the same whether its angle is fixed or arbitrary, so the
+saving would evaporate if the conjugating network were controlled along with
+everything else. It is not: those factors carry ``needs_control=False``, which is
+sound because :math:`C(V D V^{\dagger}) = V\, C(D)\, V^{\dagger}` -- with the control
+off the network cancels against its own adjoint --  and
+:class:`~qdk_chemistry.data.PauliProductFormulaContainer` verifies that cancellation
+rather than taking it on trust.
 
-   The saving is recoverable because :math:`C(V D V^{\dagger}) = V\, C(D)\, V^{\dagger}`
-   -- with the control off the network cancels against its own adjoint -- so only the
-   two eigenvalue phases need controlling. That requires a controlled mapper able to
-   distinguish the conjugating layers from the phase layer, which
-   :class:`~qdk_chemistry.algorithms.ControlledPauliSequenceMapper` does not yet do.
+Measured on one Trotter step of a 4x4 lattice, mapped through
+:class:`~qdk_chemistry.algorithms.ControlledPauliSequenceMapper`:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 20 15 20
+
+   * - Builder
+     - Rotations
+     - T
+     - Rotation depth
+   * - ``trotter``
+     - 704
+     - 0
+     - 451
+   * - ``plaquette``
+     - 225
+     - 384
+     - 143
 
 .. rubric:: Settings
 

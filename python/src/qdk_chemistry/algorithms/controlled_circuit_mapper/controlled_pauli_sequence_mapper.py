@@ -81,6 +81,7 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
         pauli_indices: list[list[int]] = []
         pauli_ops: list[list[qsharp.Pauli]] = []
         angles: list[float] = []
+        needs_control: list[bool] = []
         for term in unitary_container.step_terms:
             indices = []
             ops = []
@@ -90,11 +91,13 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
             pauli_indices.append(indices)
             pauli_ops.append(ops)
             angles.append(term.angle)
+            needs_control.append(term.needs_control)
 
         controlled_evo_params = QSHARP_UTILS.ControlledPauliExp.SparseRepControlledPauliExpParams(
             pauliIndices=pauli_indices,
             pauliOps=pauli_ops,
             pauliCoefficients=angles,
+            needsControl=needs_control,
             repetitions=unitary_container.step_reps,
             control=control_indices[0],
             systems=target_indices,

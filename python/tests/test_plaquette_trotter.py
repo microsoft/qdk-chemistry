@@ -18,6 +18,10 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.plaquet
     plaquette_sections,
 )
 from qdk_chemistry.data import LatticeGraph, MajoranaMapping, QubitOperator
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
+    ExponentiatedPauliTerm,
+    PauliProductFormulaContainer,
+)
 from qdk_chemistry.utils.model_hamiltonians import create_hubbard_hamiltonian
 
 _PAULI = {
@@ -244,3 +248,76 @@ class TestPlaquetteTrotter:
         operator = QubitOperator(pauli_strings=["".join(reversed(label))], coefficients=np.array([0.5]))
         with pytest.raises(ValueError, match="spin-up and spin-down"):
             PlaquetteTrotter(lattice_width=side, lattice_height=side, order=2, time=0.05, num_divisions=1).run(operator)
+
+
+class TestControlExemption:
+    """Tests for the factors the plaquette scheme exempts from control."""
+
+    def test_conjugating_factors_are_exempt_and_phases_are_not(self):
+        """Only the two eigenvalue phases should need controlling."""
+        terms = _plaquette_terms((0, 1, 4, 3), hopping=1.0, time=0.05)
+        exempt = [t for t in terms if not t.needs_control]
+        controlled = [t for t in terms if t.needs_control]
+        assert len(exempt) == 12, "the Givens network should be exempt from control"
+        assert len(controlled) == 2, "only the eigenvalue phases should be controlled"
+
+    def test_control_off_branch_is_the_identity(self):
+        """With the control off only the exempt factors run, and they must cancel.
+
+        This is the property that makes the exemption sound. If it fails the circuit
+        is wrong on the control-off branch, which is invisible to any check that only
+        inspects the control-on evolution.
+        """
+        num_modes = 6
+        terms = _plaquette_terms((0, 1, 4, 3), hopping=1.0, time=0.37)
+        control_off = [t for t in terms if not t.needs_control]
+        assert np.allclose(_unitary_from_terms(control_off, num_modes), np.eye(2**num_modes), atol=1e-10)
+
+    def test_control_on_branch_still_reproduces_the_evolution(self):
+        """Exempting factors must not change the control-on evolution."""
+        num_modes, time = 6, 0.37
+        sites = (0, 1, 4, 3)
+        terms = _plaquette_terms(sites, hopping=1.0, time=time)
+        expected = scipy.linalg.expm(-1j * time * _cycle_hamiltonian(sites, num_modes))
+        assert np.allclose(_unitary_from_terms(terms, num_modes), expected, atol=1e-10)
+
+    def test_container_rejects_exempt_factors_that_do_not_cancel(self):
+        """A factor exempted from control without a matching inverse must be caught."""
+        terms = [
+            ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.3, needs_control=False),
+            ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.1),
+        ]
+        with pytest.raises(ValueError, match="do not cancel"):
+            PauliProductFormulaContainer(step_terms=terms, step_reps=1, num_qubits=2, scale=1.0)
+
+    def test_container_rejects_a_near_miss_inverse(self):
+        """A factor undone by the wrong angle is not a cancellation."""
+        terms = [
+            ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.3, needs_control=False),
+            ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=-0.4, needs_control=False),
+        ]
+        with pytest.raises(ValueError, match="do not cancel"):
+            PauliProductFormulaContainer(step_terms=terms, step_reps=1, num_qubits=2, scale=1.0)
+
+    def test_container_accepts_a_nested_sandwich(self):
+        """Conjugations nest, so cancellation is last-in-first-out rather than pairwise."""
+        terms = [
+            ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.3, needs_control=False),
+            ExponentiatedPauliTerm(pauli_term={1: "Y"}, angle=0.2, needs_control=False),
+            ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.9),
+            ExponentiatedPauliTerm(pauli_term={1: "Y"}, angle=-0.2, needs_control=False),
+            ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=-0.3, needs_control=False),
+        ]
+        PauliProductFormulaContainer(step_terms=terms, step_reps=1, num_qubits=2, scale=1.0)
+
+    def test_a_whole_step_passes_the_container_check(self):
+        """Consecutive plaquettes interleave their sandwiches; the check must still hold."""
+        side = 4
+        operator = TestPlaquetteTrotter._hubbard(side)
+        container = (
+            PlaquetteTrotter(lattice_width=side, lattice_height=side, order=2, time=0.05, num_divisions=1)
+            .run(operator)
+            .get_container()
+        )
+        exempt = sum(1 for t in container.step_terms if not t.needs_control)
+        assert exempt == 4 * 2 * 4 * 12

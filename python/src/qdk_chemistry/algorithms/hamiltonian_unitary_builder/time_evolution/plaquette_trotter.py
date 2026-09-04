@@ -112,6 +112,9 @@ def _givens_terms(mode_i: int, mode_j: int, theta: float) -> list[ExponentiatedP
     they need not be adjacent and no fermionic swap network is required. The two
     Pauli terms commute, so the product splits exactly.
 
+    Both are marked as not needing control: they belong to the conjugating network,
+    which cancels against its own adjoint when a controlled mapper's control is off.
+
     Args:
         mode_i: First mode.
         mode_j: Second mode.
@@ -127,8 +130,8 @@ def _givens_terms(mode_i: int, mode_j: int, theta: float) -> list[ExponentiatedP
     string = dict.fromkeys(range(low + 1, high), "Z")
     half = orientation * theta / 2.0
     return [
-        ExponentiatedPauliTerm(pauli_term={**string, low: "X", high: "Y"}, angle=-half),
-        ExponentiatedPauliTerm(pauli_term={**string, low: "Y", high: "X"}, angle=half),
+        ExponentiatedPauliTerm(pauli_term={**string, low: "X", high: "Y"}, angle=-half, needs_control=False),
+        ExponentiatedPauliTerm(pauli_term={**string, low: "Y", high: "X"}, angle=half, needs_control=False),
     ]
 
 
@@ -164,7 +167,11 @@ def _plaquette_terms(sites: tuple[int, ...], hopping: float, time: float) -> lis
 
     tail: list[ExponentiatedPauliTerm] = []
     for local_i, local_j in reversed(_BUTTERFLY):
-        tail += _givens_terms(sites[local_i], sites[local_j], _QUARTER)
+        # Reversed within the pair as well as across the network, so the conjugating
+        # factors undo each other strictly last-in-first-out. The two Paulis of one
+        # Givens rotation commute, so this ordering is free, and it lets
+        # PauliProductFormulaContainer verify that the uncontrolled factors cancel.
+        tail += reversed(_givens_terms(sites[local_i], sites[local_j], _QUARTER))
 
     return head + middle + tail
 
@@ -197,22 +204,15 @@ class PlaquetteTrotter(Trotter):
         hopping, an interleaved mode ordering, an open boundary, or a bond graph
         that is not the declared lattice raises rather than being approximated.
 
-    Warning:
-        The rotation saving described above is only realized when the Givens
-        network is applied **uncontrolled**. Controlling a fixed-angle rotation
-        costs the same as controlling an arbitrary one -- measured on the resource
-        estimator, ``Controlled Exp(P, pi/8)`` counts two rotations and no T gate,
-        exactly like an arbitrary angle -- so a mapper that controls every emitted
-        term uniformly turns this scheme into a *more* expensive one than the
-        term-by-term path it replaces.
-
-        The saving is recoverable because ``Controlled(V D V^dag)`` equals
-        ``V Controlled(D) V^dag``: with the control off, the network cancels
-        against its own adjoint. Only the two eigenvalue phases need controlling.
-        Realizing that requires a controlled mapper that can distinguish the
-        conjugating layers from the phase layer, which
-        :class:`~qdk_chemistry.algorithms.ControlledPauliSequenceMapper` does not
-        currently do. Until it can, prefer this builder for uncontrolled evolution.
+        The saving depends on the conjugating network being applied **uncontrolled**,
+        because controlling a rotation costs the same whether its angle is fixed or
+        arbitrary: a fixed ``pi/8`` factor is one T gate uncontrolled but two
+        rotations controlled. The network's factors are therefore emitted with
+        ``needs_control=False``, which is sound because
+        ``C(V D V^dag) = V C(D) V^dag`` -- with the control off the network cancels
+        against its own adjoint. A controlled mapper that ignored the flag and
+        controlled every factor would make this scheme more expensive than the
+        term-by-term path, not less.
 
     """
 
