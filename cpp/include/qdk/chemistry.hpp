@@ -15,6 +15,7 @@
 #include <qdk/chemistry/algorithms/population_analysis.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/algorithms/stability.hpp>
+#include <qdk/chemistry/algorithms/symmetry_shift.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/lattice_graph.hpp>
 #include <qdk/chemistry/data/nuclear_gradients.hpp>
@@ -23,4 +24,6 @@
 #include <qdk/chemistry/data/stability_result.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
+#include <qdk/chemistry/utils/double_factorization.hpp>
+#include <qdk/chemistry/utils/hamiltonian_one_norm.hpp>
 #include <qdk/chemistry/utils/model_hamiltonians.hpp>

@@ -772,6 +772,7 @@ def _register_cpp_factories():
         ProjectedMultiConfigurationCalculatorFactory,
         ScfSolverFactory,
         StabilityCheckerFactory,
+        SymmetryShifterFactory,
     )
 
     register_factory(ActiveSpaceSelectorFactory)
@@ -787,6 +788,7 @@ def _register_cpp_factories():
     register_factory(ProjectedMultiConfigurationCalculatorFactory)
     register_factory(ScfSolverFactory)
     register_factory(StabilityCheckerFactory)
+    register_factory(SymmetryShifterFactory)
 
 
 def _register_python_factories():
