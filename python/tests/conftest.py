@@ -80,17 +80,26 @@ if build_dir.exists():
 def qsharp_test_context():
     """Q# context that also carries the test-only Q# sources in ``tests/qsharp``.
 
-    Those sources are evaluated onto a *fresh* context rather than shipped in the
-    package or compiled as a dependent one: Q# ``internal`` visibility is
-    package-scoped and the drivers call ``internal`` library callables, and a fresh
-    context keeps them out of what production code paths resolve against.
+    Those sources are evaluated onto a *fresh* context rather than shipped in the package
+    or compiled as a dependent one. Q# ``internal`` visibility is package-scoped, so the
+    drivers can only call the ``internal`` library callables they need from inside the
+    package -- and anything left in the package is reachable from Python on
+    ``context.code``, ``internal`` included, which is what keeping them out of it avoids.
 
-    Ops resolved from a context can only be composed with ops from that same
-    context, so a test mixing library and test-only Q# must take both from here.
+    Costs one extra context build plus one eval per file, roughly 450 ms and 42 MiB, once
+    per session and only for tests that ask for it.
+
+    Ops resolved from a context can only be composed with ops from that same context, so a
+    test mixing library and test-only Q# must take both from here.
     """
     context = create_qsharp_context()
+    # Sorted so that, should one test module ever import another, the order is at least
+    # deterministic rather than filesystem-dependent.
     for path in sorted((Path(__file__).parent / "qsharp").glob("*.qs")):
-        context.eval(path.read_text(encoding="utf-8"))
+        try:
+            context.eval(path.read_text(encoding="utf-8"))
+        except Exception as error:  # qdk reports line numbers per fragment, so name the file
+            raise RuntimeError(f"failed to evaluate Q# test source {path.name}: {error}") from error
     return context
 
 

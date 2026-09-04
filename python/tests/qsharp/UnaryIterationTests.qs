@@ -4,9 +4,9 @@
 
 /// Test-only drivers for `QDKChemistry.Utils.UnaryIteration`.
 ///
-/// The Python test layer evaluates this file into a throwaway context (see
-/// `tests/qsharp_test_sources.py`); it is never part of the shipped
-/// `qdk_chemistry.utils.qsharp` project.
+/// The Python test layer evaluates this file into a throwaway context (see the
+/// `qsharp_test_context` fixture in `tests/conftest.py`); it is never part of the
+/// shipped `qdk_chemistry.utils.qsharp` project.
 namespace QDKChemistry.TestUtils.UnaryIterationTests {
 
     import Std.Canon.ApplyToEach;

@@ -10,6 +10,7 @@ from __future__ import annotations
 import inspect
 import threading
 from pathlib import Path
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -46,9 +47,27 @@ _PORTABLE_MODULES = tuple(Path(name).stem for name in _BASE_PROFILE_FILES)
 _ADAPTIVE_ONLY_MODULES = ("UnaryIteration", "UnaryPhaseEstimation")
 
 
-def _declared_callables(namespace) -> list[str]:
-    """Names a compiled Q# namespace exposes, ``internal`` ones included."""
-    return [name for name in dir(namespace) if not name.startswith("_")]
+#: The only shipped names that legitimately read as "test": the Hadamard test is a standard
+#: quantum primitive. Exact paths, not a prefix, so a real driver added to that module still
+#: gets caught.
+_TEST_NAME_EXEMPTIONS = frozenset({"QDKChemistry.Utils.HadamardTest", "QDKChemistry.Utils.HadamardTest.HadamardTest"})
+
+
+def _walk_namespaces(namespace, prefix: str) -> Iterator[tuple[str, str, bool]]:
+    """Yield ``(path, name, is_namespace)`` for everything a compiled Q# tree exposes.
+
+    ``dir()`` reaches ``internal`` declarations, nested namespaces and structs alike, which
+    is what lets the guards below see the whole context rather than one level of it.
+    """
+    for name in dir(namespace):
+        if name.startswith("_"):
+            continue
+        child = getattr(namespace, name)
+        path = f"{prefix}.{name}"
+        is_namespace = isinstance(child, SimpleNamespace)
+        yield path, name, is_namespace
+        if is_namespace:
+            yield from _walk_namespaces(child, path)
 
 
 @pytest.fixture(scope="module")
@@ -200,33 +219,41 @@ class TestTargetProfiles:
 class TestTestOnlySourcesAreNotShipped:
     """Q# that only tests call lives under ``QDKChemistry.TestUtils``, outside the package.
 
-    Anything vendored under ``qdk_chemistry/utils/qsharp/src`` is compiled into every
-    context a user creates, so a helper no production code path calls has no business
-    being there.
+    Q# ``internal`` is package-scoped, not a privacy boundary: everything vendored under
+    ``qdk_chemistry/utils/qsharp/src`` is reachable from Python on ``context.code``,
+    ``internal`` included. A test driver left there is therefore public API a user can
+    call, which is what these guards exist to prevent.
     """
 
-    def test_the_shipped_modules_declare_no_test_prefixed_callable(self) -> None:
-        """Test drivers are named ``Test*``, so a vendored one is a move that was missed."""
-        utils = get_qsharp_context().code.QDKChemistry.Utils
-        offenders = {
-            module: [name for name in _declared_callables(getattr(utils, module)) if name.startswith("Test")]
-            for module in _declared_callables(utils)
-        }
-        assert {module: found for module, found in offenders.items() if found} == {}
+    def test_the_shipped_project_declares_nothing_test_only(self) -> None:
+        """A test-only helper vendored into the package is a move that was missed.
 
-    def test_every_test_only_callable_uses_the_test_prefix(self, qsharp_test_utils) -> None:
-        """The vendored-modules guard keys on the prefix, so hold the test tree to it."""
-        unprefixed = {
-            module: [
-                name for name in _declared_callables(getattr(qsharp_test_utils, module)) if not name.startswith("Test")
-            ]
-            for module in _declared_callables(qsharp_test_utils)
-        }
-        assert {module: found for module, found in unprefixed.items() if found} == {}
+        Matches ``test`` anywhere in a name, case-insensitively, because the naming this
+        guard has to catch has historically been ``MakeTest*`` as often as ``Test*``, and
+        walks the whole tree because a stray declaration need not sit one level down in
+        ``Utils``. Built on a fresh context so the assertion is about the shipped project
+        rather than whichever context a previously-run test happened to install.
+        """
+        context = create_qsharp_context()
+        offenders = [
+            path
+            for path, name, _ in _walk_namespaces(context.code.QDKChemistry, "QDKChemistry")
+            if "test" in name.lower() and path not in _TEST_NAME_EXEMPTIONS
+        ]
+        assert offenders == []
+
+    def test_every_test_only_declaration_uses_the_test_prefix(self, qsharp_test_utils) -> None:
+        """Drivers under ``TestUtils`` are named ``Test*`` so their role is legible at the call site."""
+        unprefixed = [
+            path
+            for path, name, is_namespace in _walk_namespaces(qsharp_test_utils, "TestUtils")
+            if not is_namespace and not name.startswith("Test")
+        ]
+        assert unprefixed == []
 
     def test_a_default_context_cannot_reach_the_test_helpers(self) -> None:
-        """A user context must not pay for, or be able to call, the test drivers."""
-        assert not hasattr(get_qsharp_context().code.QDKChemistry, "TestUtils")
+        """A user context must not be able to call the test drivers."""
+        assert not hasattr(create_qsharp_context().code.QDKChemistry, "TestUtils")
 
     def test_the_test_context_can_reach_them(self, qsharp_test_context: qdk.Context) -> None:
         """Evaluating the test sources is what makes the drivers available to the Python tests."""

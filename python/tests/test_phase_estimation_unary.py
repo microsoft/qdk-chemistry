@@ -69,7 +69,7 @@ class TestUnaryIterationQsharp:
 
             expected = np.zeros(1 << (num_address_qubits + num_actions), dtype=complex)
             expected[1 << (num_actions - 1 - address_value)] = 1.0
-            np.testing.assert_allclose(state, expected, atol=1e-10)
+            np.testing.assert_allclose(state, expected, atol=1e-10, err_msg=f"address {address_value}")
 
     @pytest.mark.parametrize("num_actions", [2, 4, 8])
     def test_superposed_address_stays_coherent(self, qsharp_test_context, qsharp_test_utils, num_actions):
