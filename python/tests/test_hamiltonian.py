@@ -18,12 +18,13 @@ import pickle
 import tempfile
 from pathlib import Path
 
+import h5py
 import numpy as np
 import pytest
 
+from qdk_chemistry import Logger
 from qdk_chemistry.data import (
     CanonicalFourCenterHamiltonianContainer,
-    CholeskyHamiltonianContainer,
     Hamiltonian,
     ModelOrbitals,
     Orbitals,
@@ -79,6 +80,33 @@ def create_non_zero_hamiltonian(container_type):
         raise ValueError(f"Unknown container_type: {container_type}")
 
     return Hamiltonian(container)
+
+
+@pytest.mark.parametrize("fmt", ["json", "hdf5"])
+def test_legacy_cholesky_container_tag_warns(tmp_path, capfd, fmt):
+    """Legacy Cholesky tags load as three-center containers with a warning."""
+    hamiltonian = create_non_zero_hamiltonian("three_center")
+
+    if fmt == "json":
+        data = json.loads(hamiltonian.to_json())
+        data["container"]["container_type"] = "cholesky"
+    else:
+        path = tmp_path / "legacy.hamiltonian.h5"
+        hamiltonian.to_hdf5_file(str(path))
+        with h5py.File(path, "r+") as handle:
+            handle["container"].attrs.modify("container_type", "cholesky")
+
+    previous_level = Logger.get_global_level()
+    Logger.set_global_level("warn")
+    capfd.readouterr()
+    try:
+        restored = Hamiltonian.from_json(json.dumps(data)) if fmt == "json" else Hamiltonian.from_hdf5_file(str(path))
+        warning_output = capfd.readouterr().out
+    finally:
+        Logger.set_global_level(previous_level)
+
+    assert restored.get_container_type() == "three_center"
+    assert "container tag 'cholesky' is deprecated" in warning_output
 
 
 # =============================================================================
@@ -903,12 +931,16 @@ class TestThreeCenterSpecific:
         assert result is not None
         np.testing.assert_array_almost_equal(result, ao_vecs)
 
+        data = json.loads(Hamiltonian(container).to_json())
+        assert "ao_three_center_vectors" in data["container"]
+        assert "ao_cholesky_vectors" not in data["container"]
+
     def test_active_space_management(self):
         """Test core energy handling."""
         one_body = np.eye(3)
         cholesky_vecs = np.random.default_rng(4).random((9, 15))
         orbitals = create_test_orbitals(3)
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 2.5, np.array([])))
+        h = Hamiltonian(ThreeCenterHamiltonianContainer(one_body, cholesky_vecs, orbitals, 2.5, np.array([])))
         assert h.get_core_energy() == 2.5
 
     def test_json_serialization(self):
@@ -918,7 +950,7 @@ class TestThreeCenterSpecific:
         cholesky_vecs = rng.random((4, 10))
         coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
         orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 1.5, np.array([])))
+        h = Hamiltonian(ThreeCenterHamiltonianContainer(one_body, cholesky_vecs, orbitals, 1.5, np.array([])))
 
         data = json.loads(h.to_json())
         assert isinstance(data, dict)
@@ -941,7 +973,7 @@ class TestThreeCenterSpecific:
         cholesky_vecs = rng.random((4, 10))
         coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
         orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 1.5, np.array([])))
+        h = Hamiltonian(ThreeCenterHamiltonianContainer(one_body, cholesky_vecs, orbitals, 1.5, np.array([])))
 
         with tempfile.NamedTemporaryFile(suffix=".hamiltonian.json", delete=False) as f:
             filename = f.name
@@ -997,7 +1029,7 @@ class TestThreeCenterSpecific:
         cholesky_vecs = rng.random((4, 10))
         coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
         orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 1.5, np.array([])))
+        h = Hamiltonian(ThreeCenterHamiltonianContainer(one_body, cholesky_vecs, orbitals, 1.5, np.array([])))
 
         with tempfile.NamedTemporaryFile(suffix=".hamiltonian.h5", delete=False) as f:
             filename = f.name
@@ -1053,7 +1085,7 @@ class TestThreeCenterSpecific:
         cholesky_vecs = rng.random((4, 10))
         coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
         orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 1.5, np.array([])))
+        h = Hamiltonian(ThreeCenterHamiltonianContainer(one_body, cholesky_vecs, orbitals, 1.5, np.array([])))
 
         # Test JSON format
         with tempfile.NamedTemporaryFile(suffix=".hamiltonian.json", delete=False) as f:
@@ -1090,12 +1122,12 @@ class TestThreeCenterSpecific:
             Path(hdf5_filename).unlink(missing_ok=True)
 
     def test_pickling_hamiltonian(self):
-        """Test that Cholesky Hamiltonian can be pickled and unpickled correctly."""
+        """Test that a three-center Hamiltonian can be pickled and unpickled correctly."""
         one_body = np.eye(3)
         rng = np.random.default_rng(5)
         cholesky_vecs = rng.random((9, 15))
         orbitals = create_test_orbitals(3)
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 0.0, np.array([])))
+        h = Hamiltonian(ThreeCenterHamiltonianContainer(one_body, cholesky_vecs, orbitals, 0.0, np.array([])))
 
         # Test pickling round-trip
         pickled_data = pickle.dumps(h)

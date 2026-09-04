@@ -219,7 +219,7 @@ compressed form:
   8-fold integral symmetry before mapping, so the result does not depend on
   which symmetry-related permutations of an integral the container stores, nor
   on their order.
-- :class:`~qdk_chemistry.data.CholeskyHamiltonianContainer` — the three-center
+- :class:`~qdk_chemistry.data.ThreeCenterHamiltonianContainer` — the three-center
   (Cholesky / density-fitted) factors are kept in their
   :math:`O(N^2 \cdot n_\text{aux})` form and the auxiliary index is contracted
   in integral space, one ``(pq|.)`` row at a time (a vectorized matrix-vector

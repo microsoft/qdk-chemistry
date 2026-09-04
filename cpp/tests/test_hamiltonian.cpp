@@ -1823,6 +1823,7 @@ TEST_F(HamiltonianConstructorTest, CholeskyFactory) {
 
   // Test default eri_threshold
   EXPECT_DOUBLE_EQ(cholesky_hc->settings().get<double>("eri_threshold"), 1e-12);
+  EXPECT_FALSE(cholesky_hc->settings().get<bool>("store_ao_cholesky_vectors"));
 
   // Test setting eri_threshold
   EXPECT_NO_THROW(cholesky_hc->settings().set("eri_threshold", 1e-10));
@@ -1990,7 +1991,7 @@ TEST_F(HamiltonianContainerTest, CholeskyContainerConstruction) {
   Eigen::MatrixXd L_mo = Eigen::MatrixXd::Random(4, 3);
 
   // Test restricted constructor
-  Hamiltonian h(std::make_unique<CholeskyHamiltonianContainer>(
+  Hamiltonian h(std::make_unique<ThreeCenterHamiltonianContainer>(
       one_body, L_mo, orbitals, core_energy, inactive_fock));
 
   EXPECT_TRUE(h.has_one_body_integrals());
@@ -2021,7 +2022,7 @@ TEST_F(HamiltonianContainerTest, CholeskyContainerUnrestrictedConstruction) {
   Eigen::MatrixXd L_mo_beta = Eigen::MatrixXd::Random(4, 3);
 
   // Test unrestricted constructor
-  Hamiltonian h(std::make_unique<CholeskyHamiltonianContainer>(
+  Hamiltonian h(std::make_unique<ThreeCenterHamiltonianContainer>(
       one_body_alpha, one_body_beta, L_mo_alpha, L_mo_beta,
       unrestricted_orbitals, core_energy, inactive_fock_alpha,
       inactive_fock_beta));
@@ -2042,7 +2043,7 @@ TEST_F(HamiltonianContainerTest, CholeskyContainerJSONSerialization) {
   Eigen::MatrixXd L_mo = Eigen::MatrixXd::Random(4, 3);
   Eigen::MatrixXd L_ao = Eigen::MatrixXd::Random(4, 3);
 
-  Hamiltonian h(std::make_unique<CholeskyHamiltonianContainer>(
+  Hamiltonian h(std::make_unique<ThreeCenterHamiltonianContainer>(
       one_body, L_mo, orbitals, core_energy, inactive_fock, L_ao));
 
   // Test JSON conversion
@@ -2052,7 +2053,8 @@ TEST_F(HamiltonianContainerTest, CholeskyContainerJSONSerialization) {
   EXPECT_EQ(j["container"]["core_energy"], 1.5);
   EXPECT_TRUE(j["container"].contains("one_body_integrals"));
   EXPECT_TRUE(j["container"].contains("three_center_integrals"));
-  EXPECT_TRUE(j["container"].contains("ao_cholesky_vectors"));
+  EXPECT_TRUE(j["container"].contains("ao_three_center_vectors"));
+  EXPECT_FALSE(j["container"].contains("ao_cholesky_vectors"));
 
   // Test deserialization
   auto h_loaded = Hamiltonian::from_json(j);
@@ -2070,7 +2072,7 @@ TEST_F(HamiltonianContainerTest, CholeskyContainerHDF5Serialization) {
   Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
   Eigen::MatrixXd L_mo = Eigen::MatrixXd::Random(4, 3);
 
-  Hamiltonian h(std::make_unique<CholeskyHamiltonianContainer>(
+  Hamiltonian h(std::make_unique<ThreeCenterHamiltonianContainer>(
       one_body, L_mo, orbitals, core_energy, inactive_fock));
 
   // Save to HDF5
@@ -2097,7 +2099,7 @@ TEST_F(HamiltonianContainerTest, CholeskyContainerClone) {
   Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
   Eigen::MatrixXd L_mo = Eigen::MatrixXd::Random(4, 3);
 
-  Hamiltonian h1(std::make_unique<CholeskyHamiltonianContainer>(
+  Hamiltonian h1(std::make_unique<ThreeCenterHamiltonianContainer>(
       one_body, L_mo, orbitals, core_energy, inactive_fock));
 
   // Test copy constructor (uses clone internally)
@@ -2275,7 +2277,7 @@ TEST_F(HamiltonianContainerTest, SparseContainerGetContainerTypedAccess) {
 
   EXPECT_TRUE(h.has_container_type<SparseHamiltonianContainer>());
   EXPECT_FALSE(h.has_container_type<CanonicalFourCenterHamiltonianContainer>());
-  EXPECT_FALSE(h.has_container_type<CholeskyHamiltonianContainer>());
+  EXPECT_FALSE(h.has_container_type<ThreeCenterHamiltonianContainer>());
 }
 
 TEST_F(HamiltonianConstructorTest, DensityFittedUnrestrictedO2) {
@@ -3095,19 +3097,16 @@ TEST_F(HamiltonianIntegrationTest, MixedIntegralSymmetriesO2Triplet) {
           double diff3 = std::abs(ijkl - jilk);
 
           EXPECT_LT(diff1, testing::integral_tolerance)
-              << "Symmetry violation for ijkl=jikl."
-              << "Difference: " << diff1 << " exceeds tolerance "
-              << testing::integral_tolerance;
+              << "Symmetry violation for ijkl=jikl." << "Difference: " << diff1
+              << " exceeds tolerance " << testing::integral_tolerance;
 
           EXPECT_LT(diff2, testing::integral_tolerance)
-              << "Symmetry violation for ijkl=ijlk."
-              << "Difference: " << diff2 << " exceeds tolerance "
-              << testing::integral_tolerance;
+              << "Symmetry violation for ijkl=ijlk." << "Difference: " << diff2
+              << " exceeds tolerance " << testing::integral_tolerance;
 
           EXPECT_LT(diff3, testing::integral_tolerance)
-              << "Symmetry violation for ijkl=jikl."
-              << "Difference: " << diff3 << " exceeds tolerance "
-              << testing::integral_tolerance;
+              << "Symmetry violation for ijkl=jikl." << "Difference: " << diff3
+              << " exceeds tolerance " << testing::integral_tolerance;
         }
       }
     }

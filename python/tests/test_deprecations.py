@@ -7,6 +7,8 @@ These tests assert that:
   replacements.
 - Removed/renamed ``qdk_chemistry.data`` names resolve to their v2 replacement
   via the module ``__getattr__`` shim, emitting a ``DeprecationWarning``.
+- ``CholeskyHamiltonianContainer`` resolves to
+    ``ThreeCenterHamiltonianContainer`` through the same warning-emitting shim.
 - The removed ``EncodingMismatchError`` / ``validate_encoding_compatibility``
   helpers still resolve (with a ``DeprecationWarning``).
 - A name whose v2 replacement is unavailable (``ControlledTimeEvolutionUnitary``)
@@ -33,6 +35,7 @@ from qdk_chemistry.data import (
     ModelOrbitals,
     Orbitals,
     StateVectorContainer,
+    ThreeCenterHamiltonianContainer,
     UnitaryContainer,
     UnitaryRepresentation,
     Wavefunction,
@@ -112,6 +115,7 @@ def test_get_inactive_space_indices_warns_and_matches_v2():
 @pytest.mark.parametrize(
     ("name", "replacement"),
     [
+        ("CholeskyHamiltonianContainer", ThreeCenterHamiltonianContainer),
         ("SlaterDeterminantContainer", StateVectorContainer),
         ("CasWavefunctionContainer", StateVectorContainer),
         ("SciWavefunctionContainer", StateVectorContainer),

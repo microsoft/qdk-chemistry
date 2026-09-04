@@ -35,7 +35,8 @@ ThreeCenterHamiltonianContainer::ThreeCenterHamiltonianContainer(
     const Eigen::MatrixXd& three_center_integrals,
     std::shared_ptr<Orbitals> orbitals, double core_energy,
     const Eigen::MatrixXd& inactive_fock_matrix,
-    std::optional<Eigen::MatrixXd> ao_cholesky_vectors, HamiltonianType type)
+    std::optional<Eigen::MatrixXd> ao_three_center_vectors,
+    HamiltonianType type)
     : ThreeCenterHamiltonianContainer(
           make_spin_diagonal_rank2_sbt(one_body_integrals, one_body_integrals,
                                        /*restricted=*/true),
@@ -43,7 +44,7 @@ ThreeCenterHamiltonianContainer::ThreeCenterHamiltonianContainer(
                                  *orbitals),
           orbitals, core_energy,
           make_spin_diagonal_rank2_sbt(inactive_fock_matrix, Eigen::MatrixXd{}),
-          std::move(ao_cholesky_vectors), type) {
+          std::move(ao_three_center_vectors), type) {
   QDK_LOG_TRACE_ENTERING();
 }
 
@@ -55,7 +56,8 @@ ThreeCenterHamiltonianContainer::ThreeCenterHamiltonianContainer(
     std::shared_ptr<Orbitals> orbitals, double core_energy,
     const Eigen::MatrixXd& inactive_fock_matrix_alpha,
     const Eigen::MatrixXd& inactive_fock_matrix_beta,
-    std::optional<Eigen::MatrixXd> ao_cholesky_vectors, HamiltonianType type)
+    std::optional<Eigen::MatrixXd> ao_three_center_vectors,
+    HamiltonianType type)
     : ThreeCenterHamiltonianContainer(
           make_spin_diagonal_rank2_sbt(one_body_integrals_alpha,
                                        one_body_integrals_beta,
@@ -65,7 +67,7 @@ ThreeCenterHamiltonianContainer::ThreeCenterHamiltonianContainer(
           orbitals, core_energy,
           make_spin_diagonal_rank2_sbt(inactive_fock_matrix_alpha,
                                        inactive_fock_matrix_beta),
-          std::move(ao_cholesky_vectors), type) {
+          std::move(ao_three_center_vectors), type) {
   QDK_LOG_TRACE_ENTERING();
 }
 
@@ -73,12 +75,13 @@ ThreeCenterHamiltonianContainer::ThreeCenterHamiltonianContainer(
     SymmetryBlockedTensor<2> one_body, SymmetryBlockedTensor<3> three_center,
     std::shared_ptr<Orbitals> orbitals, double core_energy,
     std::shared_ptr<const SymmetryBlockedTensor<2>> inactive_fock,
-    std::optional<Eigen::MatrixXd> ao_cholesky_vectors, HamiltonianType type)
+    std::optional<Eigen::MatrixXd> ao_three_center_vectors,
+    HamiltonianType type)
     : HamiltonianContainer(std::move(one_body), orbitals, core_energy,
                            std::move(inactive_fock), type),
       _three_center(std::make_shared<const SymmetryBlockedTensor<3>>(
           std::move(three_center))),
-      _ao_cholesky_vectors(std::move(ao_cholesky_vectors)) {
+      _ao_three_center_vectors(std::move(ao_three_center_vectors)) {
   QDK_LOG_TRACE_ENTERING();
 
   validate_integral_dimensions();
@@ -98,7 +101,7 @@ std::unique_ptr<HamiltonianContainer> ThreeCenterHamiltonianContainer::clone()
   // straight through (no per-block copy or v1 round-trip needed).
   return std::make_unique<ThreeCenterHamiltonianContainer>(
       *_one_body, *_three_center, _orbitals, _core_energy, _inactive_fock,
-      _ao_cholesky_vectors, _type);
+      _ao_three_center_vectors, _type);
 }
 
 std::string ThreeCenterHamiltonianContainer::get_container_type() const {
@@ -187,7 +190,7 @@ ThreeCenterHamiltonianContainer::get_three_center_integrals() const {
 const std::optional<Eigen::MatrixXd>&
 ThreeCenterHamiltonianContainer::get_ao_three_center_vectors() const {
   QDK_LOG_TRACE_ENTERING();
-  return _ao_cholesky_vectors;
+  return _ao_three_center_vectors;
 }
 
 double ThreeCenterHamiltonianContainer::get_two_body_element(
@@ -406,17 +409,17 @@ nlohmann::json ThreeCenterHamiltonianContainer::to_json() const {
     j["orbitals"] = _orbitals->to_json();
   }
 
-  // Store AO Cholesky vectors (if available)
-  if (_ao_cholesky_vectors) {
-    std::vector<std::vector<double>> ao_cholesky_vectors_vec;
-    for (int i = 0; i < _ao_cholesky_vectors->rows(); ++i) {
+  // Store AO three-center vectors (if available)
+  if (_ao_three_center_vectors) {
+    std::vector<std::vector<double>> ao_three_center_vectors_vec;
+    for (int i = 0; i < _ao_three_center_vectors->rows(); ++i) {
       std::vector<double> row;
-      for (int j_idx = 0; j_idx < _ao_cholesky_vectors->cols(); ++j_idx) {
-        row.push_back((*_ao_cholesky_vectors)(i, j_idx));
+      for (int j_idx = 0; j_idx < _ao_three_center_vectors->cols(); ++j_idx) {
+        row.push_back((*_ao_three_center_vectors)(i, j_idx));
       }
-      ao_cholesky_vectors_vec.push_back(row);
+      ao_three_center_vectors_vec.push_back(row);
     }
-    j["ao_cholesky_vectors"] = ao_cholesky_vectors_vec;
+    j["ao_three_center_vectors"] = ao_three_center_vectors_vec;
   }
   return j;
 }
@@ -479,10 +482,19 @@ ThreeCenterHamiltonianContainer::from_json(const nlohmann::json& j) {
             ? SymmetryBlockedTensor<2>::from_json(j["inactive_fock_matrix"])
             : nullptr;
 
-    std::optional<Eigen::MatrixXd> ao_cholesky_vectors;
-    if (j.contains("ao_cholesky_vectors")) {
+    std::optional<Eigen::MatrixXd> ao_three_center_vectors;
+    const char* ao_vectors_field = nullptr;
+    if (j.contains("ao_three_center_vectors")) {
+      ao_vectors_field = "ao_three_center_vectors";
+    } else if (j.contains("ao_cholesky_vectors")) {
+      QDK_LOGGER().warn(
+          "Serialized field 'ao_cholesky_vectors' is deprecated; use "
+          "'ao_three_center_vectors' instead.");
+      ao_vectors_field = "ao_cholesky_vectors";
+    }
+    if (ao_vectors_field) {
       auto matrix_vec =
-          j["ao_cholesky_vectors"].get<std::vector<std::vector<double>>>();
+          j[ao_vectors_field].get<std::vector<std::vector<double>>>();
       int rows = matrix_vec.size();
       int cols = rows > 0 ? matrix_vec[0].size() : 0;
       Eigen::MatrixXd matrix(rows, cols);
@@ -491,12 +503,12 @@ ThreeCenterHamiltonianContainer::from_json(const nlohmann::json& j) {
           matrix(i, jj) = matrix_vec[i][jj];
         }
       }
-      ao_cholesky_vectors = std::move(matrix);
+      ao_three_center_vectors = std::move(matrix);
     }
 
     return std::make_unique<ThreeCenterHamiltonianContainer>(
         std::move(*one_body), std::move(*three_center), orbitals, core_energy,
-        std::move(inactive_fock), std::move(ao_cholesky_vectors), type);
+        std::move(inactive_fock), std::move(ao_three_center_vectors), type);
 
   } catch (const std::exception& e) {
     throw std::runtime_error("Failed to parse Hamiltonian from JSON: " +
@@ -564,9 +576,10 @@ void ThreeCenterHamiltonianContainer::to_hdf5(H5::Group& group) const {
       _orbitals->to_hdf5(orbitals_group);
     }
 
-    // Save AO Cholesky vectors (if available)
-    if (_ao_cholesky_vectors) {
-      save_matrix_to_group(group, "ao_cholesky_vectors", *_ao_cholesky_vectors);
+    // Save AO three-center vectors (if available)
+    if (_ao_three_center_vectors) {
+      save_matrix_to_group(group, "ao_three_center_vectors",
+                           *_ao_three_center_vectors);
     }
 
   } catch (const H5::Exception& e) {
@@ -637,16 +650,22 @@ ThreeCenterHamiltonianContainer::from_hdf5(H5::Group& group) {
       inactive_fock = SymmetryBlockedTensor<2>::from_hdf5(fock_group);
     }
 
-    // Load AO Cholesky vectors (if available)
-    std::optional<Eigen::MatrixXd> ao_cholesky_vectors;
-    if (dataset_exists_in_group(group, "ao_cholesky_vectors")) {
-      ao_cholesky_vectors =
+    // Load AO three-center vectors (if available)
+    std::optional<Eigen::MatrixXd> ao_three_center_vectors;
+    if (dataset_exists_in_group(group, "ao_three_center_vectors")) {
+      ao_three_center_vectors =
+          load_matrix_from_group(group, "ao_three_center_vectors");
+    } else if (dataset_exists_in_group(group, "ao_cholesky_vectors")) {
+      QDK_LOGGER().warn(
+          "Serialized field 'ao_cholesky_vectors' is deprecated; use "
+          "'ao_three_center_vectors' instead.");
+      ao_three_center_vectors =
           load_matrix_from_group(group, "ao_cholesky_vectors");
     }
 
     return std::make_unique<ThreeCenterHamiltonianContainer>(
         std::move(*one_body), std::move(*three_center), orbitals, core_energy,
-        std::move(inactive_fock), std::move(ao_cholesky_vectors), type);
+        std::move(inactive_fock), std::move(ao_three_center_vectors), type);
 
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
@@ -663,7 +682,7 @@ void ThreeCenterHamiltonianContainer::hash_update(
   } else {
     hash_field_presence(ctx, false);
   }
-  hash_value(ctx, _ao_cholesky_vectors);
+  hash_value(ctx, _ao_three_center_vectors);
 }
 
 }  // namespace qdk::chemistry::data

@@ -105,14 +105,14 @@ class ThreeCenterHamiltonianContainer : public HamiltonianContainer {
    * @param orbitals Shared pointer to molecular orbital data.
    * @param core_energy Core energy.
    * @param inactive_fock Inactive Fock matrix as rank-2 SymmetryBlockedTensor.
-   * @param ao_cholesky_vectors Optional AO Cholesky vectors.
+   * @param ao_three_center_vectors Optional AO three-center vectors.
    * @param type Hamiltonian type.
    */
   ThreeCenterHamiltonianContainer(
       SymmetryBlockedTensor<2> one_body, SymmetryBlockedTensor<3> three_center,
       std::shared_ptr<Orbitals> orbitals, double core_energy,
       std::shared_ptr<const SymmetryBlockedTensor<2>> inactive_fock,
-      std::optional<Eigen::MatrixXd> ao_cholesky_vectors = std::nullopt,
+      std::optional<Eigen::MatrixXd> ao_three_center_vectors = std::nullopt,
       HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
@@ -159,9 +159,9 @@ class ThreeCenterHamiltonianContainer : public HamiltonianContainer {
   const SymmetryBlockedTensor<3>& three_center() const;
 
   /**
-   * @brief Get the optional AO Cholesky vectors
-   * @return Const reference to the optional AO Cholesky vectors matrix
-   * [nao^2 x nchol]. Contains std::nullopt if AO Cholesky vectors were not
+   * @brief Get the optional AO three-center vectors
+   * @return Const reference to the optional AO three-center vectors matrix
+   * [nao^2 x naux]. Contains std::nullopt if AO three-center vectors were not
    * provided at construction.
    */
   const std::optional<Eigen::MatrixXd>& get_ao_three_center_vectors() const;
@@ -256,13 +256,15 @@ class ThreeCenterHamiltonianContainer : public HamiltonianContainer {
   /** Validation helper for integral dimensions */
   void validate_integral_dimensions() const override final;
 
-  /** Optional AO Cholesky vectors for potential reuse */
-  const std::optional<Eigen::MatrixXd> _ao_cholesky_vectors;
+  /** Optional AO three-center vectors for potential reuse */
+  const std::optional<Eigen::MatrixXd> _ao_three_center_vectors;
 
   /** Serialization version */
   static constexpr const char* SERIALIZATION_VERSION = "0.2.0";
 };
 
-using CholeskyHamiltonianContainer = ThreeCenterHamiltonianContainer;
+using CholeskyHamiltonianContainer
+    [[deprecated("Use ThreeCenterHamiltonianContainer instead.")]] =
+        ThreeCenterHamiltonianContainer;
 
 }  // namespace qdk::chemistry::data

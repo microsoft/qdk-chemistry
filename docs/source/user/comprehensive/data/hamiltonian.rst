@@ -157,6 +157,13 @@ Three-center Hamiltonian container
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A memory-efficient container that stores two-electron integrals using density fitting (also known as resolution-of-the-identity, RI) approximation or Cholesky decomposition.
+
+.. admonition:: Deprecated alias
+
+   ``CholeskyHamiltonianContainer`` is a deprecated alias. Use
+   ``ThreeCenterHamiltonianContainer`` for three-center integrals produced by
+   either Cholesky decomposition or density fitting.
+
 Instead of directly storing four-center integrals in the molecular orbital basis :math:`( ij|kl )`, it stores three-center integrals :math:`(ij|P)` where :math:`P` indexes an auxiliary basis set in case of density fitting or the Cholesky vectors in case of Cholesky decomposition.
 The four-center integrals are computed on-the-fly when needed via:
 

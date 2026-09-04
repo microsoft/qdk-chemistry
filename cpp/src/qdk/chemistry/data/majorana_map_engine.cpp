@@ -11,8 +11,8 @@
 #include <cstdint>
 #include <map>
 #include <qdk/chemistry/data/hamiltonian.hpp>
-#include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/three_center.hpp>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <qdk/chemistry/data/pauli_operator.hpp>
 #include <qdk/chemistry/utils/hash_context.hpp>
@@ -1105,9 +1105,9 @@ MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
     h1b_ptr = h1b_flat.data();
   }
 
-  if (hamiltonian.has_container_type<CholeskyHamiltonianContainer>()) {
+  if (hamiltonian.has_container_type<ThreeCenterHamiltonianContainer>()) {
     const auto& container =
-        hamiltonian.get_container<CholeskyHamiltonianContainer>();
+        hamiltonian.get_container<ThreeCenterHamiltonianContainer>();
     const auto three_center = container.get_three_center_integrals();
     const Eigen::MatrixXd& three_center_aa = three_center.first;
     const Eigen::MatrixXd& three_center_bb = three_center.second;

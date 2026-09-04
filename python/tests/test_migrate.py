@@ -322,19 +322,21 @@ def test_hamiltonian_unrestricted(tmp_path, fmt):
 
 
 # --------------------------------------------------------------------------- #
-# Genuine (three-center) Cholesky -> preserved as a Cholesky container
+# Genuine (three-center) Cholesky -> migrated to a three-center container
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize("fmt", ["json", "hdf5"])
 @pytest.mark.parametrize("restricted", [True, False])
 def test_cholesky_three_center_preserved(tmp_path, fmt, restricted):
     # The later v1 Cholesky container stored MO three-center vectors L[pq, aux]
-    # (not a dense four-center). They are the current Cholesky data model, so the
-    # container is preserved and (pq|rs) reconstructs as sum_aux L[pq,aux] L[rs,aux].
+    # (not a dense four-center). They use the current three-center data model, so the
+    # container becomes three-center and (pq|rs) reconstructs as
+    # sum_aux L[pq,aux] L[rs,aux].
     norb, naux = 2, 3
     ca, cb = RNG.standard_normal((norb, norb)), RNG.standard_normal((norb, norb))
     h1a, h1b = _sym(norb), _sym(norb)
     fa, fb = _sym(norb), _sym(norb)
     la, lb = RNG.standard_normal((norb * norb, naux)), RNG.standard_normal((norb * norb, naux))
+    ao_vectors = RNG.standard_normal((norb * norb, naux))
     if restricted:
         cb, h1b, fb, lb = ca, h1a, fa, la
     src = tmp_path / f"chol.hamiltonian.{'json' if fmt == 'json' else 'h5'}"
@@ -351,6 +353,7 @@ def test_cholesky_three_center_preserved(tmp_path, fmt, restricted):
             "is_restricted": restricted,
             "one_body_integrals_alpha": h1a.tolist(),
             "three_center_integrals": three_center,
+            "ao_cholesky_vectors": ao_vectors.tolist(),
             "inactive_fock_matrix_alpha": fa.tolist(),
             "orbitals": orb,
         }
@@ -370,6 +373,7 @@ def test_cholesky_three_center_preserved(tmp_path, fmt, restricted):
             metadata.attrs["is_restricted"] = restricted
             _write_matrix(group, "one_body_integrals_alpha", h1a)
             _write_matrix(group, "three_center_integrals_aa", la)
+            _write_matrix(group, "ao_cholesky_vectors", ao_vectors)
             _write_matrix(group, "inactive_fock_matrix_alpha", fa)
             if not restricted:
                 _write_matrix(group, "one_body_integrals_beta", h1b)
@@ -379,7 +383,11 @@ def test_cholesky_three_center_preserved(tmp_path, fmt, restricted):
 
     migrate.convert_file(src, dst)
     ham = Hamiltonian.from_file(str(dst), fmt)
-    assert ham.get_container_type() == "cholesky"
+    assert ham.get_container_type() == "three_center"
+    migrated_container = json.loads(ham.to_json())["container"]
+    assert "ao_three_center_vectors" in migrated_container
+    assert "ao_cholesky_vectors" not in migrated_container
+    assert np.allclose(migrated_container["ao_three_center_vectors"], ao_vectors)
     assert abs(ham.get_core_energy() - 1.23) < 1e-12
     assert np.allclose(ham.get_one_body_integrals()[0], h1a)
     aaaa, aabb, bbbb = ham.get_two_body_integrals()

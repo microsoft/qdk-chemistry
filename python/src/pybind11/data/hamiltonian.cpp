@@ -544,9 +544,6 @@ Args:
 )",
       py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
 
-  data.attr("CholeskyHamiltonianContainer") =
-      data.attr("ThreeCenterHamiltonianContainer");
-
   // ============================================================================
   // CanonicalFourCenterHamiltonianContainer - Concrete implementation
   // ============================================================================

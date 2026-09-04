@@ -4,4 +4,6 @@
 
 #pragma once
 
+// Deprecated compatibility header. Use three_center.hpp and
+// ThreeCenterHamiltonianContainer instead.
 #include <qdk/chemistry/data/hamiltonian_containers/three_center.hpp>

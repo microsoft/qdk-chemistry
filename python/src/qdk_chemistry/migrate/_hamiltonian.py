@@ -12,8 +12,8 @@ Two distinct ``cholesky`` container layouts both serialize at container version
   container, dropping the now-unused AO Cholesky vectors.
 - The later container stored the MO three-center vectors directly (key ``aa``/
   ``bb``, or the ``three_center_integrals_aa`` HDF5 dataset). Those vectors are the
-  current Cholesky data model, so the container is preserved as ``cholesky`` with
-  the vectors re-expressed as a ``SymmetryBlockedTensor``.
+    current three-center data model, so the container is migrated to ``three_center``
+    with the vectors re-expressed as a ``SymmetryBlockedTensor``.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -34,6 +34,7 @@ OLD_CONTAINER_VERSION = "0.1.0"
 
 _FOUR_CENTER = "canonical_four_center"
 _CHOLESKY = "cholesky"
+_THREE_CENTER = "three_center"
 
 
 def from_json_doc(doc: dict) -> dict:
@@ -167,7 +168,7 @@ def _cholesky_from_json(container: dict) -> dict:
         "three_center_bb": _opt_array(three_center.get("bb")),
         "fock_alpha": _opt_array(container.get("inactive_fock_matrix_alpha")),
         "fock_beta": _opt_array(container.get("inactive_fock_matrix_beta")),
-        "ao_cholesky_vectors": _opt_array(container.get("ao_cholesky_vectors")),
+        "ao_three_center_vectors": _opt_array(container.get("ao_cholesky_vectors")),
         "orbitals": _orbitals.from_json_doc(container["orbitals"]),
     }
 
@@ -187,17 +188,17 @@ def _cholesky_from_hdf5(container: h5py.Group) -> dict:
         "three_center_bb": _io.read_matrix(container, "three_center_integrals_bb"),
         "fock_alpha": _io.read_matrix(container, "inactive_fock_matrix_alpha"),
         "fock_beta": _io.read_matrix(container, "inactive_fock_matrix_beta"),
-        "ao_cholesky_vectors": _io.read_matrix(container, "ao_cholesky_vectors"),
+        "ao_three_center_vectors": _io.read_matrix(container, "ao_cholesky_vectors"),
         "orbitals": _orbitals.from_hdf5_group(container["orbitals"]),
     }
 
 
 def _cholesky_to_new_json(old: dict) -> dict:
-    """Build the migrated Cholesky container JSON from an old-doc."""
+    """Build the migrated three-center container JSON from an old Cholesky document."""
     restricted = old["is_restricted"]
     container: dict = {
         "version": CONTAINER_VERSION,
-        "container_type": _CHOLESKY,
+        "container_type": _THREE_CENTER,
         "core_energy": float(old["core_energy"]),
         "type": old["type"],
         "is_restricted": restricted,
@@ -214,8 +215,8 @@ def _cholesky_to_new_json(old: dict) -> dict:
         beta = None if restricted else old.get("fock_beta")
         container["inactive_fock_matrix"] = _sbt.rank2_dict(old["fock_alpha"], beta)
 
-    if old.get("ao_cholesky_vectors") is not None:
-        container["ao_cholesky_vectors"] = np.asarray(old["ao_cholesky_vectors"], dtype=np.float64).tolist()
+    if old.get("ao_three_center_vectors") is not None:
+        container["ao_three_center_vectors"] = np.asarray(old["ao_three_center_vectors"], dtype=np.float64).tolist()
 
     return container
 

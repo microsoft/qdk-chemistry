@@ -1,7 +1,7 @@
 """Equivalence tests for QdkQubitMapper sparse / factorized fast paths.
 
 These tests verify that mapping a Hamiltonian stored in a
-:class:`~qdk_chemistry.data.CholeskyHamiltonianContainer` or
+:class:`~qdk_chemistry.data.ThreeCenterHamiltonianContainer` or
 :class:`~qdk_chemistry.data.SparseHamiltonianContainer` produces a
 ``QubitOperator`` that is numerically equivalent, term-by-term, to the
 dense (:class:`~qdk_chemistry.data.CanonicalFourCenterHamiltonianContainer`)
@@ -26,11 +26,11 @@ import pytest
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
     CanonicalFourCenterHamiltonianContainer,
-    CholeskyHamiltonianContainer,
     Hamiltonian,
     LatticeGraph,
     MajoranaMapping,
     Orbitals,
+    ThreeCenterHamiltonianContainer,
 )
 from qdk_chemistry.utils.model_hamiltonians import (
     create_hubbard_hamiltonian,
@@ -125,7 +125,7 @@ def _build_restricted_cholesky_pair(n: int, naux: int, seed: int):
     empty_fock = np.eye(0)
 
     dense = Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, eri, orbitals, core_energy, empty_fock))
-    cholesky = Hamiltonian(CholeskyHamiltonianContainer(one_body, three_center, orbitals, core_energy, empty_fock))
+    cholesky = Hamiltonian(ThreeCenterHamiltonianContainer(one_body, three_center, orbitals, core_energy, empty_fock))
     return dense, cholesky
 
 
@@ -161,7 +161,7 @@ def _build_unrestricted_cholesky_pair(n: int, naux: int, seed: int):
         )
     )
     cholesky = Hamiltonian(
-        CholeskyHamiltonianContainer(h1_alpha, h1_beta, tc_aa, tc_bb, orbitals, core_energy, empty, empty)
+        ThreeCenterHamiltonianContainer(h1_alpha, h1_beta, tc_aa, tc_bb, orbitals, core_energy, empty, empty)
     )
     return dense, cholesky
 
@@ -212,7 +212,7 @@ class TestCholeskyFastPathRestricted:
     def test_cholesky_matches_dense(self, n: int, naux: int, encoding: str) -> None:
         """Cholesky and dense containers map to the same operator."""
         dense, cholesky = _build_restricted_cholesky_pair(n, naux, seed=100 + n)
-        assert cholesky.get_container_type() == "cholesky"
+        assert cholesky.get_container_type() == "three_center"
         assert dense.get_container_type() == "canonical_four_center"
 
         mapping = getattr(MajoranaMapping, encoding)(num_modes=2 * n)
@@ -236,7 +236,7 @@ class TestCholeskyFastPathUnrestricted:
     def test_cholesky_matches_dense(self, n: int, naux: int, encoding: str) -> None:
         """Unrestricted Cholesky and dense containers map identically."""
         dense, cholesky = _build_unrestricted_cholesky_pair(n, naux, seed=200 + n)
-        assert cholesky.get_container_type() == "cholesky"
+        assert cholesky.get_container_type() == "three_center"
 
         mapping = getattr(MajoranaMapping, encoding)(num_modes=2 * n)
         mapper = create("qubit_mapper", "qdk")
@@ -289,7 +289,7 @@ def _molecular_cholesky_pair(atom: str, basis: str):
     dense = Hamiltonian(
         CanonicalFourCenterHamiltonianContainer(h1, np.ascontiguousarray(eri_recon.ravel()), orbitals, enuc, empty)
     )
-    cholesky = Hamiltonian(CholeskyHamiltonianContainer(h1, np.ascontiguousarray(factors), orbitals, enuc, empty))
+    cholesky = Hamiltonian(ThreeCenterHamiltonianContainer(h1, np.ascontiguousarray(factors), orbitals, enuc, empty))
     return dense, cholesky, norb
 
 
@@ -302,7 +302,7 @@ class TestCholeskyFastPathMolecular:
     def test_molecular_cholesky_matches_dense(self, atom: str, basis: str, encoding: str) -> None:
         """Molecular Cholesky and dense containers map identically."""
         dense, cholesky, norb = _molecular_cholesky_pair(atom, basis)
-        assert cholesky.get_container_type() == "cholesky"
+        assert cholesky.get_container_type() == "three_center"
 
         mapping = getattr(MajoranaMapping, encoding)(num_modes=2 * norb)
         mapper = create("qubit_mapper", "qdk")

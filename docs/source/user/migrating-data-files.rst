@@ -93,9 +93,10 @@ Cholesky decomposition from the orbitals if a Cholesky representation is needed
 again.
 
 A later Cholesky container stored the molecular-orbital three-center vectors
-directly. Those vectors are the current Cholesky data model, so that container is
-preserved as a :class:`~qdk_chemistry.data.CholeskyHamiltonianContainer`, with the
-vectors re-expressed as a symmetry-blocked tensor. The two layouts are detected
+directly. Those vectors use the current three-center data model, so that
+container is migrated to a
+:class:`~qdk_chemistry.data.ThreeCenterHamiltonianContainer`, with the vectors
+re-expressed as a symmetry-blocked tensor. The two layouts are detected
 automatically.
 
 Supported formats

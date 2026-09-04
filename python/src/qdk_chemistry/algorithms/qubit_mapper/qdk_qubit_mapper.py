@@ -81,7 +81,7 @@ class QdkQubitMapper(QubitMapper):
       iterates only the stored non-zero ``(p, q, r, s)`` entries, so both
       memory and runtime improve for the mostly-zero integrals of lattice /
       model Hamiltonians.
-    * :class:`~qdk_chemistry.data.CholeskyHamiltonianContainer`: the
+    * :class:`~qdk_chemistry.data.ThreeCenterHamiltonianContainer`: the
       three-center factors are kept in their ``O(N**2 * naux)`` form and the
       auxiliary index is contracted one ``(pq|.)`` row at a time, so the dense
       ``N**4`` tensor is never built and peak additional memory is a single

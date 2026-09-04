@@ -15,7 +15,7 @@ Exposed classes are:
 - :class:`AuxiliaryBasisRole`: Algorithm-facing purpose served by an auxiliary basis.
 - :class:`BasisSet`: Gaussian basis set definitions for quantum calculations.
 - :class:`CanonicalFourCenterHamiltonianContainer`: Container for four-center two-electron integrals in canonical form.
-- :class:`CholeskyHamiltonianContainer`: Alias of :class:`ThreeCenterHamiltonianContainer`.
+- :class:`CholeskyHamiltonianContainer`: Deprecated alias of :class:`ThreeCenterHamiltonianContainer`.
 - :class:`ThreeCenterHamiltonianContainer`: Container for Hamiltonians represented using three-center integrals.
 - :class:`Circuit`: Quantum circuit information.
 - :class:`Configuration`: Electronic configuration state information.
@@ -82,7 +82,6 @@ from qdk_chemistry._core.data import (
     AuxiliaryBasisRole,
     BasisSet,
     CanonicalFourCenterHamiltonianContainer,
-    CholeskyHamiltonianContainer,
     Configuration,
     ConfigurationSet,
     ElectronicStructureSettings,
@@ -156,7 +155,6 @@ __all__ = [
     "AuxiliaryBasisRole",
     "BasisSet",
     "CanonicalFourCenterHamiltonianContainer",
-    "CholeskyHamiltonianContainer",
     "Circuit",
     "CircuitExecutorData",
     "Configuration",
@@ -221,11 +219,11 @@ __all__ = [
 ]
 
 
-# v1 names removed or renamed in v2.0, kept as deprecated aliases to their v2
-# replacement. The constructor signatures of the v2 replacements may differ from
-# the v1 classes; see the v1 -> v2 migration guide for details. These names are
-# intentionally omitted from ``__all__`` so ``import *`` does not pull them in.
+# Removed or renamed names kept as deprecated aliases to their replacements.
+# These names are intentionally omitted from ``__all__`` so ``import *`` does
+# not pull them in.
 _DEPRECATED_ALIASES = {
+    "CholeskyHamiltonianContainer": "ThreeCenterHamiltonianContainer",
     "SlaterDeterminantContainer": "StateVectorContainer",
     "CasWavefunctionContainer": "StateVectorContainer",
     "SciWavefunctionContainer": "StateVectorContainer",
@@ -237,13 +235,13 @@ _DEPRECATED_ALIASES = {
 
 
 def __getattr__(name: str):
-    """Resolve deprecated v1 data-class names removed or renamed in v2.0.
+    """Resolve deprecated data-class names to their replacements.
 
     Args:
         name: Attribute name requested from the ``qdk_chemistry.data`` module.
 
     Returns:
-        The v2 replacement object for a deprecated v1 name.
+        The replacement object for a deprecated name.
 
     Raises:
         AttributeError: If the name is not a known deprecated alias.

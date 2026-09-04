@@ -518,7 +518,13 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_json(
   if (container_type == "canonical_four_center") {
     return CanonicalFourCenterHamiltonianContainer::from_json(j);
   }
-  if (container_type == "three_center" || container_type == "cholesky") {
+  if (container_type == "three_center") {
+    return ThreeCenterHamiltonianContainer::from_json(j);
+  }
+  if (container_type == "cholesky") {
+    QDK_LOGGER().warn(
+        "Hamiltonian container tag 'cholesky' is deprecated; use "
+        "'three_center' instead.");
     return ThreeCenterHamiltonianContainer::from_json(j);
   }
   if (container_type == "sparse") {
@@ -545,8 +551,12 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_hdf5(
     // Forward to appropriate container implementation
     if (container_type == "canonical_four_center") {
       return CanonicalFourCenterHamiltonianContainer::from_hdf5(group);
-    } else if (container_type == "three_center" ||
-               container_type == "cholesky") {
+    } else if (container_type == "three_center") {
+      return ThreeCenterHamiltonianContainer::from_hdf5(group);
+    } else if (container_type == "cholesky") {
+      QDK_LOGGER().warn(
+          "Hamiltonian container tag 'cholesky' is deprecated; use "
+          "'three_center' instead.");
       return ThreeCenterHamiltonianContainer::from_hdf5(group);
     }
     if (container_type == "sparse") {
