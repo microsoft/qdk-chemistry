@@ -34,6 +34,13 @@ FactorizedHamiltonianContainer::FactorizedHamiltonianContainer(
       _energy_gap(energy_gap) {
   QDK_LOG_TRACE_ENTERING();
 
+  if (_signs.size() != _wb.rows()) {
+    throw std::invalid_argument(
+        "Factorized Hamiltonian expects one sign per rank, but got " +
+        std::to_string(_signs.size()) + " signs for " +
+        std::to_string(_wb.rows()) + " ranks.");
+  }
+
   validate_integral_dimensions();
   validate_restrictedness_consistency();
   validate_active_space_dimensions();
@@ -131,8 +138,10 @@ bool FactorizedHamiltonianContainer::is_valid() const {
 
 Eigen::VectorXd FactorizedHamiltonianContainer::reconstruct_two_body_integrals()
     const {
-  //   h2_{pqrs} = Σ_{r,c} s_r M^{rc}_{pq} M^{rc}_{rs},
-  //   M^{rc}_{pq} = Σ_b W^r_{bc} U^r_{bp} U^r_{bq},
+  //   h2_{pqrs} = Σ_{t,c} s_t M^{tc}_{pq} M^{tc}_{rs},
+  //   M^{tc}_{pq} = Σ_b W^{tc}_b U^t_{bp} U^t_{bq},
+  // where t indexes ranks and c copies, and p,q,r,s are orbitals. The loop
+  // below names the rank index r for symmetry with R; it is not an orbital.
   size_t norb = get_num_orbitals();
   size_t R = get_num_ranks();
   size_t B = get_num_bases();

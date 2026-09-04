@@ -63,6 +63,22 @@ class FactorizedHamiltonianTest : public ::testing::Test {
   std::shared_ptr<Orbitals> orbitals;
 };
 
+TEST_F(FactorizedHamiltonianTest, SignCountMustMatchRankCount) {
+  // Omitting the signs is the documented shorthand for an all-positive
+  // factorization.
+  EXPECT_NO_THROW(std::make_unique<FactorizedHamiltonianContainer>(
+      core_energy, u, w, wb, one_body, inactive_fock, orbitals,
+      Eigen::VectorXd(), energy_gap));
+
+  // Any other mismatch would misassign signs across fragments, so it is
+  // rejected rather than padded or truncated.
+  const Eigen::VectorXd too_many = Eigen::VectorXd::Ones(R + 1);
+  EXPECT_THROW(std::make_unique<FactorizedHamiltonianContainer>(
+                   core_energy, u, w, wb, one_body, inactive_fock, orbitals,
+                   too_many, energy_gap),
+               std::invalid_argument);
+}
+
 TEST_F(FactorizedHamiltonianTest, Properties) {
   auto container = make_container();
 
@@ -72,6 +88,17 @@ TEST_F(FactorizedHamiltonianTest, Properties) {
   EXPECT_EQ(container->get_num_bases(), B);
   EXPECT_EQ(container->get_num_copies(), C);
 
+  // The literals below are hand-derived from the fixture in closed form, so
+  // they check the implementation rather than restate it. With one rank, one
+  // copy and s = +1, the fixture's bases give the single mode matrix
+  //   M_{pq} = Sum_b W_b U_{bp} U_{bq}
+  //          = 0.5 * outer([0.8, 0.6]) - 0.3 * outer([-0.6, 0.8])
+  //          = [[0.212, 0.384], [0.384, -0.012]],
+  // whose trace is 0.2 and therefore cancels wB = 0.2 exactly. Hence
+  //   h1' = h1 - M^2 / 2 + (tr(M) - wB) M = h1 - M^2 / 2,
+  //   h2_{pqrs} = M_{pq} M_{rs},
+  //   Lambda = Sum_i |eig_i(h1')| + (|wB| + Sum_b |W_b|)^2 / 4
+  //          = 1.83 + 1.0 / 4 = 2.08.
   const double expected_h1[4] = {0.90379999999999994, 0.26160000000000005,
                                  0.26160000000000005, 0.92620000000000002};
   Eigen::MatrixXd h1p = container->get_h1_prime();
@@ -83,7 +110,8 @@ TEST_F(FactorizedHamiltonianTest, Properties) {
     }
   }
 
-  // Reconstructed two-body integrals (row-major, N^4 = 16).
+  // Reconstructed two-body integrals (row-major, N^4 = 16): the outer product
+  // M_{pq} M_{rs} of the mode matrix derived above.
   const double expected_h2[16] = {0.044944000000000033,
                                   0.081408000000000036,
                                   0.081408000000000036,
