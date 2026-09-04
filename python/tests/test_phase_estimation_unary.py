@@ -40,15 +40,6 @@ def _dumped_address_index(address_value: int, num_address_qubits: int) -> int:
     return int(format(address_value, f"0{num_address_qubits}b")[::-1], 2)
 
 
-def _dump_op(op, num_qubits: int, context) -> np.ndarray:
-    """Simulate ``op`` on the all-zero state and return the resulting statevector.
-
-    The context has to be the one the operation was resolved from, otherwise the helper
-    that ``dump_operation_on_state`` evaluates cannot bind the callable.
-    """
-    return np.array(dump_operation_on_state(op, num_qubits, context=context))
-
-
 def _decode(counts: dict[str, int], num_bits: int, *, resolve_positive_branch: bool = False):
     """Run the decoder against a walk whose block encoding has ``lambda = 1``."""
     return _post_process_phase_estimation(
@@ -65,7 +56,7 @@ class TestUnaryIterationQsharp:
         num_address_qubits = _address_qubits(num_actions)
         for address_value in range(num_actions):
             op = qsharp_test_utils.UnaryIterationTests.TestMakeOneHotOp(num_actions, address_value)
-            state = _dump_op(op, num_address_qubits + num_actions, qsharp_test_context)
+            state = np.array(dump_operation_on_state(op, num_address_qubits + num_actions, context=qsharp_test_context))
 
             expected = np.zeros(1 << (num_address_qubits + num_actions), dtype=complex)
             expected[1 << (num_actions - 1 - address_value)] = 1.0
@@ -76,7 +67,7 @@ class TestUnaryIterationQsharp:
         """A superposed address must produce sum_a |a>|onehot(a)> with no ancilla residue."""
         num_address_qubits = _address_qubits(num_actions)
         op = qsharp_test_utils.UnaryIterationTests.TestMakeSuperposedAddressOp(num_actions)
-        state = _dump_op(op, num_address_qubits + num_actions, qsharp_test_context)
+        state = np.array(dump_operation_on_state(op, num_address_qubits + num_actions, context=qsharp_test_context))
 
         expected = np.zeros(1 << (num_address_qubits + num_actions), dtype=complex)
         for address_value in range(num_actions):
@@ -96,7 +87,7 @@ class TestUnaryIterationQsharp:
         """Phasing the exposed control must imprint exactly the flagged sign pattern."""
         num_address_qubits = _address_qubits(num_actions)
         op = qsharp_test_utils.UnaryIterationTests.TestMakeControlPhasesOp(num_actions, data)
-        state = _dump_op(op, num_address_qubits, qsharp_test_context)
+        state = np.array(dump_operation_on_state(op, num_address_qubits, context=qsharp_test_context))
 
         # Addresses at or above num_actions are outside the iteration's promise: the last
         # leaf fires on its control alone, so they alias onto a neighbouring action.
@@ -126,7 +117,7 @@ class TestBlockEncodingAgnosticSchedule:
             0.9,
         )
         num_address_qubits = _address_qubits(num_queries + 1)
-        state = _dump_op(op, num_address_qubits + 2, qsharp_test_context)
+        state = np.array(dump_operation_on_state(op, num_address_qubits + 2, context=qsharp_test_context))
 
         expected = np.zeros(1 << (num_address_qubits + 2), dtype=complex)
         expected[0] = np.cos(0.45)  # system |0>, ancilla |0>
@@ -147,7 +138,7 @@ class TestBlockEncodingAgnosticSchedule:
             1,
             0.9,
         )
-        state = _dump_op(op, 4, qsharp_test_context)
+        state = np.array(dump_operation_on_state(op, 4, context=qsharp_test_context))
 
         expected = np.zeros(1 << 4, dtype=complex)
         expected[0] = np.cos(0.45)

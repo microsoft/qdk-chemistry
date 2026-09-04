@@ -53,23 +53,6 @@ _ADAPTIVE_ONLY_MODULES = ("UnaryIteration", "UnaryPhaseEstimation")
 _TEST_NAME_EXEMPTIONS = frozenset({"QDKChemistry.Utils.HadamardTest", "QDKChemistry.Utils.HadamardTest.HadamardTest"})
 
 
-def _walk_namespaces(namespace, prefix: str) -> Iterator[tuple[str, str, bool]]:
-    """Yield ``(path, name, is_namespace)`` for everything a compiled Q# tree exposes.
-
-    ``dir()`` reaches ``internal`` declarations, nested namespaces and structs alike, which
-    is what lets the guards below see the whole context rather than one level of it.
-    """
-    for name in dir(namespace):
-        if name.startswith("_"):
-            continue
-        child = getattr(namespace, name)
-        path = f"{prefix}.{name}"
-        is_namespace = isinstance(child, SimpleNamespace)
-        yield path, name, is_namespace
-        if is_namespace:
-            yield from _walk_namespaces(child, path)
-
-
 @pytest.fixture(scope="module")
 def base_context() -> qdk.Context:
     """A ``TargetProfile.Base`` context, built once for this module."""
@@ -225,6 +208,19 @@ class TestTestOnlySourcesAreNotShipped:
     call, which is what these guards exist to prevent.
     """
 
+    @staticmethod
+    def _walk_namespaces(namespace, prefix: str) -> Iterator[tuple[str, str, bool]]:
+        """Yield ``(path, name, is_namespace)`` for a compiled Q# namespace tree."""
+        for name in dir(namespace):
+            if name.startswith("_"):
+                continue
+            child = getattr(namespace, name)
+            path = f"{prefix}.{name}"
+            is_namespace = isinstance(child, SimpleNamespace)
+            yield path, name, is_namespace
+            if is_namespace:
+                yield from TestTestOnlySourcesAreNotShipped._walk_namespaces(child, path)
+
     def test_the_shipped_project_declares_nothing_test_only(self) -> None:
         """A test-only helper vendored into the package is a move that was missed.
 
@@ -237,7 +233,7 @@ class TestTestOnlySourcesAreNotShipped:
         context = create_qsharp_context()
         offenders = [
             path
-            for path, name, _ in _walk_namespaces(context.code.QDKChemistry, "QDKChemistry")
+            for path, name, _ in self._walk_namespaces(context.code.QDKChemistry, "QDKChemistry")
             if "test" in name.lower() and path not in _TEST_NAME_EXEMPTIONS
         ]
         assert offenders == []
@@ -246,7 +242,7 @@ class TestTestOnlySourcesAreNotShipped:
         """Drivers under ``TestUtils`` are named ``Test*`` so their role is legible at the call site."""
         unprefixed = [
             path
-            for path, name, is_namespace in _walk_namespaces(qsharp_test_utils, "TestUtils")
+            for path, name, is_namespace in self._walk_namespaces(qsharp_test_utils, "TestUtils")
             if not is_namespace and not name.startswith("Test")
         ]
         assert unprefixed == []
