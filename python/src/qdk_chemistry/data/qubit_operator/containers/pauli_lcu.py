@@ -1,8 +1,4 @@
-"""QDK/Chemistry Qubit Operator module.
-
-This module provides the ``QubitOperator`` dataclass: a general operator on qubits expressed
-as a weighted sum of Pauli strings.
-"""
+"""Pauli-LCU qubit operator container."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -13,13 +9,12 @@ from __future__ import annotations
 
 import json
 import re
-import warnings
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 from qdk_chemistry.data._hashing import _hash_arg, _hash_array, _hash_optional, _hash_str, _hash_uint
-from qdk_chemistry.data.base import DataClass
+from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorContainer
 from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix, pauli_to_sparse_matrix
 
@@ -27,11 +22,14 @@ if TYPE_CHECKING:
     import h5py
     import scipy
 
+    import qdk_chemistry.data.enums.fermion_mode_order
+    import qdk_chemistry.data.term_partition
+
 from qdk_chemistry._core.data import TaperingSpecification
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
 
-__all__: list[str] = []
+__all__ = ["PauliLCUContainer"]
 
 
 def _merge_term_partitions(p0: TermPartition, p1: TermPartition) -> TermPartition:
@@ -65,18 +63,20 @@ def _hash_tapering(h, tapering: TaperingSpecification) -> None:
     _hash_arg(h, tapering.to_json())
 
 
-class QubitOperator(DataClass):
-    """Data class representing an operator as a weighted sum of Pauli strings.
+class PauliLCUContainer(QubitOperatorContainer):
+    """Container representing an operator as a weighted sum of Pauli strings.
 
     Attributes:
         pauli_strings (list[str]): List of Pauli strings representing the ``QubitOperator``.
         coefficients (numpy.ndarray): Array of coefficients corresponding to each Pauli string.
         encoding (str | None): The fermion-to-qubit encoding used to create this operator
             (e.g., "jordan-wigner", "bravyi-kitaev", "parity"). If None, encoding is not specified.
-        fermion_mode_order (FermionModeOrder | None): The fermion mode ordering convention used
+        fermion_mode_order (~qdk_chemistry.data.enums.fermion_mode_order.FermionModeOrder | None):
+            The fermion mode ordering convention used
             when mapping fermionic modes to qubits (``"blocked"`` or ``"interleaved"``). If None,
             the ordering is unspecified or not applicable.
-        term_partition (TermPartition | None): Optional index-based partition of
+        term_partition (~qdk_chemistry.data.term_partition.TermPartition | None):
+            Optional index-based partition of
             :attr:`pauli_strings` into algorithm-relevant groups (and, for layered
             partitions, into parallelisable layers within each group).  Set by
             geometry-aware constructors and by ``term_grouper`` algorithms; reset
@@ -91,15 +91,18 @@ class QubitOperator(DataClass):
 
     """
 
+    # Class attribute for filename validation
+    _data_type_name = "pauli_lcu_container"
+
     @staticmethod
     def data_type_name() -> str:
-        """Return the wire-format identifier for qubit operators.
+        """Return the wire-format identifier for Pauli-LCU containers.
 
         Returns:
-            ``"qubit_hamiltonian"``.
+            ``"pauli_lcu_container"``.
 
         """
-        return "qubit_hamiltonian"
+        return "pauli_lcu_container"
 
     # Serialization version for this class
     _serialization_version = "0.1.0"
@@ -109,18 +112,20 @@ class QubitOperator(DataClass):
         pauli_strings: list[str],
         coefficients: np.ndarray,
         encoding: str | None = None,
-        fermion_mode_order: FermionModeOrder | str | None = None,
-        term_partition: TermPartition | None = None,
+        fermion_mode_order: qdk_chemistry.data.enums.fermion_mode_order.FermionModeOrder | str | None = None,
+        term_partition: qdk_chemistry.data.term_partition.TermPartition | None = None,
         tapering: TaperingSpecification | None = None,
     ) -> None:
-        """Initialize a QubitOperator.
+        """Initialize a PauliLCUContainer.
 
         Args:
             pauli_strings (list[str]): List of Pauli strings representing the ``QubitOperator``.
             coefficients (numpy.ndarray): Array of coefficients corresponding to each Pauli string.
             encoding (str | None): Fermion-to-qubit encoding (e.g., ``"jordan-wigner"``). Default ``None``.
-            fermion_mode_order (FermionModeOrder | str | None): Mode ordering (``"blocked"``/``"interleaved"``).
-            term_partition (TermPartition | None): Optional ``TermPartition`` carrying group/layer metadata.
+            fermion_mode_order (~qdk_chemistry.data.enums.fermion_mode_order.FermionModeOrder | str | None):
+                Mode ordering (``"blocked"``/``"interleaved"``).
+            term_partition (~qdk_chemistry.data.term_partition.TermPartition | None): Optional
+                ``TermPartition`` carrying group/layer metadata.
             tapering (TaperingSpecification | None): Applied tapering metadata, or None if untapered.
 
         Raises:
@@ -134,11 +139,7 @@ class QubitOperator(DataClass):
 
         self.pauli_strings = pauli_strings
         self.coefficients = coefficients
-        self.encoding = encoding
-        self.fermion_mode_order: FermionModeOrder | None = (
-            FermionModeOrder(fermion_mode_order) if fermion_mode_order is not None else None
-        )
-        self.term_partition: TermPartition | None = term_partition
+        self.term_partition: qdk_chemistry.data.term_partition.TermPartition | None = term_partition
         self.tapering: TaperingSpecification | None = tapering
 
         # Validate Pauli strings
@@ -157,7 +158,12 @@ class QubitOperator(DataClass):
                 )
 
         # Make instance immutable after construction (handled by base class)
-        super().__init__()
+        super().__init__(encoding=encoding, fermion_mode_order=fermion_mode_order)
+
+    @property
+    def type(self) -> str:
+        """Return the container type."""
+        return "pauli_lcu"
 
     def _hash_update(self, h) -> None:
         """Feed identifying data into the hasher."""
@@ -210,7 +216,7 @@ class QubitOperator(DataClass):
             return pauli_to_sparse_matrix(self.pauli_strings, self.coefficients)
         return np.asarray(pauli_to_dense_matrix(self.pauli_strings, self.coefficients))
 
-    def equiv(self, other: QubitOperator, atol: float = 1e-12) -> bool:
+    def equiv(self, other: PauliLCUContainer, atol: float = 1e-12) -> bool:
         """Check mathematical equivalence with another QubitOperator.
 
         Two operators are equivalent if they contain the same Pauli
@@ -225,16 +231,16 @@ class QubitOperator(DataClass):
             ``True`` if the two operators are mathematically equivalent.
 
         Examples:
-            >>> qh1 = QubitOperator(["XI", "ZZ"], np.array([0.5, 0.3]))
-            >>> qh2 = QubitOperator(["ZZ", "XI"], np.array([0.3, 0.5]))
+            >>> qh1 = PauliLCUContainer(["XI", "ZZ"], np.array([0.5, 0.3]))
+            >>> qh2 = PauliLCUContainer(["ZZ", "XI"], np.array([0.3, 0.5]))
             >>> qh1.equiv(qh2)
             True
 
         """
-        if not isinstance(other, QubitOperator):
+        if not isinstance(other, PauliLCUContainer):
             return False
 
-        def _sum_terms(qh: QubitOperator) -> dict[str, complex]:
+        def _sum_terms(qh: PauliLCUContainer) -> dict[str, complex]:
             d: dict[str, complex] = {}
             for ps, c in zip(qh.pauli_strings, qh.coefficients, strict=True):
                 d[ps] = d.get(ps, 0) + c
@@ -262,7 +268,7 @@ class QubitOperator(DataClass):
         """
         return all(abs(complex(c).imag) <= tolerance for c in self.coefficients)
 
-    def __add__(self, other: QubitOperator) -> QubitOperator:
+    def __add__(self, other: PauliLCUContainer) -> PauliLCUContainer:
         """Return the sum of two qubit operators.
 
         Pauli strings and coefficients are concatenated.  The ``encoding``,
@@ -283,8 +289,8 @@ class QubitOperator(DataClass):
             ValueError: If the two operators have different qubit counts, encodings, or modes.
 
         """
-        if not isinstance(other, QubitOperator):
-            raise TypeError(f"Cannot add QubitOperator with {type(other).__name__}.")
+        if not isinstance(other, PauliLCUContainer):
+            raise TypeError(f"Cannot add PauliLCUContainer with {type(other).__name__}.")
         if self.num_qubits != other.num_qubits:
             raise ValueError(f"Cannot add operators with {self.num_qubits} and {other.num_qubits} qubits.")
         if self.encoding != other.encoding:
@@ -304,7 +310,7 @@ class QubitOperator(DataClass):
         if self.term_partition is not None and other.term_partition is not None:
             partition = _merge_term_partitions(self.term_partition, other.term_partition)
 
-        return QubitOperator(
+        return PauliLCUContainer(
             pauli_strings,
             coefficients,
             encoding=self.encoding,
@@ -313,7 +319,7 @@ class QubitOperator(DataClass):
             tapering=self.tapering,
         )
 
-    def __mul__(self, scalar) -> QubitOperator:
+    def __mul__(self, scalar) -> PauliLCUContainer:
         """Return the operator with all coefficients scaled by *scalar*.
 
         The :attr:`term_partition` is preserved since term indices are unchanged.
@@ -327,7 +333,7 @@ class QubitOperator(DataClass):
         """
         if not isinstance(scalar, int | float | complex | np.number):
             return NotImplemented
-        return QubitOperator(
+        return PauliLCUContainer(
             list(self.pauli_strings),
             self.coefficients * scalar,
             encoding=self.encoding,
@@ -336,7 +342,7 @@ class QubitOperator(DataClass):
             tapering=self.tapering,
         )
 
-    def __rmul__(self, scalar: float) -> QubitOperator:
+    def __rmul__(self, scalar: float) -> PauliLCUContainer:
         """Support ``scalar * operator``."""
         return self.__mul__(scalar)
 
@@ -369,7 +375,7 @@ class QubitOperator(DataClass):
             terms.sort(key=lambda t: abs(t[1]), reverse=True)
         return terms
 
-    def to_interleaved(self, n_spatial: int) -> QubitOperator:
+    def to_interleaved(self, n_spatial: int) -> PauliLCUContainer:
         """Convert from blocked to interleaved spin-orbital ordering.
 
         Converts a qubit operator from blocked ordering (alpha orbitals first,
@@ -418,7 +424,7 @@ class QubitOperator(DataClass):
                 new_chars[permutation[old_pos]] = char
             reordered_strings.append("".join(new_chars))
 
-        return QubitOperator(
+        return PauliLCUContainer(
             pauli_strings=reordered_strings,
             coefficients=self.coefficients.copy(),
             encoding=self.encoding,
@@ -454,10 +460,12 @@ class QubitOperator(DataClass):
         # This handles both real and complex coefficient arrays
         coeffs = self.coefficients
         data = {
+            "container_type": self.type,
             "pauli_strings": self.pauli_strings,
             "coefficients": {
                 "real": coeffs.real.tolist(),
                 "imag": coeffs.imag.tolist(),
+                "dtype": str(coeffs.dtype),
             },
         }
         if self.encoding is not None:
@@ -478,6 +486,7 @@ class QubitOperator(DataClass):
 
         """
         self._add_hdf5_version(group)
+        group.attrs["container_type"] = self.type
         group.create_dataset("pauli_strings", data=np.array(self.pauli_strings, dtype="S"))
         group.create_dataset("coefficients", data=self.coefficients)
         if self.encoding is not None:
@@ -490,7 +499,7 @@ class QubitOperator(DataClass):
             group.attrs["tapering"] = json.dumps(self.tapering.to_json())
 
     @classmethod
-    def from_json(cls, json_data: dict[str, Any]) -> QubitOperator:
+    def from_json(cls, json_data: dict[str, Any]) -> PauliLCUContainer:
         """Create a QubitOperator from a JSON dictionary.
 
         Args:
@@ -508,6 +517,8 @@ class QubitOperator(DataClass):
         # Handle complex coefficients serialized as {"real": [...], "imag": [...]}
         if isinstance(coeff_data, dict) and "real" in coeff_data and "imag" in coeff_data:
             coefficients = np.array(coeff_data["real"]) + 1j * np.array(coeff_data["imag"])
+            if "dtype" in coeff_data:
+                coefficients = coefficients.astype(coeff_data["dtype"])
         else:
             # Fallback for legacy format (simple list of real numbers)
             coefficients = np.array(coeff_data)
@@ -525,7 +536,7 @@ class QubitOperator(DataClass):
         )
 
     @classmethod
-    def from_hdf5(cls, group: h5py.Group) -> QubitOperator:
+    def from_hdf5(cls, group: h5py.Group) -> PauliLCUContainer:
         """Load a QubitOperator from an HDF5 group.
 
         Args:
@@ -594,44 +605,3 @@ def _validate_pauli_strings(pauli_strings: list[str]) -> None:
         if not valid_pauli_pattern.fullmatch(ps):
             invalid = set(ps) - set("IXYZ")
             raise ValueError(f"Pauli string at index {i} contains invalid characters: {invalid}.")
-
-
-class _DeprecatedQubitOperatorAliasMeta(type(QubitOperator)):  # type: ignore[misc]
-    """Metaclass that makes the deprecated alias behave like :class:`QubitOperator` for type checks.
-
-    ``isinstance`` and ``issubclass`` tests against the alias delegate to
-    :class:`QubitOperator`, so existing checks keep working in both directions
-    even though :class:`QubitHamiltonian` is a distinct subclass.
-    """
-
-    def __instancecheck__(cls, instance: object) -> bool:
-        """Report any :class:`QubitOperator` instance as an instance of the alias."""
-        return isinstance(instance, QubitOperator)
-
-    def __subclasscheck__(cls, subclass: type) -> bool:
-        """Report any :class:`QubitOperator` subclass as a subclass of the alias."""
-        return issubclass(subclass, QubitOperator)
-
-
-class QubitHamiltonian(QubitOperator, metaclass=_DeprecatedQubitOperatorAliasMeta):
-    """Deprecated alias for :class:`QubitOperator`.
-
-    .. deprecated::
-        ``QubitHamiltonian`` was renamed to :class:`QubitOperator`. This subclass
-        is retained for backward compatibility and will be removed in a future
-        release. Constructing it emits a :class:`DeprecationWarning`. Thanks to a
-        custom metaclass, ``isinstance(obj, QubitHamiltonian)`` still matches any
-        :class:`QubitOperator` instance (and vice versa), so existing type checks
-        keep working.
-    """
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        """Construct a :class:`QubitOperator`, warning that ``QubitHamiltonian`` is deprecated."""
-        warnings.warn(
-            "'QubitHamiltonian' has been renamed to 'QubitOperator' and is deprecated; it will be "
-            "removed in a future release. Replace 'QubitHamiltonian' with 'QubitOperator' "
-            "(from qdk_chemistry.data import QubitOperator).",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        super().__init__(*args, **kwargs)

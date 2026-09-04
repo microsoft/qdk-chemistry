@@ -7,12 +7,15 @@
 
 import numpy as np
 
+from qdk_chemistry.algorithms.qubit_mapper.sos import SOSQubitMapper
 from qdk_chemistry.data import (
     Ansatz,
     BasisSet,
     CanonicalFourCenterHamiltonianContainer,
     Configuration,
+    FactorizedHamiltonianContainer,
     Hamiltonian,
+    MajoranaMapping,
     Orbitals,
     OrbitalType,
     Shell,
@@ -247,6 +250,81 @@ def create_test_ansatz(num_orbitals: int = 2):
     wavefunction = Wavefunction(container)
 
     return Ansatz(hamiltonian, wavefunction)
+
+
+def create_random_factorized_hamiltonian(
+    num_orbitals: int = 2,
+    num_ranks: int = 2,
+    num_bases: int = 1,
+    num_copies: int = 1,
+    *,
+    seed: int = 42,
+):
+    """Create a random FactorizedHamiltonianContainer for testing.
+
+    Args:
+        num_orbitals: Number of spatial orbitals (N).
+        num_ranks: Number of ranks (R).
+        num_bases: Number of bases (B).
+        num_copies: Number of copies (C).
+        seed: Random seed for reproducibility.
+
+    Returns:
+        FactorizedHamiltonianContainer from C++ pybind11.
+
+    """
+    rng = np.random.default_rng(seed)
+    n, r, b, c = num_orbitals, num_ranks, num_bases, num_copies
+
+    # Symmetric one-body integrals
+    h1 = rng.standard_normal((n, n))
+    h1 = (h1 + h1.T) / 2
+
+    # Random orthogonal basis vectors (U), flattened [R*B*N]
+    u_matrices = np.zeros(r * b * n)
+    for ri in range(r):
+        for bi in range(b):
+            v = rng.standard_normal(n)
+            v /= np.linalg.norm(v)
+            u_matrices[ri * b * n + bi * n : ri * b * n + (bi + 1) * n] = v
+
+    # Two-body weights W [R*B*C]
+    w_matrices = rng.standard_normal(r * b * c)
+
+    # Identity weights WB [R, C]
+    wb_matrix = rng.standard_normal((r, c))
+
+    orbitals = create_test_orbitals(n)
+    inactive_fock = np.zeros((n, n))
+
+    return FactorizedHamiltonianContainer(
+        0.0,
+        u_matrices,
+        w_matrices,
+        wb_matrix,
+        h1,
+        inactive_fock,
+        orbitals,
+    )
+
+
+def to_sossa_operator(factorized_hamiltonian):
+    """Map a factorized Hamiltonian to the SOSSA QubitOperator the SOSSA builder expects.
+
+    Wrapping the container in a :class:`Hamiltonian` transfers ownership to C++ and
+    disowns the Python handle, so callers must not touch ``factorized_hamiltonian``
+    afterwards.
+
+    Args:
+        factorized_hamiltonian: The FactorizedHamiltonianContainer to map.
+
+    Returns:
+        The SOSSA QubitOperator.
+
+    """
+    num_modes = 2 * factorized_hamiltonian.get_num_orbitals()
+    hamiltonian = Hamiltonian(factorized_hamiltonian)
+    return SOSQubitMapper().run(hamiltonian, MajoranaMapping.jordan_wigner(num_modes))
 
 
 def create_random_bitstring_matrix(

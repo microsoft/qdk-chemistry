@@ -574,6 +574,9 @@ class TestGetQreApplication:
         circuit = Circuit(qsharp_factory=qsharp_factory)
         app = circuit.get_qre_application()
         assert isinstance(app, QSharpApplication)
+        assert app.entry_expr is qsharp_factory.program
+        assert app.args == tuple(qsharp_factory.parameter.values())
+        assert app.get_trace().total_qubits == 2
 
     def test_get_qre_application_from_qasm(self):
         """Test that get_qre_application works with QASM-only circuit."""

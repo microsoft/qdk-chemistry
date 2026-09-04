@@ -50,6 +50,7 @@ _ADAPTIVE_ONLY_MODULES = (
     "AliasSamplingStatePrep",
     "QROMStatePrep",
     "PhaseGradient",
+    "SOSSAWalk",
 )
 
 

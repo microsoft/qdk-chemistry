@@ -10,6 +10,10 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     import Std.Canon.ApplyXorInPlace;
     import Std.Diagnostics.Fact;
     import Std.Math.AbsI;
+    import Std.ResourceEstimation.EnableMemoryComputeArchitecture;
+    import Std.ResourceEstimation.IsResourceEstimating;
+    import Std.ResourceEstimation.LeastRecentlyUsed;
+    import Std.ResourceEstimation.RepeatEstimates;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
     import QDKChemistry.Utils.UnaryIteration.UnaryIterationWithControl;
 
@@ -17,6 +21,41 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     function PhaseRegisterSize(numQueries : Int) : Int {
         Fact(numQueries > 0, "numQueries must be positive");
         return AddressQubits(numQueries + 1);
+    }
+
+    internal operation ApplySignedPowerSlot(
+        applyBlockEncoding : (Qubit[] => Unit is Adj),
+        applyReflection : (Qubit[] => Unit is Adj + Ctl),
+        includeBlockEncoding : Bool,
+        selected : Qubit,
+        allQubits : Qubit[],
+    ) : Unit is Adj {
+        within {
+            X(selected);
+        } apply {
+            Controlled applyReflection([selected], allQubits);
+        }
+        if includeBlockEncoding {
+            applyBlockEncoding(allQubits);
+        }
+    }
+
+    internal operation ApplySignedPowerScheduleDirect(
+        applyBlockEncoding : (Qubit[] => Unit is Adj),
+        applyReflection : (Qubit[] => Unit is Adj + Ctl),
+        numQueries : Int,
+        phaseReg : Qubit[],
+        allQubits : Qubit[],
+    ) : Unit is Adj {
+        UnaryIterationWithControl(phaseReg, numQueries + 1, (slot, selected) => {
+            ApplySignedPowerSlot(
+                applyBlockEncoding,
+                applyReflection,
+                slot < numQueries,
+                selected,
+                allQubits
+            );
+        });
     }
 
     /// Applies `numQueries` self-inverse blocks, omitting the one reflection `phaseReg` selects.
@@ -31,17 +70,27 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
         allQubits : Qubit[],
     ) : Unit is Adj {
         Fact(numQueries > 0, "numQueries must be positive");
-        UnaryIterationWithControl(phaseReg, numQueries + 1, (slot, selected) => {
-            within {
-                X(selected);
-            } apply {
-                Controlled applyReflection([selected], allQubits);
-            }
-            // At slot = numQueries only the reflection is run
-            if slot < numQueries {
-                applyBlockEncoding(allQubits);
-            }
-        });
+        if IsResourceEstimating() {
+            UnaryIterationWithControl(phaseReg, numQueries + 1, (slot, selected) => {
+                if slot == 0 {
+                    within {
+                        RepeatEstimates(numQueries);
+                    } apply {
+                        ApplySignedPowerSlot(applyBlockEncoding, applyReflection, true, selected, allQubits);
+                    }
+                } elif slot == numQueries {
+                    ApplySignedPowerSlot(applyBlockEncoding, applyReflection, false, selected, allQubits);
+                }
+            });
+        } else {
+            ApplySignedPowerScheduleDirect(
+                applyBlockEncoding,
+                applyReflection,
+                numQueries,
+                phaseReg,
+                allQubits
+            );
+        }
     }
 
     /// Build a unary-iteration QPE circuit for an arbitrary (non-power-of-two) query count.
@@ -52,6 +101,8 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     /// shared qubits sit past them: `prepareSharedOp` initializes them once around the query
     /// schedule and whoever consumes them leaves them in that state. Set `statePrepUsesShared` or
     /// `blockEncodingUsesShared` for the component that expects them appended to its register.
+    /// Set `computeCapacity` to a positive logical-qubit capacity to enable least-recently-used
+    /// memory placement, or to -1 to keep all logical qubits in compute.
     operation MakeUnaryQPECircuit(
         statePrep : Qubit[] => Unit,
         applyBlockEncoding : (Qubit[] => Unit is Adj),
@@ -64,6 +115,7 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
         numSharedAncillas : Int,
         statePrepUsesShared : Bool,
         blockEncodingUsesShared : Bool,
+        computeCapacity : Int,
     ) : Result[] {
         Fact(numSystemQubits > 0, "numSystemQubits must be positive");
         Fact(numAncillas >= 0, "numAncillas must be non-negative");
@@ -72,7 +124,12 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
             numSharedAncillas > 0 or not (statePrepUsesShared or blockEncodingUsesShared),
             "consuming shared ancilla requires a non-empty shared register"
         );
+        Fact(computeCapacity == -1 or computeCapacity > 0, "computeCapacity must be -1 or positive");
         let numPhaseQubits = PhaseRegisterSize(numQueries);
+
+        if computeCapacity > 0 {
+            EnableMemoryComputeArchitecture(computeCapacity, LeastRecentlyUsed());
+        }
 
         use qs = Qubit[numPhaseQubits + numSystemQubits + numAncillas + numSharedAncillas];
         let phaseQubits = qs[0..numPhaseQubits - 1];
@@ -88,10 +145,7 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
             }
         } apply {
             statePrep(statePrepUsesShared ? systemQubits + sharedQubits | systemQubits);
-            let blockEncoding =
-                blockEncodingUsesShared
-                ? (register) => applyBlockEncoding(register + sharedQubits)
-                | applyBlockEncoding;
+            let blockEncoding = blockEncodingUsesShared ? (register) => applyBlockEncoding(register + sharedQubits) | applyBlockEncoding;
             ApplySignedPowerSchedule(
                 blockEncoding,
                 applyReflection,
@@ -147,6 +201,24 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
         };
     }
 
+    /// Compares the estimator-specialized schedule with its literal implementation.
+    internal operation TestSignedPowerScheduleResources(numQueries : Int, useOptimizedSchedule : Bool) : Unit {
+        let numAddressQubits = AddressQubits(numQueries + 1);
+        use qs = Qubit[numAddressQubits + 1];
+        let address = qs[0..numAddressQubits - 1];
+        let targets = qs[numAddressQubits...];
+        let applyBlockEncoding = (register) => T(register[0]);
+        let applyReflection = (register) => Z(register[0]);
+
+        if useOptimizedSchedule {
+            ApplySignedPowerSchedule(applyBlockEncoding, applyReflection, numQueries, address, targets);
+        } else {
+            ApplySignedPowerScheduleDirect(applyBlockEncoding, applyReflection, numQueries, address, targets);
+        }
+
+        ResetAll(qs);
+    }
+
     /// Runs `MakeUnaryQPECircuit` on a synthetic one-qubit walk with an exact eigenphase.
     internal operation TestUnaryQpeSyntheticWalk(numQueries : Int, theta : Double, systemAngle : Double) : Result[] {
         Fact(
@@ -169,7 +241,8 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
             0,
             0,
             false,
-            false
+            false,
+            -1
         );
     }
 }
