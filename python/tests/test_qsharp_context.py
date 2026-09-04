@@ -41,9 +41,10 @@ if TYPE_CHECKING:
 #: shipped staging list so that list, not a copy of it, is what the classification pins.
 _PORTABLE_MODULES = tuple(Path(name).stem for name in _BASE_PROFILE_FILES)
 
-#: Modules withheld from ``TargetProfile.Base``. They uncompute through measurement, which
-#: Base cannot express, so they are made to fail as missing rather than compile and mislead.
-_ADAPTIVE_ONLY_MODULES = ("UnaryIteration", "UnaryPhaseEstimation")
+#: Modules withheld from ``TargetProfile.Base``. They uncompute through measurement, or use
+#: classical feed-forward, which Base cannot express, so they are made to fail as missing
+#: rather than compile and mislead.
+_ADAPTIVE_ONLY_MODULES = ("CombinedIterationPhaseEstimation", "UnaryIteration", "UnaryPhaseEstimation")
 
 
 @pytest.fixture(scope="module")

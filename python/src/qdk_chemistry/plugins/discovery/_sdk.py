@@ -15,17 +15,6 @@ from azure.core.polling import NoPolling
 DISCOVERY_SCOPE = "https://discovery.azure.com/.default"
 
 
-def create_credential(credential_mode: str) -> Any:
-    """Create the configured Azure credential."""
-    from azure.identity import AzureCliCredential, DefaultAzureCredential  # noqa: PLC0415
-
-    if credential_mode == "azure-cli":
-        return AzureCliCredential()
-    if credential_mode == "default":
-        return DefaultAzureCredential()
-    raise ValueError(f"unsupported Discovery credential mode {credential_mode!r}")
-
-
 def create_workspace_client(endpoint: str, credential: Any) -> Any:
     """Create an Azure AI Discovery workspace client."""
     from azure.ai.discovery import WorkspaceClient  # noqa: PLC0415

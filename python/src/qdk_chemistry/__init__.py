@@ -64,6 +64,7 @@ _BUNDLED_PLUGIN_AUTOLOAD = (
     ("openfermion", "QDK_CHEMISTRY_DISABLE_OPENFERMION_AUTOLOAD"),
     ("networkx", "QDK_CHEMISTRY_DISABLE_NETWORKX_AUTOLOAD"),
     ("geometric", "QDK_CHEMISTRY_DISABLE_GEOMETRIC_AUTOLOAD"),
+    ("azure_quantum", "QDK_CHEMISTRY_DISABLE_AZUREQUANTUM_AUTOLOAD"),
 )
 _STUBGEN_BLOCK_MARKER = Path(__file__).parent / "_core" / ".no-stubgen"
 

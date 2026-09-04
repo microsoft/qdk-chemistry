@@ -125,7 +125,7 @@ qre = [
   "qdk[qre,jupyter]>=1.30.0"
 ]
 test = [
-  "qdk-chemistry[coverage,discovery,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre]",
+  "qdk-chemistry[azure-quantum,coverage,discovery,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre]",
   "qdk-chemistry[mcp]; sys_platform != 'win32' or platform_machine != 'ARM64'",
   "nbclient",
   "nbformat",
@@ -137,6 +137,7 @@ test = [
   "setuptools>=64",
   "wheel"
 ]
+azure-quantum = ["azure-identity", "azure-quantum"]
 
 [project.urls]
 Documentation = "https://microsoft.github.io/qdk-chemistry"
