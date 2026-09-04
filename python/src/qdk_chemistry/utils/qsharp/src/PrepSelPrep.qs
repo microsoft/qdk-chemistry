@@ -202,15 +202,4 @@ namespace QDKChemistry.Utils.PrepSelPrep {
             }
         }
     }
-
-    /// # Summary
-    /// One-system-qubit, one-ancilla block encoding used to drive block-encoding-agnostic
-    /// schedules from a test.
-    internal function MakeTestBlockEncodingOp(theta : Double) : (Qubit[] => Unit is Adj + Ctl) {
-        MakePrepSelPrepOp(
-            (ancilla) => Ry(theta, ancilla[0]),
-            (ancilla, system) => Controlled Z(ancilla, system[0]),
-            1
-        )
-    }
 }

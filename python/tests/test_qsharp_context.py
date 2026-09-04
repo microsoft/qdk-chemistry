@@ -10,6 +10,7 @@ from __future__ import annotations
 import inspect
 import threading
 from pathlib import Path
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -190,3 +191,37 @@ class TestTargetProfiles:
 
         pauli_exp = utils.ControlledPauliExp.MakeRepControlledPauliExpCircuit
         assert "define" in str(base_context.compile(pauli_exp, [[Pauli.X, Pauli.Z]], [0.5], 2, 0, [1, 2]))
+
+
+class TestTestOnlySourcesAreNotShipped:
+    """Ensure test-only Q# declarations are not shipped."""
+
+    @staticmethod
+    def _walk_namespaces(namespace, prefix: str) -> Iterator[tuple[str, str, bool]]:
+        """Yield ``(path, name, is_namespace)`` for a compiled Q# namespace tree."""
+        for name in dir(namespace):
+            if name.startswith("_"):
+                continue
+            child = getattr(namespace, name)
+            path = f"{prefix}.{name}"
+            is_namespace = isinstance(child, SimpleNamespace)
+            yield path, name, is_namespace
+            if is_namespace:
+                yield from TestTestOnlySourcesAreNotShipped._walk_namespaces(child, path)
+
+    def test_every_test_only_declaration_uses_the_test_prefix(self, qsharp_test_utils) -> None:
+        """Test-only declarations use the ``Test`` prefix."""
+        unprefixed = [
+            path
+            for path, name, is_namespace in self._walk_namespaces(qsharp_test_utils, "TestUtils")
+            if not is_namespace and not name.startswith("Test")
+        ]
+        assert unprefixed == []
+
+    def test_a_default_context_cannot_reach_the_test_helpers(self) -> None:
+        """A user context must not be able to call the test drivers."""
+        assert not hasattr(create_qsharp_context().code.QDKChemistry, "TestUtils")
+
+    def test_the_test_context_can_reach_them(self, qsharp_test_context: qdk.Context) -> None:
+        """Evaluating the test sources is what makes the drivers available to the Python tests."""
+        assert hasattr(qsharp_test_context.code.QDKChemistry, "TestUtils")
