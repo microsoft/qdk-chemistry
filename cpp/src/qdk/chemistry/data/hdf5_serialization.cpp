@@ -187,9 +187,11 @@ void save_vector_to_group(H5::Group& group, const std::string& dataset_name,
   if (!vector.empty()) {
     hsize_t dims[1] = {vector.size()};
     H5::DataSpace dataspace(1, dims);
+    // Windows LLP64: unsigned long is 4 bytes, so use NATIVE_UINT64 for size_t.
+    static_assert(sizeof(size_t) == 8);
     H5::DataSet dataset = group.createDataSet(
-        dataset_name, H5::PredType::NATIVE_ULONG, dataspace);
-    dataset.write(vector.data(), H5::PredType::NATIVE_ULONG);
+        dataset_name, H5::PredType::NATIVE_UINT64, dataspace);
+    dataset.write(vector.data(), H5::PredType::NATIVE_UINT64);
   }
 }
 
@@ -225,7 +227,8 @@ std::vector<size_t> load_size_vector_from_group(
   hsize_t dims[1];
   dataspace.getSimpleExtentDims(dims);
   std::vector<size_t> vector(dims[0]);
-  dataset.read(vector.data(), H5::PredType::NATIVE_ULONG);
+  static_assert(sizeof(size_t) == 8);
+  dataset.read(vector.data(), H5::PredType::NATIVE_UINT64);
   return vector;
 }
 
@@ -327,6 +330,28 @@ void save_vector_variant_to_group(
     // Write directly from Eigen's memory without copying
     real_dataset.write(vector_real.data(), H5::PredType::NATIVE_DOUBLE);
   }
+}
+
+void save_matrix_variant_to_group_with_complex_attr(
+    const std::shared_ptr<MatrixVariant>& matrix_variant, H5::Group& group,
+    const std::string& storage_name, const std::string& complex_attr_name) {
+  bool is_complex = std::holds_alternative<Eigen::MatrixXcd>(*matrix_variant);
+  H5::Attribute attr = group.createAttribute(
+      complex_attr_name, H5::PredType::NATIVE_HBOOL, H5::DataSpace(H5S_SCALAR));
+  save_matrix_variant_to_group(is_complex, matrix_variant, group, storage_name);
+  hbool_t flag = is_complex ? 1 : 0;
+  attr.write(H5::PredType::NATIVE_HBOOL, &flag);
+}
+
+void save_vector_variant_to_group_with_complex_attr(
+    const std::shared_ptr<VectorVariant>& vector_variant, H5::Group& group,
+    const std::string& storage_name, const std::string& complex_attr_name) {
+  bool is_complex = std::holds_alternative<Eigen::VectorXcd>(*vector_variant);
+  H5::Attribute attr = group.createAttribute(
+      complex_attr_name, H5::PredType::NATIVE_HBOOL, H5::DataSpace(H5S_SCALAR));
+  save_vector_variant_to_group(is_complex, vector_variant, group, storage_name);
+  hbool_t flag = is_complex ? 1 : 0;
+  attr.write(H5::PredType::NATIVE_HBOOL, &flag);
 }
 
 }  // namespace qdk::chemistry::data

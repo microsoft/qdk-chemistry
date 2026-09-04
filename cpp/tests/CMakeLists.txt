@@ -41,6 +41,7 @@ target_compile_definitions(test_main PUBLIC TEST_RESOURCES_DIR="${PROJECT_SOURCE
 target_include_directories(test_main PUBLIC
   $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/tests>
   $<BUILD_INTERFACE:${QDK_SCF_TEST_DIR}>
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src>
 )
 
 # Manage reference data for SCF tests
@@ -74,12 +75,19 @@ function(add_gtest_executable test_source)
 
     if(QDK_CHEMISTRY_ENABLE_COVERAGE)
         # Handle coverage of inline functions
-        target_compile_options(${test_name} PRIVATE --coverage -fprofile-arcs -ftest-coverage)
-        target_link_libraries(${test_name} PRIVATE --coverage)
+        if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang" AND NOT MSVC)
+            target_compile_options(${test_name} PRIVATE --coverage -fprofile-arcs -ftest-coverage)
+            target_link_libraries(${test_name} PRIVATE --coverage)
+        endif()
     endif()
 
-    # Discover tests automatically
-    gtest_discover_tests(${test_name})
+    # Discover tests automatically. Build-time discovery is fragile on CI when
+    # many freshly linked coverage-instrumented test executables discover in
+    # parallel. Defer discovery to CTest while preserving parameterized tests.
+    gtest_discover_tests(${test_name}
+        DISCOVERY_MODE PRE_TEST
+        DISCOVERY_TIMEOUT 60
+    )
 
     # Set properties for better organization
     set_target_properties(${test_name} PROPERTIES

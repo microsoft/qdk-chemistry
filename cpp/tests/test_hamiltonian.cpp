@@ -15,21 +15,48 @@
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
+#include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/three_center.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 
 #include "../src/qdk/chemistry/algorithms/microsoft/mp2.hpp"
 #include "ut_common.hpp"
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
+
+// Electronic spin symmetry for model orbitals. Model systems are otherwise
+// symmetry-agnostic (no S_z axis by default); an electronic Hamiltonian
+// requests a spin axis explicitly so its integrals can be spin-blocked.
+static std::shared_ptr<const SymmetryProduct> model_spin_symmetry(
+    bool restricted) {
+  return std::make_shared<const SymmetryProduct>(
+      SymmetryProduct({axes::spin(1, restricted)}));
+}
+
+// Build a trivial (no-symmetry) index set over `num_modes` carrying `indices`,
+// for model orbitals that declare an explicit active/inactive space.
+static std::shared_ptr<const SymmetryBlockedIndexSet> trivial_index_set(
+    size_t num_modes, const std::vector<size_t>& indices) {
+  auto sym =
+      std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial());
+  std::unordered_map<SymmetryLabel, std::size_t> extents{
+      {SymmetryLabel{}, num_modes}};
+  std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>> idx{
+      {SymmetryLabel{},
+       std::vector<std::uint32_t>(indices.begin(), indices.end())}};
+  return std::make_shared<const SymmetryBlockedIndexSet>(sym, extents,
+                                                         std::move(idx));
+}
 
 class HamiltonianTest : public ::testing::TestWithParam<std::string> {
  protected:
@@ -42,8 +69,8 @@ class HamiltonianTest : public ::testing::TestWithParam<std::string> {
     two_body = 2 * Eigen::VectorXd::Ones(16);
 
     // Create a test Orbitals object using ModelOrbitals for model systems
-    orbitals =
-        std::make_shared<ModelOrbitals>(2, true);  // 2 orbitals, restricted
+    orbitals = std::make_shared<ModelOrbitals>(
+        2, model_spin_symmetry(true));  // 2 orbitals, restricted
 
     num_electrons = 2;
     core_energy = 1.5;
@@ -100,7 +127,8 @@ class HamiltonianTest : public ::testing::TestWithParam<std::string> {
     sample_inactive_fock_alpha = Eigen::MatrixXd::Constant(2, 2, 4.0);
     sample_inactive_fock_beta = Eigen::MatrixXd::Constant(2, 2, 5.0);
 
-    orbitals_unrestricted = std::make_shared<ModelOrbitals>(2, false);
+    orbitals_unrestricted =
+        std::make_shared<ModelOrbitals>(2, model_spin_symmetry(false));
 
     // Create restricted Hamiltonian with the parameterized container type
     hamiltonian_restricted = createHamiltonian(container_type);
@@ -196,6 +224,25 @@ class HamiltonianTest : public ::testing::TestWithParam<std::string> {
   std::shared_ptr<Hamiltonian> hamiltonian_unrestricted;
 };
 
+class HamiltonianContainerTest : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    one_body = Eigen::MatrixXd::Identity(2, 2);
+    one_body(0, 1) = 0.5;
+    one_body(1, 0) = 0.5;
+    two_body = 2 * Eigen::VectorXd::Ones(16);
+    orbitals = std::make_shared<ModelOrbitals>(2, model_spin_symmetry(true));
+    inactive_fock = Eigen::MatrixXd::Zero(0, 0);
+    core_energy = 1.5;
+  }
+
+  Eigen::MatrixXd one_body;
+  Eigen::VectorXd two_body;
+  std::shared_ptr<Orbitals> orbitals;
+  Eigen::MatrixXd inactive_fock;
+  double core_energy;
+};
+
 class HamiltonianConstructorTest : public ::testing::Test {
  protected:
   void SetUp() override {}
@@ -208,7 +255,8 @@ class TestHamiltonianConstructor : public HamiltonianConstructor {
   std::string name() const override { return "test-hamiltonian_constructor"; }
   std::shared_ptr<Hamiltonian> _run_impl(
       std::shared_ptr<Orbitals> orbitals) const override {
-    // Dummy implementation for testing
+    orbitals = std::make_shared<ModelOrbitals>(
+        2, model_spin_symmetry(true));  // 2 orbitals, restricted
     Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(3, 3);
     Eigen::VectorXd two_body = Eigen::VectorXd::Random(81);
     Eigen::MatrixXd f_inact = Eigen::MatrixXd::Identity(0, 0);
@@ -250,6 +298,11 @@ TEST_P(HamiltonianTest, Constructor) {
 TEST_P(HamiltonianTest, ConstructorWithInactiveFock) {
   // Test the constructor with inactive fock matrix
   // For this test specifically, create ModelOrbitals with inactive space
+  std::vector<size_t> active_indices = {1, 2};  // Only orbital 1 is active
+  std::vector<size_t> inactive_indices = {0};   // Orbital 0 is inactive
+  auto orbitals_with_inactive =
+      std::make_shared<ModelOrbitals>(trivial_index_set(4, active_indices),
+                                      trivial_index_set(4, inactive_indices));
 
   std::string test_p = GetParam();
 
@@ -260,7 +313,8 @@ TEST_P(HamiltonianTest, ConstructorWithInactiveFock) {
         std::make_unique<CanonicalFourCenterHamiltonianContainer>(
             one_body, two_body, orbitals_with_inactive, core_energy,
             inactive_fock_non_empty));
-
+    orbitals_unrestricted =
+        std::make_shared<ModelOrbitals>(2, model_spin_symmetry(false));
   } else if (test_p == "three_center") {
     Eigen::MatrixXd three_center_2x2 = Eigen::MatrixXd::Random(4, 3);
     h_active_space = std::make_shared<Hamiltonian>(
@@ -459,8 +513,8 @@ TEST_P(HamiltonianTest, TwoBodyElementAccess) {
     large_two_body[52] = 8.0;
 
     // Create orbitals for the larger system
-    auto large_orbitals =
-        std::make_shared<ModelOrbitals>(3, true);  // 3 orbitals, restricted
+    auto large_orbitals = std::make_shared<ModelOrbitals>(
+        3, model_spin_symmetry(true));  // 3 orbitals, restricted
 
     Hamiltonian h_large(
         std::make_unique<CanonicalFourCenterHamiltonianContainer>(
@@ -534,8 +588,8 @@ TEST_P(HamiltonianTest, TwoBodyElementAccess) {
     large_three_center(3, 52) = 8.0;
 
     // Create orbitals for the larger system
-    auto large_orbitals =
-        std::make_shared<ModelOrbitals>(3, true);  // 3 orbitals, restricted
+    auto large_orbitals = std::make_shared<ModelOrbitals>(
+        3, model_spin_symmetry(true));  // 3 orbitals, restricted
 
     Hamiltonian h_large(std::make_unique<ThreeCenterHamiltonianContainer>(
         large_one_body, large_three_center, large_orbitals, 0.0,
@@ -581,9 +635,9 @@ TEST_P(HamiltonianTest, JSONSerialization) {
   nlohmann::json j = hamiltonian_restricted->to_json();
 
   EXPECT_EQ(j["container"]["core_energy"], 1.5);
-  EXPECT_TRUE(j["container"]["has_one_body_integrals"]);
-  EXPECT_TRUE(j["container"]["has_two_body_integrals"]);
-  if (container_type != "sparse") EXPECT_TRUE(j["container"]["has_orbitals"]);
+  EXPECT_TRUE(j["container"].contains("one_body_integrals"));
+  EXPECT_TRUE(j["container"].contains("two_body_integrals"));
+  EXPECT_TRUE(j["container"].contains("orbitals"));
 
   // Test round-trip conversion
   auto h2 = Hamiltonian::from_json(j);
@@ -797,8 +851,8 @@ TEST_P(HamiltonianTest, ValidationEdgeCases) {
   Eigen::MatrixXd tiny_one_body = Eigen::MatrixXd::Identity(1, 1);
   Eigen::VectorXd tiny_two_body = Eigen::VectorXd::Random(1);  // 1^4 = 1
   Eigen::MatrixXd tiny_three_center = Eigen::MatrixXd::Identity(1, 1);
-  auto tiny_orbitals =
-      std::make_shared<ModelOrbitals>(1, true);  // 1 orbital, restricted
+  auto tiny_orbitals = std::make_shared<ModelOrbitals>(
+      1, model_spin_symmetry(true));  // 1 orbital, restricted
   Eigen::MatrixXd tiny_inactive_fock = Eigen::MatrixXd::Zero(1, 1);
 
   if (test_p == "canonical_four_center") {
@@ -822,8 +876,8 @@ TEST_P(HamiltonianTest, ValidationEdgeCases) {
   // Need orbitals that match the 10x10 size
   Eigen::MatrixXd large_coeffs = Eigen::MatrixXd::Identity(10, 10);
 
-  auto large_orbitals =
-      std::make_shared<ModelOrbitals>(10, true);  // 10 orbitals, restricted
+  auto large_orbitals = std::make_shared<ModelOrbitals>(
+      10, model_spin_symmetry(true));  // 10 orbitals, restricted
 
   // Create a larger inactive_fock matrix for this test
   Eigen::MatrixXd large_inactive_fock = Eigen::MatrixXd::Zero(0, 0);
@@ -923,7 +977,8 @@ TEST_P(HamiltonianTest, UnrestrictedSpinChannelAccess) {
   // Create unrestricted orbitals for this test
   std::string test_p = GetParam();
 
-  auto unrestricted_orbitals = std::make_shared<ModelOrbitals>(2, false);
+  auto unrestricted_orbitals =
+      std::make_shared<ModelOrbitals>(2, model_spin_symmetry(false));
 
   // Create unrestricted Hamiltonian with specific two-body integral values
   Eigen::MatrixXd one_body_alpha = Eigen::MatrixXd::Identity(2, 2);
@@ -1187,7 +1242,8 @@ TEST_P(HamiltonianTest, ErrorHandlingUnrestrictedMismatchedActiveSpace) {
   // Test error handling when alpha and beta active spaces have different sizes
   std::string test_p = GetParam();
 
-  auto unrestricted_orbitals = std::make_shared<ModelOrbitals>(3, false);
+  auto unrestricted_orbitals =
+      std::make_shared<ModelOrbitals>(3, model_spin_symmetry(false));
 
   // Manually set different active space sizes for alpha and beta
   std::vector<size_t> alpha_active = {0, 1};  // 2 orbitals
@@ -1325,7 +1381,7 @@ auto run_restricted_o2 = [](const std::string& factory_name = "qdk") {
 
   auto ham_factory = HamiltonianConstructorFactory::create(factory_name);
   if (factory_name == "qdk_cholesky") {
-    ham_factory->settings().set("store_ao_three_center_vectors", true);
+    ham_factory->settings().set("store_ao_cholesky_vectors", true);
   }
 
   auto rhf_hamiltonian = ham_factory->run(rhf_orbitals);
@@ -1359,7 +1415,7 @@ auto run_unrestricted_o2 = [](const std::string& factory_name = "qdk") {
 
   auto ham_factory = HamiltonianConstructorFactory::create(factory_name);
   if (factory_name == "qdk_cholesky") {
-    ham_factory->settings().set("store_ao_three_center_vectors", true);
+    ham_factory->settings().set("store_ao_cholesky_vectors", true);
   }
 
   auto uhf_hamiltonian = ham_factory->run(uhf_orbitals);
@@ -1403,7 +1459,7 @@ auto run_restricted_active_o2 = [](const std::string& factory_name = "qdk") {
 
   auto ham_factory = HamiltonianConstructorFactory::create(factory_name);
   if (factory_name == "qdk_cholesky") {
-    ham_factory->settings().set("store_ao_three_center_vectors", true);
+    ham_factory->settings().set("store_ao_cholesky_vectors", true);
   }
 
   auto orbitals = wfn_active->get_orbitals();
@@ -1468,8 +1524,8 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
   EXPECT_THROW(
       {
         // Create model orbitals without basis set
-        auto orbitals =
-            std::make_shared<ModelOrbitals>(3, true);  // 3 orbitals, restricted
+        auto orbitals = std::make_shared<ModelOrbitals>(
+            3, model_spin_symmetry(true));  // 3 orbitals, restricted
         hc->run(orbitals);
       },
       std::runtime_error);
@@ -1482,51 +1538,60 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
         // Create restricted orbitals with no active space
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, std::nullopt, std::nullopt, basis_set,
-            std::make_tuple(std::move(empty_active_indices),
-                            std::vector<size_t>{}));
+            testing::restricted_index_set(coeffs.cols(), empty_active_indices),
+            testing::restricted_index_set(coeffs.cols(),
+                                          std::vector<size_t>{}));
         hc->run(orbitals);
       },
       std::runtime_error);
 
-  // Test that unrestricted orbitals throw when alpha is empty
-  EXPECT_THROW(({
-                 Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
-                 Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
-                 std::vector<size_t> alpha_active_indices{};  // Empty alpha
-                 std::vector<size_t> beta_active_indices{0, 1};
-                 std::vector<size_t> alpha_inactive_indices{};
-                 std::vector<size_t> beta_inactive_indices{2};
-                 // Create unrestricted orbitals with only beta active space
-                 auto orbitals = std::make_shared<Orbitals>(
-                     coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt,
-                     std::nullopt, basis_set,
-                     std::make_tuple(std::move(alpha_active_indices),
-                                     std::move(beta_active_indices),
-                                     std::move(alpha_inactive_indices),
-                                     std::move(beta_inactive_indices)));
-                 hc->run(orbitals);
-               }),
-               std::runtime_error);
+  // Test that unrestricted orbitals throw when alpha is empty.
+  // GCC statement expressions ({...}) are not supported by MSVC, so we use
+  // a named lambda invoked inside the macro to avoid unprotected commas.
+  {
+    auto throw_empty_alpha = [&]() {
+      Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
+      Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
+      std::vector<size_t> alpha_active_indices{};  // Empty alpha
+      std::vector<size_t> beta_active_indices{0, 1};
+      std::vector<size_t> alpha_inactive_indices{};
+      std::vector<size_t> beta_inactive_indices{2};
+      // Create unrestricted orbitals with only beta active space
+      auto orbitals = std::make_shared<Orbitals>(
+          coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
+          basis_set,
+          testing::unrestricted_index_set(
+              coeffs_alpha.cols(), alpha_active_indices, beta_active_indices),
+          testing::unrestricted_index_set(coeffs_alpha.cols(),
+                                          alpha_inactive_indices,
+                                          beta_inactive_indices));
+      hc->run(orbitals);
+    };
+    EXPECT_THROW(throw_empty_alpha(), std::runtime_error);
+  }
 
   // Test that unrestricted orbitals throw when beta is empty
-  EXPECT_THROW(({
-                 Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
-                 Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
-                 std::vector<size_t> alpha_active_indices{0, 1};
-                 std::vector<size_t> beta_active_indices{};  // Empty beta
-                 std::vector<size_t> alpha_inactive_indices{2};
-                 std::vector<size_t> beta_inactive_indices{};
-                 // Create unrestricted orbitals with only alpha active space
-                 auto orbitals = std::make_shared<Orbitals>(
-                     coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt,
-                     std::nullopt, basis_set,
-                     std::make_tuple(std::move(alpha_active_indices),
-                                     std::move(beta_active_indices),
-                                     std::move(alpha_inactive_indices),
-                                     std::move(beta_inactive_indices)));
-                 hc->run(orbitals);
-               }),
-               std::runtime_error);
+  {
+    auto throw_empty_beta = [&]() {
+      Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
+      Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
+      std::vector<size_t> alpha_active_indices{0, 1};
+      std::vector<size_t> beta_active_indices{};  // Empty beta
+      std::vector<size_t> alpha_inactive_indices{2};
+      std::vector<size_t> beta_inactive_indices{};
+      // Create unrestricted orbitals with only alpha active space
+      auto orbitals = std::make_shared<Orbitals>(
+          coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
+          basis_set,
+          testing::unrestricted_index_set(
+              coeffs_alpha.cols(), alpha_active_indices, beta_active_indices),
+          testing::unrestricted_index_set(coeffs_alpha.cols(),
+                                          alpha_inactive_indices,
+                                          beta_inactive_indices));
+      hc->run(orbitals);
+    };
+    EXPECT_THROW(throw_empty_beta(), std::runtime_error);
+  }
 
   // Throw if the active space is larger than the MO set
   EXPECT_THROW(
@@ -1537,10 +1602,12 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
         // Create orbitals with invalid active space
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, std::nullopt, std::nullopt, basis_set,
-            std::make_tuple(std::move(active_indices), std::vector<size_t>{}));
+            testing::restricted_index_set(coeffs.cols(), active_indices),
+            testing::restricted_index_set(coeffs.cols(),
+                                          std::vector<size_t>{}));
         hc->run(orbitals);
       },
-      std::invalid_argument);
+      std::out_of_range);
 
   // Throw if there is an index out of bounds
   EXPECT_THROW(
@@ -1551,10 +1618,12 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
         // Create orbitals with out-of-bounds active space index
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, std::nullopt, std::nullopt, basis_set,
-            std::make_tuple(std::move(active_indices), std::vector<size_t>{}));
+            testing::restricted_index_set(coeffs.cols(), active_indices),
+            testing::restricted_index_set(coeffs.cols(),
+                                          std::vector<size_t>{}));
         hc->run(orbitals);
       },
-      std::invalid_argument);
+      std::out_of_range);
 
   // Throw if there are repeated indices in the active space
   EXPECT_THROW(
@@ -1564,7 +1633,9 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
         // Create orbitals with repeated active space indices
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, std::nullopt, std::nullopt, basis_set,
-            std::make_tuple(std::move(active_indices), std::vector<size_t>{}));
+            testing::restricted_index_set(coeffs.cols(), active_indices),
+            testing::restricted_index_set(coeffs.cols(),
+                                          std::vector<size_t>{}));
         hc->run(orbitals);
       },
       std::invalid_argument);
@@ -1577,10 +1648,12 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
         // Create orbitals with unsorted active space indices
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, std::nullopt, std::nullopt, basis_set,
-            std::make_tuple(std::move(active_indices), std::vector<size_t>{}));
+            testing::restricted_index_set(coeffs.cols(), active_indices),
+            testing::restricted_index_set(coeffs.cols(),
+                                          std::vector<size_t>{}));
         hc->run(orbitals);
       },
-      std::runtime_error);
+      std::invalid_argument);
 
   // Throw if alpha and beta active spaces have different sizes
   EXPECT_THROW(
@@ -1595,10 +1668,11 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
         auto orbitals = std::make_shared<Orbitals>(
             coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
             basis_set,
-            std::make_tuple(std::move(alpha_active_indices),
-                            std::move(beta_active_indices),
-                            std::move(alpha_inactive_indices),
-                            std::move(beta_inactive_indices)));
+            testing::unrestricted_index_set(
+                coeffs_alpha.cols(), alpha_active_indices, beta_active_indices),
+            testing::unrestricted_index_set(coeffs_alpha.cols(),
+                                            alpha_inactive_indices,
+                                            beta_inactive_indices));
         hc->run(orbitals);
       },
       std::runtime_error);
@@ -1634,10 +1708,11 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
     auto orbitals = std::make_shared<Orbitals>(
         coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
         large_basis_set,
-        std::make_tuple(std::move(alpha_active_indices),
-                        std::move(beta_active_indices),
-                        std::move(alpha_inactive_indices),
-                        std::move(beta_inactive_indices)));
+        testing::unrestricted_index_set(
+            coeffs_alpha.cols(), alpha_active_indices, beta_active_indices),
+        testing::unrestricted_index_set(coeffs_alpha.cols(),
+                                        alpha_inactive_indices,
+                                        beta_inactive_indices));
     auto hamiltonian = hc->run(orbitals);
     EXPECT_TRUE(hamiltonian->has_one_body_integrals());
     EXPECT_TRUE(hamiltonian->has_two_body_integrals());
@@ -1673,8 +1748,8 @@ TEST_F(HamiltonianConstructorTest, NonContiguousActiveSpace) {
 
   auto orbitals = std::make_shared<Orbitals>(
       coeffs, std::nullopt, std::nullopt, basis_set,
-      std::make_tuple(std::vector<size_t>(active_indices),
-                      std::vector<size_t>{}));
+      testing::restricted_index_set(coeffs.cols(), active_indices),
+      testing::restricted_index_set(coeffs.cols(), std::vector<size_t>{}));
   // This should successfully construct the Hamiltonian
   // and exercise the non-contiguous active space code paths
   EXPECT_NO_THROW({
@@ -1715,7 +1790,8 @@ TEST_F(HamiltonianConstructorTest, NonContiguousInactiveSpace) {
 
   auto orbitals = std::make_shared<Orbitals>(
       coeffs, std::nullopt, std::nullopt, basis_set,
-      std::make_tuple(std::move(active_indices), std::move(inactive_indices)));
+      testing::restricted_index_set(coeffs.cols(), active_indices),
+      testing::restricted_index_set(coeffs.cols(), inactive_indices));
   EXPECT_NO_THROW({
     auto hamiltonian = hc->run(orbitals);
     EXPECT_TRUE(hamiltonian->has_one_body_integrals());
@@ -1751,6 +1827,42 @@ TEST_F(HamiltonianConstructorTest, CholeskyFactory) {
   // Test setting eri_threshold
   EXPECT_NO_THROW(cholesky_hc->settings().set("eri_threshold", 1e-10));
   EXPECT_DOUBLE_EQ(cholesky_hc->settings().get<double>("eri_threshold"), 1e-10);
+}
+
+TEST_F(HamiltonianConstructorTest, EcpCoreEnergyUsesEffectiveNuclearRepulsion) {
+  auto structure = testing::create_agh_structure();
+  auto basis_set = BasisSet::from_basis_name("def2-svp", structure);
+  ASSERT_TRUE(basis_set->has_ecp_electrons());
+
+  const auto num_atomic_orbitals = basis_set->get_num_atomic_orbitals();
+  auto orbitals = std::make_shared<Orbitals>(
+      Eigen::MatrixXd::Identity(num_atomic_orbitals, num_atomic_orbitals),
+      Eigen::VectorXd::Zero(num_atomic_orbitals), std::nullopt, basis_set);
+
+  const double bond_length =
+      (structure->get_atom_coordinates(1) - structure->get_atom_coordinates(0))
+          .norm();
+  // def2-SVP replaces 28 Ag core electrons, so Z_eff(Ag) = 47 - 28 = 19.
+  const double expected_core_energy = 19.0 / bond_length;
+  EXPECT_NEAR(basis_set->calculate_effective_nuclear_repulsion_energy(),
+              expected_core_energy, testing::numerical_zero_tolerance);
+  const double structure_nuclear_repulsion =
+      structure->calculate_nuclear_repulsion_energy();
+  EXPECT_NEAR(structure_nuclear_repulsion, 47.0 / bond_length,
+              testing::numerical_zero_tolerance);
+  EXPECT_GT(std::abs(structure_nuclear_repulsion - expected_core_energy),
+            testing::numerical_zero_tolerance);
+
+  for (const auto* constructor_name : {"qdk", "qdk_cholesky"}) {
+    SCOPED_TRACE(constructor_name);
+    auto constructor = HamiltonianConstructorFactory::create(constructor_name);
+    auto hamiltonian = constructor->run(orbitals);
+    EXPECT_NEAR(hamiltonian->get_core_energy(), expected_core_energy,
+                testing::numerical_zero_tolerance);
+    EXPECT_GT(
+        std::abs(hamiltonian->get_core_energy() - structure_nuclear_repulsion),
+        testing::numerical_zero_tolerance);
+  }
 }
 
 TEST_F(HamiltonianConstructorTest, CholeskyRestrictedO2) {
@@ -1869,6 +1981,303 @@ TEST_F(HamiltonianConstructorTest, DensityFittedRestrictedO2) {
   });
 }
 
+TEST_F(HamiltonianContainerTest, CholeskyContainerConstruction) {
+  auto orbitals = std::make_shared<ModelOrbitals>(2, model_spin_symmetry(true));
+
+  Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
+
+  // Create cholesky vectors (2x2 MO basis, 3 cholesky vectors)
+  Eigen::MatrixXd L_mo = Eigen::MatrixXd::Random(4, 3);
+
+  // Test restricted constructor
+  Hamiltonian h(std::make_unique<CholeskyHamiltonianContainer>(
+      one_body, L_mo, orbitals, core_energy, inactive_fock));
+
+  EXPECT_TRUE(h.has_one_body_integrals());
+  EXPECT_TRUE(h.has_two_body_integrals());
+  EXPECT_TRUE(h.has_orbitals());
+  EXPECT_EQ(h.get_container_type(), "three_center");
+  EXPECT_TRUE(h.is_restricted());
+}
+
+TEST_F(HamiltonianContainerTest, CholeskyContainerUnrestrictedConstruction) {
+  // Create unrestricted orbitals
+  auto unrestricted_orbitals =
+      std::make_shared<ModelOrbitals>(2, model_spin_symmetry(false));
+
+  // Create different alpha and beta data
+  Eigen::MatrixXd one_body_alpha = Eigen::MatrixXd::Identity(2, 2);
+  Eigen::MatrixXd one_body_beta = Eigen::MatrixXd::Ones(2, 2);
+
+  Eigen::VectorXd two_body_aaaa = Eigen::VectorXd::Constant(16, 1.0);
+  Eigen::VectorXd two_body_aabb = Eigen::VectorXd::Constant(16, 2.0);
+  Eigen::VectorXd two_body_bbbb = Eigen::VectorXd::Constant(16, 3.0);
+
+  Eigen::MatrixXd inactive_fock_alpha = Eigen::MatrixXd::Constant(2, 2, 4.0);
+  Eigen::MatrixXd inactive_fock_beta = Eigen::MatrixXd::Constant(2, 2, 5.0);
+
+  // Create cholesky vectors
+  Eigen::MatrixXd L_mo_alpha = Eigen::MatrixXd::Random(4, 3);
+  Eigen::MatrixXd L_mo_beta = Eigen::MatrixXd::Random(4, 3);
+
+  // Test unrestricted constructor
+  Hamiltonian h(std::make_unique<CholeskyHamiltonianContainer>(
+      one_body_alpha, one_body_beta, L_mo_alpha, L_mo_beta,
+      unrestricted_orbitals, core_energy, inactive_fock_alpha,
+      inactive_fock_beta));
+
+  EXPECT_TRUE(h.has_one_body_integrals());
+  EXPECT_TRUE(h.has_two_body_integrals());
+  EXPECT_TRUE(h.has_orbitals());
+  EXPECT_EQ(h.get_container_type(), "three_center");
+  EXPECT_TRUE(h.is_unrestricted());
+}
+
+TEST_F(HamiltonianContainerTest, CholeskyContainerJSONSerialization) {
+  // Create test data
+  Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(2, 2);
+  Eigen::VectorXd two_body = 2 * Eigen::VectorXd::Ones(16);
+  auto orbitals = std::make_shared<ModelOrbitals>(2, model_spin_symmetry(true));
+  Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
+  Eigen::MatrixXd L_mo = Eigen::MatrixXd::Random(4, 3);
+  Eigen::MatrixXd L_ao = Eigen::MatrixXd::Random(4, 3);
+
+  Hamiltonian h(std::make_unique<CholeskyHamiltonianContainer>(
+      one_body, L_mo, orbitals, core_energy, inactive_fock, L_ao));
+
+  // Test JSON conversion
+  nlohmann::json j = h.to_json();
+
+  EXPECT_EQ(j["container"]["container_type"], "three_center");
+  EXPECT_EQ(j["container"]["core_energy"], 1.5);
+  EXPECT_TRUE(j["container"].contains("one_body_integrals"));
+  EXPECT_TRUE(j["container"].contains("three_center_integrals"));
+  EXPECT_TRUE(j["container"].contains("ao_cholesky_vectors"));
+
+  // Test deserialization
+  auto h_loaded = Hamiltonian::from_json(j);
+  EXPECT_TRUE(h_loaded->has_one_body_integrals());
+  EXPECT_TRUE(h_loaded->has_two_body_integrals());
+  EXPECT_EQ(h_loaded->get_container_type(), "three_center");
+  EXPECT_DOUBLE_EQ(h_loaded->get_core_energy(), 1.5);
+}
+
+TEST_F(HamiltonianContainerTest, CholeskyContainerHDF5Serialization) {
+  // Create test data
+  Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(2, 2);
+  Eigen::VectorXd two_body = 2 * Eigen::VectorXd::Ones(16);
+  auto orbitals = std::make_shared<ModelOrbitals>(2, model_spin_symmetry(true));
+  Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
+  Eigen::MatrixXd L_mo = Eigen::MatrixXd::Random(4, 3);
+
+  Hamiltonian h(std::make_unique<CholeskyHamiltonianContainer>(
+      one_body, L_mo, orbitals, core_energy, inactive_fock));
+
+  // Save to HDF5
+  std::string filename = "test.cholesky.hamiltonian.h5";
+  h.to_file(filename, "hdf5");
+
+  // Load from HDF5
+  auto h_loaded = Hamiltonian::from_file(filename, "hdf5");
+
+  EXPECT_TRUE(h_loaded->has_one_body_integrals());
+  EXPECT_TRUE(h_loaded->has_two_body_integrals());
+  EXPECT_EQ(h_loaded->get_container_type(), "three_center");
+  EXPECT_DOUBLE_EQ(h_loaded->get_core_energy(), 1.5);
+
+  // Clean up
+  std::filesystem::remove(filename);
+}
+
+TEST_F(HamiltonianContainerTest, CholeskyContainerClone) {
+  // Create test data
+  Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(2, 2);
+  Eigen::VectorXd two_body = 2 * Eigen::VectorXd::Ones(16);
+  auto orbitals = std::make_shared<ModelOrbitals>(2, model_spin_symmetry(true));
+  Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
+  Eigen::MatrixXd L_mo = Eigen::MatrixXd::Random(4, 3);
+
+  Hamiltonian h1(std::make_unique<CholeskyHamiltonianContainer>(
+      one_body, L_mo, orbitals, core_energy, inactive_fock));
+
+  // Test copy constructor (uses clone internally)
+  Hamiltonian h2(h1);
+
+  EXPECT_EQ(h2.get_container_type(), "three_center");
+  EXPECT_DOUBLE_EQ(h2.get_core_energy(), h1.get_core_energy());
+
+  auto [h1_one_alpha, h1_one_beta] = h1.get_one_body_integrals();
+  auto [h2_one_alpha, h2_one_beta] = h2.get_one_body_integrals();
+  EXPECT_TRUE(h1_one_alpha.isApprox(h2_one_alpha));
+}
+
+TEST_F(HamiltonianContainerTest, SparseContainerConstructionWithTwoBody) {
+  Eigen::SparseMatrix<double> sparse_one_body(2, 2);
+  sparse_one_body.insert(0, 0) = 1.0;
+  sparse_one_body.insert(0, 1) = 0.5;
+  sparse_one_body.insert(1, 0) = 0.5;
+  sparse_one_body.insert(1, 1) = 1.0;
+  sparse_one_body.makeCompressed();
+
+  SparseHamiltonianContainer::TwoBodyMap two_body_map;
+  two_body_map[{0, 0, 0, 0}] = 2.0;
+  two_body_map[{1, 1, 1, 1}] = 2.0;
+
+  Hamiltonian h(std::make_unique<SparseHamiltonianContainer>(
+      sparse_one_body, two_body_map, core_energy));
+
+  EXPECT_TRUE(h.has_one_body_integrals());
+  EXPECT_TRUE(h.has_two_body_integrals());
+  EXPECT_TRUE(h.has_orbitals());
+  EXPECT_EQ(h.get_orbitals()->get_num_molecular_orbitals(), 2);
+  EXPECT_DOUBLE_EQ(h.get_core_energy(), core_energy);
+  EXPECT_EQ(h.get_container_type(), "sparse");
+  EXPECT_TRUE(h.is_restricted());
+  EXPECT_FALSE(h.is_unrestricted());
+}
+
+TEST_F(HamiltonianContainerTest, SparseContainerConstructionOneBodyOnly) {
+  Eigen::SparseMatrix<double> sparse_one_body(2, 2);
+  sparse_one_body.insert(0, 0) = 1.0;
+  sparse_one_body.insert(0, 1) = 0.5;
+  sparse_one_body.insert(1, 0) = 0.5;
+  sparse_one_body.insert(1, 1) = 1.0;
+  sparse_one_body.makeCompressed();
+
+  Hamiltonian h(
+      std::make_unique<SparseHamiltonianContainer>(sparse_one_body, 0.0));
+
+  EXPECT_TRUE(h.has_one_body_integrals());
+  EXPECT_FALSE(h.has_two_body_integrals());
+  EXPECT_TRUE(h.is_restricted());
+  EXPECT_DOUBLE_EQ(h.get_core_energy(), 0.0);
+  EXPECT_EQ(h.get_container_type(), "sparse");
+}
+
+TEST_F(HamiltonianContainerTest, SparseContainerConstructionFromDense) {
+  Hamiltonian h(std::make_unique<SparseHamiltonianContainer>(one_body, two_body,
+                                                             core_energy));
+
+  EXPECT_TRUE(h.has_one_body_integrals());
+  EXPECT_TRUE(h.has_two_body_integrals());
+  EXPECT_TRUE(h.is_restricted());
+  EXPECT_DOUBLE_EQ(h.get_core_energy(), core_energy);
+  EXPECT_EQ(h.get_container_type(), "sparse");
+  EXPECT_EQ(h.get_orbitals()->get_num_molecular_orbitals(), 2);
+}
+
+TEST_F(HamiltonianContainerTest,
+       SparseContainerConstructionFromDenseOneBodyOnly) {
+  Hamiltonian h(
+      std::make_unique<SparseHamiltonianContainer>(one_body, core_energy));
+
+  EXPECT_TRUE(h.has_one_body_integrals());
+  EXPECT_FALSE(h.has_two_body_integrals());
+  EXPECT_TRUE(h.is_restricted());
+  EXPECT_DOUBLE_EQ(h.get_core_energy(), core_energy);
+  EXPECT_EQ(h.get_container_type(), "sparse");
+}
+
+TEST_F(HamiltonianContainerTest, SparseContainerClone) {
+  Hamiltonian h1(std::make_unique<SparseHamiltonianContainer>(
+      one_body, two_body, core_energy));
+
+  // Copy constructor uses clone() internally
+  Hamiltonian h2(h1);
+
+  EXPECT_EQ(h2.get_container_type(), "sparse");
+  EXPECT_DOUBLE_EQ(h2.get_core_energy(), h1.get_core_energy());
+
+  auto [h1_one_alpha, h1_one_beta2] = h1.get_one_body_integrals();
+  auto [h2_one_alpha2, h2_one_beta2] = h2.get_one_body_integrals();
+  EXPECT_TRUE(h1_one_alpha.isApprox(h2_one_alpha2));
+  EXPECT_TRUE(h1_one_beta2.isApprox(h2_one_beta2));
+
+  auto [h1_two_aaaa, h1_two_aabb, h1_two_bbbb] = h1.get_two_body_integrals();
+  auto [h2_two_aaaa, h2_two_aabb, h2_two_bbbb] = h2.get_two_body_integrals();
+  EXPECT_TRUE(h1_two_aaaa.isApprox(h2_two_aaaa));
+  // Restricted: all channels are the same
+  EXPECT_TRUE(h1_two_aabb.isApprox(h2_two_aabb));
+  EXPECT_TRUE(h1_two_bbbb.isApprox(h2_two_bbbb));
+}
+
+TEST_F(HamiltonianContainerTest, SparseContainerMoveConstructor) {
+  Hamiltonian h1(std::make_unique<SparseHamiltonianContainer>(
+      one_body, two_body, core_energy));
+  Hamiltonian h2(std::move(h1));
+
+  EXPECT_TRUE(h2.has_one_body_integrals());
+  EXPECT_TRUE(h2.has_two_body_integrals());
+  EXPECT_TRUE(h2.has_orbitals());
+  EXPECT_EQ(h2.get_orbitals()->get_num_molecular_orbitals(), 2);
+  EXPECT_DOUBLE_EQ(h2.get_core_energy(), core_energy);
+  EXPECT_EQ(h2.get_container_type(), "sparse");
+}
+
+TEST_F(HamiltonianContainerTest, SparseContainerTwoBodyElementAccess) {
+  SparseHamiltonianContainer::TwoBodyMap two_body_map;
+  two_body_map[{0, 0, 0, 0}] = 1.0;
+  two_body_map[{0, 0, 0, 1}] = 2.0;
+  two_body_map[{1, 1, 1, 1}] = 4.0;
+  two_body_map[{0, 1, 1, 0}] = 5.0;
+
+  Eigen::SparseMatrix<double> sp_one_body(2, 2);
+  sp_one_body.insert(0, 0) = 1.0;
+  sp_one_body.insert(1, 1) = 1.0;
+  sp_one_body.makeCompressed();
+
+  Hamiltonian h(std::make_unique<SparseHamiltonianContainer>(
+      sp_one_body, two_body_map, 0.0));
+
+  EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 0), 1.0);
+  EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 1), 2.0);
+  EXPECT_DOUBLE_EQ(h.get_two_body_element(1, 1, 1, 1), 4.0);
+  EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 1, 1, 0), 5.0);
+  // Non-stored entries return 0
+  EXPECT_DOUBLE_EQ(h.get_two_body_element(1, 0, 0, 0), 0.0);
+  EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 1, 0, 1), 0.0);
+}
+
+TEST_F(HamiltonianContainerTest, SparseContainerSparseAccessors) {
+  Eigen::SparseMatrix<double> sparse_one_body(2, 2);
+  sparse_one_body.insert(0, 0) = 1.0;
+  sparse_one_body.insert(0, 1) = 0.5;
+  sparse_one_body.insert(1, 0) = 0.5;
+  sparse_one_body.insert(1, 1) = 1.0;
+  sparse_one_body.makeCompressed();
+
+  SparseHamiltonianContainer::TwoBodyMap two_body_map;
+  two_body_map[{0, 0, 0, 0}] = 2.0;
+  two_body_map[{1, 1, 1, 1}] = 3.0;
+
+  auto container = std::make_unique<SparseHamiltonianContainer>(
+      sparse_one_body, two_body_map, core_energy);
+  const auto& ref = *container;
+
+  // sparse-specific accessors
+  EXPECT_DOUBLE_EQ(ref.one_body_element(0, 0), 1.0);
+  EXPECT_DOUBLE_EQ(ref.one_body_element(0, 1), 0.5);
+  EXPECT_DOUBLE_EQ(ref.one_body_element(1, 0), 0.5);
+  EXPECT_DOUBLE_EQ(ref.one_body_element(1, 1), 1.0);
+
+  const auto& h2_map = ref.sparse_two_body_integrals();
+  EXPECT_EQ(h2_map.size(), 2u);
+  EXPECT_DOUBLE_EQ(h2_map.at({0, 0, 0, 0}), 2.0);
+  EXPECT_DOUBLE_EQ(h2_map.at({1, 1, 1, 1}), 3.0);
+
+  const auto& h1_sp = ref.sparse_one_body_integrals();
+  EXPECT_EQ(h1_sp.nonZeros(), 4);
+}
+
+TEST_F(HamiltonianContainerTest, SparseContainerGetContainerTypedAccess) {
+  Hamiltonian h(std::make_unique<SparseHamiltonianContainer>(one_body, two_body,
+                                                             core_energy));
+
+  EXPECT_TRUE(h.has_container_type<SparseHamiltonianContainer>());
+  EXPECT_FALSE(h.has_container_type<CanonicalFourCenterHamiltonianContainer>());
+  EXPECT_FALSE(h.has_container_type<CholeskyHamiltonianContainer>());
+}
+
 TEST_F(HamiltonianConstructorTest, DensityFittedUnrestrictedO2) {
   // Run unrestricted O2 triplet with density-fitted
   auto [energy, hamiltonian] =
@@ -1889,6 +2298,505 @@ TEST_F(HamiltonianConstructorTest, DensityFittedUnrestrictedO2) {
         hamiltonian->get_container<ThreeCenterHamiltonianContainer>();
     EXPECT_EQ(container.get_container_type(), "three_center");
   });
+}
+
+TEST_F(HamiltonianContainerTest, SparseContainerJSONSerialization) {
+  Eigen::SparseMatrix<double> sparse_one_body(2, 2);
+  sparse_one_body.insert(0, 0) = 1.0;
+  sparse_one_body.insert(0, 1) = 0.5;
+  sparse_one_body.insert(1, 0) = 0.5;
+  sparse_one_body.insert(1, 1) = 1.0;
+  sparse_one_body.makeCompressed();
+
+  SparseHamiltonianContainer::TwoBodyMap two_body_map;
+  two_body_map[{0, 0, 0, 0}] = 2.0;
+  two_body_map[{1, 1, 1, 1}] = 3.0;
+
+  Hamiltonian h(std::make_unique<SparseHamiltonianContainer>(
+      sparse_one_body, two_body_map, core_energy));
+
+  nlohmann::json j = h.to_json();
+  EXPECT_EQ(j["container"]["container_type"], "sparse");
+  EXPECT_DOUBLE_EQ(j["container"]["core_energy"].get<double>(), core_energy);
+  EXPECT_TRUE(j["container"].contains("one_body_integrals_alpha_sparse"));
+  EXPECT_TRUE(j["container"].contains("two_body_integrals"));
+
+  // Round-trip
+  auto h_loaded = Hamiltonian::from_json(j);
+  EXPECT_EQ(h_loaded->get_container_type(), "sparse");
+  EXPECT_DOUBLE_EQ(h_loaded->get_core_energy(), core_energy);
+  EXPECT_TRUE(h_loaded->has_one_body_integrals());
+  EXPECT_TRUE(h_loaded->has_two_body_integrals());
+  EXPECT_TRUE(h_loaded->is_restricted());
+
+  // Verify integral round-trip
+  auto [h_one_alpha, h_one_beta] = h.get_one_body_integrals();
+  auto [hl_one_alpha, hl_one_beta] = h_loaded->get_one_body_integrals();
+  EXPECT_TRUE(h_one_alpha.isApprox(hl_one_alpha, testing::json_tolerance));
+  EXPECT_TRUE(h_one_beta.isApprox(hl_one_beta, testing::json_tolerance));
+
+  auto [h_two_aaaa, h_two_aabb, h_two_bbbb] = h.get_two_body_integrals();
+  auto [hl_two_aaaa, hl_two_aabb, hl_two_bbbb] =
+      h_loaded->get_two_body_integrals();
+  EXPECT_TRUE(h_two_aaaa.isApprox(hl_two_aaaa, testing::json_tolerance));
+}
+
+TEST_F(HamiltonianContainerTest, SparseContainerJSONSerializationOneBodyOnly) {
+  Hamiltonian h(
+      std::make_unique<SparseHamiltonianContainer>(one_body, core_energy));
+
+  nlohmann::json j = h.to_json();
+  EXPECT_EQ(j["container"]["container_type"], "sparse");
+  EXPECT_FALSE(j["container"].contains("two_body_integrals"));
+
+  auto h_loaded = Hamiltonian::from_json(j);
+  EXPECT_EQ(h_loaded->get_container_type(), "sparse");
+  EXPECT_FALSE(h_loaded->has_two_body_integrals());
+  EXPECT_TRUE(h_loaded->has_one_body_integrals());
+}
+
+TEST_F(HamiltonianContainerTest, SparseContainerHDF5Serialization) {
+  Eigen::SparseMatrix<double> sparse_one_body(2, 2);
+  sparse_one_body.insert(0, 0) = 1.0;
+  sparse_one_body.insert(0, 1) = 0.5;
+  sparse_one_body.insert(1, 0) = 0.5;
+  sparse_one_body.insert(1, 1) = 1.0;
+  sparse_one_body.makeCompressed();
+
+  SparseHamiltonianContainer::TwoBodyMap two_body_map;
+  two_body_map[{0, 0, 0, 0}] = 2.0;
+  two_body_map[{1, 1, 1, 1}] = 3.0;
+
+  Hamiltonian h(std::make_unique<SparseHamiltonianContainer>(
+      sparse_one_body, two_body_map, core_energy));
+
+  std::string filename = "test.sparse.hamiltonian.h5";
+  h.to_hdf5_file(filename);
+  EXPECT_TRUE(std::filesystem::exists(filename));
+
+  auto h_loaded = Hamiltonian::from_hdf5_file(filename);
+  EXPECT_EQ(h_loaded->get_container_type(), "sparse");
+  EXPECT_DOUBLE_EQ(h_loaded->get_core_energy(), core_energy);
+  EXPECT_TRUE(h_loaded->has_one_body_integrals());
+  EXPECT_TRUE(h_loaded->has_two_body_integrals());
+  EXPECT_TRUE(h_loaded->is_restricted());
+
+  // Verify integral round-trip
+  auto [h_one_alpha, h_one_beta] = h.get_one_body_integrals();
+  auto [hl_one_alpha, hl_one_beta] = h_loaded->get_one_body_integrals();
+  EXPECT_TRUE(h_one_alpha.isApprox(hl_one_alpha, testing::hdf5_tolerance));
+
+  auto [h_two_aaaa, h_two_aabb, h_two_bbbb] = h.get_two_body_integrals();
+  auto [hl_two_aaaa, hl_two_aabb, hl_two_bbbb] =
+      h_loaded->get_two_body_integrals();
+  EXPECT_TRUE(h_two_aaaa.isApprox(hl_two_aaaa, testing::hdf5_tolerance));
+
+  std::filesystem::remove(filename);
+}
+
+TEST_F(HamiltonianContainerTest, SparseContainerFCIDUMP) {
+  Eigen::SparseMatrix<double> sparse_one_body(2, 2);
+  sparse_one_body.insert(0, 0) = 1.0;
+  sparse_one_body.insert(0, 1) = 0.5;
+  sparse_one_body.insert(1, 0) = 0.5;
+  sparse_one_body.insert(1, 1) = 1.0;
+  sparse_one_body.makeCompressed();
+
+  SparseHamiltonianContainer::TwoBodyMap two_body_map;
+  two_body_map[{0, 0, 0, 0}] = 2.0;
+  two_body_map[{1, 1, 1, 1}] = 3.0;
+
+  Hamiltonian h(std::make_unique<SparseHamiltonianContainer>(
+      sparse_one_body, two_body_map, core_energy));
+
+  std::string filename = "test.sparse.hamiltonian.fcidump";
+  EXPECT_NO_THROW(h.to_fcidump_file(filename, 1, 1));
+
+  // Scope the stream so it closes before remove() (Windows file lock).
+  {
+    std::ifstream file(filename);
+    EXPECT_TRUE(file.is_open());
+
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string fcidump_content = buffer.str();
+
+    // Two-body integrals from sparse map (sorted by key: (0,0,0,0) then
+    // (1,1,1,1)), one-body lower triangle in column-major order, then core
+    // energy.
+    const std::string reference_fcidump_contents =
+        "&FCI NORB=2, NELEC=2, MS2=0,\n"
+        "ORBSYM=1,1,\n"
+        "ISYM=1,\n"
+        "&END\n"
+        "      2.0000000000000000e+00    1    1    1    1\n"
+        "      3.0000000000000000e+00    2    2    2    2\n"
+        "      1.0000000000000000e+00    1    1    0    0\n"
+        "      5.0000000000000000e-01    2    1    0    0\n"
+        "      1.0000000000000000e+00    2    2    0    0\n"
+        "      1.5000000000000000e+00    0    0    0    0\n";
+
+    EXPECT_EQ(fcidump_content, reference_fcidump_contents);
+  }
+
+  std::filesystem::remove(filename);
+}
+
+TEST_F(HamiltonianContainerTest, SparseContainerIsValid) {
+  // Valid container with two-body
+  auto c1 = std::make_unique<SparseHamiltonianContainer>(one_body, two_body,
+                                                         core_energy);
+  EXPECT_TRUE(c1->is_valid());
+
+  // One-body only is also valid
+  auto c2 = std::make_unique<SparseHamiltonianContainer>(one_body, core_energy);
+  EXPECT_TRUE(c2->is_valid());
+}
+
+TEST_F(HamiltonianContainerTest, UnrestrictedConstructor) {
+  // Create unrestricted orbitals for this test
+  auto unrestricted_orbitals =
+      std::make_shared<ModelOrbitals>(2, model_spin_symmetry(false));
+
+  // Create different alpha and beta matrices to test unrestricted
+  // functionality
+  Eigen::MatrixXd one_body_alpha = Eigen::MatrixXd::Random(2, 2);
+  Eigen::MatrixXd one_body_beta = Eigen::MatrixXd::Random(2, 2);
+
+  Eigen::VectorXd two_body_aaaa = Eigen::VectorXd::Random(16);
+  Eigen::VectorXd two_body_aabb = Eigen::VectorXd::Random(16);
+  Eigen::VectorXd two_body_bbbb = Eigen::VectorXd::Random(16);
+
+  Eigen::MatrixXd inactive_fock_alpha = Eigen::MatrixXd::Random(2, 2);
+  Eigen::MatrixXd inactive_fock_beta = Eigen::MatrixXd::Random(2, 2);
+
+  Hamiltonian h_unrestricted(
+      std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+          one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
+          two_body_bbbb, unrestricted_orbitals, core_energy,
+          inactive_fock_alpha, inactive_fock_beta));
+
+  // Verify the unrestricted Hamiltonian was created successfully
+  EXPECT_TRUE(h_unrestricted.has_one_body_integrals());
+  EXPECT_TRUE(h_unrestricted.has_two_body_integrals());
+  EXPECT_TRUE(h_unrestricted.has_orbitals());
+  EXPECT_TRUE(h_unrestricted.has_inactive_fock_matrix());
+  EXPECT_EQ(h_unrestricted.get_core_energy(), core_energy);
+  EXPECT_FALSE(h_unrestricted.is_restricted());
+  EXPECT_TRUE(h_unrestricted.is_unrestricted());
+}
+
+TEST_F(HamiltonianContainerTest, UnrestrictedAccessorMethods) {
+  // Create unrestricted orbitals for this test
+  auto unrestricted_orbitals =
+      std::make_shared<ModelOrbitals>(2, model_spin_symmetry(false));
+
+  // Create different alpha and beta data
+  Eigen::MatrixXd one_body_alpha = Eigen::MatrixXd::Identity(2, 2);
+  Eigen::MatrixXd one_body_beta = Eigen::MatrixXd::Ones(2, 2);
+
+  Eigen::VectorXd two_body_aaaa = Eigen::VectorXd::Constant(16, 1.0);
+  Eigen::VectorXd two_body_aabb = Eigen::VectorXd::Constant(16, 2.0);
+  Eigen::VectorXd two_body_bbbb = Eigen::VectorXd::Constant(16, 3.0);
+
+  Eigen::MatrixXd inactive_fock_alpha = Eigen::MatrixXd::Constant(2, 2, 4.0);
+  Eigen::MatrixXd inactive_fock_beta = Eigen::MatrixXd::Constant(2, 2, 5.0);
+
+  Hamiltonian h(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+      one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
+      two_body_bbbb, unrestricted_orbitals, core_energy, inactive_fock_alpha,
+      inactive_fock_beta));
+
+  // Test alpha/beta one-body integral access
+  auto [h_one_alpha, h_one_beta] = h.get_one_body_integrals();
+  EXPECT_TRUE(h_one_alpha.isApprox(one_body_alpha));
+  EXPECT_TRUE(h_one_beta.isApprox(one_body_beta));
+
+  // Test tuple access for two-body integrals
+  auto [aaaa, aabb, bbbb] = h.get_two_body_integrals();
+  EXPECT_TRUE(aaaa.isApprox(two_body_aaaa));
+  EXPECT_TRUE(aabb.isApprox(two_body_aabb));
+  EXPECT_TRUE(bbbb.isApprox(two_body_bbbb));
+  // Test alpha/beta inactive Fock matrix access
+  auto fock_matrices = h.get_inactive_fock_matrix();
+  EXPECT_TRUE(fock_matrices.first.isApprox(inactive_fock_alpha));
+  EXPECT_TRUE(fock_matrices.second.isApprox(inactive_fock_beta));
+}
+
+TEST_F(HamiltonianContainerTest, RestrictedVsUnrestrictedDetection) {
+  // Create restricted Hamiltonian using the first constructor
+  Hamiltonian h_restricted(
+      std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+          one_body, two_body, orbitals, core_energy, inactive_fock));
+
+  // Create unrestricted orbitals for the unrestricted test
+  auto unrestricted_orbitals =
+      std::make_shared<ModelOrbitals>(2, model_spin_symmetry(false));
+
+  // Create unrestricted Hamiltonian with different alpha/beta data
+  Eigen::MatrixXd one_body_alpha = Eigen::MatrixXd::Identity(2, 2);
+  Eigen::MatrixXd one_body_beta = Eigen::MatrixXd::Ones(2, 2);
+  Eigen::VectorXd two_body_aaaa = Eigen::VectorXd::Constant(16, 1.0);
+  Eigen::VectorXd two_body_aabb = Eigen::VectorXd::Constant(16, 2.0);
+  Eigen::VectorXd two_body_bbbb = Eigen::VectorXd::Constant(16, 3.0);
+  Eigen::MatrixXd inactive_fock_alpha = Eigen::MatrixXd::Identity(2, 2);
+  Eigen::MatrixXd inactive_fock_beta = Eigen::MatrixXd::Ones(2, 2);
+
+  Hamiltonian h_unrestricted(
+      std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+          one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
+          two_body_bbbb, unrestricted_orbitals, core_energy,
+          inactive_fock_alpha, inactive_fock_beta));
+
+  // Test restricted detection
+  EXPECT_TRUE(h_restricted.is_restricted());
+  EXPECT_FALSE(h_restricted.is_unrestricted());
+
+  // Test unrestricted detection
+  EXPECT_FALSE(h_unrestricted.is_restricted());
+  EXPECT_TRUE(h_unrestricted.is_unrestricted());
+}
+
+TEST_F(HamiltonianContainerTest, UnrestrictedSpinChannelAccess) {
+  // Create unrestricted orbitals for this test
+  auto unrestricted_orbitals =
+      std::make_shared<ModelOrbitals>(2, model_spin_symmetry(false));
+
+  // Create unrestricted Hamiltonian with specific two-body integral values
+  Eigen::MatrixXd one_body_alpha = Eigen::MatrixXd::Identity(2, 2);
+  Eigen::MatrixXd one_body_beta = Eigen::MatrixXd::Identity(2, 2);
+
+  Eigen::VectorXd two_body_aaaa = Eigen::VectorXd::Zero(16);
+  Eigen::VectorXd two_body_aabb = Eigen::VectorXd::Zero(16);
+  Eigen::VectorXd two_body_bbbb = Eigen::VectorXd::Zero(16);
+
+  // Set specific values for each spin channel
+  two_body_aaaa[0] = 1.0;   // (0,0,0,0) in aaaa channel
+  two_body_aabb[5] = 2.0;   // (0,1,0,1) in aabb channel
+  two_body_bbbb[15] = 3.0;  // (1,1,1,1) in bbbb channel
+
+  Eigen::MatrixXd empty_fock = Eigen::MatrixXd::Zero(0, 0);
+
+  Hamiltonian h(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+      one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
+      two_body_bbbb, unrestricted_orbitals, core_energy, empty_fock,
+      empty_fock));
+
+  // Test accessing elements through different spin channels
+  EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 0, SpinChannel::aaaa), 1.0);
+  EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 1, 0, 1, SpinChannel::aabb), 2.0);
+  EXPECT_DOUBLE_EQ(h.get_two_body_element(1, 1, 1, 1, SpinChannel::bbbb), 3.0);
+
+  // Verify other elements are zero
+  EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 0, SpinChannel::aabb), 0.0);
+  EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 0, SpinChannel::bbbb), 0.0);
+}
+
+TEST_F(HamiltonianContainerTest, UnrestrictedJSONSerialization) {
+  // Create unrestricted orbitals for this test
+  auto unrestricted_orbitals =
+      std::make_shared<ModelOrbitals>(2, model_spin_symmetry(false));
+
+  // Create unrestricted Hamiltonian
+  Eigen::MatrixXd one_body_alpha = Eigen::MatrixXd::Random(2, 2);
+  Eigen::MatrixXd one_body_beta = Eigen::MatrixXd::Random(2, 2);
+  Eigen::VectorXd two_body_aaaa = Eigen::VectorXd::Random(16);
+  Eigen::VectorXd two_body_aabb = Eigen::VectorXd::Random(16);
+  Eigen::VectorXd two_body_bbbb = Eigen::VectorXd::Random(16);
+  Eigen::MatrixXd inactive_fock_alpha = Eigen::MatrixXd::Random(2, 2);
+  Eigen::MatrixXd inactive_fock_beta = Eigen::MatrixXd::Random(2, 2);
+
+  Hamiltonian h_orig(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+      one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
+      two_body_bbbb, unrestricted_orbitals, core_energy, inactive_fock_alpha,
+      inactive_fock_beta));
+
+  // Test JSON serialization round-trip
+  nlohmann::json j = h_orig.to_json();
+  auto h_loaded = Hamiltonian::from_json(j);
+
+  // Verify the loaded Hamiltonian matches the original
+  EXPECT_EQ(h_loaded->get_core_energy(), core_energy);
+  EXPECT_FALSE(h_loaded->is_restricted());
+  EXPECT_TRUE(h_loaded->is_unrestricted());
+
+  auto [orig_one_alpha, orig_one_beta] = h_orig.get_one_body_integrals();
+  auto [loaded_one_alpha, loaded_one_beta] = h_loaded->get_one_body_integrals();
+  EXPECT_TRUE(orig_one_alpha.isApprox(loaded_one_alpha));
+  EXPECT_TRUE(orig_one_beta.isApprox(loaded_one_beta));
+
+  auto [orig_two_aaaa, orig_two_aabb, orig_two_bbbb] =
+      h_orig.get_two_body_integrals();
+  auto [loaded_two_aaaa, loaded_two_aabb, loaded_two_bbbb] =
+      h_loaded->get_two_body_integrals();
+  EXPECT_TRUE(orig_two_aaaa.isApprox(loaded_two_aaaa));
+  EXPECT_TRUE(orig_two_aabb.isApprox(loaded_two_aabb));
+  EXPECT_TRUE(orig_two_bbbb.isApprox(loaded_two_bbbb));
+
+  auto [h_orig_alpha, h_orig_beta] = h_orig.get_inactive_fock_matrix();
+  auto [h_loaded_alpha, h_loaded_beta] = h_loaded->get_inactive_fock_matrix();
+  EXPECT_TRUE(h_orig_alpha.isApprox(h_loaded_alpha));
+  EXPECT_TRUE(h_orig_beta.isApprox(h_loaded_beta));
+}
+
+TEST_F(HamiltonianContainerTest, UnrestrictedHDF5Serialization) {
+  // Create unrestricted orbitals for this test
+  auto unrestricted_orbitals =
+      std::make_shared<ModelOrbitals>(2, model_spin_symmetry(false));
+
+  // Create unrestricted Hamiltonian
+  Eigen::MatrixXd one_body_alpha = Eigen::MatrixXd::Random(2, 2);
+  Eigen::MatrixXd one_body_beta = Eigen::MatrixXd::Random(2, 2);
+  Eigen::VectorXd two_body_aaaa = Eigen::VectorXd::Random(16);
+  Eigen::VectorXd two_body_aabb = Eigen::VectorXd::Random(16);
+  Eigen::VectorXd two_body_bbbb = Eigen::VectorXd::Random(16);
+  Eigen::MatrixXd inactive_fock_alpha = Eigen::MatrixXd::Random(2, 2);
+  Eigen::MatrixXd inactive_fock_beta = Eigen::MatrixXd::Random(2, 2);
+
+  Hamiltonian h_orig(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+      one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
+      two_body_bbbb, unrestricted_orbitals, core_energy, inactive_fock_alpha,
+      inactive_fock_beta));
+
+  // Test HDF5 serialization round-trip
+  std::string filename = "test_unrestricted.hamiltonian.h5";
+  h_orig.to_hdf5_file(filename);
+
+  auto h_loaded = Hamiltonian::from_hdf5_file(filename);
+
+  // Verify the loaded Hamiltonian matches the original
+  EXPECT_EQ(h_loaded->get_core_energy(), core_energy);
+  EXPECT_FALSE(h_loaded->is_restricted());
+  EXPECT_TRUE(h_loaded->is_unrestricted());
+
+  auto [orig_one_alpha, orig_one_beta] = h_orig.get_one_body_integrals();
+  auto [loaded_one_alpha, loaded_one_beta] = h_loaded->get_one_body_integrals();
+  EXPECT_TRUE(orig_one_alpha.isApprox(loaded_one_alpha));
+  EXPECT_TRUE(orig_one_beta.isApprox(loaded_one_beta));
+
+  auto [orig_two_aaaa, orig_two_aabb, orig_two_bbbb] =
+      h_orig.get_two_body_integrals();
+  auto [loaded_two_aaaa, loaded_two_aabb, loaded_two_bbbb] =
+      h_loaded->get_two_body_integrals();
+  EXPECT_TRUE(orig_two_aaaa.isApprox(loaded_two_aaaa));
+  EXPECT_TRUE(orig_two_aabb.isApprox(loaded_two_aabb));
+  EXPECT_TRUE(orig_two_bbbb.isApprox(loaded_two_bbbb));
+
+  auto [h_orig_alpha, h_orig_beta] = h_orig.get_inactive_fock_matrix();
+  auto [h_loaded_alpha, h_loaded_beta] = h_loaded->get_inactive_fock_matrix();
+  EXPECT_TRUE(h_orig_alpha.isApprox(h_loaded_alpha));
+  EXPECT_TRUE(h_orig_beta.isApprox(h_loaded_beta));
+}
+
+TEST_F(HamiltonianContainerTest, FCIDUMPSerialization) {
+  Hamiltonian h(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+      one_body, two_body, orbitals, core_energy, inactive_fock));
+
+  // Test FCIDUMP serialization
+  h.to_fcidump_file("test.hamiltonian.fcidump", 1, 1);
+
+  std::ifstream file("test.hamiltonian.fcidump");
+  EXPECT_TRUE(file.is_open());
+
+  std::stringstream buffer;
+  buffer << file.rdbuf();
+  std::string fcidump_content = buffer.str();
+
+  // Check that the file matches the reference
+  const std::string reference_fcidump_contents =
+      "&FCI NORB=2, NELEC=2, MS2=0,\n"
+      "ORBSYM=1,1,\n"
+      "ISYM=1,\n"
+      "&END\n"
+      "      2.0000000000000000e+00    1    1    1    1\n"
+      "      2.0000000000000000e+00    1    1    1    2\n"
+      "      2.0000000000000000e+00    1    1    2    2\n"
+      "      2.0000000000000000e+00    1    2    1    2\n"
+      "      2.0000000000000000e+00    1    2    2    2\n"
+      "      2.0000000000000000e+00    2    2    2    2\n"
+      "      1.0000000000000000e+00    1    1    0    0\n"
+      "      5.0000000000000000e-01    2    1    0    0\n"
+      "      1.0000000000000000e+00    2    2    0    0\n"
+      "      1.5000000000000000e+00    0    0    0    0";
+
+  EXPECT_TRUE(fcidump_content == reference_fcidump_contents);
+}
+
+TEST_F(HamiltonianContainerTest, FCIDUMPSerializationUnrestrictedThrowsError) {
+  // Create unrestricted orbitals for this test
+  auto unrestricted_orbitals =
+      std::make_shared<ModelOrbitals>(2, model_spin_symmetry(false));
+
+  // Create different alpha and beta matrices
+  Eigen::MatrixXd one_body_alpha = Eigen::MatrixXd::Identity(2, 2);
+  Eigen::MatrixXd one_body_beta = Eigen::MatrixXd::Ones(2, 2);
+
+  Eigen::VectorXd two_body_aaaa = Eigen::VectorXd::Ones(16);
+  Eigen::VectorXd two_body_aabb = 2 * Eigen::VectorXd::Ones(16);
+  Eigen::VectorXd two_body_bbbb = 3 * Eigen::VectorXd::Ones(16);
+
+  Eigen::MatrixXd empty_fock = Eigen::MatrixXd::Zero(0, 0);
+
+  // Create unrestricted Hamiltonian
+  Hamiltonian h_unrestricted(
+      std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+          one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
+          two_body_bbbb, unrestricted_orbitals, core_energy, empty_fock,
+          empty_fock));
+
+  // Verify it's actually unrestricted
+  EXPECT_TRUE(h_unrestricted.is_unrestricted());
+  EXPECT_FALSE(h_unrestricted.is_restricted());
+
+  // Test that FCIDUMP serialization throws an error for unrestricted case
+  EXPECT_THROW(h_unrestricted.to_fcidump_file(
+                   "test_unrestricted.hamiltonian.fcidump", 1, 1),
+               std::runtime_error);
+}
+
+TEST_F(HamiltonianContainerTest, FCIDUMPActiveSpaceConsistency) {
+  // Test that FCIDUMP correctly handles the active space indices properly
+  // Create orbitals with a specific active space setup
+  std::vector<size_t> active_indices = {0,
+                                        1};    // Use first 2 orbitals as active
+  std::vector<size_t> inactive_indices = {2};  // Third orbital is inactive
+
+  auto orbitals_with_active_space =
+      std::make_shared<ModelOrbitals>(trivial_index_set(3, active_indices),
+                                      trivial_index_set(3, inactive_indices));
+
+  // Create 2x2 matrices for the active space
+  Eigen::MatrixXd one_body_2x2 = Eigen::MatrixXd::Identity(2, 2);
+  one_body_2x2(0, 1) = 0.5;
+  one_body_2x2(1, 0) = 0.5;
+
+  Eigen::VectorXd two_body_2x2 = 2 * Eigen::VectorXd::Ones(16);  // 2^4 = 16
+
+  // Create appropriate inactive Fock matrix for the inactive space, size must
+  // match total number of orbitals (3x3) (see orbitals_with_active_space).
+  Eigen::MatrixXd inactive_fock_3x3 = Eigen::MatrixXd::Zero(3, 3);
+
+  Hamiltonian h_active_space(
+      std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+          one_body_2x2, two_body_2x2, orbitals_with_active_space, core_energy,
+          inactive_fock_3x3));
+
+  // Should successfully write FCIDUMP using active space dimensions
+  EXPECT_NO_THROW(h_active_space.to_fcidump_file(
+      "test_active_space.hamiltonian.fcidump", 1, 1));
+
+  // Verify file was created and has correct NORB (should be 2, not 3).
+  {
+    std::ifstream file("test_active_space.hamiltonian.fcidump");
+    EXPECT_TRUE(file.is_open());
+
+    std::string first_line;
+    std::getline(file, first_line);
+    EXPECT_TRUE(first_line.find("NORB=2") != std::string::npos);
+  }
+
+  // Clean up
+  std::filesystem::remove("test_active_space.hamiltonian.fcidump");
 }
 
 TEST_F(HamiltonianConstructorTest, UnrestrictedOneSpinEmpty) {
@@ -1922,7 +2830,7 @@ TEST_F(HamiltonianConstructorTest, UnrestrictedOneSpinEmpty) {
 
   // Also test with cholesky path
   auto ham_cholesky = HamiltonianConstructorFactory::create("qdk_cholesky");
-  ham_cholesky->settings().set("store_ao_three_center_vectors", true);
+  ham_cholesky->settings().set("store_ao_cholesky_vectors", true);
   auto hamiltonian_chol = ham_cholesky->run(uhf_orbitals);
 
   EXPECT_TRUE(hamiltonian_chol->has_one_body_integrals());
@@ -1947,6 +2855,7 @@ class ForceUnrestrictedOrbitals : public Orbitals {
   void set_active_space(const std::vector<size_t>& alpha_active,
                         const std::vector<size_t>& beta_active) {
     _active_space_indices = {alpha_active, beta_active};
+    _build_space_index_sets();
   }
 };
 
@@ -1988,8 +2897,14 @@ TEST_F(HamiltonianIntegrationTest, IntegralSymmetriesEnergiesO2Singlet) {
 
   // Create unrestricted orbitals from restricted ones
   // Get restricted coefficients and energies
-  auto [rhf_coeffs_alpha, rhf_coeffs_beta] = rhf_orbitals->get_coefficients();
-  auto [rhf_energies_alpha, rhf_energies_beta] = rhf_orbitals->get_energies();
+  const auto& rhf_coeffs_alpha =
+      rhf_orbitals->coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& rhf_coeffs_beta =
+      rhf_orbitals->coefficients()->block({axes::beta(), axes::beta()});
+  const auto& rhf_energies_alpha =
+      rhf_orbitals->energies()->block({axes::alpha()});
+  const auto& rhf_energies_beta =
+      rhf_orbitals->energies()->block({axes::beta()});
 
   // For closed shell: alpha = beta coefficients and energies
   // Create unrestricted orbitals with same alpha/beta data but force
@@ -2000,7 +2915,10 @@ TEST_F(HamiltonianIntegrationTest, IntegralSymmetriesEnergiesO2Singlet) {
 
   // Set active space if it exists in original orbitals
   if (rhf_orbitals->has_active_space()) {
-    auto [alpha_active, beta_active] = rhf_orbitals->get_active_space_indices();
+    auto alpha_active =
+        spin_channel_indices(rhf_orbitals->active_indices(), axes::alpha());
+    auto beta_active =
+        spin_channel_indices(rhf_orbitals->active_indices(), axes::beta());
     unrestricted_orbitals->set_active_space(alpha_active, beta_active);
   }
 
@@ -2011,12 +2929,12 @@ TEST_F(HamiltonianIntegrationTest, IntegralSymmetriesEnergiesO2Singlet) {
   // Need to create a UHF wavefunction with the unrestricted orbitals
   // Get the determinant from the RHF wavefunction
   const auto& rhf_sd_container =
-      rhf_wavefunction->get_container<SlaterDeterminantContainer>();
+      rhf_wavefunction->get_container<StateVectorContainer>();
   const auto& rhf_determinants = rhf_sd_container.get_active_determinants();
 
-  // Create a new SlaterDeterminantContainer with the same determinant but
+  // Create a new StateVectorContainer with the same determinant but
   // unrestricted orbitals
-  auto uhf_container = std::make_unique<SlaterDeterminantContainer>(
+  auto uhf_container = std::make_unique<StateVectorContainer>(
       rhf_determinants[0], unrestricted_orbitals);
   auto uhf_wavefunction =
       std::make_shared<Wavefunction>(std::move(uhf_container));
@@ -2089,8 +3007,10 @@ TEST_F(HamiltonianIntegrationTest, IntegralSymmetriesEnergiesO2Singlet) {
   // Verify aabb == bbaa symmetry
   // Get active space size to determine integral tensor dimensions
   size_t active_space_size;
-  auto [alpha_active, beta_active] =
-      unrestricted_orbitals->get_active_space_indices();
+  auto alpha_active = spin_channel_indices(
+      unrestricted_orbitals->active_indices(), axes::alpha());
+  auto beta_active = spin_channel_indices(
+      unrestricted_orbitals->active_indices(), axes::beta());
   active_space_size = alpha_active.size();
 
   // Test aabb[i,j,k,l] == aabb[k,l,i,j] (particle exchange symmetry)
@@ -2145,7 +3065,10 @@ TEST_F(HamiltonianIntegrationTest, MixedIntegralSymmetriesO2Triplet) {
       uhf_hamiltonian->get_two_body_integrals();
 
   // Get active space size
-  auto [alpha_active, beta_active] = orbitals->get_active_space_indices();
+  auto alpha_active =
+      spin_channel_indices(orbitals->active_indices(), axes::alpha());
+  auto beta_active =
+      spin_channel_indices(orbitals->active_indices(), axes::beta());
   size_t active_space_size = alpha_active.size();
 
   auto get_index = [active_space_size](size_t i, size_t j, size_t k,
@@ -2423,7 +3346,7 @@ TEST(HamiltonianContainerTypeTest, ContainerTypePreservedThroughSerialization) {
   Eigen::MatrixXd three_center = (Eigen::MatrixXd(4, 3) << 1.0, 0.6, 0.8, 1.0,
                                   0.6, 0.8, 1.0, 0.6, 0.8, 1.0, 0.6, 0.8)
                                      .finished();
-  auto orbitals = std::make_shared<ModelOrbitals>(2, true);
+  auto orbitals = std::make_shared<ModelOrbitals>(2, model_spin_symmetry(true));
   Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
 
   // Create canonical Hamiltonian
@@ -2491,8 +3414,8 @@ TEST_F(CholeskyTest, N2_Restricted_Comparison) {
   auto orbitals_scf = wavefunction->get_orbitals();
 
   // Create new Orbitals with active space
-  auto coeffs = orbitals_scf->get_coefficients();
-  auto energies = orbitals_scf->get_energies();
+  auto coeffs = orbitals_scf->coefficients();
+  auto energies = orbitals_scf->energies();
   auto overlap = orbitals_scf->get_overlap_matrix();
   auto basis = orbitals_scf->get_basis_set();
 
@@ -2601,10 +3524,13 @@ TEST_F(CholeskyTest, N2_Restricted_Comparison) {
     std::vector<size_t> active_alpha = {2, 3, 5, 6, 7, 9};
     std::vector<size_t> inactive_alpha = {0, 1, 4};
     auto orbitals = std::make_shared<Orbitals>(
-        full_orbitals->get_coefficients().first,
-        full_orbitals->get_energies().first,
+        full_orbitals->coefficients()->block({axes::alpha(), axes::alpha()}),
+        full_orbitals->energies()->block({axes::alpha()}),
         full_orbitals->get_overlap_matrix(), full_orbitals->get_basis_set(),
-        std::make_tuple(active_alpha, inactive_alpha));
+        testing::restricted_index_set(
+            full_orbitals->get_num_molecular_orbitals(), active_alpha),
+        testing::restricted_index_set(
+            full_orbitals->get_num_molecular_orbitals(), inactive_alpha));
 
     // 3. Run Hamiltonian with Incore (Exact)
     auto ham_incore_factory = HamiltonianConstructorFactory::create("qdk");
@@ -2668,8 +3594,8 @@ TEST_F(CholeskyTest, O2_Unrestricted_Comparison) {
   auto orbitals_scf = wavefunction->get_orbitals();
 
   // Create new Orbitals with active space
-  auto coeffs = orbitals_scf->get_coefficients();
-  auto energies = orbitals_scf->get_energies();
+  auto coeffs = orbitals_scf->coefficients();
+  auto energies = orbitals_scf->energies();
   auto overlap = orbitals_scf->get_overlap_matrix();
   auto basis = orbitals_scf->get_basis_set();
 
@@ -2721,13 +3647,17 @@ TEST_F(CholeskyTest, O2_Unrestricted_Comparison) {
     std::vector<size_t> active_beta = {2, 3, 4, 5, 6, 7, 8, 9};
     std::vector<size_t> inactive_beta = {0, 1};
     auto orbitals = std::make_shared<Orbitals>(
-        full_orbitals->get_coefficients().first,
-        full_orbitals->get_coefficients().second,
-        full_orbitals->get_energies().first,
-        full_orbitals->get_energies().second,
+        full_orbitals->coefficients()->block({axes::alpha(), axes::alpha()}),
+        full_orbitals->coefficients()->block({axes::beta(), axes::beta()}),
+        full_orbitals->energies()->block({axes::alpha()}),
+        full_orbitals->energies()->block({axes::beta()}),
         full_orbitals->get_overlap_matrix(), full_orbitals->get_basis_set(),
-        std::make_tuple(active_alpha, active_beta, inactive_alpha,
-                        inactive_beta));
+        testing::unrestricted_index_set(
+            full_orbitals->get_num_molecular_orbitals(), active_alpha,
+            active_beta),
+        testing::unrestricted_index_set(
+            full_orbitals->get_num_molecular_orbitals(), inactive_alpha,
+            inactive_beta));
 
     // 3. Run Hamiltonian with Incore (Exact)
     auto ham_incore_factory = HamiltonianConstructorFactory::create("qdk");
@@ -2783,13 +3713,17 @@ TEST_F(CholeskyTest, O2_Unrestricted_Comparison) {
     std::vector<size_t> active_beta = {2, 3, 5, 6, 7, 9};
     std::vector<size_t> inactive_beta = {0, 1, 4};
     auto orbitals = std::make_shared<Orbitals>(
-        full_orbitals->get_coefficients().first,
-        full_orbitals->get_coefficients().second,
-        full_orbitals->get_energies().first,
-        full_orbitals->get_energies().second,
+        full_orbitals->coefficients()->block({axes::alpha(), axes::alpha()}),
+        full_orbitals->coefficients()->block({axes::beta(), axes::beta()}),
+        full_orbitals->energies()->block({axes::alpha()}),
+        full_orbitals->energies()->block({axes::beta()}),
         full_orbitals->get_overlap_matrix(), full_orbitals->get_basis_set(),
-        std::make_tuple(active_alpha, active_beta, inactive_alpha,
-                        inactive_beta));
+        testing::unrestricted_index_set(
+            full_orbitals->get_num_molecular_orbitals(), active_alpha,
+            active_beta),
+        testing::unrestricted_index_set(
+            full_orbitals->get_num_molecular_orbitals(), inactive_alpha,
+            inactive_beta));
 
     // 3. Run Hamiltonian with Incore (Exact)
     auto ham_incore_factory = HamiltonianConstructorFactory::create("qdk");

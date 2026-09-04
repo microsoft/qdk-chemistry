@@ -8,7 +8,7 @@
 import numpy as np
 import pytest
 
-from qdk_chemistry.data import Hamiltonian, LatticeGraph, QubitHamiltonian
+from qdk_chemistry.data import Hamiltonian, LatticeGraph, QubitOperator
 from qdk_chemistry.utils.model_hamiltonians import (
     create_heisenberg_hamiltonian,
     create_hubbard_hamiltonian,
@@ -22,7 +22,7 @@ from qdk_chemistry.utils.model_hamiltonians import (
 from .reference_tolerances import float_comparison_absolute_tolerance
 
 
-def _get_terms_dict(qh: QubitHamiltonian) -> dict[str, float]:
+def _get_terms_dict(qh: QubitOperator) -> dict[str, float]:
     """Return a {pauli_string: coefficient} dict for easy assertions."""
     return dict(qh.get_real_coefficients())
 
@@ -138,7 +138,7 @@ class TestModelHamiltonians:
 
         # scalar
         qh = create_ising_hamiltonian(lattice, j=j, h=h)
-        assert isinstance(qh, QubitHamiltonian)
+        assert isinstance(qh, QubitOperator)
         assert qh.num_qubits == n
         assert qh.is_hermitian()
         terms = _get_terms_dict(qh)
@@ -204,7 +204,7 @@ class TestModelHamiltonians:
 
         # scalar
         qh = create_heisenberg_hamiltonian(lattice, jx=jx, jy=jy, jz=jz, hx=hx, hy=hy, hz=hz)
-        assert isinstance(qh, QubitHamiltonian)
+        assert isinstance(qh, QubitOperator)
         assert qh.num_qubits == n
         assert qh.is_hermitian()
         terms = _get_terms_dict(qh)

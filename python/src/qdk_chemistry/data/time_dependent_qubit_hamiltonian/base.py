@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
+    from qdk_chemistry.data.qubit_operator import QubitOperator
 
     from .containers.base import TimeDependentQubitHamiltonianContainer
 
@@ -41,7 +41,7 @@ class TimeDependentQubitHamiltonian:
         """
         return self._container
 
-    def evaluate(self, t: float) -> QubitHamiltonian:
+    def evaluate(self, t: float) -> QubitOperator:
         """Return the qubit Hamiltonian at time *t*.
 
         Args:

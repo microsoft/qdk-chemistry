@@ -14,6 +14,49 @@
 
 namespace qdk::chemistry::data {
 
+std::string sparse_pauli_word_to_label(const SparsePauliWord& word,
+                                       std::uint64_t num_qubits) {
+  std::string label(num_qubits, 'I');
+  for (const auto& [qubit, op_type] : word) {
+    if (qubit >= num_qubits) {
+      throw std::invalid_argument(
+          "Sparse Pauli word references qubit " + std::to_string(qubit) +
+          " outside the requested register size " + std::to_string(num_qubits));
+    }
+    label[num_qubits - 1 - qubit] = PauliOperator(op_type, qubit).to_char();
+  }
+  return label;
+}
+
+SparsePauliWord label_to_sparse_pauli_word(const std::string& label) {
+  SparsePauliWord word;
+  auto n = static_cast<std::uint64_t>(label.size());
+  for (std::uint64_t i = 0; i < n; ++i) {
+    char c = label[i];
+    std::uint8_t op;
+    switch (c) {
+      case 'I':
+        continue;
+      case 'X':
+        op = 1;
+        break;
+      case 'Y':
+        op = 2;
+        break;
+      case 'Z':
+        op = 3;
+        break;
+      default:
+        throw std::invalid_argument("Invalid Pauli character '" +
+                                    std::string(1, c) +
+                                    "'; expected I, X, Y, or Z");
+    }
+    word.emplace_back(n - 1 - i, op);
+  }
+  std::sort(word.begin(), word.end());
+  return word;
+}
+
 namespace detail {
 
 /**
@@ -1093,7 +1136,7 @@ PauliTermAccumulator::multiply_uncached(const SparsePauliWord& word1,
 // Excitation Term Computation
 // ============================================================================
 
-namespace {
+namespace detail {
 
 // Pauli operator type constants
 constexpr std::uint8_t OP_X = 1;
@@ -1270,7 +1313,7 @@ compute_bk_excitation_terms_single(
   return result;
 }
 
-}  // anonymous namespace
+}  // namespace detail
 
 std::unordered_map<
     std::pair<std::uint64_t, std::uint64_t>,
@@ -1292,7 +1335,7 @@ PauliTermAccumulator::compute_all_jw_excitation_terms(
 
   for (std::uint64_t p = 0; p < n_spin_orbitals; ++p) {
     for (std::uint64_t q = 0; q < n_spin_orbitals; ++q) {
-      result[{p, q}] = compute_jw_excitation_terms_single(p, q);
+      result[{p, q}] = detail::compute_jw_excitation_terms_single(p, q);
     }
   }
 
@@ -1333,7 +1376,7 @@ PauliTermAccumulator::compute_all_bk_excitation_terms(
       const auto& update_q = update_sets.at(q);
       const auto& remainder_q = remainder_sets.at(q);
 
-      result[{p, q}] = compute_bk_excitation_terms_single(
+      result[{p, q}] = detail::compute_bk_excitation_terms_single(
           p, q, parity_p, update_p, remainder_p, parity_q, update_q,
           remainder_q);
     }

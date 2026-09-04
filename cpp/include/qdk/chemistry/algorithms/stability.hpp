@@ -114,7 +114,7 @@ class StabilityChecker
    * @return A pair containing stability status and detailed results
    */
   virtual std::pair<bool, std::shared_ptr<data::StabilityResult>> _run_impl(
-      std::shared_ptr<data::Wavefunction> wavefunction) const = 0;
+      std::shared_ptr<data::Wavefunction> wavefunction) const override = 0;
 };
 
 /**

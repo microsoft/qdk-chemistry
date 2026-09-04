@@ -21,9 +21,6 @@ from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_pauli_sequenc
     ControlledPauliSequenceMapper,
 )
 from qdk_chemistry.data.circuit import Circuit
-from qdk_chemistry.data.controlled_unitary import (
-    ControlledUnitary,
-)
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
@@ -53,13 +50,9 @@ def simple_ppf_container():
 
 
 @pytest.fixture
-def controlled_unitary(simple_ppf_container):
-    """Create a ControlledUnitary for testing."""
-    teu = UnitaryRepresentation(container=simple_ppf_container)
-    return ControlledUnitary(
-        unitary=teu,
-        control_indices=[2],
-    )
+def unitary_rep(simple_ppf_container):
+    """Create a UnitaryRepresentation for testing."""
+    return UnitaryRepresentation(container=simple_ppf_container)
 
 
 class TestPauliSequenceMapper:
@@ -70,20 +63,22 @@ class TestPauliSequenceMapper:
         mapper = ControlledPauliSequenceMapper()
         assert mapper.name() == "pauli_sequence"
 
-    def test_basic_mapping(self, controlled_unitary):
-        """Test basic mapping of ControlledUnitary to Circuit."""
+    def test_basic_mapping(self, unitary_rep):
+        """Test basic mapping of unitary to Circuit."""
         mapper = ControlledPauliSequenceMapper()
+        mapper.settings().set("control_indices", [2])
 
-        circuit = mapper.run(controlled_unitary)
+        circuit = mapper.run(unitary_rep)
 
         assert isinstance(circuit, Circuit)
         assert isinstance(circuit.get_qsharp_circuit(), QdkCircuitType)
 
-    def test_default_target_indices(self, controlled_unitary):
+    def test_default_target_indices(self, unitary_rep):
         """Test that default target indices are used when none are provided."""
         mapper = ControlledPauliSequenceMapper()
+        mapper.settings().set("control_indices", [2])
 
-        circuit = mapper.run(controlled_unitary)
+        circuit = mapper.run(unitary_rep)
         qsc_json = json.loads(circuit.get_qsharp_circuit().json())
         num_qubits = len(qsc_json["qubits"])  # 2 system qubits + 1 control qubit
         assert num_qubits == 3
@@ -109,20 +104,21 @@ class TestPauliSequenceMapper:
 
         assert set(control_qubits) == {2}
 
-    def test_target_indices_validation(self, simple_ppf_container):
-        """Test that invalid target indices raise ValueError."""
-        teu = UnitaryRepresentation(container=simple_ppf_container)
+    def test_explicit_target_indices(self, unitary_rep):
+        """Test that explicit target indices are used when provided."""
+        mapper = ControlledPauliSequenceMapper()
+        mapper.settings().set("control_indices", [2])
+        mapper.settings().set("target_indices", [0, 1])
 
-        # Overlapping target and control indices
-        with pytest.raises(ValueError, match="must not overlap"):
-            ControlledUnitary(unitary=teu, control_indices=[2], target_indices=[1, 2])
+        circuit = mapper.run(unitary_rep)
+        assert isinstance(circuit, Circuit)
 
-        # Non-overlapping indices in a larger circuit are valid
-        cu = ControlledUnitary(unitary=teu, control_indices=[2], target_indices=[0, 1])
-        assert cu.target_indices == [0, 1]
+        mapper2 = ControlledPauliSequenceMapper()
+        mapper2.settings().set("control_indices", [2])
+        mapper2.settings().set("target_indices", [3, 4])
 
-        cu = ControlledUnitary(unitary=teu, control_indices=[2], target_indices=[3, 4])
-        assert cu.target_indices == [3, 4]
+        circuit2 = mapper2.run(unitary_rep)
+        assert isinstance(circuit2, Circuit)
 
     def test_invalid_container_type_raises(self):
         """Test that an invalid container type raises a ValueError."""
@@ -137,21 +133,19 @@ class TestPauliSequenceMapper:
                 return "mock_container"
 
         invalid_teu = UnitaryRepresentation(container=MockContainer())
-        invalid_controlled = ControlledUnitary(
-            unitary=invalid_teu,
-            control_indices=[2],
-        )
 
         mapper = ControlledPauliSequenceMapper()
+        mapper.settings().set("control_indices", [2])
 
         with pytest.raises(ValueError, match="not supported"):
-            mapper.run(invalid_controlled)
+            mapper.run(invalid_teu)
 
-    def test_rotation_parameters(self, controlled_unitary):
+    def test_rotation_parameters(self, unitary_rep):
         """Test that rotation parameters are correctly set in the mapped circuit."""
         mapper = ControlledPauliSequenceMapper()
+        mapper.settings().set("control_indices", [2])
 
-        circuit = mapper.run(controlled_unitary)
+        circuit = mapper.run(unitary_rep)
 
         qsc_json = json.loads(circuit.get_qsharp_circuit().json())
         num_qubits = len(qsc_json["qubits"])  # 2 system qubits + 1 control qubit
@@ -179,15 +173,15 @@ class TestPauliSequenceMapper:
                         )  # Z on qubit 1
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
-    def test_controlled_u_circuit_matrix(self, controlled_unitary):
+    def test_controlled_u_circuit_matrix(self, unitary_rep, simple_ppf_container):
         """Test that the constructed controlled-U circuit has the expected matrix."""
         mapper = ControlledPauliSequenceMapper()
-        circuit = mapper.run(controlled_unitary)
+        mapper.settings().set("control_indices", [2])
+        circuit = mapper.run(unitary_rep)
 
         # Extract angles from the container
-        container = controlled_unitary.unitary.get_container()
-        angle_x = container.step_terms[0].angle
-        angle_z = container.step_terms[1].angle
+        angle_x = simple_ppf_container.step_terms[0].angle
+        angle_z = simple_ppf_container.step_terms[1].angle
 
         pauli_x = np.array([[0, 1], [1, 0]], dtype=complex)
         pauli_z = np.array([[1, 0], [0, -1]], dtype=complex)
@@ -213,3 +207,38 @@ class TestPauliSequenceMapper:
             atol=float_comparison_absolute_tolerance,
             rtol=float_comparison_relative_tolerance,
         )
+
+    def test_duplicate_control_indices_raises(self, unitary_rep):
+        """Test that duplicate control indices raise a ValueError."""
+        mapper = ControlledPauliSequenceMapper()
+        mapper.settings().set("control_indices", [2, 2])
+
+        with pytest.raises(ValueError, match="duplicates"):
+            mapper.run(unitary_rep)
+
+    def test_duplicate_target_indices_raises(self, unitary_rep):
+        """Test that duplicate target indices raise a ValueError."""
+        mapper = ControlledPauliSequenceMapper()
+        mapper.settings().set("control_indices", [2])
+        mapper.settings().set("target_indices", [0, 0])
+
+        with pytest.raises(ValueError, match="duplicates"):
+            mapper.run(unitary_rep)
+
+    def test_overlapping_control_and_target_indices_raises(self, unitary_rep):
+        """Test that overlapping control and target indices raise a ValueError."""
+        mapper = ControlledPauliSequenceMapper()
+        mapper.settings().set("control_indices", [1])
+        mapper.settings().set("target_indices", [0, 1])
+
+        with pytest.raises(ValueError, match="overlap"):
+            mapper.run(unitary_rep)
+
+    def test_wrong_target_indices_length_raises(self, unitary_rep):
+        """Test that target_indices length mismatching unitary qubit count raises ValueError."""
+        mapper = ControlledPauliSequenceMapper()
+        mapper.settings().set("control_indices", [3])
+        mapper.settings().set("target_indices", [0, 1, 2])  # unitary has 2 qubits, not 3
+
+        with pytest.raises(ValueError, match="length"):
+            mapper.run(unitary_rep)

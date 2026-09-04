@@ -152,8 +152,9 @@ void append_singles_asci_contributions(
  * @param[in] vir Virtual orbital indices
  * @param[in] os_occ Opposite-spin occupied orbital indices
  * @param[in] eps_same Orbital energies for the same spin
- * @param[in] G Same-spin two-electron integral tensor
- * @param[in] LDG Leading dimension of G tensor
+ * @param[in] V Two-electron integral tensor used to build same-spin
+ * antisymmetrized terms on the fly
+ * @param[in] LDV Leading dimension of V tensor
  * @param[in] h_el_tol Threshold for matrix element magnitude
  * @param[in] root_diag Root diagonal correction term
  * @param[in] E0 Reference energy
@@ -166,7 +167,7 @@ void append_ss_doubles_asci_contributions(
     double coeff, WfnType state_full, SpinWfnType state_same,
     SpinWfnType state_other, const std::vector<uint32_t>& ss_occ,
     const std::vector<uint32_t>& vir, const std::vector<uint32_t>& os_occ,
-    const double* eps_same, const double* G, size_t LDG, double h_el_tol,
+    const double* eps_same, const double* V, size_t LDV, double h_el_tol,
     double root_diag, double E0,
     const HamiltonianGeneratorBase<double>& ham_gen,
     asci_contrib_container<WfnType>& asci_contributions) {
@@ -175,19 +176,22 @@ void append_ss_doubles_asci_contributions(
   const size_t num_occupied_orbitals = ss_occ.size();
   const size_t num_virtual_orbitals = vir.size();
 
-  const size_t LDG2 = LDG * LDG;
+  const size_t LDV2 = LDV * LDV;
   for (auto ii = 0; ii < num_occupied_orbitals; ++ii)
     for (auto aa = 0; aa < num_virtual_orbitals; ++aa) {
       const auto i = ss_occ[ii];
       const auto a = vir[aa];
-      const auto G_ai = G + (a + i * LDG) * LDG2;
+      const auto V_ai = V + (a + i * LDV) * LDV2;
 
       for (auto jj = ii + 1; jj < num_occupied_orbitals; ++jj)
         for (auto bb = aa + 1; bb < num_virtual_orbitals; ++bb) {
           const auto j = ss_occ[jj];
           const auto b = vir[bb];
-          const auto jb = b + j * LDG;
-          const auto G_aibj = G_ai[jb];
+          const auto jb = b + j * LDV;
+          const auto ib = b + i * LDV;
+          const auto V_aibj = V_ai[jb];
+          const auto V_ajbi = (V + (a + j * LDV) * LDV2)[ib];
+          const auto G_aibj = V_aibj - V_ajbi;
 
           if (std::abs(coeff * G_aibj) < h_el_tol) continue;
 
@@ -307,7 +311,8 @@ void append_os_doubles_asci_contributions(
 template <size_t N, typename IndContainer>
 void generate_pairs(const IndContainer& inds, std::vector<wfn_t<N>>& w) {
   const size_t nind = inds.size();
-  w.resize((nind * (nind - 1)) / 2, 0);
+  w.clear();
+  w.resize((nind * (nind - 1)) / 2);
   for (int i = 0, ij = 0; i < nind; ++i)
     for (int j = i + 1; j < nind; ++j, ++ij) {
       w[ij].flip(inds[i]).flip(inds[j]);

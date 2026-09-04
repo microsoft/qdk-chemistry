@@ -11,7 +11,6 @@
 #include <qdk/chemistry/data/element_data.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <sstream>
 #include <stdexcept>
 #include <unordered_map>
@@ -480,7 +479,7 @@ void Structure::to_json_file(const std::string& filename) const {
   }
   // Validate filename has correct data type suffix
   std::string validated_filename = DataTypeFilename::validate_write_suffix(
-      filename, DATACLASS_TO_SNAKE_CASE(Structure));
+      filename, Structure::data_type_name());
 
   _to_json_file(validated_filename);
 }
@@ -492,8 +491,8 @@ std::shared_ptr<Structure> Structure::from_json_file(
     throw std::invalid_argument("Filename cannot be empty");
   }
   // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_read_suffix(filename, "structure");
+  std::string validated_filename = DataTypeFilename::validate_read_suffix(
+      filename, Structure::data_type_name());
 
   return _from_json_file(validated_filename);
 }
@@ -1064,7 +1063,7 @@ void Structure::to_hdf5_file(const std::string& filename) const {
   }
   // Validate filename has correct data type suffix
   std::string validated_filename = DataTypeFilename::validate_write_suffix(
-      filename, DATACLASS_TO_SNAKE_CASE(Structure));
+      filename, Structure::data_type_name());
 
   _to_hdf5_file(validated_filename);
 }
@@ -1076,8 +1075,8 @@ std::shared_ptr<Structure> Structure::from_hdf5_file(
     throw std::invalid_argument("Filename cannot be empty");
   }
   // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_read_suffix(filename, "structure");
+  std::string validated_filename = DataTypeFilename::validate_read_suffix(
+      filename, Structure::data_type_name());
 
   return _from_hdf5_file(validated_filename);
 }
@@ -1153,6 +1152,16 @@ void Structure::_validate_dimensions() const {
       throw std::invalid_argument("Empty structure must have all arrays empty");
     }
   }
+}
+
+void Structure::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
+  hash_value(ctx, get_data_type_name());
+  hash_value(ctx, _coordinates);
+  for (const auto& elem : _elements) {
+    hash_value(ctx, static_cast<int64_t>(elem));
+  }
+  hash_value(ctx, _masses);
+  hash_value(ctx, _nuclear_charges);
 }
 
 }  // namespace qdk::chemistry::data

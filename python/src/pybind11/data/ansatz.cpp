@@ -8,7 +8,6 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -24,7 +23,6 @@ void ansatz_to_file_wrapper(qdk::chemistry::data::Ansatz& self,
   self.to_file(qdk::chemistry::python::utils::to_string_path(filename),
                format_type);
 }
-
 std::shared_ptr<qdk::chemistry::data::Ansatz> ansatz_from_file_wrapper(
     const py::object& filename, const std::string& format_type) {
   return qdk::chemistry::data::Ansatz::from_file(
@@ -386,5 +384,11 @@ Raises:
       }));
 
   // Data type name class attribute
-  ansatz.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(Ansatz);
+  ansatz.def_static("data_type_name", &Ansatz::data_type_name, R"(
+Return the wire-format identifier for ansatz data.
+
+Returns:
+        str: ``"ansatz"``
+
+)");
 }

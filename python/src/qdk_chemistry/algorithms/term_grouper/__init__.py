@@ -1,8 +1,8 @@
-"""Term-grouper algorithms for :class:`~qdk_chemistry.data.QubitHamiltonian`.
+"""Term-grouper algorithms for :class:`~qdk_chemistry.data.QubitOperator`.
 
-A *term grouper* takes a :class:`~qdk_chemistry.data.QubitHamiltonian` and
+A *term grouper* takes a :class:`~qdk_chemistry.data.QubitOperator` and
 returns a new one with a populated
-:attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition` that downstream
+:attr:`~qdk_chemistry.data.QubitOperator.term_partition` that downstream
 algorithms can exploit.
 
 Example:
@@ -18,12 +18,16 @@ Example:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.algorithms.term_grouper.base import TermGrouper, TermGrouperFactory
+from qdk_chemistry.algorithms.term_grouper.base import TermGrouper, TermGrouperFactory, TermGrouperSettings
 from qdk_chemistry.algorithms.term_grouper.commuting import (
     FullCommutingTermGrouper,
     QubitWiseCommutingTermGrouper,
 )
 from qdk_chemistry.algorithms.term_grouper.identity import IdentityTermGrouper
+from qdk_chemistry.algorithms.term_grouper.vacuum_annihilating import (
+    VacuumAnnihilatingTermGrouper,
+    VacuumAnnihilatingTermGrouperSettings,
+)
 
 __all__ = [
     "FullCommutingTermGrouper",
@@ -31,4 +35,7 @@ __all__ = [
     "QubitWiseCommutingTermGrouper",
     "TermGrouper",
     "TermGrouperFactory",
+    "TermGrouperSettings",
+    "VacuumAnnihilatingTermGrouper",
+    "VacuumAnnihilatingTermGrouperSettings",
 ]

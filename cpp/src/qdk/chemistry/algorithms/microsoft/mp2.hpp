@@ -9,6 +9,7 @@
 #include <qdk/chemistry/algorithms/dynamical_correlation_calculator.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
 
 namespace qdk::chemistry::algorithms::microsoft {
 
@@ -47,8 +48,8 @@ class MP2Calculator : public DynamicalCorrelationCalculator {
    *
    * This method performs the MP2 calculation using the provided ansatz and
    * returns the total energy (reference + correlation), the MP2 ket
-   * wavefunction stored in an MP2Container. T2 amplitudes are computed
-   * lazily by the MP2Container when first requested.
+   * wavefunction stored in an AmplitudeContainer. The T1/T2 amplitudes are
+   * computed here and stored in the container.
    *
    * @param ansatz The Ansatz (Wavefunction and Hamiltonian) describing the
    *               quantum system
@@ -159,6 +160,22 @@ class MP2Calculator : public DynamicalCorrelationCalculator {
       std::shared_ptr<qdk::chemistry::data::Hamiltonian> ham,
       std::shared_ptr<qdk::chemistry::data::Orbitals> orbitals, size_t n_alpha,
       size_t n_beta) const;
+
+  /**
+   * @brief Compute MP2 T1/T2 amplitudes and package them in a container.
+   *
+   * @param ham Shared pointer to the Hamiltonian containing MO integrals
+   * @param orbitals Shared pointer to orbitals containing orbital energies
+   * @param wavefunction Shared pointer to the reference wavefunction
+   * @param n_alpha Number of alpha electrons
+   * @param n_beta Number of beta electrons
+   * @return Container holding the computed amplitude blocks
+   */
+  std::unique_ptr<data::AmplitudeContainer> compute_amplitudes(
+      std::shared_ptr<qdk::chemistry::data::Hamiltonian> ham,
+      std::shared_ptr<qdk::chemistry::data::Orbitals> orbitals,
+      std::shared_ptr<qdk::chemistry::data::Wavefunction> wavefunction,
+      size_t n_alpha, size_t n_beta) const;
 };
 
 /**

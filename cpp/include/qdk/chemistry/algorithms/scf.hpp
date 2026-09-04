@@ -6,6 +6,7 @@
 #include <iostream>
 #include <optional>
 #include <qdk/chemistry/algorithms/algorithm.hpp>
+#include <qdk/chemistry/data/auxiliary_basis.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/settings.hpp>
 #include <qdk/chemistry/data/structure.hpp>
@@ -80,7 +81,8 @@ using BasisOrGuessType =
 class ScfSolver
     : public Algorithm<
           ScfSolver, std::pair<double, std::shared_ptr<data::Wavefunction>>,
-          std::shared_ptr<data::Structure>, int, int, BasisOrGuessType> {
+          std::shared_ptr<data::Structure>, int, int, BasisOrGuessType,
+          std::shared_ptr<data::AuxiliaryBasisCollection>> {
  public:
   /**
    * @brief Default constructor
@@ -130,7 +132,19 @@ class ScfSolver
    *       the SCF calculation may vary by implementation. See the
    * documentation for the specific SCF solver being used.
    */
-  using Algorithm::run;
+  std::pair<double, std::shared_ptr<data::Wavefunction>> run(
+      std::shared_ptr<data::Structure> structure, int charge,
+      int spin_multiplicity, BasisOrGuessType basis_or_guess,
+      std::shared_ptr<data::AuxiliaryBasisCollection> auxiliary_bases =
+          nullptr) const override;
+
+  /**
+   * @brief Hash an SCF run, including any auxiliary-basis inputs.
+   */
+  std::string hash(std::shared_ptr<data::Structure> structure, int charge,
+                   int spin_multiplicity, BasisOrGuessType basis_or_guess,
+                   std::shared_ptr<data::AuxiliaryBasisCollection>
+                       auxiliary_bases = nullptr) const override;
 
   /**
    * @brief Access the algorithm's name
@@ -166,7 +180,9 @@ class ScfSolver
    */
   virtual std::pair<double, std::shared_ptr<data::Wavefunction>> _run_impl(
       std::shared_ptr<data::Structure> structure, int charge,
-      int spin_multiplicity, BasisOrGuessType basis_or_guess) const = 0;
+      int spin_multiplicity, BasisOrGuessType basis_or_guess,
+      std::shared_ptr<data::AuxiliaryBasisCollection> auxiliary_bases)
+      const = 0;
 };
 
 /**

@@ -1,4 +1,4 @@
-"""QDK/Chemistry Energy Estimator Results module."""
+"""QDK/Chemistry Expectation Estimator Results module."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -10,8 +10,9 @@ from typing import Any
 import h5py
 import numpy as np
 
+from qdk_chemistry.data._hashing import _hash_array, _hash_float, _hash_int, _hash_str, _hash_uint
 from qdk_chemistry.data.base import DataClass
-from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
+from qdk_chemistry.data.qubit_operator import QubitOperator
 from qdk_chemistry.utils import Logger
 
 __all__: list[str] = []
@@ -28,8 +29,15 @@ class EnergyExpectationResult(DataClass):
 
     """
 
-    # Class attribute for filename validation
-    _data_type_name = "energy_expectation_result"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for energy expectation results.
+
+        Returns:
+            ``"energy_expectation_result"``.
+
+        """
+        return "energy_expectation_result"
 
     # Serialization version for this class
     _serialization_version = "0.1.0"
@@ -56,6 +64,18 @@ class EnergyExpectationResult(DataClass):
         self.expvals_each_term = expvals_each_term
         self.variances_each_term = variances_each_term
         super().__init__()
+
+    def _hash_update(self, h) -> None:
+        """Feed identifying data into the hasher."""
+        _hash_str(h, "energy_expectation_result")
+        _hash_float(h, self.energy_expectation_value)
+        _hash_float(h, self.energy_variance)
+        _hash_uint(h, len(self.expvals_each_term))
+        for arr in self.expvals_each_term:
+            _hash_array(h, arr)
+        _hash_uint(h, len(self.variances_each_term))
+        for arr in self.variances_each_term:
+            _hash_array(h, arr)
 
     def get_summary(self) -> str:
         """Get a human-readable summary of the energy expectation result.
@@ -169,32 +189,39 @@ class EnergyExpectationResult(DataClass):
 
 
 class MeasurementData(DataClass):
-    """Measurement bitstring data and metadata for a ``QubitHamiltonian``.
+    """Measurement bitstring data and metadata for a ``QubitOperator``.
 
     Attributes:
-        hamiltonians (list[QubitHamiltonian]): List of QubitHamiltonian corresponding to the measurement data.
-        bitstring_counts (list[dict[str, int] | None] | None): Bitstring count dictionaries for each QubitHamiltonian.
+        hamiltonians (list[QubitOperator]): List of QubitOperator corresponding to the measurement data.
+        bitstring_counts (list[dict[str, int] | None] | None): Bitstring count dictionaries for each QubitOperator.
         shots_list (list[int] | None): List of number of shots used for each measurement.
 
     """
 
-    # Class attribute for filename validation
-    _data_type_name = "measurement_data"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for measurement data.
+
+        Returns:
+            ``"measurement_data"``.
+
+        """
+        return "measurement_data"
 
     # Serialization version for this class
     _serialization_version = "0.1.0"
 
     def __init__(
         self,
-        hamiltonians: list[QubitHamiltonian],
+        hamiltonians: list[QubitOperator],
         bitstring_counts: list[dict[str, int] | None] | None = None,
         shots_list: list[int] | None = None,
     ) -> None:
         """Initialize measurement data.
 
         Args:
-            hamiltonians (list[QubitHamiltonian]): List of QubitHamiltonian objects.
-            bitstring_counts (list[dict[str, int] | None] | None): Bitstring count dicts for each QubitHamiltonian.
+            hamiltonians (list[QubitOperator]): List of QubitOperator objects.
+            bitstring_counts (list[dict[str, int] | None] | None): Bitstring count dicts for each QubitOperator.
             shots_list (list[int] | None): List of number of shots used for each measurement.
 
         """
@@ -203,6 +230,26 @@ class MeasurementData(DataClass):
         self.bitstring_counts = bitstring_counts if bitstring_counts is not None else []
         self.shots_list = shots_list if shots_list is not None else []
         super().__init__()
+
+    def _hash_update(self, h) -> None:
+        """Feed identifying data into the hasher."""
+        _hash_str(h, "measurement_data")
+        _hash_uint(h, len(self.hamiltonians))
+        for ham in self.hamiltonians:
+            _hash_str(h, ham.content_hash())
+        _hash_uint(h, len(self.bitstring_counts))
+        for bc in self.bitstring_counts:
+            if bc is None:
+                h.update(b"\x00")
+            else:
+                h.update(b"\x01")
+                _hash_uint(h, len(bc))
+                for k in sorted(bc.keys()):
+                    _hash_str(h, k)
+                    _hash_int(h, bc[k])
+        _hash_uint(h, len(self.shots_list))
+        for s in self.shots_list:
+            _hash_int(h, s)
 
     def get_summary(self) -> str:
         """Get a human-readable summary of the measurement data.
@@ -286,7 +333,7 @@ class MeasurementData(DataClass):
         """
         cls._validate_json_version(cls._serialization_version, json_data)
 
-        hamiltonians: list[QubitHamiltonian] = []
+        hamiltonians: list[QubitOperator] = []
         bitstring_counts: list[dict[str, int] | None] = []
         shots_list: list[int] = []
 
@@ -294,9 +341,9 @@ class MeasurementData(DataClass):
         for key in sorted((k for k in json_data if k != "version"), key=int):
             item = json_data[key]
 
-            # Reconstruct QubitHamiltonian
+            # Reconstruct QubitOperator
             ham_data = item["hamiltonian"]
-            hamiltonian = QubitHamiltonian(
+            hamiltonian = QubitOperator(
                 ham_data["paulis"],
                 np.array(ham_data["coefficients"]),
             )
@@ -332,7 +379,7 @@ class MeasurementData(DataClass):
 
         num_hamiltonians = group.attrs["num_hamiltonians"]
 
-        hamiltonians: list[QubitHamiltonian] = []
+        hamiltonians: list[QubitOperator] = []
         bitstring_counts: list[dict[str, int] | None] = []
         shots_list: list[int] = []
 
@@ -342,7 +389,7 @@ class MeasurementData(DataClass):
             # Load Hamiltonian data
             pauli_strings = [s.decode() for s in ham_group["pauli_strings"][:]]
             coefficients = np.array(ham_group["coefficients"])
-            hamiltonian = QubitHamiltonian(pauli_strings, coefficients)
+            hamiltonian = QubitOperator(pauli_strings, coefficients)
             hamiltonians.append(hamiltonian)
 
             # Load bitstring counts if available

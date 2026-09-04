@@ -10,7 +10,7 @@ import tempfile
 
 import numpy as np
 
-from qdk_chemistry.data import QubitHamiltonian
+from qdk_chemistry.data import QubitOperator
 from qdk_chemistry.data.estimator_data import EnergyExpectationResult, MeasurementData
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
@@ -22,9 +22,9 @@ def test_measurement_data_serialization():
     measurement_data = MeasurementData(
         bitstring_counts=[{"00": 5000, "11": 5000}, {"1": 6000, "0": 4000}, None],
         hamiltonians=[
-            QubitHamiltonian(["ZZ"], np.array([1.0])),
-            QubitHamiltonian(["IX"], np.array([1.0])),
-            QubitHamiltonian(["IY"], np.array([1.0])),
+            QubitOperator(["ZZ"], np.array([1.0])),
+            QubitOperator(["IX"], np.array([1.0])),
+            QubitOperator(["IY"], np.array([1.0])),
         ],
         shots_list=[10000, 10000, 0],
     )
@@ -49,7 +49,7 @@ def test_measurement_data_serialization():
         tmpfile_path = tmpfile.name
 
     # Load from json file and verify contents
-    with open(tmpfile_path) as f:
+    with open(tmpfile_path, encoding="utf-8") as f:
         data = json.load(f)
     assert data == measurement_data_dict
 

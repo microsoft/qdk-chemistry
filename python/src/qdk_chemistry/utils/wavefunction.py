@@ -8,7 +8,9 @@
 import numpy as np
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Hamiltonian, SciWavefunctionContainer, Wavefunction
+from qdk_chemistry.data import Hamiltonian, StateVectorContainer, Wavefunction
+from qdk_chemistry.data._spin_channels import spin_channel_indices
+from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.utils import Logger
 
 __all__ = [
@@ -35,8 +37,7 @@ def get_active_determinants_info(wavefunction: Wavefunction, max_determinants: i
     orbitals = wavefunction.get_orbitals()
     num_orbital_chars = 0
     if orbitals.has_active_space():
-        alpha_indices = orbitals.get_active_space_indices()[0]
-        num_orbital_chars = len(alpha_indices)
+        num_orbital_chars = len(spin_channel_indices(orbitals.active_indices(), axes.alpha()))
 
     for det, coeff in wavefunction.get_top_determinants(max_determinants=max_determinants).items():
         det_string = det.to_string()
@@ -76,7 +77,7 @@ def calculate_sparse_wavefunction(
     ranked = reference_wavefunction.get_top_determinants(max_determinants=max_determinants)
     if not ranked:
         Logger.warn("No determinants found; returning an empty wavefunction.")
-        return Wavefunction(SciWavefunctionContainer(np.array([]), [], reference_wavefunction.get_orbitals()))
+        return Wavefunction(StateVectorContainer(np.array([]), [], reference_wavefunction.get_orbitals(), "electrons"))
 
     projector = create("projected_multi_configuration_calculator", pmc_calculator)
 
@@ -110,9 +111,10 @@ def calculate_sparse_wavefunction(
     Logger.info(f"Sparse CI finder ({best_count} dets) = {best_energy:.8f} Hartree (ΔE = {diff * 1000.0:.4f} mHartree)")
     determinants = list(best_wavefunction.get_active_determinants())
     coeffs = [best_wavefunction.get_coefficient(det) for det in determinants]
-    sci_container = SciWavefunctionContainer(
+    sci_container = StateVectorContainer(
         np.array(coeffs),
         determinants,
         best_wavefunction.get_orbitals(),
+        "electrons",
     )
     return best_energy, Wavefunction(sci_container)

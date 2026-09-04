@@ -8,27 +8,35 @@
 ################################################################################
 # start-cell-create
 from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import MajoranaMapping
 
 # Create a QubitMapper instance
-qubit_mapper = create("qubit_mapper", "qiskit")
+qubit_mapper = create("qubit_mapper")
 # end-cell-create
 ################################################################################
 
 ################################################################################
 # start-cell-configure
-# Configure the encoding strategy
-qubit_mapper.settings().set("encoding", "jordan-wigner")
+# Optional: configure numerical thresholds
+qubit_mapper.settings().set("threshold", 1e-12)
+qubit_mapper.settings().set("integral_threshold", 1e-12)
 # end-cell-configure
 ################################################################################
 
 ################################################################################
+# docs:xyz ../data/water.structure.xyz
 # start-cell-run
-from pathlib import Path
 
 from qdk_chemistry.data import Structure
 
-# Read a molecular structure from XYZ file
-structure = Structure.from_xyz_file(Path(".") / "../data/water.structure.xyz")
+# Read a molecular structure from inline XYZ file
+structure = Structure.from_xyz("""\
+3
+Water molecule
+O    0.000000    0.000000    0.000000
+H    0.758602    0.000000    0.504284
+H   -0.758602    0.000000    0.504284
+""")
 
 # Perform an SCF calculation to generate initial orbitals
 scf_solver = create("scf_solver")
@@ -37,11 +45,12 @@ _, wfn_hf = scf_solver.run(
 )
 
 # Select an active space
+num_active_orbitals = 6
 active_space_selector = create(
     "active_space_selector",
     algorithm_name="qdk_valence",
     num_active_electrons=4,
-    num_active_orbitals=6,
+    num_active_orbitals=num_active_orbitals,
 )
 active_wfn = active_space_selector.run(wfn_hf)
 active_orbitals = active_wfn.get_orbitals()
@@ -50,8 +59,14 @@ active_orbitals = active_wfn.get_orbitals()
 hamiltonian_constructor = create("hamiltonian_constructor")
 hamiltonian = hamiltonian_constructor.run(active_orbitals)
 
+# Determine the number of spin-orbitals in the active space
+n_spin_orbitals = 2 * num_active_orbitals
+
+# Choose an encoding
+mapping = MajoranaMapping.jordan_wigner(num_modes=n_spin_orbitals)
+
 # Map the fermionic Hamiltonian to a qubit Hamiltonian
-qubit_hamiltonian = qubit_mapper.run(hamiltonian)
+qubit_hamiltonian = qubit_mapper.run(hamiltonian, mapping)
 print(f"Qubit Hamiltonian has {qubit_hamiltonian.num_qubits} qubits")
 # end-cell-run
 ################################################################################
@@ -68,45 +83,20 @@ print(registry.available("qubit_mapper"))
 ################################################################################
 # start-cell-qdk-mapper
 from qdk_chemistry.algorithms import create as create_algorithm
+from qdk_chemistry.data import MajoranaMapping
 
 # Create a native QDK QubitMapper instance
 qdk_mapper = create_algorithm("qubit_mapper", "qdk")
-
-# Configure the encoding (jordan-wigner or bravyi-kitaev)
-qdk_mapper.settings().set("encoding", "jordan-wigner")
 
 # Optional: configure thresholds for numerical precision
 qdk_mapper.settings().set("threshold", 1e-12)
 qdk_mapper.settings().set("integral_threshold", 1e-12)
 
+# Choose an encoding (Jordan-Wigner, Bravyi-Kitaev, or Parity)
+mapping = MajoranaMapping.jordan_wigner(num_modes=n_spin_orbitals)
+
 # Map the fermionic Hamiltonian to a qubit Hamiltonian
-qdk_qubit_hamiltonian = qdk_mapper.run(hamiltonian)
+qdk_qubit_hamiltonian = qdk_mapper.run(hamiltonian, mapping)
 print(f"QDK mapper produced {len(qdk_qubit_hamiltonian.pauli_strings)} Pauli terms")
 # end-cell-qdk-mapper
-################################################################################
-
-################################################################################
-# start-cell-scbk-mapper
-from qdk_chemistry.data import Symmetries
-
-# Create an OpenFermion mapper with SCBK encoding
-scbk_mapper = create_algorithm(
-    "qubit_mapper", "openfermion", encoding="symmetry-conserving-bravyi-kitaev"
-)
-
-# Provide symmetries: the SCBK encoding needs active electron counts
-# Option 1: construct directly
-symmetries = Symmetries(n_alpha=2, n_beta=2)
-scbk_hamiltonian = scbk_mapper.run(hamiltonian, symmetries)
-
-# Option 2: derive from a wavefunction
-symmetries = Symmetries.from_wavefunction(active_wfn)
-scbk_hamiltonian = scbk_mapper.run(hamiltonian, symmetries)
-
-# SCBK reduces the qubit count by 2 compared to JW or BK
-print(
-    f"SCBK mapper: {scbk_hamiltonian.num_qubits} qubits "
-    f"(vs {qdk_qubit_hamiltonian.num_qubits} for JW)"
-)
-# end-cell-scbk-mapper
 ################################################################################

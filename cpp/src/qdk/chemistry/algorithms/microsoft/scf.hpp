@@ -4,9 +4,19 @@
 
 #pragma once
 
+#include <Eigen/Dense>
 #include <qdk/chemistry/algorithms/scf.hpp>
 
 namespace qdk::chemistry::algorithms::microsoft {
+
+/**
+ * @brief Internal SCF result including optional analytic nuclear gradients.
+ */
+struct ScfCalculationResult {
+  double energy;
+  std::shared_ptr<data::Wavefunction> wavefunction;
+  std::optional<Eigen::VectorXd> nuclear_gradient;
+};
 
 /**
  * @class ScfSettings
@@ -65,21 +75,6 @@ class ScfSettings
     set_default("nthreads", static_cast<int64_t>(-1),
                 "Number of OpenMP threads to use for SCF calculation. "
                 "Set to -1 to use all available threads.");
-    set_default(
-        "integral_type", std::string("auto"),
-        "How to calculate integrals: 'four_center' for standard four-center "
-        "integrals, 'dfj' for density fitting for Coulomb (J) integrals, or "
-        "'auto' to select automatically based on whether an auxiliary basis "
-        "is available. "
-        "When 'dfj' is used, an auxiliary basis set must be provided either "
-        "embedded in the BasisSet object or via the 'aux_basis' setting. "
-        "If the BasisSet object already contains an auxiliary basis, it takes "
-        "precedence over the 'aux_basis' setting.");
-    set_default("aux_basis", std::string(""),
-                "Auxiliary basis set name for density-fitted Coulomb (J) "
-                "integrals (e.g., 'def2-universal-jfit'). Only used when "
-                "'integral_type' is 'dfj'. Ignored if the BasisSet object "
-                "already contains an auxiliary basis.");
   }
 };
 
@@ -137,6 +132,22 @@ class ScfSolver : public qdk::chemistry::algorithms::ScfSolver {
 
   virtual std::string name() const final { return "qdk"; }
 
+  /**
+   * @brief Run the internal SCF solver and return analytic nuclear gradients
+   * when available.
+   *
+   * Settings are locked in the same way as the base run() API. The gradient is
+   * returned atom-major with length 3 * number of atoms.
+   *
+   * @note When MPI is enabled, the analytic gradient is only populated on rank
+   * 0. See ScfCalculationResult::nuclear_gradient.
+   */
+  ScfCalculationResult run_with_analytic_gradient(
+      std::shared_ptr<data::Structure> structure, int charge,
+      int spin_multiplicity, BasisOrGuessType basis_or_guess,
+      std::shared_ptr<data::AuxiliaryBasisCollection> auxiliary_bases =
+          nullptr) const;
+
  protected:
   /**
    * @brief Perform an SCF calculation on the given molecular structure
@@ -168,7 +179,16 @@ class ScfSolver : public qdk::chemistry::algorithms::ScfSolver {
    */
   std::pair<double, std::shared_ptr<data::Wavefunction>> _run_impl(
       std::shared_ptr<data::Structure> structure, int charge,
-      int spin_multiplicity, BasisOrGuessType basis_or_guess) const override;
+      int spin_multiplicity, BasisOrGuessType basis_or_guess,
+      std::shared_ptr<data::AuxiliaryBasisCollection> auxiliary_bases)
+      const override;
+
+ private:
+  ScfCalculationResult _run_with_options(
+      std::shared_ptr<data::Structure> structure, int charge,
+      int spin_multiplicity, BasisOrGuessType basis_or_guess,
+      std::shared_ptr<data::AuxiliaryBasisCollection> auxiliary_bases,
+      bool require_gradient) const;
 };
 
 }  // namespace qdk::chemistry::algorithms::microsoft

@@ -10,50 +10,45 @@
 
 namespace qdk::chemistry::utils {
 
+// Lightweight helpers for local hash-code composition. Use hash_combine() for
+// std::hash-compatible values used by in-memory lookup structures, especially
+// in hot paths. These hashes are process-local hash codes, not content digests.
+
 /**
- * @brief Combines a hash value with the hash of another value.
+ * @brief Combine an existing hash seed with the hash of another value.
  *
- * This function implements a hash combination algorithm that takes an existing
- * hash seed and combines it with the hash of a new value. It uses a modified
- * version of the boost::hash_combine algorithm with the golden ratio constant
- * for better hash distribution.
+ * This helper is intended for fast local hash-code composition, not for
+ * persistent content hashes.
  *
- * @tparam T The type of value to hash.
- * @tparam Hasher The hash function type (defaults to std::hash<T>).
- * @param seed The existing hash value to combine with.
- * @param v The value to hash and combine.
- * @return The combined hash value.
- *
- * @note The algorithm uses the magic constant 0x9e3779b9 (derived from the
- *       golden ratio) and bit shifting for good hash distribution properties.
+ * @tparam T Value type to hash.
+ * @tparam Hasher Hash function type. Defaults to std::hash<T>.
+ * @param seed Existing hash seed.
+ * @param value Value to hash and combine into the seed.
+ * @return Combined hash value.
  */
 template <typename T, typename Hasher = std::hash<T>>
-inline std::size_t hash_combine(std::size_t seed, const T& v) {
-  Hasher h;
-  return seed ^ (h(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2));
+inline std::size_t hash_combine(std::size_t seed, const T& value) {
+  Hasher hasher;
+  return seed ^ (hasher(value) + 0x9e3779b9 + (seed << 6) + (seed >> 2));
 }
 
 /**
- * @brief Variadic overload that combines a hash seed with multiple values.
+ * @brief Combine an existing hash seed with multiple values from left to right.
  *
- * This function recursively combines the hash of multiple values into a single
- * hash value, processing values left-to-right.
+ * This helper is intended for fast local hash-code composition, not for
+ * persistent content hashes.
  *
- * @tparam T The type of the first value to hash.
- * @tparam Args The types of the remaining values to hash.
- * @param seed The existing hash value to combine with.
- * @param v The first value to hash and combine.
- * @param args The remaining values to hash and combine.
- * @return The combined hash value.
- *
- * Example:
- * @code
- *   std::size_t h = hash_combine(0, x, y, z);  // Combines hashes of x, y, z
- * @endcode
+ * @tparam T First value type to hash.
+ * @tparam Args Remaining value types to hash.
+ * @param seed Existing hash seed.
+ * @param value First value to hash and combine into the seed.
+ * @param args Remaining values to hash and combine into the seed.
+ * @return Combined hash value.
  */
 template <typename T, typename... Args>
-inline std::size_t hash_combine(std::size_t seed, const T& v, Args&&... args) {
-  return hash_combine(hash_combine(seed, v), std::forward<Args>(args)...);
+inline std::size_t hash_combine(std::size_t seed, const T& value,
+                                Args&&... args) {
+  return hash_combine(hash_combine(seed, value), std::forward<Args>(args)...);
 }
 
 }  // namespace qdk::chemistry::utils

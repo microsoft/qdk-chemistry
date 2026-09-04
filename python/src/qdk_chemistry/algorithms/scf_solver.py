@@ -12,5 +12,6 @@ internal package paths.
 
 from qdk_chemistry._core._algorithms import (
     QdkScfSolver,  # noqa: F401 - re-export
+    QdkStabilizedScfSolver,  # noqa: F401 - re-export
     ScfSolver,  # noqa: F401 - re-export
 )

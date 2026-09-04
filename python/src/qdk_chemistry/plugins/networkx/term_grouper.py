@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 import networkx as nx
 
 from qdk_chemistry.algorithms.term_grouper.base import TermGrouper
-from qdk_chemistry.data import FlatPartition, QubitHamiltonian
+from qdk_chemistry.data import FlatPartition, QubitOperator
 from qdk_chemistry.utils.pauli_commutation import do_pauli_labels_commute, do_pauli_labels_qw_commute
 
 if TYPE_CHECKING:
@@ -73,19 +73,19 @@ class NxFullCommutingTermGrouper(TermGrouper):
         """Return ``nx_commuting`` as the algorithm name."""
         return "nx_commuting"
 
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> QubitHamiltonian:
+    def _run_impl(self, qubit_hamiltonian: QubitOperator) -> QubitOperator:
         """Return a copy of ``qubit_hamiltonian`` with a full-commutation DSATUR partition.
 
         Args:
             qubit_hamiltonian: Hamiltonian to partition.
 
         Returns:
-            QubitHamiltonian: New instance with a ``FlatPartition`` (strategy ``"nx_commuting"``).
+            QubitOperator: New instance with a ``FlatPartition`` (strategy ``"nx_commuting"``).
 
         """
         groups = _dsatur_commutation_grouping(qubit_hamiltonian.pauli_strings, do_pauli_labels_commute)
         partition = FlatPartition(strategy="nx_commuting", groups=groups)
-        return QubitHamiltonian(
+        return QubitOperator(
             pauli_strings=list(qubit_hamiltonian.pauli_strings),
             coefficients=qubit_hamiltonian.coefficients.copy(),
             encoding=qubit_hamiltonian.encoding,
@@ -107,19 +107,19 @@ class NxQubitWiseCommutingTermGrouper(TermGrouper):
         """Return ``nx_qubit_wise_commuting`` as the algorithm name."""
         return "nx_qubit_wise_commuting"
 
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> QubitHamiltonian:
+    def _run_impl(self, qubit_hamiltonian: QubitOperator) -> QubitOperator:
         """Return a copy with a qubit-wise commutation DSATUR partition.
 
         Args:
             qubit_hamiltonian: Hamiltonian to partition.
 
         Returns:
-            QubitHamiltonian: New instance with a ``FlatPartition`` (strategy ``"nx_qubit_wise_commuting"``).
+            QubitOperator: New instance with a ``FlatPartition`` (strategy ``"nx_qubit_wise_commuting"``).
 
         """
         groups = _dsatur_commutation_grouping(qubit_hamiltonian.pauli_strings, do_pauli_labels_qw_commute)
         partition = FlatPartition(strategy="nx_qubit_wise_commuting", groups=groups)
-        return QubitHamiltonian(
+        return QubitOperator(
             pauli_strings=list(qubit_hamiltonian.pauli_strings),
             coefficients=qubit_hamiltonian.coefficients.copy(),
             encoding=qubit_hamiltonian.encoding,

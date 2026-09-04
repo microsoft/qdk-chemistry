@@ -1,0 +1,85 @@
+parameters:
+- name: march
+  type: string
+  default: x86-64-v3
+- name: buildType
+  type: string
+  default: Release
+- name: buildTesting
+  type: string
+  default: 'OFF'
+- name: enableCoverage
+  type: string
+  default: 'OFF'
+- name: pythonVersion
+  type: string
+  default: '3.11'
+- name: devTag
+  type: string
+  default: 'None'
+
+steps:
+- checkout: self
+  persistCredentials: true
+  path: qdk-chemistry
+  fetchDepth: 1
+  retryCountOnTaskFailure: 3
+
+- pwsh: |
+    python "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\versioning.py" `
+      --version-file "$(System.DefaultWorkingDirectory)\VERSION" `
+      --dev-tag ${{ parameters.devTag }}
+    Get-Content "$(System.DefaultWorkingDirectory)\VERSION"
+  displayName: Validate/Set Development Version for Wheels
+  condition: ne('${{ parameters.devTag }}', 'None')
+
+# Import the VS x64 developer environment (INCLUDE, LIB, PATH, etc.) so that
+# cl.exe and the MSVC linker are available to all subsequent steps.
+# Also resolves the MSVC toolset version for the dependency cache key.
+- pwsh: $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\setup-msvc-env.ps1
+  displayName: Set up MSVC environment
+
+# Restore the dependency build dirs separately to avoid a known Windows issue
+# with Cache@2 multi-line `path`: the task passes both lines as a single tar
+# argument, causing "could not chdir" at save time. Two tasks work reliably.
+- task: Cache@2
+  displayName: Restore/save vcpkg dependency cache
+  inputs:
+    key: >-
+      "windows-vcpkg-x64-windows-static-md-v1" | "$(MSVC_TOOLSET)" |
+      vcpkg.json |
+      vcpkg-configuration.json |
+      vcpkg-overlay/**/* |
+      .pipelines/install-scripts/install-cpp-deps-windows.ps1
+    path: $(System.DefaultWorkingDirectory)/vcpkg_installed
+    cacheHitVar: VCPKG_CACHE_RESTORED
+
+- task: Cache@2
+  displayName: Restore/save C++ deps install cache
+  inputs:
+    key: >-
+      "windows-deps-install-msvc-x64-windows-static-md-v2" | "$(MSVC_TOOLSET)" |
+      cpp/manifest/qdk-chemistry/cgmanifest.json |
+      external/macis/manifest/cgmanifest.json |
+      cpp/cmake/patches/**/* |
+      .pipelines/install-scripts/install-cpp-deps-windows.ps1 |
+      .pipelines/toolchains/windows.cmake
+    path: $(System.DefaultWorkingDirectory)/deps-install-msvc
+    cacheHitVar: DEPS_INSTALL_CACHE_RESTORED
+
+# Full qdk build, C++ tests, conda environment setup, and Python wheel build.
+# SYSTEM_ACCESSTOKEN is required by bootstrap-conda for the Azure Artifacts feed.
+- pwsh: |
+    & "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\build-pip-wheels-windows.ps1" `
+        -SrcDir         "$(System.DefaultWorkingDirectory)" `
+        -March          "${{ parameters.march }}" `
+        -BuildType      "${{ parameters.buildType }}" `
+        -BuildTesting   "${{ parameters.buildTesting }}" `
+        -EnableCoverage "${{ parameters.enableCoverage }}" `
+        -ClPath         "$(CL_PATH)" `
+        -PythonVersion  "${{ parameters.pythonVersion }}" `
+        -DevTag         "${{ parameters.devTag }}"
+  displayName: Build C++ library, run tests, build Python wheel
+  env:
+    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+    OMP_NUM_THREADS: '2'

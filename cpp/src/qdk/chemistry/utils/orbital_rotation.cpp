@@ -128,7 +128,8 @@ std::shared_ptr<Orbitals> rotate_orbitals(
 
   if (orbitals->is_restricted()) {
     // Restricted case - could be RHF or ROHF
-    const Eigen::MatrixXd& mo_coeff = orbitals->get_coefficients_alpha();
+    const Eigen::MatrixXd& mo_coeff =
+        orbitals->coefficients()->block({axes::alpha(), axes::alpha()});
 
     // Create mask for allowed rotations
     auto mask = detail::create_rotation_mask(num_molecular_orbitals,
@@ -193,8 +194,10 @@ std::shared_ptr<Orbitals> rotate_orbitals(
     Eigen::VectorXd rotation_beta = rotation_vector.tail(beta_size);
 
     // Get alpha and beta coefficients
-    const Eigen::MatrixXd& mo_coeff_alpha = orbitals->get_coefficients_alpha();
-    const Eigen::MatrixXd& mo_coeff_beta = orbitals->get_coefficients_beta();
+    const Eigen::MatrixXd& mo_coeff_alpha =
+        orbitals->coefficients()->block({axes::alpha(), axes::alpha()});
+    const Eigen::MatrixXd& mo_coeff_beta =
+        orbitals->coefficients()->block({axes::beta(), axes::beta()});
 
     // Create masks for alpha and beta channels (UHF: simple rectangular)
     auto mask_alpha = detail::create_rotation_mask(

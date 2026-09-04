@@ -7,8 +7,19 @@
 
 from abc import abstractmethod
 
+import numpy as np
+
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
-from qdk_chemistry.data import QubitHamiltonian, Settings, UnitaryRepresentation
+from qdk_chemistry.data import (
+    FlatPartition,
+    LayeredPartition,
+    QubitOperator,
+    Settings,
+    TermPartition,
+    UnitaryRepresentation,
+)
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import ExponentiatedPauliTerm
+from qdk_chemistry.utils import Logger
 
 __all__: list[str] = [
     "HamiltonianUnitaryBuilder",
@@ -27,14 +38,14 @@ class HamiltonianUnitaryBuilder(Algorithm):
         super().__init__()
 
     @abstractmethod
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> UnitaryRepresentation:
-        """Construct a UnitaryRepresentation for the given QubitHamiltonian.
+    def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
+        """Construct a UnitaryRepresentation for the given Hamiltonian.
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian.
 
         Returns:
-            UnitaryRepresentation: A UnitaryRepresentation for the given QubitHamiltonian.
+            UnitaryRepresentation: A UnitaryRepresentation for the given Hamiltonian.
 
         """
 
@@ -122,16 +133,112 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
         return time, power
 
     @abstractmethod
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> UnitaryRepresentation:
-        """Construct a UnitaryRepresentation representing the time evolution unitary for the given QubitHamiltonian.
+    def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
+        """Construct a UnitaryRepresentation representing the time evolution unitary for the given QubitOperator.
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian.
 
         Returns:
-            UnitaryRepresentation: A UnitaryRepresentation representing the evolution of the given QubitHamiltonian.
+            UnitaryRepresentation: A UnitaryRepresentation representing the evolution of the given QubitOperator.
 
         """
+
+    def _group_terms(
+        self,
+        qubit_hamiltonian: QubitOperator,
+    ) -> list[list[QubitOperator]]:
+        """Group Hamiltonian terms for decomposition."""
+        partition = qubit_hamiltonian.term_partition
+        if partition is not None:
+            Logger.debug(
+                f"{self.name().capitalize()}: consuming QubitOperator.term_partition "
+                f"(strategy={partition.strategy!r}, num_groups={partition.num_groups})."
+            )
+            return self._groups_from_partition(qubit_hamiltonian, partition)
+
+        Logger.debug(
+            f"{self.name().capitalize()}: no term_partition present; treating each Pauli term as its own group."
+        )
+        return [
+            [
+                QubitOperator(
+                    pauli_strings=[label],
+                    coefficients=[coeff],
+                    encoding=qubit_hamiltonian.encoding,
+                    fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
+                )
+            ]
+            for label, coeff in zip(qubit_hamiltonian.pauli_strings, qubit_hamiltonian.coefficients, strict=True)
+        ]
+
+    def _groups_from_partition(
+        self,
+        qubit_hamiltonian: QubitOperator,
+        partition: TermPartition,
+    ) -> list[list[QubitOperator]]:
+        """Materialise a :class:`TermPartition` into sub-groups."""
+        labels = qubit_hamiltonian.pauli_strings
+        coeffs = qubit_hamiltonian.coefficients
+        encoding = qubit_hamiltonian.encoding
+        fmo = qubit_hamiltonian.fermion_mode_order
+
+        def _make(indices: tuple[int, ...]) -> QubitOperator:
+            return QubitOperator(
+                pauli_strings=[labels[i] for i in indices],
+                coefficients=np.asarray([coeffs[i] for i in indices]),
+                encoding=encoding,
+                fermion_mode_order=fmo,
+            )
+
+        if isinstance(partition, LayeredPartition):
+            layered_groups = partition.groups
+        elif isinstance(partition, FlatPartition):
+            layered_groups = tuple((g,) for g in partition.groups)
+        else:
+            raise TypeError(
+                f"Unsupported TermPartition subtype: {type(partition).__name__}. "
+                "Expected FlatPartition or LayeredPartition."
+            )
+
+        groups: list[list[QubitOperator]] = [
+            [_make(layer) for layer in group_layers if layer] for group_layers in layered_groups
+        ]
+
+        groups = [g for g in groups if g]
+        groups.sort(key=len)
+        return groups
+
+    def _exponentiate_commuting(
+        self,
+        group: QubitOperator,
+        time: float,
+        *,
+        atol: float = 1e-12,
+    ) -> list[ExponentiatedPauliTerm]:
+        r"""Exponentiate a group of commuting Pauli terms.
+
+        Each term :math:`P_j` with coefficient :math:`c_j` is converted to
+        the rotation :math:`e^{-i\,c_j\,t\,P_j}`.  Because all terms in the
+        group commute, the product of rotations equals the exponential of
+        the sum regardless of ordering.
+
+        Args:
+            group: The group of commuting Hamiltonian terms to exponentiate.
+            time: The evolution time used to compute rotation angles
+                (:math:`\theta_j = c_j \cdot t`).
+            atol: Absolute tolerance for filtering small coefficients.
+
+        Returns:
+            A flat list of ExponentiatedPauliTerm.
+
+        """
+        terms: list[ExponentiatedPauliTerm] = []
+        for label, coeff in group.get_real_coefficients(tolerance=atol):
+            mapping = self._pauli_label_to_map(label)
+            angle = coeff * time
+            terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
+        return terms
 
 
 class HamiltonianUnitaryBuilderFactory(AlgorithmFactory):

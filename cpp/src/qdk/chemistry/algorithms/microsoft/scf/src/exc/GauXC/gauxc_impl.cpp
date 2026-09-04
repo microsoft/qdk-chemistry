@@ -17,6 +17,8 @@
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 #include <qdk/chemistry/scf/util/gpu/cuda_helper.h>
 #endif
+#include <qdk/chemistry/scf/util/blas_threads.h>
+
 #include <qdk/chemistry/utils/logger.hpp>
 
 namespace qdk::chemistry::scf::impl {
@@ -96,8 +98,8 @@ GauXC::BasisSet<T> to_gauxc_basisset(const BasisSet& aimd_basisset) {
 
   for (size_t ishell = 0; ishell != nshell; ++ishell) {
     auto aimd_shell = aimd_basisset.shells[ishell];
-    prim_array exponents;
-    prim_array coefficients;
+    prim_array exponents{};
+    prim_array coefficients{};
 
     for (size_t iprim = 0; iprim != aimd_shell.contraction; ++iprim) {
       exponents.at(iprim) = aimd_shell.exponents[iprim];
@@ -249,8 +251,6 @@ GAUXC::GAUXC(BasisSet& basis_set, const GAUXCInput& gauxc_input,
 void GAUXC::eval_dd_psi(int lmax, const double* D, double* dd_psi) {
   QDK_LOG_TRACE_ENTERING();
   auto num_atomic_orbitals = integrator_->load_balancer().basis().nbf();
-  auto natom = integrator_->load_balancer().molecule().size();
-  auto nharmonics = (lmax + 1) * (lmax + 1);
   Eigen::MatrixXd D_eigen = Eigen::Map<const Eigen::MatrixXd>(
       D, num_atomic_orbitals, num_atomic_orbitals);
   auto dd_psi_vec = integrator_->eval_dd_psi(D_eigen, lmax);
@@ -295,6 +295,9 @@ void GAUXC::free_device_buffer_async_(cudaStream_t stream) {
 
 void GAUXC::build_XC(const double* D, double* XC, double* xc_energy) {
   QDK_LOG_TRACE_ENTERING();
+
+  // Pin BLAS to one thread: GauXC calls it from every OpenMP grid thread.
+  util::ScopedBlasThreads blas_thread_guard;
 
   // Allocate a large temporary buffer
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
@@ -352,6 +355,9 @@ void GAUXC::build_XC(const double* D, double* XC, double* xc_energy) {
 void GAUXC::get_gradients(const double* D, double* dXC) {
   QDK_LOG_TRACE_ENTERING();
 
+  // Pin BLAS to one thread: GauXC calls it from every OpenMP grid thread.
+  util::ScopedBlasThreads blas_thread_guard;
+
   // Allocate a large temporary buffer
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
   allocate_device_buffer_async_(device_buffer_sz_, 0);
@@ -398,6 +404,9 @@ void GAUXC::get_gradients(const double* D, double* dXC) {
 void GAUXC::build_snK(const double* D, double* K) {
   QDK_LOG_TRACE_ENTERING();
 
+  // Pin BLAS to one thread: GauXC calls it from every OpenMP grid thread.
+  util::ScopedBlasThreads blas_thread_guard;
+
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
   allocate_device_buffer_async_(device_buffer_sz_, 0);
 #endif
@@ -430,6 +439,10 @@ void GAUXC::eval_fxc_contraction(const double* D, const double* tD,
   QDK_LOG_TRACE_ENTERING();
 
   AutoTimer __timer("polarizability::  GAUXC::eval_fxc_contraction");
+
+  // Pin BLAS to one thread: GauXC calls it from every OpenMP grid thread.
+  util::ScopedBlasThreads blas_thread_guard;
+
   // Allocate a large temporary buffer
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
   allocate_device_buffer_async_(device_buffer_sz_, 0);

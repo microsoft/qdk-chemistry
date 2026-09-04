@@ -4,7 +4,7 @@ This module provides functions to convert between QDK/Chemistry data structures
 and OpenFermion operator representations:
 
 - Hamiltonian to InteractionOperator / FermionOperator
-- QubitOperator to/from QubitHamiltonian
+- QubitOperator to/from QubitOperator
 """
 
 # --------------------------------------------------------------------------------------------
@@ -191,19 +191,19 @@ def qubit_operator_to_qubit_hamiltonian(
     qubit_op: "of.QubitOperator",
     encoding: str | None = None,
     fermion_mode_order: "data.FermionModeOrder | str | None" = None,
-) -> data.QubitHamiltonian:
-    """Convert an OpenFermion QubitOperator to a QDK/Chemistry QubitHamiltonian.
+) -> data.QubitOperator:
+    """Convert an OpenFermion QubitOperator to a QDK/Chemistry QubitOperator.
 
     Translates OpenFermion's Pauli term format (e.g., ``((0, 'X'), (1, 'Z'))``)
     to the dense Pauli string format used by QDK/Chemistry (e.g., ``"XZI..."``).
 
     Args:
         qubit_op: The OpenFermion QubitOperator to convert.
-        encoding: Optional encoding label (e.g., ``"jordan-wigner"``) to attach to the resulting QubitHamiltonian.
-        fermion_mode_order: Fermion mode ordering (``"blocked"`` or ``"interleaved"``) for the ``QubitHamiltonian``.
+        encoding: Optional encoding label (e.g., ``"jordan-wigner"``) to attach to the resulting QubitOperator.
+        fermion_mode_order: Fermion mode ordering (``"blocked"`` or ``"interleaved"``) for the ``QubitOperator``.
 
     Returns:
-        QubitHamiltonian: A QDK/Chemistry QubitHamiltonian.
+        QubitOperator: A QDK/Chemistry QubitOperator.
 
     Raises:
         ValueError: If the QubitOperator has no terms.
@@ -244,7 +244,7 @@ def qubit_operator_to_qubit_hamiltonian(
         pauli_strings.append(pauli_str)
         coefficients.append(coeff)
 
-    return data.QubitHamiltonian(
+    return data.QubitOperator(
         pauli_strings=pauli_strings,
         coefficients=np.array(coefficients, dtype=complex),
         encoding=encoding,
@@ -253,15 +253,15 @@ def qubit_operator_to_qubit_hamiltonian(
 
 
 def qubit_hamiltonian_to_qubit_operator(
-    qubit_hamiltonian: data.QubitHamiltonian,
+    qubit_hamiltonian: data.QubitOperator,
 ) -> "of.QubitOperator":
-    """Convert a QDK/Chemistry QubitHamiltonian to an OpenFermion QubitOperator.
+    """Convert a QDK/Chemistry QubitOperator to an OpenFermion QubitOperator.
 
     Translates the dense Pauli string format (e.g., ``"XZII"``) to OpenFermion's
     sparse tuple format (e.g., ``((0, 'X'), (1, 'Z'))``).
 
     Args:
-        qubit_hamiltonian: The QDK/Chemistry QubitHamiltonian to convert.
+        qubit_hamiltonian: The QDK/Chemistry QubitOperator to convert.
 
     Returns:
         openfermion.QubitOperator: The equivalent OpenFermion QubitOperator.

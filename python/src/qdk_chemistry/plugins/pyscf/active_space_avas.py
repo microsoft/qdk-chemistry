@@ -32,7 +32,9 @@ import numpy as np
 from pyscf.mcscf import avas
 
 from qdk_chemistry.algorithms import ActiveSpaceSelector
-from qdk_chemistry.data import Configuration, Orbitals, Settings, SlaterDeterminantContainer, Wavefunction
+from qdk_chemistry.data import Configuration, Orbitals, Settings, StateVectorContainer, Wavefunction
+from qdk_chemistry.data._spin_channels import spin_channel_indices
+from qdk_chemistry.data.symmetry import axes, spin_index_set
 from qdk_chemistry.plugins.pyscf.conversion import orbitals_to_scf
 from qdk_chemistry.utils import Logger
 
@@ -171,10 +173,14 @@ class PyscfAVAS(ActiveSpaceSelector):
 
         # Extract active indices
         # nelec_act is the number of active electrons (int or tuple of alpha/beta)
-        n_active_electrons = sum(nelec_act) if isinstance(nelec_act, (tuple, list)) else int(nelec_act)  # noqa: UP038
+        n_active_electrons = sum(nelec_act) if isinstance(nelec_act, tuple | list) else int(nelec_act)
         n_inactive_occ = (mol.nelectron - n_active_electrons) // 2
         active_indices = [n_inactive_occ + i for i in range(norb_act)]
         inactive_indices = list(range(n_inactive_occ))
+
+        nmo = mo_coeff.shape[1]
+        active_sbid = spin_index_set(nmo, active_indices, active_indices, equivalent=not open_shell)
+        inactive_sbid = spin_index_set(nmo, inactive_indices, inactive_indices, equivalent=not open_shell)
 
         if open_shell:
             # Create active orbitals
@@ -185,7 +191,8 @@ class PyscfAVAS(ActiveSpaceSelector):
                 None,
                 orbitals.get_overlap_matrix() if orbitals.has_overlap_matrix() else None,
                 orbitals.get_basis_set(),
-                [active_indices, active_indices, inactive_indices, inactive_indices],
+                active_sbid,
+                inactive_sbid,
             )
         else:
             # Create active orbitals
@@ -194,7 +201,8 @@ class PyscfAVAS(ActiveSpaceSelector):
                 None,
                 orbitals.get_overlap_matrix() if orbitals.has_overlap_matrix() else None,
                 orbitals.get_basis_set(),
-                [active_indices, inactive_indices],
+                active_sbid,
+                inactive_sbid,
             )
         if len(wavefunction.get_active_determinants()) == 1:
             # Single determinant case - return new wavefunction with localized orbitals
@@ -202,8 +210,8 @@ class PyscfAVAS(ActiveSpaceSelector):
 
             # Get old and new active space indices
             old_orbitals = wavefunction.get_orbitals()
-            old_active_indices = old_orbitals.get_active_space_indices()[0]
-            new_active_indices = active_orbitals.get_active_space_indices()[0]
+            old_active_indices = spin_channel_indices(old_orbitals.active_indices(), axes.alpha())
+            new_active_indices = spin_channel_indices(active_orbitals.active_indices(), axes.alpha())
 
             # Map from old active space to new active space
             # The old determinant is already shortened to the old active space
@@ -220,8 +228,8 @@ class PyscfAVAS(ActiveSpaceSelector):
                     # This orbital wasn't in the old active space, so it's unoccupied
                     new_config_chars.append("0")
 
-            active_config = Configuration("".join(new_config_chars))
-            return Wavefunction(SlaterDeterminantContainer(active_config, active_orbitals))
+            active_config = Configuration.from_spin_half_string("".join(new_config_chars))
+            return Wavefunction(StateVectorContainer(active_config, active_orbitals, "electrons"))
         raise NotImplementedError(
             "PySCF AVAS active space selector currently only supports single-determinant wavefunctions."
         )

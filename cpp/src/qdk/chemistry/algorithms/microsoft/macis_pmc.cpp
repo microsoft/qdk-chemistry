@@ -11,7 +11,8 @@
 #include <macis/solvers/selected_ci_diag.hpp>
 #include <macis/util/mpi.hpp>
 #include <qdk/chemistry/data/structure.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
 namespace qdk::chemistry::algorithms::microsoft {
@@ -47,9 +48,10 @@ struct pmc_helper {
     using generator_t = macis::SortedDoubleLoopHamiltonianGenerator<wfn_type>;
 
     auto orbitals = hamiltonian.get_orbitals();
-    std::vector<size_t> active_indices =
-        orbitals->get_active_space_indices().first;
-    const size_t num_molecular_orbitals = active_indices.size();
+    const size_t num_molecular_orbitals =
+        data::spin_channel_indices(orbitals->active_indices(),
+                                   data::axes::alpha())
+            .size();
 
     const auto& [T_a, T_b] = hamiltonian.get_one_body_integrals();
     const auto& [V_aaaa, V_aabb, V_bbbb] = hamiltonian.get_two_body_integrals();
@@ -117,7 +119,8 @@ struct pmc_helper {
     std::vector<data::Configuration> dets_configs;
     for (auto det : dets) {
       // Convert macis::wfn_t to data::Configuration
-      dets_configs.emplace_back(det, num_molecular_orbitals);
+      dets_configs.push_back(data::Configuration::from_spin_half_bitset(
+          det, num_molecular_orbitals));
     }
     std::copy(C_pmc.begin(), C_pmc.end(), C_vector.data());
 
@@ -152,17 +155,15 @@ struct pmc_helper {
                 num_molecular_orbitals * num_molecular_orbitals);
 
         // Create wavefunction with RDMs
-        return data::Wavefunction(
-            std::make_unique<data::SciWavefunctionContainer>(
-                std::move(C_vector), std::move(dets_configs),
-                hamiltonian.get_orbitals(), std::move(one_rdm),
-                std::move(two_rdm)));
+        return data::Wavefunction(std::make_unique<data::StateVectorContainer>(
+            std::move(C_vector), std::move(dets_configs),
+            hamiltonian.get_orbitals(), std::move(one_rdm), std::move(two_rdm),
+            "electrons"));
       } else {
         // Create wavefunction without RDMs
-        return data::Wavefunction(
-            std::make_unique<data::SciWavefunctionContainer>(
-                std::move(C_vector), std::move(dets_configs),
-                hamiltonian.get_orbitals()));
+        return data::Wavefunction(std::make_unique<data::StateVectorContainer>(
+            std::move(C_vector), std::move(dets_configs),
+            hamiltonian.get_orbitals(), "electrons"));
       }
     }();
 
@@ -185,10 +186,11 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> MacisPmc::_run_impl(
         "MacisPmc does not support unrestricted orbitals. "
         "Only restricted orbitals are supported.");
   }
-  std::vector<size_t> active_indices =
-      orbitals->get_active_space_indices().first;
   auto result = dispatch_by_norb<pmc_helper>(
-      active_indices.size(), *hamiltonian, configurations, *_settings);
+      data::spin_channel_indices(orbitals->active_indices(),
+                                 data::axes::alpha())
+          .size(),
+      *hamiltonian, configurations, *_settings);
   return std::make_pair(result.first, std::make_shared<data::Wavefunction>(
                                           std::move(result.second)));
 }

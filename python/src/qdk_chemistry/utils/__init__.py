@@ -5,15 +5,25 @@
 # --------------------------------------------------------------------------------------------
 
 # Import C++ utilities from the compiled extension
-from qdk_chemistry._core.utils import Logger, compute_valence_space_parameters, rotate_orbitals
+from qdk_chemistry._core.utils import (
+    CubeGenerator,
+    CubeGrid,
+    Logger,
+    compute_valence_space_parameters,
+    generate_orbital_cubes,
+    rotate_orbitals,
+)
 from qdk_chemistry.utils.enum import CaseInsensitiveStrEnum
 
 from . import model_hamiltonians
 
 __all__ = [
     "CaseInsensitiveStrEnum",
+    "CubeGenerator",
+    "CubeGrid",
     "Logger",
     "compute_valence_space_parameters",
+    "generate_orbital_cubes",
     "model_hamiltonians",
     "rotate_orbitals",
 ]

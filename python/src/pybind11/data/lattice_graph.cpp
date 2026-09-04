@@ -8,7 +8,6 @@
 
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/lattice_graph.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -23,7 +22,6 @@ void lattice_graph_to_file_wrapper(
   self.to_file(qdk::chemistry::python::utils::to_string_path(filename),
                format_type);
 }
-
 qdk::chemistry::data::LatticeGraph lattice_graph_from_file_wrapper(
     const py::object &filename, const std::string &format_type) {
   return qdk::chemistry::data::LatticeGraph::from_file(
@@ -295,7 +293,7 @@ Examples:
     >>> ring = LatticeGraph.chain(6, periodic=True)
 )",
                            py::arg("n"), py::arg("periodic") = false,
-                           py::arg("t") = 1.0);
+                           py::arg("t") = 1.0, py::arg("dfs_ordering") = false);
 
   lattice_graph.def_static("square", &LatticeGraph::square, R"(
 Create a two-dimensional square lattice.
@@ -332,9 +330,11 @@ Raises:
 )",
                            py::arg("nx"), py::arg("ny"),
                            py::arg("periodic_x") = false,
-                           py::arg("periodic_y") = false, py::arg("t") = 1.0);
+                           py::arg("periodic_y") = false, py::arg("t") = 1.0,
+                           py::arg("dfs_ordering") = false);
 
-  lattice_graph.def_static("triangular", &LatticeGraph::triangular, R"(
+  lattice_graph.def_static(
+      "triangular", &LatticeGraph::triangular, R"(
 Create a two-dimensional triangular lattice.
 
 Sites are indexed in row-major order: site index = y * nx + x.
@@ -371,10 +371,9 @@ Returns:
 Raises:
     ValueError: If nx or ny is 0.
 )",
-                           py::arg("nx"), py::arg("ny"),
-                           py::arg("periodic_x") = false,
-                           py::arg("periodic_y") = false, py::arg("t") = 1.0,
-                           py::arg("coloring_seed") = 0);
+      py::arg("nx"), py::arg("ny"), py::arg("periodic_x") = false,
+      py::arg("periodic_y") = false, py::arg("t") = 1.0,
+      py::arg("coloring_seed") = 0, py::arg("dfs_ordering") = false);
 
   lattice_graph.def_static("honeycomb", &LatticeGraph::honeycomb, R"(
 Create a two-dimensional honeycomb lattice.
@@ -417,9 +416,11 @@ Raises:
 )",
                            py::arg("nx"), py::arg("ny"),
                            py::arg("periodic_x") = false,
-                           py::arg("periodic_y") = false, py::arg("t") = 1.0);
+                           py::arg("periodic_y") = false, py::arg("t") = 1.0,
+                           py::arg("dfs_ordering") = false);
 
-  lattice_graph.def_static("kagome", &LatticeGraph::kagome, R"(
+  lattice_graph.def_static(
+      "kagome", &LatticeGraph::kagome, R"(
 Create a two-dimensional kagome lattice.
 
 The kagome lattice has three sites per unit cell, arranged as
@@ -467,10 +468,9 @@ Returns:
 Raises:
     ValueError: If nx or ny is 0.
 )",
-                           py::arg("nx"), py::arg("ny"),
-                           py::arg("periodic_x") = false,
-                           py::arg("periodic_y") = false, py::arg("t") = 1.0,
-                           py::arg("coloring_seed") = 0);
+      py::arg("nx"), py::arg("ny"), py::arg("periodic_x") = false,
+      py::arg("periodic_y") = false, py::arg("t") = 1.0,
+      py::arg("coloring_seed") = 0, py::arg("dfs_ordering") = false);
 
   lattice_graph.def("__repr__", [](const LatticeGraph &self) {
     return "<LatticeGraph sites=" + std::to_string(self.num_sites()) +
@@ -622,5 +622,12 @@ Examples:
       }));
 
   // Data type name class attribute
-  lattice_graph.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(LatticeGraph);
+  lattice_graph.def_static("data_type_name", &LatticeGraph::data_type_name,
+                           R"(
+Return the wire-format identifier for lattice graphs.
+
+Returns:
+        str: ``"lattice_graph"``
+
+)");
 }

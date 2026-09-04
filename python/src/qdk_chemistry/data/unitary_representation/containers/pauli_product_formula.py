@@ -9,6 +9,9 @@ from dataclasses import dataclass
 from typing import Any
 
 import h5py
+import numpy as np
+
+from qdk_chemistry.data._hashing import _hash_float, _hash_int, _hash_str, _hash_uint
 
 from .base import UnitaryContainer
 
@@ -47,17 +50,25 @@ class PauliProductFormulaContainer(UnitaryContainer):
     where ``step_reps = r`` is the number of repeated steps.
     """
 
-    # Class attribute for filename validation
-    _data_type_name = "pauli_product_formula_container"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for product-formula containers.
+
+        Returns:
+            ``"pauli_product_formula_container"``.
+
+        """
+        return "pauli_product_formula_container"
 
     # Serialization version for this class
-    _serialization_version = "0.1.0"
+    _serialization_version = "0.2.0"
 
     def __init__(
         self,
         step_terms: list[ExponentiatedPauliTerm],
         step_reps: int,
         num_qubits: int,
+        scale: float = 1.0,
     ) -> None:
         """Initialize a PauliProductFormulaContainer.
 
@@ -65,12 +76,57 @@ class PauliProductFormulaContainer(UnitaryContainer):
             step_terms: The list of exponentiated Pauli terms in a single step.
             step_reps: The number of repetitions of the single step.
             num_qubits: The number of qubits the unitary acts on.
+            scale: The evolution time used for eigenvalue-phase conversion.
+
+        Raises:
+            TypeError: If ``step_reps`` is not an integer.
+            ValueError: If ``step_reps`` is not positive.
 
         """
+        # bool is an int subclass, but True as a repetition count is always a mistake.
+        if isinstance(step_reps, bool) or not isinstance(step_reps, int | np.integer):
+            raise TypeError(f"step_reps must be an integer, got {type(step_reps).__name__}.")
+        if step_reps <= 0:
+            raise ValueError(f"step_reps must be a positive integer, got {step_reps}.")
+
         self.step_terms = step_terms
-        self.step_reps = step_reps
+        self.step_reps = int(step_reps)
         self._num_qubits = num_qubits
+        self.scale = scale
         super().__init__()
+
+    def eigenvalue_from_phase(self, phase_fraction: float) -> float:
+        r"""Recover a Hamiltonian eigenvalue from a time-evolution phase.
+
+        For :math:`U(t) = e^{-iHt}` an eigenstate with energy :math:`E` acquires
+        phase :math:`e^{-iEt}`, so QPE measures :math:`\varphi = (-Et / 2\pi) \bmod 1`.
+        Inverting gives ``E = -angle / t``.
+
+        Args:
+            phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.
+
+        Returns:
+            float: The corresponding Hamiltonian eigenvalue.
+
+        """
+        angle = (phase_fraction % 1.0) * (2 * np.pi)
+        if angle > np.pi:
+            angle -= 2 * np.pi
+        return float(-angle / self.scale)
+
+    def _hash_update(self, h) -> None:
+        """Feed identifying data into the hasher."""
+        _hash_str(h, "pauli_product_formula")
+        _hash_uint(h, len(self.step_terms))
+        for term in self.step_terms:
+            _hash_uint(h, len(term.pauli_term))
+            for qubit_idx in sorted(term.pauli_term.keys()):
+                _hash_int(h, qubit_idx)
+                _hash_str(h, term.pauli_term[qubit_idx])
+            _hash_float(h, term.angle)
+        _hash_int(h, self.step_reps)
+        _hash_int(h, self._num_qubits)
+        _hash_float(h, self.scale)
 
     @property
     def type(self) -> str:
@@ -152,6 +208,11 @@ class PauliProductFormulaContainer(UnitaryContainer):
                 f"num_qubits (self.num_qubits={self.num_qubits}, "
                 f"other_container.num_qubits={other_container.num_qubits})."
             )
+        if not np.isclose(self.scale, other_container.scale):
+            raise ValueError(
+                f"Cannot combine PauliProductFormulaContainer instances with different "
+                f"scale (self.scale={self.scale}, other_container.scale={other_container.scale})."
+            )
 
         merged: list[ExponentiatedPauliTerm] = []
         for step_terms, step_reps in (
@@ -168,7 +229,12 @@ class PauliProductFormulaContainer(UnitaryContainer):
                             merged.pop()
                     else:
                         merged.append(term)
-        return PauliProductFormulaContainer(step_terms=merged, step_reps=1, num_qubits=self.num_qubits)
+        return PauliProductFormulaContainer(
+            step_terms=merged,
+            step_reps=1,
+            num_qubits=self.num_qubits,
+            scale=self.scale,
+        )
 
     def to_json(self) -> dict[str, Any]:
         """Convert the PauliProductFormulaContainer to a dictionary for JSON serialization.
@@ -185,6 +251,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
             ],
             "step_reps": self.step_reps,
             "num_qubits": self.num_qubits,
+            "scale": self.scale,
         }
         return self._add_json_version(data)
 
@@ -199,6 +266,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
         group.attrs["container_type"] = self.type
         group.attrs["step_reps"] = self.step_reps
         group.attrs["num_qubits"] = self.num_qubits
+        group.attrs["scale"] = self.scale
 
         step_terms_group = group.create_group("step_terms")
         for i, term in enumerate(self.step_terms):
@@ -245,6 +313,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
             step_terms=step_terms,
             step_reps=step_reps,
             num_qubits=num_qubits,
+            scale=json_data.get("scale", 1.0),
         )
 
     @classmethod
@@ -279,6 +348,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
             step_terms=step_terms,
             step_reps=step_reps,
             num_qubits=num_qubits,
+            scale=float(group.attrs.get("scale", 1.0)),
         )
 
     def get_summary(self) -> str:

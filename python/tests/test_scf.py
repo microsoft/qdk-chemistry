@@ -12,7 +12,15 @@ import pytest
 
 from qdk_chemistry import algorithms
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
-from qdk_chemistry.data import BasisSet, Structure
+from qdk_chemistry.data import (
+    AuxiliaryBasis,
+    AuxiliaryBasisCollection,
+    AuxiliaryBasisRole,
+    BasisSet,
+    OrbitalType,
+    Shell,
+    Structure,
+)
 from qdk_chemistry.utils import Logger
 
 from .reference_tolerances import (
@@ -78,6 +86,10 @@ class TestScfSolver:
         available_solvers = algorithms.available("scf_solver")
         assert isinstance(available_solvers, list)
         assert len(available_solvers) >= 1
+        assert "qdk" in available_solvers
+        assert "qdk_stabilized" in available_solvers
+        assert "stabilized" in available_solvers
+        assert "stabilized_scf" in available_solvers
 
         # Test creating default solver
         scf_solver = algorithms.create("scf_solver")
@@ -87,9 +99,29 @@ class TestScfSolver:
         scf_solver_default = algorithms.create("scf_solver", "qdk")
         assert scf_solver_default is not None
 
+        scf_solver_stabilized = algorithms.create("scf_solver", "qdk_stabilized")
+        assert scf_solver_stabilized is not None
+
         # Test that nonexistent solver raises error
         with pytest.raises(KeyError):
             algorithms.create("scf_solver", "nonexistent_solver")
+
+    def test_stabilized_scf_solver_passthrough(self):
+        """Test stabilized SCF solver can run a regular SCF calculation."""
+        water = create_water_structure()
+        regular_scf_solver = algorithms.create("scf_solver", "qdk")
+        regular_scf_solver.settings().set("method", "hf")
+        regular_energy, regular_wavefunction = regular_scf_solver.run(water, 0, 1, "sto-3g")
+
+        scf_solver = algorithms.create("scf_solver", "qdk_stabilized")
+        scf_solver.settings().set("method", "hf")
+        scf_solver.settings().set("max_stability_iterations", 0)
+
+        energy, wavefunction = scf_solver.run(water, 0, 1, "sto-3g")
+
+        assert np.isclose(energy, regular_energy, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance)
+        assert regular_wavefunction.get_orbitals().is_restricted()
+        assert wavefunction.get_orbitals().is_restricted()
 
     def test_scf_solver_water_default_settings(self):
         """Test SCF solver on water molecule with default settings."""
@@ -108,10 +140,10 @@ class TestScfSolver:
         assert np.isclose(energy, -75.9229032345, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance)
 
         # Check that orbitals have expected properties
-        coeffs = orbitals.get_coefficients()
-        assert coeffs is not None
+        coefficients = orbitals.coefficients()
+        assert coefficients is not None
 
-        energies = orbitals.get_energies()
+        energies = orbitals.energies()
         assert energies is not None
 
     def test_scf_solver_water_def2_tzvp(self):
@@ -272,6 +304,64 @@ class TestScfSolver:
 
         assert abs(energy - (-74.361530753176)) < scf_energy_tolerance
         assert orbitals.is_restricted()
+
+    def test_scf_solver_oh_rohf_incore_diis(self):
+        """Test SCF solver on OH system with ROHF/sto-3g using incore ERI."""
+        oh_structure = create_oh_structure()
+        scf_solver = algorithms.create("scf_solver")
+
+        scf_solver.settings().set("enable_gdm", False)
+        scf_solver.settings().set("method", "hf")
+        scf_solver.settings().set("scf_type", "restricted")
+        scf_solver.settings().set("eri_method", "incore")
+
+        energy, wavefunction = scf_solver.run(oh_structure, 0, 2, "sto-3g")
+        orbitals = wavefunction.get_orbitals()
+
+        assert abs(energy - (-74.361530753176)) < scf_energy_tolerance
+        assert orbitals.is_restricted()
+
+    def test_scf_solver_oh_rohf_gdm(self):
+        """Test SCF solver on OH system with ROHF/sto-3g and GDM enabled."""
+        oh_structure = create_oh_structure()
+        scf_solver = algorithms.create("scf_solver")
+
+        scf_solver.settings().set("enable_gdm", True)
+        scf_solver.settings().set("method", "hf")
+        scf_solver.settings().set("scf_type", "restricted")
+
+        energy, wavefunction = scf_solver.run(oh_structure, 0, 2, "sto-3g")
+        orbitals = wavefunction.get_orbitals()
+
+        assert abs(energy - (-74.361530753176)) < scf_energy_tolerance
+        assert orbitals.is_restricted()
+
+    def test_scf_solver_oxygen_atom_rohf_gdm(self):
+        """Test SCF solver on oxygen atom triplet with ROHF/cc-pvdz and GDM."""
+        oxygen = create_oxygen_structure()
+        scf_solver = algorithms.create("scf_solver")
+
+        scf_solver.settings().set("enable_gdm", True)
+        scf_solver.settings().set("method", "hf")
+        scf_solver.settings().set("scf_type", "restricted")
+
+        energy, wavefunction = scf_solver.run(oxygen, 0, 3, "cc-pvdz")
+        orbitals = wavefunction.get_orbitals()
+
+        assert abs(energy - (-74.787513074624)) < scf_energy_tolerance
+        assert orbitals.is_restricted()
+
+    def test_scf_solver_oh_roks_invalid(self):
+        """Test restricted open-shell KS request on OH doublet raises error."""
+        oh_structure = create_oh_structure()
+        scf_solver = algorithms.create("scf_solver")
+
+        scf_solver.settings().set("enable_gdm", True)
+        scf_solver.settings().set("method", "pbe")
+        scf_solver.settings().set("scf_type", "restricted")
+
+        with pytest.raises(ValueError, match="Restricted open-shell calculations are only supported"):
+            scf_solver.run(oh_structure, 0, 2, "sto-3g")
 
     def test_scf_solver_oxygen_atom_gdm(self):
         """Test SCF solver on oxygen atom with PBE/cc-pvdz."""
@@ -441,31 +531,68 @@ def _create_bf_structure():
     return Structure(["F", "B"], coords)
 
 
+def _create_dfj_auxiliary_bases(structure, role=AuxiliaryBasisRole.JFIT):
+    auxiliary_basis = AuxiliaryBasis.from_basis_name("def2-universal-jfit", structure)
+    return AuxiliaryBasisCollection({role: auxiliary_basis})
+
+
 class TestScfSolverDfj:
     """DFJ (Density-Fitted Coulomb) SCF tests."""
+
+    def test_auxiliary_bases_participate_in_hash(self):
+        water = _create_h2o_dfj_structure()
+        scf_solver = algorithms.create("scf_solver")
+        basis = BasisSet.from_basis_name("def2-svp", water)
+        auxiliary_bases = _create_dfj_auxiliary_bases(water)
+
+        baseline_hash = scf_solver.hash(water, 0, 1, basis)
+        assert baseline_hash == scf_solver.hash(water, 0, 1, basis, AuxiliaryBasisCollection())
+        assert baseline_hash != scf_solver.hash(water, 0, 1, basis, auxiliary_bases)
+
+    def test_oversized_auxiliary_contraction_is_rejected(self):
+        hydrogen = Structure(["H"], np.zeros((1, 3)))
+        oversized = AuxiliaryBasis(
+            "oversized",
+            [Shell(0, OrbitalType.S, np.arange(1.0, 66.0), np.ones(65))],
+            hydrogen,
+        )
+        auxiliary_bases = AuxiliaryBasisCollection({AuxiliaryBasisRole.JFIT: oversized})
+        scf_solver = algorithms.create("scf_solver", "qdk")
+
+        with pytest.raises(ValueError, match="internal limit"):
+            scf_solver.run(hydrogen, 0, 2, "sto-3g", auxiliary_bases)
+
+    def test_stabilized_scf_rejects_dfj(self):
+        water = _create_h2o_dfj_structure()
+        auxiliary_bases = _create_dfj_auxiliary_bases(water)
+        scf_solver = algorithms.create("scf_solver", "qdk_stabilized")
+
+        with pytest.raises(ValueError, match="Stabilized SCF does not support DF-J"):
+            scf_solver.run(water, 0, 1, "def2-svp", auxiliary_bases)
 
     def test_water_rhf_dfj(self):
         """Test RHF-DFJ on water with def2-svp / def2-universal-jfit."""
         water = _create_h2o_dfj_structure()
         scf_solver = algorithms.create("scf_solver")
         scf_solver.settings().set("method", "hf")
-        scf_solver.settings().set("eri_method", "incore")
 
-        basis = BasisSet.from_basis_name("def2-svp", "def2-universal-jfit", water)
-        energy, wfn = scf_solver.run(water, 0, 1, basis)
+        basis = BasisSet.from_basis_name("def2-svp", water)
+        auxiliary_bases = _create_dfj_auxiliary_bases(water)
+        energy, wfn = scf_solver.run(water, 0, 1, basis, auxiliary_bases)
 
         # Reference from: cpp/src/qdk/chemistry/algorithms/microsoft/scf/tests/data/h2o_gauxc.json
         assert abs(energy - (-75.955848898587732)) < scf_energy_tolerance
 
     def test_water_rks_dfj_pbe_m06_2x(self):
-        """Test RKS-DFJ/PBE then use it as guess for RKS-DFJ/M06-2X on water with def2-svp / def2-universal-jfit."""
+        """Test RKS-DFJ/PBE and an RKS-DFJ/M06-2X orbital restart."""
         water = _create_h2o_dfj_structure()
         scf_solver = algorithms.create("scf_solver")
         scf_solver.settings().set("method", "pbe")
         scf_solver.settings().set("eri_method", "incore")
 
-        basis = BasisSet.from_basis_name("def2-svp", "def2-universal-jfit", water)
-        energy, wfn = scf_solver.run(water, 0, 1, basis)
+        basis = BasisSet.from_basis_name("def2-svp", water)
+        auxiliary_bases = _create_dfj_auxiliary_bases(water, AuxiliaryBasisRole.JKFIT)
+        energy, wfn = scf_solver.run(water, 0, 1, basis, auxiliary_bases)
 
         # Reference from: cpp/src/qdk/chemistry/algorithms/microsoft/scf/tests/data/h2o_gauxc.json
         assert abs(energy - (-76.271464794036)) < scf_energy_tolerance
@@ -474,7 +601,7 @@ class TestScfSolverDfj:
         m06_solver = algorithms.create("scf_solver")
         m06_solver.settings().set("method", "m06-2x")
         m06_solver.settings().set("eri_method", "incore")
-        energy, m06_wfn = m06_solver.run(water, 0, 1, wfn.get_orbitals())
+        energy, m06_wfn = m06_solver.run(water, 0, 1, wfn.get_orbitals(), auxiliary_bases)
 
         # Reference from: cpp/src/qdk/chemistry/algorithms/microsoft/scf/tests/data/h2o_gauxc.json
         assert abs(energy - (-76.320941901587)) < scf_energy_tolerance
@@ -486,8 +613,9 @@ class TestScfSolverDfj:
         scf_solver.settings().set("method", "hf")
         scf_solver.settings().set("eri_method", "incore")
 
-        basis = BasisSet.from_basis_name("def2-svp", "def2-universal-jfit", o2)
-        energy, wfn = scf_solver.run(o2, 0, 3, basis)
+        basis = BasisSet.from_basis_name("def2-svp", o2)
+        auxiliary_bases = _create_dfj_auxiliary_bases(o2)
+        energy, wfn = scf_solver.run(o2, 0, 3, basis, auxiliary_bases)
 
         # Reference from: cpp/src/qdk/chemistry/algorithms/microsoft/scf/tests/data/o2.json
         assert abs(energy - (-149.489993170463)) < scf_energy_tolerance
@@ -500,23 +628,29 @@ class TestScfSolverDfj:
         scf_solver.settings().set("scf_type", "unrestricted")
         scf_solver.settings().set("eri_method", "incore")
 
-        basis = BasisSet.from_basis_name("sto-3g", "def2-universal-jfit", bf)
-        energy, wfn = scf_solver.run(bf, 0, 1, basis)
+        basis = BasisSet.from_basis_name("sto-3g", bf)
+        auxiliary_bases = _create_dfj_auxiliary_bases(bf)
+        energy, wfn = scf_solver.run(bf, 0, 1, basis, auxiliary_bases)
 
         # Reference from: cpp/src/qdk/chemistry/algorithms/microsoft/scf/tests/data/bf.json
         assert abs(energy - (-122.732943463018)) < scf_energy_tolerance
 
-    def test_dfj_without_aux_basis_raises(self):
-        """Test that requesting DFJ without an auxiliary basis raises ValueError."""
+    def test_non_jfit_auxiliary_basis_does_not_enable_dfj(self):
+        """Test that an unrelated auxiliary-basis role leaves four-center SCF enabled."""
+        water = create_water_structure()
+        scf_solver = algorithms.create("scf_solver")
+        basis = BasisSet.from_basis_name("def2-svp", water)
+        ri_only = _create_dfj_auxiliary_bases(water, AuxiliaryBasisRole.RIFIT)
+        energy, wfn = scf_solver.run(water, 0, 1, basis, ri_only)
+
+        assert abs(energy - (-75.9229032345009)) < scf_energy_tolerance
+
+    def test_dfj_auxiliary_basis_must_match_structure(self):
+        """Test that an automatically detected DFJ basis matches the SCF structure."""
         water = _create_h2o_dfj_structure()
         scf_solver = algorithms.create("scf_solver")
-        scf_solver.settings().set("method", "hf")
-        scf_solver.settings().set("eri_method", "incore")
-        scf_solver.settings().set("integral_type", "dfj")
-
-        # Basis without auxiliary shells
         basis = BasisSet.from_basis_name("def2-svp", water)
-        with pytest.raises(ValueError, match="DFJ requested but no auxiliary"):
-            scf_solver.run(water, 0, 1, basis)
-        with pytest.raises(ValueError, match="DFJ requested but no auxiliary"):
-            scf_solver.run(water, 0, 1, "def2-svp")
+
+        mismatched = _create_dfj_auxiliary_bases(_create_o2_dfj_structure())
+        with pytest.raises(ValueError, match="must describe the SCF structure"):
+            scf_solver.run(water, 0, 1, basis, mismatched)

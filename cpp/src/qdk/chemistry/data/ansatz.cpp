@@ -5,9 +5,9 @@
 #include <fstream>
 #include <qdk/chemistry/data/ansatz.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <sstream>
 #include <stdexcept>
 
@@ -141,15 +141,17 @@ double Ansatz::calculate_energy() const {
     const auto& h2 = h2_aaaa;
 
     // check that active space indices are consistent
-    auto active_space_indices =
-        _wavefunction->get_orbitals()->get_active_space_indices();
-    if (active_space_indices.first.size() !=
-        active_space_indices.second.size()) {
+    const auto active_ai = _wavefunction->get_orbitals()->active_indices();
+    if (spin_channel_indices(active_ai, axes::alpha()).size() !=
+        spin_channel_indices(active_ai, axes::beta()).size()) {
       throw std::runtime_error(
           "Active space indices are inconsistent between Hamiltonian and "
           "wavefunction");
     }
-    size_t norb = active_space_indices.first.size();
+    size_t norb =
+        spin_channel_indices(_wavefunction->get_orbitals()->active_indices(),
+                             axes::alpha())
+            .size();
 
     // One-body contribution
     for (int p = 0; p < norb; ++p) {
@@ -180,17 +182,22 @@ double Ansatz::calculate_energy() const {
   // Unrestricted case
   else {
     // Use spin-dependent RDMs for unrestricted case
-    const auto& [rdm1_aa_var, rdm1_bb_var] =
-        _wavefunction->get_active_one_rdm_spin_dependent();
-    const auto& [rdm2_aabb_var, rdm2_aaaa_var, rdm2_bbbb_var] =
-        _wavefunction->get_active_two_rdm_spin_dependent();
+    const auto& rdm1_sbt = std::get<SymmetryBlockedTensor<2, double>>(
+        _wavefunction->active_one_rdm());
+    const auto& rdm2_sbt = std::get<SymmetryBlockedTensor<4, double>>(
+        _wavefunction->active_two_rdm());
 
-    // Extract RDM matrices/vectors from variants
-    const auto& rdm1_aa = std::get<Eigen::MatrixXd>(rdm1_aa_var);
-    const auto& rdm1_bb = std::get<Eigen::MatrixXd>(rdm1_bb_var);
-    const auto& rdm2_aabb = std::get<Eigen::VectorXd>(rdm2_aabb_var);
-    const auto& rdm2_aaaa = std::get<Eigen::VectorXd>(rdm2_aaaa_var);
-    const auto& rdm2_bbbb = std::get<Eigen::VectorXd>(rdm2_bbbb_var);
+    // Extract RDM blocks from the symmetry-blocked tensors
+    const Eigen::MatrixXd& rdm1_aa =
+        rdm1_sbt.block({axes::alpha(), axes::alpha()});
+    const Eigen::MatrixXd& rdm1_bb =
+        rdm1_sbt.block({axes::beta(), axes::beta()});
+    const Eigen::VectorXd& rdm2_aabb = rdm2_sbt.block(
+        {axes::alpha(), axes::alpha(), axes::beta(), axes::beta()});
+    const Eigen::VectorXd& rdm2_aaaa = rdm2_sbt.block(
+        {axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()});
+    const Eigen::VectorXd& rdm2_bbbb = rdm2_sbt.block(
+        {axes::beta(), axes::beta(), axes::beta(), axes::beta()});
 
     // get one body integrals from hamiltonian
     const auto& [h1_alpha, h1_beta] = _hamiltonian->get_one_body_integrals();
@@ -200,15 +207,17 @@ double Ansatz::calculate_energy() const {
         _hamiltonian->get_two_body_integrals();
 
     // check that active space indices are consistent
-    auto active_space_indices =
-        _wavefunction->get_orbitals()->get_active_space_indices();
-    if (active_space_indices.first.size() !=
-        active_space_indices.second.size()) {
+    const auto active_ai = _wavefunction->get_orbitals()->active_indices();
+    if (spin_channel_indices(active_ai, axes::alpha()).size() !=
+        spin_channel_indices(active_ai, axes::beta()).size()) {
       throw std::runtime_error(
           "Active space indices are inconsistent between Hamiltonian and "
           "wavefunction");
     }
-    size_t norb = active_space_indices.first.size();
+    size_t norb =
+        spin_channel_indices(_wavefunction->get_orbitals()->active_indices(),
+                             axes::alpha())
+            .size();
 
     // One-body contribution (alpha + beta)
     for (int p = 0; p < norb; ++p) {
@@ -348,10 +357,12 @@ void Ansatz::validate_orbital_consistency() const {
   }
 
   // Check active space indices consistency
-  const auto& [ham_active_alpha, ham_active_beta] =
-      ham_orbitals.get_active_space_indices();
-  const auto& [wf_active_alpha, wf_active_beta] =
-      wf_orbitals.get_active_space_indices();
+  const auto ham_active = ham_orbitals.active_indices();
+  const auto wf_active = wf_orbitals.active_indices();
+  const auto ham_active_alpha = spin_channel_indices(ham_active, axes::alpha());
+  const auto ham_active_beta = spin_channel_indices(ham_active, axes::beta());
+  const auto wf_active_alpha = spin_channel_indices(wf_active, axes::alpha());
+  const auto wf_active_beta = spin_channel_indices(wf_active, axes::beta());
 
   if (ham_active_alpha != wf_active_alpha) {
     throw std::runtime_error(
@@ -365,10 +376,15 @@ void Ansatz::validate_orbital_consistency() const {
   }
 
   // Check inactive space indices consistency
-  const auto& [ham_inactive_alpha, ham_inactive_beta] =
-      ham_orbitals.get_inactive_space_indices();
-  const auto& [wf_inactive_alpha, wf_inactive_beta] =
-      wf_orbitals.get_inactive_space_indices();
+  const auto ham_inactive = ham_orbitals.inactive_indices();
+  const auto wf_inactive = wf_orbitals.inactive_indices();
+  const auto ham_inactive_alpha =
+      spin_channel_indices(ham_inactive, axes::alpha());
+  const auto ham_inactive_beta =
+      spin_channel_indices(ham_inactive, axes::beta());
+  const auto wf_inactive_alpha =
+      spin_channel_indices(wf_inactive, axes::alpha());
+  const auto wf_inactive_beta = spin_channel_indices(wf_inactive, axes::beta());
 
   if (ham_inactive_alpha != wf_inactive_alpha) {
     throw std::runtime_error(
@@ -383,10 +399,14 @@ void Ansatz::validate_orbital_consistency() const {
 
   // Compare orbital coefficients numerically
 
-  const auto& [ham_coeffs_alpha, ham_coeffs_beta] =
-      ham_orbitals.get_coefficients();
-  const auto& [wf_coeffs_alpha, wf_coeffs_beta] =
-      wf_orbitals.get_coefficients();
+  const auto& ham_coeffs_alpha =
+      ham_orbitals.coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& ham_coeffs_beta =
+      ham_orbitals.coefficients()->block({axes::beta(), axes::beta()});
+  const auto& wf_coeffs_alpha =
+      wf_orbitals.coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& wf_coeffs_beta =
+      wf_orbitals.coefficients()->block({axes::beta(), axes::beta()});
 
   // Check alpha coefficients
   if (ham_coeffs_alpha.rows() != wf_coeffs_alpha.rows() ||
@@ -424,10 +444,14 @@ void Ansatz::validate_orbital_consistency() const {
   if (ham_orbitals.has_energies() && wf_orbitals.has_energies()) {
     constexpr double energy_tolerance = 1e-12;
 
-    const auto& [ham_energies_alpha, ham_energies_beta] =
-        ham_orbitals.get_energies();
-    const auto& [wf_energies_alpha, wf_energies_beta] =
-        wf_orbitals.get_energies();
+    const auto& ham_energies_alpha =
+        ham_orbitals.energies()->block({axes::alpha()});
+    const auto& ham_energies_beta =
+        ham_orbitals.energies()->block({axes::beta()});
+    const auto& wf_energies_alpha =
+        wf_orbitals.energies()->block({axes::alpha()});
+    const auto& wf_energies_beta =
+        wf_orbitals.energies()->block({axes::beta()});
 
     // Check alpha energies
     if (ham_energies_alpha.size() != wf_energies_alpha.size()) {
@@ -548,8 +572,7 @@ void Ansatz::to_hdf5_file(const std::string& filename) const {
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_write_suffix(filename,
-                                          DATACLASS_TO_SNAKE_CASE(Ansatz));
+  DataTypeFilename::validate_write_suffix(filename, Ansatz::data_type_name());
   _to_hdf5_file(filename);
 }
 
@@ -558,8 +581,7 @@ std::shared_ptr<Ansatz> Ansatz::from_hdf5_file(const std::string& filename) {
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_read_suffix(filename,
-                                         DATACLASS_TO_SNAKE_CASE(Ansatz));
+  DataTypeFilename::validate_read_suffix(filename, Ansatz::data_type_name());
   return _from_hdf5_file(filename);
 }
 
@@ -568,8 +590,7 @@ void Ansatz::to_json_file(const std::string& filename) const {
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_write_suffix(filename,
-                                          DATACLASS_TO_SNAKE_CASE(Ansatz));
+  DataTypeFilename::validate_write_suffix(filename, Ansatz::data_type_name());
   _to_json_file(filename);
 }
 
@@ -578,8 +599,7 @@ std::shared_ptr<Ansatz> Ansatz::from_json_file(const std::string& filename) {
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_read_suffix(filename,
-                                         DATACLASS_TO_SNAKE_CASE(Ansatz));
+  DataTypeFilename::validate_read_suffix(filename, Ansatz::data_type_name());
   return _from_json_file(filename);
 }
 
@@ -931,6 +951,22 @@ std::shared_ptr<Ansatz> Ansatz::_from_hdf5_file(const std::string& filename) {
     throw std::runtime_error("Unable to read Ansatz data from HDF5 file '" +
                              filename + "'. " +
                              "HDF5 error: " + std::string(e.getCDetailMsg()));
+  }
+}
+
+void Ansatz::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
+  hash_value(ctx, get_data_type_name());
+  if (_hamiltonian) {
+    hash_field_presence(ctx, true);
+    hash_value(ctx, _hamiltonian->content_hash());
+  } else {
+    hash_field_presence(ctx, false);
+  }
+  if (_wavefunction) {
+    hash_field_presence(ctx, true);
+    hash_value(ctx, _wavefunction->content_hash());
+  } else {
+    hash_field_presence(ctx, false);
   }
 }
 

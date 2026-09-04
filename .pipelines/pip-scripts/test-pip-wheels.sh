@@ -16,6 +16,20 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 
 if [ "$MAC_BUILD" == "OFF" ]; then
+    # CFSClean3: redirect Ubuntu apt endpoints to the Azure-internal mirror.
+    # Note: azure.archive.ubuntu.com only carries amd64/i386. Non-x86 architectures
+    # (e.g. arm64) live under ubuntu-ports and must go to azure.ports.ubuntu.com,
+    # otherwise apt gets a 404 for binary-<arch>/Packages and exits with code 100.
+    _cfs_apt_redirect() {
+        sed -i \
+            -e 's|https\?://archive.ubuntu.com/ubuntu|http://azure.archive.ubuntu.com/ubuntu|g' \
+            -e 's|https\?://security.ubuntu.com/ubuntu|http://azure.archive.ubuntu.com/ubuntu|g' \
+            -e 's|https\?://ports.ubuntu.com/ubuntu-ports|http://azure.ports.ubuntu.com/ubuntu-ports|g' \
+            "$1"
+    }
+    [ -f /etc/apt/sources.list.d/ubuntu.sources ] && _cfs_apt_redirect /etc/apt/sources.list.d/ubuntu.sources
+    [ -f /etc/apt/sources.list ]                  && _cfs_apt_redirect /etc/apt/sources.list
+
     # Try to prevent stochastic segfault from libc-bin
     echo "Reinstalling libc-bin..."
     rm /var/lib/dpkg/info/libc-bin.*
@@ -84,10 +98,22 @@ if [ ${#WHEEL[@]} -ne 1 ] || [ ! -f "${WHEEL[0]}" ]; then
 fi
 python3 -m pip install "${WHEEL[0]}[test]"
 
-# Print installed packages for debugging
-echo "------------------ Installed Python packages ------------------"
-python3 -m pip freeze
-echo "---------------------------------------------------------------"
+# Snapshot the full env and feed it to a dry-run `pip install --report` so
+# Component Governance's PipReportDetector sees every package in testenv.
+# The report is auto-discovered when it sits next to a setup.py or
+# requirements.txt in a non-hidden directory (the detector skips dotdirs
+# like .pipelines/). The locally-built qdk_chemistry wheel is excluded
+# because it is not resolvable from any index. See:
+#   https://github.com/microsoft/component-detection/blob/main/docs/detectors/pip.md
+#   https://github.com/microsoft/component-detection/issues/243
+mkdir -p "$PYTHON_DIR/build/test-manifest"
+echo "------------------ Installed Python packages (testenv) ------------------"
+python3 -m pip list --format=freeze --exclude qdk_chemistry \
+    | tee "$PYTHON_DIR/build/test-manifest/requirements.txt"
+echo "-------------------------------------------------------------------------"
+python3 -m pip install --dry-run --ignore-installed --quiet \
+    --report "$PYTHON_DIR/build/test-manifest/component-detection-pip-report.json" \
+    -r "$PYTHON_DIR/build/test-manifest/requirements.txt"
 
 # Disable telemetry during testing
 export QSHARP_PYTHON_TELEMETRY=false

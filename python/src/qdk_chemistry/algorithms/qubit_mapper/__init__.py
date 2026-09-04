@@ -1,7 +1,7 @@
 """QDK/Chemistry qubit mapper abstractions and utilities.
 
 This module provides the base class `QubitMapper` as well as the `QubitMapperFactory`
-for mapping electronic structure Hamiltonians to qubit Hamiltonians using various mapping
+for mapping electronic structure Hamiltonians to qubit operators using various mapping
 strategies.
 """
 

@@ -9,14 +9,14 @@
 
 #include <filesystem>
 #include <nlohmann/json.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/cc.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 
 #include "ut_common.hpp"
 
 using namespace qdk::chemistry::data;
 
-class CoupledClusterContainerTest : public ::testing::Test {
+class AmplitudeContainerTest : public ::testing::Test {
  protected:
   void SetUp() override {}
 
@@ -25,27 +25,28 @@ class CoupledClusterContainerTest : public ::testing::Test {
   // Helper function to create a simple Wavefunction from a Configuration
   std::shared_ptr<Wavefunction> create_test_wavefunction(
       const Configuration& ref, std::shared_ptr<Orbitals> orbitals) {
-    auto sd_container =
-        std::make_unique<SlaterDeterminantContainer>(ref, orbitals);
+    auto sd_container = std::make_unique<StateVectorContainer>(ref, orbitals);
     return std::make_shared<Wavefunction>(std::move(sd_container));
   }
 };
 
-TEST_F(CoupledClusterContainerTest, BasicProperties) {
+TEST_F(AmplitudeContainerTest, BasicProperties) {
   size_t nocc = 2;
   size_t nvirt = 2;
   size_t nmo = nocc + nvirt;
 
   auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
-  Configuration ref("2200");
+  auto ref = Configuration::from_spin_half_string("2200");
   auto wavefunction = create_test_wavefunction(ref, orbitals);
 
   Eigen::VectorXd t1_amplitudes = Eigen::VectorXd::Random(nocc * nvirt);
   Eigen::VectorXd t2_amplitudes =
       Eigen::VectorXd::Random(nocc * nocc * nvirt * nvirt);
 
-  CoupledClusterContainer cc(orbitals, wavefunction, t1_amplitudes,
-                             t2_amplitudes);
+  AmplitudeContainer cc(orbitals, wavefunction, AmplitudeType::CoupledCluster,
+                        t1_amplitudes, t2_amplitudes);
+
+  EXPECT_EQ(cc.get_amplitude_type(), AmplitudeType::CoupledCluster);
 
   // check amplitudes
   auto [t1_alpha, t1_beta] = cc.get_t1_amplitudes();
@@ -64,13 +65,13 @@ TEST_F(CoupledClusterContainerTest, BasicProperties) {
 }
 
 // Test it throws when amplitude sizes are wrong
-TEST_F(CoupledClusterContainerTest, InvalidAmplitudeSizesThrow) {
+TEST_F(AmplitudeContainerTest, InvalidAmplitudeSizesThrow) {
   size_t nocc = 2;
   size_t nvirt = 2;
   size_t nmo = nocc + nvirt;
 
   auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
-  Configuration ref("2200");
+  auto ref = Configuration::from_spin_half_string("2200");
   auto wavefunction = create_test_wavefunction(ref, orbitals);
 
   // Correct sizes: T1 = nocc * nvirt = 4, T2 = nocc * nocc * nvirt * nvirt = 16
@@ -78,72 +79,83 @@ TEST_F(CoupledClusterContainerTest, InvalidAmplitudeSizesThrow) {
   // Test: T1 amplitude with wrong size (too small)
   Eigen::VectorXd t1_wrong_size = Eigen::VectorXd::Random(2);  // Should be 4
   Eigen::VectorXd t2_correct = Eigen::VectorXd::Random(16);
-  EXPECT_THROW(CoupledClusterContainer(orbitals, wavefunction, t1_wrong_size,
-                                       t2_correct),
-               std::invalid_argument);
+  EXPECT_THROW(
+      AmplitudeContainer(orbitals, wavefunction, AmplitudeType::CoupledCluster,
+                         t1_wrong_size, t2_correct),
+      std::invalid_argument);
 
   // Test: T1 amplitude with wrong size (too large)
   Eigen::VectorXd t1_too_large = Eigen::VectorXd::Random(10);  // Should be 4
   EXPECT_THROW(
-      CoupledClusterContainer(orbitals, wavefunction, t1_too_large, t2_correct),
+      AmplitudeContainer(orbitals, wavefunction, AmplitudeType::CoupledCluster,
+                         t1_too_large, t2_correct),
       std::invalid_argument);
 
   // Test: T2 amplitude with wrong size (too small)
   Eigen::VectorXd t1_correct = Eigen::VectorXd::Random(4);
   Eigen::VectorXd t2_wrong_size = Eigen::VectorXd::Random(10);  // Should be 16
-  EXPECT_THROW(CoupledClusterContainer(orbitals, wavefunction, t1_correct,
-                                       t2_wrong_size),
-               std::invalid_argument);
+  EXPECT_THROW(
+      AmplitudeContainer(orbitals, wavefunction, AmplitudeType::CoupledCluster,
+                         t1_correct, t2_wrong_size),
+      std::invalid_argument);
 
   // Test: T2 amplitude with wrong size (too large)
   Eigen::VectorXd t2_too_large = Eigen::VectorXd::Random(20);  // Should be 16
   EXPECT_THROW(
-      CoupledClusterContainer(orbitals, wavefunction, t1_correct, t2_too_large),
+      AmplitudeContainer(orbitals, wavefunction, AmplitudeType::CoupledCluster,
+                         t1_correct, t2_too_large),
       std::invalid_argument);
 
   // Test: Both amplitudes with wrong sizes
-  EXPECT_THROW(CoupledClusterContainer(orbitals, wavefunction, t1_wrong_size,
-                                       t2_wrong_size),
-               std::invalid_argument);
+  EXPECT_THROW(
+      AmplitudeContainer(orbitals, wavefunction, AmplitudeType::CoupledCluster,
+                         t1_wrong_size, t2_wrong_size),
+      std::invalid_argument);
 
   // Test: Correct sizes should not throw
-  EXPECT_NO_THROW(
-      CoupledClusterContainer(orbitals, wavefunction, t1_correct, t2_correct));
+  EXPECT_NO_THROW(AmplitudeContainer(orbitals, wavefunction,
+                                     AmplitudeType::CoupledCluster, t1_correct,
+                                     t2_correct));
 }
 
 // Test JSON serialization/deserialization
-TEST_F(CoupledClusterContainerTest, JsonSerializationSpatial) {
+TEST_F(AmplitudeContainerTest, JsonSerializationSpatial) {
   size_t nocc = 2;
   size_t nvirt = 2;
   size_t nmo = nocc + nvirt;
 
   auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
-  Configuration ref("2200");
+  auto ref = Configuration::from_spin_half_string("2200");
   auto wavefunction = create_test_wavefunction(ref, orbitals);
 
   Eigen::VectorXd t1_amplitudes = Eigen::VectorXd::Random(nocc * nvirt);
   Eigen::VectorXd t2_amplitudes =
       Eigen::VectorXd::Random(nocc * nocc * nvirt * nvirt);
 
-  CoupledClusterContainer original(orbitals, wavefunction, t1_amplitudes,
-                                   t2_amplitudes);
+  AmplitudeContainer original(orbitals, wavefunction,
+                              AmplitudeType::CoupledCluster, t1_amplitudes,
+                              t2_amplitudes);
 
   // Serialize to JSON
   nlohmann::json j = original.to_json();
 
   // Deserialize from JSON using container-specific method
-  auto restored = CoupledClusterContainer::from_json(j);
+  auto restored = AmplitudeContainer::from_json(j);
+
+  // The amplitude type round-trips through serialization.
+  EXPECT_EQ(restored->get_amplitude_type(), AmplitudeType::CoupledCluster);
 
   // Also test base Wavefunction::from_json() by wrapping container in
   // Wavefunction
   auto original_wf =
-      std::make_shared<Wavefunction>(std::make_unique<CoupledClusterContainer>(
-          orbitals, wavefunction, t1_amplitudes, t2_amplitudes));
+      std::make_shared<Wavefunction>(std::make_unique<AmplitudeContainer>(
+          orbitals, wavefunction, AmplitudeType::CoupledCluster, t1_amplitudes,
+          t2_amplitudes));
   nlohmann::json wf_j = original_wf->to_json();
   auto wf_restored = Wavefunction::from_json(wf_j);
-  EXPECT_EQ(wf_restored->get_container_type(), "coupled_cluster");
+  EXPECT_EQ(wf_restored->get_container_type(), "amplitude");
   auto& wf_restored_container =
-      wf_restored->get_container<CoupledClusterContainer>();
+      wf_restored->get_container<AmplitudeContainer>();
 
   // check amplitudes
   auto [t1_alpha_orig, t1_beta_orig] = original.get_t1_amplitudes();
@@ -189,13 +201,13 @@ TEST_F(CoupledClusterContainerTest, JsonSerializationSpatial) {
                             testing::wf_tolerance));
 }
 
-TEST_F(CoupledClusterContainerTest, JsonSerializationSpin) {
+TEST_F(AmplitudeContainerTest, JsonSerializationSpin) {
   size_t nocc = 2;
   size_t nvirt = 2;
   size_t nmo = nocc + nvirt;
 
   auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
-  Configuration ref("2200");
+  auto ref = Configuration::from_spin_half_string("2200");
   auto wavefunction = create_test_wavefunction(ref, orbitals);
 
   Eigen::VectorXd t1_aa = Eigen::VectorXd::Random(nocc * nvirt);
@@ -207,14 +219,15 @@ TEST_F(CoupledClusterContainerTest, JsonSerializationSpin) {
   Eigen::VectorXd t2_bbbb =
       Eigen::VectorXd::Random(nocc * nocc * nvirt * nvirt);
 
-  CoupledClusterContainer original(orbitals, wavefunction, t1_aa, t1_bb,
-                                   t2_abab, t2_aaaa, t2_bbbb);
+  AmplitudeContainer original(orbitals, wavefunction,
+                              AmplitudeType::CoupledCluster, t1_aa, t1_bb,
+                              t2_abab, t2_aaaa, t2_bbbb);
 
   // Serialize to JSON
   nlohmann::json j = original.to_json();
 
   // Deserialize from JSON
-  auto restored = CoupledClusterContainer::from_json(j);
+  auto restored = AmplitudeContainer::from_json(j);
 
   // check amplitudes
   auto [t1_alpha_orig, t1_beta_orig] = original.get_t1_amplitudes();
@@ -241,21 +254,22 @@ TEST_F(CoupledClusterContainerTest, JsonSerializationSpin) {
 }
 
 // Test HDF5 serialization/deserialization
-TEST_F(CoupledClusterContainerTest, Hdf5SerializationSpatial) {
+TEST_F(AmplitudeContainerTest, Hdf5SerializationSpatial) {
   size_t nocc = 2;
   size_t nvirt = 2;
   size_t nmo = nocc + nvirt;
 
   auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
-  Configuration ref("2200");
+  auto ref = Configuration::from_spin_half_string("2200");
   auto wavefunction = create_test_wavefunction(ref, orbitals);
 
   Eigen::VectorXd t1_amplitudes = Eigen::VectorXd::Random(nocc * nvirt);
   Eigen::VectorXd t2_amplitudes =
       Eigen::VectorXd::Random(nocc * nocc * nvirt * nvirt);
 
-  CoupledClusterContainer original(orbitals, wavefunction, t1_amplitudes,
-                                   t2_amplitudes);
+  AmplitudeContainer original(orbitals, wavefunction,
+                              AmplitudeType::CoupledCluster, t1_amplitudes,
+                              t2_amplitudes);
 
   std::string filename = "test_cc_spatial_serialization.h5";
   {
@@ -266,7 +280,10 @@ TEST_F(CoupledClusterContainerTest, Hdf5SerializationSpatial) {
     original.to_hdf5(root);
 
     // Deserialize from HDF5 using container-specific method
-    auto restored = CoupledClusterContainer::from_hdf5(root);
+    auto restored = AmplitudeContainer::from_hdf5(root);
+
+    // The amplitude type round-trips through HDF5 serialization.
+    EXPECT_EQ(restored->get_amplitude_type(), AmplitudeType::CoupledCluster);
 
     // check amplitudes
     auto [t1_alpha_orig, t1_beta_orig] = original.get_t1_amplitudes();
@@ -299,9 +316,10 @@ TEST_F(CoupledClusterContainerTest, Hdf5SerializationSpatial) {
   std::string wf_filename = "test_cc_wavefunction_serialization.h5";
   {
     // Create and serialize a Wavefunction wrapping the container
-    auto original_wf = std::make_shared<Wavefunction>(
-        std::make_unique<CoupledClusterContainer>(
-            orbitals, wavefunction, t1_amplitudes, t2_amplitudes));
+    auto original_wf =
+        std::make_shared<Wavefunction>(std::make_unique<AmplitudeContainer>(
+            orbitals, wavefunction, AmplitudeType::CoupledCluster,
+            t1_amplitudes, t2_amplitudes));
     H5::H5File file(wf_filename, H5F_ACC_TRUNC);
     H5::Group root = file.openGroup("/");
     original_wf->to_hdf5(root);
@@ -312,14 +330,14 @@ TEST_F(CoupledClusterContainerTest, Hdf5SerializationSpatial) {
     H5::H5File file(wf_filename, H5F_ACC_RDONLY);
     H5::Group root = file.openGroup("/");
     auto wf_restored = Wavefunction::from_hdf5(root);
-    EXPECT_EQ(wf_restored->get_container_type(), "coupled_cluster");
+    EXPECT_EQ(wf_restored->get_container_type(), "amplitude");
     auto& wf_restored_container =
-        wf_restored->get_container<CoupledClusterContainer>();
+        wf_restored->get_container<AmplitudeContainer>();
 
     // Get the restored amplitudes from container-specific method for comparison
     H5::H5File file2(filename, H5F_ACC_RDONLY);
     H5::Group root2 = file2.openGroup("/");
-    auto restored = CoupledClusterContainer::from_hdf5(root2);
+    auto restored = AmplitudeContainer::from_hdf5(root2);
 
     auto [t1_alpha_rest, t1_beta_rest] = restored->get_t1_amplitudes();
     auto [t2_abab_rest, t2_aaaa_rest, t2_bbbb_rest] =
@@ -352,124 +370,12 @@ TEST_F(CoupledClusterContainerTest, Hdf5SerializationSpatial) {
   std::remove(wf_filename.c_str());
 }
 
-// Test CI coefficients generation from CC amplitudes
-TEST_F(CoupledClusterContainerTest, CICoefficientsGeneration) {
-  size_t nocc = 2;
-  size_t nvirt = 2;
-  size_t nmo = nocc + nvirt;
-
-  auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
-  Configuration ref("2200");
-  auto wavefunction = create_test_wavefunction(ref, orbitals);
-
-  Eigen::VectorXd t1_amplitudes = Eigen::VectorXd::Random(nocc * nvirt);
-  Eigen::VectorXd t2_amplitudes =
-      Eigen::VectorXd::Random(nocc * nocc * nvirt * nvirt);
-
-  CoupledClusterContainer cc(orbitals, wavefunction, t1_amplitudes,
-                             t2_amplitudes);
-
-  // Test that CI coefficients can be retrieved (lazy evaluation)
-  const auto& coefficients = cc.get_coefficients();
-
-  // Verify coefficients are non-empty
-  std::visit(
-      [](const auto& vec) {
-        EXPECT_GT(vec.size(), 0) << "CI coefficients should not be empty";
-      },
-      coefficients);
-
-  // Test that determinants can be retrieved
-  const auto& determinants = cc.get_active_determinants();
-  EXPECT_GT(determinants.size(), 0)
-      << "Active determinants should not be empty";
-
-  // The number of coefficients should match the number of determinants
-  std::visit(
-      [&determinants](const auto& vec) {
-        EXPECT_EQ(static_cast<size_t>(vec.size()), determinants.size())
-            << "Number of coefficients should match number of determinants";
-      },
-      coefficients);
-
-  // The reference determinant should be in the expansion
-  bool found_reference = false;
-  for (const auto& det : determinants) {
-    if (det.to_string() == ref.to_string()) {
-      found_reference = true;
-      break;
-    }
-  }
-  EXPECT_TRUE(found_reference)
-      << "Reference determinant should be in the CI expansion";
-
-  // Test get_coefficient for reference determinant
-  auto ref_coeff = cc.get_coefficient(ref);
-  std::visit(
-      [](const auto& coeff) {
-        using T = std::decay_t<decltype(coeff)>;
-        if constexpr (std::is_same_v<T, double>) {
-          // Reference coefficient should be close to 1.0 for well-behaved CC
-          EXPECT_TRUE(std::abs(coeff) > 0.0)
-              << "Reference coefficient should be non-zero";
-        } else {
-          EXPECT_TRUE(std::abs(coeff) > 0.0)
-              << "Reference coefficient should be non-zero";
-        }
-      },
-      ref_coeff);
-
-  // Test size() returns the number of determinants
-  EXPECT_EQ(cc.size(), determinants.size())
-      << "size() should return the number of determinants";
-}
-
-TEST_F(CoupledClusterContainerTest, CIExpansionConsistency) {
+TEST_F(AmplitudeContainerTest, RdmsAndExpansionNotAvailable) {
   size_t nocc = 2;
   size_t nvirt = 2;
 
   auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
-  Configuration ref("2200");
-  auto wavefunction = create_test_wavefunction(ref, orbitals);
-
-  // Use small but non-zero amplitudes for testing
-  Eigen::VectorXd t1_amplitudes = Eigen::VectorXd::Ones(nocc * nvirt) * 0.1;
-  Eigen::VectorXd t2_amplitudes =
-      Eigen::VectorXd::Ones(nocc * nocc * nvirt * nvirt) * 0.05;
-
-  CoupledClusterContainer cc(orbitals, wavefunction, t1_amplitudes,
-                             t2_amplitudes);
-
-  const auto& coefficients = cc.get_coefficients();
-  const auto& determinants = cc.get_active_determinants();
-
-  // Verify each determinant can be looked up individually
-  for (size_t i = 0; i < determinants.size(); ++i) {
-    auto coeff = cc.get_coefficient(determinants[i]);
-    std::visit(
-        [i, &coefficients](const auto& individual_coeff) {
-          using T = std::decay_t<decltype(individual_coeff)>;
-          std::visit(
-              [i, &individual_coeff](const auto& all_coeffs) {
-                using U = std::decay_t<decltype(all_coeffs[0])>;
-                if constexpr (std::is_same_v<T, U>) {
-                  EXPECT_NEAR(std::abs(individual_coeff),
-                              std::abs(all_coeffs[i]), testing::wf_tolerance)
-                      << "Individual coefficient lookup should match vector";
-                }
-              },
-              coefficients);
-        },
-        coeff);
-  }
-}
-
-TEST_F(CoupledClusterContainerTest, RDMsRequireAdjointWavefunction) {
-  size_t nocc = 2;
-  size_t nvirt = 2;
-
-  auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
-  Configuration ref("2200");
+  auto ref = Configuration::from_spin_half_string("2200");
   auto wavefunction = create_test_wavefunction(ref, orbitals);
 
   // Use small but non-zero amplitudes
@@ -477,93 +383,71 @@ TEST_F(CoupledClusterContainerTest, RDMsRequireAdjointWavefunction) {
   Eigen::VectorXd t2_amplitudes =
       Eigen::VectorXd::Ones(nocc * nocc * nvirt * nvirt) * 0.05;
 
-  // Create CC container with only amplitudes (no explicit RDMs)
-  CoupledClusterContainer cc(orbitals, wavefunction, t1_amplitudes,
-                             t2_amplitudes);
+  AmplitudeContainer cc(orbitals, wavefunction, AmplitudeType::CoupledCluster,
+                        t1_amplitudes, t2_amplitudes);
 
-  // CI coefficients should be available (lazy evaluation from amplitudes)
-  const auto& coefficients = cc.get_coefficients();
-  std::visit(
-      [](const auto& vec) {
-        EXPECT_EQ(vec.size(), 36) << "36 CI coefficients should be available";
-      },
-      coefficients);
+  // Amplitude wavefunctions are not stored as a determinant/coefficient
+  // expansion, so these accessors must throw.
+  EXPECT_THROW(cc.get_coefficients(), std::runtime_error);
+  EXPECT_THROW(cc.get_active_determinants(), std::runtime_error);
+  EXPECT_THROW(cc.size(), std::runtime_error);
 
-  const auto& determinants = cc.get_active_determinants();
-  EXPECT_EQ(determinants.size(), 36) << "36 determinants should be available";
+  // RDMs are not stored by amplitude wavefunctions.
+  EXPECT_FALSE(cc.has_one_rdm_spin_traced());
+  EXPECT_FALSE(cc.has_one_rdm_spin_dependent());
+  EXPECT_FALSE(cc.has_two_rdm_spin_traced());
+  EXPECT_FALSE(cc.has_two_rdm_spin_dependent());
 
-  // RDMs should NOT be available without the adjoint wavefunction
-  EXPECT_FALSE(cc.has_one_rdm_spin_traced())
-      << "Spin-traced 1-RDM requires adjoint wavefunction";
-  EXPECT_FALSE(cc.has_one_rdm_spin_dependent())
-      << "Spin-dependent 1-RDM requires adjoint wavefunction";
-  EXPECT_FALSE(cc.has_two_rdm_spin_traced())
-      << "Spin-traced 2-RDM requires adjoint wavefunction";
-  EXPECT_FALSE(cc.has_two_rdm_spin_dependent())
-      << "Spin-dependent 2-RDM requires adjoint wavefunction";
+  EXPECT_THROW(cc.get_active_one_rdm_spin_traced(), std::runtime_error);
+  EXPECT_THROW(cc.get_active_one_rdm_spin_dependent(), std::runtime_error);
+  EXPECT_THROW(cc.get_active_two_rdm_spin_traced(), std::runtime_error);
+  EXPECT_THROW(cc.get_active_two_rdm_spin_dependent(), std::runtime_error);
+}
 
-  // Attempting to get RDMs should throw an error
-  EXPECT_THROW(
-      {
-        try {
-          cc.get_active_one_rdm_spin_traced();
-        } catch (const std::runtime_error& e) {
-          EXPECT_TRUE(std::string(e.what()).find("adjoint") !=
-                      std::string::npos)
-              << "Error message should mention adjoint wavefunction";
-          throw;
-        }
-      },
-      std::runtime_error);
+// The "no determinant/coefficient expansion" behavior must also surface through
+// the top-level Wavefunction accessors, which delegate to the container.
+TEST_F(AmplitudeContainerTest, WavefunctionExpansionAccessorsThrow) {
+  size_t nocc = 2;
+  size_t nvirt = 2;
 
-  EXPECT_THROW(
-      {
-        try {
-          cc.get_active_one_rdm_spin_dependent();
-        } catch (const std::runtime_error& e) {
-          EXPECT_TRUE(std::string(e.what()).find("adjoint") !=
-                      std::string::npos)
-              << "Error message should mention adjoint wavefunction";
-          throw;
-        }
-      },
-      std::runtime_error);
+  auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
+  auto ref = Configuration::from_spin_half_string("2200");
+  auto reference = create_test_wavefunction(ref, orbitals);
 
-  EXPECT_THROW(
-      {
-        try {
-          cc.get_active_two_rdm_spin_traced();
-        } catch (const std::runtime_error& e) {
-          EXPECT_TRUE(std::string(e.what()).find("adjoint") !=
-                      std::string::npos)
-              << "Error message should mention adjoint wavefunction";
-          throw;
-        }
-      },
-      std::runtime_error);
+  Eigen::VectorXd t1_amplitudes = Eigen::VectorXd::Ones(nocc * nvirt) * 0.1;
+  Eigen::VectorXd t2_amplitudes =
+      Eigen::VectorXd::Ones(nocc * nocc * nvirt * nvirt) * 0.05;
 
-  EXPECT_THROW(
-      {
-        try {
-          cc.get_active_two_rdm_spin_dependent();
-        } catch (const std::runtime_error& e) {
-          EXPECT_TRUE(std::string(e.what()).find("adjoint") !=
-                      std::string::npos)
-              << "Error message should mention adjoint wavefunction";
-          throw;
-        }
-      },
-      std::runtime_error);
+  Wavefunction wf(std::make_unique<AmplitudeContainer>(
+      orbitals, reference, AmplitudeType::CoupledCluster, t1_amplitudes,
+      t2_amplitudes));
+
+  EXPECT_EQ(wf.get_container_type(), "amplitude");
+
+  // Determinant/coefficient accessors throw through the Wavefunction facade.
+  EXPECT_THROW(wf.get_coefficients(), std::runtime_error);
+  EXPECT_THROW(wf.get_coefficient(ref), std::runtime_error);
+  EXPECT_THROW(wf.get_active_determinants(), std::runtime_error);
+  EXPECT_THROW(wf.get_total_determinants(), std::runtime_error);
+  EXPECT_THROW(wf.size(), std::runtime_error);
+
+  // Amplitudes and electron counts remain accessible.
+  const auto& container = wf.get_container<AmplitudeContainer>();
+  EXPECT_TRUE(container.has_t1_amplitudes());
+  EXPECT_TRUE(container.has_t2_amplitudes());
+  auto [n_alpha, n_beta] = wf.get_active_num_electrons();
+  EXPECT_EQ(n_alpha, 2u);
+  EXPECT_EQ(n_beta, 2u);
 }
 
 // Test HDF5 serialization/deserialization
-TEST_F(CoupledClusterContainerTest, Hdf5SerializationSpin) {
+TEST_F(AmplitudeContainerTest, Hdf5SerializationSpin) {
   size_t nocc = 2;
   size_t nvirt = 2;
   size_t nmo = nocc + nvirt;
 
   auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
-  Configuration ref("2200");
+  auto ref = Configuration::from_spin_half_string("2200");
   auto wavefunction = create_test_wavefunction(ref, orbitals);
 
   Eigen::VectorXd t1_aa = Eigen::VectorXd::Random(nocc * nvirt);
@@ -575,8 +459,9 @@ TEST_F(CoupledClusterContainerTest, Hdf5SerializationSpin) {
   Eigen::VectorXd t2_bbbb =
       Eigen::VectorXd::Random(nocc * nocc * nvirt * nvirt);
 
-  CoupledClusterContainer original(orbitals, wavefunction, t1_aa, t1_bb,
-                                   t2_abab, t2_aaaa, t2_bbbb);
+  AmplitudeContainer original(orbitals, wavefunction,
+                              AmplitudeType::CoupledCluster, t1_aa, t1_bb,
+                              t2_abab, t2_aaaa, t2_bbbb);
 
   std::string filename = "test_cc_serialization.h5";
   {
@@ -587,7 +472,7 @@ TEST_F(CoupledClusterContainerTest, Hdf5SerializationSpin) {
     original.to_hdf5(root);
 
     // Deserialize from HDF5
-    auto restored = CoupledClusterContainer::from_hdf5(root);
+    auto restored = AmplitudeContainer::from_hdf5(root);
 
     // check amplitudes
     auto [t1_alpha_orig, t1_beta_orig] = original.get_t1_amplitudes();

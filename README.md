@@ -25,6 +25,8 @@ QDK/Chemistry bridges classical computational chemistry with quantum computing b
 
 ```txt
 qdk-chemistry/
+├── .github/
+│   └── skills/         # Development guidance for working in this repository
 ├── cpp/                # C++ core library
 │   ├── include/        # Header files
 │   ├── src/            # Implementation files
@@ -36,6 +38,10 @@ qdk-chemistry/
     ├── src/            # pybind11 wrapper and python code
     └── tests/          # Python unit tests
 ```
+
+Files under `.github/skills/` provide development-time guidance for coding
+agents working on the repository. They are not part of the installed package or
+its runtime behavior.
 
 ## Installing
 

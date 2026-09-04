@@ -13,7 +13,6 @@
 #include <nlohmann/json_fwd.hpp>
 #include <optional>
 #include <qdk/chemistry/data/data_class.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -229,10 +228,12 @@ class LatticeGraph : public DataClass {
    * @param periodic If true, add an edge between the first and last site
    *                 (ring topology). Requires n > 2. Default: false.
    * @param t        Uniform hopping weight for every edge. Default: 1.0.
+   * @param dfs_ordering If true, relabel sites in Hamiltonian-path order found
+   *                     by depth-first search. Default: false.
    * @throws std::invalid_argument If n == 0.
    */
   static LatticeGraph chain(std::uint64_t n, bool periodic = false,
-                            double t = 1.0);
+                            double t = 1.0, bool dfs_ordering = false);
 
   /**
    * @brief Create a two-dimensional square lattice.
@@ -262,11 +263,13 @@ class LatticeGraph : public DataClass {
    * @param periodic_y If true, apply periodic boundary conditions along y.
    * Requires ny >= 2. Default: false.
    * @param t          Uniform hopping weight. Default: 1.0.
+   * @param dfs_ordering If true, relabel sites in Hamiltonian-path order found
+   *                     by depth-first search. Default: false.
    * @throws std::invalid_argument If nx or ny is 0.
    */
   static LatticeGraph square(std::uint64_t nx, std::uint64_t ny,
                              bool periodic_x = false, bool periodic_y = false,
-                             double t = 1.0);
+                             double t = 1.0, bool dfs_ordering = false);
 
   /**
    * @brief Create a two-dimensional triangular lattice.
@@ -300,12 +303,15 @@ class LatticeGraph : public DataClass {
    * Requires ny >= 2. Default: false.
    * @param t          Uniform hopping weight. Default: 1.0.
    * @param coloring_seed PRNG seed for greedy edge coloring. Default: 0.
+   * @param dfs_ordering If true, relabel sites in Hamiltonian-path order found
+   *                     by depth-first search. Default: false.
    * @throws std::invalid_argument If nx or ny is 0.
    */
   static LatticeGraph triangular(std::uint64_t nx, std::uint64_t ny,
                                  bool periodic_x = false,
                                  bool periodic_y = false, double t = 1.0,
-                                 int coloring_seed = 0);
+                                 int coloring_seed = 0,
+                                 bool dfs_ordering = false);
 
   /**
    * @brief Create a two-dimensional honeycomb lattice.
@@ -340,11 +346,14 @@ class LatticeGraph : public DataClass {
    * @param periodic_y If true, apply periodic boundary conditions along y.
    * Requires ny >= 2. Default: false.
    * @param t          Uniform hopping weight. Default: 1.0.
+   * @param dfs_ordering Reserved for API compatibility; currently ignored.
+   *                     Default: false.
    * @throws std::invalid_argument If nx or ny is 0.
    */
   static LatticeGraph honeycomb(std::uint64_t nx, std::uint64_t ny,
                                 bool periodic_x = false,
-                                bool periodic_y = false, double t = 1.0);
+                                bool periodic_y = false, double t = 1.0,
+                                bool dfs_ordering = false);
 
   /**
    * @brief Create a two-dimensional kagome lattice.
@@ -390,11 +399,14 @@ class LatticeGraph : public DataClass {
    * Requires ny >= 2. Default: false.
    * @param t          Uniform hopping weight. Default: 1.0.
    * @param coloring_seed PRNG seed for greedy edge coloring. Default: 0.
+   * @param dfs_ordering Reserved for API compatibility; currently ignored.
+   *                     Default: false.
    * @throws std::invalid_argument If nx or ny is 0.
    */
   static LatticeGraph kagome(std::uint64_t nx, std::uint64_t ny,
                              bool periodic_x = false, bool periodic_y = false,
-                             double t = 1.0, int coloring_seed = 0);
+                             double t = 1.0, int coloring_seed = 0,
+                             bool dfs_ordering = false);
 
   /**
    * @brief Edge coloring stored at construction time, if any.
@@ -407,12 +419,18 @@ class LatticeGraph : public DataClass {
   const std::optional<EdgeColoring>& edge_coloring() const;
 
   /**
-   * @brief Get the data type name for this class.
+   * @brief Get the static data type name for this class.
    * @return "lattice_graph"
    */
-  std::string get_data_type_name() const override {
+  static std::string data_type_name() {
     return DATACLASS_TO_SNAKE_CASE(LatticeGraph);
   }
+
+  /**
+   * @brief Get the data type name for this instance.
+   * @return "lattice_graph"
+   */
+  std::string get_data_type_name() const override { return data_type_name(); }
 
   /**
    * @brief Get a human-readable summary of the lattice graph.
@@ -476,7 +494,25 @@ class LatticeGraph : public DataClass {
    */
   static LatticeGraph from_hdf5(H5::Group& group);
 
+  /**
+   * @brief Permutes the vertices of the lattice graph according to the given
+   * path.
+   *
+   * Reorders the sparse adjacency matrix using Eigen's permutation operations
+   * and updates the edge coloring to align with the new vertex indexing.
+   *
+   * @param graph The source lattice graph to permute.
+   * @param path The sequence of original vertex indices representing the target
+   * permutation.
+   * @return A new LatticeGraph with the permuted adjacency matrix and edge
+   * coloring.
+   */
+  static LatticeGraph permute(const LatticeGraph& graph,
+                              const std::vector<std::uint64_t>& path);
+
  private:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   /**
    * @brief Private constructor from a sparse adjacency matrix.
    *

@@ -165,6 +165,9 @@ Returns:
 
 )");
 
+  pmc_calculator.def("hash", &ProjectedMultiConfigurationCalculator::hash,
+                     py::arg("hamiltonian"), py::arg("configurations"));
+
   // Factory class binding - creates
   // ProjectedMultiConfigurationCalculatorFactory class with static methods
   qdk::chemistry::python::bind_algorithm_factory<

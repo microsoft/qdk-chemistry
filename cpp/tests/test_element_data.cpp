@@ -74,7 +74,7 @@ TEST_F(ElementDataTest, ChargeToSymbol) {
 // Test that all elements from 1-118 have symbols
 TEST_F(ElementDataTest, AllElementsHaveSymbols) {
   for (unsigned z = 1; z <= 118; ++z) {
-    EXPECT_NO_THROW(CHARGE_TO_SYMBOL.at(z));
+    EXPECT_NO_THROW((void)CHARGE_TO_SYMBOL.at(z));
     EXPECT_FALSE(CHARGE_TO_SYMBOL.at(z).empty());
   }
 }

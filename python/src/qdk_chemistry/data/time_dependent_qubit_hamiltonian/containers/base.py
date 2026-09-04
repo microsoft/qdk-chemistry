@@ -11,7 +11,7 @@ from abc import abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
+    from qdk_chemistry.data.qubit_operator import QubitOperator
 
 __all__: list[str] = []
 
@@ -26,7 +26,7 @@ class TimeDependentQubitHamiltonianContainer:
     """
 
     @abstractmethod
-    def evaluate(self, t: float) -> QubitHamiltonian:
+    def evaluate(self, t: float) -> QubitOperator:
         """Return the qubit Hamiltonian at time *t*.
 
         Args:

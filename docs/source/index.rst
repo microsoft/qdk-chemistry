@@ -53,6 +53,13 @@ Composable, Extensible Architecture
    user/quickstart
    user/features
    user/comprehensive/index
+   user/migrating-data-files
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Tutorials
+
+   tutorials/index
 
 .. _apidocs:
 

@@ -336,9 +336,9 @@ def test_write_fcidump_with_threshold(tmp_path):
     pymacis.write_fcidump(str(output_path2), header, T, V, core_energy, 1e-13)
 
     # Read file contents
-    with open(output_path1, "r") as f:
+    with open(output_path1, "r", encoding="utf-8") as f:
         content_tight = f.read()
-    with open(output_path2, "r") as f:
+    with open(output_path2, "r", encoding="utf-8") as f:
         content_loose = f.read()
 
     # With tight threshold, small integrals should be present
@@ -465,7 +465,7 @@ def test_write_fcidump_file_format(tmp_path):
     pymacis.write_fcidump(str(output_path), header, T, V, core_energy)
 
     # Read file content and verify format
-    with open(output_path, "r") as f:
+    with open(output_path, "r", encoding="utf-8") as f:
         content = f.read()
 
     # Check header format
@@ -520,7 +520,7 @@ def test_fcidump_format_compatibility(tmp_path):
 
     # Manually create FCIDUMP file in indices first format
     fcidump_indices_first = tmp_path / "test_indices_first.fcidump"
-    with open(fcidump_indices_first, "w") as f:
+    with open(fcidump_indices_first, "w", encoding="utf-8") as f:
         # Write header
         f.write("&FCI NORB=2,NELEC=2,MS2=0,\n")
         f.write("  ISYM=1,\n")

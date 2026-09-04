@@ -11,12 +11,17 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
+#include <utility>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
 
 namespace py = pybind11;
+
+// This translation unit intentionally binds the deprecated v1 facade
+// accessors/constructors to Python; suppress their deprecation warnings here.
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
 // Wrapper functions for file I/O methods that accept both strings and pathlib
 // Path objects
@@ -26,7 +31,6 @@ void orbitals_to_file_wrapper(qdk::chemistry::data::Orbitals &self,
   self.to_file(qdk::chemistry::python::utils::to_string_path(filename),
                format_type);
 }
-
 std::shared_ptr<qdk::chemistry::data::Orbitals> orbitals_from_file_wrapper(
     const py::object &filename, const std::string &format_type) {
   return qdk::chemistry::data::Orbitals::from_file(
@@ -56,6 +60,38 @@ std::shared_ptr<qdk::chemistry::data::Orbitals> orbitals_from_json_file_wrapper(
 }
 
 void bind_model_orbitals(py::module &data);
+
+namespace {
+
+// C++ [[deprecated]] does not propagate to Python callers, so the deprecated
+// v1 facade accessors raise a DeprecationWarning explicitly from the binding.
+void warn_v1_deprecated(const char *message) {
+  if (PyErr_WarnEx(PyExc_DeprecationWarning, message, 1) < 0) {
+    throw py::error_already_set();
+  }
+}
+
+// Bind a deprecated "get_*" accessor as both a method and a read-only property,
+// emitting a DeprecationWarning on each access.
+template <typename ClassBinding, typename Getter, typename... Extra>
+void bind_deprecated_getter_as_property(ClassBinding &cls,
+                                        const char *method_name,
+                                        const char *property_name,
+                                        Getter getter, const char *message,
+                                        const char *docstring,
+                                        const Extra &...extra) {
+  using Ret = decltype((std::declval<const qdk::chemistry::data::Orbitals &>().*
+                        getter)());
+  auto wrapper = [getter,
+                  message](const qdk::chemistry::data::Orbitals &self) -> Ret {
+    warn_v1_deprecated(message);
+    return (self.*getter)();
+  };
+  cls.def(method_name, wrapper, docstring, extra...);
+  cls.def_property_readonly(property_name, wrapper, docstring, extra...);
+}
+
+}  // namespace
 
 void bind_orbitals(py::module &data) {
   using namespace qdk::chemistry::algorithms;
@@ -100,8 +136,8 @@ Examples:
       py::init<const Eigen::MatrixXd &, const std::optional<Eigen::VectorXd> &,
                const std::optional<Eigen::MatrixXd> &,
                std::shared_ptr<qdk::chemistry::data::BasisSet>,
-               const std::optional<
-                   std::tuple<std::vector<size_t>, std::vector<size_t>>> &>(),
+               std::shared_ptr<const SymmetryBlockedIndexSet>,
+               std::shared_ptr<const SymmetryBlockedIndexSet>>(),
       R"(
 Constructor for restricted orbitals.
 
@@ -113,33 +149,34 @@ Args:
     energies (numpy.ndarray | None): The orbital energies (``num_molecular_orbitals``), can be None
     ao_overlap (numpy.ndarray | None): The atomic orbital overlap matrix (``num_atomic_orbitals`` × ``num_atomic_orbitals``), can be ``None``
     basis_set (BasisSet): The basis set
-    indices (tuple[list[int], list[int]] | None): Tuple of (active_space_indices, inactive_space_indices), can be ``None``
+    active_indices (SymmetryBlockedIndexSet | None): Active-space index set, can be ``None``
+    inactive_indices (SymmetryBlockedIndexSet | None): Inactive-space index set, can be ``None``
 
 Examples:
     >>> import numpy as np
     >>> coeffs = np.random.random((4, 3))
     >>> basis_set = BasisSet(...)
-    >>> orbitals = Orbitals(coeffs, None, None, basis_set, None)
+    >>> orbitals = Orbitals(coeffs, None, None, basis_set)
 
 )",
       py::arg("coefficients"),
       py::arg("energies") = std::optional<Eigen::VectorXd>{},
       py::arg("ao_overlap") = std::optional<Eigen::MatrixXd>{},
       py::arg("basis_set"),
-      py::arg("indices") = std::optional<
-          std::tuple<std::vector<size_t>, std::vector<size_t>>>{});
+      py::arg("active_indices") =
+          std::shared_ptr<const SymmetryBlockedIndexSet>(),
+      py::arg("inactive_indices") =
+          std::shared_ptr<const SymmetryBlockedIndexSet>());
 
   // Constructor for unrestricted orbitals
-  orbitals.def(
-      py::init<const Eigen::MatrixXd &, const Eigen::MatrixXd &,
-               const std::optional<Eigen::VectorXd> &,
-               const std::optional<Eigen::VectorXd> &,
-               const std::optional<Eigen::MatrixXd> &,
-               std::shared_ptr<qdk::chemistry::data::BasisSet>,
-               const std::optional<
-                   std::tuple<std::vector<size_t>, std::vector<size_t>,
-                              std::vector<size_t>, std::vector<size_t>>> &>(),
-      R"(
+  orbitals.def(py::init<const Eigen::MatrixXd &, const Eigen::MatrixXd &,
+                        const std::optional<Eigen::VectorXd> &,
+                        const std::optional<Eigen::VectorXd> &,
+                        const std::optional<Eigen::MatrixXd> &,
+                        std::shared_ptr<qdk::chemistry::data::BasisSet>,
+                        std::shared_ptr<const SymmetryBlockedIndexSet>,
+                        std::shared_ptr<const SymmetryBlockedIndexSet>>(),
+               R"(
 Constructor for unrestricted orbitals.
 
 ``num_atomic_orbitals`` refers to the number of atomic orbitals and ``num_molecular_orbitals`` refers to
@@ -168,30 +205,167 @@ Args:
 
     basis_set (BasisSet): The basis set
 
-    indices (tuple[list[int], list[int], list[int], list[int]] | None): Tuple of
+    active_indices (SymmetryBlockedIndexSet | None): Active-space index set, can be ``None``
 
-        (``active_alpha``, ``active_beta``, ``inactive_alpha``, ``inactive_beta``), can be ``None``
+    inactive_indices (SymmetryBlockedIndexSet | None): Inactive-space index set, can be ``None``
 
 Examples:
     >>> import numpy as np
     >>> alpha_coeffs = np.random.random((4, 3))
     >>> beta_coeffs = np.random.random((4, 3))
     >>> basis_set = BasisSet(...)
-    >>> orbitals = Orbitals(alpha_coeffs, beta_coeffs, None, None, None, basis_set, None)
+    >>> orbitals = Orbitals(alpha_coeffs, beta_coeffs, None, None, None, basis_set)
 
+)",
+               py::arg("coefficients_alpha"), py::arg("coefficients_beta"),
+               py::arg("energies_alpha") = std::optional<Eigen::VectorXd>{},
+               py::arg("energies_beta") = std::optional<Eigen::VectorXd>{},
+               py::arg("ao_overlap") = std::optional<Eigen::MatrixXd>{},
+               py::arg("basis_set"),
+               py::arg("active_indices") =
+                   std::shared_ptr<const SymmetryBlockedIndexSet>(),
+               py::arg("inactive_indices") =
+                   std::shared_ptr<const SymmetryBlockedIndexSet>());
+
+  // SBT-native constructor (symmetry-blocked tensors)
+  orbitals.def(
+      py::init<std::shared_ptr<const SymmetryBlockedTensor<2>>,
+               std::shared_ptr<const SymmetryBlockedTensor<1>>,
+               const std::optional<Eigen::MatrixXd> &,
+               std::shared_ptr<qdk::chemistry::data::BasisSet>,
+               std::shared_ptr<const SymmetryBlockedIndexSet>,
+               std::shared_ptr<const SymmetryBlockedIndexSet>>(),
+      R"(
+Construct from symmetry-blocked tensors.
+
+This is the preferred (non-deprecated) construction path. The orbital
+coefficients and energies are supplied as SymmetryBlockedTensor objects.
+
+Args:
+    coefficients (qdk_chemistry.data.symmetry.SymmetryBlockedTensorRank2): Rank-2 coefficient tensor [AO x MO]
+    energies (qdk_chemistry.data.symmetry.SymmetryBlockedTensorRank1 | None): Rank-1 energy tensor, can be None
+    ao_overlap (numpy.ndarray | None): The atomic orbital overlap matrix, can be None
+    basis_set (BasisSet | None): The basis set, can be None
+    active_indices (SymmetryBlockedIndexSet | None): Active-space index set, can be None
+    inactive_indices (SymmetryBlockedIndexSet | None): Inactive-space index set, can be None
+)",
+      py::arg("coefficients"), py::arg("energies"),
+      py::arg("ao_overlap") = std::optional<Eigen::MatrixXd>{},
+      py::arg("basis_set") = std::shared_ptr<qdk::chemistry::data::BasisSet>{},
+      py::arg("active_indices") =
+          std::shared_ptr<const SymmetryBlockedIndexSet>(),
+      py::arg("inactive_indices") =
+          std::shared_ptr<const SymmetryBlockedIndexSet>());
+
+  // Deprecated v1 restricted constructor accepting a legacy
+  // ``(active, inactive)`` index tuple. Forwards to the v2
+  // SymmetryBlockedIndexSet path and emits a DeprecationWarning.
+  orbitals.def(
+      py::init([](const Eigen::MatrixXd &coefficients,
+                  const std::optional<Eigen::VectorXd> &energies,
+                  const std::optional<Eigen::MatrixXd> &ao_overlap,
+                  std::shared_ptr<qdk::chemistry::data::BasisSet> basis_set,
+                  const std::optional<std::tuple<
+                      std::vector<size_t>, std::vector<size_t>>> &indices) {
+        warn_v1_deprecated(
+            "Orbitals(coefficients, energies, ao_overlap, basis_set, "
+            "(active, inactive)) is deprecated in v2.0; pass "
+            "SymmetryBlockedIndexSet active_indices/inactive_indices instead.");
+        return std::make_unique<Orbitals>(coefficients, energies, ao_overlap,
+                                          std::move(basis_set), indices);
+      }),
+      R"(
+Deprecated v1 restricted constructor accepting a legacy index tuple.
+
+This forwards to the ``SymmetryBlockedIndexSet`` construction path and emits a
+``DeprecationWarning``. Prefer passing ``active_indices``/``inactive_indices``.
+
+Args:
+    coefficients (numpy.ndarray): The molecular orbital coefficients matrix.
+    energies (numpy.ndarray | None): The orbital energies, can be ``None``.
+    ao_overlap (numpy.ndarray | None): The atomic orbital overlap matrix, can be ``None``.
+    basis_set (BasisSet): The basis set.
+    indices (tuple[list[int], list[int]] | None): The ``(active, inactive)`` mode indices, or ``None`` for the full space.
+)",
+      py::arg("coefficients"),
+      py::arg("energies") = std::optional<Eigen::VectorXd>{},
+      py::arg("ao_overlap") = std::optional<Eigen::MatrixXd>{},
+      py::arg("basis_set"), py::arg("indices"));
+
+  // Deprecated v1 unrestricted constructor accepting a legacy
+  // ``(active_alpha, active_beta, inactive_alpha, inactive_beta)`` index tuple.
+  orbitals.def(
+      py::init([](const Eigen::MatrixXd &coefficients_alpha,
+                  const Eigen::MatrixXd &coefficients_beta,
+                  const std::optional<Eigen::VectorXd> &energies_alpha,
+                  const std::optional<Eigen::VectorXd> &energies_beta,
+                  const std::optional<Eigen::MatrixXd> &ao_overlap,
+                  std::shared_ptr<qdk::chemistry::data::BasisSet> basis_set,
+                  const std::optional<std::tuple<
+                      std::vector<size_t>, std::vector<size_t>,
+                      std::vector<size_t>, std::vector<size_t>>> &indices) {
+        warn_v1_deprecated(
+            "Orbitals(coefficients_alpha, coefficients_beta, ..., "
+            "(active_alpha, active_beta, inactive_alpha, inactive_beta)) is "
+            "deprecated in v2.0; pass SymmetryBlockedIndexSet "
+            "active_indices/inactive_indices instead.");
+        return std::make_unique<Orbitals>(
+            coefficients_alpha, coefficients_beta, energies_alpha,
+            energies_beta, ao_overlap, std::move(basis_set), indices);
+      }),
+      R"(
+Deprecated v1 unrestricted constructor accepting a legacy index tuple.
+
+This forwards to the ``SymmetryBlockedIndexSet`` construction path and emits a
+``DeprecationWarning``. Prefer passing ``active_indices``/``inactive_indices``.
+
+Args:
+    coefficients_alpha (numpy.ndarray): The alpha molecular orbital coefficients matrix.
+    coefficients_beta (numpy.ndarray): The beta molecular orbital coefficients matrix.
+    energies_alpha (numpy.ndarray | None): The alpha orbital energies, can be ``None``.
+    energies_beta (numpy.ndarray | None): The beta orbital energies, can be ``None``.
+    ao_overlap (numpy.ndarray | None): The atomic orbital overlap matrix, can be ``None``.
+    basis_set (BasisSet): The basis set.
+    indices (tuple[list[int], list[int], list[int], list[int]] | None): The ``(active_alpha, active_beta, inactive_alpha, inactive_beta)`` mode indices, or ``None`` for the full space.
 )",
       py::arg("coefficients_alpha"), py::arg("coefficients_beta"),
       py::arg("energies_alpha") = std::optional<Eigen::VectorXd>{},
       py::arg("energies_beta") = std::optional<Eigen::VectorXd>{},
       py::arg("ao_overlap") = std::optional<Eigen::MatrixXd>{},
-      py::arg("basis_set"),
-      py::arg("indices") = std::optional<
-          std::tuple<std::vector<size_t>, std::vector<size_t>,
-                     std::vector<size_t>, std::vector<size_t>>>{});
+      py::arg("basis_set"), py::arg("indices"));
 
-  // Coefficient access (read-only)
-  orbitals.def("get_coefficients", &Orbitals::get_coefficients,
-               R"(
+  // SBT-native accessors
+  orbitals.def("coefficients", &Orbitals::coefficients,
+               "The molecular-orbital coefficients as a rank-2 "
+               "SymmetryBlockedTensor.");
+  orbitals.def("energies", &Orbitals::energies,
+               "The orbital energies as a rank-1 "
+               "SymmetryBlockedTensor.");
+  orbitals.def("active_indices", &Orbitals::active_indices,
+               "Active-space indices as a SymmetryBlockedIndexSet (or None if "
+               "no active space is set).");
+  orbitals.def(
+      "inactive_indices", &Orbitals::inactive_indices,
+      "Inactive-space indices as a SymmetryBlockedIndexSet (or None if "
+      "no inactive space is set).");
+  orbitals.def(
+      "symmetries", &Orbitals::symmetries,
+      "SymmetryProduct the molecular-orbital modes are blocked under.");
+  orbitals.def("mo_extents", &Orbitals::mo_extents,
+               "Per-label mode extents (number of molecular orbitals carrying "
+               "each label).");
+  orbitals.def("num_modes", &Orbitals::num_modes,
+               "Total number of molecular-orbital modes across all symmetry "
+               "blocks.");
+  orbitals.def(
+      "get_coefficients",
+      [](const Orbitals &self) {
+        warn_v1_deprecated(
+            "Orbitals.get_coefficients() is deprecated in v2.0; use "
+            "coefficients() (SymmetryBlockedTensor) instead.");
+        return self.get_coefficients();
+      },
+      R"(
 Get orbital coefficients as pair of (alpha, beta) matrices.
 
 ``num_atomic_orbitals`` refers to the number of atomic orbitals and ``num_molecular_orbitals`` refers to
@@ -209,8 +383,15 @@ Examples:
 )");
 
   // Energy access (read-only)
-  orbitals.def("get_energies", &Orbitals::get_energies,
-               R"(
+  orbitals.def(
+      "get_energies",
+      [](const Orbitals &self) {
+        warn_v1_deprecated(
+            "Orbitals.get_energies() is deprecated in v2.0; use energies() "
+            "(SymmetryBlockedTensor) instead.");
+        return self.get_energies();
+      },
+      R"(
 Get orbital energies in Hartrees as pair of (alpha, beta) vectors.
 
 Returns:
@@ -455,9 +636,12 @@ Examples:
 )");
 
   // Individual alpha/beta access
-  bind_getter_as_property(orbitals, "get_coefficients_alpha",
-                          &Orbitals::get_coefficients_alpha,
-                          R"(
+  bind_deprecated_getter_as_property(
+      orbitals, "get_coefficients_alpha", "coefficients_alpha",
+      &Orbitals::get_coefficients_alpha,
+      "Orbitals.get_coefficients_alpha() is deprecated in v2.0; use "
+      "coefficients() (SymmetryBlockedTensor) instead.",
+      R"(
 Get alpha orbital coefficients matrix.
 
 Returns:
@@ -468,11 +652,14 @@ Examples:
     >>> print(f"Alpha coefficients shape: {alpha_coeffs.shape}")
 
 )",
-                          py::return_value_policy::reference_internal);
+      py::return_value_policy::reference_internal);
 
-  bind_getter_as_property(orbitals, "get_coefficients_beta",
-                          &Orbitals::get_coefficients_beta,
-                          R"(
+  bind_deprecated_getter_as_property(
+      orbitals, "get_coefficients_beta", "coefficients_beta",
+      &Orbitals::get_coefficients_beta,
+      "Orbitals.get_coefficients_beta() is deprecated in v2.0; use "
+      "coefficients() (SymmetryBlockedTensor) instead.",
+      R"(
 Get beta orbital coefficients matrix.
 
 Returns:
@@ -483,11 +670,14 @@ Examples:
     >>> print(f"Beta coefficients shape: {beta_coeffs.shape}")
 
 )",
-                          py::return_value_policy::reference_internal);
+      py::return_value_policy::reference_internal);
 
-  bind_getter_as_property(orbitals, "get_energies_alpha",
-                          &Orbitals::get_energies_alpha,
-                          R"(
+  bind_deprecated_getter_as_property(
+      orbitals, "get_energies_alpha", "energies_alpha",
+      &Orbitals::get_energies_alpha,
+      "Orbitals.get_energies_alpha() is deprecated in v2.0; use energies() "
+      "(SymmetryBlockedTensor) instead.",
+      R"(
 Get alpha orbital energies (Hartree).
 
 Returns:
@@ -498,11 +688,14 @@ Examples:
     >>> homo_energy = alpha_energies[homo_index]
 
 )",
-                          py::return_value_policy::reference_internal);
+      py::return_value_policy::reference_internal);
 
-  bind_getter_as_property(orbitals, "get_energies_beta",
-                          &Orbitals::get_energies_beta,
-                          R"(
+  bind_deprecated_getter_as_property(
+      orbitals, "get_energies_beta", "energies_beta",
+      &Orbitals::get_energies_beta,
+      "Orbitals.get_energies_beta() is deprecated in v2.0; use energies() "
+      "(SymmetryBlockedTensor) instead.",
+      R"(
 Get beta orbital energies (Hartree).
 
 Returns:
@@ -513,7 +706,7 @@ Examples:
     >>> homo_energy = beta_energies[homo_index]
 
 )",
-                          py::return_value_policy::reference_internal);
+      py::return_value_policy::reference_internal);
 
   bind_getter_as_property(orbitals, "get_summary", &Orbitals::get_summary,
                           R"(
@@ -529,8 +722,15 @@ Examples:
 )");
 
   // Active space information (read-only)
-  orbitals.def("get_active_space_indices", &Orbitals::get_active_space_indices,
-               R"(
+  orbitals.def(
+      "get_active_space_indices",
+      [](const Orbitals &self) {
+        warn_v1_deprecated(
+            "Orbitals.get_active_space_indices() is deprecated in v2.0; use "
+            "active_indices() (SymmetryBlockedIndexSet) instead.");
+        return self.get_active_space_indices();
+      },
+      R"(
 Get the active space orbital indices.
 
 Returns:
@@ -542,23 +742,15 @@ Examples:
 
 )");
 
-  orbitals.def("get_inactive_space_indices",
-               &Orbitals::get_inactive_space_indices,
-               R"(
-Get the inactive space orbital indices.
-
-Returns:
-    tuple: Pair of ``(alpha_indices, beta_indices)`` for inactive space orbitals
-
-Examples:
-    >>> alpha_inactive, beta_inactive = orbitals.get_inactive_space_indices()
-    >>> print(f"Inactive space size: {len(alpha_inactive)}")
-
-)");
-
-  orbitals.def("get_inactive_space_indices",
-               &Orbitals::get_inactive_space_indices,
-               R"(
+  orbitals.def(
+      "get_inactive_space_indices",
+      [](const Orbitals &self) {
+        warn_v1_deprecated(
+            "Orbitals.get_inactive_space_indices() is deprecated in v2.0; use "
+            "inactive_indices() (SymmetryBlockedIndexSet) instead.");
+        return self.get_inactive_space_indices();
+      },
+      R"(
 Get the inactive space orbital indices.
 
 Returns:
@@ -726,7 +918,7 @@ Examples:
   orbitals.def_static(
       "from_json",
       [](const std::string &json_str) {
-        return *Orbitals::from_json(nlohmann::json::parse(json_str));
+        return Orbitals::from_json(nlohmann::json::parse(json_str));
       },
       R"(
 Load orbital data from JSON string (static method).
@@ -819,8 +1011,13 @@ Examples:
             return *Orbitals::from_json(nlohmann::json::parse(json_str));
           }));
 
-  // Data type name class attribute
-  orbitals.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(Orbitals);
+  orbitals.def_static("data_type_name", &Orbitals::data_type_name, R"(
+Return the wire-format identifier for orbitals.
+
+Returns:
+        str: ``"orbitals"``
+
+)");
 
   // Bind ModelOrbitals
   bind_model_orbitals(data);
@@ -841,94 +1038,127 @@ Calls to any functions requiring actual data (e.g. ``get_coefficients``,
 ``get_energies``, ``calculate_ao_density_matrix``, etc.) will throw runtime errors.
 
 Examples:
-    >>> # Create a simple 4-orbital restricted model system
-    >>> model_orb = ModelOrbitals(4, True)
+    >>> # Create a simple 4-orbital model system (no symmetry, aggregate quantities)
+    >>> model_orb = ModelOrbitals(4)
     >>> print(f"Number of orbitals: {model_orb.get_num_molecular_orbitals()}")
 
-    >>> # Create with active and inactive spaces
-    >>> active_indices = [1, 2]
-    >>> inactive_indices = [0, 3]
-    >>> model_orb = ModelOrbitals(4, active_indices, inactive_indices)
+    >>> # Create with an explicit spin axis for spin-resolved quantities
+    >>> from qdk_chemistry.data.symmetry import SymmetryProduct, axes
+    >>> model_orb = ModelOrbitals(4, SymmetryProduct([axes.spin(1, True)]))
 
 )");
 
-  // Basic constructor
-  model_orbitals.def(py::init<size_t, bool>(),
-                     R"(
-Constructor for model orbitals with basic parameters.
-
-Args:
-    basis_size (int): Number of atomic orbitals (and molecular orbitals)
-    restricted (bool): Whether the calculation is restricted (True) or unrestricted (False)
-
-Examples:
-    >>> # Restricted calculation with 6 orbitals
-    >>> model_orb = ModelOrbitals(6, True)
-    >>> print(f"Is restricted: {model_orb.is_restricted()}")
-
-    >>> # Unrestricted calculation with 4 orbitals
-    >>> model_orb = ModelOrbitals(4, False)
-    >>> print(f"Is unrestricted: {model_orb.is_unrestricted()}")
-
-)",
-                     py::arg("basis_size"), py::arg("restricted"));
-
-  // Constructor with active and inactive space indices (restricted)
+  // Full active space; restricted inferred from symmetries.
   model_orbitals.def(
-      py::init<size_t,
-               const std::tuple<std::vector<size_t>, std::vector<size_t>> &>(),
+      py::init<size_t, std::shared_ptr<const SymmetryProduct>>(),
       R"(
-Constructor with active and inactive space indices (restricted).
+Construct model orbitals over a full active space.
 
-For restricted calculations, the same active and inactive space indices are used for both alpha and beta electrons.
+Restricted-ness is inferred from ``symmetries`` (a spin axis whose labels are
+equivalent is restricted); the default is no symmetry.
 
 Args:
-    basis_size (int): Number of atomic orbitals (and molecular orbitals)
-    indices (tuple[list[int], list[int]]): Tuple of ``(active_space_indices, inactive_space_indices)``
-
-Raises:
-    ValueError: If indices are >= basis_size or if active and inactive spaces overlap
+    basis_size (int): Number of single-particle modes.
+    symmetries (SymmetryProduct, optional): Explicit single-particle symmetries; defaults to no symmetry. Pass ``SymmetryProduct([axes.spin(1, True)])`` for spin-resolved quantities.
 
 Examples:
-    >>> # Create a 6-orbital system with orbitals 2,3 active and 0,1,4,5 inactive
-    >>> active = [2, 3]
-    >>> inactive = [0, 1, 4, 5]
-    >>> indices = (active, inactive)
-    >>> model_orb = ModelOrbitals(6, indices)
-    >>> print(f"Active space size: {len(model_orb.get_active_space_indices()[0])}")
+    >>> # Full active space, no symmetry (aggregate quantities)
+    >>> model_orb = ModelOrbitals(6)
 
+    >>> # Full active space with an explicit spin axis
+    >>> from qdk_chemistry.data.symmetry import SymmetryProduct, axes
+    >>> model_orb = ModelOrbitals(6, SymmetryProduct([axes.spin(1, True)]))
+)",
+      py::arg("basis_size"),
+      py::arg("symmetries") = std::shared_ptr<const SymmetryProduct>());
+
+  // Active (+ optional inactive) spaces as symmetry-blocked index sets.
+  model_orbitals.def(py::init<std::shared_ptr<const SymmetryBlockedIndexSet>,
+                              std::shared_ptr<const SymmetryBlockedIndexSet>>(),
+                     R"(
+Construct model orbitals from symmetry-blocked active/inactive index sets.
+
+The single-particle symmetries, per-mode extents, and restricted-ness are taken
+from the index sets; no spin convention is assumed.
+
+Args:
+    active_indices (SymmetryBlockedIndexSet): Active-space index set.
+    inactive_indices (SymmetryBlockedIndexSet, optional): Inactive-space index set; defaults to none.
+)",
+                     py::arg("active_indices"),
+                     py::arg("inactive_indices") =
+                         std::shared_ptr<const SymmetryBlockedIndexSet>());
+
+  // Deprecated v1 constructor taking a ``restricted`` flag. Maps the flag to a
+  // spin symmetry axis (equivalent labels => restricted) and emits a
+  // DeprecationWarning.
+  model_orbitals.def(
+      py::init([](size_t basis_size, bool restricted) {
+        warn_v1_deprecated(
+            "ModelOrbitals(basis_size, restricted) is deprecated in v2.0; pass "
+            "a SymmetryProduct instead, e.g. "
+            "SymmetryProduct([axes.spin(1, restricted)]).");
+        return std::make_unique<ModelOrbitals>(
+            basis_size, std::make_shared<const SymmetryProduct>(
+                            SymmetryProduct({axes::spin(1, restricted)})));
+      }),
+      R"(
+Deprecated v1 constructor taking a ``restricted`` flag.
+
+The flag is mapped to a spin symmetry axis (equivalent labels for restricted)
+and emits a ``DeprecationWarning``. Prefer passing a ``SymmetryProduct``.
+
+Args:
+    basis_size (int): Number of single-particle modes.
+    restricted (bool): Whether the calculation is restricted (``True``) or unrestricted (``False``).
+)",
+      py::arg("basis_size"), py::arg("restricted"));
+
+  // Deprecated v1 restricted constructor accepting a legacy
+  // ``(active, inactive)`` index tuple.
+  model_orbitals.def(
+      py::init([](size_t basis_size,
+                  const std::tuple<std::vector<size_t>, std::vector<size_t>>
+                      &indices) {
+        warn_v1_deprecated(
+            "ModelOrbitals(basis_size, (active, inactive)) is deprecated in "
+            "v2.0; use the SymmetryBlockedIndexSet constructor instead.");
+        return std::make_unique<ModelOrbitals>(basis_size, indices);
+      }),
+      R"(
+Deprecated v1 restricted constructor accepting a legacy index tuple.
+
+This forwards to the ``SymmetryBlockedIndexSet`` construction path and emits a
+``DeprecationWarning``.
+
+Args:
+    basis_size (int): Number of single-particle modes.
+    indices (tuple[list[int], list[int]]): The ``(active, inactive)`` mode indices.
 )",
       py::arg("basis_size"), py::arg("indices"));
 
-  // Constructor with active and inactive space indices (unrestricted)
+  // Deprecated v1 unrestricted constructor accepting a legacy
+  // ``(active_alpha, active_beta, inactive_alpha, inactive_beta)`` index tuple.
   model_orbitals.def(
-      py::init<size_t,
-               const std::tuple<std::vector<size_t>, std::vector<size_t>,
-                                std::vector<size_t>, std::vector<size_t>> &>(),
+      py::init([](size_t basis_size,
+                  const std::tuple<std::vector<size_t>, std::vector<size_t>,
+                                   std::vector<size_t>, std::vector<size_t>>
+                      &indices) {
+        warn_v1_deprecated(
+            "ModelOrbitals(basis_size, (active_alpha, active_beta, "
+            "inactive_alpha, inactive_beta)) is deprecated in v2.0; use the "
+            "SymmetryBlockedIndexSet constructor instead.");
+        return std::make_unique<ModelOrbitals>(basis_size, indices);
+      }),
       R"(
-Constructor with active and inactive space indices (unrestricted).
+Deprecated v1 unrestricted constructor accepting a legacy index tuple.
 
-For unrestricted calculations, separate active and inactive space indices can be provided for alpha and beta electrons.
+This forwards to the ``SymmetryBlockedIndexSet`` construction path and emits a
+``DeprecationWarning``.
 
 Args:
-    basis_size (int): Number of atomic orbitals (and molecular orbitals)
-    indices (tuple[list[int], list[int], list[int], list[int]]): Tuple of
-
-        ``(active_alpha, active_beta, inactive_alpha, inactive_beta)``
-
-Raises:
-    ValueError: If indices are >= basis_size or if active and inactive spaces overlap
-
-Examples:
-    >>> # Create unrestricted system with different alpha/beta active spaces
-    >>> alpha_active = [1, 2]
-    >>> beta_active = [2, 3]
-    >>> alpha_inactive = [0, 3, 4]
-    >>> beta_inactive = [0, 1, 4]
-    >>> indices = (alpha_active, beta_active, alpha_inactive, beta_inactive)
-    >>> model_orb = ModelOrbitals(5, indices)
-    >>> print(f"Is unrestricted: {model_orb.is_unrestricted()}")
-
+    basis_size (int): Number of single-particle modes.
+    indices (tuple[list[int], list[int], list[int], list[int]]): The ``(active_alpha, active_beta, inactive_alpha, inactive_beta)`` mode indices.
 )",
       py::arg("basis_size"), py::arg("indices"));
 

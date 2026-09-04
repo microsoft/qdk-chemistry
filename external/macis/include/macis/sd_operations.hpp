@@ -510,7 +510,7 @@ WfnType from_canonical_string(std::string str) {
   using wfn_traits = wavefunction_traits<WfnType>;
   using spin_wfn_traits = wavefunction_traits<spin_wfn_type>;
   spin_wfn_type state_alpha(0), state_beta(0);
-  for (auto i = 0ul; i < std::min(str.length(), spin_wfn_traits::size()); ++i) {
+  for (size_t i = 0; i < std::min(str.length(), spin_wfn_traits::size()); ++i) {
     if (str[i] == '2') {
       state_alpha = spin_wfn_traits::create_no_check(state_alpha, i);
       state_beta = spin_wfn_traits::create_no_check(state_beta, i);

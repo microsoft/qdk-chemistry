@@ -9,13 +9,6 @@ Creating Operators
 
 Use factory methods to create Pauli operators on specific qubits:
 
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/pauli_operator.cpp
-      :language: cpp
-      :start-after: // start-cell-creation
-      :end-before: // end-cell-creation
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/pauli_operator.py
@@ -23,17 +16,17 @@ Use factory methods to create Pauli operators on specific qubits:
       :start-after: # start-cell-creation
       :end-before: # end-cell-creation
 
-Building Expressions
---------------------
-
-Combine operators using arithmetic to build expressions:
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/pauli_operator.cpp
       :language: cpp
-      :start-after: // start-cell-expressions
-      :end-before: // end-cell-expressions
+      :start-after: // start-cell-creation
+      :end-before: // end-cell-creation
+
+Building Expressions
+--------------------
+
+Combine operators using arithmetic to build expressions:
 
 .. tab:: Python API
 
@@ -42,18 +35,18 @@ Combine operators using arithmetic to build expressions:
       :start-after: # start-cell-expressions
       :end-before: # end-cell-expressions
 
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/pauli_operator.cpp
+      :language: cpp
+      :start-after: // start-cell-expressions
+      :end-before: // end-cell-expressions
+
 Simplifying Expressions
 -----------------------
 
 The ``simplify()`` method applies Pauli algebra rules and combines like terms.
 The ``distribute()`` method expands products over sums.
-
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/pauli_operator.cpp
-      :language: cpp
-      :start-after: // start-cell-simplify
-      :end-before: // end-cell-simplify
 
 .. tab:: Python API
 
@@ -62,17 +55,17 @@ The ``distribute()`` method expands products over sums.
       :start-after: # start-cell-simplify
       :end-before: # end-cell-simplify
 
-Canonical Representation
-------------------------
-
-Use ``to_canonical_string()`` to get a circuit-compatible string format, or ``to_canonical_terms()`` to get coefficient-string pairs:
-
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/pauli_operator.cpp
       :language: cpp
-      :start-after: // start-cell-canonical
-      :end-before: // end-cell-canonical
+      :start-after: // start-cell-simplify
+      :end-before: // end-cell-simplify
+
+Canonical Representation
+------------------------
+
+Use ``to_canonical_string()`` to get a circuit-compatible string format, or ``to_canonical_terms()`` to get coefficient-string pairs:
 
 .. tab:: Python API
 
@@ -80,6 +73,13 @@ Use ``to_canonical_string()`` to get a circuit-compatible string format, or ``to
       :language: python
       :start-after: # start-cell-canonical
       :end-before: # end-cell-canonical
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/pauli_operator.cpp
+      :language: cpp
+      :start-after: // start-cell-canonical
+      :end-before: // end-cell-canonical
 
 Further Reading
 ---------------

@@ -7,7 +7,6 @@
 
 #include <Eigen/Dense>
 #include <qdk/chemistry/data/data_class.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 
 namespace qdk::chemistry::data {
 
@@ -322,12 +321,18 @@ class StabilityResult : public DataClass,
   // === DataClass interface implementation ===
 
   /**
-   * @brief Get the data type name for this class
+   * @brief Get the static data type name for this class.
    * @return "stability_result"
    */
-  std::string get_data_type_name() const override {
+  static std::string data_type_name() {
     return DATACLASS_TO_SNAKE_CASE(StabilityResult);
   }
+
+  /**
+   * @brief Get the data type name for this instance.
+   * @return "stability_result"
+   */
+  std::string get_data_type_name() const override { return data_type_name(); }
 
   /**
    * @brief Get summary string of stability result information
@@ -441,6 +446,8 @@ class StabilityResult : public DataClass,
   static std::shared_ptr<StabilityResult> from_hdf5(H5::Group& group);
 
  private:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   /// True if internal stability is satisfied (default: true)
   bool internal_stable_ = true;
 

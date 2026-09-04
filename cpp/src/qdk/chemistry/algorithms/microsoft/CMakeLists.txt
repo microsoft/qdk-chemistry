@@ -5,8 +5,11 @@ target_sources(chemistry PRIVATE
     active_space/occupation_active_space.cpp
     active_space/valence_active_space.cpp
     localization/iterative_localizer_base.cpp
+    localization/gauge_fixing.cpp
     localization/mp2_natural_orbitals.cpp
+    localization/natural_orbitals.cpp
     localization/pipek_mezey.cpp
+    localization/active_space_qio.cpp
     localization/vvhv.cpp
     hamiltonian.cpp
     density_fitted_hamiltonian.cpp
@@ -18,6 +21,7 @@ target_sources(chemistry PRIVATE
     macis_pmc.cpp
     mp2.cpp
     scf.cpp
+    stabilized_scf.cpp
     stability.cpp
     utils.cpp
 )
