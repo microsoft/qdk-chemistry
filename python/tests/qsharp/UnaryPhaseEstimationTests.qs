@@ -4,10 +4,10 @@
 
 /// Test-only drivers for `QDKChemistry.Utils.UnaryPhaseEstimation`.
 ///
-/// These are staged into a throwaway Q# project by the Python test layer
-/// (see `tests/qsharp_test_project.py`) and are never part of the shipped
-/// `qdk_chemistry.utils.qsharp` project. Staging them alongside the shipped
-/// sources — rather than as a dependent Q# package — is what keeps the
+/// The Python test layer evaluates this file into a throwaway context (see
+/// `tests/qsharp_test_sources.py`); it is never part of the shipped
+/// `qdk_chemistry.utils.qsharp` project. Evaluating it onto that project —
+/// rather than compiling it as a dependent Q# package — is what keeps the
 /// `internal` `ApplySignedPowerSchedule` reachable from here.
 namespace QDKChemistry.TestUtils.UnaryPhaseEstimationTests {
 

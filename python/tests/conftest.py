@@ -41,7 +41,7 @@ from qdk_chemistry.data import (
     Wavefunction,
 )
 
-from .qsharp_test_project import create_test_qsharp_context
+from .qsharp_test_sources import create_test_qsharp_context
 from .test_helpers import create_test_orbitals
 
 # Dynamically add the build directory to Python path

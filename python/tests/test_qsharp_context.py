@@ -33,7 +33,7 @@ from qdk_chemistry.utils.qsharp import (
     use_qsharp_context,
 )
 
-from .qsharp_test_project import TEST_SOURCE_ROOT
+from .qsharp_test_sources import TEST_SOURCE_ROOT
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -236,6 +236,6 @@ class TestTestOnlySourcesAreNotShipped:
         """A user context must not pay for, or be able to call, the test drivers."""
         assert not hasattr(get_qsharp_context().code.QDKChemistry, "TestUtils")
 
-    def test_the_staged_test_context_can_reach_them(self, qsharp_test_context: qdk.Context) -> None:
-        """The staged project is what makes the drivers available to the Python tests."""
+    def test_the_test_context_can_reach_them(self, qsharp_test_context: qdk.Context) -> None:
+        """Evaluating the test sources is what makes the drivers available to the Python tests."""
         assert hasattr(qsharp_test_context.code.QDKChemistry, "TestUtils")

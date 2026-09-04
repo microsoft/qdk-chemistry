@@ -41,7 +41,7 @@ def _dumped_address_index(address_value: int, num_address_qubits: int) -> int:
 
 
 def _test_utils(context, module: str):
-    """Resolve a test-only Q# module (staged from ``tests/qsharp``) from *context*."""
+    """Resolve a test-only Q# module (evaluated from ``tests/qsharp``) from *context*."""
     return getattr(context.code.QDKChemistry.TestUtils, module)
 
 

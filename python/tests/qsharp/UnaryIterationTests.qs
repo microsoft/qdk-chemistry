@@ -4,8 +4,8 @@
 
 /// Test-only drivers for `QDKChemistry.Utils.UnaryIteration`.
 ///
-/// These are staged into a throwaway Q# project by the Python test layer
-/// (see `tests/qsharp_test_project.py`) and are never part of the shipped
+/// The Python test layer evaluates this file into a throwaway context (see
+/// `tests/qsharp_test_sources.py`); it is never part of the shipped
 /// `qdk_chemistry.utils.qsharp` project.
 namespace QDKChemistry.TestUtils.UnaryIterationTests {
 
