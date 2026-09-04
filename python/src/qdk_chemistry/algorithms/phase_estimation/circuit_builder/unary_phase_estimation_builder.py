@@ -72,6 +72,13 @@ class QdkUnaryQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
             "Mapper producing the uncontrolled block encoding. It must lay the block encoding "
             "out as [system | ancilla].",
         )
+        self._set_default(
+            "compute_capacity",
+            "int",
+            -1,
+            "Maximum number of logical qubits kept in compute under least-recently-used memory placement. "
+            "Set to -1 to keep all logical qubits in compute.",
+        )
         self.set("unitary_builder", AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True))
 
 
@@ -99,6 +106,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         num_queries: int = -1,
         unitary_builder: AlgorithmRef | None = None,
         circuit_mapper: AlgorithmRef | None = None,
+        compute_capacity: int = -1,
     ) -> None:
         """Initialize the unary-iteration QPE circuit builder.
 
@@ -106,12 +114,14 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
             num_queries: Number of queries to the block encoding. Default to -1; user needs to set a valid value.
             unitary_builder: Optional algorithm reference for the unitary builder.
             circuit_mapper: Optional algorithm reference for the block-encoding circuit mapper.
+            compute_capacity: Logical-qubit compute capacity for LRU memory placement; -1 disables placement.
 
         """
         Logger.trace_entering()
         super().__init__(num_bits=-1)
         self._settings = QdkUnaryQpeCircuitBuilderSettings()
         self._settings.set("num_queries", num_queries)
+        self._settings.set("compute_capacity", compute_capacity)
         if unitary_builder is not None:
             self._settings.set("unitary_builder", unitary_builder)
         if circuit_mapper is not None:
@@ -176,6 +186,9 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         )
 
         num_queries, num_phase_qubits = self.resolve_num_queries()
+        compute_capacity = int(self._settings.get("compute_capacity"))
+        if compute_capacity == 0 or compute_capacity < -1:
+            raise ValueError(f"compute_capacity must be -1 or a positive integer. Got {compute_capacity}.")
         configured_num_bits = self._settings.get("num_bits")
         if configured_num_bits > 0 and configured_num_bits != num_phase_qubits:
             Logger.warn(
@@ -231,6 +244,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
             "numSharedAncillas": num_phase_gradient_ancillas,
             "statePrepUsesShared": bool(state_prep_shared),
             "blockEncodingUsesShared": bool(block_encoding_shared),
+            "computeCapacity": compute_capacity,
         }
         circuit = Circuit(
             qsharp_factory=QsharpFactoryData(

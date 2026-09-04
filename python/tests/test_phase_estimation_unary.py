@@ -278,6 +278,12 @@ class TestMisconfigurationIsSurfaced:
         with pytest.raises(ValueError, match="num_queries must be a positive integer"):
             QdkUnaryQpeCircuitBuilder(num_queries=num_queries).resolve_num_queries()
 
+    @pytest.mark.parametrize("compute_capacity", [0, -2])
+    def test_an_invalid_compute_capacity_is_rejected(self, compute_capacity):
+        """Memory placement accepts a positive compute capacity or the disabled sentinel."""
+        with pytest.raises(ValueError, match="compute_capacity must be -1 or a positive integer"):
+            _run_builder(QdkUnaryQpeCircuitBuilder(num_queries=3, compute_capacity=compute_capacity))
+
     def test_a_plain_block_encoding_is_rejected(self):
         """The schedule drops one reflection, so a bare LCU has nothing to drop."""
         with pytest.raises(ValueError, match="Requires a LCU or SOSSA walk unitary representation"):
@@ -525,6 +531,21 @@ def test_the_builder_reflects_the_ancilla_tail_the_mapper_declared():
     )[0]
 
     assert circuit._qsharp_factory.parameter["numAncillas"] == declared - hamiltonian.num_qubits
+
+
+@pytest.mark.parametrize("compute_capacity", [-1, 2])
+def test_the_builder_passes_compute_capacity_to_qsharp(compute_capacity):
+    """The Python setting must reach the Q# factory unchanged."""
+    circuit = _run_builder(QdkUnaryQpeCircuitBuilder(num_queries=3, compute_capacity=compute_capacity))[0]
+
+    assert circuit._qsharp_factory.parameter["computeCapacity"] == compute_capacity
+
+
+def test_a_positive_compute_capacity_can_be_resource_estimated():
+    """The memory-aware branch must execute on the Q# resource-estimation path."""
+    circuit = _run_builder(QdkUnaryQpeCircuitBuilder(num_queries=3, compute_capacity=2))[0]
+
+    assert circuit.estimate().logical_counts["numQubits"] > 0
 
 
 def _ground_state_wavefunction(hamiltonian: QubitOperator) -> Wavefunction:

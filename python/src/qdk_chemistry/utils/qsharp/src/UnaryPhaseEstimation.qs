@@ -10,7 +10,9 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     import Std.Canon.ApplyXorInPlace;
     import Std.Diagnostics.Fact;
     import Std.Math.AbsI;
+    import Std.ResourceEstimation.EnableMemoryComputeArchitecture;
     import Std.ResourceEstimation.IsResourceEstimating;
+    import Std.ResourceEstimation.LeastRecentlyUsed;
     import Std.ResourceEstimation.RepeatEstimates;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
     import QDKChemistry.Utils.UnaryIteration.UnaryIterationWithControl;
@@ -99,6 +101,8 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     /// shared qubits sit past them: `prepareSharedOp` initializes them once around the query
     /// schedule and whoever consumes them leaves them in that state. Set `statePrepUsesShared` or
     /// `blockEncodingUsesShared` for the component that expects them appended to its register.
+    /// Set `computeCapacity` to a positive logical-qubit capacity to enable least-recently-used
+    /// memory placement, or to -1 to keep all logical qubits in compute.
     operation MakeUnaryQPECircuit(
         statePrep : Qubit[] => Unit,
         applyBlockEncoding : (Qubit[] => Unit is Adj),
@@ -111,6 +115,7 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
         numSharedAncillas : Int,
         statePrepUsesShared : Bool,
         blockEncodingUsesShared : Bool,
+        computeCapacity : Int,
     ) : Result[] {
         Fact(numSystemQubits > 0, "numSystemQubits must be positive");
         Fact(numAncillas >= 0, "numAncillas must be non-negative");
@@ -119,7 +124,12 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
             numSharedAncillas > 0 or not (statePrepUsesShared or blockEncodingUsesShared),
             "consuming shared ancilla requires a non-empty shared register"
         );
+        Fact(computeCapacity == -1 or computeCapacity > 0, "computeCapacity must be -1 or positive");
         let numPhaseQubits = PhaseRegisterSize(numQueries);
+
+        if computeCapacity > 0 {
+            EnableMemoryComputeArchitecture(computeCapacity, LeastRecentlyUsed());
+        }
 
         use qs = Qubit[numPhaseQubits + numSystemQubits + numAncillas + numSharedAncillas];
         let phaseQubits = qs[0..numPhaseQubits - 1];
@@ -135,10 +145,7 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
             }
         } apply {
             statePrep(statePrepUsesShared ? systemQubits + sharedQubits | systemQubits);
-            let blockEncoding =
-                blockEncodingUsesShared
-                ? (register) => applyBlockEncoding(register + sharedQubits)
-                | applyBlockEncoding;
+            let blockEncoding = blockEncodingUsesShared ? (register) => applyBlockEncoding(register + sharedQubits) | applyBlockEncoding;
             ApplySignedPowerSchedule(
                 blockEncoding,
                 applyReflection,
@@ -234,7 +241,8 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
             0,
             0,
             false,
-            false
+            false,
+            -1
         );
     }
 }
