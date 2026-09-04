@@ -12,8 +12,9 @@ Reference: Low et al., Phys. Rev. X 15 (2025), :cite:`Low2025`
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
 import math
-from math import sqrt
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -44,42 +45,37 @@ from .test_helpers import create_random_factorized_hamiltonian, create_test_orbi
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def _build_h2_dfthc_data():
-    """Construct a small H2-like DFTHC factorized Hamiltonian for testing.
+#: The factorized H2 shipped with the examples, which the SOSSA notebook also loads.
+H2_DFTHC_EXAMPLE = Path(__file__).resolve().parents[2] / "examples" / "data" / "h2_dfthc_r2_b2_c1.hamiltonian.json"
 
-    Uses N=2 orbitals, R=1 rank, B=1 basis, C=1 copy with manually chosen
-    matrices that produce a known spectrum.
+
+def _build_h2_dfthc_data():
+    """Load the shipped factorized H2 and return its tensors.
+
+    The tests below check invariants the SOSSA construction depends on -- that the
+    sum-of-squares form is positive semidefinite, that it reproduces the physical
+    Hamiltonian once ``E_SOS`` is added back, and that a walk eigenphase decodes to the
+    ground-state energy. Running them on hand-written tensors proves those properties of
+    an operator nothing ships. Reading the example instead makes the shipped file's
+    validity the thing under test, so a regenerated Hamiltonian that violates a
+    precondition fails here rather than silently producing an unresolvable phase.
 
     Returns a dict with all tensor data needed for SOSSA.
     """
-    n_orb = 2  # spatial orbitals
-    n_ranks = 1  # ranks
-    n_bases = 1  # bases
-    n_copies = 1  # copies
-
-    # Symmetric one-body matrix (adjusted for Majorana representation)
-    h1 = np.array(
-        [
-            [0.3, 0.1],
-            [0.1, -0.2],
-        ]
-    )
-
-    # Basis vectors: unit vectors in R^N for each (r, b)
-    # Tensor shape is (R, B, N)
-    basis_vectors = np.array([[[1.0 / sqrt(2), 1.0 / sqrt(2)]]])
-
-    # Two-body weights: [R, B, C]
-    two_body_weights = np.array([[[0.15]]])
-
-    # Identity weights (WB): [R, C]
-    identity_weight = np.array([[0.08]])
+    container = json.loads(H2_DFTHC_EXAMPLE.read_text())["container"]
+    n_orb = int(container["orbitals"]["num_orbitals"])
+    n_ranks = int(container["num_ranks"])
+    n_bases = int(container["num_bases"])
+    n_copies = int(container["num_copies"])
 
     return {
-        "h1": h1,
-        "basis_vectors": basis_vectors,
-        "two_body_weights": two_body_weights,
-        "identity_weight": identity_weight,
+        "h1": np.asarray(container["one_body_integrals"], dtype=float).reshape(n_orb, n_orb),
+        # u_matrices is [R, B, N] and w_matrices [R, B, C], both stored flat.
+        "basis_vectors": np.asarray(container["u_matrices"], dtype=float).reshape(n_ranks, n_bases, n_orb),
+        "two_body_weights": np.asarray(container["w_matrices"], dtype=float).reshape(n_ranks, n_bases, n_copies),
+        "identity_weight": np.asarray(container["wb_matrix"], dtype=float).reshape(n_ranks, n_copies),
+        "signs": np.asarray(container["signs"], dtype=float),
+        "core_energy": float(container["core_energy"]),
         "N": n_orb,
         "R": n_ranks,
         "B": n_bases,
