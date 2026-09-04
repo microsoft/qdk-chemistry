@@ -60,7 +60,6 @@ Create a folder for your downloaded tutorial files, then use **File > Open Folde
 Use Python 3.10 or later on a platform supported by :term:`QDK`/Chemistry.
 Released packages support Linux on x86-64 and Arm64, macOS on Apple silicon, and native Windows on x86-64 and Arm64.
 Windows users on either x86-64 or Arm64 can also use the `Windows Subsystem for Linux (WSL) <https://learn.microsoft.com/windows/wsl/install>`_, which uses the corresponding Linux wheels and Linux commands.
-Automated native Windows Arm64 coverage for this tutorial is tracked separately; the wheel itself is part of the release matrix.
 The `installation instructions <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_ contain the current support matrix.
 Check the version before creating the environment:
 

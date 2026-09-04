@@ -4,314 +4,246 @@
 What's New in Version 2.2
 ==========================
 
-Version 2.2 changes how QDK/Chemistry can be driven and where it runs. A Model Context
-Protocol (MCP) server and a ``qc`` command line expose the pipeline as structured tools,
-so an agent or a shell script can run a workflow without writing Python, and any
-serializable algorithm call can now execute outside the calling process through a remote
-backend, with result caching. Alongside that, the library gains new circuit-synthesis
-primitives, a gauge-fixing transformation that targets the mapped Hamiltonian coefficient
-norm, an orbital transformation that concentrates correlation, native volumetric orbital
-evaluation, and native Windows wheels for x86-64 and Arm64.
-
-Several defaults, file names, and numerical results change relative to
-:ref:`2.1 <release-v2.1.0>`; see
-:ref:`Behavior changes <v2-2-behavior-changes>`.
+Version 2.2 changes several numerical and packaging behaviors; see
+:ref:`v2-2-behavior-changes`.
 
 .. contents:: On this page
    :local:
    :depth: 1
 
 
-Highlights
-==========
+Command-Line and MCP Interfaces
+===============================
 
-- **Agent and command-line interfaces.** An MCP server (``qcmcp``) and a CLI (``qc``) expose the chemistry pipeline as structured tools, together with installable Copilot skills and MCP-configuration assets. See :doc:`../user/agents`.
-- **Remote execution and caching.** Algorithms created through :func:`~qdk_chemistry.algorithms.create` accept ``remote`` and ``cache`` arguments on ``run()``, backed by a serialization format that carries inputs, settings, and results between machines.
-- **Microsoft Discovery backend.** The new ``discovery`` extra registers a remote backend that runs jobs through Microsoft Discovery.
-- **New circuit-synthesis primitives.** Unary-iteration phase estimation, a binary encoding for the sparse isometry, a controlled-SWAP mapper that avoids controlling every gate, and amplitude amplification with a :term:`QPE` subspace-marking oracle.
-- **Active-space orbital transformations.** A gauge-fixing localizer searches occupation-degenerate blocks for rotations that reduce the mapped coefficient norm :math:`\lambda`, while a quantum-information orbital localizer optimizes total single-orbital entropy to concentrate correlation.
-- **Native volumetric orbital evaluation.** Cube files for orbitals are generated in process, with no third-party quantum chemistry package required.
-- **Native Windows on x86-64 and Arm64.** Wheels are published for both — x86-64 from Python 3.10 and Arm64 from Python 3.11.
-- **Ground-state QPE tutorial.** A full tutorial takes stretched N\ :sub:`2` from geometry to an :term:`IQPE` energy and back to a :term:`CASCI` reference.
+The base package installs the ``qc`` command-line interface. Its command groups
+run algorithms, inspect data files, manage projects, perform unit conversions,
+and query the algorithm registry. Algorithm commands accept ``--cache``,
+``--remote``, and ``--remote-config``. ``--dry-run`` displays the supplied
+parameters without executing the command.
 
+The ``mcp`` extra installs the dependencies required by ``qcmcp``:
 
-Agent and Command-Line Interfaces
-=================================
+.. code-block:: bash
 
-QDK/Chemistry can now be driven without writing Python. The ``qc`` entry point ships with
-the base package; install the ``mcp`` extra to use ``qcmcp``:
+   pip install 'qdk-chemistry[mcp]'
 
-``qcmcp``
-   An MCP server that exposes the chemistry pipeline as structured tools. The chemistry
-   and algorithm tools return a JSON envelope whose ``status`` is ``"ok"``, ``"error"``,
-   ``"exists"`` (a valid output is already present), or ``"submitted"``, carrying a
-   ``result`` or a ``message``, and the ``run_*`` tools accept ``remote`` and ``cache``
-   parameters. The MCP Apps visualization tools, registered only when ``qsharp_widgets``
-   is installed, instead return MCP ``content`` and ``structuredContent`` fields. The
-   server speaks stdio by default and can also serve streamable HTTP.
+The MCP server exposes the same project and algorithm operations as structured
+tools. It uses stdio by default and also supports streamable HTTP. File-producing
+tools report whether output was created, already existed, or failed. MCP Apps
+visualization tools are registered when ``qsharp_widgets`` is installed.
 
-``qc``
-   A CLI covering the same ground for shell workflows, organized around algorithm
-   execution (``qc run``), reading results back out of a project (``qc data``), project
-   management (``qc project``), utilities such as coordinate and energy conversion
-   (``qc util``), and registry introspection (``qc config``). Algorithm
-   commands accept ``--cache``, ``--remote``, and ``--remote-config``, and ``--dry-run``
-   previews the supplied parameters without executing.
+The repository contains a Copilot plugin with skills and MCP configuration:
 
-The repository also ships a Copilot plugin under ``copilot-plugins/qdk-chemistry``
-containing skills with worked examples and MCP server configuration.
-``qc plugin install qdk-chemistry@qdk-chemistry --target-dir .`` deploys those assets into
-the current workspace. The deployed skill definitions are plain Markdown and are meant to
-be edited; the MCP server configuration is JSON.
+.. code-block:: bash
 
-See :doc:`../user/agents` for the full walkthrough.
+   qc plugin install qdk-chemistry@qdk-chemistry --target-dir .
+
+The command deploys the plugin into the current workspace. See
+:doc:`../user/agents`.
 
 
 Remote Execution and Caching
 ============================
 
-An algorithm whose arguments and results are serializable can now run outside the calling
-process. :func:`~qdk_chemistry.algorithms.create` returns an algorithm whose ``run()``
-accepts ``remote`` and ``cache`` arguments; the algorithm type, its settings, and its
-inputs are serialized, executed by the backend, and deserialized back into the same result
-objects the local call would have returned. The protocol carries registered QDK/Chemistry
-data classes, :class:`~qdk_chemistry.data.AlgorithmRef`, NumPy arrays, strings, numbers,
-booleans, ``None``, and lists or tuples of those; anything else — a plain dictionary, for
-example — raises ``TypeError`` rather than being sent.
+Algorithms returned by :func:`~qdk_chemistry.algorithms.create` accept
+``remote`` and ``cache`` arguments on ``run()``. Serializable arguments,
+settings, and results are transferred through a registered remote backend.
+Supported values include QDK/Chemistry data classes,
+:class:`~qdk_chemistry.data.AlgorithmRef`, NumPy arrays, scalar values, and
+lists or tuples of those values. Unsupported values raise ``TypeError`` before
+submission.
 
-The built-in ``"local"`` backend executes the serialized request in a subprocess on the
-same machine. It is useful for checking that a workflow crosses the serialization
-boundary before selecting a remote plugin backend:
+The built-in ``"local"`` backend runs the serialized request in a subprocess on
+the same machine:
 
 .. literalinclude:: ../_static/examples/python/release_notes_v2_2.py
    :language: python
    :start-after: # start-cell-remote-execution
    :end-before: # end-cell-remote-execution
 
-Work can also be submitted asynchronously: :meth:`~qdk_chemistry.remote.job.Job.fetch`
-retrieves a result once the job reaches a terminal state, and
-:meth:`~qdk_chemistry.remote.job.Job.cleanup` removes backend artifacts.
+Passing a path as ``cache`` creates a
+:class:`~qdk_chemistry.remote.cache.folder.FolderCache`. Completed entries are
+returned without resubmission, and an in-flight remote entry resumes polling
+instead of starting a duplicate job. ``force_rerun=True`` bypasses the lookup.
+A cache shared with the compute node must be configured with ``is_shared=True``.
 
-Passing a path as ``cache`` creates a :class:`~qdk_chemistry.remote.cache.folder.FolderCache`
-keyed on the algorithm, its settings, and its inputs. A completed hit reconstructs the
-result without resubmitting; an in-flight hit resumes polling instead of creating a
-duplicate job. Set ``is_shared=True`` when the same store is reachable from both the
-caller and the compute node, and ``force_rerun=True`` to bypass the lookup.
-Run hashes do not include the QDK/Chemistry version, so caches should not be reused across
-releases when algorithm semantics have changed. In particular, clear pre-2.2 cache
-entries for calculations that use effective core potentials.
+Run hashes do not include the QDK/Chemistry version. Do not reuse cache entries
+across releases when algorithm behavior has changed. In particular, clear
+pre-2.2 entries for calculations that use effective core potentials.
 
-Remote backends and cache backends are plugin capabilities. A backend implements
-:class:`~qdk_chemistry.remote.backends.base.RemoteBackend` and is registered through
-:class:`~qdk_chemistry.plugins.base.PluginRegistrar`, so an installed plugin package is
-discovered at import time and its backend name becomes available to
-:func:`~qdk_chemistry.remote.backends.base.create_remote`. See
-:ref:`Implementing a remote backend <adding-remote-backends>` for a complete SSH example.
+Remote and cache backends can be registered by plugins through
+:class:`~qdk_chemistry.plugins.base.PluginRegistrar`. See
+:ref:`Implementing a remote backend <adding-remote-backends>` for an SSH
+example.
 
-.. rubric:: Microsoft Discovery plugin
+Microsoft Discovery
+-------------------
 
-The bundled ``"discovery"`` backend runs jobs through Microsoft Discovery:
+The ``discovery`` extra installs the Microsoft Discovery backend:
 
 .. code-block:: bash
 
    pip install 'qdk-chemistry[discovery]'
 
-It submits a containerized tool invocation to a Microsoft Discovery workspace and moves job inputs
-and outputs either through Azure Blob Storage or through a shared cache, selected by its
-``transport`` setting. Workspace endpoint, project, tool and node-pool identifiers,
-container image, storage location, and authentication mode are supplied either as
-constructor arguments or through the corresponding ``QDK_DISCOVERY_*`` environment
-variables.
-
-Quantum Algorithm Building Blocks
-=================================
-
-.. rubric:: Unary-iteration phase estimation
-
-``phase_estimation`` / ``qdk_unary`` (and the matching ``qpe_circuit_builder`` /
-``qdk_unary``) builds a flat chain of alternating qubitized walk queries and reflections.
-Unary iteration over the phase register selects which reflection is omitted, so one chain
-realizes every required walk power. The phase register is prepared in a cosine window
-rather than a uniform superposition to suppress spectral leakage, and the number of
-queries is set directly with ``num_queries`` — it need not be a power of two. Because the
-walk spectrum is :math:`e^{\pm i\arccos(E/\lambda)}`, where :math:`\lambda` is the
-coefficient 1-norm used to normalize the block encoding, the result's ``branching`` tuple
-carries both candidate energies. The boolean ``resolve_positive_branch`` setting selects
-which candidate is stored in ``resolved_energy``; its default selects the non-positive
-branch used for ground-state calculations. The path requires a ``quantum_walk`` unitary
-builder; there is no product-formula equivalent. The recursive Q# operation does not
-lower to QIR, so this implementation currently requires Q# state preparation and the
-``qdk_sparse_state_simulator`` executor for execution. The circuit retains its Q#
-representation and remains available to :meth:`~qdk_chemistry.data.Circuit.estimate`. See
-:class:`~qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation.UnaryPhaseEstimation`
-and :doc:`../user/comprehensive/algorithms/phase_estimation`.
-
-.. rubric:: Binary-encoded sparse isometry
-
-The sparse-isometry state preparation gains a ``binary_encoding`` setting. The standard
-path reduces the determinant-support matrix over :math:`\mathrm{GF}(2)` and loads
-amplitudes on the rows left by that reduction. When
-:math:`\lceil \log_2 d \rceil` is smaller than the reduced width, binary encoding instead
-constructs a one-to-one map from the :math:`d` determinants into the
-:math:`2^{\lceil \log_2 d \rceil}` basis states of the smaller register. The lookup blocks
-add CCZ operations and may require ancilla qubits; they borrow idle system qubits before
-allocating new ones, so the complete circuit can use more qubits even though its dense
-amplitude-loading register is smaller. ``measurement_based_uncompute`` trades their
-Toffoli-based uncomputation for mid-circuit measurement and feedforward, which requires
-an adaptive target profile. When the state is not compressible by this criterion, the
-standard path is used unchanged. See
-:doc:`../user/comprehensive/algorithms/state_preparation`.
-
-.. rubric:: Controlled-SWAP circuit synthesis
-
-``controlled_circuit_mapper`` / ``cswap_pauli_sequence`` synthesizes a controlled time
-evolution without controlling every gate. For an :math:`n`-qubit system it allocates an
-additional :math:`n`-qubit vacuum register, conditionally swaps the system into it, applies
-the *uncontrolled* product formula, and uncomputes the swap, for two layers of
-:math:`n` controlled-SWAP gates. The mapper applies to particle-conserving Hamiltonians,
-which keep the vacuum in its own particle-number sector. Correctness requires that the
-vacuum stay an eigenstate of the evolution; the mapper computes and cancels the vacuum's
-phase. Each fermionic term annihilates the vacuum but an individual mapped Pauli string
-does not, so the companion ``term_grouper`` / ``vacuum_annihilating`` keeps each set of
-cancellation partners contiguous. The mapper rejects an ordering that leaks amplitude
-from the vacuum rather than returning a wrong result. See
-:doc:`../user/comprehensive/algorithms/circuit_mapper`.
-
-.. rubric:: Amplitude amplification
-
-:class:`~qdk_chemistry.algorithms.amplitude_amplification.amplitude_amplification.AmplitudeAmplification`
-(``amplitude_amplification`` / ``qdk_base``) takes a state-preparation circuit and a
-marking oracle and applies ``rounds`` amplification steps, each reflecting about the
-marked subspace and then about the prepared state.
-:class:`~qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.QPESubspaceMarking`
-(``amplitude_amplification_oracle`` / ``qdk_qpe_subspace``) is the first registered
-oracle: it runs nested phase estimation on the register it is handed, flips the flag when
-the recovered energy is at least ``energy_lower_bound``, and uncomputes the estimation.
-It therefore marks the upper part of the encoded energy spectrum relative to the chosen
-bound. The operation is an exact reflection only when the relevant eigenphases lie
-exactly on phase-register bins; off-bin phases leave residual amplitude in the released
-ancillas.
-See :doc:`../user/comprehensive/algorithms/amplitude_amplification`.
-
-.. rubric:: Effective Hamiltonian construction
-
-A new ``effective_hamiltonian_constructor`` algorithm type defines the interface for
-downfolding a Hamiltonian from a larger orbital window onto a target space:
-:class:`~qdk_chemistry.algorithms.EffectiveHamiltonianConstructor` takes a reference
-:class:`~qdk_chemistry.data.Wavefunction`, a full-window
-:class:`~qdk_chemistry.data.Hamiltonian`, and the target-space orbital indices, and
-returns a Hamiltonian acting only in that space. The interface leaves the downfolding
-approximation to the implementation, and the target indices need not lie inside the
-reference wavefunction's active space. No implementation ships with the library; the type
-exists so that downfolding methods can be registered like any other algorithm. See
-:doc:`../user/comprehensive/algorithms/effective_hamiltonian_constructor`.
+The backend submits a containerized tool invocation and transfers files through
+Azure Blob Storage or a shared cache. Workspace, project, tool, node-pool,
+container, storage, and authentication settings can be supplied directly or
+through ``QDK_DISCOVERY_*`` environment variables.
 
 
-Active Spaces, Orbitals, and Analysis
-=====================================
+Algorithm Components
+====================
 
-Two new orbital localizers address a freedom that ordinary localization leaves open: an
-active space fixes the :term:`CASCI` energy, but the orbital basis chosen inside it
-determines the qubit Hamiltonian that follows.
+Unary-iteration phase estimation
+--------------------------------
 
-:ref:`Gauge fixing <localizer-qdk-gauge-fixing>` (``orbital_localizer`` /
-``qdk_gauge_fixing``) resolves the rotational freedom among natural orbitals with equal
-occupation numbers. It anchors each occupation-degenerate block to the atomic-orbital
-basis and then runs coordinate-descent sweeps over Givens rotations inside the block,
-accepting only rotations that reduce the mapped coefficient norm
-:math:`\lambda = \sum_\ell |h_\ell|` of the mapped active-space Hamiltonian, excluding
-the separate core-energy constant. AO anchoring first makes the gauge deterministic and
-can raise :math:`\lambda` relative to the input orientation. The capped local sweeps then
-reduce it monotonically from the anchored gauge, so the final value is not guaranteed to
-be below the input value. Each objective evaluation performs an integral transformation
-and a qubit mapping.
+``phase_estimation`` / ``qdk_unary`` builds an arbitrary-length chain of
+qubitized-walk queries. The phase register uses a cosine window, and
+``num_queries`` need not be a power of two.
 
-That norm sets the evolution time in phase estimation and the normalization of an
-:term:`LCU` block encoding. Before post-mapping tapering it is identical for linear
-fermion-to-qubit encodings, meaning encodings that map each Majorana monomial to one Pauli
-word up to phase, so the gauge choice does not depend on the mapping. Choosing a gauge is
-a separate objective from finding the natural orbitals, so the two compose: run
-``qdk_natural_orbitals`` first and pass its result here.
+The walk spectrum contains conjugate branches
+:math:`e^{\pm i\arccos(E/\lambda)}`. The result stores both energy candidates
+in ``branching``; ``resolve_positive_branch`` selects ``resolved_energy``. The
+default selects the non-positive branch used for ground-state calculations.
 
-:ref:`Active-space quantum-information orbitals <localizer-qdk-active-space-qio>`
-(``orbital_localizer`` / ``qdk_active_space_qio``) use gradient-free Jacobi sweeps to
-search for rotations that reduce the sum of single-orbital entropies, using the same entropy convention as
-:meth:`~qdk_chemistry.data.Wavefunction.get_single_orbital_entropies`. The rotation is
-restricted to a fixed active space and optimizes against the input density matrices
-without reoptimizing the correlated wavefunction in the new basis.
+This implementation requires a ``quantum_walk`` unitary builder. For execution,
+it also requires Q# state preparation and the ``qdk_sparse_state_simulator``
+executor because its recursive Q# operation does not lower to QIR. The circuit
+retains a Q# representation and can still be passed to
+:meth:`~qdk_chemistry.data.Circuit.estimate`.
 
-Both take a :class:`~qdk_chemistry.data.Wavefunction` carrying active-space :term:`RDM`
-data and return a new single-reference wavefunction built from the transformed orbitals.
-Both carry rotated active-space 1-RDM data in the chosen basis; the QIO result does not
-carry a rotated 2-RDM or a reoptimized correlated state. See
-:doc:`../user/comprehensive/algorithms/localizer` for their input requirements and
-settings.
+Binary encoding for sparse isometry
+-----------------------------------
 
-Two analysis capabilities are also new. A ``population_analyzer`` algorithm type
-(:class:`~qdk_chemistry.algorithms.PopulationAnalyzer`) takes a
-:class:`~qdk_chemistry.data.Wavefunction` and returns Mulliken electron populations per
-atom, or site occupations for model orbitals, with a native ``"qdk"`` implementation and
-a ``"pyscf"`` variant. The
-:meth:`~qdk_chemistry.data.Wavefunction.compute_s_squared` method evaluates
-:math:`\langle \hat{S}^2 \rangle` for a wavefunction container, the standard check that a
-correlated state carries the intended spin symmetry.
+Sparse-isometry state preparation now has a ``binary_encoding`` setting. The
+standard path reduces the determinant-support matrix over
+:math:`\mathrm{GF}(2)` and loads amplitudes on the remaining rows. When
+:math:`\lceil\log_2 d\rceil` is smaller than that width, binary encoding maps
+the :math:`d` determinants one-to-one into the basis states of the smaller
+register.
 
-.. rubric:: Native cube generation
+The lookup circuit adds CCZ operations and may allocate ancilla qubits, so a
+smaller amplitude-loading register does not imply a smaller complete circuit.
+``measurement_based_uncompute`` replaces Toffoli-based uncomputation with
+mid-circuit measurement and feedforward and therefore requires an adaptive
+target profile. See :doc:`../user/comprehensive/algorithms/state_preparation`.
 
-:func:`~qdk_chemistry.utils.cubegen.generate_cubefiles_from_orbitals` now defaults to
-``backend="native"``, evaluating orbitals on the grid in process through the native
-``CubeGenerator`` and ``CubeGrid`` utilities. No third-party quantum chemistry package is
-required to visualize orbitals, and both spherical and Cartesian basis sets are supported.
-The ``"pyscf"`` backend is retained for comparison. Both backends place grid points
-identically and share the atomic-orbital ordering, so the same coefficient vector means
-the same thing to each.
+Controlled-SWAP circuit mapping
+-------------------------------
+
+``controlled_circuit_mapper`` / ``cswap_pauli_sequence`` implements controlled
+time evolution without controlling every gate in the product formula. For an
+:math:`n`-qubit system it uses an additional :math:`n`-qubit vacuum register
+and two layers of :math:`n` controlled-SWAP gates.
+
+The mapper applies to particle-conserving Hamiltonians. The vacuum must remain
+an eigenstate of the grouped evolution; the mapper computes and cancels the vacuum's
+phase. ``term_grouper`` / ``vacuum_annihilating`` keeps the Pauli cancellation
+partners from each fermionic term contiguous. The mapper rejects an ordering
+that leaks amplitude from the vacuum.
+
+Amplitude amplification
+-----------------------
+
+``amplitude_amplification`` / ``qdk_base`` applies a configurable number of
+amplification rounds to a state-preparation circuit and a marking oracle. Each
+round reflects about the marked subspace and the prepared state.
+
+The registered ``amplitude_amplification_oracle`` / ``qdk_qpe_subspace`` oracle
+marks phase-estimation bins whose energy is at least ``energy_lower_bound``.
+It is an exact reflection only when the relevant eigenphases lie on
+phase-register bins.
+
+Effective Hamiltonian interface
+-------------------------------
+
+The new ``effective_hamiltonian_constructor`` algorithm type defines the
+interface for downfolding a Hamiltonian onto target orbitals. It accepts a
+reference :class:`~qdk_chemistry.data.Wavefunction`, a full-window
+:class:`~qdk_chemistry.data.Hamiltonian`, and target indices. No implementation
+ships in this release.
 
 
-Documentation and Tutorials
-===========================
+Orbitals, Analysis, and Cube Generation
+=======================================
 
-A complete tutorial, :doc:`Ground-state molecular energies with quantum phase estimation
-<../tutorials/ground_state_molecular_energies_with_qpe/index>`, is new in this release.
-Its chapters take stretched N\ :sub:`2` from a target accuracy and a molecular geometry
-through active-space selection, qubit mapping, and trial-state preparation to an
-:term:`IQPE` energy, and then reconstruct the total energy and compare it against the
-matching :term:`CASCI` reference. Runnable example scripts cover the whole workflow, and
-three notebooks accompany the active-space, trial-state, and circuit-visualization
-chapters; all of them are executed in CI. The tutorial also carries a cumulative
-lab-notebook exercise. It runs entirely on library APIs, using the
-``qdk_gauge_fixing`` localizer and native basis-function and molecular-orbital cube
-generation, so those steps require no PySCF installation.
+``orbital_localizer`` / ``qdk_gauge_fixing`` fixes the rotational freedom
+within occupation-degenerate natural-orbital blocks. It first anchors each
+block to the atomic-orbital basis, then performs capped coordinate-descent
+sweeps that reduce
+:math:`\lambda = \sum_\ell |h_\ell|` from the anchored gauge. Anchoring can
+raise :math:`\lambda` relative to the input orientation, so the final value is
+not guaranteed to be below the input value.
 
-Two algorithm types are also documented for the first time:
-:doc:`../user/comprehensive/algorithms/propagator` and
-:doc:`../user/comprehensive/algorithms/hamiltonian_simulation`, which cover the real-time
-dynamics primitives introduced in 2.0.
+The norm excludes the separate core-energy constant and is evaluated before
+post-mapping tapering. It is invariant across linear fermion-to-qubit encodings,
+where each Majorana monomial maps to one Pauli word up to phase. Each objective
+evaluation performs an integral transformation and a qubit mapping. Run
+``qdk_natural_orbitals`` before gauge fixing.
+
+``orbital_localizer`` / ``qdk_active_space_qio`` performs gradient-free Jacobi
+sweeps that reduce the sum of single-orbital entropies within a fixed active
+space. It rotates the input density matrices but does not reoptimize the
+correlated wavefunction.
+
+Both new localizers return transformed orbitals and rotated active-space 1-RDM
+data; the QIO result does not carry a rotated 2-RDM.
+See :doc:`../user/comprehensive/algorithms/localizer`.
+
+The new ``population_analyzer`` type provides Mulliken electron populations
+per atom, or site occupations for model orbitals, through native ``"qdk"`` and
+``"pyscf"`` implementations.
+:meth:`~qdk_chemistry.data.Wavefunction.compute_s_squared` evaluates
+:math:`\langle\hat{S}^2\rangle`.
+
+:func:`~qdk_chemistry.utils.cubegen.generate_cubefiles_from_orbitals` evaluates
+orbitals in process, supporting spherical and Cartesian basis sets without a
+third-party quantum chemistry package. The ``"pyscf"`` backend remains
+available for comparison.
+
+
+Molecular QPE Tutorial
+======================
+
+:doc:`Ground-state molecular energies with quantum phase estimation
+<../tutorials/ground_state_molecular_energies_with_qpe/index>` follows stretched
+N\ :sub:`2` from molecular input through active-space selection, qubit mapping,
+trial-state preparation, and iterative phase estimation. It includes executable
+scripts and three notebooks and does not require PySCF.
+
+The propagator and Hamiltonian-simulation interfaces introduced in 2.0 are also
+documented in :doc:`../user/comprehensive/algorithms/propagator` and
+:doc:`../user/comprehensive/algorithms/hamiltonian_simulation`.
 
 
 Platforms and Packaging
 =======================
 
-Windows is now a native platform on both x86-64 and Arm64: the project is built and
-tested on both architectures with MSVC and clang-cl, and wheels are published for both —
-x86-64 from Python 3.10 and Arm64 from Python 3.11, the first CPython release with a
-win-arm64 build. Three caveats apply to native Windows, and none of them apply under the
-`Windows Subsystem for Linux <https://learn.microsoft.com/windows/wsl/install>`_, which
-uses the Linux wheels:
+Wheels are built for Linux x86-64 and Arm64, macOS Arm64, Windows x86-64, and
+Windows Arm64. Windows x86-64 supports Python 3.10 and later; Windows Arm64
+supports Python 3.11 and later.
 
-- PySCF publishes no Windows wheels, so the ``plugins`` extra installs no PySCF there and the PySCF plugin is unavailable. The native implementations are unaffected.
-- On Arm64 the ``mcp`` extra is omitted from ``all`` and ``test`` because ``cryptography`` publishes no native wheel; installing ``mcp`` explicitly may require an Arm64 Rust toolchain, MSVC C/C++ build tools, and Arm64 OpenSSL development libraries. The Qiskit stack, PennyLane, and RDKit are also skipped because ``rustworkx`` publishes no native wheel, and the Microsoft Discovery backend is skipped with its ``azure-*`` dependencies.
-- OpenMP parallel regions in QDK/Chemistry are disabled on Windows; vendor libraries may still use their own threading.
+Native Windows has the following restrictions:
 
-The `installation instructions <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_
-carry the current support matrix.
+- PySCF is unavailable because it publishes no Windows wheels.
+- On Windows Arm64, ``mcp`` is omitted from ``all`` and ``test`` because
+  ``cryptography`` publishes no native wheel. An explicit ``mcp`` installation
+  may require an Arm64 Rust toolchain, MSVC C/C++ build tools, and Arm64 OpenSSL
+  development libraries.
+- Qiskit, PennyLane, RDKit, and the Microsoft Discovery backend are unavailable
+  on Windows Arm64 through the standard extras.
+- QDK/Chemistry OpenMP regions are disabled on Windows. Vendor libraries may
+  still use their own threading.
 
-Packaging and build changes:
+Other packaging and build changes:
 
-- **New** ``mcp`` **extra.** ``mcp>=2,<3`` installs the MCP server dependencies. It is omitted from the ``all`` and ``test`` extras on Windows Arm64 to avoid a source build of ``cryptography``.
-- **New** ``discovery`` **extra.** ``azure-ai-discovery``, ``azure-identity``, and ``azure-storage-blob`` install the Microsoft Discovery remote backend.
-- **The** ``jupyter`` **extra no longer implies** ``plugins``. Notebook support and third-party chemistry backends are now independent; install ``'qdk-chemistry[plugins]'`` explicitly if you need PySCF or geomeTRIC.
-- Source builds and CI now use Libint2 2.13.1 consistently.
-- A BLIS/libFLAME symbol collision that affected Linux wheel builds is resolved.
+- ``jupyter`` no longer includes ``plugins``.
+- Source builds and CI use Libint2 2.13.1.
+- A BLIS/libFLAME symbol collision in Linux wheel builds is fixed.
+
+See the `installation instructions
+<https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_ for the
+complete extras and platform matrix.
 
 
 .. _v2-2-behavior-changes:
@@ -319,67 +251,67 @@ Packaging and build changes:
 Behavior Changes
 ================
 
-.. rubric:: Sparse isometry factory name
+Sparse-isometry name
+--------------------
 
-The ``state_prep`` implementation formerly named ``"sparse_isometry_gf2x"`` is now
-``"sparse_isometry"``. The old name still resolves and emits a ``DeprecationWarning``.
+The ``state_prep`` implementation ``"sparse_isometry_gf2x"`` is renamed
+``"sparse_isometry"``. The old name remains available and emits a
+``DeprecationWarning``.
 
-.. rubric:: ECP-adjusted nuclear charges
+ECP handling
+------------
 
-SCF electron counts, nuclear repulsion energies, and Hamiltonian core energies now use
-nuclear charges reduced by the electrons replaced by an :term:`ECP`, via the new
-``BasisSet::get_effective_nuclear_charges`` and
-``BasisSet::calculate_effective_nuclear_repulsion_energy``. Total energies for systems
-with effective core potentials change accordingly; previously reported values for those
-systems are wrong and should be recomputed. Clear cached results from earlier releases
-before recomputing them. Relatedly, ECP assignments are now keyed by atom rather than by
-element, so two centers of the same element can carry different ECP treatments.
+Effective nuclear charges now determine SCF electron counts, nuclear repulsion
+energies, and Hamiltonian core energies for systems with effective core
+potentials. ECP assignments are keyed by atom rather than element. Recompute
+affected results and clear pre-2.2 cache entries before doing so.
 
-.. rubric:: Orbital occupations
+Orbital occupations
+-------------------
 
-A :class:`~qdk_chemistry.data.StateVectorContainer` whose stored one-particle :term:`RDM`
-does not match its determinant now reports natural occupation numbers obtained by
-diagonalizing that :term:`RDM`. Previously it returned the determinant's integer
-occupations. For a non-natural orbital basis these eigenvalues are not the diagonal
+When a stored one-particle :term:`RDM` does not match its determinant,
+:class:`~qdk_chemistry.data.StateVectorContainer` reports natural occupation
+numbers obtained by diagonalizing the RDM rather than integer determinant
+occupations. For a non-natural orbital basis these eigenvalues are not diagonal
 populations of the stored orbitals.
 
-.. rubric:: Cube generation defaults and file names
+Cube generation
+---------------
 
-Orbital cube generation now defaults to ``backend="native"`` instead of ``"pyscf"``.
-Default labels are also zero-based: orbital ``0`` now writes ``orbital_0000.cube`` rather
-than ``orbital_0001.cube``. Pass ``label_maker`` to
-:func:`~qdk_chemistry.utils.cubegen.generate_cubefiles_from_orbitals` to choose another
-scheme.
+Orbital cube generation defaults to ``backend="native"`` instead of
+``"pyscf"``. Default labels are zero-based: orbital ``0`` now writes
+``orbital_0000.cube`` instead of ``orbital_0001.cube``.
 
-.. rubric:: Duplicate registrations
+Registration
+------------
 
-Registration names must be unique within their registry. Registering a second algorithm,
-algorithm type, data class, remote backend, or cache backend under a name that is already
-taken now raises :class:`~qdk_chemistry.plugins.DuplicateRegistrationError`, a
-``ValueError`` subclass, and leaves the existing implementation in place. During
-entry-point discovery the exception is caught, reported as a ``UserWarning`` identifying
-the offending plugin, and the remaining plugins continue to load.
+Duplicate algorithm, algorithm-type, data-class, remote-backend, and
+cache-backend registrations now raise
+:class:`~qdk_chemistry.plugins.DuplicateRegistrationError` and preserve the
+existing registration.
 
-.. rubric:: Custom data-class type names
+Custom :class:`~qdk_chemistry.data.DataClass` subclasses must declare their wire
+identifier with a static ``data_type_name()`` method. Replace the former
+``_data_type_name`` class attribute before registering the class through a
+plugin.
 
-Custom :class:`~qdk_chemistry.data.DataClass` subclasses must now declare their serialized
-wire identifier with a static ``data_type_name()`` method. Replace the former
-``_data_type_name`` class attribute before registering the class through a plugin; classes
-that do not declare the method directly are rejected during registration.
+Nested BLAS threading
+---------------------
 
-.. rubric:: Nested BLAS threading in GauXC operations
-
-For linked BLAS libraries with runtime thread control, QDK/Chemistry temporarily restricts
-the library to one thread inside GauXC-backed SCF, gradient, and response operations.
-Nested BLAS threading previously could cause oversubscription or wrong results for some
-backends. Other BLAS backends emit guidance for setting their thread limits externally.
-Recompute results from pre-2.2 runs if they showed thread-dependent numerical behavior.
+For linked BLAS libraries with runtime thread control, QDK/Chemistry restricts
+the library to one thread inside GauXC-backed SCF, gradient, and response
+operations. Nested BLAS threading could previously cause oversubscription or
+wrong results for some backends. Other BLAS libraries emit guidance for setting
+thread limits externally. Recompute pre-2.2 results if they showed
+thread-dependent numerical behavior.
 
 
 Bug Fixes
 =========
 
-- Importing ``qdk_chemistry`` no longer emits the ``MP2NaturalOrbitalLocalizer`` deprecation message. Requesting ``qdk_mp2_natural_orbitals`` explicitly still warns.
-- Deserializing :class:`~qdk_chemistry.data.Orbitals` from JSON preserves the concrete type: ``Orbitals.from_json`` applied to a serialized :class:`~qdk_chemistry.data.ModelOrbitals` returns a ``ModelOrbitals`` rather than a sliced base ``Orbitals``.
-- Cache plugin discovery failures are logged instead of being swallowed.
+- Importing ``qdk_chemistry`` no longer emits the
+  ``MP2NaturalOrbitalLocalizer`` deprecation message. Explicitly requesting
+  ``qdk_mp2_natural_orbitals`` still warns.
+- JSON deserialization preserves derived orbital types.
+- Cache plugin discovery failures are logged instead of discarded.
 - The controlled-IQPE tutorial diagram renders unitary powers as superscripts.

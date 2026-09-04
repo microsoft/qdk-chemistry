@@ -191,7 +191,7 @@ Compare the gate types and circuit structure before revealing the answer below.
 
 To measure the generated logical-circuit cost, the script traverses the decomposed :ref:`Q# circuit representation <tutorial-qsharp>`, counts displayed gate records that have no nested child operations, and identifies controlled X gates as CNOT gates.
 The script creates the QDK/Chemistry sparse-isometry implementation and inspects the generated Q# logical circuit.
-The script currently uses the deprecated :ref:`sparse_isometry_gf2x <sparse-isometry-gf2x>` compatibility key, which resolves to the current ``sparse_isometry`` implementation:
+The factory key :ref:`sparse_isometry_gf2x <sparse-isometry-gf2x>` is the implementation's current API identifier using a helper function to count gates:
 
 .. literalinclude:: ../../_static/examples/python/tutorial_prepare_trial_state.py
    :language: python
