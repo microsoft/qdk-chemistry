@@ -1,6 +1,6 @@
 ---
 name: remote-execution
-version: 'v2.1.0'
+version: 'v2.2.0'
 description: 'Describes the QDK Chemistry remote execution API and job lifecycle.'
 ---
 

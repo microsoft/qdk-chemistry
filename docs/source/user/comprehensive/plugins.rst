@@ -97,10 +97,9 @@ The PySCF plugin is installed via the ``plugins`` extra:
 
 .. note::
 
-   PySCF is the only package in the ``plugins`` extra and publishes no Windows wheels, so the PySCF
-   plugin is unavailable on native Windows. Because ``jupyter``, ``test``, and ``all`` depend on
-   ``plugins``, this applies to those extras as well — they install successfully on Windows, but
-   without PySCF.
+   PySCF publishes no Windows wheels, so the ``plugins`` extra installs geomeTRIC but omits PySCF
+   on native Windows. The ``test`` and ``all`` extras include ``plugins`` and likewise install
+   without PySCF there. The ``jupyter`` extra does not include ``plugins``.
 
    The native QDK/Chemistry implementations are unaffected and remain available on Windows.
    To use the PySCF plugin on a Windows machine, work inside
