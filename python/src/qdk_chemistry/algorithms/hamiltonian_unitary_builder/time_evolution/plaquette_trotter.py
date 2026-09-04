@@ -43,6 +43,7 @@ import math
 from typing import TYPE_CHECKING
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter, TrotterSettings
+from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import ExponentiatedPauliTerm
 from qdk_chemistry.utils import Logger
 
@@ -190,11 +191,28 @@ class PlaquetteTrotter(Trotter):
     silently wrong circuit.
 
     Note:
-        This expects a Jordan-Wigner encoded, spin-ordered uniform Fermi-Hubbard
+        This expects a Jordan-Wigner encoded, spin-blocked uniform Fermi-Hubbard
         model on a periodic square lattice of even side length at least four, with
         spin-up modes occupying the first half of the register. A non-uniform
-        hopping, an open boundary, or a term that does not match a lattice bond
-        raises rather than being approximated.
+        hopping, an interleaved mode ordering, an open boundary, or a bond graph
+        that is not the declared lattice raises rather than being approximated.
+
+    Warning:
+        The rotation saving described above is only realized when the Givens
+        network is applied **uncontrolled**. Controlling a fixed-angle rotation
+        costs the same as controlling an arbitrary one -- measured on the resource
+        estimator, ``Controlled Exp(P, pi/8)`` counts two rotations and no T gate,
+        exactly like an arbitrary angle -- so a mapper that controls every emitted
+        term uniformly turns this scheme into a *more* expensive one than the
+        term-by-term path it replaces.
+
+        The saving is recoverable because ``Controlled(V D V^dag)`` equals
+        ``V Controlled(D) V^dag``: with the control off, the network cancels
+        against its own adjoint. Only the two eigenvalue phases need controlling.
+        Realizing that requires a controlled mapper that can distinguish the
+        conjugating layers from the phase layer, which
+        :class:`~qdk_chemistry.algorithms.ControlledPauliSequenceMapper` does not
+        currently do. Until it can, prefer this builder for uncontrolled evolution.
 
     """
 
@@ -290,9 +308,33 @@ class PlaquetteTrotter(Trotter):
                 f"Hamiltonian has {qubit_hamiltonian.num_qubits}."
             )
 
-        hopping, diagonal = self._split_hopping(qubit_hamiltonian, atol)
+        declared_order = getattr(qubit_hamiltonian, "fermion_mode_order", None)
+        if declared_order is not None and str(declared_order) != str(FermionModeOrder.BLOCKED):
+            raise ValueError(
+                f"PlaquetteTrotter reads the register as spin-blocked (spin-up modes first), but "
+                f"the Hamiltonian declares {declared_order!s} ordering. Re-map it with "
+                f"{FermionModeOrder.BLOCKED!s} ordering before building the unitary."
+            )
+
+        hopping, diagonal, observed_bonds = self._split_hopping(qubit_hamiltonian, num_sites, atol)
         section_a, section_b = plaquette_sections(width, height)
         order = self._settings.get("order")
+
+        # The tiling is derived from the declared lattice shape, while the bonds above
+        # come from the operator. Comparing them catches every way the two can disagree
+        # -- a transposed or wrongly sized lattice, an open rather than periodic
+        # boundary, column-major site numbering -- each of which would otherwise emit a
+        # well-formed circuit for the wrong Hamiltonian.
+        tiled_bonds = {frozenset((cycle[k], cycle[(k + 1) % 4])) for cycle in section_a + section_b for k in range(4)}
+        if observed_bonds != tiled_bonds:
+            missing = len(tiled_bonds - observed_bonds)
+            extra = len(observed_bonds - tiled_bonds)
+            raise ValueError(
+                f"The Hamiltonian's hopping graph does not match a periodic {width}x{height} "
+                f"square lattice: {missing} lattice bond(s) absent from the operator and "
+                f"{extra} operator bond(s) outside the lattice. Check the lattice dimensions, "
+                "the boundary conditions, and that sites are numbered row-major."
+            )
 
         def hop_layer(section, fraction):
             """Evolve every plaquette of *section*, for both spins, for *fraction* of the step."""
@@ -322,32 +364,50 @@ class PlaquetteTrotter(Trotter):
             + hop_layer(section_a, 0.5)
         )
 
-    def _split_hopping(self, qubit_hamiltonian, atol):
-        """Separate the uniform hopping amplitude from the diagonal terms.
+    def _split_hopping(self, qubit_hamiltonian, num_sites, atol):
+        """Separate the uniform hopping amplitude, the diagonal terms, and the bond graph.
 
         Args:
             qubit_hamiltonian: The Hamiltonian to inspect.
+            num_sites: Number of lattice sites, used to fold the two spin blocks together.
             atol: Threshold below which coefficients are dropped.
 
         Returns:
-            ``(hopping, diagonal)`` where *hopping* is the amplitude ``t`` and
+            ``(hopping, diagonal, bonds)`` where *hopping* is the amplitude ``t``,
             *diagonal* holds every non-hopping term as an
-            :class:`ExponentiatedPauliTerm` scaled to unit time.
+            :class:`ExponentiatedPauliTerm` scaled to unit time, and *bonds* is the
+            set of site pairs the hopping terms connect.
 
         Raises:
-            ValueError: If no hopping is present or it is not uniform.
+            ValueError: If no hopping is present, it is not uniform, a hopping term
+                connects the two spin blocks, or the two spin sectors disagree.
 
         """
         magnitudes: set[float] = set()
         diagonal: list[ExponentiatedPauliTerm] = []
+        # Tracked per spin sector: a bond present for one spin but not the other would
+        # otherwise be hidden by folding the two blocks together, and the tiling applies
+        # every plaquette to both spins.
+        bonds: dict[int, set[frozenset[int]]] = {0: set(), 1: set()}
         for label, coeff in qubit_hamiltonian.get_real_coefficients(tolerance=atol):
             mapping = self._pauli_label_to_map(label)
             axes = [position for position, axis in mapping.items() if axis in "XY"]
-            if len(axes) == 2:
-                # A Jordan-Wigner hopping bond contributes two Paulis of weight t/2.
-                magnitudes.add(round(abs(coeff), 12))
-            else:
+            if len(axes) != 2:
                 diagonal.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=coeff))
+                continue
+
+            # A Jordan-Wigner hopping bond contributes two Paulis of weight t/2, whose
+            # X/Y endpoints are the two modes it connects.
+            magnitudes.add(round(abs(coeff), 12))
+            first, second = axes
+            if (first < num_sites) != (second < num_sites):
+                raise ValueError(
+                    f"The term {label!r} hops between the spin-up and spin-down blocks. "
+                    "PlaquetteTrotter tiles each spin sector separately and cannot express "
+                    "spin-flip hopping."
+                )
+            spin = 0 if first < num_sites else 1
+            bonds[spin].add(frozenset((first % num_sites, second % num_sites)))
 
         if not magnitudes:
             raise ValueError("The Hamiltonian carries no hopping terms; nothing to tile into plaquettes.")
@@ -356,7 +416,15 @@ class PlaquetteTrotter(Trotter):
                 f"PlaquetteTrotter requires a uniform hopping amplitude, but found "
                 f"{len(magnitudes)} distinct magnitudes: {sorted(magnitudes)}."
             )
+        if bonds[0] != bonds[1]:
+            raise ValueError(
+                f"The two spin sectors carry different hopping graphs "
+                f"({len(bonds[0])} and {len(bonds[1])} bonds). PlaquetteTrotter applies the same "
+                "tiling to both spins."
+            )
 
         hopping = 2.0 * next(iter(magnitudes))
-        Logger.debug(f"PlaquetteTrotter: hopping t={hopping}, {len(diagonal)} diagonal terms.")
-        return hopping, diagonal
+        Logger.debug(
+            f"PlaquetteTrotter: hopping t={hopping}, {len(bonds[0])} bonds per spin, {len(diagonal)} diagonal terms."
+        )
+        return hopping, diagonal, bonds[0]

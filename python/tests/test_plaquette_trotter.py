@@ -195,3 +195,52 @@ class TestPlaquetteTrotter:
         )
         with pytest.raises(ValueError, match="uniform hopping"):
             PlaquetteTrotter(lattice_width=side, lattice_height=side, order=2, time=0.05, num_divisions=1).run(detuned)
+
+    def test_rejects_interleaved_mode_ordering(self):
+        """The tiling reads the register as spin-blocked; interleaved would mis-address sites."""
+        side = 4
+        operator = self._hubbard(side)
+        interleaved = QubitOperator(
+            pauli_strings=list(operator.pauli_strings),
+            coefficients=operator.coefficients.copy(),
+            encoding=operator.encoding,
+            fermion_mode_order="interleaved",
+        )
+        with pytest.raises(ValueError, match="spin-blocked"):
+            PlaquetteTrotter(lattice_width=side, lattice_height=side, order=2, time=0.05, num_divisions=1).run(
+                interleaved
+            )
+
+    def test_rejects_a_hopping_graph_that_is_not_the_declared_lattice(self):
+        """A bond graph mismatch must raise rather than emit a circuit for another Hamiltonian."""
+        side = 4
+        operator = self._hubbard(side)
+        # Drop one bond's two Pauli terms, leaving the lattice with a hole.
+        labels = list(operator.pauli_strings)
+
+        def support(label):
+            return frozenset(i for i, axis in enumerate(reversed(label)) if axis in "XY")
+
+        target = support(next(label for label in labels if len(support(label)) == 2))
+        keep = [index for index, label in enumerate(labels) if support(label) != target]
+        punctured = QubitOperator(
+            pauli_strings=[labels[i] for i in keep],
+            coefficients=operator.coefficients[keep],
+            encoding=operator.encoding,
+            fermion_mode_order=operator.fermion_mode_order,
+        )
+        with pytest.raises(ValueError, match="does not match a periodic|different hopping graphs"):
+            PlaquetteTrotter(lattice_width=side, lattice_height=side, order=2, time=0.05, num_divisions=1).run(
+                punctured
+            )
+
+    def test_rejects_spin_flip_hopping(self):
+        """Each spin sector is tiled separately, so cross-block hopping cannot be expressed."""
+        side = 4
+        num_qubits = 2 * side * side
+        label = ["I"] * num_qubits
+        label[0] = "X"
+        label[side * side] = "Y"
+        operator = QubitOperator(pauli_strings=["".join(reversed(label))], coefficients=np.array([0.5]))
+        with pytest.raises(ValueError, match="spin-up and spin-down"):
+            PlaquetteTrotter(lattice_width=side, lattice_height=side, order=2, time=0.05, num_divisions=1).run(operator)

@@ -128,7 +128,6 @@ class QubitOperator(DataClass):
                 or if the Pauli strings or coefficients are invalid.
 
         """
-        Logger.trace_entering()
         if len(pauli_strings) != len(coefficients):
             raise ValueError("Mismatch between number of Pauli strings and coefficients.")
 

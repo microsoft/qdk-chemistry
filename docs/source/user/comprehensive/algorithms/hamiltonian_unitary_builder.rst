@@ -177,9 +177,25 @@ operator that does not match the declared lattice raises rather than producing a
 silently incorrect circuit.
 
 .. note::
-   This implementation expects a Jordan-Wigner encoded, spin-ordered uniform
+   This implementation expects a Jordan-Wigner encoded, spin-blocked uniform
    Fermi-Hubbard model on a periodic square lattice whose sides are even and at least
-   four. Smaller periodic lattices wrap onto themselves and cannot be tiled.
+   four. Smaller periodic lattices wrap onto themselves and cannot be tiled. An
+   interleaved mode ordering, a non-uniform hopping, or a bond graph that is not the
+   declared lattice raises rather than being approximated.
+
+.. warning::
+   The rotation saving is only realized when the Givens network is applied
+   **uncontrolled**. Controlling a fixed-angle rotation costs the same as controlling
+   an arbitrary one, so a controlled mapper that treats every emitted term uniformly
+   makes this scheme *more* expensive than the term-by-term path. Measured on one
+   four-site sandwich: 16 rotations term-by-term, 28 with the whole sandwich
+   controlled, and 4 with the network left uncontrolled.
+
+   The saving is recoverable because :math:`C(V D V^{\dagger}) = V\, C(D)\, V^{\dagger}`
+   -- with the control off the network cancels against its own adjoint -- so only the
+   two eigenvalue phases need controlling. That requires a controlled mapper able to
+   distinguish the conjugating layers from the phase layer, which
+   :class:`~qdk_chemistry.algorithms.ControlledPauliSequenceMapper` does not yet do.
 
 .. rubric:: Settings
 
