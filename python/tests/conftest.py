@@ -86,6 +86,16 @@ def qsharp_test_context():
     return create_test_qsharp_context()
 
 
+@pytest.fixture(scope="session")
+def qsharp_test_utils(qsharp_test_context):
+    """The ``QDKChemistry.TestUtils`` namespace holding the Q# drivers in ``tests/qsharp``.
+
+    Ops taken from here compose only with ops from ``qsharp_test_context``, so a test
+    that mixes library and test-only Q# must take both fixtures.
+    """
+    return qsharp_test_context.code.QDKChemistry.TestUtils
+
+
 @pytest.fixture
 def basic_orbital():
     """Create a basic valid Orbitals object for testing."""

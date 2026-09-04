@@ -40,11 +40,6 @@ def _dumped_address_index(address_value: int, num_address_qubits: int) -> int:
     return int(format(address_value, f"0{num_address_qubits}b")[::-1], 2)
 
 
-def _test_utils(context, module: str):
-    """Resolve a test-only Q# module (evaluated from ``tests/qsharp``) from *context*."""
-    return getattr(context.code.QDKChemistry.TestUtils, module)
-
-
 def _dump_op(op, num_qubits: int, context) -> np.ndarray:
     """Simulate ``op`` on the all-zero state and return the resulting statevector.
 
@@ -65,11 +60,11 @@ class TestUnaryIterationQsharp:
     """Statevector checks of the unary-iteration primitives against exact references."""
 
     @pytest.mark.parametrize("num_actions", [1, 2, 3, 5, 8])
-    def test_one_hot_address_selects_exactly_one_action(self, qsharp_test_context, num_actions):
+    def test_one_hot_address_selects_exactly_one_action(self, qsharp_test_context, qsharp_test_utils, num_actions):
         """A basis-state address must fire the matching action and only that one."""
         num_address_qubits = _address_qubits(num_actions)
         for address_value in range(num_actions):
-            op = _test_utils(qsharp_test_context, "UnaryIterationTests").TestMakeOneHotOp(num_actions, address_value)
+            op = qsharp_test_utils.UnaryIterationTests.TestMakeOneHotOp(num_actions, address_value)
             state = _dump_op(op, num_address_qubits + num_actions, qsharp_test_context)
 
             expected = np.zeros(1 << (num_address_qubits + num_actions), dtype=complex)
@@ -77,10 +72,10 @@ class TestUnaryIterationQsharp:
             np.testing.assert_allclose(state, expected, atol=1e-10)
 
     @pytest.mark.parametrize("num_actions", [2, 4, 8])
-    def test_superposed_address_stays_coherent(self, qsharp_test_context, num_actions):
+    def test_superposed_address_stays_coherent(self, qsharp_test_context, qsharp_test_utils, num_actions):
         """A superposed address must produce sum_a |a>|onehot(a)> with no ancilla residue."""
         num_address_qubits = _address_qubits(num_actions)
-        op = _test_utils(qsharp_test_context, "UnaryIterationTests").TestMakeSuperposedAddressOp(num_actions)
+        op = qsharp_test_utils.UnaryIterationTests.TestMakeSuperposedAddressOp(num_actions)
         state = _dump_op(op, num_address_qubits + num_actions, qsharp_test_context)
 
         expected = np.zeros(1 << (num_address_qubits + num_actions), dtype=complex)
@@ -97,10 +92,10 @@ class TestUnaryIterationQsharp:
             (7, [True, False, False, False, False, True, True]),
         ],
     )
-    def test_exposed_control_is_an_equality_predicate(self, qsharp_test_context, num_actions, data):
+    def test_exposed_control_is_an_equality_predicate(self, qsharp_test_context, qsharp_test_utils, num_actions, data):
         """Phasing the exposed control must imprint exactly the flagged sign pattern."""
         num_address_qubits = _address_qubits(num_actions)
-        op = _test_utils(qsharp_test_context, "UnaryIterationTests").TestMakeControlPhasesOp(num_actions, data)
+        op = qsharp_test_utils.UnaryIterationTests.TestMakeControlPhasesOp(num_actions, data)
         state = _dump_op(op, num_address_qubits, qsharp_test_context)
 
         # Addresses at or above num_actions are outside the iteration's promise: the last
@@ -118,11 +113,13 @@ class TestBlockEncodingAgnosticSchedule:
         ("num_queries", "address_value"),
         [(p, t) for p in (1, 2, 3, 5) for t in range(p + 1)],
     )
-    def test_psp_schedule_matches_the_explicit_walk_power(self, qsharp_test_context, num_queries, address_value):
+    def test_psp_schedule_matches_the_explicit_walk_power(
+        self, qsharp_test_context, qsharp_test_utils, num_queries, address_value
+    ):
         """A PREPARE-SELECT-PREPARE walk must obey the same ``W^(p - 2t)`` contract."""
         psp = qsharp_test_context.code.QDKChemistry.Utils.PrepSelPrep
-        op = _test_utils(qsharp_test_context, "UnaryPhaseEstimationTests").TestMakeSignedPowerScheduleAgainstWalkOp(
-            _test_utils(qsharp_test_context, "PrepSelPrepTests").TestMakeBlockEncodingOp(0.7),
+        op = qsharp_test_utils.UnaryPhaseEstimationTests.TestMakeSignedPowerScheduleAgainstWalkOp(
+            qsharp_test_utils.PrepSelPrepTests.TestMakeBlockEncodingOp(0.7),
             psp.MakeAncillaReflectionOp(1),
             num_queries,
             address_value,
@@ -137,11 +134,11 @@ class TestBlockEncodingAgnosticSchedule:
         np.testing.assert_allclose(state, expected, atol=1e-10)
 
     @pytest.mark.parametrize("theta", [0.0, 1.3, np.pi / 2])
-    def test_psp_schedule_holds_for_every_encoded_eigenvalue(self, qsharp_test_context, theta):
+    def test_psp_schedule_holds_for_every_encoded_eigenvalue(self, qsharp_test_context, qsharp_test_utils, theta):
         """The contract must not depend on what the block encoding encodes."""
         psp = qsharp_test_context.code.QDKChemistry.Utils.PrepSelPrep
-        op = _test_utils(qsharp_test_context, "UnaryPhaseEstimationTests").TestMakeSignedPowerScheduleAgainstWalkOp(
-            _test_utils(qsharp_test_context, "PrepSelPrepTests").TestMakeBlockEncodingOp(theta),
+        op = qsharp_test_utils.UnaryPhaseEstimationTests.TestMakeSignedPowerScheduleAgainstWalkOp(
+            qsharp_test_utils.PrepSelPrepTests.TestMakeBlockEncodingOp(theta),
             psp.MakeAncillaReflectionOp(1),
             3,
             1,
@@ -383,40 +380,38 @@ class TestUnaryQpeEndToEnd:
     """End-to-end checks of ``MakeUnaryQPECircuit`` on a walk with an exact eigenphase."""
 
     @staticmethod
-    def _measure(context, num_queries: int, k: int, system_angle: float) -> int:
+    def _measure(test_utils, num_queries: int, k: int, system_angle: float) -> int:
         """Run the synthetic-walk QPE circuit from ``Ry(system_angle)|0>`` and decode the phase register."""
         num_states = num_queries + 1
         theta = -np.pi * k / num_states
-        results = _test_utils(context, "UnaryPhaseEstimationTests").TestRunSyntheticWalkQpe(
-            num_queries, theta, system_angle
-        )
+        results = test_utils.UnaryPhaseEstimationTests.TestRunSyntheticWalkQpe(num_queries, theta, system_angle)
         return int("".join("1" if str(bit) == "One" else "0" for bit in reversed(results)), 2)
 
     @pytest.mark.parametrize(
         ("num_queries", "k", "system_state"),
         [(m, k, s) for m in (3, 7) for k in range(m + 1) for s in (0, 1)],
     )
-    def test_measured_bin_is_twice_the_walk_phase(self, qsharp_test_context, num_queries, k, system_state):
+    def test_measured_bin_is_twice_the_walk_phase(self, qsharp_test_utils, num_queries, k, system_state):
         """The measured register must read exactly ``2*phi*N``."""
         num_states = num_queries + 1
         expected = (-k) % num_states if system_state == 1 else k
-        assert self._measure(qsharp_test_context, num_queries, k, system_state * np.pi) == expected
+        assert self._measure(qsharp_test_utils, num_queries, k, system_state * np.pi) == expected
 
     @pytest.mark.parametrize("system_angle", [np.pi / 2, 2 * np.pi / 3])
-    def test_superposed_input_splits_across_both_eigenphase_bins(self, qsharp_test_context, system_angle):
+    def test_superposed_input_splits_across_both_eigenphase_bins(self, qsharp_test_utils, system_angle):
         """A non-eigenstate must land in the two eigenphase bins with the overlap weights."""
         num_queries, k, shots = 7, 3, 256
         num_states = num_queries + 1
         ground_bin, excited_bin = k, (-k) % num_states
 
-        measured = np.array([self._measure(qsharp_test_context, num_queries, k, system_angle) for _ in range(shots)])
+        measured = np.array([self._measure(qsharp_test_utils, num_queries, k, system_angle) for _ in range(shots)])
 
         assert set(np.unique(measured).tolist()) == {ground_bin, excited_bin}
         assert np.mean(measured == excited_bin) == pytest.approx(np.sin(system_angle / 2) ** 2, abs=0.12)
 
     @pytest.mark.parametrize("resolve_positive_branch", [True, False])
     @pytest.mark.parametrize("k", [1, 2, 3])
-    def test_decoder_recovers_the_walk_phase(self, qsharp_test_context, k, resolve_positive_branch):
+    def test_decoder_recovers_the_walk_phase(self, qsharp_test_utils, k, resolve_positive_branch):
         """The measured bin, run through the decoder, returns the walk phase.
 
         The two eigenvectors carry conjugate phases ``+-phi`` and land in
@@ -430,7 +425,7 @@ class TestUnaryQpeEndToEnd:
         walk_phase = k / (2 * num_states)
         expected_phase = walk_phase if resolve_positive_branch else 0.5 - walk_phase
         for system_state in (0, 1):
-            measured_bin = self._measure(qsharp_test_context, num_queries, k, system_state * np.pi)
+            measured_bin = self._measure(qsharp_test_utils, num_queries, k, system_state * np.pi)
             counts = {format(measured_bin, f"0{num_bits}b"): 1}
             result = _decode(counts, num_bits, resolve_positive_branch=resolve_positive_branch)
             assert result.canonical_phase_fraction == pytest.approx(expected_phase)
