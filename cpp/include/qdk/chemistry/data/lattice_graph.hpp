@@ -8,6 +8,7 @@
 
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+#include <array>
 #include <cstdint>
 #include <map>
 #include <nlohmann/json_fwd.hpp>
@@ -26,6 +27,33 @@ namespace qdk::chemistry::data {
  * Two edges sharing the same color have disjoint vertex sets.
  */
 using EdgeColoring = std::map<std::pair<std::uint64_t, std::uint64_t>, int>;
+
+/** @brief Opaque semantic label assigned to a geometric bond class. */
+using BondFlavorId = std::uint32_t;
+
+/** @brief A radial shell and unoriented geometric bond-axis class. */
+struct BondClass {
+  std::uint64_t shell;
+  std::uint32_t orientation;
+  Eigen::RowVector2d axis;
+};
+
+/** @brief Optional semantic label for one shell and geometric bond axis. */
+struct BondFlavorDefinition {
+  std::uint64_t shell;
+  Eigen::RowVector2d axis;
+  BondFlavorId flavor;
+};
+
+/** @brief One physical lattice connection, including its periodic image. */
+struct NeighborConnection {
+  std::uint64_t site_i;
+  std::uint64_t site_j;
+  BondClass bond_class;
+  Eigen::RowVector2d displacement;
+  std::array<std::int64_t, 2> image_shift;
+  std::optional<BondFlavorId> flavor;
+};
 
 // ---- Free coloring functions ------------------------------------------------
 // These compute edge colorings for known lattice topologies.  They are
@@ -210,6 +238,77 @@ class LatticeGraph : public DataClass {
   std::uint64_t num_edges() const;
 
   /**
+   * @brief Return the Cartesian site positions, if this graph has geometry.
+   * @return A (num_sites, 2) position matrix, or std::nullopt.
+   */
+  const std::optional<Eigen::MatrixXd>& positions() const;
+
+  /**
+   * @brief Return all pairs in the m-th geometric neighbor shell.
+   *
+   * The shells are the distinct positive minimum-image distances between
+   * lattice positions, ordered from shortest to longest. Returned pairs are
+   * canonical (i < j).
+   *
+   * @param m One-based shell index.
+   * @param tolerance Relative tolerance used to group equal distances.
+   * @return Canonical site pairs in the requested shell, or an empty vector if
+   *         the finite lattice has fewer than m shells.
+   * @throws std::invalid_argument If m is zero or tolerance is not positive.
+   * @throws std::runtime_error If this graph has no lattice geometry.
+   */
+  std::vector<std::pair<std::uint64_t, std::uint64_t>> mth_nearest_neighbors(
+      std::uint64_t m, double tolerance = 1.0e-9) const;
+
+  /**
+   * @brief Return the pairs in multiple geometric neighbor shells.
+   *
+   * Pair distances are classified once for all requested shell indices.
+   * Returned pairs are canonical (i < j), and unavailable shells map to empty
+   * vectors.
+   *
+   * @param shells One-based shell indices.
+   * @param tolerance Relative tolerance used to group equal distances.
+   * @return Requested shell indices mapped to their canonical site pairs.
+   * @throws std::invalid_argument If any index is zero or tolerance is not
+   * positive.
+   * @throws std::runtime_error If this graph has no lattice geometry.
+   */
+  std::map<std::uint64_t, std::vector<std::pair<std::uint64_t, std::uint64_t>>>
+  nearest_neighbor_shells(const std::vector<std::uint64_t>& shells,
+                          double tolerance = 1.0e-9) const;
+
+  /**
+   * @brief Return physical connections classified by shell and bond axis.
+   *
+   * Unlike nearest_neighbor_shells(), this method preserves distinct periodic
+   * images that collapse onto the same finite-lattice site pair.
+   *
+   * @param shells One-based shell indices.
+   * @param tolerance Relative tolerance used to group distances and axes.
+   * @return Connections in deterministic shell, orientation, and site order.
+   * @throws std::invalid_argument If any index is zero or tolerance is not
+   * positive.
+   * @throws std::runtime_error If this graph has no lattice geometry.
+   */
+  std::vector<NeighborConnection> neighbor_connections(
+      const std::vector<std::uint64_t>& shells,
+      double tolerance = 1.0e-9) const;
+
+  /**
+   * @brief Return a copy with semantic labels for selected geometric classes.
+   * @param definitions Shell-axis flavor definitions.
+   * @param tolerance Relative tolerance used to detect duplicate axes.
+   * @return A graph with unchanged geometry and the supplied flavor metadata.
+   */
+  LatticeGraph with_bond_flavors(
+      const std::vector<BondFlavorDefinition>& definitions,
+      double tolerance = 1.0e-9) const;
+
+  /** @brief Return semantic bond-flavor definitions, if any. */
+  const std::vector<BondFlavorDefinition>& bond_flavor_definitions() const;
+
+  /**
    * @brief Create a one-dimensional chain lattice.
    *
    * Sites are labelled 0 ... n-1 with nearest-neighbour edges.
@@ -318,7 +417,7 @@ class LatticeGraph : public DataClass {
    *
    * The honeycomb lattice has two sites per unit cell (A and B sublattices).
    * Unit cells are arranged on a rectangular grid of size nx x ny, giving a
-   * total of 2 * nx * ny sites.  Sites are indexed as:
+   * total of 2 * nx * ny sites. Sites are indexed as:
    *   - A-sublattice: 2 * (y * nx + x)
    *   - B-sublattice: 2 * (y * nx + x) + 1
    *
@@ -335,16 +434,12 @@ class LatticeGraph : public DataClass {
    *
    * @endcode
    *
-   * With periodic boundary conditions (using the 3x4 example above):
-   *   - periodic_x wraps right to left: 5 -- 0, 11 -- 6, 17 -- 12, 23 -- 18
-   *   - periodic_y wraps top to bottom: 19 -- 0, 15 -- 2, 17 -- 4
-   *
    * @param nx         Number of unit cells along the x-axis.
    * @param ny         Number of unit cells along the y-axis.
    * @param periodic_x If true, apply periodic boundary conditions along x.
-   * Requires nx >= 2. Default: false.
+   * Requires nx > 1. Default: false.
    * @param periodic_y If true, apply periodic boundary conditions along y.
-   * Requires ny >= 2. Default: false.
+   * Requires ny > 1. Default: false.
    * @param t          Uniform hopping weight. Default: 1.0.
    * @param dfs_ordering Reserved for API compatibility; currently ignored.
    *                     Default: false.
@@ -354,6 +449,36 @@ class LatticeGraph : public DataClass {
                                 bool periodic_x = false,
                                 bool periodic_y = false, double t = 1.0,
                                 bool dfs_ordering = false);
+
+  /**
+   * @brief Create a honeycomb patch sized by complete hexagonal plaquettes.
+   *
+   * Open directions include the boundary sites needed to complete every
+   * requested plaquette. A fully open 1 x 1 patch is one six-site hexagon.
+   *
+   * @code
+   *   1x1 open plaquette patch:
+   *
+   *       1---2
+   *      /     \
+   *     0       5
+   *      \     /
+   *       3---4
+   * @endcode
+   *
+   * @param nx Number of complete plaquettes along x.
+   * @param ny Number of complete plaquettes along y.
+   * @param periodic_x If true, apply periodic boundary conditions along x.
+   * @param periodic_y If true, apply periodic boundary conditions along y.
+   * @param t Uniform hopping weight.
+   * @param dfs_ordering Reserved for API compatibility; currently ignored.
+   * @throws std::invalid_argument If nx or ny is 0.
+   */
+  static LatticeGraph honeycomb_plaquettes(std::uint64_t nx, std::uint64_t ny,
+                                           bool periodic_x = false,
+                                           bool periodic_y = false,
+                                           double t = 1.0,
+                                           bool dfs_ordering = false);
 
   /**
    * @brief Create a two-dimensional kagome lattice.
@@ -521,9 +646,27 @@ class LatticeGraph : public DataClass {
    *
    * @param adjacency Sparse square adjacency matrix (moved in).
    * @param coloring  Optional edge coloring (moved in).
+   * @param positions Optional Cartesian site positions (moved in).
+   * @param periods Optional periodic supercell vectors (moved in).
+   * @param bond_flavors Optional semantic shell-axis labels (moved in).
    */
   explicit LatticeGraph(Eigen::SparseMatrix<double> adjacency,
-                        std::optional<EdgeColoring> coloring = std::nullopt);
+                        std::optional<EdgeColoring> coloring = std::nullopt,
+                        std::optional<Eigen::MatrixXd> positions = std::nullopt,
+                        std::optional<Eigen::MatrixXd> periods = std::nullopt,
+                        std::vector<BondFlavorDefinition> bond_flavors = {});
+
+  static void _validate_geometry(
+      std::uint64_t num_sites, const std::optional<Eigen::MatrixXd>& positions,
+      const std::optional<Eigen::MatrixXd>& periods);
+  static void _validate_bond_flavors(
+      const std::optional<Eigen::MatrixXd>& positions,
+      std::vector<BondFlavorDefinition>& definitions, double tolerance);
+
+  static LatticeGraph _honeycomb(std::uint64_t num_cells_x,
+                                 std::uint64_t num_cells_y,
+                                 bool remove_open_corners, bool periodic_x,
+                                 bool periodic_y, double t, bool dfs_ordering);
 
   /** @brief Check if a sparse matrix is symmetric within a numerical tolerance.
    */
@@ -539,6 +682,12 @@ class LatticeGraph : public DataClass {
   bool _is_symmetric;
   /// Edge coloring, populated at construction for recognised topologies.
   std::optional<EdgeColoring> _edge_coloring;
+  /// Cartesian site positions used to identify geometric neighbor shells.
+  std::optional<Eigen::MatrixXd> _positions;
+  /// Periodic supercell vectors, with one vector per row.
+  std::optional<Eigen::MatrixXd> _periods;
+  /// Optional semantic labels for selected shell-axis classes.
+  std::vector<BondFlavorDefinition> _bond_flavor_definitions;
 };
 
 static_assert(DataClassCompliant<LatticeGraph>,

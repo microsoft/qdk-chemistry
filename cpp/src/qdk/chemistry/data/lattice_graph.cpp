@@ -4,9 +4,13 @@
 
 #include <Eigen/Sparse>
 #include <algorithm>
+#include <array>
+#include <blas.hh>
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <fstream>
+#include <lapack.hh>
 #include <limits>
 #include <nlohmann/json.hpp>
 #include <numeric>
@@ -16,7 +20,11 @@
 #include <set>
 #include <sstream>
 #include <stdexcept>
+#include <tuple>
 #include <vector>
+
+#include "hdf5_serialization.hpp"
+#include "json_serialization.hpp"
 
 namespace qdk::chemistry::data {
 
@@ -27,6 +35,39 @@ using Triplet = Eigen::Triplet<double>;
 static void add_edge(std::vector<Triplet>& triplets, int i, int j, double t) {
   triplets.emplace_back(i, j, t);
   triplets.emplace_back(j, i, t);
+}
+
+template <std::size_t NumBasisSites>
+Eigen::MatrixXd lattice_positions(
+    int nx, int ny, const Eigen::RowVector2d& a1, const Eigen::RowVector2d& a2,
+    const std::array<Eigen::RowVector2d, NumBasisSites>& basis) {
+  Eigen::MatrixXd positions(nx * ny * NumBasisSites, 2);
+  for (int y = 0; y < ny; ++y) {
+    for (int x = 0; x < nx; ++x) {
+      for (std::size_t s = 0; s < NumBasisSites; ++s) {
+        auto i = NumBasisSites * (y * nx + x) + s;
+        positions.row(static_cast<Eigen::Index>(i)) =
+            x * a1 + y * a2 + basis[s];
+      }
+    }
+  }
+  return positions;
+}
+
+std::optional<Eigen::MatrixXd> lattice_periods(
+    const Eigen::RowVector2d& period_1 = Eigen::RowVector2d::Zero(),
+    const Eigen::RowVector2d& period_2 = Eigen::RowVector2d::Zero()) {
+  const auto nonzero = [](const Eigen::RowVector2d& vector) {
+    return vector.cwiseAbs().maxCoeff() != 0.0;
+  };
+  const Eigen::Index count = nonzero(period_1) + nonzero(period_2);
+  if (count == 0) return std::nullopt;
+
+  Eigen::MatrixXd periods(count, 2);
+  Eigen::Index row = 0;
+  if (nonzero(period_1)) periods.row(row++) = period_1;
+  if (nonzero(period_2)) periods.row(row) = period_2;
+  return periods;
 }
 
 /**
@@ -128,11 +169,19 @@ LatticeGraph::LatticeGraph(
 }
 
 LatticeGraph::LatticeGraph(Eigen::SparseMatrix<double> adjacency,
-                           std::optional<EdgeColoring> coloring)
+                           std::optional<EdgeColoring> coloring,
+                           std::optional<Eigen::MatrixXd> positions,
+                           std::optional<Eigen::MatrixXd> periods,
+                           std::vector<BondFlavorDefinition> bond_flavors)
     : _num_sites(static_cast<std::uint64_t>(adjacency.rows())),
       adjacency_(std::move(adjacency)),
       _is_symmetric(_check_symmetry(adjacency_)),
-      _edge_coloring(std::move(coloring)) {
+      _edge_coloring(std::move(coloring)),
+      _positions(std::move(positions)),
+      _periods(std::move(periods)),
+      _bond_flavor_definitions(std::move(bond_flavors)) {
+  _validate_geometry(_num_sites, _positions, _periods);
+  _validate_bond_flavors(_positions, _bond_flavor_definitions, 1.0e-9);
 #ifndef NDEBUG
   if (_edge_coloring.has_value()) {
     // Verify every edge in the coloring exists in the adjacency matrix.
@@ -185,7 +234,8 @@ LatticeGraph LatticeGraph::make_bidirectional(const LatticeGraph& graph) {
       (graph.adjacency_ +
        Eigen::SparseMatrix<double>(graph.adjacency_.transpose()));
   sym.makeCompressed();
-  return LatticeGraph(std::move(sym));
+  return LatticeGraph(std::move(sym), std::nullopt, graph._positions,
+                      graph._periods, graph._bond_flavor_definitions);
 }
 
 std::uint64_t LatticeGraph::num_sites() const { return _num_sites; }
@@ -225,6 +275,539 @@ std::uint64_t LatticeGraph::num_edges() const {
   return count;
 }
 
+const std::optional<Eigen::MatrixXd>& LatticeGraph::positions() const {
+  return _positions;
+}
+
+void LatticeGraph::_validate_geometry(
+    std::uint64_t num_sites, const std::optional<Eigen::MatrixXd>& positions,
+    const std::optional<Eigen::MatrixXd>& periods) {
+  if (!positions.has_value()) {
+    if (periods.has_value()) {
+      throw std::invalid_argument(
+          "Periodic vectors require Cartesian site positions.");
+    }
+    return;
+  }
+
+  auto n = static_cast<Eigen::Index>(num_sites);
+  if (positions->rows() != n || positions->cols() != 2 ||
+      !positions->allFinite()) {
+    throw std::invalid_argument(
+        "Lattice positions must be a finite (num_sites, 2) matrix.");
+  }
+
+  if (!periods.has_value()) return;
+  if ((periods->rows() != 1 && periods->rows() != 2) || periods->cols() != 2 ||
+      !periods->allFinite()) {
+    throw std::invalid_argument(
+        "Periodic vectors must be a finite (1, 2) or (2, 2) matrix.");
+  }
+  for (Eigen::Index i = 0; i < periods->rows(); ++i) {
+    if (periods->row(i).cwiseAbs().maxCoeff() == 0.0) {
+      throw std::invalid_argument("Periodic vectors must be nonzero.");
+    }
+    if (!std::isfinite(std::hypot((*periods)(i, 0), (*periods)(i, 1)))) {
+      throw std::invalid_argument("Periodic vector lengths must be finite.");
+    }
+  }
+  if (periods->rows() == 2) {
+    const double period_0_length =
+        std::hypot((*periods)(0, 0), (*periods)(0, 1));
+    const double period_1_length =
+        std::hypot((*periods)(1, 0), (*periods)(1, 1));
+    const double min_period_length = std::min(period_0_length, period_1_length);
+    const double max_period_length = std::max(period_0_length, period_1_length);
+    const double position_span =
+        std::max(positions->col(0).maxCoeff() - positions->col(0).minCoeff(),
+                 positions->col(1).maxCoeff() - positions->col(1).minCoeff());
+    const double geometry_scale = std::max(max_period_length, position_span);
+    if (min_period_length <
+        16.0 * std::numeric_limits<double>::epsilon() * geometry_scale) {
+      throw std::invalid_argument(
+          "Lattice geometry exceeds the supported numerical condition range.");
+    }
+
+    const double p0_scale = periods->row(0).cwiseAbs().maxCoeff();
+    const double p1_scale = periods->row(1).cwiseAbs().maxCoeff();
+    const Eigen::RowVector2d p0 = periods->row(0) / p0_scale;
+    const Eigen::RowVector2d p1 = periods->row(1) / p1_scale;
+    const Eigen::RowVector2d u0 = p0 / blas::nrm2(2, p0.data(), 1);
+    const Eigen::RowVector2d u1 = p1 / blas::nrm2(2, p1.data(), 1);
+    const double sine = std::abs(u0.x() * u1.y() - u0.y() * u1.x());
+    if (sine <= 16.0 * std::numeric_limits<double>::epsilon()) {
+      throw std::invalid_argument(
+          "Two periodic vectors must be linearly independent.");
+    }
+  }
+}
+
+void LatticeGraph::_validate_bond_flavors(
+    const std::optional<Eigen::MatrixXd>& positions,
+    std::vector<BondFlavorDefinition>& definitions, double tolerance) {
+  if (definitions.empty()) return;
+  if (!positions.has_value()) {
+    throw std::invalid_argument(
+        "Bond flavors require Cartesian lattice positions.");
+  }
+  if (!std::isfinite(tolerance) || tolerance <= 0.0) {
+    throw std::invalid_argument("Bond-flavor tolerance must be positive.");
+  }
+
+  for (auto& definition : definitions) {
+    if (definition.shell == 0 || !definition.axis.allFinite() ||
+        definition.axis.cwiseAbs().maxCoeff() == 0.0) {
+      throw std::invalid_argument(
+          "Bond flavors require a positive shell and a finite nonzero axis.");
+    }
+    definition.axis /= blas::nrm2(2, definition.axis.data(), 1);
+    if (!definition.axis.allFinite() ||
+        std::abs(definition.axis.squaredNorm() - 1.0) > tolerance) {
+      throw std::invalid_argument("Bond-flavor axis normalization failed.");
+    }
+    if (definition.axis.x() < -tolerance ||
+        (std::abs(definition.axis.x()) <= tolerance &&
+         definition.axis.y() < 0.0)) {
+      definition.axis = -definition.axis;
+    }
+  }
+  std::sort(definitions.begin(), definitions.end(),
+            [](const auto& lhs, const auto& rhs) {
+              if (lhs.shell != rhs.shell) return lhs.shell < rhs.shell;
+              return std::atan2(lhs.axis.y(), lhs.axis.x()) <
+                     std::atan2(rhs.axis.y(), rhs.axis.x());
+            });
+  for (std::size_t i = 1; i < definitions.size(); ++i) {
+    const Eigen::RowVector2d difference =
+        definitions[i - 1].axis - definitions[i].axis;
+    if (definitions[i - 1].shell == definitions[i].shell &&
+        blas::nrm2(2, difference.data(), 1) <= tolerance) {
+      throw std::invalid_argument(
+          "Each shell-axis class may have only one bond flavor.");
+    }
+  }
+}
+
+std::vector<std::pair<std::uint64_t, std::uint64_t>>
+LatticeGraph::mth_nearest_neighbors(std::uint64_t m, double tolerance) const {
+  return nearest_neighbor_shells({m}, tolerance).at(m);
+}
+
+std::map<std::uint64_t, std::vector<std::pair<std::uint64_t, std::uint64_t>>>
+LatticeGraph::nearest_neighbor_shells(const std::vector<std::uint64_t>& shells,
+                                      double tolerance) const {
+  if (!std::isfinite(tolerance) || tolerance <= 0.0) {
+    throw std::invalid_argument("Neighbor shell tolerance must be positive.");
+  }
+  std::map<std::uint64_t, std::vector<std::pair<std::uint64_t, std::uint64_t>>>
+      results;
+  for (std::uint64_t shell : shells) {
+    if (shell == 0) {
+      throw std::invalid_argument("Neighbor shell index m must be > 0.");
+    }
+    results.try_emplace(shell);
+  }
+  if (!_positions.has_value()) {
+    throw std::runtime_error(
+        "Geometric neighbor shells require lattice positions.");
+  }
+  if (results.empty() || _num_sites < 2) return results;
+
+  const Eigen::Index num_periods = _periods.has_value() ? _periods->rows() : 0;
+  Eigen::MatrixXd positions = *_positions;
+  Eigen::MatrixXd periods = _periods.value_or(Eigen::MatrixXd(0, 2));
+  double geometry_scale = positions.cwiseAbs().maxCoeff();
+  if (num_periods != 0) {
+    geometry_scale = std::max(geometry_scale, periods.cwiseAbs().maxCoeff());
+  }
+  if (geometry_scale == 0.0) geometry_scale = 1.0;
+  positions /= geometry_scale;
+  periods /= geometry_scale;
+  const Eigen::RowVector2d origin = positions.row(0);
+  positions.rowwise() -= origin;
+
+  Eigen::RowVector2d period_0 = Eigen::RowVector2d::Zero();
+  Eigen::RowVector2d period_1 = Eigen::RowVector2d::Zero();
+  if (num_periods == 1) {
+    period_0 = periods.row(0);
+  } else if (num_periods == 2) {
+    period_0 = periods.row(0);
+    period_1 = periods.row(1);
+
+    // Gauss reduction preserves the period lattice while making the fixed
+    // 3x3 closest-image search independent of supercell aspect ratio.
+    while (true) {
+      const double length_0 = blas::nrm2(2, period_0.data(), 1);
+      const double length_1 = blas::nrm2(2, period_1.data(), 1);
+      if (length_1 < length_0) {
+        std::swap(period_0, period_1);
+        continue;
+      }
+      const Eigen::RowVector2d unit_0 = period_0 / length_0;
+      const Eigen::RowVector2d normal_0{-unit_0.y(), unit_0.x()};
+      const double parallel = period_1.dot(unit_0);
+      if (2.0 * std::abs(parallel) <=
+          length_0 * (1.0 + 16.0 * std::numeric_limits<double>::epsilon())) {
+        break;
+      }
+      const double perpendicular = period_1.dot(normal_0);
+      const double reduced_parallel = std::remainder(parallel, length_0);
+      const Eigen::RowVector2d reduced =
+          reduced_parallel * unit_0 + perpendicular * normal_0;
+      if (reduced == period_1) {
+        throw std::runtime_error(
+            "Lattice period reduction made no numerical progress.");
+      }
+      period_1 = reduced;
+    }
+  }
+
+  const auto reduce_along =
+      [](const Eigen::RowVector2d& vector,
+         const Eigen::RowVector2d& period) -> Eigen::RowVector2d {
+    const double length = blas::nrm2(2, period.data(), 1);
+    const Eigen::RowVector2d unit = period / length;
+    const Eigen::RowVector2d normal{-unit.y(), unit.x()};
+    const double parallel = vector.dot(unit);
+    const double perpendicular = vector.dot(normal);
+    return (std::remainder(parallel, length) * unit + perpendicular * normal)
+        .eval();
+  };
+
+  auto minimum_image_distance = [&](const Eigen::RowVector2d& displacement) {
+    if (num_periods == 0) {
+      return blas::nrm2(2, displacement.data(), 1);
+    }
+    if (num_periods == 1) {
+      const double period_length = blas::nrm2(2, period_0.data(), 1);
+      const Eigen::RowVector2d unit = period_0 / period_length;
+      const Eigen::RowVector2d normal{-unit.y(), unit.x()};
+      const double parallel = displacement.dot(unit);
+      const double perpendicular = displacement.dot(normal);
+      return std::hypot(std::remainder(parallel, period_length), perpendicular);
+    }
+
+    Eigen::RowVector2d diagonal = period_1;
+    if (period_0.dot(period_1) > 0.0) {
+      diagonal -= period_0;
+    } else {
+      diagonal += period_0;
+    }
+    const std::array<Eigen::RowVector2d, 3> relevant_vectors = {
+        period_0, period_1, diagonal};
+    Eigen::RowVector2d image = displacement;
+    for (int iteration = 0; iteration < 64; ++iteration) {
+      bool reduced = false;
+      for (const auto& period : relevant_vectors) {
+        const Eigen::RowVector2d candidate = reduce_along(image, period);
+        const double current_distance = blas::nrm2(2, image.data(), 1);
+        const double candidate_distance = blas::nrm2(2, candidate.data(), 1);
+        if (candidate_distance <
+            current_distance *
+                (1.0 - 64.0 * std::numeric_limits<double>::epsilon())) {
+          image = candidate;
+          reduced = true;
+        }
+      }
+      if (!reduced) return blas::nrm2(2, image.data(), 1);
+    }
+    throw std::runtime_error("Minimum-image reduction did not converge.");
+  };
+
+  struct PairDistance {
+    double distance;
+    std::uint64_t i;
+    std::uint64_t j;
+  };
+  std::vector<PairDistance> pairs;
+  pairs.reserve(static_cast<std::size_t>(_num_sites * (_num_sites - 1) / 2));
+  for (std::uint64_t i = 0; i < _num_sites; ++i) {
+    for (std::uint64_t j = i + 1; j < _num_sites; ++j) {
+      const Eigen::RowVector2d displacement =
+          positions.row(static_cast<Eigen::Index>(j)) -
+          positions.row(static_cast<Eigen::Index>(i));
+      const double distance = minimum_image_distance(displacement);
+      if (distance == 0.0) {
+        continue;
+      }
+      pairs.push_back({distance, i, j});
+    }
+  }
+  std::sort(pairs.begin(), pairs.end(),
+            [](const PairDistance& lhs, const PairDistance& rhs) {
+              if (lhs.distance != rhs.distance) {
+                return lhs.distance < rhs.distance;
+              }
+              return std::tie(lhs.i, lhs.j) < std::tie(rhs.i, rhs.j);
+            });
+
+  const std::uint64_t max_requested_shell = results.rbegin()->first;
+  std::uint64_t shell = 0;
+  double shell_distance = 0.0;
+  for (const auto& pair : pairs) {
+    bool same_shell =
+        shell != 0 && std::abs(pair.distance - shell_distance) <=
+                          tolerance * std::max(std::abs(pair.distance),
+                                               std::abs(shell_distance));
+    if (!same_shell) {
+      ++shell;
+      shell_distance = pair.distance;
+      if (shell > max_requested_shell) break;
+    }
+    auto result = results.find(shell);
+    if (result != results.end()) {
+      result->second.emplace_back(pair.i, pair.j);
+    }
+  }
+  for (auto& [requested_shell, shell_pairs] : results) {
+    (void)requested_shell;
+    std::sort(shell_pairs.begin(), shell_pairs.end());
+  }
+  return results;
+}
+
+std::vector<NeighborConnection> LatticeGraph::neighbor_connections(
+    const std::vector<std::uint64_t>& shells, double tolerance) const {
+  if (!std::isfinite(tolerance) || tolerance <= 0.0) {
+    throw std::invalid_argument(
+        "Neighbor connection tolerance must be positive.");
+  }
+  std::set<std::uint64_t> requested_shells;
+  for (std::uint64_t shell : shells) {
+    if (shell == 0) {
+      throw std::invalid_argument("Neighbor shell index must be > 0.");
+    }
+    requested_shells.insert(shell);
+  }
+  if (requested_shells.empty() || _num_sites == 0) return {};
+  if (!_positions.has_value()) {
+    throw std::runtime_error(
+        "Geometric neighbor connections require lattice positions.");
+  }
+
+  struct Candidate {
+    double distance;
+    std::uint64_t site_i;
+    std::uint64_t site_j;
+    std::array<std::int64_t, 2> image_shift;
+    Eigen::RowVector2d displacement;
+    std::uint64_t shell = 0;
+  };
+
+  const Eigen::Index num_periods = _periods.has_value() ? _periods->rows() : 0;
+  Eigen::MatrixXd positions = *_positions;
+  Eigen::MatrixXd periods = _periods.value_or(Eigen::MatrixXd(0, 2));
+  double geometry_scale = positions.cwiseAbs().maxCoeff();
+  if (num_periods != 0) {
+    geometry_scale = std::max(geometry_scale, periods.cwiseAbs().maxCoeff());
+  }
+  if (geometry_scale == 0.0) geometry_scale = 1.0;
+  positions /= geometry_scale;
+  periods /= geometry_scale;
+  const Eigen::RowVector2d origin = positions.row(0);
+  positions.rowwise() -= origin;
+
+  double minimum_period_scale = std::numeric_limits<double>::infinity();
+  if (num_periods == 1) {
+    minimum_period_scale =
+        blas::nrm2(2, periods.row(0).data(), periods.outerStride());
+  } else if (num_periods == 2) {
+    Eigen::Matrix2d basis;
+    basis.col(0) = periods.row(0).transpose();
+    basis.col(1) = periods.row(1).transpose();
+    std::array<double, 2> singular_values;
+    double unused = 0.0;
+    const auto info = lapack::gesvd(lapack::Job::NoVec, lapack::Job::NoVec, 2,
+                                    2, basis.data(), 2, singular_values.data(),
+                                    &unused, 1, &unused, 1);
+    if (info != 0) {
+      throw std::runtime_error(
+          "Failed to compute the periodic-vector singular values.");
+    }
+    minimum_period_scale =
+        *std::min_element(singular_values.begin(), singular_values.end());
+  }
+  const Eigen::RowVector2d position_extents{
+      positions.col(0).maxCoeff() - positions.col(0).minCoeff(),
+      positions.col(1).maxCoeff() - positions.col(1).minCoeff()};
+  const double position_span = blas::nrm2(2, position_extents.data(), 1);
+  const std::uint64_t max_requested_shell = *requested_shells.rbegin();
+
+  std::vector<Candidate> candidates;
+  for (std::int64_t radius = 0;; ++radius) {
+    candidates.clear();
+    std::set<
+        std::tuple<std::uint64_t, std::uint64_t, std::int64_t, std::int64_t>>
+        seen;
+    const std::int64_t lower_0 = num_periods >= 1 ? -radius : 0;
+    const std::int64_t upper_0 = num_periods >= 1 ? radius : 0;
+    const std::int64_t lower_1 = num_periods == 2 ? -radius : 0;
+    const std::int64_t upper_1 = num_periods == 2 ? radius : 0;
+    for (std::uint64_t source = 0; source < _num_sites; ++source) {
+      for (std::uint64_t target = 0; target < _num_sites; ++target) {
+        for (std::int64_t image_0 = lower_0; image_0 <= upper_0; ++image_0) {
+          for (std::int64_t image_1 = lower_1; image_1 <= upper_1; ++image_1) {
+            if (source == target && image_0 == 0 && image_1 == 0) continue;
+
+            std::uint64_t site_i = source;
+            std::uint64_t site_j = target;
+            std::array<std::int64_t, 2> image_shift = {image_0, image_1};
+            if (site_i > site_j ||
+                (site_i == site_j &&
+                 (image_shift[0] < 0 ||
+                  (image_shift[0] == 0 && image_shift[1] < 0)))) {
+              std::swap(site_i, site_j);
+              image_shift[0] = -image_shift[0];
+              image_shift[1] = -image_shift[1];
+            }
+            if (!seen.emplace(site_i, site_j, image_shift[0], image_shift[1])
+                     .second) {
+              continue;
+            }
+
+            Eigen::RowVector2d displacement =
+                positions.row(static_cast<Eigen::Index>(site_j)) -
+                positions.row(static_cast<Eigen::Index>(site_i));
+            if (num_periods >= 1) {
+              displacement +=
+                  static_cast<double>(image_shift[0]) * periods.row(0);
+            }
+            if (num_periods == 2) {
+              displacement +=
+                  static_cast<double>(image_shift[1]) * periods.row(1);
+            }
+            const double distance = blas::nrm2(2, displacement.data(), 1);
+            if (distance != 0.0) {
+              candidates.push_back(
+                  {distance, site_i, site_j, image_shift, displacement});
+            }
+          }
+        }
+      }
+    }
+
+    std::sort(candidates.begin(), candidates.end(),
+              [](const Candidate& lhs, const Candidate& rhs) {
+                if (lhs.distance != rhs.distance) {
+                  return lhs.distance < rhs.distance;
+                }
+                return std::tie(lhs.site_i, lhs.site_j, lhs.image_shift) <
+                       std::tie(rhs.site_i, rhs.site_j, rhs.image_shift);
+              });
+    std::uint64_t shell = 0;
+    double shell_distance = 0.0;
+    double requested_shell_distance = 0.0;
+    for (auto& candidate : candidates) {
+      const bool same_shell =
+          shell != 0 && std::abs(candidate.distance - shell_distance) <=
+                            tolerance * std::max(std::abs(candidate.distance),
+                                                 std::abs(shell_distance));
+      if (!same_shell) {
+        ++shell;
+        shell_distance = candidate.distance;
+      }
+      candidate.shell = shell;
+      if (shell == max_requested_shell) {
+        requested_shell_distance = shell_distance;
+      }
+    }
+
+    if (num_periods == 0 ||
+        (shell >= max_requested_shell &&
+         minimum_period_scale * static_cast<double>(radius + 1) -
+                 position_span >
+             requested_shell_distance * (1.0 + tolerance))) {
+      break;
+    }
+    if (radius == std::numeric_limits<std::int64_t>::max() - 1) {
+      throw std::overflow_error(
+          "Neighbor connection image radius exceeds the supported range.");
+    }
+  }
+
+  std::map<std::uint64_t, std::vector<Eigen::RowVector2d>> shell_axes;
+  for (const auto& candidate : candidates) {
+    if (!requested_shells.contains(candidate.shell)) continue;
+    Eigen::RowVector2d axis = candidate.displacement / candidate.distance;
+    if (axis.x() < -tolerance ||
+        (std::abs(axis.x()) <= tolerance && axis.y() < 0.0)) {
+      axis = -axis;
+    }
+    auto& axes = shell_axes[candidate.shell];
+    if (std::none_of(axes.begin(), axes.end(), [&](const auto& existing) {
+          const Eigen::RowVector2d difference = existing - axis;
+          return blas::nrm2(2, difference.data(), 1) <= tolerance;
+        })) {
+      axes.push_back(axis);
+    }
+  }
+  for (auto& [shell, axes] : shell_axes) {
+    (void)shell;
+    std::sort(axes.begin(), axes.end(), [](const auto& lhs, const auto& rhs) {
+      return std::atan2(lhs.y(), lhs.x()) < std::atan2(rhs.y(), rhs.x());
+    });
+  }
+
+  std::vector<NeighborConnection> result;
+  for (const auto& candidate : candidates) {
+    if (!requested_shells.contains(candidate.shell)) continue;
+    Eigen::RowVector2d axis = candidate.displacement / candidate.distance;
+    if (axis.x() < -tolerance ||
+        (std::abs(axis.x()) <= tolerance && axis.y() < 0.0)) {
+      axis = -axis;
+    }
+    const auto& axes = shell_axes.at(candidate.shell);
+    const auto orientation = static_cast<std::uint32_t>(std::distance(
+        axes.begin(),
+        std::find_if(axes.begin(), axes.end(), [&](const auto& existing) {
+          const Eigen::RowVector2d difference = existing - axis;
+          return blas::nrm2(2, difference.data(), 1) <= tolerance;
+        })));
+    std::optional<BondFlavorId> flavor;
+    for (const auto& definition : _bond_flavor_definitions) {
+      if (definition.shell != candidate.shell) continue;
+      const Eigen::RowVector2d difference = definition.axis - axis;
+      if (blas::nrm2(2, difference.data(), 1) <= tolerance) {
+        flavor = definition.flavor;
+        break;
+      }
+    }
+    const Eigen::RowVector2d displacement =
+        candidate.displacement * geometry_scale;
+    if (!displacement.allFinite()) {
+      throw std::overflow_error(
+          "Neighbor connection displacement exceeds the supported range.");
+    }
+    result.push_back({candidate.site_i,
+                      candidate.site_j,
+                      {candidate.shell, orientation, axes[orientation]},
+                      displacement,
+                      candidate.image_shift,
+                      flavor});
+  }
+  std::sort(result.begin(), result.end(), [](const auto& lhs, const auto& rhs) {
+    return std::tie(lhs.bond_class.shell, lhs.bond_class.orientation,
+                    lhs.site_i, lhs.site_j, lhs.image_shift) <
+           std::tie(rhs.bond_class.shell, rhs.bond_class.orientation,
+                    rhs.site_i, rhs.site_j, rhs.image_shift);
+  });
+  return result;
+}
+
+LatticeGraph LatticeGraph::with_bond_flavors(
+    const std::vector<BondFlavorDefinition>& definitions,
+    double tolerance) const {
+  auto normalized = definitions;
+  _validate_bond_flavors(_positions, normalized, tolerance);
+  return LatticeGraph(adjacency_, _edge_coloring, _positions, _periods,
+                      std::move(normalized));
+}
+
+const std::vector<BondFlavorDefinition>& LatticeGraph::bond_flavor_definitions()
+    const {
+  return _bond_flavor_definitions;
+}
+
 LatticeGraph LatticeGraph::chain(std::uint64_t n, bool periodic, double t,
                                  bool dfs_ordering) {
   if (n == 0) {
@@ -248,8 +831,13 @@ LatticeGraph LatticeGraph::chain(std::uint64_t n, bool periodic, double t,
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
-  LatticeGraph g(std::move(adj),
-                 chain_coloring(static_cast<std::int64_t>(N), periodic));
+  const Eigen::RowVector2d a1(1.0, 0.0);
+  const Eigen::RowVector2d a2 = Eigen::RowVector2d::Zero();
+  const std::array<Eigen::RowVector2d, 1> basis = {Eigen::RowVector2d::Zero()};
+  auto positions = detail::lattice_positions(N, 1, a1, a2, basis);
+  LatticeGraph g(
+      std::move(adj), chain_coloring(static_cast<std::int64_t>(N), periodic),
+      std::move(positions), detail::lattice_periods((periodic ? N : 0) * a1));
   if (dfs_ordering) {
     auto path = detail::find_hamiltonian_path(g.sparse_adjacency_matrix());
     if (!path.empty()) {
@@ -307,8 +895,15 @@ LatticeGraph LatticeGraph::square(std::uint64_t nx, std::uint64_t ny,
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
+  const Eigen::RowVector2d a1(1.0, 0.0);
+  const Eigen::RowVector2d a2(0.0, 1.0);
+  const std::array<Eigen::RowVector2d, 1> basis = {Eigen::RowVector2d::Zero()};
+  auto positions = detail::lattice_positions(Nx, Ny, a1, a2, basis);
   LatticeGraph g(std::move(adj),
-                 square_coloring(Nx, Ny, periodic_x, periodic_y));
+                 square_coloring(Nx, Ny, periodic_x, periodic_y),
+                 std::move(positions),
+                 detail::lattice_periods((periodic_x ? Nx : 0) * a1,
+                                         (periodic_y ? Ny : 0) * a2));
   if (dfs_ordering) {
     auto path = detail::find_hamiltonian_path(g.sparse_adjacency_matrix());
     if (!path.empty()) {
@@ -377,9 +972,19 @@ LatticeGraph LatticeGraph::triangular(std::uint64_t nx, std::uint64_t ny,
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
+  // Guo and Franz, Phys. Rev. B 80, 113102 (2009), define the unit
+  // directions u1=(1,0), u2=(1/2,sqrt(3)/2). The equivalent primitive basis
+  // a1=u1, a2=u2-u1 matches the upper-right bonds used by this factory.
+  const Eigen::RowVector2d a1(1.0, 0.0);
+  const Eigen::RowVector2d a2(-0.5, std::sqrt(3.0) / 2.0);
+  const std::array<Eigen::RowVector2d, 1> basis = {Eigen::RowVector2d::Zero()};
+  auto positions = detail::lattice_positions(Nx, Ny, a1, a2, basis);
   // No known deterministic coloring for triangular lattices with arbitrary
   // periodic boundaries; use greedy with multiple trials instead.
-  LatticeGraph g(std::move(adj), greedy_edge_coloring(adj, coloring_seed, 32));
+  auto coloring = greedy_edge_coloring(adj, coloring_seed, 32);
+  LatticeGraph g(std::move(adj), std::move(coloring), std::move(positions),
+                 detail::lattice_periods((periodic_x ? Nx : 0) * a1,
+                                         (periodic_y ? Ny : 0) * a2));
   if (dfs_ordering) {
     auto path = detail::find_hamiltonian_path(g.sparse_adjacency_matrix());
     if (!path.empty()) {
@@ -395,55 +1000,118 @@ LatticeGraph LatticeGraph::triangular(std::uint64_t nx, std::uint64_t ny,
 LatticeGraph LatticeGraph::honeycomb(std::uint64_t nx, std::uint64_t ny,
                                      bool periodic_x, bool periodic_y, double t,
                                      bool dfs_ordering) {
-  (void)dfs_ordering;
+  return _honeycomb(nx, ny, false, periodic_x, periodic_y, t, dfs_ordering);
+}
+
+LatticeGraph LatticeGraph::honeycomb_plaquettes(std::uint64_t nx,
+                                                std::uint64_t ny,
+                                                bool periodic_x,
+                                                bool periodic_y, double t,
+                                                bool dfs_ordering) {
   if (nx == 0 || ny == 0) {
+    throw std::invalid_argument("honeycomb_plaquettes: nx and ny must be > 0.");
+  }
+  const auto num_cells_x = nx + static_cast<std::uint64_t>(!periodic_x);
+  const auto num_cells_y = ny + static_cast<std::uint64_t>(!periodic_y);
+  return _honeycomb(num_cells_x, num_cells_y, !periodic_x && !periodic_y,
+                    periodic_x, periodic_y, t, dfs_ordering);
+}
+
+LatticeGraph LatticeGraph::_honeycomb(std::uint64_t num_cells_x,
+                                      std::uint64_t num_cells_y,
+                                      bool remove_open_corners, bool periodic_x,
+                                      bool periodic_y, double t,
+                                      bool dfs_ordering) {
+  (void)dfs_ordering;
+  if (num_cells_x == 0 || num_cells_y == 0) {
     throw std::invalid_argument("honeycomb: nx and ny must be > 0.");
   }
-  if (periodic_x && nx < 2) {
+  if (periodic_x && num_cells_x < 2) {
     throw std::invalid_argument("honeycomb: periodic_x requires nx > 1.");
   }
-  if (periodic_y && ny < 2) {
+  if (periodic_y && num_cells_y < 2) {
     throw std::invalid_argument("honeycomb: periodic_y requires ny > 1.");
   }
 
-  auto Nx = static_cast<int>(nx);
-  auto Ny = static_cast<int>(ny);
-  int N = 2 * Nx * Ny;  // 2 sites per unit cell
+  const auto Nx = static_cast<int>(num_cells_x);
+  const auto Ny = static_cast<int>(num_cells_y);
+  const int full_num_sites = 2 * Nx * Ny;
 
   // Site indices within unit cell (x, y):
   //   A = 2 * (y * Nx + x),  B = 2 * (y * Nx + x) + 1
   auto idxA = [Nx](int x, int y) { return 2 * (y * Nx + x); };
   auto idxB = [Nx](int x, int y) { return 2 * (y * Nx + x) + 1; };
 
+  std::vector<int> old_to_new(full_num_sites, -1);
+  int num_sites = 0;
+  for (int old_site = 0; old_site < full_num_sites; ++old_site) {
+    const bool dangling_open_corner =
+        remove_open_corners &&
+        (old_site == idxA(0, 0) || old_site == idxB(Nx - 1, Ny - 1));
+    if (!dangling_open_corner) old_to_new[old_site] = num_sites++;
+  }
+
   std::vector<detail::Triplet> triplets;
-  triplets.reserve(3 * N);
+  triplets.reserve(3 * num_sites);
+  auto add_edge = [&triplets, &old_to_new, t](int old_i, int old_j) {
+    const int i = old_to_new[old_i];
+    const int j = old_to_new[old_j];
+    if (i >= 0 && j >= 0) detail::add_edge(triplets, i, j, t);
+  };
 
   for (int y = 0; y < Ny; ++y) {
     for (int x = 0; x < Nx; ++x) {
       // Intra-cell bond: A -- B
-      detail::add_edge(triplets, idxA(x, y), idxB(x, y), t);
+      add_edge(idxA(x, y), idxB(x, y));
 
       // Inter-cell bond 1: B(x,y) -- A(x+1, y)  (horizontal)
       if (x + 1 < Nx) {
-        detail::add_edge(triplets, idxB(x, y), idxA(x + 1, y), t);
+        add_edge(idxB(x, y), idxA(x + 1, y));
       } else if (periodic_x) {
-        detail::add_edge(triplets, idxB(x, y), idxA(0, y), t);
+        add_edge(idxB(x, y), idxA(0, y));
       }
 
       // Inter-cell bond 2: B(x,y) -- A(x, y+1)  (vertical)
       if (y + 1 < Ny) {
-        detail::add_edge(triplets, idxB(x, y), idxA(x, y + 1), t);
+        add_edge(idxB(x, y), idxA(x, y + 1));
       } else if (periodic_y) {
-        detail::add_edge(triplets, idxB(x, y), idxA(x, 0), t);
+        add_edge(idxB(x, y), idxA(x, 0));
       }
     }
   }
 
-  Eigen::SparseMatrix<double> adj(N, N);
+  Eigen::SparseMatrix<double> adj(num_sites, num_sites);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
-  return LatticeGraph(std::move(adj),
-                      honeycomb_coloring(Nx, Ny, periodic_x, periodic_y));
+  // Castro Neto et al., Rev. Mod. Phys. 81, 109 (2009), Eq. (1), in units
+  // of the nearest-neighbor distance.
+  const Eigen::RowVector2d a1(1.5, std::sqrt(3.0) / 2.0);
+  const Eigen::RowVector2d a2(1.5, -std::sqrt(3.0) / 2.0);
+  const std::array<Eigen::RowVector2d, 2> basis = {
+      Eigen::RowVector2d::Zero(), Eigen::RowVector2d(1.0, 0.0)};
+  const auto full_positions = detail::lattice_positions(Nx, Ny, a1, a2, basis);
+  Eigen::MatrixXd positions(num_sites, 2);
+  for (int old_site = 0; old_site < full_num_sites; ++old_site) {
+    if (old_to_new[old_site] >= 0) {
+      positions.row(old_to_new[old_site]) = full_positions.row(old_site);
+    }
+  }
+
+  EdgeColoring coloring;
+  for (const auto& [edge, color] :
+       honeycomb_coloring(Nx, Ny, periodic_x, periodic_y)) {
+    const int i = old_to_new[edge.first];
+    const int j = old_to_new[edge.second];
+    if (i < 0 || j < 0) continue;
+    const auto mapped_i = static_cast<std::uint64_t>(i);
+    const auto mapped_j = static_cast<std::uint64_t>(j);
+    coloring[{std::min(mapped_i, mapped_j), std::max(mapped_i, mapped_j)}] =
+        color;
+  }
+
+  return LatticeGraph(std::move(adj), std::move(coloring), std::move(positions),
+                      detail::lattice_periods((periodic_x ? Nx : 0) * a1,
+                                              (periodic_y ? Ny : 0) * a2));
 }
 
 LatticeGraph LatticeGraph::kagome(std::uint64_t nx, std::uint64_t ny,
@@ -517,8 +1185,18 @@ LatticeGraph LatticeGraph::kagome(std::uint64_t nx, std::uint64_t ny,
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
-  return LatticeGraph(std::move(adj),
-                      greedy_edge_coloring(adj, coloring_seed, 32));
+  // Guo and Franz, Phys. Rev. B 80, 113102 (2009), Fig. 1 and the text
+  // following Eq. (2): the Bravais periods are twice their unit directions.
+  const Eigen::RowVector2d a1(2.0, 0.0);
+  const Eigen::RowVector2d a2(1.0, std::sqrt(3.0));
+  const std::array<Eigen::RowVector2d, 3> basis = {
+      Eigen::RowVector2d(0.0, 0.0), Eigen::RowVector2d(1.0, 0.0),
+      Eigen::RowVector2d(0.5, std::sqrt(3.0) / 2.0)};
+  auto positions = detail::lattice_positions(Nx, Ny, a1, a2, basis);
+  auto coloring = greedy_edge_coloring(adj, coloring_seed, 32);
+  return LatticeGraph(std::move(adj), std::move(coloring), std::move(positions),
+                      detail::lattice_periods((periodic_x ? Nx : 0) * a1,
+                                              (periodic_y ? Ny : 0) * a2));
 }
 
 namespace detail {
@@ -782,6 +1460,22 @@ nlohmann::json LatticeGraph::to_json() const {
     j["edge_coloring"] = coloring_json;
   }
 
+  if (_positions.has_value()) {
+    j["positions"] = matrix_to_json(*_positions);
+  }
+  if (_periods.has_value()) {
+    j["periods"] = matrix_to_json(*_periods);
+  }
+  if (!_bond_flavor_definitions.empty()) {
+    nlohmann::json definitions = nlohmann::json::array();
+    for (const auto& definition : _bond_flavor_definitions) {
+      definitions.push_back({definition.shell, definition.axis.x(),
+                             definition.axis.y(),
+                             static_cast<std::uint8_t>(definition.flavor)});
+    }
+    j["bond_flavor_definitions"] = std::move(definitions);
+  }
+
   return j;
 }
 
@@ -852,6 +1546,35 @@ void LatticeGraph::to_hdf5(H5::Group& group) const {
       H5::DataSet cds = group.createDataSet(
           "edge_coloring", H5::PredType::NATIVE_DOUBLE, cspace);
       cds.write(cbuf.data(), H5::PredType::NATIVE_DOUBLE);
+    }
+
+    if (_positions.has_value()) {
+      save_matrix_to_group(group, "positions", *_positions);
+    }
+    if (_periods.has_value()) {
+      save_matrix_to_group(group, "periods", *_periods);
+    }
+    if (!_bond_flavor_definitions.empty()) {
+      const auto count = static_cast<hsize_t>(_bond_flavor_definitions.size());
+      std::vector<std::uint64_t> shells(count);
+      std::vector<BondFlavorId> flavors(count);
+      Eigen::MatrixXd axes(count, 2);
+      for (hsize_t i = 0; i < count; ++i) {
+        const auto& definition = _bond_flavor_definitions[i];
+        shells[i] = definition.shell;
+        axes.row(static_cast<Eigen::Index>(i)) = definition.axis;
+        flavors[i] = definition.flavor;
+      }
+      H5::Group flavor_group = group.createGroup("bond_flavor_definitions");
+      hsize_t dims[1] = {count};
+      H5::DataSpace space(1, dims);
+      auto shell_dataset = flavor_group.createDataSet(
+          "shells", H5::PredType::NATIVE_UINT64, space);
+      shell_dataset.write(shells.data(), H5::PredType::NATIVE_UINT64);
+      save_matrix_to_group(flavor_group, "axes", axes);
+      auto flavor_dataset = flavor_group.createDataSet(
+          "flavors", H5::PredType::NATIVE_UINT32, space);
+      flavor_dataset.write(flavors.data(), H5::PredType::NATIVE_UINT32);
     }
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error in LatticeGraph::to_hdf5: " +
@@ -945,7 +1668,38 @@ LatticeGraph LatticeGraph::from_json(const nlohmann::json& j) {
     coloring = std::move(c);
   }
 
-  return LatticeGraph(std::move(sparse), std::move(coloring));
+  std::optional<Eigen::MatrixXd> positions;
+  if (j.contains("positions")) {
+    positions = json_to_matrix(j["positions"]);
+  }
+  std::optional<Eigen::MatrixXd> periods;
+  if (j.contains("periods")) {
+    periods = json_to_matrix(j["periods"]);
+  }
+  std::vector<BondFlavorDefinition> bond_flavors;
+  if (j.contains("bond_flavor_definitions")) {
+    for (const auto& entry : j["bond_flavor_definitions"]) {
+      if (!entry.is_array() || entry.size() != 4 ||
+          !entry[0].is_number_unsigned() || !entry[3].is_number_unsigned()) {
+        throw std::runtime_error(
+            "Bond-flavor definitions require unsigned integer shell and flavor "
+            "values.");
+      }
+      const auto shell = entry[0].get<std::uint64_t>();
+      const auto flavor = entry[3].get<std::uint64_t>();
+      if (shell == 0 || flavor > std::numeric_limits<BondFlavorId>::max()) {
+        throw std::runtime_error(
+            "Invalid bond-flavor definition in JSON data.");
+      }
+      bond_flavors.push_back({shell,
+                              {entry[1].get<double>(), entry[2].get<double>()},
+                              static_cast<BondFlavorId>(flavor)});
+    }
+  }
+
+  return LatticeGraph(std::move(sparse), std::move(coloring),
+                      std::move(positions), std::move(periods),
+                      std::move(bond_flavors));
 }
 
 LatticeGraph LatticeGraph::from_hdf5_file(const std::string& filename) {
@@ -1034,7 +1788,70 @@ LatticeGraph LatticeGraph::from_hdf5(H5::Group& group) {
     coloring = std::move(c);
   }
 
-  return LatticeGraph(std::move(sparse), std::move(coloring));
+  std::optional<Eigen::MatrixXd> positions;
+  if (group.nameExists("positions")) {
+    positions = load_matrix_from_group(group, "positions");
+  }
+  std::optional<Eigen::MatrixXd> periods;
+  if (group.nameExists("periods")) {
+    periods = load_matrix_from_group(group, "periods");
+  }
+  std::vector<BondFlavorDefinition> bond_flavors;
+  if (group.nameExists("bond_flavor_definitions")) {
+    H5::Group flavor_group = group.openGroup("bond_flavor_definitions");
+    if (!flavor_group.nameExists("shells") ||
+        !flavor_group.nameExists("axes") ||
+        !flavor_group.nameExists("flavors")) {
+      throw std::runtime_error(
+          "Bond-flavor definitions require shells, axes, and flavors "
+          "datasets.");
+    }
+    H5::DataSet shell_dataset = flavor_group.openDataSet("shells");
+    H5::DataSet axis_dataset = flavor_group.openDataSet("axes");
+    H5::DataSet flavor_dataset = flavor_group.openDataSet("flavors");
+    H5::DataSpace shell_space = shell_dataset.getSpace();
+    H5::DataSpace axis_space = axis_dataset.getSpace();
+    H5::DataSpace flavor_space = flavor_dataset.getSpace();
+    hsize_t shell_dims[1];
+    hsize_t axis_dims[2];
+    hsize_t flavor_dims[1];
+    if (shell_space.getSimpleExtentNdims() != 1 ||
+        axis_space.getSimpleExtentNdims() != 2 ||
+        flavor_space.getSimpleExtentNdims() != 1) {
+      throw std::runtime_error("Invalid bond-flavor dataset rank.");
+    }
+    shell_space.getSimpleExtentDims(shell_dims);
+    axis_space.getSimpleExtentDims(axis_dims);
+    flavor_space.getSimpleExtentDims(flavor_dims);
+    if (axis_dims[0] != shell_dims[0] || axis_dims[1] != 2 ||
+        flavor_dims[0] != shell_dims[0] ||
+        shell_dataset.getTypeClass() != H5T_INTEGER ||
+        shell_dataset.getIntType().getSign() != H5T_SGN_NONE ||
+        axis_dataset.getTypeClass() != H5T_FLOAT ||
+        flavor_dataset.getTypeClass() != H5T_INTEGER ||
+        flavor_dataset.getIntType().getSign() != H5T_SGN_NONE) {
+      throw std::runtime_error("Invalid bond-flavor dataset shape or type.");
+    }
+    std::vector<std::uint64_t> shells(shell_dims[0]);
+    std::vector<std::uint64_t> flavors(shell_dims[0]);
+    Eigen::MatrixXd axes(shell_dims[0], 2);
+    shell_dataset.read(shells.data(), H5::PredType::NATIVE_UINT64);
+    axis_dataset.read(axes.data(), H5::PredType::NATIVE_DOUBLE);
+    flavor_dataset.read(flavors.data(), H5::PredType::NATIVE_UINT64);
+    for (hsize_t i = 0; i < shell_dims[0]; ++i) {
+      if (shells[i] == 0 ||
+          flavors[i] > std::numeric_limits<BondFlavorId>::max()) {
+        throw std::runtime_error(
+            "Invalid bond-flavor definition in HDF5 data.");
+      }
+      bond_flavors.push_back(
+          {shells[i], axes.row(i), static_cast<BondFlavorId>(flavors[i])});
+    }
+  }
+
+  return LatticeGraph(std::move(sparse), std::move(coloring),
+                      std::move(positions), std::move(periods),
+                      std::move(bond_flavors));
 }
 
 void LatticeGraph::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
@@ -1042,6 +1859,19 @@ void LatticeGraph::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
   hash_value(ctx, static_cast<uint64_t>(_num_sites));
   hash_value(ctx, adjacency_);
   hash_value(ctx, _is_symmetric);
+  hash_value(ctx, _positions.has_value());
+  if (_positions.has_value()) {
+    hash_value(ctx, *_positions);
+  }
+  hash_value(ctx, _periods.has_value());
+  if (_periods.has_value()) {
+    hash_value(ctx, *_periods);
+  }
+  for (const auto& definition : _bond_flavor_definitions) {
+    hash_value(ctx, definition.shell);
+    hash_value(ctx, definition.axis);
+    hash_value(ctx, definition.flavor);
+  }
 }
 
 LatticeGraph LatticeGraph::permute(const LatticeGraph& graph,
@@ -1075,7 +1905,18 @@ LatticeGraph LatticeGraph::permute(const LatticeGraph& graph,
     new_coloring = std::move(coloring);
   }
 
-  return LatticeGraph(std::move(new_adj), std::move(new_coloring));
+  std::optional<Eigen::MatrixXd> new_positions;
+  if (graph._positions.has_value()) {
+    new_positions.emplace(static_cast<Eigen::Index>(V), 2);
+    for (std::uint64_t i = 0; i < V; ++i) {
+      new_positions->row(static_cast<Eigen::Index>(i)) =
+          graph._positions->row(static_cast<Eigen::Index>(path[i]));
+    }
+  }
+
+  return LatticeGraph(std::move(new_adj), std::move(new_coloring),
+                      std::move(new_positions), graph._periods,
+                      graph._bond_flavor_definitions);
 }
 
 }  // namespace qdk::chemistry::data

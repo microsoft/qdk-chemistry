@@ -11,6 +11,8 @@ Exposed classes are:
 - :class:`Ansatz`: Quantum chemical ansatz combining a Hamiltonian and wavefunction for energy calculations.
 - :class:`AOType`: Enumeration of basis set types (STO-3G, 6-31G, etc.).
 - :class:`BasisSet`: Gaussian basis set definitions for quantum calculations.
+- :class:`BondClass`: Geometric neighbor shell and unoriented bond-axis class.
+- :class:`BondFlavorDefinition`: Mapping from one shell-axis class to an opaque semantic flavor ID.
 - :class:`CanonicalFourCenterHamiltonianContainer`: Container for four-center two-electron integrals in canonical form.
 - :class:`CholeskyHamiltonianContainer`: Container for Hamiltonians represented using Cholesky-decomposed integrals.
 - :class:`Circuit`: Quantum circuit information.
@@ -28,6 +30,7 @@ Exposed classes are:
 - :class:`MeasurementData`: Measurement bitstring data and metadata for QubitOperator objects.
 - :class:`SparseHamiltonianContainer`: Container for lattice model Hamiltonians with sparse internal storage.
 - :class:`ModelOrbitals`: Simple orbital representation for model systems without full basis set information.
+- :class:`NeighborConnection`: Physical lattice connection retaining periodic-image geometry.
 - :class:`NuclearGradients`: Nuclear gradient values associated with a molecular structure.
 - :class:`NuclearHessian`: Nuclear Hessian matrix associated with a molecular structure.
 - :class:`Orbitals`: Molecular orbital information and properties.
@@ -74,6 +77,8 @@ from qdk_chemistry._core.data import (
     Ansatz,
     AOType,
     BasisSet,
+    BondClass,
+    BondFlavorDefinition,
     CanonicalFourCenterHamiltonianContainer,
     CholeskyHamiltonianContainer,
     Configuration,
@@ -86,6 +91,7 @@ from qdk_chemistry._core.data import (
     LatticeGraph,
     MajoranaMapping,
     ModelOrbitals,
+    NeighborConnection,
     NuclearGradients,
     NuclearHessian,
     Orbitals,
@@ -143,6 +149,8 @@ __all__ = [
     "AmplitudeType",
     "Ansatz",
     "BasisSet",
+    "BondClass",
+    "BondFlavorDefinition",
     "CanonicalFourCenterHamiltonianContainer",
     "CholeskyHamiltonianContainer",
     "Circuit",
@@ -165,6 +173,7 @@ __all__ = [
     "MajoranaMapping",
     "MeasurementData",
     "ModelOrbitals",
+    "NeighborConnection",
     "NuclearGradients",
     "NuclearHessian",
     "OrbitalType",
