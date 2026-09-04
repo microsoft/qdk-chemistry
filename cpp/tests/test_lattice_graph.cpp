@@ -17,6 +17,27 @@ using namespace qdk::chemistry::data;
 
 class LatticeGraphTest : public ::testing::Test {};
 
+namespace {
+constexpr BondFlavorId flavor_x = 10;
+constexpr BondFlavorId flavor_y = 20;
+constexpr BondFlavorId flavor_z = 30;
+
+std::vector<BondFlavorDefinition> honeycomb_flavor_ids() {
+  const double root_three = std::sqrt(3.0);
+  return {
+      {1, {0.5, root_three / 2.0}, flavor_x},
+      {1, {0.5, -root_three / 2.0}, flavor_y},
+      {1, {1.0, 0.0}, flavor_z},
+      {2, {1.5, -root_three / 2.0}, flavor_x},
+      {2, {1.5, root_three / 2.0}, flavor_y},
+      {2, {0.0, root_three}, flavor_z},
+      {3, {1.0, root_three}, flavor_x},
+      {3, {1.0, -root_three}, flavor_y},
+      {3, {2.0, 0.0}, flavor_z},
+  };
+}
+}  // namespace
+
 TEST_F(LatticeGraphTest, ChainConstructor) {
   // 4-site chain
   //
@@ -223,10 +244,11 @@ TEST_F(LatticeGraphTest, GeometricBondClassesAndHoneycombFlavors) {
   EXPECT_EQ(square_orientations.at(1).size(), 2);
   EXPECT_EQ(square_orientations.at(2).size(), 2);
 
-  auto honeycomb = LatticeGraph::honeycomb(5, 5);
+  auto honeycomb =
+      LatticeGraph::honeycomb(5, 5).with_bond_flavors(honeycomb_flavor_ids());
   const auto connections = honeycomb.neighbor_connections({1, 2, 3});
   constexpr std::uint64_t center = 24;
-  std::map<std::uint64_t, std::map<BondFlavor, std::size_t>> flavor_degree;
+  std::map<std::uint64_t, std::map<BondFlavorId, std::size_t>> flavor_degree;
   std::map<std::uint64_t, std::set<std::pair<std::uint64_t, std::uint64_t>>>
       projected_pairs;
   for (const auto& connection : connections) {
@@ -243,21 +265,19 @@ TEST_F(LatticeGraphTest, GeometricBondClassesAndHoneycombFlavors) {
               (std::set<std::pair<std::uint64_t, std::uint64_t>>(pairs.begin(),
                                                                  pairs.end())));
   }
-  for (BondFlavor flavor : {BondFlavor::X, BondFlavor::Y, BondFlavor::Z}) {
+  for (BondFlavorId flavor : {flavor_x, flavor_y, flavor_z}) {
     EXPECT_EQ(flavor_degree.at(1).at(flavor), 1);
     EXPECT_EQ(flavor_degree.at(2).at(flavor), 2);
     EXPECT_EQ(flavor_degree.at(3).at(flavor), 1);
   }
 }
 
-TEST_F(LatticeGraphTest, NarrowHoneycombOnlyFlavorsMatchingPhysicalAxes) {
+TEST_F(LatticeGraphTest, HoneycombFactoriesDoNotAssignModelFlavors) {
   const auto connections =
-      LatticeGraph::honeycomb(1, 2).neighbor_connections({1, 2, 3});
-  EXPECT_TRUE(std::any_of(connections.begin(), connections.end(),
-                          [](const auto& connection) {
-                            return connection.bond_class.shell == 3 &&
-                                   !connection.flavor.has_value();
-                          }));
+      LatticeGraph::honeycomb(3, 3).neighbor_connections({1, 2, 3});
+  EXPECT_TRUE(std::all_of(
+      connections.begin(), connections.end(),
+      [](const auto& connection) { return !connection.flavor.has_value(); }));
 }
 
 TEST_F(LatticeGraphTest, HoneycombOpenPlaquettePatches) {
@@ -279,13 +299,15 @@ TEST_F(LatticeGraphTest, HoneycombOpenPlaquettePatches) {
               2);
   }
 
-  const auto connections = hexagon.neighbor_connections({1, 2, 3});
-  std::map<std::uint64_t, std::map<BondFlavor, std::size_t>> counts;
+  const auto flavored_hexagon =
+      hexagon.with_bond_flavors(honeycomb_flavor_ids());
+  const auto connections = flavored_hexagon.neighbor_connections({1, 2, 3});
+  std::map<std::uint64_t, std::map<BondFlavorId, std::size_t>> counts;
   for (const auto& connection : connections) {
     ASSERT_TRUE(connection.flavor.has_value());
     ++counts[connection.bond_class.shell][*connection.flavor];
   }
-  for (BondFlavor flavor : {BondFlavor::X, BondFlavor::Y, BondFlavor::Z}) {
+  for (BondFlavorId flavor : {flavor_x, flavor_y, flavor_z}) {
     EXPECT_EQ(counts.at(1).at(flavor), 2);
     EXPECT_EQ(counts.at(2).at(flavor), 2);
     EXPECT_EQ(counts.at(3).at(flavor), 1);
@@ -317,7 +339,8 @@ TEST_F(LatticeGraphTest, HoneycombOpenPlaquettePatches) {
 }
 
 TEST_F(LatticeGraphTest, PeriodicConnectionsPreserveFlavorMultiplicity) {
-  auto honeycomb = LatticeGraph::honeycomb(2, 2, true, true);
+  auto honeycomb = LatticeGraph::honeycomb(2, 2, true, true)
+                       .with_bond_flavors(honeycomb_flavor_ids());
   const auto all_connections = honeycomb.neighbor_connections({1, 2, 3});
   for (std::uint64_t shell = 1; shell <= 3; ++shell) {
     std::set<std::pair<std::uint64_t, std::uint64_t>> projection;
@@ -335,7 +358,7 @@ TEST_F(LatticeGraphTest, PeriodicConnectionsPreserveFlavorMultiplicity) {
                std::back_inserter(connections), [](const auto& connection) {
                  return connection.bond_class.shell == 3;
                });
-  std::map<std::pair<std::uint64_t, std::uint64_t>, std::set<BondFlavor>>
+  std::map<std::pair<std::uint64_t, std::uint64_t>, std::set<BondFlavorId>>
       flavors_by_pair;
   for (const auto& connection : connections) {
     ASSERT_TRUE(connection.flavor.has_value());
@@ -349,12 +372,13 @@ TEST_F(LatticeGraphTest, PeriodicConnectionsPreserveFlavorMultiplicity) {
 }
 
 TEST_F(LatticeGraphTest, BondFlavorDefinitionsSurviveDataOperations) {
-  auto honeycomb = LatticeGraph::honeycomb(3, 3, true, true);
+  auto honeycomb = LatticeGraph::honeycomb(3, 3, true, true)
+                       .with_bond_flavors(honeycomb_flavor_ids());
   ASSERT_EQ(honeycomb.bond_flavor_definitions().size(), 9);
 
   auto flavor_signature = [](const LatticeGraph& graph) {
     std::vector<std::tuple<std::uint64_t, std::uint32_t, std::uint64_t,
-                           std::uint64_t, BondFlavor>>
+                           std::uint64_t, BondFlavorId>>
         result;
     for (const auto& connection : graph.neighbor_connections({1, 2, 3})) {
       EXPECT_TRUE(connection.flavor.has_value());
@@ -386,13 +410,12 @@ TEST_F(LatticeGraphTest, BondFlavorDefinitionsSurviveDataOperations) {
   EXPECT_EQ(permuted.neighbor_connections({1, 2, 3}).size(),
             honeycomb.neighbor_connections({1, 2, 3}).size());
 
-  auto square = LatticeGraph::square(3, 3).with_bond_flavors(
-      {{1, {1.0, 0.0}, BondFlavor::X}});
+  auto square =
+      LatticeGraph::square(3, 3).with_bond_flavors({{1, {1.0, 0.0}, 1000}});
   const auto square_connections = square.neighbor_connections({1});
-  EXPECT_TRUE(std::any_of(square_connections.begin(), square_connections.end(),
-                          [](const auto& connection) {
-                            return connection.flavor == BondFlavor::X;
-                          }));
+  EXPECT_TRUE(std::any_of(
+      square_connections.begin(), square_connections.end(),
+      [](const auto& connection) { return connection.flavor == 1000; }));
   EXPECT_TRUE(std::any_of(
       square_connections.begin(), square_connections.end(),
       [](const auto& connection) { return !connection.flavor.has_value(); }));
@@ -401,8 +424,7 @@ TEST_F(LatticeGraphTest, BondFlavorDefinitionsSurviveDataOperations) {
 TEST_F(LatticeGraphTest, BondFlavorAxesAreScaleInvariant) {
   const auto square = LatticeGraph::square(2, 2);
   for (double scale : {1.0e-200, 1.0e200}) {
-    const auto flavored =
-        square.with_bond_flavors({{1, {scale, 0.0}, BondFlavor::X}});
+    const auto flavored = square.with_bond_flavors({{1, {scale, 0.0}, 1000}});
     ASSERT_EQ(flavored.bond_flavor_definitions().size(), 1);
     EXPECT_TRUE(flavored.bond_flavor_definitions()[0].axis.isApprox(
         Eigen::RowVector2d(1.0, 0.0)));
@@ -411,8 +433,9 @@ TEST_F(LatticeGraphTest, BondFlavorAxesAreScaleInvariant) {
 
 TEST_F(LatticeGraphTest, BondFlavorPersistencePreservesTypes) {
   constexpr std::uint64_t shell = (std::uint64_t{1} << 53) + 1;
+  constexpr BondFlavorId flavor = std::numeric_limits<BondFlavorId>::max();
   const auto graph = LatticeGraph::square(2, 2).with_bond_flavors(
-      {{shell, {1.0, 0.0}, BondFlavor::X}});
+      {{shell, {1.0, 0.0}, flavor}});
   const std::filesystem::path filename =
       "test_lattice_graph_bond_flavor_types.lattice_graph.h5";
   graph.to_hdf5_file(filename.string());
@@ -421,12 +444,13 @@ TEST_F(LatticeGraphTest, BondFlavorPersistencePreservesTypes) {
 
   ASSERT_EQ(restored.bond_flavor_definitions().size(), 1);
   EXPECT_EQ(restored.bond_flavor_definitions()[0].shell, shell);
+  EXPECT_EQ(restored.bond_flavor_definitions()[0].flavor, flavor);
   EXPECT_EQ(restored.content_hash(), graph.content_hash());
 }
 
 TEST_F(LatticeGraphTest, BondFlavorJsonRejectsMalformedMetadata) {
   const auto valid = LatticeGraph::square(2, 2)
-                         .with_bond_flavors({{1, {1.0, 0.0}, BondFlavor::X}})
+                         .with_bond_flavors({{1, {1.0, 0.0}, 1000}})
                          .to_json();
   const auto expect_invalid = [&](const nlohmann::json& definition) {
     auto malformed = valid;
@@ -437,13 +461,16 @@ TEST_F(LatticeGraphTest, BondFlavorJsonRejectsMalformedMetadata) {
   expect_invalid({1.5, 1.0, 0.0, 0});
   expect_invalid({-1, 1.0, 0.0, 0});
   expect_invalid({1, 1.0, 0.0, 1.5});
-  expect_invalid({1, 1.0, 0.0, 256});
+  expect_invalid(
+      {1, 1.0, 0.0,
+       static_cast<std::uint64_t>(std::numeric_limits<BondFlavorId>::max()) +
+           1});
   expect_invalid({1, 1.0, 0.0});
 }
 
 TEST_F(LatticeGraphTest, BondFlavorHdf5RejectsMalformedMetadata) {
-  const auto graph = LatticeGraph::square(2, 2).with_bond_flavors(
-      {{1, {1.0, 0.0}, BondFlavor::X}});
+  const auto graph =
+      LatticeGraph::square(2, 2).with_bond_flavors({{1, {1.0, 0.0}, 1000}});
   const std::filesystem::path filename =
       "test_lattice_graph_invalid_bond_flavors.lattice_graph.h5";
   const auto expect_invalid = [&](const auto& mutate) {
@@ -476,9 +503,14 @@ TEST_F(LatticeGraphTest, BondFlavorHdf5RejectsMalformedMetadata) {
     dataset.write(&shell, H5::PredType::NATIVE_DOUBLE);
   });
   expect_invalid([](H5::Group& definitions) {
-    const std::uint8_t flavor = 3;
-    definitions.openDataSet("flavors").write(&flavor,
-                                             H5::PredType::NATIVE_UINT8);
+    definitions.unlink("flavors");
+    hsize_t dims[1] = {1};
+    auto dataset = definitions.createDataSet(
+        "flavors", H5::PredType::NATIVE_UINT64, H5::DataSpace(1, dims));
+    const std::uint64_t flavor =
+        static_cast<std::uint64_t>(std::numeric_limits<BondFlavorId>::max()) +
+        1;
+    dataset.write(&flavor, H5::PredType::NATIVE_UINT64);
   });
 }
 

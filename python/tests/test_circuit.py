@@ -11,8 +11,9 @@ import tempfile
 from pathlib import Path
 
 import h5py
+import numpy as np
 import pytest
-from qdk import TargetProfile
+from qdk import TargetProfile, qsharp
 from qdk.openqasm import circuit as openqasm_circuit
 from qdk.openqasm import compile as openqasm_compile
 
@@ -29,7 +30,7 @@ from qdk_chemistry.data import Circuit
 from qdk_chemistry.data import circuit as circuit_module
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, set_qsharp_context
 
 
 def strip_ws(s: str) -> str:
@@ -165,6 +166,80 @@ class TestGetQsharpCircuit:
         qsc_info = json.loads(qsc.json())
         assert len(qsc_info["qubits"]) == 4
         assert len(qsc_pruned_info["qubits"]) == 2
+
+
+class TestUniformSpinBasisRotation:
+    """Tests for immutable uniform spin-basis rotation."""
+
+    def test_qsharp_rotation_is_measurement_free_and_context_safe(self):
+        """Rotation composes in the base circuit's context and adds no measurement."""
+        original_context = create_qsharp_context()
+        set_qsharp_context(original_context)
+        base = Circuit(
+            qsharp_factory=QsharpFactoryData(
+                program=QSHARP_UTILS.PauliExp.MakeRepPauliExpCircuit,
+                parameter={
+                    "evo_params": {"pauliExponents": [], "pauliCoefficients": [], "repetitions": 1},
+                    "target_indices": [0],
+                },
+            ),
+            qsharp_op=QSHARP_UTILS.PauliExp.MakeRepPauliExpOp(
+                {"pauliExponents": [], "pauliCoefficients": [], "repetitions": 1}
+            ),
+            num_qubits=1,
+        )
+        set_qsharp_context(create_qsharp_context())
+        try:
+            rotated = base.with_uniform_spin_basis_rotation([0.6, 0.0, 0.8])
+            assert rotated.num_qubits == 1
+            assert "measure" not in rotated.get_qsharp_circuit().json().lower()
+            assert rotated.get_qir() is not None
+        finally:
+            set_qsharp_context(None)
+
+    def test_oblique_direction_has_expected_measurement_probability(self):
+        """Rotating |0> by an oblique direction gives p(0)=(1+n_z)/2."""
+        from qdk_chemistry.algorithms import create  # noqa: PLC0415
+        from qdk_chemistry.algorithms.state_preparation import identity_state_prep  # noqa: PLC0415
+
+        rotated = identity_state_prep(1).with_uniform_spin_basis_rotation([0.6, 0.0, 0.8], num_qubits=1)
+        context = rotated._qsharp_factory.program._qdk_context
+        measured = Circuit(
+            qsharp_factory=QsharpFactoryData(
+                program=context.code.QDKChemistry.Utils.MeasurementBasis.MakeMeasurementCircuit,
+                parameter={
+                    "baseCircuit": rotated._qsharp_op,
+                    "bases": [qsharp.Pauli.Z],
+                    "numQubits": 1,
+                },
+            ),
+            num_qubits=1,
+        )
+        counts = create("circuit_executor", "qdk_sparse_state_simulator").run(measured, shots=5000).bitstring_counts
+        assert counts.get("0", 0) / sum(counts.values()) == pytest.approx(0.9, abs=0.035)
+
+    @pytest.mark.parametrize(
+        ("direction", "message"),
+        [
+            ([0.0, 0.0, 0.0], "must be nonzero"),
+            ([np.nan, 0.0, 1.0], "must be a finite length-3 vector"),
+            ([1.0, 0.0], "must be a finite length-3 vector"),
+        ],
+    )
+    def test_invalid_directions_are_rejected(self, direction, message):
+        """Directions must be finite, nonzero, and three-dimensional."""
+        circuit = Circuit(qasm="OPENQASM 3.0; qubit[1] q;", num_qubits=1)
+        with pytest.raises(ValueError, match=message):
+            circuit.with_uniform_spin_basis_rotation(direction)
+
+    def test_qasm_rotation_rejects_existing_measurement(self):
+        """Rotation is not appended after a terminal measurement."""
+        circuit = Circuit(
+            qasm="OPENQASM 3.0; qubit[1] q; bit[1] c; c[0] = measure q[0];",
+            num_qubits=1,
+        )
+        with pytest.raises(RuntimeError, match="after measurements"):
+            circuit.with_uniform_spin_basis_rotation([0.0, 1.0, 0.0])
 
 
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")

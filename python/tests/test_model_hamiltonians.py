@@ -9,19 +9,20 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.data import (
-    BondFlavor,
     BondFlavorDefinition,
     Hamiltonian,
     LatticeGraph,
     QubitOperator,
 )
 from qdk_chemistry.utils.model_hamiltonians import (
+    KitaevBondFlavor,
     create_heisenberg_hamiltonian,
     create_hubbard_hamiltonian,
     create_huckel_hamiltonian,
     create_ising_hamiltonian,
     create_kitaev_hamiltonian,
     create_ppp_hamiltonian,
+    kitaev_honeycomb_bond_flavors,
     mataga_nishimoto_potential,
     ohno_potential,
 )
@@ -32,6 +33,11 @@ from .reference_tolerances import float_comparison_absolute_tolerance
 def _get_terms_dict(qh: QubitOperator) -> dict[str, float]:
     """Return a {pauli_string: coefficient} dict for easy assertions."""
     return dict(qh.get_real_coefficients())
+
+
+def _with_standard_kitaev_flavors(graph: LatticeGraph) -> LatticeGraph:
+    """Attach the standard honeycomb Kitaev flavor IDs for inspection."""
+    return graph.with_bond_flavors(kitaev_honeycomb_bond_flavors())
 
 
 class TestModelHamiltonians:
@@ -382,42 +388,43 @@ class TestModelHamiltonians:
 
     def test_kitaev_nearest_neighbor_components(self):
         graph = LatticeGraph.honeycomb(2, 2, periodic_x=True, periodic_y=True)
+        flavored_graph = _with_standard_kitaev_flavors(graph)
         cases = (
             (
                 {"j": 4.0},
                 {
-                    BondFlavor.X: {"XX": 1.0, "YY": 1.0, "ZZ": 1.0},
-                    BondFlavor.Y: {"XX": 1.0, "YY": 1.0, "ZZ": 1.0},
-                    BondFlavor.Z: {"XX": 1.0, "YY": 1.0, "ZZ": 1.0},
+                    KitaevBondFlavor.X: {"XX": 1.0, "YY": 1.0, "ZZ": 1.0},
+                    KitaevBondFlavor.Y: {"XX": 1.0, "YY": 1.0, "ZZ": 1.0},
+                    KitaevBondFlavor.Z: {"XX": 1.0, "YY": 1.0, "ZZ": 1.0},
                 },
             ),
             (
                 {"kx": 8.0, "ky": 12.0, "kz": 16.0},
                 {
-                    BondFlavor.X: {"XX": 2.0},
-                    BondFlavor.Y: {"YY": 3.0},
-                    BondFlavor.Z: {"ZZ": 4.0},
+                    KitaevBondFlavor.X: {"XX": 2.0},
+                    KitaevBondFlavor.Y: {"YY": 3.0},
+                    KitaevBondFlavor.Z: {"ZZ": 4.0},
                 },
             ),
             (
                 {"gamma": 20.0},
                 {
-                    BondFlavor.X: {"YZ": 5.0, "ZY": 5.0},
-                    BondFlavor.Y: {"XZ": 5.0, "ZX": 5.0},
-                    BondFlavor.Z: {"XY": 5.0, "YX": 5.0},
+                    KitaevBondFlavor.X: {"YZ": 5.0, "ZY": 5.0},
+                    KitaevBondFlavor.Y: {"XZ": 5.0, "ZX": 5.0},
+                    KitaevBondFlavor.Z: {"XY": 5.0, "YX": 5.0},
                 },
             ),
             (
                 {"gamma_prime": 24.0},
                 {
-                    BondFlavor.X: {"XY": 6.0, "YX": 6.0, "XZ": 6.0, "ZX": 6.0},
-                    BondFlavor.Y: {"XY": 6.0, "YX": 6.0, "YZ": 6.0, "ZY": 6.0},
-                    BondFlavor.Z: {"XZ": 6.0, "ZX": 6.0, "YZ": 6.0, "ZY": 6.0},
+                    KitaevBondFlavor.X: {"XY": 6.0, "YX": 6.0, "XZ": 6.0, "ZX": 6.0},
+                    KitaevBondFlavor.Y: {"XY": 6.0, "YX": 6.0, "YZ": 6.0, "ZY": 6.0},
+                    KitaevBondFlavor.Z: {"XZ": 6.0, "ZX": 6.0, "YZ": 6.0, "ZY": 6.0},
                 },
             ),
         )
 
-        connections = graph.neighbor_connections([1])
+        connections = flavored_graph.neighbor_connections([1])
         for overrides, expected_by_flavor in cases:
             parameters = {"kx": 0.0, "ky": 0.0, "kz": 0.0, "j": 0.0, "gamma": 0.0, "gamma_prime": 0.0}
             parameters.update(overrides)
@@ -427,7 +434,7 @@ class TestModelHamiltonians:
             expected: dict[str, float] = {}
             for connection in connections:
                 assert connection.flavor is not None
-                for pauli_label, coefficient in expected_by_flavor[connection.flavor].items():
+                for pauli_label, coefficient in expected_by_flavor[KitaevBondFlavor(connection.flavor)].items():
                     pauli = ["I"] * graph.num_sites
                     pauli[graph.num_sites - 1 - connection.site_i] = pauli_label[0]
                     pauli[graph.num_sites - 1 - connection.site_j] = pauli_label[1]
@@ -436,6 +443,7 @@ class TestModelHamiltonians:
 
     def test_kitaev_flavored_geometric_shells(self):
         graph = LatticeGraph.honeycomb(5, 5)
+        flavored_graph = _with_standard_kitaev_flavors(graph)
         shell_couplings = {1: 4.0, 2: 8.0, 3: 12.0}
         zero_couplings = {1: 0.0, 2: 0.0, 3: 0.0}
         hamiltonian = create_kitaev_hamiltonian(
@@ -447,8 +455,8 @@ class TestModelHamiltonians:
         assert hamiltonian.term_partition is None
         terms = _get_terms_dict(hamiltonian)
         expected: dict[str, float] = {}
-        for connection in graph.neighbor_connections([1, 2, 3]):
-            if connection.flavor != BondFlavor.X:
+        for connection in flavored_graph.neighbor_connections([1, 2, 3]):
+            if connection.flavor != KitaevBondFlavor.X:
                 continue
             pauli = ["I"] * graph.num_sites
             pauli[graph.num_sites - 1 - connection.site_i] = "X"
@@ -465,7 +473,7 @@ class TestModelHamiltonians:
         )
         heisenberg_terms = _get_terms_dict(heisenberg)
         expected_heisenberg: dict[str, float] = {}
-        for connection in graph.neighbor_connections([1, 2, 3]):
+        for connection in flavored_graph.neighbor_connections([1, 2, 3]):
             for component in "XYZ":
                 pauli = ["I"] * graph.num_sites
                 pauli[graph.num_sites - 1 - connection.site_i] = component
@@ -478,41 +486,47 @@ class TestModelHamiltonians:
         assert all(connection.flavor is None for connection in square.neighbor_connections([1]))
 
         flavored = square.with_bond_flavors(
-            [BondFlavorDefinition(shell=1, axis=np.array([1.0, 0.0]), flavor=BondFlavor.X)]
+            [
+                BondFlavorDefinition(shell=1, axis=np.array([1.0, 0.0]), flavor=1000),
+                BondFlavorDefinition(shell=1, axis=np.array([0.0, 1.0]), flavor=1001),
+                BondFlavorDefinition(shell=2, axis=np.array([1.0, 1.0]), flavor=1002),
+                BondFlavorDefinition(shell=2, axis=np.array([1.0, -1.0]), flavor=1003),
+            ]
         )
-        connections = flavored.neighbor_connections([1])
-        assert any(connection.flavor == BondFlavor.X for connection in connections)
-        assert any(connection.flavor is None for connection in connections)
+        connections = flavored.neighbor_connections([1, 2])
+        assert {connection.flavor for connection in connections} == {1000, 1001, 1002, 1003}
 
     def test_kitaev_flavor_specific_gamma_terms(self):
         graph = LatticeGraph.honeycomb(3, 3)
-        gamma = {BondFlavor.X: 4.0, BondFlavor.Y: 8.0, BondFlavor.Z: 12.0}
-        gamma_prime = {BondFlavor.X: 16.0, BondFlavor.Y: 20.0, BondFlavor.Z: 24.0}
+        flavored_graph = _with_standard_kitaev_flavors(graph)
+        gamma = {KitaevBondFlavor.X: 4.0, KitaevBondFlavor.Y: 8.0, KitaevBondFlavor.Z: 12.0}
+        gamma_prime = {KitaevBondFlavor.X: 16.0, KitaevBondFlavor.Y: 20.0, KitaevBondFlavor.Z: 24.0}
         hamiltonian = create_kitaev_hamiltonian(
             graph,
             kx=0.0,
             ky=0.0,
             kz=0.0,
-            gamma_x=gamma[BondFlavor.X],
-            gamma_y=gamma[BondFlavor.Y],
-            gamma_z=gamma[BondFlavor.Z],
-            gamma_prime_x=gamma_prime[BondFlavor.X],
-            gamma_prime_y=gamma_prime[BondFlavor.Y],
-            gamma_prime_z=gamma_prime[BondFlavor.Z],
+            gamma_x=gamma[KitaevBondFlavor.X],
+            gamma_y=gamma[KitaevBondFlavor.Y],
+            gamma_z=gamma[KitaevBondFlavor.Z],
+            gamma_prime_x=gamma_prime[KitaevBondFlavor.X],
+            gamma_prime_y=gamma_prime[KitaevBondFlavor.Y],
+            gamma_prime_z=gamma_prime[KitaevBondFlavor.Z],
             include_term_groups=False,
         )
         terms = _get_terms_dict(hamiltonian)
-        flavor_index = {BondFlavor.X: 0, BondFlavor.Y: 1, BondFlavor.Z: 2}
+        flavor_index = {KitaevBondFlavor.X: 0, KitaevBondFlavor.Y: 1, KitaevBondFlavor.Z: 2}
         components = "XYZ"
         expected: dict[str, float] = {}
-        for connection in graph.neighbor_connections([1]):
+        for connection in flavored_graph.neighbor_connections([1]):
             assert connection.flavor is not None
-            selected = flavor_index[connection.flavor]
+            flavor = KitaevBondFlavor(connection.flavor)
+            selected = flavor_index[flavor]
             other = tuple(index for index in range(3) if index != selected)
             matrix = np.zeros((3, 3))
-            matrix[other[0], other[1]] = matrix[other[1], other[0]] = gamma[connection.flavor] / 4.0
+            matrix[other[0], other[1]] = matrix[other[1], other[0]] = gamma[flavor] / 4.0
             for index in other:
-                matrix[selected, index] = matrix[index, selected] = gamma_prime[connection.flavor] / 4.0
+                matrix[selected, index] = matrix[index, selected] = gamma_prime[flavor] / 4.0
             for first in range(3):
                 for second in range(3):
                     if matrix[first, second] == 0.0:
@@ -675,13 +689,18 @@ class TestModelHamiltonians:
         coefficient_b = k / 3 - (gamma - gamma_prime) / 3
         j_ab = j + coefficient_b - gamma_prime
         j_c = j + coefficient_a + 2 * gamma_prime
-        phases = {BondFlavor.Z: 0.0, BondFlavor.X: 2 * np.pi / 3, BondFlavor.Y: 4 * np.pi / 3}
+        phases = {
+            KitaevBondFlavor.Z: 0.0,
+            KitaevBondFlavor.X: 2 * np.pi / 3,
+            KitaevBondFlavor.Y: 4 * np.pi / 3,
+        }
         expected: dict[str, float] = {}
         components = ("X", "Y", "Z")
-        for connection in graph.neighbor_connections([1]):
+        for connection in _with_standard_kitaev_flavors(graph).neighbor_connections([1]):
             assert connection.flavor is not None
-            cosine = np.cos(phases[connection.flavor])
-            sine = np.sin(phases[connection.flavor])
+            flavor = KitaevBondFlavor(connection.flavor)
+            cosine = np.cos(phases[flavor])
+            sine = np.sin(phases[flavor])
             exchange = np.array(
                 [
                     [j_ab + coefficient_a * cosine, -coefficient_a * sine, -np.sqrt(2) * coefficient_b * cosine],
@@ -727,29 +746,35 @@ class TestModelHamiltonians:
 
     def test_kitaev_accumulates_periodic_flavor_collisions(self):
         graph = LatticeGraph.honeycomb(2, 2, periodic_x=True, periodic_y=True)
-        couplings = {BondFlavor.X: 4.0, BondFlavor.Y: 8.0, BondFlavor.Z: 12.0}
+        flavored_graph = _with_standard_kitaev_flavors(graph)
+        couplings = {KitaevBondFlavor.X: 4.0, KitaevBondFlavor.Y: 8.0, KitaevBondFlavor.Z: 12.0}
         hamiltonian = create_kitaev_hamiltonian(
             graph,
-            kx={3: couplings[BondFlavor.X]},
-            ky={3: couplings[BondFlavor.Y]},
-            kz={3: couplings[BondFlavor.Z]},
+            kx={3: couplings[KitaevBondFlavor.X]},
+            ky={3: couplings[KitaevBondFlavor.Y]},
+            kz={3: couplings[KitaevBondFlavor.Z]},
         )
         terms = _get_terms_dict(hamiltonian)
         expected: dict[str, float] = {}
-        pauli_for_flavor = {BondFlavor.X: "X", BondFlavor.Y: "Y", BondFlavor.Z: "Z"}
-        for connection in graph.neighbor_connections([3]):
+        pauli_for_flavor = {KitaevBondFlavor.X: "X", KitaevBondFlavor.Y: "Y", KitaevBondFlavor.Z: "Z"}
+        for connection in flavored_graph.neighbor_connections([3]):
             assert connection.flavor is not None
-            pauli_char = pauli_for_flavor[connection.flavor]
+            flavor = KitaevBondFlavor(connection.flavor)
+            pauli_char = pauli_for_flavor[flavor]
             pauli = ["I"] * graph.num_sites
             pauli[graph.num_sites - 1 - connection.site_i] = pauli_char
             pauli[graph.num_sites - 1 - connection.site_j] = pauli_char
             pauli_string = "".join(pauli)
-            expected[pauli_string] = expected.get(pauli_string, 0.0) + couplings[connection.flavor] / 4.0
+            expected[pauli_string] = expected.get(pauli_string, 0.0) + couplings[flavor] / 4.0
         assert terms == pytest.approx(expected, abs=float_comparison_absolute_tolerance)
 
     def test_kitaev_requires_flavored_connections(self):
-        with pytest.raises(ValueError, match="requires bond flavors"):
+        with pytest.raises(ValueError, match="requires X, Y, or Z flavor IDs"):
             create_kitaev_hamiltonian(LatticeGraph.square(3, 3), kx=1.0, ky=1.0, kz=1.0)
+
+        unsupported = LatticeGraph.square(3, 3).with_bond_flavors([BondFlavorDefinition(1, np.array([1.0, 0.0]), 1000)])
+        with pytest.raises(ValueError, match="requires X, Y, or Z flavor IDs"):
+            create_kitaev_hamiltonian(unsupported, kx=1.0, ky=1.0, kz=1.0)
 
         graph = LatticeGraph.honeycomb(3, 3)
         invalid_transforms = (
@@ -789,6 +814,36 @@ class TestModelHamiltonians:
         with pytest.raises(ValueError, match="bohr_magneton"):
             create_kitaev_hamiltonian(graph, 0.0, 0.0, 0.0, bohr_magneton=np.inf)
 
+    def test_kitaev_explicit_flavors_override_defaults(self):
+        graph = LatticeGraph.honeycomb_plaquettes(1, 1)
+        flavor_swap = {
+            KitaevBondFlavor.X: KitaevBondFlavor.Z,
+            KitaevBondFlavor.Y: KitaevBondFlavor.Y,
+            KitaevBondFlavor.Z: KitaevBondFlavor.X,
+        }
+        swapped = graph.with_bond_flavors(
+            [
+                BondFlavorDefinition(
+                    definition.shell,
+                    definition.axis,
+                    flavor_swap[KitaevBondFlavor(definition.flavor)],
+                )
+                for definition in kitaev_honeycomb_bond_flavors()
+            ]
+        )
+
+        actual = _get_terms_dict(create_kitaev_hamiltonian(swapped, 4.0, 0.0, 0.0, include_term_groups=False))
+        expected = {}
+        for connection in swapped.neighbor_connections([1]):
+            if connection.flavor != KitaevBondFlavor.X:
+                continue
+            pauli = ["I"] * graph.num_sites
+            pauli[graph.num_sites - 1 - connection.site_i] = "X"
+            pauli[graph.num_sites - 1 - connection.site_j] = "X"
+            expected["".join(pauli)] = 1.0
+
+        assert actual == expected
+
     def test_kitaev_without_interactions_does_not_require_geometry(self):
         graph = LatticeGraph.from_dense_matrix(np.zeros((2, 2)))
         zero = create_kitaev_hamiltonian(graph, 0.0, 0.0, 0.0)
@@ -822,20 +877,20 @@ class TestModelHamiltonians:
     def test_kitaev_open_hexagon_matches_explicit_matrix(self):
         graph = LatticeGraph.honeycomb_plaquettes(1, 1)
         bonds = {
-            (1, BondFlavor.X): {(0, 1), (4, 5)},
-            (1, BondFlavor.Y): {(0, 3), (2, 5)},
-            (1, BondFlavor.Z): {(1, 2), (3, 4)},
-            (2, BondFlavor.X): {(0, 4), (1, 5)},
-            (2, BondFlavor.Y): {(0, 2), (3, 5)},
-            (2, BondFlavor.Z): {(1, 3), (2, 4)},
-            (3, BondFlavor.X): {(2, 3)},
-            (3, BondFlavor.Y): {(1, 4)},
-            (3, BondFlavor.Z): {(0, 5)},
+            (1, KitaevBondFlavor.X): {(0, 1), (4, 5)},
+            (1, KitaevBondFlavor.Y): {(0, 3), (2, 5)},
+            (1, KitaevBondFlavor.Z): {(1, 2), (3, 4)},
+            (2, KitaevBondFlavor.X): {(0, 4), (1, 5)},
+            (2, KitaevBondFlavor.Y): {(0, 2), (3, 5)},
+            (2, KitaevBondFlavor.Z): {(1, 3), (2, 4)},
+            (3, KitaevBondFlavor.X): {(2, 3)},
+            (3, KitaevBondFlavor.Y): {(1, 4)},
+            (3, KitaevBondFlavor.Z): {(0, 5)},
         }
-        actual_bonds: dict[tuple[int, BondFlavor], set[tuple[int, int]]] = {}
-        for connection in graph.neighbor_connections([1, 2, 3]):
+        actual_bonds: dict[tuple[int, KitaevBondFlavor], set[tuple[int, int]]] = {}
+        for connection in _with_standard_kitaev_flavors(graph).neighbor_connections([1, 2, 3]):
             assert connection.flavor is not None
-            key = (connection.bond_class.shell, connection.flavor)
+            key = (connection.bond_class.shell, KitaevBondFlavor(connection.flavor))
             actual_bonds.setdefault(key, set()).add((connection.site_i, connection.site_j))
         assert actual_bonds == bonds
 
@@ -898,7 +953,7 @@ class TestModelHamiltonians:
             return result
 
         expected = np.zeros((64, 64), dtype=complex)
-        flavor_index = {BondFlavor.X: 0, BondFlavor.Y: 1, BondFlavor.Z: 2}
+        flavor_index = {KitaevBondFlavor.X: 0, KitaevBondFlavor.Y: 1, KitaevBondFlavor.Z: 2}
         components = "XYZ"
         for (shell, flavor), pairs in bonds.items():
             selected = flavor_index[flavor]

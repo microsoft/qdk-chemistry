@@ -268,21 +268,15 @@ The number of orientations depends on the geometry: a chain has one orientation 
 Distinct periodic-image connections remain distinct even when they project onto the same canonical finite-lattice site pair.
 By contrast, ``mth_nearest_neighbors()`` and ``nearest_neighbor_shells()`` intentionally deduplicate those connections and continue to return canonical pairs.
 
-Semantic bond flavors are optional labels on geometric shell-axis classes.
-Use :class:`~qdk_chemistry.data.BondFlavorDefinition` and ``with_bond_flavors()`` to label classes on another embedded lattice.
+Semantic bond flavors are optional non-negative integer IDs on geometric shell-axis classes.
+Use :class:`~qdk_chemistry.data.BondFlavorDefinition` and ``with_bond_flavors()`` to attach model-specific meanings to any embedded lattice.
+For example, a square lattice can assign four independent IDs to horizontal and vertical first-neighbor bonds and the two diagonal second-neighbor axes.
 Unlabeled lattices retain all shell and orientation functionality, and their connection ``flavor`` properties are ``None``.
 
-The honeycomb factory predefines :class:`~qdk_chemistry.data.BondFlavor` labels ``X``, ``Y``, and ``Z`` for the standard axes at distances :math:`1`, :math:`\sqrt{3}`, and :math:`2`.
-Thus each honeycomb shell decomposes as
-
-.. math::
-
-   N_m = X_m \cup Y_m \cup Z_m,
-
-when those distances are present as shells :math:`m=1,2,3`.
-An interior site has one connection of each flavor in shells 1 and 3, and two connections of each flavor in shell 2.
-These labels are physical model metadata and remain distinct from ``edge_coloring``, whose colors describe conflict-free scheduling layers.
-On narrow finite patches, one of the standard distances can be absent. Because shell indices rank the distances present in that finite graph, a later distance that occupies the same rank remains unlabeled rather than being assigned a different physical honeycomb flavor.
+Lattice factories provide geometry rather than model-specific flavor semantics.
+A model builder may supply defaults for a known geometry or interpret caller-provided IDs.
+For example, the :doc:`Kitaev model builder <../model_hamiltonians>` maps IDs 0, 1, and 2 to its X, Y, and Z spin interactions.
+Flavor IDs remain distinct from ``edge_coloring``, whose colors describe conflict-free scheduling layers.
 
 Built-in lattice embeddings
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

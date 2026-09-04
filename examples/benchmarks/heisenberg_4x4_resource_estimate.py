@@ -1,4 +1,4 @@
-"""Estimate resources for time evolution of an open 4x4 Kitaev patch."""
+"""Estimate resources for time evolution of an open 4x4 J1-J2 Heisenberg model."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -18,12 +18,12 @@ from qdk_chemistry.data import (
     QubitOperator,
 )
 from qdk_chemistry.utils import Logger
-from qdk_chemistry.utils.model_hamiltonians import create_kitaev_hamiltonian
+from qdk_chemistry.utils.model_hamiltonians import create_heisenberg_hamiltonian
 
 
 def create_lattice() -> LatticeGraph:
-    """Create the open 4x4 complete-plaquette patch in the default orientation."""
-    return LatticeGraph.honeycomb_plaquettes(
+    """Create the open 4x4 square lattice."""
+    return LatticeGraph.square(
         4,
         4,
         periodic_x=False,
@@ -32,27 +32,15 @@ def create_lattice() -> LatticeGraph:
 
 
 def create_hamiltonian(graph: LatticeGraph) -> QubitOperator:
-    """Create the extended Kitaev Hamiltonian used by the smaller benchmarks."""
-    crystallographic_transform = np.array(
-        [
-            [1.0 / np.sqrt(6.0), 1.0 / np.sqrt(6.0), -2.0 / np.sqrt(6.0)],
-            [-1.0 / np.sqrt(2.0), 1.0 / np.sqrt(2.0), 0.0],
-            [1.0 / np.sqrt(3.0), 1.0 / np.sqrt(3.0), 1.0 / np.sqrt(3.0)],
-        ]
-    )
-    kitaev_couplings = {1: -13.3, 2: -0.67, 3: 0.1}  # meV
-    return create_kitaev_hamiltonian(
+    r"""Create the J1-J2 model with physical spins S = sigma / 2."""
+    j1 = 1.0
+    j2 = 0.5
+    pauli_couplings = {1: j1 / 4.0, 2: j2 / 4.0}
+    return create_heisenberg_hamiltonian(
         graph,
-        kx=kitaev_couplings,
-        ky=kitaev_couplings,
-        kz=kitaev_couplings,
-        j={1: -1.3, 3: 1.0},  # meV; omitted J2 is zero
-        gamma=9.4,  # meV
-        gamma_prime=-2.3,  # meV
-        magnetic_field_abc=(0.0, 10.0, 0.0),  # tesla; H_b = 10 T
-        g_factors_abc=(2.3, 2.3, 1.3),
-        bohr_magneton=5.988e-2,  # meV/T
-        crystallographic_transform=crystallographic_transform,
+        jx=pauli_couplings,
+        jy=pauli_couplings,
+        jz=pauli_couplings,
         include_term_groups=False,
     )
 
@@ -89,13 +77,22 @@ def build_time_evolution_circuit(
 
 
 def main() -> None:
-    """Build and estimate the 4x4 time-evolution circuit with QRE."""
+    """Build and estimate the 4x4 J1-J2 Heisenberg circuit with QRE."""
     Logger.set_global_level(Logger.LogLevel.off)
 
+    j1 = 1.0
+    j2 = 0.5
     dt = 1.0
     total_time = 100.0
     graph = create_lattice()
+    shells = graph.nearest_neighbor_shells([1, 2])
     hamiltonian = create_hamiltonian(graph)
+
+    if {shell: len(pairs) for shell, pairs in shells.items()} != {1: 24, 2: 18}:
+        raise RuntimeError("The open 4x4 square lattice has unexpected shell counts.")
+    if len(hamiltonian.pauli_strings) != 126:
+        raise RuntimeError("The J1-J2 Hamiltonian has an unexpected term count.")
+
     circuit = build_time_evolution_circuit(
         hamiltonian,
         dt=dt,
@@ -107,8 +104,13 @@ def main() -> None:
         num_qubits=graph.num_sites,
     )
 
-    print("Open 4x4 complete-plaquette Kitaev benchmark")
+    print("Open 4x4 J1-J2 Heisenberg benchmark")
     print(f"Sites: {graph.num_sites}")
+    print(
+        f"Geometric shell counts: { {shell: len(pairs) for shell, pairs in shells.items()} }"
+    )
+    print(f"Physical couplings: J1={j1}, J2={j2}")
+    print(f"Hamiltonian Pauli terms: {len(hamiltonian.pauli_strings)}")
     print(f"Spin basis rotation direction: {spin_direction.tolist()}")
     print(f"Evolution: total_time={total_time}, dt={dt}, Trotter order=4, divisions=1")
 
@@ -123,7 +125,7 @@ def main() -> None:
         architecture,
         isa_query,
         max_error=0.01,
-        name="Kitaev 4x4",
+        name="Heisenberg 4x4",
     )
     results.add_factory_summary_column()
 

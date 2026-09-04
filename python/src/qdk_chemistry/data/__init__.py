@@ -12,8 +12,7 @@ Exposed classes are:
 - :class:`AOType`: Enumeration of basis set types (STO-3G, 6-31G, etc.).
 - :class:`BasisSet`: Gaussian basis set definitions for quantum calculations.
 - :class:`BondClass`: Geometric neighbor shell and unoriented bond-axis class.
-- :class:`BondFlavor`: Optional X, Y, or Z semantic label for a geometric bond class.
-- :class:`BondFlavorDefinition`: Mapping from one shell-axis class to a semantic bond flavor.
+- :class:`BondFlavorDefinition`: Mapping from one shell-axis class to an opaque semantic flavor ID.
 - :class:`CanonicalFourCenterHamiltonianContainer`: Container for four-center two-electron integrals in canonical form.
 - :class:`CholeskyHamiltonianContainer`: Container for Hamiltonians represented using Cholesky-decomposed integrals.
 - :class:`Circuit`: Quantum circuit information.
@@ -79,7 +78,6 @@ from qdk_chemistry._core.data import (
     AOType,
     BasisSet,
     BondClass,
-    BondFlavor,
     BondFlavorDefinition,
     CanonicalFourCenterHamiltonianContainer,
     CholeskyHamiltonianContainer,
@@ -152,7 +150,6 @@ __all__ = [
     "Ansatz",
     "BasisSet",
     "BondClass",
-    "BondFlavor",
     "BondFlavorDefinition",
     "CanonicalFourCenterHamiltonianContainer",
     "CholeskyHamiltonianContainer",

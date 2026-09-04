@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 from collections.abc import Iterable, Mapping
+from enum import IntEnum
 from numbers import Integral
 
 import numpy as np
@@ -20,20 +21,46 @@ from qdk_chemistry._core.utils.model_hamiltonians import (
     to_pair_param,
     to_site_param,
 )
-from qdk_chemistry.data import BondFlavor, LatticeGraph, LayeredPartition, QubitOperator
+from qdk_chemistry.data import BondFlavorDefinition, LatticeGraph, LayeredPartition, QubitOperator
 from qdk_chemistry.utils import Logger
 
 __all__ = [
+    "KitaevBondFlavor",
     "create_heisenberg_hamiltonian",
     "create_hubbard_hamiltonian",
     "create_huckel_hamiltonian",
     "create_ising_hamiltonian",
     "create_kitaev_hamiltonian",
     "create_ppp_hamiltonian",
+    "kitaev_honeycomb_bond_flavors",
     "mataga_nishimoto_potential",
     "ohno_potential",
     "pairwise_potential",
 ]
+
+
+class KitaevBondFlavor(IntEnum):
+    """Spin component selected by a Kitaev bond."""
+
+    X = 0
+    Y = 1
+    Z = 2
+
+
+def kitaev_honeycomb_bond_flavors() -> list[BondFlavorDefinition]:
+    """Return the standard honeycomb shell-axis flavor mapping."""
+    root_three = np.sqrt(3.0)
+    return [
+        BondFlavorDefinition(1, np.array([0.5, root_three / 2]), KitaevBondFlavor.X),
+        BondFlavorDefinition(1, np.array([0.5, -root_three / 2]), KitaevBondFlavor.Y),
+        BondFlavorDefinition(1, np.array([1.0, 0.0]), KitaevBondFlavor.Z),
+        BondFlavorDefinition(2, np.array([1.5, -root_three / 2]), KitaevBondFlavor.X),
+        BondFlavorDefinition(2, np.array([1.5, root_three / 2]), KitaevBondFlavor.Y),
+        BondFlavorDefinition(2, np.array([0.0, root_three]), KitaevBondFlavor.Z),
+        BondFlavorDefinition(3, np.array([1.0, root_three]), KitaevBondFlavor.X),
+        BondFlavorDefinition(3, np.array([1.0, -root_three]), KitaevBondFlavor.Y),
+        BondFlavorDefinition(3, np.array([2.0, 0.0]), KitaevBondFlavor.Z),
+    ]
 
 
 def _build_geometry_grouped_hamiltonian(
@@ -413,14 +440,14 @@ def create_kitaev_hamiltonian(
         prepared[name] = normalized
 
     gamma_parameters = {
-        BondFlavor.X: pair_parameter(gamma if gamma_x is None else gamma_x, "gamma_x"),
-        BondFlavor.Y: pair_parameter(gamma if gamma_y is None else gamma_y, "gamma_y"),
-        BondFlavor.Z: pair_parameter(gamma if gamma_z is None else gamma_z, "gamma_z"),
+        KitaevBondFlavor.X: pair_parameter(gamma if gamma_x is None else gamma_x, "gamma_x"),
+        KitaevBondFlavor.Y: pair_parameter(gamma if gamma_y is None else gamma_y, "gamma_y"),
+        KitaevBondFlavor.Z: pair_parameter(gamma if gamma_z is None else gamma_z, "gamma_z"),
     }
     gamma_prime_parameters = {
-        BondFlavor.X: pair_parameter(gamma_prime if gamma_prime_x is None else gamma_prime_x, "gamma_prime_x"),
-        BondFlavor.Y: pair_parameter(gamma_prime if gamma_prime_y is None else gamma_prime_y, "gamma_prime_y"),
-        BondFlavor.Z: pair_parameter(gamma_prime if gamma_prime_z is None else gamma_prime_z, "gamma_prime_z"),
+        KitaevBondFlavor.X: pair_parameter(gamma_prime if gamma_prime_x is None else gamma_prime_x, "gamma_prime_x"),
+        KitaevBondFlavor.Y: pair_parameter(gamma_prime if gamma_prime_y is None else gamma_prime_y, "gamma_prime_y"),
+        KitaevBondFlavor.Z: pair_parameter(gamma_prime if gamma_prime_z is None else gamma_prime_z, "gamma_prime_z"),
     }
     if any(np.any(value != 0.0) for value in (*gamma_parameters.values(), *gamma_prime_parameters.values())):
         requested_shells.add(1)
@@ -445,9 +472,18 @@ def create_kitaev_hamiltonian(
         weighted_field_xyz = crystal_transform.T @ weighted_field_abc
         output_field = bohr_magneton * transform @ weighted_field_xyz / 2.0
 
-    connections = graph.neighbor_connections(sorted(requested_shells))
-    if any(connection.flavor is None for connection in connections):
-        raise ValueError("The Kitaev Hamiltonian requires bond flavors for every requested geometric connection.")
+    model_graph = (
+        graph.with_bond_flavors(kitaev_honeycomb_bond_flavors())
+        if requested_shells and graph.positions is not None and not graph.bond_flavor_definitions
+        else graph
+    )
+    connections = model_graph.neighbor_connections(sorted(requested_shells))
+    try:
+        connection_flavors = [KitaevBondFlavor(connection.flavor) for connection in connections]
+    except (TypeError, ValueError) as error:
+        raise ValueError(
+            "The Kitaev Hamiltonian requires X, Y, or Z flavor IDs for every requested geometric connection."
+        ) from error
     if any(connection.site_i == connection.site_j for connection in connections):
         raise ValueError("Kitaev interactions cannot connect a site to its own periodic image.")
 
@@ -468,25 +504,24 @@ def create_kitaev_hamiltonian(
             result *= graph.weight(*pair) / shell_one_multiplicity[pair]
         return float(result)
 
-    def nearest_neighbor_value(values: dict[BondFlavor, np.ndarray | float], connection) -> float:
+    def nearest_neighbor_value(
+        values: dict[KitaevBondFlavor, np.ndarray | float], connection, flavor: KitaevBondFlavor
+    ) -> float:
         if connection.bond_class.shell != 1:
             return 0.0
-        assert connection.flavor is not None
-        value = values[connection.flavor]
+        value = values[flavor]
         result = value if isinstance(value, float) else value[connection.site_i, connection.site_j]
         pair = (connection.site_i, connection.site_j)
         return float(result * graph.weight(*pair) / shell_one_multiplicity[pair])
 
-    flavor_indices = {BondFlavor.X: 0, BondFlavor.Y: 1, BondFlavor.Z: 2}
     exchange_by_pair: dict[tuple[int, int], np.ndarray] = {}
-    for connection in connections:
-        assert connection.flavor is not None
-        flavor_index = flavor_indices[connection.flavor]
+    for connection, flavor in zip(connections, connection_flavors, strict=True):
+        flavor_index = int(flavor)
         other_indices = tuple(index for index in range(3) if index != flavor_index)
         exchange = np.eye(3) * parameter_value("j", connection)
-        exchange[flavor_index, flavor_index] += parameter_value("k" + connection.flavor.name.lower(), connection)
-        gamma_value = nearest_neighbor_value(gamma_parameters, connection)
-        gamma_prime_value = nearest_neighbor_value(gamma_prime_parameters, connection)
+        exchange[flavor_index, flavor_index] += parameter_value("k" + flavor.name.lower(), connection)
+        gamma_value = nearest_neighbor_value(gamma_parameters, connection, flavor)
+        gamma_prime_value = nearest_neighbor_value(gamma_prime_parameters, connection, flavor)
         exchange[other_indices[0], other_indices[1]] = gamma_value
         exchange[other_indices[1], other_indices[0]] = gamma_value
         for other_index in other_indices:

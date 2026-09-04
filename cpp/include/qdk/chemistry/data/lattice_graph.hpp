@@ -28,9 +28,8 @@ namespace qdk::chemistry::data {
  */
 using EdgeColoring = std::map<std::pair<std::uint64_t, std::uint64_t>, int>;
 
-/** @brief Semantic spin-interaction flavor assigned to a geometric bond class.
- */
-enum class BondFlavor : std::uint8_t { X, Y, Z };
+/** @brief Opaque semantic label assigned to a geometric bond class. */
+using BondFlavorId = std::uint32_t;
 
 /** @brief A radial shell and unoriented geometric bond-axis class. */
 struct BondClass {
@@ -43,7 +42,7 @@ struct BondClass {
 struct BondFlavorDefinition {
   std::uint64_t shell;
   Eigen::RowVector2d axis;
-  BondFlavor flavor;
+  BondFlavorId flavor;
 };
 
 /** @brief One physical lattice connection, including its periodic image. */
@@ -53,7 +52,7 @@ struct NeighborConnection {
   BondClass bond_class;
   Eigen::RowVector2d displacement;
   std::array<std::int64_t, 2> image_shift;
-  std::optional<BondFlavor> flavor;
+  std::optional<BondFlavorId> flavor;
 };
 
 // ---- Free coloring functions ------------------------------------------------

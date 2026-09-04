@@ -311,8 +311,9 @@ Scalar and array parameters retain adjacency-based nearest-neighbor behavior and
 A mapping ``{m: coupling}`` selects geometric shell :math:`m` independently of adjacency weights.
 The shared ``gamma`` and ``gamma_prime`` arguments provide isotropic defaults; ``gamma_x``, ``gamma_y``, ``gamma_z`` and their primed counterparts override individual flavors.
 
-The lattice must provide semantic flavors for every selected :class:`~qdk_chemistry.data.NeighborConnection`.
-The honeycomb factory supplies ``X``, ``Y``, and ``Z`` labels for the standard first-, second-, and third-neighbor axes when those physical distances are present in the finite lattice.
+The builder interprets :class:`~qdk_chemistry.utils.model_hamiltonians.KitaevBondFlavor` values X, Y, and Z as flavor IDs 0, 1, and 2.
+When a graph has no flavor definitions, the builder applies :func:`~qdk_chemistry.utils.model_hamiltonians.kitaev_honeycomb_bond_flavors` to a temporary graph copy.
+Caller-provided flavor definitions override that default and must assign one of those three IDs to every selected :class:`~qdk_chemistry.data.NeighborConnection`.
 When distinct periodic images collapse onto one finite-lattice pair, their exchange contributions are accumulated rather than discarded.
 
 The magnetic field and diagonal g factors are supplied in a crystallographic :math:`(a,b,c)` frame.

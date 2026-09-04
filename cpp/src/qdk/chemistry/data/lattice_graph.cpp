@@ -70,21 +70,6 @@ std::optional<Eigen::MatrixXd> lattice_periods(
   return periods;
 }
 
-std::vector<BondFlavorDefinition> honeycomb_bond_flavor_definitions() {
-  const double root_three = std::sqrt(3.0);
-  return {
-      {1, {0.5, root_three / 2.0}, BondFlavor::X},
-      {1, {0.5, -root_three / 2.0}, BondFlavor::Y},
-      {1, {1.0, 0.0}, BondFlavor::Z},
-      {2, {1.5, -root_three / 2.0}, BondFlavor::X},
-      {2, {1.5, root_three / 2.0}, BondFlavor::Y},
-      {2, {0.0, root_three}, BondFlavor::Z},
-      {3, {1.0, root_three}, BondFlavor::X},
-      {3, {1.0, -root_three}, BondFlavor::Y},
-      {3, {2.0, 0.0}, BondFlavor::Z},
-  };
-}
-
 /**
  * @brief Depth-first search (DFS) helper to find a Hamiltonian path in a sparse
  * graph.
@@ -778,7 +763,7 @@ std::vector<NeighborConnection> LatticeGraph::neighbor_connections(
           const Eigen::RowVector2d difference = existing - axis;
           return blas::nrm2(2, difference.data(), 1) <= tolerance;
         })));
-    std::optional<BondFlavor> flavor;
+    std::optional<BondFlavorId> flavor;
     for (const auto& definition : _bond_flavor_definitions) {
       if (definition.shell != candidate.shell) continue;
       const Eigen::RowVector2d difference = definition.axis - axis;
@@ -1126,8 +1111,7 @@ LatticeGraph LatticeGraph::_honeycomb(std::uint64_t num_cells_x,
 
   return LatticeGraph(std::move(adj), std::move(coloring), std::move(positions),
                       detail::lattice_periods((periodic_x ? Nx : 0) * a1,
-                                              (periodic_y ? Ny : 0) * a2),
-                      detail::honeycomb_bond_flavor_definitions());
+                                              (periodic_y ? Ny : 0) * a2));
 }
 
 LatticeGraph LatticeGraph::kagome(std::uint64_t nx, std::uint64_t ny,
@@ -1573,13 +1557,13 @@ void LatticeGraph::to_hdf5(H5::Group& group) const {
     if (!_bond_flavor_definitions.empty()) {
       const auto count = static_cast<hsize_t>(_bond_flavor_definitions.size());
       std::vector<std::uint64_t> shells(count);
-      std::vector<std::uint8_t> flavors(count);
+      std::vector<BondFlavorId> flavors(count);
       Eigen::MatrixXd axes(count, 2);
       for (hsize_t i = 0; i < count; ++i) {
         const auto& definition = _bond_flavor_definitions[i];
         shells[i] = definition.shell;
         axes.row(static_cast<Eigen::Index>(i)) = definition.axis;
-        flavors[i] = static_cast<std::uint8_t>(definition.flavor);
+        flavors[i] = definition.flavor;
       }
       H5::Group flavor_group = group.createGroup("bond_flavor_definitions");
       hsize_t dims[1] = {count};
@@ -1589,8 +1573,8 @@ void LatticeGraph::to_hdf5(H5::Group& group) const {
       shell_dataset.write(shells.data(), H5::PredType::NATIVE_UINT64);
       save_matrix_to_group(flavor_group, "axes", axes);
       auto flavor_dataset = flavor_group.createDataSet(
-          "flavors", H5::PredType::NATIVE_UINT8, space);
-      flavor_dataset.write(flavors.data(), H5::PredType::NATIVE_UINT8);
+          "flavors", H5::PredType::NATIVE_UINT32, space);
+      flavor_dataset.write(flavors.data(), H5::PredType::NATIVE_UINT32);
     }
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error in LatticeGraph::to_hdf5: " +
@@ -1703,13 +1687,13 @@ LatticeGraph LatticeGraph::from_json(const nlohmann::json& j) {
       }
       const auto shell = entry[0].get<std::uint64_t>();
       const auto flavor = entry[3].get<std::uint64_t>();
-      if (shell == 0 || flavor > static_cast<std::uint8_t>(BondFlavor::Z)) {
+      if (shell == 0 || flavor > std::numeric_limits<BondFlavorId>::max()) {
         throw std::runtime_error(
             "Invalid bond-flavor definition in JSON data.");
       }
       bond_flavors.push_back({shell,
                               {entry[1].get<double>(), entry[2].get<double>()},
-                              static_cast<BondFlavor>(flavor)});
+                              static_cast<BondFlavorId>(flavor)});
     }
   }
 
@@ -1849,19 +1833,19 @@ LatticeGraph LatticeGraph::from_hdf5(H5::Group& group) {
       throw std::runtime_error("Invalid bond-flavor dataset shape or type.");
     }
     std::vector<std::uint64_t> shells(shell_dims[0]);
-    std::vector<std::uint8_t> flavors(shell_dims[0]);
+    std::vector<std::uint64_t> flavors(shell_dims[0]);
     Eigen::MatrixXd axes(shell_dims[0], 2);
     shell_dataset.read(shells.data(), H5::PredType::NATIVE_UINT64);
     axis_dataset.read(axes.data(), H5::PredType::NATIVE_DOUBLE);
-    flavor_dataset.read(flavors.data(), H5::PredType::NATIVE_UINT8);
+    flavor_dataset.read(flavors.data(), H5::PredType::NATIVE_UINT64);
     for (hsize_t i = 0; i < shell_dims[0]; ++i) {
       if (shells[i] == 0 ||
-          flavors[i] > static_cast<std::uint8_t>(BondFlavor::Z)) {
+          flavors[i] > std::numeric_limits<BondFlavorId>::max()) {
         throw std::runtime_error(
             "Invalid bond-flavor definition in HDF5 data.");
       }
       bond_flavors.push_back(
-          {shells[i], axes.row(i), static_cast<BondFlavor>(flavors[i])});
+          {shells[i], axes.row(i), static_cast<BondFlavorId>(flavors[i])});
     }
   }
 
@@ -1886,7 +1870,7 @@ void LatticeGraph::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
   for (const auto& definition : _bond_flavor_definitions) {
     hash_value(ctx, definition.shell);
     hash_value(ctx, definition.axis);
-    hash_value(ctx, static_cast<std::uint8_t>(definition.flavor));
+    hash_value(ctx, definition.flavor);
   }
 }
 

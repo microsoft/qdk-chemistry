@@ -57,12 +57,6 @@ void bind_lattice_graph(pybind11::module &m) {
 
   using qdk::chemistry::python::utils::bind_getter_as_property;
 
-  py::enum_<BondFlavor>(m, "BondFlavor", "Semantic bond flavor.")
-      .value("X", BondFlavor::X)
-      .value("Y", BondFlavor::Y)
-      .value("Z", BondFlavor::Z)
-      .export_values();
-
   py::class_<BondClass>(m, "BondClass", "Geometric shell and bond-axis class.")
       .def_property_readonly("shell",
                              [](const BondClass &self) { return self.shell; })
@@ -73,7 +67,7 @@ void bind_lattice_graph(pybind11::module &m) {
 
   py::class_<BondFlavorDefinition>(m, "BondFlavorDefinition",
                                    "Semantic label for a shell-axis class.")
-      .def(py::init<std::uint64_t, Eigen::RowVector2d, BondFlavor>(),
+      .def(py::init<std::uint64_t, Eigen::RowVector2d, BondFlavorId>(),
            py::arg("shell"), py::arg("axis"), py::arg("flavor"))
       .def_property_readonly(
           "shell", [](const BondFlavorDefinition &self) { return self.shell; })
