@@ -13,7 +13,7 @@ See :ref:`release-v2.2.0` for full details.
 - Remote algorithm execution and result caching: ``run()`` accepts ``remote`` and ``cache`` for serializable arguments and results, backed by a file-based request format and pluggable remote and cache backends
 - Remote backend for Microsoft Discovery, installed with the new ``discovery`` extra
 - Unary-iteration phase estimation (``phase_estimation`` / ``qdk_unary``) over a qubitized walk; execution currently requires the sparse-state simulator
-- Binary encoding for sparse-isometry state preparation, reducing the dense amplitude-loading width when :math:`\lceil \log_2 d \rceil` is smaller than the reduced support width, in exchange for lookup ancillas and CCZ operations
+- Binary encoding for sparse isometry state preparation, reducing the dense amplitude-loading width when :math:`\lceil \log_2 d \rceil` is smaller than the reduced support width, in exchange for lookup ancillas and CCZ operations
 - Controlled-SWAP circuit mapper (``controlled_circuit_mapper`` / ``cswap_pauli_sequence``) with a vacuum-annihilating term grouper and an additional system-sized vacuum register
 - Amplitude amplification (``amplitude_amplification`` / ``qdk_base``) with a registered QPE subspace-marking oracle
 - Gauge-fixing orbital localizer (``qdk_gauge_fixing``) that searches occupation-degenerate blocks for a lower mapped coefficient norm, and an active-space quantum-information orbital localizer (``qdk_active_space_qio``) that optimizes total single-orbital entropy

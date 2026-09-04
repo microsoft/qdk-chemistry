@@ -1,19 +1,24 @@
 """Sparse isometry module for quantum state preparation.
 
-This module implements sparse-isometry algorithms for quantum-circuit
-generation from electronic-structure wavefunctions. They reduce the binary
-support before loading amplitudes, then reconstruct the original occupation
-register. Complete circuit costs depend on the support structure and selected
-encoding strategy.
+This module implements sparse isometry algorithms for efficient quantum circuit
+generation from electronic structure wavefunctions. Sparse isometry methods
+leverage the sparsity of quantum states to create optimized circuits that
+prepare only the non-zero amplitude components, significantly reducing circuit
+depth and gate count compared to dense state preparation methods.
 
-**SparseIsometryStatePrep**: Sparse-isometry state-preparation method.
+**SparseIsometryStatePrep**: Enhanced sparse isometry method.
 This method performs duplicate row removal, all-ones row removal, and diagonal
 matrix rank reduction besides standard GF2 Gaussian elimination. It tracks both
-CNOT and X operations for circuit reconstruction.
+CNOT and X operations for optimal circuit reconstruction and can be more
+efficient than standard GF2 for matrices with specific structural patterns.
 
 The sparse isometry algorithms are particularly well-suited for quantum chemistry
 applications where electronic structure wavefunctions often have a small number of
 dominant determinants.
+
+The implementations prepare the same quantum state with much more efficient
+circuits, featuring significantly reduced gate counts and circuit depths
+compared to traditional isometry methods.
 
 Algorithm Details:
 

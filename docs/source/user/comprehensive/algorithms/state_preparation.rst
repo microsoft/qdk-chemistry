@@ -82,7 +82,7 @@ Sparse Isometry
 
 .. rubric:: Factory name: ``"sparse_isometry"``
 
-This method leverages sparsity in the target wavefunction. It is a modification of the original sparse-isometry work in :cite:`Malvetti2021`, and its QDK/Chemistry implementation is described in :cite:`Chen2026`. Its state-loading problem is governed by the determinant support and the width remaining after binary-matrix reduction rather than by the full :math:`2^n`-amplitude Hilbert space.
+This method is an optimized approach that leverages sparsity in the target wavefunction. It is a modification of the original sparse isometry work in :cite:`Malvetti2021`, and is native to QDK/Chemistry, described in :cite:`Chen2026`. By working only with the non-zero amplitudes, it substantially reduces circuit depth and gate count compared with dense methods, and is especially efficient for wavefunctions with sparse amplitude structure.
 
 .. rubric:: How it works
 
