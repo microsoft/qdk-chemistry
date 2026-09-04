@@ -4,8 +4,7 @@
 
 #pragma once
 
-#include <qdk/chemistry/algorithms/hamiltonian.hpp>
-#include <qdk/chemistry/data/hamiltonian.hpp>
+#include "hamiltonian.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
 
@@ -50,7 +49,7 @@ Eigen::MatrixXd build_K_from_cholesky(
 
 }  // namespace detail
 
-class CholeskyHamiltonianSettings : public qdk::chemistry::data::Settings {
+class CholeskyHamiltonianSettings : public HamiltonianSettings {
  public:
   CholeskyHamiltonianSettings() {
     set_default("cholesky_tolerance", 1e-8);

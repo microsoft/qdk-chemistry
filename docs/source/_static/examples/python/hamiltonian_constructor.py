@@ -63,10 +63,30 @@ print(hamiltonian.get_summary())
 ################################################################################
 
 ################################################################################
+# start-cell-x2c
+# Build a spin-free one-electron X2C Hamiltonian from all-electron orbitals.
+x2c_constructor = create(
+    "hamiltonian_constructor",
+    "qdk",
+    integral_dressing="x2c_1e",
+)
+x2c_hamiltonian = x2c_constructor.run(orbitals)
+
+# The same integral dressing can be combined with Cholesky storage.
+x2c_cholesky_constructor = create(
+    "hamiltonian_constructor",
+    "qdk_cholesky",
+    integral_dressing="x2c_1e",
+)
+x2c_cholesky_hamiltonian = x2c_cholesky_constructor.run(orbitals)
+# end-cell-x2c
+################################################################################
+
+################################################################################
 # start-cell-list-implementations
 from qdk_chemistry.algorithms import registry
 
 print(registry.available("hamiltonian_constructor"))
-# ['qdk']
+# ['qdk', 'qdk_cholesky']
 # end-cell-list-implementations
 ################################################################################

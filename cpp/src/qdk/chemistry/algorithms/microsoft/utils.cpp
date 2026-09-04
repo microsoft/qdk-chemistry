@@ -5,6 +5,7 @@
 #include "utils.hpp"
 
 #include <qdk/chemistry/scf/config.h>
+
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
 #include <mpi.h>
 #endif
