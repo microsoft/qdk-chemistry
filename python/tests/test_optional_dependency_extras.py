@@ -27,7 +27,7 @@ def test_jupyter_extra_excludes_plugins_and_includes_widget_support():
     jupyter_block = _get_optional_extra_block(pyproject_text, "jupyter")
     assert '"ipykernel>=6.0"' in jupyter_block
     assert '"pandas>=2.0.0"' in jupyter_block
-    assert '"qdk[jupyter]>=1.31.0"' in jupyter_block
+    assert '"qdk[jupyter]>=1.30.0"' in jupyter_block
     assert "qdk-chemistry[plugins]" not in jupyter_block
 
 
