@@ -14,6 +14,7 @@
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <string>
+#include <utility>
 
 #ifdef _OPENMP
 #include <omp.h>

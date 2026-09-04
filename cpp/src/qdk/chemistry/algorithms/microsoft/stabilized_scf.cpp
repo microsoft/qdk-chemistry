@@ -73,6 +73,16 @@ StabilizedScfSolver::_run_impl(std::shared_ptr<data::Structure> structure,
                                BasisOrGuessType basis_or_guess,
                                std::shared_ptr<data::AuxiliaryBasisCollection>
                                    auxiliary_basis_collection) const {
+  if (auxiliary_basis_collection &&
+      (auxiliary_basis_collection->has_auxiliary_basis(
+           data::AuxiliaryBasisRole::JFit) ||
+       auxiliary_basis_collection->has_auxiliary_basis(
+           data::AuxiliaryBasisRole::JKFit))) {
+    throw std::invalid_argument(
+        "Stabilized SCF does not support DF-J because stability analysis "
+        "requires conventional four-center Coulomb integrals");
+  }
+
   const int64_t max_stability_iterations =
       _settings->get<int64_t>("max_stability_iterations");
   const bool check_internal = _settings->get<bool>("check_internal");

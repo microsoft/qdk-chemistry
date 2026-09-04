@@ -85,9 +85,21 @@ AuxiliaryBasis::AuxiliaryBasis(std::string name, std::vector<Shell> shells,
       throw std::invalid_argument(
           "Auxiliary shells cannot use the ECP local-potential orbital type");
     }
+    const int angular_momentum = static_cast<int>(shell.orbital_type);
+    if (angular_momentum < 0 ||
+        angular_momentum > static_cast<int>(MAX_ORBITAL_ANGULAR_MOMENTUM)) {
+      throw std::invalid_argument(
+          "AuxiliaryBasis contains unsupported angular momentum");
+    }
     if (shell.exponents.size() == 0 || shell.coefficients.size() == 0 ||
         shell.exponents.size() != shell.coefficients.size()) {
       throw std::invalid_argument("AuxiliaryBasis contains an invalid shell");
+    }
+    if (!shell.exponents.allFinite() || !shell.coefficients.allFinite() ||
+        (shell.exponents.array() <= 0.0).any()) {
+      throw std::invalid_argument(
+          "Auxiliary shell exponents must be finite and positive, and "
+          "coefficients must be finite");
     }
   }
 
@@ -153,12 +165,13 @@ std::shared_ptr<AuxiliaryBasis> AuxiliaryBasis::from_basis_name(
   basis_name = detail::lowercase_basis_name(std::move(basis_name));
 
   std::vector<Shell> shells;
+  detail::BasisLibrary basis_library(basis_name);
   const auto nuclear_charges = structure->get_nuclear_charges();
   for (size_t atom_index = 0; atom_index < nuclear_charges.size();
        ++atom_index) {
     auto [atom_shells, ignored_ecp_shells, ignored_ecp_electrons] =
-        detail::get_basis_for_nuclear_charge(nuclear_charges[atom_index],
-                                             basis_name, atom_index);
+        basis_library.get_basis_for_nuclear_charge(nuclear_charges[atom_index],
+                                                   atom_index);
     clear_legacy_radial_powers(atom_shells);
     shells.insert(shells.end(), atom_shells.begin(), atom_shells.end());
   }
@@ -193,6 +206,7 @@ std::shared_ptr<AuxiliaryBasis> AuxiliaryBasis::from_index_map(
   }
 
   std::vector<Shell> shells;
+  std::map<std::string, detail::BasisLibrary> basis_libraries;
   const auto nuclear_charges = structure->get_nuclear_charges();
   for (size_t atom_index = 0; atom_index < nuclear_charges.size();
        ++atom_index) {
@@ -203,9 +217,10 @@ std::shared_ptr<AuxiliaryBasis> AuxiliaryBasis::from_index_map(
           std::to_string(atom_index));
     }
     std::string basis_name = detail::lowercase_basis_name(basis->second);
+    auto library = basis_libraries.try_emplace(basis_name, basis_name).first;
     auto [atom_shells, ignored_ecp_shells, ignored_ecp_electrons] =
-        detail::get_basis_for_nuclear_charge(nuclear_charges[atom_index],
-                                             basis_name, atom_index);
+        library->second.get_basis_for_nuclear_charge(
+            nuclear_charges[atom_index], atom_index);
     clear_legacy_radial_powers(atom_shells);
     shells.insert(shells.end(), atom_shells.begin(), atom_shells.end());
   }
@@ -294,6 +309,10 @@ void AuxiliaryBasis::to_json_file(const std::string& filename) const {
     throw std::runtime_error("Unable to open file for writing: " + validated);
   }
   output << to_json().dump(2);
+  output.flush();
+  if (!output) {
+    throw std::runtime_error("Unable to write JSON file: " + validated);
+  }
 }
 
 std::shared_ptr<AuxiliaryBasis> AuxiliaryBasis::from_json_file(
@@ -481,6 +500,10 @@ void AuxiliaryBasisCollection::to_json_file(const std::string& filename) const {
     throw std::runtime_error("Unable to open file for writing: " + validated);
   }
   output << to_json().dump(2);
+  output.flush();
+  if (!output) {
+    throw std::runtime_error("Unable to write JSON file: " + validated);
+  }
 }
 
 std::shared_ptr<AuxiliaryBasisCollection>

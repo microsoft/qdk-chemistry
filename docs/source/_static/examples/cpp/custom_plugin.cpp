@@ -48,7 +48,7 @@ class CustomScfSolver : public qdk::chemistry::algorithms::ScfSolver {
     auto external_mol = convert_to_external_format(structure);
 
     // Execute external calculation
-    auto basis = _settings->get<std::string>("basis_set");
+    const auto& basis = std::get<std::string>(basis_or_guess);
     auto [energy, external_orbitals] =
         external_package::run_scf(external_mol, basis);
 

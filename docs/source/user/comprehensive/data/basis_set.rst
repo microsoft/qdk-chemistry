@@ -98,7 +98,7 @@ The library supports three methods for loading basis sets:
 .. seealso::
    For a complete list of available basis sets, see the :doc:`Supported Basis Sets <../basis_functionals>` documentation.
 
-Primary and auxiliary bases are independent values constructed against the same molecular structure. Group auxiliary bases in an :class:`~qdk_chemistry.data.AuxiliaryBasisCollection`, keyed by role. The collection is an independent data model for future algorithm inputs and is not stored on the primary basis or wavefunction. Current algorithms do not consume it; computational integration such as density fitting is outside this feature:
+Primary and auxiliary bases are independent values constructed against the same molecular structure. Group auxiliary bases in an :class:`~qdk_chemistry.data.AuxiliaryBasisCollection`, keyed by role. The collection is not stored on the primary basis or wavefunction. The native ``qdk`` SCF implementation consumes ``JFIT`` and ``JKFIT`` entries for density-fitted Coulomb calculations; other roles remain available to algorithms that explicitly support them:
 
 .. tab:: C++ API
 

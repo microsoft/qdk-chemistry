@@ -17,6 +17,8 @@ from qdk_chemistry.data import (
     AuxiliaryBasisCollection,
     AuxiliaryBasisRole,
     BasisSet,
+    OrbitalType,
+    Shell,
     Structure,
 )
 from qdk_chemistry.utils import Logger
@@ -546,7 +548,30 @@ class TestScfSolverDfj:
         basis = BasisSet.from_basis_name("def2-svp", water)
         auxiliary_bases = _create_dfj_auxiliary_bases(water)
 
-        assert scf_solver.hash(water, 0, 1, basis) != scf_solver.hash(water, 0, 1, basis, auxiliary_bases)
+        baseline_hash = scf_solver.hash(water, 0, 1, basis)
+        assert baseline_hash == scf_solver.hash(water, 0, 1, basis, AuxiliaryBasisCollection())
+        assert baseline_hash != scf_solver.hash(water, 0, 1, basis, auxiliary_bases)
+
+    def test_oversized_auxiliary_contraction_is_rejected(self):
+        hydrogen = Structure(["H"], np.zeros((1, 3)))
+        oversized = AuxiliaryBasis(
+            "oversized",
+            [Shell(0, OrbitalType.S, np.arange(1.0, 66.0), np.ones(65))],
+            hydrogen,
+        )
+        auxiliary_bases = AuxiliaryBasisCollection({AuxiliaryBasisRole.JFIT: oversized})
+        scf_solver = algorithms.create("scf_solver", "qdk")
+
+        with pytest.raises(ValueError, match="internal limit"):
+            scf_solver.run(hydrogen, 0, 2, "sto-3g", auxiliary_bases)
+
+    def test_stabilized_scf_rejects_dfj(self):
+        water = _create_h2o_dfj_structure()
+        auxiliary_bases = _create_dfj_auxiliary_bases(water)
+        scf_solver = algorithms.create("scf_solver", "qdk_stabilized")
+
+        with pytest.raises(ValueError, match="Stabilized SCF does not support DF-J"):
+            scf_solver.run(water, 0, 1, "def2-svp", auxiliary_bases)
 
     def test_water_rhf_dfj(self):
         """Test RHF-DFJ on water with def2-svp / def2-universal-jfit."""

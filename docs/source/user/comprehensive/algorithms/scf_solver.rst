@@ -127,8 +127,10 @@ Density-fitted Coulomb integrals (DF-J)
 For larger molecules, evaluation of the four-center Coulomb (J) integrals becomes the computational bottleneck.
 Density fitting (also known as the resolution-of-the-identity approximation for J) replaces the expensive four-center integrals with a three-center expansion using an auxiliary basis set. With a suitable J-fitting basis, this can reduce the cost of constructing J while typically introducing only a small approximation error.
 
-To run an :term:`SCF` calculation with density fitting, pass an :class:`~qdk_chemistry.data.AuxiliaryBasisCollection` containing a ``JFit`` basis.
-The solver automatically enables DF-J when the collection can satisfy the ``JFit`` role and selects the required in-core Coulomb backend. An exact ``JFit`` association takes precedence, while ``JKFit`` is accepted as a compatible fallback. Without either role, the solver uses standard four-center integrals.
+To run an :term:`SCF` calculation with density fitting, pass an :class:`~qdk_chemistry.data.AuxiliaryBasisCollection` containing a ``JFit`` basis to the native ``qdk`` implementation.
+That implementation automatically enables DF-J when the collection can satisfy the ``JFit`` role and selects the required in-core Coulomb backend. An exact ``JFit`` association takes precedence, while ``JKFit`` is accepted as a compatible fallback. Without either role, the solver uses standard four-center integrals.
+
+The ``qdk_stabilized`` implementation currently rejects DF-J because its stability Hessian uses conventional four-center Coulomb integrals. The PySCF implementations also reject nonempty auxiliary-basis collections. Other plugin implementations may opt into auxiliary-basis support explicitly.
 
 .. tab:: C++ API
 
@@ -144,7 +146,7 @@ The solver automatically enables DF-J when the collection can satisfy the ``JFit
       :start-after: # start-cell-dfj
       :end-before: # end-cell-dfj
 
-.. note:: Supplying a ``JFit`` or ``JKFit`` auxiliary basis opts the calculation into DF-J; no separate integral-type setting is needed.
+.. note:: Supplying a ``JFit`` or ``JKFit`` auxiliary basis to the native ``qdk`` implementation opts the calculation into DF-J; no separate integral-type setting is needed.
 
 
 
@@ -311,7 +313,7 @@ This hybrid approach combines the speed of :term:`DIIS` for typical systems with
    * - ``eri_method``
      - string
      - ``"direct"``
-     - Electron repulsion integral evaluation method: ``"direct"`` (on-the-fly) or ``"incore"`` (precomputed). When using density fitting (DF-J), ``"incore"`` is required.
+     - Electron repulsion integral evaluation method for conventional calculations: ``"direct"`` (on-the-fly) or ``"incore"`` (precomputed). DF-J selects its in-core Coulomb backend automatically.
    * - ``fock_reset_steps``
      - int
      - ``1073741824``

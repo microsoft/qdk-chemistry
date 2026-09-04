@@ -8,12 +8,17 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <nlohmann/json.hpp>
+#include <random>
 #include <regex>
 #include <stdexcept>
+#include <utility>
 
 namespace qdk::chemistry::data::detail {
 
@@ -41,7 +46,25 @@ std::string lowercase_basis_name(std::string name) {
 
 namespace {
 
-std::filesystem::path unpack_basis_set_archive(std::string& basis_set_name) {
+class StagingDirectory {
+ public:
+  explicit StagingDirectory(std::filesystem::path path)
+      : _path(std::move(path)) {}
+
+  ~StagingDirectory() {
+    std::error_code error;
+    std::filesystem::remove_all(_path, error);
+  }
+
+  StagingDirectory(const StagingDirectory&) = delete;
+  StagingDirectory& operator=(const StagingDirectory&) = delete;
+
+ private:
+  std::filesystem::path _path;
+};
+
+std::filesystem::path unpack_basis_set_archive(
+    const std::string& basis_set_name) {
   std::string normalized_name = normalize_basis_set_name(basis_set_name);
   std::filesystem::path file_path =
       qdk::chemistry::scf::QDKChemistryConfig::get_resources_dir() /
@@ -52,10 +75,25 @@ std::filesystem::path unpack_basis_set_archive(std::string& basis_set_name) {
                                 file_path.string());
   }
 
-  std::filesystem::path temp_dir =
-      std::filesystem::temp_directory_path() / "qdk" / "chemistry";
-  if (!std::filesystem::exists(temp_dir)) {
-    std::filesystem::create_directories(temp_dir);
+  const std::filesystem::path temp_root =
+      std::filesystem::temp_directory_path() / "qdk" / "chemistry" /
+      "basis_loads";
+  std::filesystem::create_directories(temp_root);
+
+  std::random_device random;
+  std::filesystem::path temp_dir;
+  for (size_t attempt = 0; attempt < 100; ++attempt) {
+    temp_dir = temp_root / (normalized_name + "-" + std::to_string(random()) +
+                            "-" + std::to_string(attempt));
+    std::error_code error;
+    if (std::filesystem::create_directory(temp_dir, error)) {
+      break;
+    }
+    temp_dir.clear();
+  }
+  if (temp_dir.empty()) {
+    throw std::runtime_error(
+        "Unable to create a temporary basis extraction directory");
   }
 
   // GNU tar needs --force-local so "C:/..." is not read as host:path; BSD tar
@@ -71,42 +109,101 @@ std::filesystem::path unpack_basis_set_archive(std::string& basis_set_name) {
   auto command = tar_cmd + "\"" + file_path.generic_string() +
                  "\" --directory \"" + temp_dir.generic_string() + "\"";
   if (std::system(command.c_str()) != 0) {
+    std::error_code error;
+    std::filesystem::remove_all(temp_dir, error);
     throw std::runtime_error("command execution failed: " + command);
   }
 
   return temp_dir;
 }
 
-std::filesystem::path get_correct_basis_set_file(std::string& basis_set_name) {
-  std::filesystem::path temp_dir = unpack_basis_set_archive(basis_set_name);
-  std::string normalized_name = normalize_basis_set_name(basis_set_name);
-  std::filesystem::path json_file_path =
-      temp_dir / "basis" / (normalized_name + ".json");
-  if (!std::filesystem::exists(json_file_path)) {
-    throw std::invalid_argument("Basis set JSON file does not exist: " +
-                                json_file_path.string());
+std::filesystem::path basis_set_json_path(const std::filesystem::path& root,
+                                          const std::string& basis_set_name) {
+  return root / "basis" / (normalize_basis_set_name(basis_set_name) + ".json");
+}
+
+nlohmann::json read_basis_set_json(const std::filesystem::path& path) {
+  std::ifstream input(path);
+  if (!input) {
+    throw std::runtime_error("Unable to read basis set file: " + path.string());
   }
-  return json_file_path;
+  auto data = nlohmann::json::parse(input);
+  if (!data.contains("elements") || !data["elements"].is_object()) {
+    throw std::runtime_error("Basis set file has no elements object: " +
+                             path.string());
+  }
+  return data;
+}
+
+nlohmann::json load_basis_set_json(const std::string& basis_set_name) {
+  const std::filesystem::path cache_root =
+      std::filesystem::temp_directory_path() / "qdk" / "chemistry";
+  const std::filesystem::path cached_file =
+      basis_set_json_path(cache_root, basis_set_name);
+  if (std::filesystem::exists(cached_file)) {
+    return read_basis_set_json(cached_file);
+  }
+
+  const std::filesystem::path staging_root =
+      unpack_basis_set_archive(basis_set_name);
+  const StagingDirectory cleanup(staging_root);
+  const std::filesystem::path staged_file =
+      basis_set_json_path(staging_root, basis_set_name);
+  if (!std::filesystem::exists(staged_file)) {
+    throw std::invalid_argument("Basis set JSON file does not exist: " +
+                                staged_file.string());
+  }
+
+  auto data = read_basis_set_json(staged_file);
+  std::filesystem::create_directories(cached_file.parent_path());
+
+  std::error_code error;
+  std::filesystem::rename(staged_file, cached_file, error);
+  if (error && !std::filesystem::exists(cached_file)) {
+    throw std::runtime_error("Unable to publish basis set cache file: " +
+                             error.message());
+  }
+  return data;
 }
 
 }  // namespace
 
-std::tuple<std::vector<Shell>, std::vector<Shell>, size_t>
-get_basis_for_nuclear_charge(const double nuclear_charge,
-                             std::string basis_set_name,
-                             const size_t atom_index) {
-  std::filesystem::path json_file_path =
-      get_correct_basis_set_file(basis_set_name);
+BasisLibrary::BasisLibrary(std::string basis_set_name)
+    : _basis_set_name(lowercase_basis_name(std::move(basis_set_name))),
+      _data(load_basis_set_json(_basis_set_name)) {}
 
-  std::ifstream input(json_file_path);
-  auto data = nlohmann::json::parse(input);
+std::tuple<std::vector<Shell>, std::vector<Shell>, size_t>
+BasisLibrary::get_basis_for_nuclear_charge(const double nuclear_charge,
+                                           const size_t atom_index) const {
+  constexpr double integral_charge_tolerance = 1e-12;
+  const double rounded_charge = std::round(nuclear_charge);
+  if (!std::isfinite(nuclear_charge) || rounded_charge < 0.0 ||
+      std::abs(nuclear_charge - rounded_charge) > integral_charge_tolerance ||
+      rounded_charge >
+          static_cast<double>(std::numeric_limits<std::uint32_t>::max())) {
+    throw std::invalid_argument(
+        "Nuclear charges must be finite, nonnegative, and integral");
+  }
+
+  const auto nuclear_charge_string =
+      std::to_string(static_cast<std::uint32_t>(rounded_charge));
+  const auto& elements = _data.at("elements");
+  const auto element = elements.find(nuclear_charge_string);
+  if (element == elements.end() || !element->is_object() ||
+      !element->contains("electron_shells") ||
+      !element->at("electron_shells").is_array() ||
+      element->at("electron_shells").empty()) {
+    throw std::invalid_argument("Basis set '" + _basis_set_name +
+                                "' is not available for nuclear charge " +
+                                nuclear_charge_string);
+  }
+
+  const auto& element_data = *element;
   size_t num_ecp_electrons = 0;
   std::vector<Shell> ecp_shells;
   std::vector<Shell> shells;
-  auto nuclear_charge_string = std::to_string(static_cast<int>(nuclear_charge));
-  auto element_data = data["elements"][nuclear_charge_string];
 
-  for (const auto& shell : element_data["electron_shells"]) {
+  for (const auto& shell : element_data.at("electron_shells")) {
     for (size_t contraction = 0; contraction < shell["coefficients"].size();
          ++contraction) {
       size_t angular_momentum_size = shell["angular_momentum"].size();

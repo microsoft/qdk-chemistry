@@ -5,6 +5,7 @@
 #pragma once
 
 #include <cstddef>
+#include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/shell.hpp>
 #include <string>
 #include <tuple>
@@ -26,14 +27,25 @@ std::string denormalize_basis_set_name(const std::string& normalized);
 std::string lowercase_basis_name(std::string name);
 
 /**
- * @brief Read one atom's shells from the basis set library.
- * @param nuclear_charge Nuclear charge of the element
- * @param basis_set_name Name of the basis set to read
- * @param atom_index Atom the returned shells are centered on
- * @return Primary shells, ECP shells, and the number of replaced electrons
+ * @brief Parsed basis-library entry reusable across all atoms in a structure.
  */
-std::tuple<std::vector<Shell>, std::vector<Shell>, size_t>
-get_basis_for_nuclear_charge(double nuclear_charge, std::string basis_set_name,
-                             size_t atom_index);
+class BasisLibrary {
+ public:
+  explicit BasisLibrary(std::string basis_set_name);
+
+  /**
+   * @brief Read one atom's shells from the parsed basis entry.
+   * @param nuclear_charge Finite, nonnegative integral nuclear charge
+   * @param atom_index Atom the returned shells are centered on
+   * @return Primary shells, ECP shells, and replaced-electron count
+   * @throws std::invalid_argument if the charge is invalid or unsupported
+   */
+  std::tuple<std::vector<Shell>, std::vector<Shell>, size_t>
+  get_basis_for_nuclear_charge(double nuclear_charge, size_t atom_index) const;
+
+ private:
+  std::string _basis_set_name;
+  nlohmann::json _data;
+};
 
 }  // namespace qdk::chemistry::data::detail

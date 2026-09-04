@@ -137,6 +137,23 @@ def test_validation_rejects_invalid_construction_and_maps():
     with pytest.raises(ValueError, match="Basis set file does not exist"):
         AuxiliaryBasis.from_element_map({"H": basis_name, "O": "invalid-basis-set"}, water)
 
+    partially_supported = _make_structure(("H", "F"))
+    with pytest.raises(ValueError, match="not available for nuclear charge"):
+        AuxiliaryBasis.from_basis_name("6-31g-j", partially_supported)
+    with pytest.raises(ValueError, match="not available for nuclear charge"):
+        AuxiliaryBasis.from_element_map({"H": "6-31g-j", "F": "6-31g-j"}, partially_supported)
+    with pytest.raises(ValueError, match="not available for nuclear charge"):
+        AuxiliaryBasis.from_index_map({0: "6-31g-j", 1: "6-31g-j"}, partially_supported)
+
+    for exponents, coefficients in (
+        ([np.nan], [1.0]),
+        ([np.inf], [1.0]),
+        ([0.0], [1.0]),
+        ([1.0], [np.nan]),
+    ):
+        with pytest.raises(ValueError, match="finite and positive"):
+            AuxiliaryBasis([Shell(0, OrbitalType.S, exponents, coefficients)], structure)
+
 
 def test_content_hash_tracks_all_owned_data():
     structure = _make_structure()

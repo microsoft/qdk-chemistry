@@ -13,6 +13,7 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <regex>
+#include <vector>
 
 #include "test_common.h"
 #include "test_config.h"
@@ -75,3 +76,53 @@ TEST(basis, resources_dir_runtime_config) {
   EXPECT_EQ(QDKChemistryConfig::get_resources_dir(), original_dir);
 }
 // clang-format on
+
+TEST(basis, database_loader_rejects_oversized_contractions) {
+  const std::filesystem::path path = "oversized_basis.json";
+  const auto mol = make_molecule("h2o");
+  const std::vector<std::string> exponents(MAX_CONTRACTION + 1, "1.0");
+  const std::vector<std::string> coefficients(MAX_CONTRACTION + 1, "1.0");
+
+  nlohmann::json electron_shell = {
+      {"angular_momentum", nlohmann::json::array({0})},
+      {"exponents", exponents},
+      {"coefficients", nlohmann::json::array({coefficients})}};
+  nlohmann::json electron_element = {
+      {"electron_shells", nlohmann::json::array({electron_shell})}};
+  nlohmann::json data;
+  data["elements"]["1"] = electron_element;
+  data["elements"]["8"] = electron_element;
+  {
+    std::ofstream output(path);
+    output << data;
+  }
+  EXPECT_THROW(
+      BasisSet::from_database_json(mol, path.string(), BasisMode::RAW, true),
+      std::invalid_argument);
+
+  electron_shell["exponents"] = nlohmann::json::array({"1.0"});
+  electron_shell["coefficients"] =
+      nlohmann::json::array({nlohmann::json::array({"1.0"})});
+  nlohmann::json ecp_entry = {
+      {"ecp_type", "scalar_ecp"},
+      {"angular_momentum", nlohmann::json::array({0})},
+      {"gaussian_exponents", exponents},
+      {"coefficients", nlohmann::json::array({coefficients})},
+      {"r_exponents", std::vector<int>(MAX_CONTRACTION + 1, 0)}};
+  nlohmann::json ecp_element = {
+      {"electron_shells", nlohmann::json::array({electron_shell})},
+      {"ecp_electrons", 0},
+      {"ecp_potentials", nlohmann::json::array({ecp_entry})}};
+  data["elements"]["1"] = ecp_element;
+  data["elements"]["8"] = ecp_element;
+  {
+    std::ofstream output(path);
+    output << data;
+  }
+  EXPECT_THROW(
+      BasisSet::from_database_json(mol, path.string(), BasisMode::RAW, true),
+      std::invalid_argument);
+
+  std::error_code error;
+  std::filesystem::remove(path, error);
+}

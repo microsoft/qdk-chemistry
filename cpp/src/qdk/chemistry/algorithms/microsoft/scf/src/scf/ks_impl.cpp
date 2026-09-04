@@ -56,16 +56,19 @@ KSImpl::KSImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
 
   // Update SCFConfig w/ RSX data
   double omega;
+  bool needs_exchange;
   {
     double alpha, beta;
     std::tie(alpha, beta, omega) = get_hyb_coeff_();
+    needs_exchange = alpha != 0.0 || beta != 0.0;
   }
   if (cfg.do_dfj) {
     TIMEIT(eri_ = ERIMultiplexer::create(*ctx_.basis_set, *ctx_.aux_basis_set,
-                                         cfg, omega),
+                                         cfg, omega, needs_exchange),
            "SCFImpl::SCFImpl->ERI::create");
   } else {
-    TIMEIT(eri_ = ERIMultiplexer::create(*ctx_.basis_set, cfg, omega),
+    TIMEIT(eri_ = ERIMultiplexer::create(*ctx_.basis_set, cfg, omega,
+                                         needs_exchange),
            "SCFImpl::SCFImpl->ERI::create");
   }
 

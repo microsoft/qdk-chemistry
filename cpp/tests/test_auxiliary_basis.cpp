@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <limits>
 #include <map>
 #include <memory>
 #include <qdk/chemistry/data/auxiliary_basis.hpp>
@@ -170,6 +171,39 @@ TEST_F(AuxiliaryBasisTest, FactoryValidationRejectsBadMaps) {
                std::invalid_argument);
   EXPECT_THROW(AuxiliaryBasis::from_element_map(
                    {{"H", basis_name}, {"O", "invalid-basis-set"}}, structure),
+               std::invalid_argument);
+
+  auto partially_supported = make_structure({"H", "F"});
+  EXPECT_THROW(AuxiliaryBasis::from_basis_name("6-31g-j", partially_supported),
+               std::invalid_argument);
+  EXPECT_THROW(AuxiliaryBasis::from_element_map(
+                   {{"H", "6-31g-j"}, {"F", "6-31g-j"}}, partially_supported),
+               std::invalid_argument);
+  EXPECT_THROW(AuxiliaryBasis::from_index_map({{0, "6-31g-j"}, {1, "6-31g-j"}},
+                                              partially_supported),
+               std::invalid_argument);
+}
+
+TEST_F(AuxiliaryBasisTest, ConstructorRejectsNonfiniteShellData) {
+  auto structure = make_structure({"H"});
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  const double infinity = std::numeric_limits<double>::infinity();
+
+  EXPECT_THROW(AuxiliaryBasis({Shell(0, OrbitalType::S, std::vector{nan},
+                                     std::vector{1.0})},
+                              structure),
+               std::invalid_argument);
+  EXPECT_THROW(AuxiliaryBasis({Shell(0, OrbitalType::S, std::vector{infinity},
+                                     std::vector{1.0})},
+                              structure),
+               std::invalid_argument);
+  EXPECT_THROW(AuxiliaryBasis({Shell(0, OrbitalType::S, std::vector{1.0},
+                                     std::vector{nan})},
+                              structure),
+               std::invalid_argument);
+  EXPECT_THROW(AuxiliaryBasis({Shell(0, OrbitalType::S, std::vector{0.0},
+                                     std::vector{1.0})},
+                              structure),
                std::invalid_argument);
 }
 

@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
+#include <numeric>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/algorithms/stability.hpp>
@@ -1388,6 +1389,60 @@ TEST_F(ScfTest, AuxiliaryBasisConversionPreservesCartesianRepresentation) {
             auxiliary_basis->get_num_auxiliary_orbitals());
   EXPECT_EQ(internal_basis->atom_ecp_electrons,
             std::vector<int>(water->get_num_atoms(), 0));
+}
+
+TEST_F(ScfTest, AuxiliaryBasisConversionRejectsOversizedContraction) {
+  auto hydrogen = testing::create_hydrogen_structure();
+  std::vector<double> exponents(65);
+  std::iota(exponents.begin(), exponents.end(), 1.0);
+  std::vector<double> coefficients(65, 1.0);
+  AuxiliaryBasis auxiliary_basis(
+      "oversized", {Shell(0, OrbitalType::S, exponents, coefficients)},
+      hydrogen);
+
+  EXPECT_THROW(
+      qdk::chemistry::utils::microsoft::convert_auxiliary_basis_from_qdk(
+          auxiliary_basis),
+      std::invalid_argument);
+}
+
+TEST_F(ScfTest, AuxiliaryBasisConversionRejectsZeroNormContraction) {
+  auto hydrogen = testing::create_hydrogen_structure();
+  AuxiliaryBasis auxiliary_basis(
+      "zero-norm",
+      {Shell(0, OrbitalType::S, std::vector{1.0}, std::vector{0.0})}, hydrogen);
+
+  EXPECT_THROW(
+      qdk::chemistry::utils::microsoft::convert_auxiliary_basis_from_qdk(
+          auxiliary_basis),
+      std::runtime_error);
+}
+
+TEST_F(ScfTest, SingularDfjMetricIsRejected) {
+  auto hydrogen = testing::create_hydrogen_structure();
+  std::vector<Shell> duplicate_shells;
+  duplicate_shells.emplace_back(0, OrbitalType::S, std::vector{1.0},
+                                std::vector{1.0});
+  duplicate_shells.emplace_back(0, OrbitalType::S, std::vector{1.0},
+                                std::vector{1.0});
+  auto auxiliary_basis =
+      std::make_shared<AuxiliaryBasis>("singular", duplicate_shells, hydrogen);
+  auto auxiliary_bases =
+      std::make_shared<AuxiliaryBasisCollection>(AuxiliaryBasisCollection::Map{
+          {AuxiliaryBasisRole::JFit, auxiliary_basis}});
+  auto solver = ScfSolverFactory::create("qdk");
+
+  EXPECT_THROW(solver->run(hydrogen, 0, 2, "sto-3g", auxiliary_bases),
+               std::runtime_error);
+}
+
+TEST_F(ScfTest, StabilizedScfRejectsDfj) {
+  auto water = testing::create_h2o_dfj_structure();
+  auto auxiliary_bases = make_dfj_auxiliary_bases(water);
+  auto solver = ScfSolverFactory::create("qdk_stabilized");
+
+  EXPECT_THROW(solver->run(water, 0, 1, "def2-svp", auxiliary_bases),
+               std::invalid_argument);
 }
 
 TEST_F(ScfTest, WaterRhfDfj) {

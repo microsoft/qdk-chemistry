@@ -6,6 +6,7 @@
 #include <qdk/chemistry/scf/core/eri.h>
 
 #include <memory>
+#include <optional>
 
 namespace qdk::chemistry::scf {
 /**
@@ -33,6 +34,8 @@ class ERIMultiplexer : public ERI {
       grad_impl_;  ///< Implementation for gradient calculations
   std::shared_ptr<ERI>
       qt_impl_;  ///< Implementation for quarter transformations
+  std::optional<SCFConfig> deferred_qt_config_;
+  double omega_ = 0.0;
 
   /**
    * @brief Construct multiplexer without auxiliary basis
@@ -46,7 +49,8 @@ class ERIMultiplexer : public ERI {
    * @param omega Range-separation parameter for range-separated hybrid
    * functionals
    */
-  ERIMultiplexer(BasisSet& basis_set, const SCFConfig& cfg, double omega);
+  ERIMultiplexer(BasisSet& basis_set, const SCFConfig& cfg, double omega,
+                 bool needs_exchange = true);
 
   /**
    * @brief Construct multiplexer with auxiliary basis for density fitting
@@ -61,7 +65,8 @@ class ERIMultiplexer : public ERI {
    * functionals (bohr⁻¹)
    */
   ERIMultiplexer(BasisSet& basis_set, BasisSet& aux_basis_set,
-                 const SCFConfig& cfg, double omega);
+                 const SCFConfig& cfg, double omega,
+                 bool needs_exchange = true);
 
   /**
    * @brief Default constructor (deleted — base class ERI has no default ctor)

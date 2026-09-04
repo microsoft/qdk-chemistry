@@ -87,10 +87,22 @@ void DensityFittingBase::generate_metric() {
     if (!mpi_.world_rank) QDK_LOGGER().trace("Saving DF Metric in Host Memory");
 #if QDK_CHEMISTRY_DF_INV_METHOD == QDK_CHEMISTRY_DF_CHOLESKY
     // Cholesky factorization
-    lapack::potrf(lapack::Uplo::Lower, naux, h_metric_.get(), naux);
+    const auto info =
+        lapack::potrf(lapack::Uplo::Lower, naux, h_metric_.get(), naux);
+    if (info != 0) {
+      throw std::runtime_error(
+          info > 0 ? "Density-fitting metric is not positive definite; remove "
+                     "linearly dependent auxiliary functions"
+                   : "Density-fitting metric factorization received an invalid "
+                     "argument");
+    }
 #elif QDK_CHEMISTRY_DF_INV_METHOD == QDK_CHEMISTRY_DF_LU
   h_metric_ipiv_ = std::make_unique<int[]>(naux);
-  lapack::getrf(naux, naux, h_metric_.get(), naux, h_metric_ipiv_.get());
+  const auto info =
+      lapack::getrf(naux, naux, h_metric_.get(), naux, h_metric_ipiv_.get());
+  if (info != 0) {
+    throw std::runtime_error("Density-fitting metric factorization failed");
+  }
 #endif
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
   }
@@ -115,10 +127,17 @@ void DensityFittingBase::solve_metric_system_host(double* X, size_t LDX) {
 
   const size_t naux = abs_.nbf();
 #if QDK_CHEMISTRY_DF_INV_METHOD == QDK_CHEMISTRY_DF_CHOLESKY
-  lapack::potrs(lapack::Uplo::Lower, naux, 1, h_metric_.get(), naux, X, LDX);
+  const auto info = lapack::potrs(lapack::Uplo::Lower, naux, 1, h_metric_.get(),
+                                  naux, X, LDX);
+  if (info != 0) {
+    throw std::runtime_error("Density-fitting metric solve failed");
+  }
 #elif QDK_CHEMISTRY_DF_INV_METHOD == QDK_CHEMISTRY_DF_LU
-  lapack::getrs(lapack::Op::NoTrans, naux, 1, h_metric_.get(), naux,
-                h_metric_ipiv_.get(), X, LDX);
+  const auto info = lapack::getrs(lapack::Op::NoTrans, naux, 1, h_metric_.get(),
+                                  naux, h_metric_ipiv_.get(), X, LDX);
+  if (info != 0) {
+    throw std::runtime_error("Density-fitting metric solve failed");
+  }
 #endif
 }
 }  // namespace qdk::chemistry::scf

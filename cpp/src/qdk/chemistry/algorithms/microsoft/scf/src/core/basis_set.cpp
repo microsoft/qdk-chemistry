@@ -18,6 +18,7 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <regex>
+#include <stdexcept>
 #include <unordered_map>
 
 #include "util/macros.h"
@@ -64,6 +65,11 @@ void load_from_database_json(std::filesystem::path bs_path, BasisSet& basis) {
           auto coeff =
               std::stod(entry["coefficients"][j][k].get<std::string>());
           if (fabs(coeff) > 1e-15) {
+            if (sh.contraction == MAX_CONTRACTION) {
+              throw std::invalid_argument(
+                  "Basis shell exceeds the internal limit of " +
+                  std::to_string(MAX_CONTRACTION) + " primitives");
+            }
             sh.exponents[sh.contraction] = alpha;
             sh.coefficients[sh.contraction] = coeff;
             sh.contraction++;
@@ -103,6 +109,11 @@ void load_from_database_json(std::filesystem::path bs_path, BasisSet& basis) {
       sh.O = mol.coords[i];
       sh.angular_momentum = am[0];
       sh.contraction = entry["gaussian_exponents"].size();
+      if (sh.contraction > MAX_CONTRACTION) {
+        throw std::invalid_argument("ECP shell exceeds the internal limit of " +
+                                    std::to_string(MAX_CONTRACTION) +
+                                    " primitives");
+      }
       for (size_t k = 0; k < sh.contraction; k++) {
         sh.coefficients[k] =
             std::stod(entry["coefficients"][0][k].get<std::string>());
@@ -466,7 +477,22 @@ Shell Shell::from_json(const nlohmann::ordered_json& rec,
     rpow = rec["rpowers"].template get<std::vector<int>>();
   }
   sh.contraction = exp.size();
-  VERIFY(sh.contraction == coeff.size());
+  if (sh.contraction != coeff.size()) {
+    throw std::invalid_argument(
+        "Shell exponent and coefficient counts must match");
+  }
+  if (sh.contraction > MAX_CONTRACTION) {
+    throw std::invalid_argument(
+        "Shell contraction exceeds the internal limit of " +
+        std::to_string(MAX_CONTRACTION) + " primitives");
+  }
+  if (!rpow.empty() && rpow.size() != sh.contraction) {
+    throw std::invalid_argument(
+        "Shell radial-power count must match its contraction count");
+  }
+  if (sh.atom_index >= mol->coords.size()) {
+    throw std::invalid_argument("Shell atom index is out of range");
+  }
   sh.O = mol->coords[sh.atom_index];
 
   std::copy(exp.begin(), exp.end(), sh.exponents);

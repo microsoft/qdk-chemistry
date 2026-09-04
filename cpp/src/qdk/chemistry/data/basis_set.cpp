@@ -315,6 +315,7 @@ std::shared_ptr<BasisSet> BasisSet::from_basis_name(
   std::vector<Shell> all_basis_shells;
   std::vector<Shell> all_ecp_shells;
   std::vector<size_t> all_ecp_electrons;
+  detail::BasisLibrary basis_library(basis_name);
   // loop over each atom in the structure and get basis set shells
   auto nuclear_charges = structure->get_nuclear_charges();
   for (size_t atom_index = 0;
@@ -322,8 +323,7 @@ std::shared_ptr<BasisSet> BasisSet::from_basis_name(
     double nuclear_charge = nuclear_charges[atom_index];
 
     auto [shells, ecp_shells, ecp_electrons] =
-        detail::get_basis_for_nuclear_charge(nuclear_charge, basis_name,
-                                             atom_index);
+        basis_library.get_basis_for_nuclear_charge(nuclear_charge, atom_index);
 
     for (const auto& sh : shells) {
       all_basis_shells.push_back(sh);
@@ -396,6 +396,7 @@ std::shared_ptr<BasisSet> BasisSet::from_index_map(
   std::vector<Shell> all_basis_shells;
   std::vector<Shell> all_ecp_shells;
   std::vector<size_t> all_ecp_electrons;
+  std::map<std::string, detail::BasisLibrary> basis_libraries;
   // loop over each atom in the structure and get basis set shells
   auto nuclear_charges = structure->get_nuclear_charges();
   for (size_t atom_index = 0;
@@ -407,10 +408,13 @@ std::shared_ptr<BasisSet> BasisSet::from_index_map(
                                   std::to_string(atom_index));
     }
     std::string tmp_basis_set_name = detail::lowercase_basis_name(it->second);
+    auto library =
+        basis_libraries.try_emplace(tmp_basis_set_name, tmp_basis_set_name)
+            .first;
 
     auto [shells, ecp_shells, ecp_electrons] =
-        detail::get_basis_for_nuclear_charge(nuclear_charge, tmp_basis_set_name,
-                                             atom_index);
+        library->second.get_basis_for_nuclear_charge(nuclear_charge,
+                                                     atom_index);
 
     for (const auto& sh : shells) {
       all_basis_shells.push_back(sh);

@@ -38,20 +38,21 @@ void _norm_psi4_mode(std::vector<qcs::Shell>& shells) {
   const double sqrt_PI_cubed = std::sqrt(std::pow(std::acos(-1.0), 3.0));
 
   for (auto& shell : shells) {
-    int am = shell.angular_momentum;
-
-    // Check if angular momentum is within the supported range
-    if (am > MAX_ORBITAL_ANGULAR_MOMENTUM) {
+    if (shell.angular_momentum > MAX_ORBITAL_ANGULAR_MOMENTUM) {
       throw std::runtime_error(
           "Shell angular momentum exceeds MAX_ORBITAL_ANGULAR_MOMENTUM");
     }
+    const int am = static_cast<int>(shell.angular_momentum);
+    if (shell.contraction == 0 || shell.contraction > qcs::MAX_CONTRACTION) {
+      throw std::runtime_error("Shell contraction count is unsupported");
+    }
 
-    // Check for zero exponents ahead of time
     for (size_t i = 0; i < shell.contraction; i++) {
-      if (shell.exponents[i] <= 0) {
+      if (!std::isfinite(shell.exponents[i]) || shell.exponents[i] <= 0.0 ||
+          !std::isfinite(shell.coefficients[i])) {
         throw std::runtime_error(
-            "Shell exponents must be positive (found a zero or negative "
-            "value)");
+            "Shell exponents must be finite and positive, and coefficients "
+            "must be finite");
       }
     }
 
@@ -72,6 +73,10 @@ void _norm_psi4_mode(std::vector<qcs::Shell>& shells) {
                 shell.coefficients[i] * shell.coefficients[j] /
                 (pow(2, am) * pow(gamma, am + 1) * sqrt(gamma));
       }
+    }
+    if (!std::isfinite(norm) || norm <= 0.0) {
+      throw std::runtime_error(
+          "Shell contraction must have a finite positive norm");
     }
     double normalization_factor = 1 / sqrt(norm);
     for (size_t i = 0; i < shell.contraction; i++) {

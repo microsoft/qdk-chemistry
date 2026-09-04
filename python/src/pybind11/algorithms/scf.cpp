@@ -9,6 +9,7 @@
 
 #include <optional>
 #include <qdk/chemistry.hpp>
+#include <utility>
 
 #include "factory_bindings.hpp"
 #include "qdk/chemistry/algorithms/microsoft/stabilized_scf.hpp"
