@@ -78,38 +78,19 @@ if build_dir.exists():
 
 @pytest.fixture(scope="session")
 def qsharp_test_context():
-    """Q# context that also carries the test-only Q# sources in ``tests/qsharp``.
-
-    Those sources are evaluated onto a *fresh* context rather than shipped in the package
-    or compiled as a dependent one. Q# ``internal`` visibility is package-scoped, so the
-    drivers can only call the ``internal`` library callables they need from inside the
-    package -- and anything left in the package is reachable from Python on
-    ``context.code``, ``internal`` included, which is what keeping them out of it avoids.
-
-    Costs one extra context build plus one eval per file, roughly 450 ms and 42 MiB, once
-    per session and only for tests that ask for it.
-
-    Ops resolved from a context can only be composed with ops from that same context, so a
-    test mixing library and test-only Q# must take both from here.
-    """
+    """Create a Q# context containing the test-only sources."""
     context = create_qsharp_context()
-    # Sorted so that, should one test module ever import another, the order is at least
-    # deterministic rather than filesystem-dependent.
     for path in sorted((Path(__file__).parent / "qsharp").glob("*.qs")):
         try:
             context.eval(path.read_text(encoding="utf-8"))
-        except Exception as error:  # qdk reports line numbers per fragment, so name the file
+        except Exception as error:
             raise RuntimeError(f"failed to evaluate Q# test source {path.name}: {error}") from error
     return context
 
 
 @pytest.fixture(scope="session")
 def qsharp_test_utils(qsharp_test_context):
-    """The ``QDKChemistry.TestUtils`` namespace holding the Q# drivers in ``tests/qsharp``.
-
-    Ops taken from here compose only with ops from ``qsharp_test_context``, so a test
-    that mixes library and test-only Q# must take both fixtures.
-    """
+    """Return the test-only Q# utilities namespace."""
     return qsharp_test_context.code.QDKChemistry.TestUtils
 
 

@@ -124,9 +124,7 @@ class TestBlockEncodingAgnosticSchedule:
         expected[2] = np.sin(0.45)  # system |1>, ancilla |0>
         np.testing.assert_allclose(state, expected, atol=1e-10)
 
-    # No theta = 0: the block encoding is then the identity, so the walk acts trivially and
-    # the case passes whatever the schedule does. Verified against a mutant that applies one
-    # block encoding too few -- 0.0 reports an exact match, 0.35 catches it by 1.5e-01.
+    # The identity encoding at theta = 0 cannot test the schedule.
     @pytest.mark.parametrize("theta", [0.35, 1.3, np.pi / 2])
     def test_psp_schedule_holds_for_every_encoded_eigenvalue(self, qsharp_test_context, qsharp_test_utils, theta):
         """The contract must not depend on what the block encoding encodes."""
