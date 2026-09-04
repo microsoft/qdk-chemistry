@@ -38,10 +38,12 @@ if TYPE_CHECKING:
 
     import qdk
 
-#: Q# modules available under every target profile.
+#: Modules the vendored Q# project exposes under every target profile. Derived from the
+#: shipped staging list so that list, not a copy of it, is what the classification pins.
 _PORTABLE_MODULES = tuple(Path(name).stem for name in _BASE_PROFILE_FILES)
 
-#: Q# modules that require the adaptive profile.
+#: Modules withheld from ``TargetProfile.Base``. They uncompute through measurement, which
+#: Base cannot express, so they are made to fail as missing rather than compile and mislead.
 _ADAPTIVE_ONLY_MODULES = ("UnaryIteration", "UnaryPhaseEstimation")
 
 
