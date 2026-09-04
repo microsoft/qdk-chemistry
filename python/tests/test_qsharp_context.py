@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 import inspect
-import re
 import threading
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -33,8 +32,6 @@ from qdk_chemistry.utils.qsharp import (
     use_qsharp_context,
 )
 
-from .qsharp_test_sources import TEST_SOURCE_ROOT
-
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
@@ -48,9 +45,10 @@ _PORTABLE_MODULES = tuple(Path(name).stem for name in _BASE_PROFILE_FILES)
 #: Base cannot express, so they are made to fail as missing rather than compile and mislead.
 _ADAPTIVE_ONLY_MODULES = ("UnaryIteration", "UnaryPhaseEstimation")
 
-#: A Q# callable declaration whose name marks it as a test driver. Anchored on the ``Test``
-#: prefix, not a substring, so production names such as ``HadamardTest`` are not caught.
-_TEST_CALLABLE = re.compile(r"^\s*(?:internal\s+)?(?:operation|function)\s+(Test\w*)", re.MULTILINE)
+
+def _declared_callables(namespace) -> list[str]:
+    """Names a compiled Q# namespace exposes, ``internal`` ones included."""
+    return [name for name in dir(namespace) if not name.startswith("_")]
 
 
 @pytest.fixture(scope="module")
@@ -207,30 +205,24 @@ class TestTestOnlySourcesAreNotShipped:
     being there.
     """
 
-    def test_the_shipped_sources_declare_no_test_namespace(self) -> None:
-        """The vendored project must not contain the test-only namespace."""
-        sources = (Path(qsharp_package.__file__).parent / "src").glob("*.qs")
-        offenders = [path.name for path in sources if "QDKChemistry.TestUtils" in path.read_text(encoding="utf-8")]
-        assert offenders == []
-
-    def test_the_shipped_sources_declare_no_test_prefixed_callable(self) -> None:
+    def test_the_shipped_modules_declare_no_test_prefixed_callable(self) -> None:
         """Test drivers are named ``Test*``, so a vendored one is a move that was missed."""
+        utils = get_qsharp_context().code.QDKChemistry.Utils
         offenders = {
-            path.name: _TEST_CALLABLE.findall(path.read_text(encoding="utf-8"))
-            for path in (Path(qsharp_package.__file__).parent / "src").glob("*.qs")
+            module: [name for name in _declared_callables(getattr(utils, module)) if name.startswith("Test")]
+            for module in _declared_callables(utils)
         }
-        assert {name: found for name, found in offenders.items() if found} == {}
+        assert {module: found for module, found in offenders.items() if found} == {}
 
-    def test_every_test_only_callable_uses_the_test_prefix(self) -> None:
-        """The vendored-sources guard keys on the prefix, so hold the test tree to it."""
-        declared = re.compile(r"^\s*(?:internal\s+)?(?:operation|function)\s+(\w+)", re.MULTILINE)
+    def test_every_test_only_callable_uses_the_test_prefix(self, qsharp_test_utils) -> None:
+        """The vendored-modules guard keys on the prefix, so hold the test tree to it."""
         unprefixed = {
-            path.name: [
-                name for name in declared.findall(path.read_text(encoding="utf-8")) if not name.startswith("Test")
+            module: [
+                name for name in _declared_callables(getattr(qsharp_test_utils, module)) if not name.startswith("Test")
             ]
-            for path in TEST_SOURCE_ROOT.glob("*.qs")
+            for module in _declared_callables(qsharp_test_utils)
         }
-        assert {name: found for name, found in unprefixed.items() if found} == {}
+        assert {module: found for module, found in unprefixed.items() if found} == {}
 
     def test_a_default_context_cannot_reach_the_test_helpers(self) -> None:
         """A user context must not pay for, or be able to call, the test drivers."""

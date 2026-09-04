@@ -40,8 +40,8 @@ from qdk_chemistry.data import (
     StateVectorContainer,
     Wavefunction,
 )
+from qdk_chemistry.utils.qsharp import create_qsharp_context
 
-from .qsharp_test_sources import create_test_qsharp_context
 from .test_helpers import create_test_orbitals
 
 # Dynamically add the build directory to Python path
@@ -80,10 +80,18 @@ if build_dir.exists():
 def qsharp_test_context():
     """Q# context that also carries the test-only Q# sources in ``tests/qsharp``.
 
+    Those sources are evaluated onto a *fresh* context rather than shipped in the
+    package or compiled as a dependent one: Q# ``internal`` visibility is
+    package-scoped and the drivers call ``internal`` library callables, and a fresh
+    context keeps them out of what production code paths resolve against.
+
     Ops resolved from a context can only be composed with ops from that same
     context, so a test mixing library and test-only Q# must take both from here.
     """
-    return create_test_qsharp_context()
+    context = create_qsharp_context()
+    for path in sorted((Path(__file__).parent / "qsharp").glob("*.qs")):
+        context.eval(path.read_text(encoding="utf-8"))
+    return context
 
 
 @pytest.fixture(scope="session")
