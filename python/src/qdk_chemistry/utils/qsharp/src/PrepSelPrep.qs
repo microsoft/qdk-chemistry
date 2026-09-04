@@ -90,21 +90,30 @@ namespace QDKChemistry.Utils.PrepSelPrep {
 
     /// # Summary
     /// Block encoding: PREPARE† · SELECT · PREPARE.
+    ///
+    /// # Description
+    /// `prepareRegister` is everything PREPARE needs. SELECT controls on only its first
+    /// `numSelectQubits` qubits, because a PREPARE oracle may need ancilla beyond the index
+    /// it produces — alias sampling, for instance, leaves `2μ + 1` qubits of garbage
+    /// entangled with a `numSelectQubits`-wide index. Handing that garbage to SELECT would
+    /// make it control on qubits that carry no index information.
+    /// Both the garbage ancillas and select ancillas are cleared by the `Adjoint prepareOp`,
+    /// which uncomputes the whole register back to |0⟩.
     operation PrepSelPrep(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
         targetRegister : Qubit[],
-        ancillaRegister : Qubit[],
+        prepareRegister : Qubit[],
+        numSelectQubits : Int,
     ) : Unit is Adj + Ctl {
         body ... {
-            let numAncillaQubits = Length(ancillaRegister);
-            if (numAncillaQubits == 0) {
+            if (Length(prepareRegister) == 0) {
                 selectOp([], targetRegister);
             } else {
                 within {
-                    prepareOp(ancillaRegister);
+                    prepareOp(prepareRegister);
                 } apply {
-                    selectOp(ancillaRegister, targetRegister);
+                    selectOp(prepareRegister[0..numSelectQubits - 1], targetRegister);
                 }
             }
         }
@@ -112,13 +121,12 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         controlled (ctls, ...) {
             // Per Babbush et al. (arXiv:1805.03662): only SELECT is controlled;
             // PREPARE and PREPARE† run unconditionally.
-            let numAncillaQubits = Length(ancillaRegister);
-            if (numAncillaQubits == 0) {
+            if (Length(prepareRegister) == 0) {
                 Controlled selectOp(ctls, ([], targetRegister));
             } else {
-                prepareOp(ancillaRegister);
-                Controlled selectOp(ctls, (ancillaRegister, targetRegister));
-                Adjoint prepareOp(ancillaRegister);
+                prepareOp(prepareRegister);
+                Controlled selectOp(ctls, (prepareRegister[0..numSelectQubits - 1], targetRegister));
+                Adjoint prepareOp(prepareRegister);
             }
         }
         controlled adjoint auto;
@@ -126,9 +134,12 @@ namespace QDKChemistry.Utils.PrepSelPrep {
 
     /// # Summary
     /// Reflection about the all-zero state of the block-encoding ancillas of a flat
-    /// `[systemReg | ancillaReg]` register.
-    function MakeAncillaReflectionOp(numSystemQubits : Int) : (Qubit[] => Unit is Adj + Ctl) {
-        (allQubits) => Reflect(allQubits[numSystemQubits...])
+    /// `[systemReg | blockAncilla]` register.
+    function MakeAncillaReflectionOp(
+        numSystemQubits : Int,
+        numBlockAncillaQubits : Int,
+    ) : (Qubit[] => Unit is Adj + Ctl) {
+        (allQubits) => Reflect(allQubits[numSystemQubits..numSystemQubits + numBlockAncillaQubits - 1])
     }
 
     /// Block encoding on the flat `[systemReg | ancillaReg]` register.
@@ -136,12 +147,14 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
         numSystemQubits : Int,
+        numSelectQubits : Int,
     ) : (Qubit[] => Unit is Adj + Ctl) {
         (allQubits) => PrepSelPrep(
             prepareOp,
             selectOp,
             allQubits[0..numSystemQubits - 1],
-            allQubits[numSystemQubits...]
+            allQubits[numSystemQubits...],
+            numSelectQubits
         )
     }
 
@@ -161,18 +174,20 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
         numSystemQubits : Int,
-        numAncillaQubits : Int,
+        numSelectQubits : Int,
+        numBlockAncillaQubits : Int,
         power : Int,
         useWalk : Bool,
     ) : Unit {
-        use register = Qubit[numSystemQubits + numAncillaQubits];
+        use register = Qubit[numSystemQubits + numBlockAncillaQubits];
         let systems = register[0..numSystemQubits - 1];
-        let ancilla = register[numSystemQubits...];
+        let prepareRegister = register[numSystemQubits...];
+        let blockAncilla = register[numSystemQubits..numSystemQubits + numBlockAncillaQubits - 1];
         for _ in 1..power {
             if BeginEstimateCaching(useWalk ? "PSPWalk" | "PrepSelPrep", SingleVariant()) {
-                PrepSelPrep(prepareOp, selectOp, systems, ancilla);
+                PrepSelPrep(prepareOp, selectOp, systems, prepareRegister, numSelectQubits);
                 if useWalk {
-                    Reflect(ancilla);
+                    Reflect(blockAncilla);
                 }
                 EndEstimateCaching();
             }
@@ -184,19 +199,24 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
         numSystemQubits : Int,
-        numAncillaQubits : Int,
+        numSelectQubits : Int,
+        numBlockAncillaQubits : Int,
         power : Int,
         useWalk : Bool,
     ) : Unit {
         use control = Qubit();
-        use register = Qubit[numSystemQubits + numAncillaQubits];
+        use register = Qubit[numSystemQubits + numBlockAncillaQubits];
         let systems = register[0..numSystemQubits - 1];
-        let ancilla = register[numSystemQubits...];
+        let prepareRegister = register[numSystemQubits...];
+        let blockAncilla = register[numSystemQubits..numSystemQubits + numBlockAncillaQubits - 1];
         for _ in 1..power {
             if BeginEstimateCaching(useWalk ? "ControlledPSPWalk" | "ControlledPrepSelPrep", SingleVariant()) {
-                Controlled PrepSelPrep([control], (prepareOp, selectOp, systems, ancilla));
+                Controlled PrepSelPrep(
+                    [control],
+                    (prepareOp, selectOp, systems, prepareRegister, numSelectQubits)
+                );
                 if useWalk {
-                    Controlled Reflect([control], ancilla);
+                    Controlled Reflect([control], blockAncilla);
                 }
                 EndEstimateCaching();
             }
@@ -210,6 +230,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         MakePrepSelPrepOp(
             (ancilla) => Ry(theta, ancilla[0]),
             (ancilla, system) => Controlled Z(ancilla, system[0]),
+            1,
             1
         )
     }

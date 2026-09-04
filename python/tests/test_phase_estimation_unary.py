@@ -21,7 +21,15 @@ from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import (
     _post_process_phase_estimation,
 )
 from qdk_chemistry.algorithms.state_preparation import identity_state_prep
-from qdk_chemistry.data import AlgorithmRef, QubitOperator
+from qdk_chemistry.algorithms.state_preparation.qrom_state_prep import QROMStatePreparation
+from qdk_chemistry.data import (
+    AlgorithmRef,
+    Configuration,
+    ModelOrbitals,
+    QubitOperator,
+    StateVectorContainer,
+    Wavefunction,
+)
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
@@ -105,7 +113,7 @@ class TestBlockEncodingAgnosticSchedule:
         """A PREPARE-SELECT-PREPARE walk must obey the same ``W^(p - 2t)`` contract."""
         psp = QSHARP_UTILS.PrepSelPrep
         op = QSHARP_UTILS.UnaryPhaseEstimation.MakeTestSignedPowerScheduleAgainstWalkOp(
-            psp.MakeTestBlockEncodingOp(0.7), psp.MakeAncillaReflectionOp(1), num_queries, address_value, 0.9
+            psp.MakeTestBlockEncodingOp(0.7), psp.MakeAncillaReflectionOp(1, 1), num_queries, address_value, 0.9
         )
         num_address_qubits = _address_qubits(num_queries + 1)
         state = _dump_op(op, num_address_qubits + 2)
@@ -120,7 +128,7 @@ class TestBlockEncodingAgnosticSchedule:
         """The contract must not depend on what the block encoding encodes."""
         psp = QSHARP_UTILS.PrepSelPrep
         op = QSHARP_UTILS.UnaryPhaseEstimation.MakeTestSignedPowerScheduleAgainstWalkOp(
-            psp.MakeTestBlockEncodingOp(theta), psp.MakeAncillaReflectionOp(1), 3, 1, 0.9
+            psp.MakeTestBlockEncodingOp(theta), psp.MakeAncillaReflectionOp(1, 1), 3, 1, 0.9
         )
         state = _dump_op(op, 4)
 
@@ -273,6 +281,12 @@ class TestMisconfigurationIsSurfaced:
         """The schedule threads the state prep into a Q# operation, so QASM alone is not enough."""
         with pytest.raises(RuntimeError, match="State preparation has no Q# operation"):
             _run_builder(_make_builder(), state_preparation=Circuit(qasm="OPENQASM 3.0;\n"))
+
+    def test_a_state_preparation_wider_than_the_register_it_gets_is_rejected(self):
+        """A PREPARE oracle keeps ancilla past its index, so it cannot stand in as an initial state."""
+        wide = Circuit(qasm="OPENQASM 3.0;\n", qsharp_op=QSHARP_UTILS.PrepSelPrep.NoOpPrepare, num_qubits=3)
+        with pytest.raises(ValueError, match="acts on 3 qubits"):
+            _run_builder(_make_builder(), state_preparation=wide)
 
     @pytest.mark.parametrize(
         ("setting", "algorithm", "message"),
@@ -439,6 +453,47 @@ class TestUnaryQpeEndToEnd:
 
         assert result.raw_energy == pytest.approx(float(energies[0]), abs=1e-9)
 
+    def test_alias_sampling_lcu_recovers_the_ground_state_energy(self):
+        """Unary QPE returns the ground-state energy with alias-sampling PREPARE in the LCU walk."""
+        num_queries = 7
+        # Multiples of 1/16 keep the alias table exact, and this ground energy lands on a
+        # phase bin. Retuning them can push it between bins, where the error exceeds the bound.
+        hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ", "XZ"], coefficients=np.array([0.1875, 0.25, 0.5625]))
+        energies, vectors = np.linalg.eigh(hamiltonian.to_matrix())
+        state_prep_params = {
+            "rowMap": list(range(hamiltonian.num_qubits - 1, -1, -1)),
+            "stateVector": np.real(vectors[:, 0]).tolist(),
+            "expansionOps": [],
+            "numQubits": hamiltonian.num_qubits,
+        }
+        state_preparation = Circuit(
+            qsharp_factory=QsharpFactoryData(
+                program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+                parameter=state_prep_params,
+            ),
+            qsharp_op=QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params),
+        )
+
+        qpe = UnaryPhaseEstimation(shots=200)
+        qpe.settings().set(
+            "qpe_circuit_builder",
+            AlgorithmRef(
+                "qpe_circuit_builder",
+                "qdk_unary",
+                num_queries=num_queries,
+                circuit_mapper=AlgorithmRef(
+                    "circuit_mapper",
+                    "prepare_select_prepare",
+                    prepare=AlgorithmRef("state_prep", "alias_sampling", bits_precision=2),
+                ),
+            ),
+        )
+        qpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"))
+
+        result = qpe.run(qubit_hamiltonian=hamiltonian, state_preparation=state_preparation)
+
+        assert result.raw_energy == pytest.approx(float(energies[0]), abs=0.02)
+
 
 def test_the_builder_reflects_the_ancilla_tail_the_mapper_declared():
     """Every qubit the mapper exposes past the system register is reflected about."""
@@ -454,3 +509,32 @@ def test_the_builder_reflects_the_ancilla_tail_the_mapper_declared():
     )[0]
 
     assert circuit._qsharp_factory.parameter["numAncillas"] == declared - hamiltonian.num_qubits
+
+
+def _ground_state_wavefunction(hamiltonian: QubitOperator) -> Wavefunction:
+    """Wrap a Hamiltonian's ground eigenvector as a single-qubit Wavefunction."""
+    _, vectors = np.linalg.eigh(hamiltonian.to_matrix())
+    amplitudes = np.real(vectors[:, 0])
+    dets = [Configuration.from_bitstring(format(idx, "01b")[::-1]) for idx in range(len(amplitudes))]
+    return Wavefunction(StateVectorContainer(amplitudes, dets, ModelOrbitals(1)))
+
+
+def test_qrom_initial_state_prep_recovers_the_ground_state_energy():
+    """QROM rotates through the shared gradient, so QPE must prepare it before the state prep.
+
+    Without that preparation the rotations leave the gradient dirty and entangled with the
+    system register, which then holds no eigenstate at all.
+    """
+    hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([0.5, 0.5]))
+    energies, _ = np.linalg.eigh(hamiltonian.to_matrix())
+    state_preparation = QROMStatePreparation(rotation_bit_precision=8, allocate_phase_gradient=False).run(
+        _ground_state_wavefunction(hamiltonian)
+    )
+
+    qpe = UnaryPhaseEstimation(shots=200)
+    qpe.settings().set("qpe_circuit_builder", AlgorithmRef("qpe_circuit_builder", "qdk_unary", num_queries=6))
+    qpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"))
+
+    result = qpe.run(qubit_hamiltonian=hamiltonian, state_preparation=state_preparation)
+
+    assert result.raw_energy == pytest.approx(float(energies[0]), abs=0.02)

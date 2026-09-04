@@ -952,7 +952,9 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import DenseMatrixSolver, SparseMatrixSolver  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import SparseIsometryStatePreparation  # noqa: PLC0415
+    from qdk_chemistry.algorithms.state_preparation.alias_sampling import AliasSamplingStatePreparation  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation.dense_pure_state import DensePureStatePreparation  # noqa: PLC0415
+    from qdk_chemistry.algorithms.state_preparation.qrom_state_prep import QROMStatePreparation  # noqa: PLC0415
     from qdk_chemistry.algorithms.term_grouper import (  # noqa: PLC0415
         FullCommutingTermGrouper,
         IdentityTermGrouper,
@@ -983,6 +985,8 @@ def _register_python_algorithms():
     register(lambda: PauliSequenceMapper())
     register(lambda: PSPMapper())
     register(lambda: ControlledPSPMapper())
+    register(lambda: AliasSamplingStatePreparation())
+    register(lambda: QROMStatePreparation())
     register(lambda: ControlledPauliSequenceMapper())
     register(lambda: ControlledSwapPauliSequenceMapper())
     register(lambda: EulerIntegrator())

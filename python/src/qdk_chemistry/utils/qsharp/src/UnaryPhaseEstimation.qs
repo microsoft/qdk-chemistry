@@ -47,34 +47,59 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     /// Build a unary-iteration QPE circuit for an arbitrary (non-power-of-two) query count.
     /// Lee et al. Even More Efficient Quantum Computations of Chemistry Through Tensor Hypercontraction.
     /// https://journals.aps.org/prxquantum/abstract/10.1103/PRXQuantum.2.030305
+    ///
+    /// `numAncillas` counts the block ancilla the walk reflects about. The `numSharedAncillas`
+    /// shared qubits sit past them: `prepareSharedOp` initializes them once around the query
+    /// schedule and whoever consumes them leaves them in that state. Set `statePrepUsesShared` or
+    /// `blockEncodingUsesShared` for the component that expects them appended to its register.
     operation MakeUnaryQPECircuit(
         statePrep : Qubit[] => Unit,
         applyBlockEncoding : (Qubit[] => Unit is Adj),
         applyReflection : (Qubit[] => Unit is Adj + Ctl),
         phaseQubitPrep : Qubit[] => Unit,
+        prepareSharedOp : Qubit[] => Unit is Adj + Ctl,
         numQueries : Int,
         numSystemQubits : Int,
         numAncillas : Int,
+        numSharedAncillas : Int,
+        statePrepUsesShared : Bool,
+        blockEncodingUsesShared : Bool,
     ) : Result[] {
         Fact(numSystemQubits > 0, "numSystemQubits must be positive");
         Fact(numAncillas >= 0, "numAncillas must be non-negative");
+        Fact(numSharedAncillas >= 0, "numSharedAncillas must be non-negative");
+        Fact(
+            numSharedAncillas > 0 or not (statePrepUsesShared or blockEncodingUsesShared),
+            "consuming shared ancilla requires a non-empty shared register"
+        );
         let numPhaseQubits = PhaseRegisterSize(numQueries);
 
-        use qs = Qubit[numPhaseQubits + numSystemQubits + numAncillas];
+        use qs = Qubit[numPhaseQubits + numSystemQubits + numAncillas + numSharedAncillas];
         let phaseQubits = qs[0..numPhaseQubits - 1];
         let systemQubits = qs[numPhaseQubits..numPhaseQubits + numSystemQubits - 1];
-        let allTargets = qs[numPhaseQubits...];
+        let allTargets = qs[numPhaseQubits..numPhaseQubits + numSystemQubits + numAncillas - 1];
+        let sharedQubits = qs[numPhaseQubits + numSystemQubits + numAncillas...];
 
-        statePrep(systemQubits);
         phaseQubitPrep(phaseQubits);
 
-        ApplySignedPowerSchedule(
-            applyBlockEncoding,
-            applyReflection,
-            numQueries,
-            Reversed(phaseQubits),
-            allTargets
-        );
+        within {
+            if numSharedAncillas > 0 {
+                prepareSharedOp(sharedQubits);
+            }
+        } apply {
+            statePrep(statePrepUsesShared ? systemQubits + sharedQubits | systemQubits);
+            let blockEncoding =
+                blockEncodingUsesShared
+                ? (register) => applyBlockEncoding(register + sharedQubits)
+                | applyBlockEncoding;
+            ApplySignedPowerSchedule(
+                blockEncoding,
+                applyReflection,
+                numQueries,
+                Reversed(phaseQubits),
+                allTargets
+            );
+        }
 
         Adjoint ApplyQFT(phaseQubits);
 
@@ -83,7 +108,7 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
             set results w/= idx <- MResetZ(phaseQubits[idx]);
         }
 
-        ResetAll(allTargets);
+        ResetAll(qs[numPhaseQubits...]);
         return results;
     }
 
@@ -138,9 +163,13 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
             },
             (qubits) => X(qubits[0]),
             ApplyToEach(H, _),
+            QDKChemistry.Utils.PrepSelPrep.NoOpPrepare,
             numQueries,
             1,
-            0
+            0,
+            0,
+            false,
+            false
         );
     }
 }

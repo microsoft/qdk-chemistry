@@ -60,6 +60,26 @@ namespace QDKChemistry.Utils.CircuitComposition {
         ApplySequential(first, second, _)
     }
 
+    /// Returns `op` wrapped so it prepares and restores its own trailing `numShared` ancillas.
+    ///
+    /// Use where `op` runs once; a caller invoking it repeatedly should hoist `prepareShared`.
+    /// `numShared` of 0 leaves `op` unwrapped, since the trailing slice would be empty.
+    function MakeSharedAncillaOp(
+        op : Qubit[] => Unit is Adj + Ctl,
+        prepareShared : Qubit[] => Unit is Adj + Ctl,
+        numShared : Int
+    ) : Qubit[] => Unit is Adj + Ctl {
+        (qs) => {
+            within {
+                if numShared > 0 {
+                    prepareShared(qs[Length(qs) - numShared...]);
+                }
+            } apply {
+                op(qs);
+            }
+        }
+    }
+
     /// Returns the maximum element of the given array of integers.
     function MaxInt(values : Int[]) : Int {
         // Caller is responsible for not passing an empty array.
