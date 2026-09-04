@@ -123,73 +123,10 @@ class QpeCircuitBuilder(Algorithm):
         unitary_builder.settings().update("power", power)
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
         num_ancilla_qubits = unitary_rep.get_num_qubits() - qubit_hamiltonian.num_qubits
-        return self._map_controlled_circuit(unitary_rep), num_ancilla_qubits
-
-    def _map_controlled_circuit(self, unitary_rep: UnitaryRepresentation) -> Circuit:
-        """Map a unitary representation to a circuit controlled on qubit 0.
-
-        Args:
-            unitary_rep: The unitary representation to map.
-
-        Returns:
-            The controlled circuit.
-
-        """
         circuit_mapper = self._create_nested("controlled_circuit_mapper")
         circuit_mapper.settings().update("control_indices", [0])
-        return circuit_mapper.run(unitary_rep)
-
-    def _create_controlled_circuits(
-        self,
-        qubit_hamiltonian: QubitOperator,
-        powers: Sequence[int],
-    ) -> tuple[list[Circuit], int]:
-        r"""Create controlled-:math:`U^{p}` circuits for every power *p* in *powers*.
-
-        Under the ``"repeat"`` power strategy the power never reaches the product
-        formula itself, it only multiplies the repetition count, so the decomposition
-        is built once and re-mapped per power instead of being rebuilt for every rung
-        of the ladder. Any other strategy falls back to one full build per power.
-
-        Args:
-            qubit_hamiltonian: The qubit Hamiltonian to evolve under.
-            powers: The powers to which the unitary should be raised.
-
-        Returns:
-            A tuple of (circuits, num_ancilla_qubits) with one circuit per entry of
-            *powers*, in the same order.
-
-        """
-        unitary_builder = self._create_nested("unitary_builder")
-        settings = unitary_builder.settings()
-
-        if settings.has("power_strategy") and settings.get("power_strategy") == "repeat":
-            settings.update("power", 1)
-            unitary_rep = unitary_builder.run(qubit_hamiltonian)
-            container = unitary_rep.get_container()
-            if isinstance(container, PauliProductFormulaContainer):
-                num_ancilla_qubits = unitary_rep.get_num_qubits() - qubit_hamiltonian.num_qubits
-                circuits = [
-                    self._map_controlled_circuit(
-                        UnitaryRepresentation(
-                            container=PauliProductFormulaContainer(
-                                step_terms=container.step_terms,
-                                step_reps=container.step_reps * power,
-                                num_qubits=container.num_qubits,
-                                scale=container.scale,
-                            )
-                        )
-                    )
-                    for power in powers
-                ]
-                return circuits, num_ancilla_qubits
-
-        circuits = []
-        num_ancilla_qubits = 0
-        for power in powers:
-            circuit, num_ancilla_qubits = self._create_controlled_circuit(qubit_hamiltonian, power)
-            circuits.append(circuit)
-        return circuits, num_ancilla_qubits
+        circuit = circuit_mapper.run(unitary_rep)
+        return circuit, num_ancilla_qubits
 
 
 class QpeCircuitBuilderFactory(AlgorithmFactory):

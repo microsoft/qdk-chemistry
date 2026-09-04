@@ -205,7 +205,7 @@ TEST(MajoranaMapEngineTest, MultiWordDispatchDoesNotCrash) {
   EXPECT_GE(terms.size(), 1u);
 }
 
-namespace {
+namespace qdk::chemistry::tests::test_support {
 
 // Single-orbital Hamiltonian embedded in an n_spatial-orbital problem: only
 // orbital 0 carries integrals, so the operator is identical for every
@@ -241,7 +241,7 @@ std::unordered_map<std::string, std::complex<double>> spin_block_terms(
   return terms;
 }
 
-}  // namespace
+}  // namespace qdk::chemistry::tests::test_support
 
 TEST(MajoranaMapEngineTest, OnDemandEngineMatchesEagerEngineAboveTheWordCap) {
   // 4 orbitals → 8 qubits → eager engine; 520 orbitals → 1040 qubits → the
@@ -295,10 +295,9 @@ TEST(MajoranaMappingTest, BilinearProductMatchesCachedBilinear) {
 
 TEST(MajoranaMappingTest, UncachedBilinearsMatchTheCachedEncoding) {
   auto cached = MajoranaMapping::jordan_wigner(8);
-  // Above the cap the upper-triangle cache is skipped and bilinears are
+  // At 136 qubits the upper-triangle cache is skipped and bilinears are
   // derived from the Majorana table on demand.
-  auto uncached = MajoranaMapping::jordan_wigner(
-      MajoranaMapping::kMaxCachedBilinearQubits + 8);
+  auto uncached = MajoranaMapping::jordan_wigner(136);
   EXPECT_THROW(uncached.bilinear(0, 1), std::logic_error);
 
   for (std::size_t j = 0; j < 16; ++j) {

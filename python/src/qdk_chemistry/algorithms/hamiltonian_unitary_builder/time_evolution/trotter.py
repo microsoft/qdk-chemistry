@@ -197,11 +197,7 @@ class Trotter(TimeEvolutionBuilder):
         """
         weight_threshold = self._settings.get("weight_threshold")
 
-        # An explicit num_divisions is quoted for the base evolution time, and
-        # holding the Trotter bias fixed needs r proportional to the time, so
-        # "rescale" must stretch it by the same factor it stretched the time.
-        manual_scale = self._settings.get("power") if self._settings.get("power_strategy") == "rescale" else 1
-        num_divisions = self._resolve_num_divisions(qubit_hamiltonian, time, manual_scale)
+        num_divisions = self._resolve_num_divisions(qubit_hamiltonian, time)
 
         delta = time / num_divisions
 
@@ -218,17 +214,15 @@ class Trotter(TimeEvolutionBuilder):
 
         return UnitaryRepresentation(container=container)
 
-    def _resolve_num_divisions(self, qubit_hamiltonian: QubitOperator, time: float, manual_scale: int = 1) -> int:
+    def _resolve_num_divisions(self, qubit_hamiltonian: QubitOperator, time: float) -> int:
         """Determine the number of Trotter divisions to use.
 
         When both *num_divisions* and *target_accuracy* are provided, the
         larger value wins.  When neither is provided, the default is 1.
-        *manual_scale* multiplies an explicit *num_divisions* so that a
-        rescaled evolution time keeps the same per-step time.
 
         """
         num_divisions = self._settings.get("num_divisions")
-        manual = (num_divisions if num_divisions > 0 else 1) * manual_scale
+        manual = num_divisions if num_divisions > 0 else 1
 
         target_accuracy = self._settings.get("target_accuracy")
         if target_accuracy <= 0.0:
@@ -295,8 +289,6 @@ class Trotter(TimeEvolutionBuilder):
             Logger.warn("Term partition produced no groups; returning empty term list.")
             return terms
 
-        # The order-2 schedule revisits each group at several time fractions, and only
-        # the angle changes, so decode every group's Pauli labels once up front.
         decomposed = [
             [self._commuting_pauli_maps(subgroup, atol=atol) for subgroup in group] for group in grouped_hamiltonians
         ]

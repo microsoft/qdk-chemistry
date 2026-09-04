@@ -103,8 +103,7 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
     /// every term, which is O(terms * qubits). Jordan-Wigner terms are far from
     /// dense, so here each term instead lists only its non-identity positions:
     /// `pauliIndices[t]` indexes into `systems` and `pauliOps[t]` holds the
-    /// matching axis. A term with no entries is the identity term, which still
-    /// contributes a phase once controlled.
+    /// matching axis. A term with no entries is the identity term.
     struct SparseRepControlledPauliExpParams {
         pauliIndices : Int[][],
         pauliOps : Pauli[][],
@@ -130,9 +129,6 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
         control : Qubit,
         systems : Qubit[]
     ) : Unit is Adj + Ctl {
-        // Terms differ in weight and angle, so RepeatEstimates cannot be used here:
-        // charging one term's cost Length(pauliOps) times mis-counts both qubits and
-        // runtime. Only the outer repetition loop is uniform enough to collapse.
         for idx in 0..Length(pauliOps) - 1 {
             Controlled Exp(
                 [control],
@@ -153,8 +149,7 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
         control : Qubit,
         systems : Qubit[],
     ) : Unit is Adj + Ctl {
-        // RepeatEstimates is a no-op outside the estimator, so the loop is still
-        // needed for simulation and circuit generation.
+
         if IsResourceEstimating() {
             within {
                 RepeatEstimates(params.repetitions);

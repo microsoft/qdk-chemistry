@@ -395,8 +395,7 @@ struct SparseEriProvider {
   }
 };
 
-// Largest packed width instantiated for the eager engine below; also the
-// qubit count above which the mapping stops caching its bilinears.
+// Largest packed width instantiated for the eager engine below.
 constexpr std::size_t max_nw = 16;
 
 template <std::size_t NW>

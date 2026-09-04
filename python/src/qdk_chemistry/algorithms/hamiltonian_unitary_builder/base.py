@@ -246,11 +246,7 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
         *,
         atol: float = 1e-12,
     ) -> list[tuple[dict[int, str], float]]:
-        """Return ``(non-identity Pauli map, coefficient)`` for each term of a group.
-
-        Separated from :meth:`_exponentiate_commuting` so a caller that visits the
-        same group at several time fractions decodes its labels only once.
-        """
+        """Return ``(non-identity Pauli map, coefficient)`` for each term of a group."""
         return [
             (self._pauli_label_to_map(label), coeff) for label, coeff in group.get_real_coefficients(tolerance=atol)
         ]

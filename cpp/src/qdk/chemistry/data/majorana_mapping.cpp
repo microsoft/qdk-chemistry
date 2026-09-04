@@ -47,6 +47,8 @@ stabilizers_from_json(const nlohmann::json& data) {
 
 }  // namespace detail
 
+constexpr std::size_t max_cached_bilinear_qubits = 128;
+
 static void hash_sparse_pauli_word(qdk::chemistry::utils::HashContext& ctx,
                                    const SparsePauliWord& word) {
   hash_value(ctx, static_cast<std::uint64_t>(word.size()));
@@ -108,7 +110,7 @@ MajoranaMapping MajoranaMapping::from_table(std::vector<SparsePauliWord> table,
   // enough that the cache dominates its footprint.
   const std::size_t M = table.size();
   std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears;
-  if (num_qubits <= kMaxCachedBilinearQubits) {
+  if (num_qubits <= max_cached_bilinear_qubits) {
     bilinears.reserve(M * (M - 1) / 2);
     for (std::size_t j = 0; j < M; ++j) {
       for (std::size_t k = j + 1; k < M; ++k) {
@@ -194,7 +196,7 @@ MajoranaMapping::bilinear(std::size_t j, std::size_t k) const {
     throw std::logic_error(
         "MajoranaMapping::bilinear returns a reference into the precomputed "
         "cache, which is skipped above " +
-        std::to_string(kMaxCachedBilinearQubits) +
+        std::to_string(max_cached_bilinear_qubits) +
         " qubits; use bilinear_product(j, k) instead.");
   }
   if (j < k) {
