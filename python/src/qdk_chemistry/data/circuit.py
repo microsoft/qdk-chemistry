@@ -496,7 +496,7 @@ class Circuit(DataClass):
         if encoding is not None and isinstance(encoding, bytes):
             encoding = encoding.decode("utf-8")
         num_qubits = group.attrs.get("num_qubits")
-        num_gradient = group["metadata"].attrs["num_phase_gradient_ancillas"] if "metadata" in group else 0
+        num_gradient = group["metadata"].attrs.get("num_phase_gradient_ancillas", 0) if "metadata" in group else 0
         return cls(
             qasm=group.attrs.get("qasm"),
             qir=group.attrs.get("qir"),

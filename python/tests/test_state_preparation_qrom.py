@@ -14,8 +14,9 @@ import pytest
 from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.state_preparation.qrom_state_prep import QROMStatePreparation
-from qdk_chemistry.data import Configuration, ModelOrbitals, StateVectorContainer, Wavefunction
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
+
+from .test_helpers import create_dense_wavefunction, create_sparse_wavefunction
 
 
 def _dump_op(op, num_qubits: int) -> np.ndarray:
@@ -65,30 +66,13 @@ def _build_expected_from_amplitudes(amplitudes: list[float], num_qubits: int) ->
     return expected
 
 
-def _make_wavefunction(amplitudes: list[float]) -> Wavefunction:
-    """Create a Wavefunction from a list of amplitudes."""
-    num_qubits = math.ceil(math.log2(len(amplitudes))) if len(amplitudes) > 1 else 1
-    dets = [Configuration.from_bitstring(format(idx, f"0{num_qubits}b")[::-1]) for idx in range(len(amplitudes))]
-    orbitals = ModelOrbitals(num_qubits)
-    container = StateVectorContainer(np.array([float(a) for a in amplitudes]), dets, orbitals)
-    return Wavefunction(container)
-
-
-def _make_sparse_wavefunction(num_qubits: int, indices: list[int], amplitudes: list[float]) -> Wavefunction:
-    """Create a Wavefunction that occupies only *indices* of a ``num_qubits`` register."""
-    dets = [Configuration.from_bitstring(format(idx, f"0{num_qubits}b")[::-1]) for idx in indices]
-    orbitals = ModelOrbitals(num_qubits)
-    container = StateVectorContainer(np.array([float(a) for a in amplitudes]), dets, orbitals)
-    return Wavefunction(container)
-
-
 class TestQROMStatePreparation:
     """Tests for the QROM-based state preparation algorithm."""
 
     def test_run_returns_circuit(self):
         """By default the gradient is internal, so the callable takes only the state."""
         prep = QROMStatePreparation(rotation_bit_precision=4)
-        wf = _make_wavefunction([0.5, 0.3, 0.7, 0.1])
+        wf = create_dense_wavefunction([0.5, 0.3, 0.7, 0.1])
         circuit = prep.run(wf)
         assert circuit is not None
         assert circuit._qsharp_op is not None
@@ -99,7 +83,7 @@ class TestQROMStatePreparation:
     def test_shared_gradient_widens_the_register_it_declares(self):
         """Opting out of internal allocation appends a gradient the caller must own."""
         prep = QROMStatePreparation(rotation_bit_precision=4, allocate_phase_gradient=False)
-        circuit = prep.run(_make_wavefunction([0.5, 0.3, 0.7, 0.1]))
+        circuit = prep.run(create_dense_wavefunction([0.5, 0.3, 0.7, 0.1]))
 
         assert circuit.num_qubits == 6
         assert circuit.metadata.num_phase_gradient_ancillas == 4
@@ -107,7 +91,7 @@ class TestQROMStatePreparation:
     def test_resource_counts(self):
         """Pin the logical resource counts so a costing regression is visible."""
         prep = QROMStatePreparation(rotation_bit_precision=4)
-        circuit = prep.run(_make_wavefunction([0.5, 0.3, 0.7, 0.1]))
+        circuit = prep.run(create_dense_wavefunction([0.5, 0.3, 0.7, 0.1]))
 
         lc = circuit.estimate()["logicalCounts"]
         assert lc["numQubits"] == 14
@@ -155,10 +139,16 @@ class TestQROMStatePreparation:
         with pytest.raises(ValueError, match="at least one coefficient"):
             prep._run_impl(_EmptyCoefficientWavefunction())
 
+    def test_coefficients_that_overflow_when_squared_are_rejected(self):
+        """The angle tree stores |c|^2, so a finite 1e200 still poisons every ratio with NaN."""
+        prep = QROMStatePreparation(rotation_bit_precision=4)
+        with pytest.raises(ValueError, match="overflows to infinity"):
+            prep.run(create_dense_wavefunction([1e200, 1.0]))
+
     def test_sparse_wavefunction_uses_determinant_indices(self):
         """A coefficient belongs at its determinant's index, not its position in the list."""
         prep = QROMStatePreparation(rotation_bit_precision=8)
-        params = prep._build_params(_make_sparse_wavefunction(2, [0, 3], [0.6, 0.8]))
+        params = prep._build_params(create_sparse_wavefunction(2, [0, 3], [0.6, 0.8]))
 
         assert params.numStateQubits == 2
         assert list(params.amplitudes) == pytest.approx([0.6, 0.0, 0.0, 0.8])

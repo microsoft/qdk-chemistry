@@ -224,40 +224,6 @@ namespace QDKChemistry.Utils.SelectSwap {
         return selectCost + swapCost + numErasures * eraseCost;
     }
 
-    /// Toffoli cost of a plain `Select` over `numData` entries plus its measurement erasure.
-    internal function SelectRoundTripCost(numData : Int) : Int {
-        let addressBits = Ceiling(Lg(IntAsDouble(numData)));
-        (numData - 2) + 2^((addressBits + 1) / 2) + 2^(addressBits / 2) - (addressBits + 2)
-    }
-
-    /// Whether a per-condition word is cheaper loaded on its own than carried in a 2D table.
-    ///
-    /// Carrying it widens the QROAM output, which the swap network is charged for on each of
-    /// `numLoads` lookups; loading it separately costs one `Select` round trip over the
-    /// conditions but also frees the table to pick a different swap width. Neither dominates
-    /// -- at small condition counts the separate load is not worth it -- so compare the totals
-    /// rather than guessing from the swap width alone.
-    function SeparateWordLoadPays(
-        numConditions : Int,
-        numInnerSlots : Int,
-        numWordBits : Int,
-        numExtraBits : Int,
-        numLoads : Int,
-    ) : Bool {
-        let inlineBits = numWordBits + numExtraBits;
-        let inlineLambda = ComputeOptimalLambda2D(numConditions, numInnerSlots, inlineBits, true);
-        let separateLambda = ComputeOptimalLambda2D(numConditions, numInnerSlots, numWordBits, true);
-        let inlineCost = numLoads * SelectSwapCost2D(inlineLambda, numConditions, numInnerSlots, inlineBits, true);
-        let separateCost = numLoads * SelectSwapCost2D(
-            separateLambda,
-            numConditions,
-            numInnerSlots,
-            numWordBits,
-            true
-        ) + SelectRoundTripCost(numConditions);
-        separateCost < inlineCost
-    }
-
     internal function DimensionsForSelect(data : Bool[][], address : Qubit[]) : Int {
         let N = Length(data);
         Fact(N > 0, "data cannot be empty");
