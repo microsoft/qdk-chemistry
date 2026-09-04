@@ -13,6 +13,7 @@
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace qdk::chemistry::algorithms {
@@ -161,11 +162,10 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
   const double truncation_threshold =
       _settings->get<double>("truncation_threshold");
 
-  auto [h_alpha, h_beta] = hamiltonian->get_one_body_integrals();
-  (void)h_beta;
-  auto [g_aaaa, g_aabb, g_bbbb] = hamiltonian->get_two_body_integrals();
-  (void)g_aabb;
-  (void)g_bbbb;
+  const Eigen::MatrixXd& h_alpha =
+      std::get<0>(hamiltonian->get_one_body_integrals());
+  const Eigen::VectorXd& g_aaaa =
+      std::get<0>(hamiltonian->get_two_body_integrals());
 
   const std::size_t norb = static_cast<std::size_t>(h_alpha.rows());
 
@@ -183,7 +183,7 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
         " leaves the factorized Hamiltonian with no two-body term at all.");
   }
 
-  // R = number of fragments, B = norb bases, C = 1
+  // R = number of fragments, B = norb bases, C = 1.
   const std::size_t num_ranks = fragments.size();
   const std::size_t num_bases = norb;
   const std::size_t num_copies = 1;

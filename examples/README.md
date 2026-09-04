@@ -53,9 +53,7 @@ python -m pip install pennylane rdkit
 
 The examples run on Linux, macOS, and Windows, with one exception. `factory_list.ipynb` and
 `extended_hubbard.ipynb` import `qdk_chemistry.plugins.pyscf`, and PySCF publishes no Windows
-wheels, so those two notebooks fail at the import on native Windows. `sossa_qre.ipynb` reaches the
-same plugin later and less visibly: Part 2 resolves `macis_cas` through the registry, so it fails
-partway through rather than at the first cell. Run them under
+wheels, so those two notebooks fail at the import on native Windows. Run them under
 [WSL](https://learn.microsoft.com/windows/wsl/install) instead. See
 [Notes for Windows users](https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md#notes-for-windows-users)
 for details.
@@ -75,7 +73,7 @@ Download or clone the full `examples/` directory structure to run the examples.
 - `time_evolve_and_measure.ipynb`: Jupyter notebook simulating the time-dependent Hamiltonian and measuring an observable's expectation value.
 - `estimation_ising_2d.ipynb`: Jupyter notebook demonstrating quantum resource estimation for simulating a 2D Ising model Hamiltonian.
 - `extended_hubbard.ipynb`: Jupyter notebook modeling cyclobutadiene with the Extended Hubbard model and estimating its energy with quantum phase estimation.
-- `sossa_qre.ipynb`: Jupyter notebook estimating the cost of unary-iteration quantum phase estimation on a Hamiltonian block-encoded with SOSSA (sum-of-squares spectral amplification), from a stored H<sub>2</sub> factorization, a double factorization of stretched N<sub>2</sub>, and synthetic (N, R, B, C) shapes.
+- `sossa_qre.ipynb`: Jupyter notebook estimating the cost of unary-iteration quantum phase estimation on a Hamiltonian block-encoded with SOSSA (sum-of-squares spectral amplification)
 
 ## Companion datasets and assets
 
