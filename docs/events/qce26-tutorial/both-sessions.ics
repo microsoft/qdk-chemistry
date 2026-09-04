@@ -1,0 +1,73 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Microsoft Quantum Development Kit//QCE 2026 Tutorial//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:Microsoft QDK Tutorials - QCE 2026
+X-WR-TIMEZONE:America/Toronto
+BEGIN:VTIMEZONE
+TZID:America/Toronto
+BEGIN:DAYLIGHT
+TZOFFSETFROM:-0500
+TZOFFSETTO:-0400
+TZNAME:EDT
+DTSTART:19700308T020000
+RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU
+END:DAYLIGHT
+BEGIN:STANDARD
+TZOFFSETFROM:-0400
+TZOFFSETTO:-0500
+TZNAME:EST
+DTSTART:19701101T020000
+RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU
+END:STANDARD
+END:VTIMEZONE
+BEGIN:VEVENT
+UID:qdk-qce2026-tutorial-session1@microsoft.com
+DTSTAMP:20260811T000000Z
+DTSTART;TZID=America/Toronto:20260916T100000
+DTEND;TZID=America/Toronto:20260916T113000
+SUMMARY:QDK Tutorial (Session 1): From Molecules to Logical Qubits
+DESCRIPTION:Session 1 of the Microsoft Quantum Development Kit tutorial at 
+ IEEE Quantum Week (QCE 2026).\n\nFrom Molecules to Logical Qubits: A Pract
+ ical Tutorial on the Microsoft Quantum Development Kit (QDK)\n\nFull detai
+ ls: https://qce.quantum.ieee.org/2026/qce26-schedule/tutorial-schedule/#12
+ 97-1
+LOCATION:Room 715B\, Metro Toronto Convention Centre\, 255 Front St W\, Tor
+ onto\, ON\, Canada
+URL:https://qce.quantum.ieee.org/2026/qce26-schedule/tutorial-schedule/#129
+ 7-1
+STATUS:CONFIRMED
+TRANSP:OPAQUE
+SEQUENCE:0
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:QDK Tutorial Session 1 starts in 30 minutes - Room 715B
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:qdk-qce2026-tutorial-session2@microsoft.com
+DTSTAMP:20260811T000000Z
+DTSTART;TZID=America/Toronto:20260916T130000
+DTEND;TZID=America/Toronto:20260916T143000
+SUMMARY:QDK Tutorial (Session 2): From Molecules to Logical Qubits
+DESCRIPTION:Session 2 of the Microsoft Quantum Development Kit tutorial at 
+ IEEE Quantum Week (QCE 2026).\n\nFrom Molecules to Logical Qubits: A Pract
+ ical Tutorial on the Microsoft Quantum Development Kit (QDK)\n\nFull detai
+ ls: https://qce.quantum.ieee.org/2026/qce26-schedule/tutorial-schedule/#12
+ 97-1
+LOCATION:Room 715B\, Metro Toronto Convention Centre\, 255 Front St W\, Tor
+ onto\, ON\, Canada
+URL:https://qce.quantum.ieee.org/2026/qce26-schedule/tutorial-schedule/#129
+ 7-1
+STATUS:CONFIRMED
+TRANSP:OPAQUE
+SEQUENCE:0
+BEGIN:VALARM
+TRIGGER:-PT30M
+ACTION:DISPLAY
+DESCRIPTION:QDK Tutorial Session 2 starts in 30 minutes - Room 715B
+END:VALARM
+END:VEVENT
+END:VCALENDAR
