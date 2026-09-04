@@ -99,6 +99,8 @@ class QROMStatePreparation(StatePreparation):
             qsharp_op = QSHARP_UTILS.QROMStatePrep.MakeQROMStatePrepOpWithPhaseGradient(params)
             num_qubits = params.numStateQubits + params.rotationBitPrecision
             num_gradient_ancillas = params.rotationBitPrecision
+        # Both branches share one factory: an exported circuit has no caller to own the
+        # gradient, so it always allocates and prepares its own.
         qsharp_factory = QsharpFactoryData(
             program=QSHARP_UTILS.QROMStatePrep.MakeQROMStatePrepCircuit,
             parameter={
@@ -127,12 +129,19 @@ class QROMStatePreparation(StatePreparation):
 
         Raises:
             ValueError: If the wavefunction has no coefficients, has an imaginary part, is
-                too wide to densify, or contains a non-finite or all-zero coefficient vector.
+                too wide to densify, or holds an all-zero coefficient vector or one that is
+                non-finite before or after squaring.
 
         """
         coeffs, num_state_qubits = self._dense_state_vector(wavefunction, "QROM state preparation")
-        if not np.all(np.isfinite(coeffs)) or not np.any(coeffs != 0.0):
-            raise ValueError("QROM state preparation requires finite, non-zero coefficients.")
+        if not np.all(np.isfinite(coeffs)):
+            raise ValueError("QROM state preparation requires finite coefficients.")
+        # The Q# angle tree stores |c|^2, so finite coefficients are not enough: 1e200 squares
+        # to infinity and every ratio taken from that subtree collapses to NaN.
+        if not np.all(np.isfinite(coeffs**2)):
+            raise ValueError("QROM state preparation overflows to infinity when squaring; rescale first.")
+        if not np.any(coeffs != 0.0):
+            raise ValueError("QROM state preparation requires at least one non-zero coefficient.")
 
         return QSHARP_UTILS.QROMStatePrep.QROMStatePrepParams(
             amplitudes=coeffs.tolist(),

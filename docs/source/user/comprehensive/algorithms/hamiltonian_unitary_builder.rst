@@ -358,7 +358,7 @@ To use alias sampling for the PREPARE oracle, pass an
 :class:`~qdk_chemistry.data.AlgorithmRef` to the
 :class:`~qdk_chemistry.algorithms.circuit_mapper.psp_mapper.PSPMapper`:
 
-.. tab:: Python API
+.. tab:: Python API -- alias sampling PREPARE
 
    .. literalinclude:: ../../../_static/examples/python/hamiltonian_unitary_builder.py
       :language: python
