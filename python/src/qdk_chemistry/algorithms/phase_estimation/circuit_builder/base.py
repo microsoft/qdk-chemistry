@@ -6,7 +6,6 @@
 # --------------------------------------------------------------------------------------------
 
 from abc import abstractmethod
-from collections.abc import Sequence
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import (
@@ -14,10 +13,6 @@ from qdk_chemistry.data import (
     Circuit,
     QubitOperator,
     Settings,
-    UnitaryRepresentation,
-)
-from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
-    PauliProductFormulaContainer,
 )
 
 __all__: list[str] = [

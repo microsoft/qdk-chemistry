@@ -243,6 +243,9 @@ std::unordered_map<std::string, std::complex<double>> spin_block_terms(
 
 }  // namespace qdk::chemistry::tests::test_support
 
+using test_support::map_single_orbital;
+using test_support::spin_block_terms;
+
 TEST(MajoranaMapEngineTest, OnDemandEngineMatchesEagerEngineAboveTheWordCap) {
   // 4 orbitals → 8 qubits → eager engine; 520 orbitals → 1040 qubits → the
   // on-demand engine, which is the only path available above 1024 qubits.
