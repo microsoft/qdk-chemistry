@@ -12,6 +12,7 @@
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/factorized.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
 
 #include "path_utils.hpp"
@@ -985,6 +986,242 @@ Args:
       py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
 
   // ============================================================================
+  // FactorizedHamiltonianContainer - double-factorized container
+  // ============================================================================
+  py::class_<FactorizedHamiltonianContainer, HamiltonianContainer,
+             py::smart_holder>
+      factorized_container(data, "FactorizedHamiltonianContainer", R"(
+Restricted, spin-free, double factorized tensor hypercontraction hamiltonian.
+
+Check :meth:`get_signs` before treating the representation as a true sum of
+squares.
+
+References:
+    :cite:`Low2025`
+)");
+
+  factorized_container.def(
+      py::init<double, const Eigen::VectorXd&, const Eigen::VectorXd&,
+               const Eigen::MatrixXd&, const Eigen::MatrixXd&,
+               const Eigen::MatrixXd&, std::shared_ptr<Orbitals>,
+               const Eigen::VectorXd&, double, HamiltonianType>(),
+      R"(
+Constructor for a factorized Hamiltonian.
+
+Args:
+    core_energy (float): Nuclear and inactive-core energy.
+    u_matrices (numpy.ndarray): U factors flattened in [R,B,N] order.
+    w_matrices (numpy.ndarray): W factors flattened in [R,B,C] order.
+    wb_matrix (numpy.ndarray): Identity weights with shape [R,C].
+    one_body_integrals (numpy.ndarray): One-body integrals with shape [N,N].
+    inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix with shape [N,N], or an empty array.
+    orbitals (Orbitals): Restricted orbitals with N active spatial orbitals.
+    signs (numpy.ndarray, optional): Rank signs of length R; entries must be +1 or -1. Empty means all positive.
+    energy_gap (float, optional): Energy gap for SOS block encoding; defaults to 0.0.
+    type (HamiltonianType, optional): Hamiltonian type; defaults to Hermitian.
+
+Raises:
+    ValueError: If required data, dimensions, restrictedness, or signs are inconsistent.
+)",
+      py::arg("core_energy"), py::arg("u_matrices"), py::arg("w_matrices"),
+      py::arg("wb_matrix"), py::arg("one_body_integrals"),
+      py::arg("inactive_fock_matrix"), py::arg("orbitals"),
+      py::arg("signs") = Eigen::VectorXd(), py::arg("energy_gap") = 0.0,
+      py::arg("type") = HamiltonianType::Hermitian);
+
+  factorized_container.def("get_u_matrices",
+                           &FactorizedHamiltonianContainer::get_u_matrices,
+                           py::return_value_policy::reference_internal, R"(
+Get U matrices as flat vector [R*B*N].
+
+Returns:
+    numpy.ndarray: U factors flattened in [R,B,N] order.
+)");
+
+  factorized_container.def("get_w_matrices",
+                           &FactorizedHamiltonianContainer::get_w_matrices,
+                           py::return_value_policy::reference_internal, R"(
+Get W matrices as flat vector [R*B*C].
+
+Returns:
+    numpy.ndarray: W factors flattened in [R,B,C] order.
+)");
+
+  factorized_container.def("get_wb_matrix",
+                           &FactorizedHamiltonianContainer::get_wb_matrix,
+                           py::return_value_policy::reference_internal, R"(
+Get WB identity weight matrix [R x C].
+
+Returns:
+    numpy.ndarray: Identity weights with shape [R,C].
+)");
+
+  factorized_container.def("get_num_orbitals",
+                           &FactorizedHamiltonianContainer::get_num_orbitals,
+                           R"(
+Number of spatial orbitals (N).
+
+Returns:
+    int: Number of active spatial orbitals.
+)");
+
+  factorized_container.def("get_num_ranks",
+                           &FactorizedHamiltonianContainer::get_num_ranks, R"(
+Number of ranks (R).
+
+Returns:
+    int: Number of ranks in the factorization.
+)");
+
+  factorized_container.def("get_num_bases",
+                           &FactorizedHamiltonianContainer::get_num_bases, R"(
+Number of bases per rank (B).
+
+Returns:
+    int: Number of bases per rank.
+)");
+
+  factorized_container.def("get_num_copies",
+                           &FactorizedHamiltonianContainer::get_num_copies, R"(
+Number of copies per rank (C).
+
+Returns:
+    int: Number of copies per rank.
+)");
+
+  factorized_container.def("get_signs",
+                           &FactorizedHamiltonianContainer::get_signs,
+                           py::return_value_policy::reference_internal, R"(
+Return the sign of each factorized rank.
+
+Returns:
+    numpy.ndarray: Length-R array containing only +1.0 or -1.0.
+)");
+
+  factorized_container.def("get_energy_gap",
+                           &FactorizedHamiltonianContainer::get_energy_gap, R"(
+E_gap for SOS block encoding.
+
+Returns:
+    float: Energy gap used by the SOS block encoding.
+)");
+
+  factorized_container.def("get_lambda",
+                           &FactorizedHamiltonianContainer::get_lambda, R"(
+Compute the normalization from the adjusted one-body matrix and factors.
+
+Returns:
+    float: Block-encoding normalization.
+
+Raises:
+    RuntimeError: If the adjusted one-body matrix cannot be diagonalized.
+)");
+
+  factorized_container.def("get_lambda_eff",
+                           &FactorizedHamiltonianContainer::get_lambda_eff, R"(
+Compute the effective SOS normalization.
+
+Returns:
+    float: ``sqrt(E_gap * (2 * Lambda - E_gap))``, or 0.0 if any rank carries a negative sign or the gap is outside ``(0, 2 * Lambda)``.
+
+Raises:
+    RuntimeError: If the adjusted one-body matrix cannot be diagonalized.
+)");
+
+  factorized_container.def("get_h1_prime",
+                           &FactorizedHamiltonianContainer::get_h1_prime, R"(
+Return the adjusted one-body matrix used by the DFTHC block encoding.
+
+Returns:
+    numpy.ndarray: Adjusted one-body matrix with shape [N,N].
+)");
+
+  factorized_container.def(
+      "reconstruct_two_body_integrals",
+      &FactorizedHamiltonianContainer::reconstruct_two_body_integrals, R"(
+Reconstruct the two-body integrals from U, W, and the rank signs.
+
+Returns:
+    numpy.ndarray: New flat N**4 array in [p,q,r,s] order.
+)");
+
+  factorized_container.def(
+      "get_two_body_integrals",
+      &FactorizedHamiltonianContainer::get_two_body_integrals,
+      py::return_value_policy::reference_internal, R"(
+Return the lazily reconstructed two-body integrals.
+
+Returns:
+    tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: The aaaa, aabb, and bbbb views of one cached N**4 vector.
+)");
+
+  factorized_container.def(
+      "get_two_body_element",
+      &FactorizedHamiltonianContainer::get_two_body_element,
+      R"(
+Get specific two-electron integral element <ij|kl>.
+
+Args:
+    i, j, k, l (int): Orbital indices.
+    channel (SpinChannel, optional): Ignored because the container is restricted; defaults to aaaa.
+
+Returns:
+    float: Two-electron integral ``(ij|kl)``.
+
+Raises:
+    IndexError: If any orbital index is outside [0,N).
+)",
+      py::arg("i"), py::arg("j"), py::arg("k"), py::arg("l"),
+      py::arg("channel") = SpinChannel::aaaa);
+
+  factorized_container.def(
+      "has_two_body_integrals",
+      &FactorizedHamiltonianContainer::has_two_body_integrals, R"(
+Check if two-body integrals are available.
+
+Returns:
+    bool: Whether U and W factors are available.
+)");
+
+  factorized_container.def("is_restricted",
+                           &FactorizedHamiltonianContainer::is_restricted, R"(
+Return whether the container is restricted.
+
+Returns:
+    bool: Always ``True``.
+)");
+
+  factorized_container.def("is_valid",
+                           &FactorizedHamiltonianContainer::is_valid, R"(
+Check if the Hamiltonian data is complete and consistent.
+
+Returns:
+    bool: Whether required data and dimensions are valid.
+)");
+
+  factorized_container.def(
+      "to_json",
+      [](const FactorizedHamiltonianContainer& self) -> std::string {
+        return self.to_json().dump();
+      },
+      R"(
+Convert container to JSON string.
+
+Returns:
+    str: JSON representation of the container.
+)");
+
+  factorized_container.def(
+      "__repr__",
+      [](const FactorizedHamiltonianContainer& self) -> std::string {
+        return "<FactorizedHamiltonianContainer N=" +
+               std::to_string(self.get_num_orbitals()) +
+               " R=" + std::to_string(self.get_num_ranks()) +
+               " B=" + std::to_string(self.get_num_bases()) +
+               " C=" + std::to_string(self.get_num_copies()) + ">";
+      });
+
+  // ============================================================================
   // Hamiltonian - Interface class
   // ============================================================================
   py::class_<Hamiltonian, DataClass, py::smart_holder> hamiltonian(
@@ -1204,6 +1441,19 @@ Get the type of the underlying container.
 
 Returns:
     str: Container type identifier (e.g., "canonical_four_center")
+)");
+
+  hamiltonian.def(
+      "get_container",
+      [](const Hamiltonian& self) -> const HamiltonianContainer& {
+        return self.get_container<HamiltonianContainer>();
+      },
+      py::return_value_policy::reference_internal,
+      R"(
+Get the underlying container.
+
+Returns:
+    HamiltonianContainer: The container holding this Hamiltonian's data.
 )");
 
   // Summary
