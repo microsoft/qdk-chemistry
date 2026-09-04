@@ -12,7 +12,6 @@ from qdk_chemistry.data import (
     BondFlavor,
     BondFlavorDefinition,
     Hamiltonian,
-    HoneycombSizeConvention,
     LatticeGraph,
     QubitOperator,
 )
@@ -322,11 +321,7 @@ class TestModelHamiltonians:
         assert unit_cell.num_sites == 2
         assert unit_cell.num_edges == 1
 
-        graph = LatticeGraph.honeycomb(
-            1,
-            1,
-            size_convention=HoneycombSizeConvention.COMPLETE_PLAQUETTES,
-        )
+        graph = LatticeGraph.honeycomb_plaquettes(1, 1)
         positions = graph.positions
         assert positions.shape == (6, 2)
 
@@ -794,6 +789,26 @@ class TestModelHamiltonians:
         with pytest.raises(ValueError, match="bohr_magneton"):
             create_kitaev_hamiltonian(graph, 0.0, 0.0, 0.0, bohr_magneton=np.inf)
 
+    def test_kitaev_without_interactions_does_not_require_geometry(self):
+        graph = LatticeGraph.from_dense_matrix(np.zeros((2, 2)))
+        zero = create_kitaev_hamiltonian(graph, 0.0, 0.0, 0.0)
+        np.testing.assert_array_equal(zero.to_matrix(), np.zeros((4, 4)))
+
+        field = create_kitaev_hamiltonian(
+            graph,
+            0.0,
+            0.0,
+            0.0,
+            magnetic_field_abc=(0.0, 1.0, 0.0),
+            crystallographic_transform=np.eye(3),
+            include_term_groups=False,
+        )
+        assert field.num_qubits == 2
+        assert field.is_hermitian()
+
+        with pytest.raises(RuntimeError, match="require lattice positions"):
+            create_kitaev_hamiltonian(graph, {1: 1.0}, 0.0, 0.0)
+
     def test_kitaev_shell_mapping_order_is_deterministic(self):
         graph = LatticeGraph.honeycomb(3, 3)
         forward = {1: 1.0, 2: -0.5, 3: 0.25}
@@ -805,11 +820,7 @@ class TestModelHamiltonians:
         assert reversed_hamiltonian.content_hash() == forward_hamiltonian.content_hash()
 
     def test_kitaev_open_hexagon_matches_explicit_matrix(self):
-        graph = LatticeGraph.honeycomb(
-            1,
-            1,
-            size_convention=HoneycombSizeConvention.COMPLETE_PLAQUETTES,
-        )
+        graph = LatticeGraph.honeycomb_plaquettes(1, 1)
         bonds = {
             (1, BondFlavor.X): {(0, 1), (4, 5)},
             (1, BondFlavor.Y): {(0, 3), (2, 5)},

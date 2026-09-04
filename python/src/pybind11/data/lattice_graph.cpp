@@ -63,13 +63,6 @@ void bind_lattice_graph(pybind11::module &m) {
       .value("Z", BondFlavor::Z)
       .export_values();
 
-  py::enum_<HoneycombSizeConvention>(
-      m, "HoneycombSizeConvention",
-      "Interpretation of honeycomb lattice dimensions.")
-      .value("UNIT_CELLS", HoneycombSizeConvention::UnitCells)
-      .value("COMPLETE_PLAQUETTES", HoneycombSizeConvention::CompletePlaquettes)
-      .export_values();
-
   py::class_<BondClass>(m, "BondClass", "Geometric shell and bond-axis class.")
       .def_property_readonly("shell",
                              [](const BondClass &self) { return self.shell; })
@@ -508,44 +501,76 @@ Raises:
       py::arg("periodic_y") = false, py::arg("t") = 1.0,
       py::arg("coloring_seed") = 0, py::arg("dfs_ordering") = false);
 
-  lattice_graph.def_static(
-      "honeycomb",
-      [](std::uint64_t nx, std::uint64_t ny, bool periodic_x, bool periodic_y,
-         double t, bool dfs_ordering, HoneycombSizeConvention size_convention) {
-        return LatticeGraph::honeycomb(nx, ny, size_convention, periodic_x,
-                                       periodic_y, t, dfs_ordering);
-      },
-      R"(
-Create a two-dimensional honeycomb lattice.
+  lattice_graph.def_static("honeycomb", &LatticeGraph::honeycomb,
+                           R"(
+Create a two-dimensional honeycomb lattice sized by unit cells.
 
 The honeycomb lattice has two sites per unit cell (A and B sublattices).
 Unit cells are arranged on a rectangular grid of size nx x ny, giving a
 total of ``2 * nx * ny`` sites.
 
-Set ``size_convention=HoneycombSizeConvention.COMPLETE_PLAQUETTES`` to count
-complete hexagonal plaquettes instead. Open directions then include the boundary
-sites needed to complete the requested plaquettes. A fully open ``1 x 1``
-complete-plaquette lattice is one six-site hexagon.
+Example: 3x4 honeycomb lattice::
+
+              18-19-20-21-22-23
+               |     |     |
+           12-13-14-15-16-17
+            |     |     |
+         6--7--8--9-10-11
+         |     |     |
+      0--1--2--3--4--5
 
 Args:
-    nx (int): Number of unit cells or complete plaquettes along x.
-    ny (int): Number of unit cells or complete plaquettes along y.
+    nx (int): Number of unit cells along x.
+    ny (int): Number of unit cells along y.
     periodic_x (bool, optional): If True, apply periodic boundary conditions along x. Requires nx > 1. Defaults to False.
     periodic_y (bool, optional): If True, apply periodic boundary conditions along y. Requires ny > 1. Defaults to False.
     t (float, optional): Hopping weight for all edges. Defaults to 1.0.
     dfs_ordering (bool, optional): Reserved for API compatibility. Defaults to False.
-    size_convention (HoneycombSizeConvention, optional): Interpretation of ``nx`` and ``ny``. Defaults to ``UNIT_CELLS``.
 
 Returns:
-    LatticeGraph: Honeycomb lattice with the requested dimensions.
+    LatticeGraph: Honeycomb lattice with ``2 * nx * ny`` sites.
+
+Raises:
+    ValueError: If nx or ny is 0.
+)",
+                           py::arg("nx"), py::arg("ny"),
+                           py::arg("periodic_x") = false,
+                           py::arg("periodic_y") = false, py::arg("t") = 1.0,
+                           py::arg("dfs_ordering") = false);
+
+  lattice_graph.def_static(
+      "honeycomb_plaquettes", &LatticeGraph::honeycomb_plaquettes,
+      R"(
+Create a honeycomb lattice patch sized by complete hexagonal plaquettes.
+
+Open directions include the boundary sites needed to complete every requested
+plaquette. A fully open ``1 x 1`` patch is one six-site hexagon.
+
+Example: 1x1 open plaquette patch::
+
+      1---2
+     /     \
+    0       5
+     \     /
+      3---4
+
+Args:
+    nx (int): Number of complete plaquettes along x.
+    ny (int): Number of complete plaquettes along y.
+    periodic_x (bool, optional): If True, apply periodic boundary conditions along x. Requires nx > 1. Defaults to False.
+    periodic_y (bool, optional): If True, apply periodic boundary conditions along y. Requires ny > 1. Defaults to False.
+    t (float, optional): Hopping weight for all edges. Defaults to 1.0.
+    dfs_ordering (bool, optional): Reserved for API compatibility. Defaults to False.
+
+Returns:
+    LatticeGraph: Honeycomb patch with the requested complete plaquettes.
 
 Raises:
     ValueError: If nx or ny is 0.
 )",
       py::arg("nx"), py::arg("ny"), py::arg("periodic_x") = false,
       py::arg("periodic_y") = false, py::arg("t") = 1.0,
-      py::arg("dfs_ordering") = false,
-      py::arg("size_convention") = HoneycombSizeConvention::UnitCells);
+      py::arg("dfs_ordering") = false);
 
   lattice_graph.def_static(
       "kagome", &LatticeGraph::kagome, R"(

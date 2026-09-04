@@ -169,11 +169,11 @@ With periodic boundary conditions, the inter-cell bonds between the B and A subl
          |     |     |
       0--1--2--3--4--5
 
-To size a honeycomb patch by complete hexagonal plaquettes, set
-``size_convention=HoneycombSizeConvention.COMPLETE_PLAQUETTES``. Open directions
-then include the boundary sites needed to complete those plaquettes. A fully open
-patch contains ``2 * (nx + 1) * (ny + 1) - 2`` sites; both size conventions
-produce the same lattice when both axes are periodic.
+Use ``honeycomb_plaquettes(nx, ny)`` to size a patch by complete hexagonal
+plaquettes instead of unit cells. Open directions include the boundary sites
+needed to complete those plaquettes. A fully open patch contains
+``2 * (nx + 1) * (ny + 1) - 2`` sites; ``honeycomb()`` and
+``honeycomb_plaquettes()`` produce the same lattice when both axes are periodic.
 
 .. code-block:: text
 
@@ -272,16 +272,17 @@ Semantic bond flavors are optional labels on geometric shell-axis classes.
 Use :class:`~qdk_chemistry.data.BondFlavorDefinition` and ``with_bond_flavors()`` to label classes on another embedded lattice.
 Unlabeled lattices retain all shell and orientation functionality, and their connection ``flavor`` properties are ``None``.
 
-The honeycomb factory predefines :class:`~qdk_chemistry.data.BondFlavor` labels ``X``, ``Y``, and ``Z`` for its first three shells.
+The honeycomb factory predefines :class:`~qdk_chemistry.data.BondFlavor` labels ``X``, ``Y``, and ``Z`` for the standard axes at distances :math:`1`, :math:`\sqrt{3}`, and :math:`2`.
 Thus each honeycomb shell decomposes as
 
 .. math::
 
    N_m = X_m \cup Y_m \cup Z_m,
 
-with shell distances :math:`1`, :math:`\sqrt{3}`, and :math:`2` for :math:`m=1,2,3`.
+when those distances are present as shells :math:`m=1,2,3`.
 An interior site has one connection of each flavor in shells 1 and 3, and two connections of each flavor in shell 2.
 These labels are physical model metadata and remain distinct from ``edge_coloring``, whose colors describe conflict-free scheduling layers.
+On narrow finite patches, one of the standard distances can be absent. Because shell indices rank the distances present in that finite graph, a later distance that occupies the same rank remains unlabeled rather than being assigned a different physical honeycomb flavor.
 
 Built-in lattice embeddings
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

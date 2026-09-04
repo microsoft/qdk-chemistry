@@ -9,7 +9,7 @@ from pathlib import Path
 
 import numpy as np
 
-from qdk_chemistry.data import HoneycombSizeConvention, LatticeGraph
+from qdk_chemistry.data import LatticeGraph
 
 ################################################################################
 # start-cell-create-chain
@@ -41,11 +41,7 @@ honeycomb = LatticeGraph.honeycomb(3, 2)
 print(f"Honeycomb: {honeycomb.num_sites} sites, {honeycomb.num_edges} edges")
 
 # Create one isolated six-site honeycomb plaquette
-hexagon = LatticeGraph.honeycomb(
-    1,
-    1,
-    size_convention=HoneycombSizeConvention.COMPLETE_PLAQUETTES,
-)
+hexagon = LatticeGraph.honeycomb_plaquettes(1, 1)
 print(f"Hexagon: {hexagon.num_sites} sites, {hexagon.num_edges} edges")
 print(f"Hexagon positions:\n{hexagon.positions}")
 print(f"Hexagon neighbor shells: {hexagon.nearest_neighbor_shells([1, 2, 3])}")

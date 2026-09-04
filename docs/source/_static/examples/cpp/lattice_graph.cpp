@@ -31,8 +31,7 @@ int main() {
   auto honeycomb = LatticeGraph::honeycomb(3, 2);
 
   // Create one isolated six-site honeycomb plaquette
-  auto hexagon = LatticeGraph::honeycomb(
-      1, 1, HoneycombSizeConvention::CompletePlaquettes);
+  auto hexagon = LatticeGraph::honeycomb_plaquettes(1, 1);
 
   // Create a 3x2 kagome lattice (3 sites per unit cell)
   auto kagome = LatticeGraph::kagome(3, 2);

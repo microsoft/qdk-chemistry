@@ -32,12 +32,6 @@ using EdgeColoring = std::map<std::pair<std::uint64_t, std::uint64_t>, int>;
  */
 enum class BondFlavor : std::uint8_t { X, Y, Z };
 
-/** @brief Interpretation of honeycomb lattice dimensions. */
-enum class HoneycombSizeConvention : std::uint8_t {
-  UnitCells,
-  CompletePlaquettes
-};
-
 /** @brief A radial shell and unoriented geometric bond-axis class. */
 struct BondClass {
   std::uint64_t shell;
@@ -458,25 +452,34 @@ class LatticeGraph : public DataClass {
                                 bool dfs_ordering = false);
 
   /**
-   * @brief Create a honeycomb lattice with an explicit size convention.
+   * @brief Create a honeycomb patch sized by complete hexagonal plaquettes.
    *
-   * CompletePlaquettes adds the boundary cells required along open axes and,
-   * for a fully open patch, removes the two dangling corner sites. UnitCells
-   * uses two sites per unit cell.
+   * Open directions include the boundary sites needed to complete every
+   * requested plaquette. A fully open 1 x 1 patch is one six-site hexagon.
    *
-   * @param nx Number of unit cells or complete plaquettes along x.
-   * @param ny Number of unit cells or complete plaquettes along y.
-   * @param size_convention Interpretation of nx and ny.
+   * @code
+   *   1x1 open plaquette patch:
+   *
+   *       1---2
+   *      /     \
+   *     0       5
+   *      \     /
+   *       3---4
+   * @endcode
+   *
+   * @param nx Number of complete plaquettes along x.
+   * @param ny Number of complete plaquettes along y.
    * @param periodic_x If true, apply periodic boundary conditions along x.
    * @param periodic_y If true, apply periodic boundary conditions along y.
    * @param t Uniform hopping weight.
    * @param dfs_ordering Reserved for API compatibility; currently ignored.
+   * @throws std::invalid_argument If nx or ny is 0.
    */
-  static LatticeGraph honeycomb(std::uint64_t nx, std::uint64_t ny,
-                                HoneycombSizeConvention size_convention,
-                                bool periodic_x = false,
-                                bool periodic_y = false, double t = 1.0,
-                                bool dfs_ordering = false);
+  static LatticeGraph honeycomb_plaquettes(std::uint64_t nx, std::uint64_t ny,
+                                           bool periodic_x = false,
+                                           bool periodic_y = false,
+                                           double t = 1.0,
+                                           bool dfs_ordering = false);
 
   /**
    * @brief Create a two-dimensional kagome lattice.
@@ -660,6 +663,11 @@ class LatticeGraph : public DataClass {
   static void _validate_bond_flavors(
       const std::optional<Eigen::MatrixXd>& positions,
       std::vector<BondFlavorDefinition>& definitions, double tolerance);
+
+  static LatticeGraph _honeycomb(std::uint64_t num_cells_x,
+                                 std::uint64_t num_cells_y,
+                                 bool remove_open_corners, bool periodic_x,
+                                 bool periodic_y, double t, bool dfs_ordering);
 
   /** @brief Check if a sparse matrix is symmetric within a numerical tolerance.
    */

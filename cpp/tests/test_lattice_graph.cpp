@@ -250,13 +250,22 @@ TEST_F(LatticeGraphTest, GeometricBondClassesAndHoneycombFlavors) {
   }
 }
 
+TEST_F(LatticeGraphTest, NarrowHoneycombOnlyFlavorsMatchingPhysicalAxes) {
+  const auto connections =
+      LatticeGraph::honeycomb(1, 2).neighbor_connections({1, 2, 3});
+  EXPECT_TRUE(std::any_of(connections.begin(), connections.end(),
+                          [](const auto& connection) {
+                            return connection.bond_class.shell == 3 &&
+                                   !connection.flavor.has_value();
+                          }));
+}
+
 TEST_F(LatticeGraphTest, HoneycombOpenPlaquettePatches) {
   auto unit_cell = LatticeGraph::honeycomb(1, 1);
   EXPECT_EQ(unit_cell.num_sites(), 2);
   EXPECT_EQ(unit_cell.num_edges(), 1);
 
-  auto hexagon = LatticeGraph::honeycomb(
-      1, 1, HoneycombSizeConvention::CompletePlaquettes, false, false, 2.5);
+  auto hexagon = LatticeGraph::honeycomb_plaquettes(1, 1, false, false, 2.5);
   EXPECT_EQ(hexagon.num_sites(), 6);
   EXPECT_EQ(hexagon.num_edges(), 6);
   EXPECT_TRUE(hexagon.is_symmetric());
@@ -293,8 +302,7 @@ TEST_F(LatticeGraphTest, HoneycombOpenPlaquettePatches) {
     }
   }
 
-  auto patch = LatticeGraph::honeycomb(
-      4, 4, HoneycombSizeConvention::CompletePlaquettes);
+  auto patch = LatticeGraph::honeycomb_plaquettes(4, 4);
   EXPECT_EQ(patch.num_sites(), 48);
   EXPECT_EQ(patch.num_edges(), 63);
   EXPECT_EQ(patch.num_edges() - patch.num_sites() + 1, 16);
@@ -302,6 +310,10 @@ TEST_F(LatticeGraphTest, HoneycombOpenPlaquettePatches) {
        site < patch.sparse_adjacency_matrix().outerSize(); ++site) {
     EXPECT_GE(patch.sparse_adjacency_matrix().innerVector(site).nonZeros(), 2);
   }
+
+  EXPECT_EQ(
+      LatticeGraph::honeycomb(2, 2, true, true).content_hash(),
+      LatticeGraph::honeycomb_plaquettes(2, 2, true, true).content_hash());
 }
 
 TEST_F(LatticeGraphTest, PeriodicConnectionsPreserveFlavorMultiplicity) {
@@ -386,6 +398,90 @@ TEST_F(LatticeGraphTest, BondFlavorDefinitionsSurviveDataOperations) {
       [](const auto& connection) { return !connection.flavor.has_value(); }));
 }
 
+TEST_F(LatticeGraphTest, BondFlavorAxesAreScaleInvariant) {
+  const auto square = LatticeGraph::square(2, 2);
+  for (double scale : {1.0e-200, 1.0e200}) {
+    const auto flavored =
+        square.with_bond_flavors({{1, {scale, 0.0}, BondFlavor::X}});
+    ASSERT_EQ(flavored.bond_flavor_definitions().size(), 1);
+    EXPECT_TRUE(flavored.bond_flavor_definitions()[0].axis.isApprox(
+        Eigen::RowVector2d(1.0, 0.0)));
+  }
+}
+
+TEST_F(LatticeGraphTest, BondFlavorPersistencePreservesTypes) {
+  constexpr std::uint64_t shell = (std::uint64_t{1} << 53) + 1;
+  const auto graph = LatticeGraph::square(2, 2).with_bond_flavors(
+      {{shell, {1.0, 0.0}, BondFlavor::X}});
+  const std::filesystem::path filename =
+      "test_lattice_graph_bond_flavor_types.lattice_graph.h5";
+  graph.to_hdf5_file(filename.string());
+  const auto restored = LatticeGraph::from_hdf5_file(filename.string());
+  std::filesystem::remove(filename);
+
+  ASSERT_EQ(restored.bond_flavor_definitions().size(), 1);
+  EXPECT_EQ(restored.bond_flavor_definitions()[0].shell, shell);
+  EXPECT_EQ(restored.content_hash(), graph.content_hash());
+}
+
+TEST_F(LatticeGraphTest, BondFlavorJsonRejectsMalformedMetadata) {
+  const auto valid = LatticeGraph::square(2, 2)
+                         .with_bond_flavors({{1, {1.0, 0.0}, BondFlavor::X}})
+                         .to_json();
+  const auto expect_invalid = [&](const nlohmann::json& definition) {
+    auto malformed = valid;
+    malformed["bond_flavor_definitions"] = nlohmann::json::array({definition});
+    EXPECT_THROW(LatticeGraph::from_json(malformed), std::runtime_error);
+  };
+
+  expect_invalid({1.5, 1.0, 0.0, 0});
+  expect_invalid({-1, 1.0, 0.0, 0});
+  expect_invalid({1, 1.0, 0.0, 1.5});
+  expect_invalid({1, 1.0, 0.0, 256});
+  expect_invalid({1, 1.0, 0.0});
+}
+
+TEST_F(LatticeGraphTest, BondFlavorHdf5RejectsMalformedMetadata) {
+  const auto graph = LatticeGraph::square(2, 2).with_bond_flavors(
+      {{1, {1.0, 0.0}, BondFlavor::X}});
+  const std::filesystem::path filename =
+      "test_lattice_graph_invalid_bond_flavors.lattice_graph.h5";
+  const auto expect_invalid = [&](const auto& mutate) {
+    graph.to_hdf5_file(filename.string());
+    {
+      H5::H5File file(filename.string(), H5F_ACC_RDWR);
+      auto definitions = file.openGroup("/bond_flavor_definitions");
+      mutate(definitions);
+    }
+    EXPECT_THROW(LatticeGraph::from_hdf5_file(filename.string()),
+                 std::runtime_error);
+    std::filesystem::remove(filename);
+  };
+
+  expect_invalid([](H5::Group& definitions) { definitions.unlink("axes"); });
+  expect_invalid([](H5::Group& definitions) {
+    definitions.unlink("axes");
+    hsize_t dims[1] = {2};
+    auto dataset = definitions.createDataSet(
+        "axes", H5::PredType::NATIVE_DOUBLE, H5::DataSpace(1, dims));
+    const double axes[2] = {1.0, 0.0};
+    dataset.write(axes, H5::PredType::NATIVE_DOUBLE);
+  });
+  expect_invalid([](H5::Group& definitions) {
+    definitions.unlink("shells");
+    hsize_t dims[1] = {1};
+    auto dataset = definitions.createDataSet(
+        "shells", H5::PredType::NATIVE_DOUBLE, H5::DataSpace(1, dims));
+    const double shell = 1.0;
+    dataset.write(&shell, H5::PredType::NATIVE_DOUBLE);
+  });
+  expect_invalid([](H5::Group& definitions) {
+    const std::uint8_t flavor = 3;
+    definitions.openDataSet("flavors").write(&flavor,
+                                             H5::PredType::NATIVE_UINT8);
+  });
+}
+
 TEST_F(LatticeGraphTest, BoundaryConditionsAffectGeometricNeighborShells) {
   auto degrees = [](const LatticeGraph& graph, std::uint64_t site) {
     std::array<std::size_t, 3> result{};
@@ -422,6 +518,8 @@ TEST_F(LatticeGraphTest, GeometricShellValidationAndPeriodicBoundaries) {
   Eigen::MatrixXd adjacency = Eigen::MatrixXd::Zero(3, 3);
   auto graph = LatticeGraph::from_dense_matrix(adjacency);
   EXPECT_THROW(graph.mth_nearest_neighbors(1), std::runtime_error);
+  EXPECT_TRUE(graph.neighbor_connections({}).empty());
+  EXPECT_THROW(graph.neighbor_connections({1}), std::runtime_error);
 
   auto periodic_square = LatticeGraph::square(4, 3, true, false);
   EXPECT_THROW(periodic_square.mth_nearest_neighbors(0), std::invalid_argument);
@@ -463,6 +561,14 @@ TEST_F(LatticeGraphTest, GeometricShellsAreScaleInvariant) {
     auto periodic = make_geometry(scale, true);
     EXPECT_EQ(periodic.mth_nearest_neighbors(1),
               (std::vector<Edge>{{0, 1}, {0, 2}, {1, 2}}));
+    const auto connections = periodic.neighbor_connections({1});
+    EXPECT_EQ(connections.size(), 3);
+    for (const auto& connection : connections) {
+      EXPECT_NEAR(
+          std::hypot(connection.displacement.x(), connection.displacement.y()) /
+              scale,
+          1.0, 1.0e-12);
+    }
   }
 
   nlohmann::json graph = {{"num_sites", 1},
@@ -486,6 +592,23 @@ TEST_F(LatticeGraphTest, GeometricShellsAreScaleInvariant) {
                       {"periods", periods}}),
                  std::invalid_argument);
   }
+}
+
+TEST_F(LatticeGraphTest, ConnectionsScaleBeforeSubtractingLargeCoordinates) {
+  const auto graph = LatticeGraph::from_json({
+      {"num_sites", 2},
+      {"is_symmetric", true},
+      {"adjacency_sparse", nlohmann::json::array()},
+      {"positions", {{-9.0e307, 0.0}, {9.0e307, 0.0}}},
+      {"periods", {{1.5e308, 0.0}}},
+  });
+
+  EXPECT_EQ(graph.mth_nearest_neighbors(1),
+            (std::vector<std::pair<std::uint64_t, std::uint64_t>>{{0, 1}}));
+  const auto connections = graph.neighbor_connections({1});
+  ASSERT_EQ(connections.size(), 1);
+  EXPECT_NEAR(connections[0].displacement.x() / 3.0e307, 1.0, 1.0e-12);
+  EXPECT_EQ(connections[0].image_shift[0], -1);
 }
 
 TEST_F(LatticeGraphTest, SkewPeriodicDistancesSearchAllRelevantImages) {

@@ -26,7 +26,6 @@ Exposed classes are:
 - :class:`Hamiltonian`: Quantum mechanical Hamiltonian operator representation.
 - :class:`HamiltonianContainer`: Abstract base class for different Hamiltonian storage formats.
 - :class:`HamiltonianType`: Enumeration of Hamiltonian types (Hermitian, NonHermitian).
-- :class:`HoneycombSizeConvention`: Interpretation of honeycomb factory dimensions.
 - :class:`LatticeGraph`: Lattice graph defining the connectivity and geometry of a model Hamiltonian.
 - :class:`MajoranaMapping`: Majorana-to-Pauli mapping data class for fermion-to-qubit encodings.
 - :class:`MeasurementData`: Measurement bitstring data and metadata for QubitOperator objects.
@@ -91,7 +90,6 @@ from qdk_chemistry._core.data import (
     Hamiltonian,
     HamiltonianContainer,
     HamiltonianType,
-    HoneycombSizeConvention,
     LatticeGraph,
     MajoranaMapping,
     ModelOrbitals,
@@ -173,7 +171,6 @@ __all__ = [
     "Hamiltonian",
     "HamiltonianContainer",
     "HamiltonianType",
-    "HoneycombSizeConvention",
     "LatticeGraph",
     "LayeredPartition",
     "MajoranaMapping",
