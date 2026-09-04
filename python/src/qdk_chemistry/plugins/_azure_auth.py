@@ -22,7 +22,7 @@ def create_credential(auth_mode: str) -> Any:
         Any: An ``azure.identity`` credential instance.
 
     Raises:
-        ValueError: If *auth_mode* is not one of :data:`AUTH_MODES`.
+        ValueError: If *auth_mode* is not ``"azure-cli"`` or ``"default"``.
 
     """
     from azure.identity import AzureCliCredential, DefaultAzureCredential  # noqa: PLC0415
