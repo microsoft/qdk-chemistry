@@ -18,8 +18,10 @@ namespace QDKChemistry.Utils.AliasSampling {
     import Std.Math.Ceiling;
     import Std.Math.Floor;
     import Std.Math.Lg;
+    import Std.Math.MinI;
     import Std.StatePreparation.PrepareUniformSuperposition;
     import Std.Arrays.Mapped;
+    import Std.Arrays.Sorted;
     import QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D;
     import QDKChemistry.Utils.SelectSwap.SelectSwap2D;
     import QDKChemistry.Utils.SelectSwap.SelectSwap;
@@ -74,20 +76,20 @@ namespace QDKChemistry.Utils.AliasSampling {
         }
 
         // Distribute leftover units to the largest remainders first, ties by ascending index.
-        // Flooring keeps the residual non-negative, so bar heights only increase.
-        mutable residual = targetTotal - scaledTotal;
-        for _ in 1..residual {
-            mutable bestIdx = -1;
-            mutable bestRem = -1.0;
-            for i in 0..nCoeffs - 1 {
-                if remainders[i] > bestRem {
-                    set bestRem = remainders[i];
-                    set bestIdx = i;
-                }
-            }
-            if bestIdx >= 0 {
+        // Flooring keeps the residual non-negative, so bar heights only increase. Sorting once
+        // costs O(L log L); rescanning every remainder per leftover unit would be O(L²).
+        let residual = MinI(targetTotal - scaledTotal, nCoeffs);
+        let finalRemainders = remainders;
+        let byRemainder = Sorted(
+            (i, j) -> finalRemainders[i] > finalRemainders[j]
+                or (finalRemainders[i] == finalRemainders[j] and i <= j),
+            MappedOverRange(i -> i, 0..nCoeffs - 1)
+        );
+        for k in 0..residual - 1 {
+            let bestIdx = byRemainder[k];
+            // Sentinel remainders mark zero coefficients, which must never gain weight.
+            if finalRemainders[bestIdx] >= 0.0 {
                 set scaledProbs w/= bestIdx <- scaledProbs[bestIdx] + 1;
-                set remainders w/= bestIdx <- -1.0;
             }
         }
 

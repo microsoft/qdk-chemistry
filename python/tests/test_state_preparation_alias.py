@@ -12,8 +12,9 @@ import pytest
 from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.state_preparation.alias_sampling import AliasSamplingStatePreparation
-from qdk_chemistry.data import Configuration, ModelOrbitals, StateVectorContainer, Wavefunction
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, get_qsharp_context
+
+from .test_helpers import create_dense_wavefunction, create_sparse_wavefunction
 
 
 def _run_alias_sampling_and_dump(
@@ -56,23 +57,6 @@ def _compute_marginal_probs(
     return probs
 
 
-def _make_sparse_wavefunction(num_qubits: int, indices: list[int], amplitudes: list[float]) -> Wavefunction:
-    """Create a Wavefunction that occupies only *indices* of a ``num_qubits`` register."""
-    dets = [Configuration.from_bitstring(format(idx, f"0{num_qubits}b")[::-1]) for idx in indices]
-    orbitals = ModelOrbitals(num_qubits)
-    container = StateVectorContainer(np.array([float(a) for a in amplitudes]), dets, orbitals)
-    return Wavefunction(container)
-
-
-def _make_wavefunction(amplitudes: list[float]) -> Wavefunction:
-    """Create a Wavefunction from a list of amplitudes."""
-    num_qubits = math.ceil(math.log2(len(amplitudes))) if len(amplitudes) > 1 else 1
-    dets = [Configuration.from_bitstring(format(idx, f"0{num_qubits}b")[::-1]) for idx in range(len(amplitudes))]
-    orbitals = ModelOrbitals(num_qubits)
-    container = StateVectorContainer(np.array([float(a) for a in amplitudes]), dets, orbitals)
-    return Wavefunction(container)
-
-
 def _alias_atol(num_coefficients: int, bits_precision: int) -> float:
     """Tolerance on a marginal probability for an L-term, mu-bit alias table."""
     return 1.0 / (num_coefficients * 2**bits_precision)
@@ -84,7 +68,7 @@ class TestAliasSamplingStatePreparation:
     def test_run_returns_circuit(self):
         """Test that run() returns a Circuit with ops set."""
         prep = AliasSamplingStatePreparation(bits_precision=4)
-        wf = _make_wavefunction([0.5, 0.3, 0.7, 0.1])
+        wf = create_dense_wavefunction([0.5, 0.3, 0.7, 0.1])
         circuit = prep.run(wf)
         assert circuit is not None
         assert circuit._qsharp_op is not None
@@ -107,7 +91,7 @@ class TestAliasSamplingStatePreparation:
         round trip from 816 to 491.
         """
         prep = AliasSamplingStatePreparation(bits_precision=4)
-        circuit = prep.run(_make_wavefunction([0.5, 0.3, 0.7, 0.1]))
+        circuit = prep.run(create_dense_wavefunction([0.5, 0.3, 0.7, 0.1]))
 
         lc = circuit.estimate()["logicalCounts"]
         assert lc["numQubits"] == 17
@@ -177,14 +161,14 @@ class TestAliasSamplingStatePreparation:
     def test_negative_coefficients_rejected(self):
         """Alias sampling is a PREPARE oracle over magnitudes and cannot carry a sign."""
         prep = AliasSamplingStatePreparation(bits_precision=4)
-        wf = _make_wavefunction([0.5, -0.3, 0.7, 0.1])
+        wf = create_dense_wavefunction([0.5, -0.3, 0.7, 0.1])
         with pytest.raises(ValueError, match="non-negative"):
             prep.run(wf)
 
     def test_sparse_wavefunction_uses_determinant_indices(self):
         """A coefficient belongs at its determinant's index, not its position in the list."""
         prep = AliasSamplingStatePreparation(bits_precision=4)
-        weights, num_index_qubits = prep._sampling_weights(_make_sparse_wavefunction(2, [0, 3], [0.6, 0.8]))
+        weights, num_index_qubits = prep._sampling_weights(create_sparse_wavefunction(2, [0, 3], [0.6, 0.8]))
 
         assert num_index_qubits == 2
         assert weights == pytest.approx([0.36, 0.0, 0.0, 0.64])
@@ -193,7 +177,7 @@ class TestAliasSamplingStatePreparation:
         """The finiteness guard has to survive the squaring, not just precede it."""
         prep = AliasSamplingStatePreparation(bits_precision=4)
         with pytest.raises(ValueError, match="overflows to infinity"):
-            prep.run(_make_wavefunction([1e200, 1.0]))
+            prep.run(create_dense_wavefunction([1e200, 1.0]))
 
     def test_zero_coefficients_get_zero_probability(self):
         """A zero coefficient must receive exactly zero probability."""

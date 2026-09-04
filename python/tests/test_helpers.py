@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import math
+
 import numpy as np
 
 from qdk_chemistry.data import (
@@ -13,6 +15,7 @@ from qdk_chemistry.data import (
     CanonicalFourCenterHamiltonianContainer,
     Configuration,
     Hamiltonian,
+    ModelOrbitals,
     Orbitals,
     OrbitalType,
     Shell,
@@ -20,6 +23,23 @@ from qdk_chemistry.data import (
     Structure,
     Wavefunction,
 )
+
+
+def create_sparse_wavefunction(num_qubits: int, indices: list[int], amplitudes: list[float]) -> Wavefunction:
+    """Create a ``Wavefunction`` occupying only *indices* of a ``num_qubits`` register.
+
+    Each index is spelled as little-endian occupation-number bits, so ``amplitudes[k]``
+    lands on basis state ``indices[k]``.
+    """
+    dets = [Configuration.from_bitstring(format(idx, f"0{num_qubits}b")[::-1]) for idx in indices]
+    container = StateVectorContainer(np.array([float(a) for a in amplitudes]), dets, ModelOrbitals(num_qubits))
+    return Wavefunction(container)
+
+
+def create_dense_wavefunction(amplitudes: list[float]) -> Wavefunction:
+    """Create a ``Wavefunction`` holding *amplitudes* on consecutive basis states."""
+    num_qubits = math.ceil(math.log2(len(amplitudes))) if len(amplitudes) > 1 else 1
+    return create_sparse_wavefunction(num_qubits, list(range(len(amplitudes))), amplitudes)
 
 
 def create_test_basis_set(num_atomic_orbitals, name="test-basis", structure=None):
