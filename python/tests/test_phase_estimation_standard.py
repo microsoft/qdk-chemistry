@@ -270,6 +270,45 @@ def test_standard_phase_estimation_extracts_phase_and_energy(
     )
 
 
+@pytest.mark.parametrize("power", [2, 4])
+def test_standard_phase_estimation_energy_is_independent_of_unitary_power(
+    two_qubit_phase_problem: PhaseEstimationProblem,
+    power: int,
+) -> None:
+    """The circuit builder overrides the unitary's power per bit, so it must not shift the energy."""
+    qpe_circuit_builder = AlgorithmRef(
+        "qpe_circuit_builder",
+        "qdk_standard",
+        num_bits=two_qubit_phase_problem.num_bits,
+        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        unitary_builder=AlgorithmRef(
+            "hamiltonian_unitary_builder",
+            "trotter",
+            time=two_qubit_phase_problem.evolution_time,
+            power=power,
+        ),
+    )
+    qpe = StandardPhaseEstimation(shots=two_qubit_phase_problem.shots)
+    qpe.settings().set(
+        "circuit_executor",
+        AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
+    )
+    qpe.settings().set("qpe_circuit_builder", qpe_circuit_builder)
+
+    result = qpe.run(
+        qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
+        state_preparation=two_qubit_phase_problem.state_prep,
+    )
+
+    assert result.bitstring_msb_first == two_qubit_phase_problem.expected_bitstring
+    assert np.isclose(
+        result.raw_energy,
+        two_qubit_phase_problem.expected_energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_energy_tolerance,
+    )
+
+
 @pytest.mark.parametrize("builder_name", _builder_params)
 @pytest.mark.parametrize("controlled_circuit_mapper_name", _controlled_mapper_params)
 def test_standard_phase_estimation_controlled_mapper_variants(

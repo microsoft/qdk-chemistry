@@ -35,7 +35,7 @@ def _post_process_phase_estimation(
     num_bits: int,
     method: str,
     resolve_positive_branch: bool,
-    eigenvalue_from_phase: Callable[[float], float],
+    eigenvalue_from_phase: Callable[[float], tuple[float, ...]],
 ) -> QpeResult:
     r"""Process the measured results from unary-iteration phase estimation into a QpeResult.
 
@@ -56,12 +56,16 @@ def _post_process_phase_estimation(
         method: Phase estimation algorithm label recorded on the result.
         resolve_positive_branch: ``True`` selects the non-negative eigenvalue branch,
             ``False`` the non-positive one, as wanted for a ground state.
-        eigenvalue_from_phase: A callable mapping a walk phase fraction to a Hamiltonian eigenvalue.
+        eigenvalue_from_phase: A callable mapping a walk phase fraction to its Hamiltonian eigenvalue candidates.
 
     Returns:
         A :class:`~qdk_chemistry.data.QpeResult` whose ``phase_fraction`` is the measured bin,
         ``canonical_phase_fraction`` is the decoded walk phase, and ``branching``
         holds both sign candidates.
+
+    Raises:
+        ValueError: If the unitary folds several eigenvalues onto a phase, since the sign branch
+            the flag names is then not a single energy.
 
     """
     num_bins = 2**num_bits
@@ -75,8 +79,14 @@ def _post_process_phase_estimation(
     # Ties are broken toward the smaller phase fraction so that equal counts decode
     # to the same phase regardless of the order the shots arrive in.
     canonical_phase_fraction = max(canonical_counts, key=lambda phase: (canonical_counts[phase], -phase))
-    raw_energy = eigenvalue_from_phase(canonical_phase_fraction)
-    mirror_energy = eigenvalue_from_phase(0.5 - canonical_phase_fraction)
+    raw_branches = eigenvalue_from_phase(canonical_phase_fraction)
+    mirror_branches = eigenvalue_from_phase(0.5 - canonical_phase_fraction)
+    if len(raw_branches) != 1 or len(mirror_branches) != 1:
+        raise ValueError(
+            f"Unary-iteration phase estimation resolves one eigenvalue per sign branch, but the unitary "
+            f"reported {len(raw_branches)} and {len(mirror_branches)} candidates for the two branches of "
+            f"phase {canonical_phase_fraction}."
+        )
 
     phase_fraction = 2.0 * min(canonical_phase_fraction, 0.5 - canonical_phase_fraction)
     bitstring_msb_first = format(round(phase_fraction * num_bins), f"0{num_bits}b")
@@ -86,8 +96,8 @@ def _post_process_phase_estimation(
         phase_fraction=phase_fraction,
         eigenvalue_from_phase=eigenvalue_from_phase,
         canonical_phase_fraction=canonical_phase_fraction,
-        branching=tuple(sorted((raw_energy, mirror_energy))),
-        resolved_energy=raw_energy,
+        branching=tuple(sorted(raw_branches + mirror_branches)),
+        resolved_energy=raw_branches[0],
         bits_msb_first=tuple(int(bit) for bit in bitstring_msb_first),
         bitstring_msb_first=bitstring_msb_first,
     )
@@ -168,8 +178,10 @@ class UnaryPhaseEstimation(PhaseEstimation):
                 f"but got {type(circuit_builder)} instead."
             )
 
-        # Resolve container before running the circuit
+        # Resolve container before running the circuit. The builder drops any carried power,
+        # so inversion must use the base (power=1) unitary.
         unitary_builder = circuit_builder._create_nested("unitary_builder")  # noqa: SLF001
+        unitary_builder.settings().update("power", 1)
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
         container = unitary_rep.get_container()
 

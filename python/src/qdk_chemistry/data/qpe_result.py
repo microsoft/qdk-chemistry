@@ -58,7 +58,7 @@ class QpeResult(DataClass):
             canonical_phase_fraction: Alias-resolved phase fraction consistent with the selected energy branch.
                 Equals ``phase_fraction`` when the algorithm performs no alias resolution.
             canonical_phase_angle: Alias-resolved phase angle in radians.
-            raw_energy: Energy computed from ``canonical_phase_fraction``.
+            raw_energy: Energy computed from ``canonical_phase_fraction``, the lowest candidate when several exist.
             branching: Sorted tuple of all alias energy candidates considered, including ``raw_energy``.
             resolved_energy: Candidate from ``branching`` picked by the algorithm's alias-resolution rule,
                 or ``None`` when no resolution was performed.
@@ -111,7 +111,7 @@ class QpeResult(DataClass):
         *,
         method: str,
         phase_fraction: float,
-        eigenvalue_from_phase: Callable[[float], float],
+        eigenvalue_from_phase: Callable[[float], float | Sequence[float]],
         canonical_phase_fraction: float | None = None,
         branching: Sequence[float] | None = None,
         resolved_energy: float | None = None,
@@ -122,15 +122,18 @@ class QpeResult(DataClass):
         r"""Construct a :class:`QpeResult` from a measured phase fraction.
 
         This factory accepts a callable that maps a phase fraction to the
-        corresponding Hamiltonian eigenvalue, as defined by the container's
+        corresponding Hamiltonian eigenvalues, as defined by the container's
         :meth:`~qdk_chemistry.data.unitary_representation.containers.base.UnitaryContainer.eigenvalue_from_phase`.
+        A representation that folds several eigenvalues onto the same phase returns
+        more than one candidate; those candidates become the result's ``branching``
+        and its ``raw_energy`` is the lowest of them.
 
         Args:
             method: Phase estimation algorithm or workflow label.
             phase_fraction: Measured phase fraction in ``[0, 1)``.
-            eigenvalue_from_phase: A callable mapping phase fraction to the Hamiltonian eigenvalue.
+            eigenvalue_from_phase: A callable mapping phase fraction to one eigenvalue or a sequence of candidates.
             canonical_phase_fraction: Alias-resolved phase the energy is computed from. Defaults to ``phase_fraction``.
-            branching: Alias energy candidates considered. Defaults to ``(raw_energy,)``.
+            branching: Alias energy candidates considered, sorted on the way in. Defaults to the callable's candidates.
             resolved_energy: Candidate picked by the algorithm's alias-resolution rule, if any.
             bits_msb_first: Optional measured bits ordered from MSB to LSB.
             bitstring_msb_first: Optional string representation of the measured bits.
@@ -138,6 +141,10 @@ class QpeResult(DataClass):
 
         Returns:
             QpeResult: Populated :class:`QpeResult` instance reflecting the supplied data.
+
+        Raises:
+            ValueError: If ``eigenvalue_from_phase`` returns no candidate energy, or if ``branching`` omits the
+                energy recovered from ``canonical_phase_fraction``.
 
         """
         Logger.trace_entering()
@@ -148,7 +155,18 @@ class QpeResult(DataClass):
 
         canonical = normalized_phase if canonical_phase_fraction is None else float(canonical_phase_fraction % 1.0)
         canonical_angle = float(canonical * (2 * np.pi))
-        raw_energy = eigenvalue_from_phase(canonical)
+        branches = tuple(sorted(float(energy) for energy in np.atleast_1d(eigenvalue_from_phase(canonical))))
+        if not branches:
+            raise ValueError("eigenvalue_from_phase returned no candidate energies.")
+        raw_energy = branches[0]
+
+        if branching is not None:
+            branches = tuple(sorted(float(energy) for energy in branching))
+            # The caller may have recomputed the candidate it passes in, so match with slack.
+            if not np.isclose(branches, raw_energy).any():
+                raise ValueError(
+                    f"branching {branches} does not contain raw_energy {raw_energy} recovered from phase {canonical}."
+                )
 
         normalized_bits: tuple[int, ...] | None = None
         bitstring = bitstring_msb_first
@@ -166,7 +184,7 @@ class QpeResult(DataClass):
             canonical_phase_fraction=canonical,
             canonical_phase_angle=canonical_angle,
             raw_energy=raw_energy,
-            branching=(raw_energy,) if branching is None else tuple(branching),
+            branching=branches,
             resolved_energy=resolved_energy,
             bits_msb_first=normalized_bits,
             bitstring_msb_first=bitstring,

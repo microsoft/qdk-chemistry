@@ -22,7 +22,8 @@ When QPE acts on :math:`U = e^{-iHt}`, the eigenvalues are :math:`e^{-iEt}` and 
 
    E = -\frac{2\pi\varphi'}{t}
 
-where :math:`\varphi' \in (-1/2, 1/2]` is the measured phase fraction wrapped from :math:`[0, 1)` into :math:`(-1/2, 1/2]`.
+where :math:`\varphi' \in (-1/2, 1/2]` is the measured phase fraction wrapped from :math:`[0, 1)` into :math:`(-1/2, 1/2]`,
+and :math:`t` is the *total* evolution time the container represents, including any repetitions folded into the circuit by a power greater than one.
 
 **Qubitization**
 
@@ -34,6 +35,11 @@ When QPE acts on the qubitization walk operator :math:`W`, the eigenvalues are :
    E = \lambda \cos(2\pi\varphi)
 
 where :math:`\lambda = \sum_j |\alpha_j|` is the 1-norm of the Hamiltonian coefficients.
+
+A container representing :math:`W^p` with :math:`p > 1` generally folds several energies onto the same phase,
+:math:`E_k = \lambda \cos(2\pi(\varphi + k)/p)` for :math:`k = 0, \ldots, p - 1`.
+``eigenvalue_from_phase`` reports every one of them, so the resulting :class:`~qdk_chemistry.data.QpeResult`
+carries all candidates in ``branching`` and the caller can resolve the branch with outside information.
 
 :class:`~qdk_chemistry.data.QpeResult` is the output of the :doc:`PhaseEstimation <../algorithms/phase_estimation>` algorithm and supports full :doc:`serialization <serialization>` to JSON and HDF5 formats.
 For details on how different :term:`QPE` implementations (:ref:`IQPE <iqpe-algorithm>`, :ref:`standard QFT-based <standard-qpe-algorithm>`) populate this result, see the :doc:`PhaseEstimation algorithm documentation <../algorithms/phase_estimation>`.
@@ -68,10 +74,10 @@ The :class:`~qdk_chemistry.data.QpeResult` stores the following information:
      - Alias-resolved phase angle in radians.
    * - ``raw_energy``
      - float
-     - Energy computed from ``canonical_phase_fraction`` via the container's ``eigenvalue_from_phase`` method.
+     - Energy computed from ``canonical_phase_fraction`` via the container's ``eigenvalue_from_phase`` method, the lowest candidate when the container reports several.
    * - ``branching``
      - tuple[float, ...]
-     - Sorted energy candidates considered, including ``raw_energy``. A single-element tuple when the algorithm performs no alias resolution.
+     - Sorted energy candidates considered, including ``raw_energy``. A single-element tuple when the phase inverts uniquely and the algorithm performs no alias resolution.
    * - ``resolved_energy``
      - float | None
      - Candidate from ``branching`` picked by the algorithm's alias-resolution rule, or ``None`` when no resolution was performed.
@@ -92,7 +98,8 @@ Alias resolution
 ----------------
 
 Alias resolution is relevant for **time-evolution-based QPE** (Trotter) where the phase is periodic.
-It is not needed for qubitization because the cosine mapping is injective over the measurable range.
+For qubitization the cosine mapping is injective over the measurable range of a single walk step, but a walk raised to a power :math:`p > 1`
+folds several energies onto one phase; ``from_phase_fraction`` then records all of them in ``branching``.
 
 Phase estimation measures a phase :math:`\varphi \in [0, 1)`, but the underlying energy eigenvalue can be negative, positive, or arbitrarily large.
 Different energy values that differ by integer multiples of :math:`2\pi / t` all map to the same phase.

@@ -105,19 +105,26 @@ class UnitaryContainer(DataClass):
         """
 
     @abstractmethod
-    def eigenvalue_from_phase(self, phase_fraction: float) -> float:
-        r"""Recover a Hamiltonian eigenvalue from the measured phase fraction.
+    def eigenvalue_from_phase(self, phase_fraction: float) -> tuple[float, ...]:
+        r"""Recover the Hamiltonian eigenvalues consistent with a measured phase.
 
         Each unitary encoding maps Hamiltonian eigenvalues to phases on the
         unit circle.  This method inverts that mapping so that a measured
         phase fraction :math:`\varphi \in [0, 1)` is converted back to the
         corresponding eigenvalue :math:`E`.
 
+        A representation that raises the base unitary to a power greater than
+        one may fold several eigenvalues onto the same phase, so the inverse is
+        reported as a tuple of every candidate, sorted in ascending order.  A
+        caller with information the container does not have can then resolve
+        the ambiguity.  Representations that always invert uniquely return a
+        one-element tuple.
+
         Args:
             phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.
 
         Returns:
-            float: The corresponding Hamiltonian eigenvalue.
+            tuple[float, ...]: The candidate Hamiltonian eigenvalues, sorted ascending.
 
         """
 

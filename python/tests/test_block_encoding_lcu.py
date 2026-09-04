@@ -19,7 +19,16 @@ from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import BlockEncodingContainer, LCUContainer
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 
-from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+from .reference_tolerances import (
+    float_comparison_absolute_tolerance,
+    float_comparison_relative_tolerance,
+)
+
+
+def _lcu_container() -> LCUContainer:
+    """Build a small LCU block encoding to wrap in a walk operator."""
+    hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ"], coefficients=np.array([0.25, 0.5]))
+    return LCUBuilder().run(hamiltonian).get_container()
 
 
 class TestLCUBuilder:
@@ -378,15 +387,62 @@ class TestLCUContainer:
         lam = hamiltonian.schatten_norm
 
         # φ=0 → E=λ
-        assert np.isclose(
+        assert np.allclose(
             container.eigenvalue_from_phase(0.0),
-            lam,
+            (lam,),
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
         # φ=0.25 → E=0
-        assert np.isclose(
-            container.eigenvalue_from_phase(0.25),
-            0.0,
+        assert np.allclose(container.eigenvalue_from_phase(0.25), (0.0,), atol=float_comparison_absolute_tolerance)
+
+    def test_walk_container_squared_folds_the_energy_sign(self):
+        """Squaring the walk sends θ and π-θ to the same eigenphases, so both signs are reported."""
+        container = LCUWalkContainer(_lcu_container(), power=2, scale=6.0)
+        energy = 6.0 * np.cos(np.pi * 0.1)
+
+        assert np.allclose(
+            container.eigenvalue_from_phase(0.1),
+            (-energy, energy),
+            rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+
+    @pytest.mark.parametrize("power", [1, 2, 3, 4])
+    @pytest.mark.parametrize("energy", [-5.5, -1.25, 0.0, 3.0, 6.0])
+    def test_walk_container_branches_are_sound_and_complete(self, power, energy):
+        """Every branch re-encodes to the measured phase, and the true energy is among them."""
+        lam = 6.0
+        container = LCUWalkContainer(_lcu_container(), power=power, scale=lam)
+        phase_fraction = (power * np.arccos(energy / lam) / (2 * np.pi)) % 1.0
+
+        branches = np.array(container.eigenvalue_from_phase(phase_fraction))
+
+        assert len(branches) <= power
+        assert np.all(np.diff(branches) > 0.0)
+        # Soundness: pushing a branch back through W^p must reproduce the measured phase, up to
+        # the conjugate eigenphase the walk cannot distinguish.
+        walk_phase = power * np.arccos(np.clip(branches / lam, -1.0, 1.0)) / (2 * np.pi)
+        offsets = np.stack([walk_phase - phase_fraction, walk_phase + phase_fraction]) % 1.0
+        drift = np.minimum(offsets, 1.0 - offsets).min(axis=0)
+        assert np.allclose(
+            drift, 0.0, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+        )
+        # Completeness: the energy the phase was built from is one of them.
+        assert np.isclose(
+            branches, energy, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+        ).any()
+
+    def test_walk_container_powered_branches_survive_serialization(self):
+        """Serialized walk containers keep the power that defines their inverse branches."""
+        container = LCUWalkContainer(_lcu_container(), power=3, scale=6.0)
+
+        restored = LCUWalkContainer.from_json(container.to_json())
+
+        assert restored.power == 3
+        assert restored.eigenvalue_from_phase(0.1) == container.eigenvalue_from_phase(0.1)
+
+    def test_walk_container_rejects_a_non_positive_power(self):
+        """A walk operator applied fewer than once represents nothing."""
+        with pytest.raises(ValueError, match="power must be a positive integer"):
+            LCUWalkContainer(_lcu_container(), power=0, scale=6.0)

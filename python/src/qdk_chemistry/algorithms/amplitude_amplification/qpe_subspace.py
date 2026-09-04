@@ -115,7 +115,9 @@ class QPESubspaceMarking(Algorithm):
                 if isinstance(container, QuantumWalkContainer)
                 else phase_bin
             )
-            if container.eigenvalue_from_phase(canonical_bin / phase_bin_count) < energy_lower_bound:
+            # A powered walk folds several energies onto one bin; the bin is marked
+            # when any of them reaches the bound.
+            if max(container.eigenvalue_from_phase(canonical_bin / phase_bin_count)) < energy_lower_bound:
                 continue
             if ranges and ranges[-1][1] == phase_bin:
                 ranges[-1] = (ranges[-1][0], phase_bin + 1)
@@ -166,7 +168,11 @@ class QPESubspaceMarking(Algorithm):
             raise ValueError(f"The nested qpe_circuit_builder needs a positive num_bits. Got {num_bits}.")
 
         num_system_qubits = qubit_hamiltonian.num_qubits
-        unitary = create_from_ref(builder.settings(), "unitary_builder").run(qubit_hamiltonian)
+        # The QPE builder overrides the unitary's power per phase bit, so marking must
+        # use the base (power=1) unitary.
+        unitary_builder = create_from_ref(builder.settings(), "unitary_builder")
+        unitary_builder.settings().update("power", 1)
+        unitary = unitary_builder.run(qubit_hamiltonian)
         num_signal_ancillas = unitary.get_num_qubits() - num_system_qubits
         bin_ranges = self._marked_phase_bins(energy_lower_bound, unitary.get_container(), num_bits)
         lower_bounds = [start for start, _ in bin_ranges]

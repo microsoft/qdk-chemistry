@@ -76,7 +76,8 @@ class PauliProductFormulaContainer(UnitaryContainer):
             step_terms: The list of exponentiated Pauli terms in a single step.
             step_reps: The number of repetitions of the single step.
             num_qubits: The number of qubits the unitary acts on.
-            scale: The evolution time used for eigenvalue-phase conversion.
+            scale: The total evolution time represented by the container, including
+                any repetitions folded into ``step_reps``.
 
         Raises:
             TypeError: If ``step_reps`` is not an integer.
@@ -95,24 +96,25 @@ class PauliProductFormulaContainer(UnitaryContainer):
         self.scale = scale
         super().__init__()
 
-    def eigenvalue_from_phase(self, phase_fraction: float) -> float:
+    def eigenvalue_from_phase(self, phase_fraction: float) -> tuple[float, ...]:
         r"""Recover a Hamiltonian eigenvalue from a time-evolution phase.
 
         For :math:`U(t) = e^{-iHt}` an eigenstate with energy :math:`E` acquires
         phase :math:`e^{-iEt}`, so QPE measures :math:`\varphi = (-Et / 2\pi) \bmod 1`.
-        Inverting gives ``E = -angle / t``.
+        Inverting gives ``E = -angle / t``.  The phase depends linearly on the
+        energy, so the inverse is always a single branch.
 
         Args:
             phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.
 
         Returns:
-            float: The corresponding Hamiltonian eigenvalue.
+            tuple[float, ...]: The corresponding Hamiltonian eigenvalue, as a one-element tuple.
 
         """
         angle = (phase_fraction % 1.0) * (2 * np.pi)
         if angle > np.pi:
             angle -= 2 * np.pi
-        return float(-angle / self.scale)
+        return (float(-angle / self.scale),)
 
     def _hash_update(self, h) -> None:
         """Feed identifying data into the hasher."""

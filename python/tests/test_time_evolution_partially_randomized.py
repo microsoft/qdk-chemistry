@@ -399,4 +399,4 @@ class TestPartiallyRandomizedScale:
         hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([1.0, 0.5]))
         builder = PartiallyRandomized(time=t)
         container = builder.run(hamiltonian).get_container()
-        assert np.isclose(container.eigenvalue_from_phase(phi), energy, rtol=1e-10, atol=1e-12)
+        assert np.isclose(container.eigenvalue_from_phase(phi)[0], energy, rtol=1e-10, atol=1e-12)

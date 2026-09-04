@@ -1166,7 +1166,8 @@ def cmd_utils_resolve_phase_energy(args):
 
     unitary = load_data_object(filename, qdk_data.UnitaryRepresentation)
     container = unitary.get_container()
-    raw_energy = container.eigenvalue_from_phase(args.phase_fraction)
+    branching = tuple(sorted(container.eigenvalue_from_phase(args.phase_fraction)))
+    raw_energy = branching[0]
     resolved_energy = raw_energy
 
     if container.type == "pauli_product_formula":
@@ -1183,6 +1184,7 @@ def cmd_utils_resolve_phase_energy(args):
                 "phase_fraction": args.phase_fraction,
                 "container_type": container.type,
                 "raw_energy": raw_energy,
+                "branching": list(branching),
                 "resolved_energy": resolved_energy,
             },
             indent=2,

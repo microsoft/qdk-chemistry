@@ -335,6 +335,58 @@ def test_qpe_result_from_phase_fraction_qubitization():
     assert result.metadata is None
 
 
+def test_qpe_result_branching_collects_candidates_and_sorts_a_supplied_set():
+    """Several candidates fill ``branching`` with ``raw_energy`` lowest; an explicit set replaces them, sorted."""
+    default = QpeResult.from_phase_fraction(
+        method="qubitization_qpe",
+        phase_fraction=0.1,
+        eigenvalue_from_phase=lambda _: (1.5, -0.5, 0.25),
+    )
+    supplied = QpeResult.from_phase_fraction(
+        method="qubitization_qpe",
+        phase_fraction=0.1,
+        eigenvalue_from_phase=lambda _: (1.5, -0.5),
+        branching=(2.5, -0.5, 1.5),
+        resolved_energy=1.5,
+    )
+
+    assert np.allclose(
+        default.branching,
+        (-0.5, 0.25, 1.5),
+        rtol=float_comparison_relative_tolerance,
+        atol=float_comparison_absolute_tolerance,
+    )
+    assert np.isclose(
+        default.raw_energy,
+        -0.5,
+        rtol=float_comparison_relative_tolerance,
+        atol=float_comparison_absolute_tolerance,
+    )
+    assert np.allclose(
+        supplied.branching,
+        (-0.5, 1.5, 2.5),
+        rtol=float_comparison_relative_tolerance,
+        atol=float_comparison_absolute_tolerance,
+    )
+    assert np.isclose(
+        supplied.resolved_energy,
+        1.5,
+        rtol=float_comparison_relative_tolerance,
+        atol=float_comparison_absolute_tolerance,
+    )
+
+
+def test_qpe_result_rejects_a_branching_without_the_recovered_energy():
+    """``branching`` that omits ``raw_energy`` would contradict the field contract."""
+    with pytest.raises(ValueError, match="does not contain raw_energy"):
+        QpeResult.from_phase_fraction(
+            method="qubitization_qpe",
+            phase_fraction=0.1,
+            eigenvalue_from_phase=lambda _: (1.5, -0.5),
+            branching=(1.5, 2.5),
+        )
+
+
 @pytest.mark.parametrize(
     ("phi", "scale", "expected"),
     [

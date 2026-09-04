@@ -183,7 +183,7 @@ class Zassenhaus(TimeEvolutionBuilder):
             step_terms=terms,
             step_reps=num_divisions * power_repetitions,
             num_qubits=num_qubits,
-            scale=effective_time,
+            scale=effective_time * power_repetitions,
         )
 
         return UnitaryRepresentation(container=container)

@@ -430,12 +430,12 @@ def test_tutorial_run_iqpe_configuration(capsys):
     )
     assert (
         abs(
-            phase_converter.eigenvalue_from_phase(problem.evolution_time.grid_phase_fraction)
+            phase_converter.eigenvalue_from_phase(problem.evolution_time.grid_phase_fraction)[0]
             - problem.evolution_time.grid_active_energy_hartree
         )
         < 1e-12
     )
-    assert abs(phase_converter.eigenvalue_from_phase(0.5) + np.pi / phase_converter.scale) < 1e-12
+    assert abs(phase_converter.eigenvalue_from_phase(0.5)[0] + np.pi / phase_converter.scale) < 1e-12
 
     if _RUN_TUTORIAL_SNAPSHOTS:
         assert abs(problem.trial_state.fidelity - 0.732385025483) < 1e-8

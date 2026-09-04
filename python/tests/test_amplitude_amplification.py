@@ -387,7 +387,7 @@ def test_walk_energies_select_a_band_around_phase_zero(energy_lower_bound, expec
 def test_walk_bins_stay_symmetric_at_an_exact_energy_boundary():
     """Mirrored walk phases use one floating-point value at an inclusive boundary."""
     container = _walk_container()
-    energy_lower_bound = container.eigenvalue_from_phase(1 / 8)
+    energy_lower_bound = max(container.eigenvalue_from_phase(1 / 8))
     assert QPESubspaceMarking._marked_phase_bins(energy_lower_bound, container, num_phase_qubits=3) == [
         (0, 2),
         (7, 8),
@@ -476,11 +476,11 @@ class _QuarterCutLaw:
     Guards against a phi = 1/2 split being baked back into the search.
     """
 
-    def eigenvalue_from_phase(self, phase_fraction: float) -> float:
+    def eigenvalue_from_phase(self, phase_fraction: float) -> tuple[float, ...]:
         angle = (phase_fraction % 1.0) * 2.0 * math.pi
         if angle > math.pi / 2.0:
             angle -= 2.0 * math.pi
-        return -angle
+        return (-angle,)
 
 
 def _assert_marks_exactly_the_bins_above(container, energy_lower_bound, num_phase_qubits):
@@ -494,7 +494,7 @@ def _assert_marks_exactly_the_bins_above(container, energy_lower_bound, num_phas
 
     def energy_of(phase_bin: int) -> float:
         canonical = min(phase_bin, phase_bin_count - phase_bin) if mirrored else phase_bin
-        return container.eigenvalue_from_phase(canonical / phase_bin_count)
+        return max(container.eigenvalue_from_phase(canonical / phase_bin_count))
 
     expected = {phase_bin for phase_bin in range(phase_bin_count) if energy_of(phase_bin) >= energy_lower_bound}
     if len(expected) in (0, phase_bin_count):

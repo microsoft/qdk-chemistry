@@ -47,26 +47,43 @@ class QuantumWalkContainer(UnitaryContainer):
     # Serialization version for this class
     _serialization_version = "0.2.0"
 
-    def eigenvalue_from_phase(self, phase_fraction: float) -> float:
-        r"""Recover a Hamiltonian eigenvalue from a quantum-walk phase.
+    def eigenvalue_from_phase(self, phase_fraction: float) -> tuple[float, ...]:
+        r"""Recover every eigenvalue consistent with a quantum-walk phase.
 
         For a walk operator whose eigenvalues are
-        :math:`e^{\pm i \arccos(E_k / \lambda)}`, QPE measures
-        :math:`\varphi = \arccos(E_k / \lambda) / (2\pi)`.  Inverting gives:
+        :math:`e^{\pm i \arccos(E_k / \lambda)}`, QPE applied to :math:`W^p`
+        measures :math:`\varphi` such that
+        :math:`\arccos(E / \lambda) = 2\pi(\varphi + k)/p` for some integer
+        :math:`k`, so the candidate eigenvalues are
 
         .. math::
 
-            E_k = \lambda \cos(2\pi\varphi)
+            E_k = \lambda \cos\!\left(\frac{2\pi(\varphi + k)}{p}\right),
+            \qquad k = 0, \ldots, p - 1
+
+        Branches whose walk angles coincide (up to a :math:`10^{-12}` phase
+        tolerance) are reported once, so :math:`p = 1` reduces to the single
+        eigenvalue :math:`E = \lambda \cos(2\pi\varphi)`.
 
         Args:
             phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.
 
         Returns:
-            float: The corresponding Hamiltonian eigenvalue.
+            tuple[float, ...]: The candidate eigenvalues, sorted ascending.
 
         """
         phi = phase_fraction % 1.0
-        return float(self.scale * np.cos(2 * np.pi * phi))
+        power = self.power
+        if power == 1:
+            return (float(self.scale * np.cos(2 * np.pi * phi)),)
+        # cos is even, so two branches coincide exactly when their walk angles fold onto
+        # the same value in [0, 1/2]. Round only the dedup key, never the returned value.
+        folded_angles: dict[float, float] = {}
+        for k in range(power):
+            angle = (phi + k) / power
+            folded = min(angle, 1.0 - angle)
+            folded_angles.setdefault(round(folded, 12), folded)
+        return tuple(sorted(float(self.scale * np.cos(2 * np.pi * a)) for a in folded_angles.values()))
 
     @property
     @abstractmethod
@@ -111,9 +128,18 @@ class LCUWalkContainer(QuantumWalkContainer):
             power: Number of times to apply the walk operator (for :math:`W^k` in QPE).
             scale: The 1-norm used for eigenvalue-phase conversion.
 
+        Raises:
+            TypeError: If ``power`` is not an integer.
+            ValueError: If ``power`` is not positive.
+
         """
+        # bool is an int subclass, but True as a power is always a mistake.
+        if isinstance(power, bool) or not isinstance(power, int | np.integer):
+            raise TypeError(f"power must be an integer, got {type(power).__name__}.")
+        if power < 1:
+            raise ValueError(f"power must be a positive integer, got {power}.")
         self._block_encoding = block_encoding
-        self._power = power
+        self._power = int(power)
         self.scale = scale
         super().__init__()
 
