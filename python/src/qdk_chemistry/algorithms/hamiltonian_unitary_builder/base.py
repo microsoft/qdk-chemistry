@@ -207,9 +207,12 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
             [_make(layer) for layer in group_layers if layer] for group_layers in layered_groups
         ]
 
-        groups = [g for g in groups if g]
-        groups.sort(key=len)
-        return groups
+        # The partition's group order is the Strang/Suzuki splitting order, so it is
+        # preserved as given: the schedule applies the last group at full time in the
+        # middle and the rest at half time on the outside, which changes both the gate
+        # count and the error constant. Reordering here would silently override the
+        # ordering the caller chose.
+        return [g for g in groups if g]
 
     def _exponentiate_commuting(
         self,

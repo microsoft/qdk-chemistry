@@ -143,6 +143,63 @@ When both ``num_divisions`` and ``target_accuracy`` are specified, the builder u
      - Coefficient threshold below which Pauli terms are discarded. Default is 1e-12.
 
 
+.. _plaquette-builder:
+
+Plaquette Trotterization
+~~~~~~~~~~~~~~~~~~~~~~~~
+.. rubric:: Factory name: ``"plaquette"``
+
+Term-by-term Trotterization pays one synthesized rotation per Pauli term, and a
+hopping bond costs two of them under Jordan-Wigner. A four-site plaquette therefore
+costs eight rotations, even though the plaquette is a *quadratic* operator whose
+exact evolution needs only two.
+
+This implementation exploits that. Each plaquette's single-particle hopping matrix is
+diagonalized, :math:`T = V \Lambda V^{T}`, which lifts to
+
+.. math::
+    e^{-i\tau H_\mathrm{plaq}} = U_V \, e^{-i\tau \sum_m \lambda_m n_m} \, U_V^{\dagger}
+
+in Fock space. A uniform four-cycle has :math:`\Lambda = \{-2t, 2t, 0, 0\}`, so only
+two modes carry a phase, and for a uniform cycle :math:`V` is the four-point Fourier
+transform whose Givens network is three rotations at a fixed :math:`\pi/4`. Fixed
+angles compile to Clifford+T once rather than being synthesized per timestep, so they
+do not count against the rotation budget.
+
+The lattice is split into two sections of vertex-disjoint plaquettes that together
+cover every bond exactly once. Cycles within a section share no site, so they commute
+and that section is exact; only the split between the two sections carries Trotter
+error. Diagonal terms — the on-site interaction, any chemical potential, and the
+identity — are emitted unchanged.
+
+The hopping amplitude is read from the Hamiltonian rather than configured, so an
+operator that does not match the declared lattice raises rather than producing a
+silently incorrect circuit.
+
+.. note::
+   This implementation expects a Jordan-Wigner encoded, spin-ordered uniform
+   Fermi-Hubbard model on a periodic square lattice whose sides are even and at least
+   four. Smaller periodic lattices wrap onto themselves and cannot be tiled.
+
+.. rubric:: Settings
+
+Accepts every :ref:`Trotter <trotter-builder>` setting, plus:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``lattice_width``
+     - int
+     - Number of lattice columns. Required.
+   * - ``lattice_height``
+     - int
+     - Number of lattice rows. Required.
+
+
 .. _zassenhaus-builder:
 
 Zassenhaus product formulas
