@@ -776,6 +776,15 @@ class TestModelHamiltonians:
                     crystallographic_transform=transform,
                 )
 
+        with pytest.raises(ValueError, match="orthogonal"):
+            create_kitaev_hamiltonian(
+                graph,
+                0.0,
+                0.0,
+                0.0,
+                crystallographic_transform=np.diag([2.0, 1.0, 1.0]),
+            )
+
         with pytest.raises(ValueError, match="shape"):
             create_kitaev_hamiltonian(graph, 0.0, 0.0, 0.0, magnetic_field_abc=np.zeros(2))
         with pytest.raises(ValueError, match="crystallographic_transform"):

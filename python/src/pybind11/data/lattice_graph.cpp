@@ -528,16 +528,16 @@ sites needed to complete the requested plaquettes. A fully open ``1 x 1``
 complete-plaquette lattice is one six-site hexagon.
 
 Args:
-        nx (int): Number of unit cells or complete plaquettes along x.
-        ny (int): Number of unit cells or complete plaquettes along y.
-        periodic_x (bool, optional): If True, apply periodic boundary conditions along x. Requires nx > 1. Defaults to False.
-        periodic_y (bool, optional): If True, apply periodic boundary conditions along y. Requires ny > 1. Defaults to False.
+    nx (int): Number of unit cells or complete plaquettes along x.
+    ny (int): Number of unit cells or complete plaquettes along y.
+    periodic_x (bool, optional): If True, apply periodic boundary conditions along x. Requires nx > 1. Defaults to False.
+    periodic_y (bool, optional): If True, apply periodic boundary conditions along y. Requires ny > 1. Defaults to False.
     t (float, optional): Hopping weight for all edges. Defaults to 1.0.
-        dfs_ordering (bool, optional): Reserved for API compatibility. Defaults to False.
-        size_convention (HoneycombSizeConvention, optional): Interpretation of ``nx`` and ``ny``. Defaults to ``UNIT_CELLS``.
+    dfs_ordering (bool, optional): Reserved for API compatibility. Defaults to False.
+    size_convention (HoneycombSizeConvention, optional): Interpretation of ``nx`` and ``ny``. Defaults to ``UNIT_CELLS``.
 
 Returns:
-        LatticeGraph: Honeycomb lattice with the requested dimensions.
+    LatticeGraph: Honeycomb lattice with the requested dimensions.
 
 Raises:
     ValueError: If nx or ny is 0.
