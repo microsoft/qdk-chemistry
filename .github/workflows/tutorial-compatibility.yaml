@@ -22,28 +22,26 @@ permissions:
   contents: read
 
 jobs:
-  # TODO(#625): After the release containing qdk_gauge_fixing and native cube
-  # generation is published and pinned by the tutorial:
-  # - rename this job and its display name back to "published-baseline" and
-  #   "Exact published baseline";
-  # - restore the 30-minute timeout;
-  # - remove the source-build prerequisite steps;
-  # - replace the current-source installation with the commented published-wheel
-  #   installation below; and
-  # - add native Windows jobs for every architecture with a published wheel.
-  #   Windows Arm64 depends on PR #593 landing and its wheel being released.
-  current-source-baseline:
-    name: Current-source baseline (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    env:
-      # Remove when this job returns to a pinned published package.
-      CMAKE_BUILD_PARALLEL_LEVEL: '1'
+  published-baseline:
+    name: Exact published baseline (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        os:
-        - ubuntu-latest
-        - macos-latest
+        include:
+        - name: Ubuntu x86-64
+          runner: ubuntu-latest
+          architecture: x64
+        - name: macOS Arm64
+          runner: macos-latest
+          architecture: arm64
+        - name: Windows x86-64
+          runner: windows-latest
+          architecture: x64
+        - name: Windows Arm64
+          runner: windows-11-arm
+          architecture: arm64
 
     steps:
     - name: Checkout repository
@@ -53,62 +51,28 @@ jobs:
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
       with:
         python-version: '3.12'
+        architecture: ${{ matrix.architecture }}
         cache: pip
         cache-dependency-path: python/pyproject.toml
 
     - name: Read tutorial package version
       id: tutorial-version
-      run: |
-        VERSION=$(python -c 'import runpy; print(runpy.run_path("docs/source/tutorials/_versions.py")["GROUND_STATE_TUTORIAL_VERSION"])')
-        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      run: >-
+        python -c "import os, runpy;
+        version = runpy.run_path('docs/source/tutorials/_versions.py')['GROUND_STATE_TUTORIAL_VERSION'];
+        open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8').write(f'version={version}\n')"
 
-    - name: Install Linux source-build prerequisites
-      if: runner.os == 'Linux'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          build-essential \
-          ninja-build \
-          cmake \
-          libeigen3-dev \
-          libboost-all-dev \
-          libhdf5-dev \
-          libopenblas-dev \
-          libgfortran5 \
-          pkg-config
-
-    - name: Install macOS source-build prerequisites
-      if: runner.os == 'macOS'
-      run: |
-        brew install \
-          cmake \
-          ninja \
-          eigen \
-          boost \
-          hdf5 \
-          nlohmann-json \
-          bison \
-          flex
-
-    - name: Install current-source tutorial environment
+    - name: Install published tutorial environment
       run: |
         python -m pip install --upgrade pip
-        # Restore this published-wheel installation as part of TODO #625:
-        # python -m pip install \
-        #   "qdk-chemistry==${{ steps.tutorial-version.outputs.version }}" \
-        #   nbclient \
-        #   nbformat \
-        #   pytest \
-        #   pytest-env
-        # Temporary current-source installation until that release is available:
-        python -m pip install \
-          ./python \
-          ipykernel \
-          nbclient \
-          nbformat \
-          pytest \
-          pytest-env
+        python -m pip install "qdk-chemistry[jupyter]==${{ steps.tutorial-version.outputs.version }}" nbclient nbformat pytest pytest-env
         python -m ipykernel install --user --name python3 --display-name "Python 3"
+
+    - name: Verify published package boundary
+      run: >-
+        python -c "import importlib.util;
+        assert importlib.util.find_spec('pyscf') is None,
+        'qdk-chemistry[jupyter] must not install PySCF'"
 
     - name: Verify tutorial setup
       env:
@@ -116,17 +80,17 @@ jobs:
       run: python docs/source/_static/examples/python/tutorial_qpe_setup.py
 
     - name: Run tutorial scripts
-      run: |
-        for example in docs/source/_static/examples/python/tutorial_*.py; do
-          if [ "$(basename "$example")" != 'tutorial_qpe_setup.py' ] && ! grep -q '# docs-example: slow' "$example"; then
-            python "$example"
-          fi
-        done
+      run: >-
+        python -c "import subprocess, sys; from pathlib import Path;
+        scripts = sorted(Path('docs/source/_static/examples/python').glob('tutorial_*.py'));
+        [subprocess.run([sys.executable, str(script)], check=True) for script in scripts
+        if script.name != 'tutorial_qpe_setup.py'
+        and '# docs-example: slow' not in script.read_text(encoding='utf-8')]"
 
-    - name: Run exact tutorial baselines
+    - name: Run full tutorial tests
       env:
         QDK_CHEMISTRY_RUN_SLOW_TESTS: '1'
         QDK_CHEMISTRY_RUN_TUTORIAL_SNAPSHOTS: '1'
       run: >-
         python -m pytest -q --strict-config --strict-markers
-        python/tests/test_sample_tutorial_gs_qpe.py -m tutorial_baseline
+        python/tests/test_sample_tutorial_gs_qpe.py
