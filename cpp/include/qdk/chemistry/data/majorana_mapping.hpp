@@ -83,8 +83,21 @@ class MajoranaMapping : public DataClass {
    *
    * @throws std::out_of_range if j or k >= 2N.
    * @throws std::invalid_argument if j == k.
+   * @throws std::logic_error if no precomputed cache exists for the mapping.
    */
   std::pair<std::complex<double>, const SparsePauliWord&> bilinear(
+      std::size_t j, std::size_t k) const;
+
+  /**
+   * @brief Pauli image of i*gamma_j*gamma_k, returned by value.
+   *
+   * Reads the cache when present and multiplies the two Majorana table
+   * entries otherwise, so it works for mappings of any size.
+   *
+   * @throws std::out_of_range if j or k >= 2N.
+   * @throws std::invalid_argument if j == k.
+   */
+  std::pair<std::complex<double>, SparsePauliWord> bilinear_product(
       std::size_t j, std::size_t k) const;
 
   /// Whether individual Majoranas have a Pauli image.
@@ -287,7 +300,7 @@ class MajoranaMapping : public DataClass {
   /// Majorana-to-Pauli table (empty for bilinear-only mappings).
   std::vector<SparsePauliWord> table_;
 
-  /// Cached bilinear table, upper triangle row-major. Always populated.
+  /// Cached bilinear table, upper triangle row-major. Empty when omitted.
   std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears_;
 
   /// Human-readable encoding name.

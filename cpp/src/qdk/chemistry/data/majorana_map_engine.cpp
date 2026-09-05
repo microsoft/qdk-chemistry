@@ -3,6 +3,7 @@
 // license information.
 
 #include <Eigen/Core>
+#include <algorithm>
 #include <array>
 #include <bit>
 #include <cmath>
@@ -356,6 +357,11 @@ struct SparseEriProvider {
   // the engine's compile-time interface.
   mutable std::vector<double> row_buf_{};
   const std::vector<Entry>& entries() const { return entries_; }
+  // Symmetry-expanded positions; the on-demand engine folds the delta_{qr}
+  // correction over these instead of an O(N^3) scalar sweep.
+  const std::unordered_map<std::uint64_t, double>& positions() const {
+    return map_;
+  }
   std::uint64_t key(std::size_t p, std::size_t q, std::size_t r,
                     std::size_t s) const {
     return static_cast<std::uint64_t>(((p * n_ + q) * n_ + r) * n_ + s);
@@ -389,6 +395,20 @@ struct SparseEriProvider {
   }
 };
 
+// Largest packed width instantiated for the eager engine below.
+constexpr std::size_t max_nw = 16;
+
+template <std::size_t NW>
+void accumulate_stabilizer_penalty(PackedAccumulator<NW>& acc,
+                                   const MajoranaMapping& mapping,
+                                   const double* h1_alpha,
+                                   const double* h1_beta, std::size_t n_spatial,
+                                   bool spin_symmetric);
+
+template <std::size_t NW>
+MajoranaMapResult finalize_result(const PackedAccumulator<NW>& acc,
+                                  double threshold);
+
 template <std::size_t NW, class EriProvider>
 MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
                                     double core_energy, const double* h1_alpha,
@@ -404,8 +424,9 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
   // ─── Pair product cache ───────────────────────────────────────────
   //
   // Precompute γ_j · γ_k = (-i) · bilinear(j, k) for each within-spin-block
-  // pair. Using bilinear() as the access primitive makes this work for both
-  // Majorana-atomic and bilinear-only mappings.
+  // pair. bilinear_product() reads the mapping's cache when it has one and
+  // derives the entry from the Majorana table otherwise, so this works for
+  // Majorana-atomic, bilinear-only, and uncached mappings alike.
 
   struct PackedPairProduct {
     std::complex<double> coeff;
@@ -423,7 +444,7 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
       for (std::size_t j = 0; j < maj_per_spin; ++j) {
         if (i == j) continue;
         auto [bl_coeff, bl_word] =
-            mapping.bilinear(i + global_offset, j + global_offset);
+            mapping.bilinear_product(i + global_offset, j + global_offset);
         cache[i * maj_per_spin + j] = {
             std::complex<double>(0.0, -1.0) * bl_coeff,
             sparse_to_packed<NW>(bl_word)};
@@ -712,6 +733,19 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
     }
   }
 
+  accumulate_stabilizer_penalty<NW>(acc, mapping, h1_alpha, h1_beta, n_spatial,
+                                    spin_symmetric);
+
+  return finalize_result<NW>(acc, threshold);
+}
+
+// H_aux = lambda * sum_i (I - S_i S_{i+1}), shared by both engines.
+template <std::size_t NW>
+void accumulate_stabilizer_penalty(PackedAccumulator<NW>& acc,
+                                   const MajoranaMapping& mapping,
+                                   const double* h1_alpha,
+                                   const double* h1_beta, std::size_t n_spatial,
+                                   bool spin_symmetric) {
   if (!mapping.stabilizers().empty()) {
     double h1_sum = 0.0;
     for (std::size_t p = 0; p < n_spatial; ++p) {
@@ -854,8 +888,11 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
       }
     }
   }
+}
 
-  // ─── Extract results as sparse Pauli words ──────────────────────
+template <std::size_t NW>
+MajoranaMapResult finalize_result(const PackedAccumulator<NW>& acc,
+                                  double threshold) {
   auto terms = acc.get_terms(threshold);
 
   MajoranaMapResult result;
@@ -870,7 +907,215 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
   return result;
 }
 
-constexpr std::size_t max_nw = 16;
+// ─── On-demand engine ──────────────────────────────────────────────
+//
+// Same arithmetic, ordering, and thresholds as majorana_map_impl, but nothing
+// is materialized for orbital pairs the integrals never touch.  The eager
+// engine's three dense tables — the (2N)^2 pair-product caches, the N^2
+// spin-summed table, and the N^2 sym_map — all scale as O(N^2) packed words,
+// i.e. O(n_qubits^3) bytes, which is what puts a ceiling on the qubit count.
+// Here each packed word is derived from the mapping on first use and memoized
+// under the key that asked for it, so the footprint follows the number of
+// non-zero integrals instead of the orbital count.
+//
+// Restricted, sparse integrals only: the dense and Cholesky two-body loops are
+// O(N^4) in time above the eager engine's range regardless of memory.
+template <std::size_t NW, class EriProvider>
+MajoranaMapResult majorana_map_impl_large(
+    const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
+    const double* h1_beta, const EriProvider& eri_provider,
+    std::size_t n_spatial, bool spin_symmetric, double threshold,
+    double integral_threshold) {
+  static_assert(EriProvider::kSparse,
+                "the on-demand engine requires sparse two-body integrals");
+
+  const std::size_t maj_per_spin = 2 * n_spatial;
+  const std::size_t num_spin_species =
+      (mapping.num_modes() < 2 * n_spatial) ? 1 : 2;
+  if (!spin_symmetric || num_spin_species != 2) {
+    throw std::invalid_argument(
+        "majorana_map_hamiltonian: mappings above " +
+        std::to_string(max_nw * 64) +
+        " qubits require restricted orbitals with both spin species.");
+  }
+
+  PackedAccumulator<NW> acc;
+
+  struct PackedPairProduct {
+    std::complex<double> coeff;
+    PackedPauliWord<NW> word;
+  };
+
+  // gamma_i gamma_j within one spin block, built the first time it is read.
+  // unordered_map keeps element references stable across rehashes.
+  std::unordered_map<std::size_t, PackedPairProduct> pair_cache[2];
+  auto pair_product = [&](std::size_t spin, std::size_t i,
+                          std::size_t j) -> const PackedPairProduct& {
+    const std::size_t key = i * maj_per_spin + j;
+    auto& cache = pair_cache[spin];
+    if (auto it = cache.find(key); it != cache.end()) return it->second;
+    PackedPairProduct value{{1.0, 0.0}, PackedPauliWord<NW>{}};
+    if (i != j) {
+      const std::size_t offset = spin * maj_per_spin;
+      auto [bl_coeff, bl_word] =
+          mapping.bilinear_product(i + offset, j + offset);
+      value = {std::complex<double>(0.0, -1.0) * bl_coeff,
+               sparse_to_packed<NW>(bl_word)};
+    }
+    return cache.emplace(key, std::move(value)).first->second;
+  };
+
+  auto accumulate_epq = [&](std::size_t spin, std::size_t p, std::size_t q,
+                            double h_pq) {
+    for (int a = 0; a < 2; ++a) {
+      for (int b = 0; b < 2; ++b) {
+        const auto& pp = pair_product(spin, 2 * p + a, 2 * q + b);
+        acc.accumulate(pp.word,
+                       pp.coeff * h_pq * 0.25 * excitation_coeff[a][b]);
+      }
+    }
+  };
+
+  // ─── Core energy ──────────────────────────────────────────────────
+  if (std::abs(core_energy) > integral_threshold) {
+    acc.accumulate(PackedPauliWord<NW>{},
+                   std::complex<double>(core_energy, 0.0));
+  }
+
+  // ─── One-body terms ──────────────────────────────────────────────
+  //
+  // delta_corr(p, s) = sum_q (pq|qs) touches only stored positions, so it is
+  // folded from the non-zero entries.  The ordered key (p, s, q) reproduces
+  // the increasing-q summation order of the eager engine's inner loop.
+  const std::uint64_t n64 = static_cast<std::uint64_t>(n_spatial);
+  std::map<std::array<std::size_t, 3>, double> delta_terms;
+  for (const auto& [position, value] : eri_provider.positions()) {
+    const std::size_t s = static_cast<std::size_t>(position % n64);
+    const std::size_t r = static_cast<std::size_t>((position / n64) % n64);
+    const std::size_t q =
+        static_cast<std::size_t>((position / (n64 * n64)) % n64);
+    const std::size_t p =
+        static_cast<std::size_t>(position / (n64 * n64 * n64));
+    if (q == r) delta_terms[{p, s, q}] = value;
+  }
+  std::unordered_map<std::size_t, double> delta;
+  for (const auto& [index, value] : delta_terms) {
+    delta[index[0] * n_spatial + index[1]] += value;
+  }
+
+  for (std::size_t p = 0; p < n_spatial; ++p) {
+    for (std::size_t q = 0; q < n_spatial; ++q) {
+      double h_pq = h1_alpha[p * n_spatial + q];
+      if (auto it = delta.find(p * n_spatial + q); it != delta.end()) {
+        h_pq -= 0.5 * it->second;
+      }
+      if (std::abs(h_pq) > integral_threshold) {
+        accumulate_epq(0, p, q, h_pq);
+        accumulate_epq(1, p, q, h_pq);
+      }
+    }
+  }
+
+  // ─── Two-body terms ───────────────────────────────────────────────
+  //
+  // The eager engine numbers the canonical (p<=q) pairs and compares those
+  // indices; the ordered (min, max) key compares identically, so the swap
+  // below selects the same orientation without an N^2 index table.
+  using PairKey = std::pair<std::size_t, std::size_t>;
+  struct SymmetrizedE {
+    std::vector<std::pair<std::complex<double>, PackedPauliWord<NW>>> terms;
+  };
+  std::map<PairKey, SymmetrizedE> sym_cache;
+
+  auto symmetrized = [&](const PairKey& key) -> const SymmetrizedE& {
+    if (auto it = sym_cache.find(key); it != sym_cache.end()) return it->second;
+    std::unordered_map<PackedPauliWord<NW>, std::complex<double>,
+                       PackedPauliWordHash<NW>>
+        merged;
+    auto add_spin_summed = [&](std::size_t p, std::size_t q) {
+      for (int a = 0; a < 2; ++a) {
+        for (int b = 0; b < 2; ++b) {
+          const auto& alpha = pair_product(0, 2 * p + a, 2 * q + b);
+          merged[alpha.word] += alpha.coeff * 0.25 * excitation_coeff[a][b];
+          const auto& beta = pair_product(1, 2 * p + a, 2 * q + b);
+          merged[beta.word] += beta.coeff * 0.25 * excitation_coeff[a][b];
+        }
+      }
+    };
+    add_spin_summed(key.first, key.second);
+    if (key.first != key.second) add_spin_summed(key.second, key.first);
+
+    SymmetrizedE entry;
+    for (auto& [word, coeff] : merged) {
+      if (std::abs(coeff) > 1e-15) {
+        entry.terms.emplace_back(coeff, std::move(word));
+      }
+    }
+    return sym_cache.emplace(key, std::move(entry)).first->second;
+  };
+
+  auto process_pair = [&](PairKey pq, PairKey rs, double eri) {
+    if (std::abs(eri) < integral_threshold) return;
+    const auto& s_pq = symmetrized(pq);
+    const auto& s_rs = symmetrized(rs);
+    const double half_eri = 0.5 * eri;
+    if (pq == rs) {
+      for (const auto& [c1, w1] : s_pq.terms) {
+        for (const auto& [c2, w2] : s_rs.terms) {
+          acc.accumulate_product(w1, w2, half_eri * c1 * c2);
+        }
+      }
+    } else {
+      for (const auto& [c1, w1] : s_pq.terms) {
+        for (const auto& [c2, w2] : s_rs.terms) {
+          acc.accumulate_product(w1, w2, half_eri * c1 * c2);
+          acc.accumulate_product(w2, w1, half_eri * c2 * c1);
+        }
+      }
+    }
+  };
+
+  for (const auto& entry : eri_provider.entries()) {
+    PairKey pq{std::min(entry.p, entry.q), std::max(entry.p, entry.q)};
+    PairKey rs{std::min(entry.r, entry.s), std::max(entry.r, entry.s)};
+    if (rs < pq) std::swap(pq, rs);
+    process_pair(pq, rs, entry.value);
+  }
+
+  accumulate_stabilizer_penalty<NW>(acc, mapping, h1_alpha, h1_beta, n_spatial,
+                                    spin_symmetric);
+
+  return finalize_result<NW>(acc, threshold);
+}
+
+// Widths instantiated for the on-demand engine.  Powers of two keep the
+// instantiation count logarithmic in the qubit ceiling; a mapping runs at the
+// first width that fits, so at most half of the last word is padding.
+using LargeWordCounts = std::index_sequence<32, 64, 128, 256, 512, 1024>;
+
+template <class EriProvider, std::size_t... Ws>
+MajoranaMapResult dispatch_large_by_words(
+    std::index_sequence<Ws...>, std::size_t num_words,
+    const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
+    const double* h1_beta, const EriProvider& eri_provider,
+    std::size_t n_spatial, bool spin_symmetric, double threshold,
+    double integral_threshold) {
+  using Fn = MajoranaMapResult (*)(
+      const MajoranaMapping&, double, const double*, const double*,
+      const EriProvider&, std::size_t, bool, double, double);
+  static constexpr std::size_t widths[] = {Ws...};
+  static const Fn table[] = {&majorana_map_impl_large<Ws, EriProvider>...};
+  for (std::size_t i = 0; i < sizeof...(Ws); ++i) {
+    if (num_words <= widths[i]) {
+      return table[i](mapping, core_energy, h1_alpha, h1_beta, eri_provider,
+                      n_spatial, spin_symmetric, threshold, integral_threshold);
+    }
+  }
+  throw std::invalid_argument(
+      "majorana_map_hamiltonian: num_qubits=" +
+      std::to_string(mapping.num_qubits()) + " exceeds the maximum of " +
+      std::to_string(widths[sizeof...(Ws) - 1] * 64) + " qubits.");
+}
 
 // Runtime dispatch over the number of 64-bit words needed for the qubit
 // count, templated on the ERI provider so each storage format reuses the
@@ -909,9 +1154,18 @@ MajoranaMapResult run_with_provider(const MajoranaMapping& mapping,
   const std::size_t num_words = (num_qubits + 63) / 64;
 
   if (num_words > max_nw) {
-    throw std::invalid_argument(
-        "majorana_map_hamiltonian: num_qubits=" + std::to_string(num_qubits) +
-        " exceeds the maximum of " + std::to_string(max_nw * 64) + " qubits.");
+    if constexpr (EriProvider::kSparse) {
+      return dispatch_large_by_words<EriProvider>(
+          LargeWordCounts{}, num_words, mapping, core_energy, h1_alpha, h1_beta,
+          eri_provider, n_spatial, spin_symmetric, threshold,
+          integral_threshold);
+    } else {
+      throw std::invalid_argument(
+          "majorana_map_hamiltonian: num_qubits=" + std::to_string(num_qubits) +
+          " exceeds the " + std::to_string(max_nw * 64) +
+          "-qubit limit for dense and Cholesky integrals; larger mappings need "
+          "a sparse Hamiltonian container, which uses the on-demand engine.");
+    }
   }
 
   return dispatch_by_words<EriProvider>(

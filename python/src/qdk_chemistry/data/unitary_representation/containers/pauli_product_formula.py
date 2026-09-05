@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import math
 from dataclasses import dataclass
 from typing import Any
 
@@ -32,6 +33,21 @@ class ExponentiatedPauliTerm:
 
     angle: float
     """The rotation angle for the exponentiation."""
+
+    needs_control: bool = True
+    """Whether a controlled mapper must control this factor.
+
+    A product formula that conjugates a phase layer, :math:`V D V^{\\dagger}`,
+    satisfies :math:`C(V D V^{\\dagger}) = V\\, C(D)\\, V^{\\dagger}`: with the control
+    off the conjugating factors cancel against their own adjoints, so only the phase
+    layer needs controlling. Marking the conjugating factors ``False`` lets a
+    controlled mapper emit them bare, which matters because controlling a rotation
+    costs the same whether its angle is fixed or arbitrary -- a fixed ``pi/8`` factor
+    is one T gate uncontrolled but two rotations controlled.
+
+    Terms marked ``False`` must genuinely cancel;
+    :class:`PauliProductFormulaContainer` verifies it rather than taking it on trust.
+    """
 
 
 class PauliProductFormulaContainer(UnitaryContainer):
@@ -80,7 +96,8 @@ class PauliProductFormulaContainer(UnitaryContainer):
 
         Raises:
             TypeError: If ``step_reps`` is not an integer.
-            ValueError: If ``step_reps`` is not positive.
+            ValueError: If ``step_reps`` is not positive, or if the terms marked
+                ``needs_control=False`` do not cancel.
 
         """
         # bool is an int subclass, but True as a repetition count is always a mistake.
@@ -89,11 +106,57 @@ class PauliProductFormulaContainer(UnitaryContainer):
         if step_reps <= 0:
             raise ValueError(f"step_reps must be a positive integer, got {step_reps}.")
 
+        self._verify_uncontrolled_terms_cancel(step_terms)
+
         self.step_terms = step_terms
         self.step_reps = int(step_reps)
         self._num_qubits = num_qubits
         self.scale = scale
         super().__init__()
+
+    @staticmethod
+    def _verify_uncontrolled_terms_cancel(step_terms) -> None:
+        """Check that factors exempted from control really do cancel.
+
+        Exempting a factor is only sound when it belongs to a conjugation that
+        vanishes with the control off. The factors form nested sandwiches, so each
+        one must be undone by the next unmatched exempt factor: walking them as a
+        stack, every factor either opens a conjugation or closes the innermost open
+        one by being its exact inverse. Anything left open at the end would survive
+        into the control-off branch and silently corrupt the circuit.
+
+        Args:
+            step_terms: The step's factors, in application order.
+
+        Raises:
+            ValueError: If an exempt factor neither opens nor closes a conjugation,
+                or if any conjugation is still open at the end.
+
+        """
+        stack: list[int] = []
+        for index, term in enumerate(step_terms):
+            if term.needs_control:
+                continue
+            if stack:
+                opener = step_terms[stack[-1]]
+                if opener.pauli_term == term.pauli_term and math.isclose(
+                    opener.angle, -term.angle, rel_tol=1e-12, abs_tol=1e-15
+                ):
+                    stack.pop()
+                    continue
+            stack.append(index)
+
+        if stack:
+            unmatched = [
+                f"index {i} ({dict(sorted(step_terms[i].pauli_term.items()))}, angle {step_terms[i].angle!r})"
+                for i in stack[:3]
+            ]
+            raise ValueError(
+                f"{len(stack)} term(s) marked needs_control=False do not cancel, so they would "
+                f"not vanish when the control is off: {', '.join(unmatched)}"
+                f"{', ...' if len(stack) > 3 else ''}. Exempt a factor from control only when a "
+                "later factor undoes it exactly."
+            )
 
     def eigenvalue_from_phase(self, phase_fraction: float) -> float:
         r"""Recover a Hamiltonian eigenvalue from a time-evolution phase.
@@ -124,6 +187,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
                 _hash_int(h, qubit_idx)
                 _hash_str(h, term.pauli_term[qubit_idx])
             _hash_float(h, term.angle)
+            _hash_uint(h, int(term.needs_control))
         _hash_int(h, self.step_reps)
         _hash_int(h, self._num_qubits)
         _hash_float(h, self.scale)

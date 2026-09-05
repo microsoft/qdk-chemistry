@@ -143,6 +143,95 @@ When both ``num_divisions`` and ``target_accuracy`` are specified, the builder u
      - Coefficient threshold below which Pauli terms are discarded. Default is 1e-12.
 
 
+.. _plaquette-builder:
+
+Plaquette Trotterization
+~~~~~~~~~~~~~~~~~~~~~~~~
+.. rubric:: Factory name: ``"plaquette"``
+
+Term-by-term Trotterization pays one synthesized rotation per Pauli term, and a
+hopping bond costs two of them under Jordan-Wigner. A four-site plaquette therefore
+costs eight rotations, even though the plaquette is a *quadratic* operator whose
+exact evolution needs only two. The scheme follows :cite:`Campbell2022`, and
+:cite:`BaySmidt2025` extends the same idea to tiles larger than a single plaquette
+and to lattices beyond the square one.
+
+This implementation exploits that. Each plaquette's single-particle hopping matrix is
+diagonalized, :math:`T = V \Lambda V^{T}`, which lifts to
+
+.. math::
+    e^{-i\tau H_\mathrm{plaq}} = U_V \, e^{-i\tau \sum_m \lambda_m n_m} \, U_V^{\dagger}
+
+in Fock space. A uniform four-cycle has :math:`\Lambda = \{-2t, 2t, 0, 0\}`, so only
+two modes carry a phase, and for a uniform cycle :math:`V` is the four-point Fourier
+transform whose Givens network is three rotations at a fixed :math:`\pi/4`. Fixed
+angles compile to Clifford+T once rather than being synthesized per timestep, so they
+do not count against the rotation budget.
+
+The lattice is split into two sections of vertex-disjoint plaquettes that together
+cover every bond exactly once. Cycles within a section share no site, so they commute
+and that section is exact; only the split between the two sections carries Trotter
+error. Diagonal terms — the on-site interaction, any chemical potential, and the
+identity — are emitted unchanged.
+
+The hopping amplitude is read from the Hamiltonian rather than configured, so an
+operator that does not match the declared lattice raises rather than producing a
+silently incorrect circuit.
+
+.. note::
+   This implementation expects a Jordan-Wigner encoded, spin-blocked uniform
+   Fermi-Hubbard model on a periodic square lattice whose sides are even and at least
+   four. Smaller periodic lattices wrap onto themselves and cannot be tiled. An
+   interleaved mode ordering, a non-uniform hopping, or a bond graph that is not the
+   declared lattice raises rather than being approximated.
+
+Controlling a rotation costs the same whether its angle is fixed or arbitrary, so the
+saving would evaporate if the conjugating network were controlled along with
+everything else. It is not: those factors carry ``needs_control=False``, which is
+sound because :math:`C(V D V^{\dagger}) = V\, C(D)\, V^{\dagger}` -- with the control
+off the network cancels against its own adjoint --  and
+:class:`~qdk_chemistry.data.PauliProductFormulaContainer` verifies that cancellation
+rather than taking it on trust.
+
+Measured on one Trotter step of a 4x4 lattice, mapped through
+:class:`~qdk_chemistry.algorithms.ControlledPauliSequenceMapper`:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 20 15 20
+
+   * - Builder
+     - Rotations
+     - T
+     - Rotation depth
+   * - ``trotter``
+     - 704
+     - 0
+     - 451
+   * - ``plaquette``
+     - 225
+     - 384
+     - 143
+
+.. rubric:: Settings
+
+Accepts every :ref:`Trotter <trotter-builder>` setting, plus:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``lattice_width``
+     - int
+     - Number of lattice columns. Required.
+   * - ``lattice_height``
+     - int
+     - Number of lattice rows. Required.
+
+
 .. _zassenhaus-builder:
 
 Zassenhaus product formulas

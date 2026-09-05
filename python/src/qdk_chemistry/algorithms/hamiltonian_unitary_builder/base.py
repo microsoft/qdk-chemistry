@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import re
 from abc import abstractmethod
 
 import numpy as np
@@ -28,6 +29,8 @@ __all__: list[str] = [
     "TimeEvolutionBuilder",
     "TimeEvolutionSettings",
 ]
+
+_NON_IDENTITY = re.compile(r"[^I]")
 
 
 class HamiltonianUnitaryBuilder(Algorithm):
@@ -60,11 +63,10 @@ class HamiltonianUnitaryBuilder(Algorithm):
             Dictionary assigning each non-identity qubit index to its Pauli axis.
 
         """
-        mapping: dict[int, str] = {}
-        for index, char in enumerate(reversed(label)):  # reversed: right-most char -> qubit 0
-            if char != "I":
-                mapping[index] = char
-        return mapping
+        # Labels are dense but Pauli strings are not, so let the regex engine skip
+        # the identity runs instead of stepping over them in Python.
+        last = len(label) - 1
+        return {last - m.start(): m[0] for m in reversed(list(_NON_IDENTITY.finditer(label)))}
 
 
 class HamiltonianUnitaryBuilderSettings(Settings):
@@ -205,9 +207,12 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
             [_make(layer) for layer in group_layers if layer] for group_layers in layered_groups
         ]
 
-        groups = [g for g in groups if g]
-        groups.sort(key=len)
-        return groups
+        # The partition's group order is the Strang/Suzuki splitting order, so it is
+        # preserved as given: the schedule applies the last group at full time in the
+        # middle and the rest at half time on the outside, which changes both the gate
+        # count and the error constant. Reordering here would silently override the
+        # ordering the caller chose.
+        return [g for g in groups if g]
 
     def _exponentiate_commuting(
         self,
@@ -234,11 +239,20 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
 
         """
         terms: list[ExponentiatedPauliTerm] = []
-        for label, coeff in group.get_real_coefficients(tolerance=atol):
-            mapping = self._pauli_label_to_map(label)
-            angle = coeff * time
-            terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
+        for mapping, coeff in self._commuting_pauli_maps(group, atol=atol):
+            terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=coeff * time))
         return terms
+
+    def _commuting_pauli_maps(
+        self,
+        group: QubitOperator,
+        *,
+        atol: float = 1e-12,
+    ) -> list[tuple[dict[int, str], float]]:
+        """Return ``(non-identity Pauli map, coefficient)`` for each term of a group."""
+        return [
+            (self._pauli_label_to_map(label), coeff) for label, coeff in group.get_real_coefficients(tolerance=atol)
+        ]
 
 
 class HamiltonianUnitaryBuilderFactory(AlgorithmFactory):

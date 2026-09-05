@@ -24,6 +24,10 @@ from qdk_chemistry.algorithms.term_grouper.commuting import (
     QubitWiseCommutingTermGrouper,
 )
 from qdk_chemistry.algorithms.term_grouper.identity import IdentityTermGrouper
+from qdk_chemistry.algorithms.term_grouper.lattice_coloring import (
+    LatticeColoringTermGrouper,
+    LatticeColoringTermGrouperSettings,
+)
 from qdk_chemistry.algorithms.term_grouper.vacuum_annihilating import (
     VacuumAnnihilatingTermGrouper,
     VacuumAnnihilatingTermGrouperSettings,
@@ -32,6 +36,8 @@ from qdk_chemistry.algorithms.term_grouper.vacuum_annihilating import (
 __all__ = [
     "FullCommutingTermGrouper",
     "IdentityTermGrouper",
+    "LatticeColoringTermGrouper",
+    "LatticeColoringTermGrouperSettings",
     "QubitWiseCommutingTermGrouper",
     "TermGrouper",
     "TermGrouperFactory",
