@@ -1,4 +1,4 @@
-"""Tests for the bundled Azure AI Discovery backend."""
+"""Tests for the bundled Microsoft Discovery backend."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -59,7 +59,7 @@ class _SharedCache:
 
 
 class _Tools:
-    """Capture one Discovery tool submission."""
+    """Capture one Microsoft Discovery tool submission."""
 
     def __init__(self) -> None:
         """Initialize without a captured submission."""
@@ -96,7 +96,7 @@ class _Container:
 
 
 def _backend(**kwargs: Any) -> DiscoveryBackend:
-    """Create a backend with required Discovery identifiers."""
+    """Create a backend with required Microsoft Discovery identifiers."""
     config = {
         "workspace_endpoint": "https://workspace.discovery.azure.com",
         "project_name": "project",
@@ -116,6 +116,7 @@ def _payload() -> dict[str, Any]:
         "args": ([1, 2],),
         "kwargs": {},
         "run_hash": "run-hash",
+        "job_cache_key": "owner.run-hash",
         "input_hashes": {"args.arg_0": "input-hash"},
     }
 
@@ -168,6 +169,7 @@ def test_cache_transport_seeds_inputs_and_submits_inline_manifest() -> None:
     manifest = json.loads(gzip.decompress(base64.b64decode(inline_file.encoded_file)))
     assert inline_file.mount_path == "/qdk/input/manifest.json"
     assert manifest["remote_cache_transport"] is True
+    assert manifest["job_cache_key"] == "owner.run-hash"
     assert manifest["args"][0] == {
         "type": "cached",
         "dataclass_type": "list",
@@ -176,7 +178,7 @@ def test_cache_transport_seeds_inputs_and_submits_inline_manifest() -> None:
 
 
 def test_blob_transport_submits_discovery_storage_mounts() -> None:
-    """Blob mode requests input and output mounts from Discovery."""
+    """Blob mode requests input and output mounts from Microsoft Discovery."""
     tools = _Tools()
     container = _Container()
     backend = _backend(
@@ -244,7 +246,7 @@ def test_partial_upload_failure_removes_uploaded_inputs(tmp_path, monkeypatch: p
 
 
 def test_submission_failure_removes_uploaded_inputs() -> None:
-    """A failed Discovery submission removes inputs before job state is returned."""
+    """A failed Microsoft Discovery submission removes inputs before job state is returned."""
     container = _Container()
     backend = _backend(
         transport="blob",
@@ -297,7 +299,7 @@ def test_cache_transport_fetches_result_without_blob(monkeypatch: pytest.MonkeyP
     """Cache transport reconstructs results without Blob Storage."""
     cache = _SharedCache()
     cache.data["output-hash"] = [1, 2]
-    cache.jobs["run-hash"] = SimpleNamespace(
+    cache.jobs["owner.run-hash"] = SimpleNamespace(
         output_hashes=[{"value": -1.5}, {"hash": "output-hash"}],
         output_is_tuple=True,
     )
@@ -309,6 +311,7 @@ def test_cache_transport_fetches_result_without_blob(monkeypatch: pytest.MonkeyP
             "transport": "cache",
             "remote_cache": {"name": cache.name},
             "run_hash": "run-hash",
+            "job_cache_key": "owner.run-hash",
         }
     )
 
@@ -331,7 +334,7 @@ def test_cache_transport_preserves_result_shape(
 ) -> None:
     """Cache transport uses the persisted result shape."""
     cache = _SharedCache()
-    cache.jobs["run-hash"] = SimpleNamespace(
+    cache.jobs["owner.run-hash"] = SimpleNamespace(
         output_hashes=output_hashes,
         output_is_tuple=output_is_tuple,
     )
@@ -342,6 +345,7 @@ def test_cache_transport_preserves_result_shape(
             "transport": "cache",
             "remote_cache": {"name": cache.name},
             "run_hash": "run-hash",
+            "job_cache_key": "owner.run-hash",
         }
     )
 
@@ -365,7 +369,11 @@ def test_cache_transport_fails_after_cache_write_failure(tmp_path, monkeypatch: 
     )
     algorithm = MagicMock()
     algorithm.run.return_value = 6
-    monkeypatch.setattr(remote_worker, "_load_remote_cache", MagicMock(return_value=(MagicMock(), "testhash", False)))
+    monkeypatch.setattr(
+        remote_worker,
+        "_load_remote_cache",
+        MagicMock(return_value=(MagicMock(), "testhash", "testhash", False)),
+    )
     monkeypatch.setattr(remote_worker, "_get_cached_result", MagicMock(return_value=remote_worker._CACHE_MISS))
     monkeypatch.setattr(remote_worker, "_store_cached_result", MagicMock(return_value=False))
     monkeypatch.setattr(algorithms_module, "create", MagicMock(return_value=algorithm))

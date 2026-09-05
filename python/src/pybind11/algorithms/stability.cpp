@@ -139,6 +139,15 @@ Returns:
 
 )");
 
+  stability_checker.def("aliases", &StabilityChecker::aliases,
+                        R"(
+The algorithm's aliases.
+
+Returns:
+    list[str]: All registered names for the algorithm
+
+)");
+
   stability_checker.def("type_name", &StabilityChecker::type_name,
                         R"(
 The algorithm's type name.
