@@ -274,10 +274,13 @@ jobs:
 
         echo "=== Running C++ Tests in Debug Mode with Coverage ==="
         set +e
+        # The slowest case (RKS_LEVEL_SHIFTING benzene RKS/PBE/cc-pvdz with
+        # GauXC) runs for ~280-300 s in this coverage-instrumented build, so a
+        # 300 s cap left no margin and timed out on runner-to-runner variation.
         if [ "$QDK_UARCH" == "native" ]; then # Exclude particular test on macOS builds
-          ctest --output-on-failure --verbose --timeout 300 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST|AtomInitGuessEnergyConvergence"
+          ctest --output-on-failure --verbose --timeout 600 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST|AtomInitGuessEnergyConvergence"
         else
-          ctest --output-on-failure --verbose --timeout 300 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST"
+          ctest --output-on-failure --verbose --timeout 600 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST"
         fi
 
         CTEST_EXIT_CODE=$?
