@@ -152,7 +152,9 @@ Plaquette Trotterization
 Term-by-term Trotterization pays one synthesized rotation per Pauli term, and a
 hopping bond costs two of them under Jordan-Wigner. A four-site plaquette therefore
 costs eight rotations, even though the plaquette is a *quadratic* operator whose
-exact evolution needs only two.
+exact evolution needs only two. The scheme follows :cite:`Campbell2022`, and
+:cite:`BaySmidt2025` extends the same idea to tiles larger than a single plaquette
+and to lattices beyond the square one.
 
 This implementation exploits that. Each plaquette's single-particle hopping matrix is
 diagonalized, :math:`T = V \Lambda V^{T}`, which lifts to
