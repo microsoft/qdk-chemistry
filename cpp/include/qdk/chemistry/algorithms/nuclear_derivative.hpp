@@ -51,10 +51,12 @@ class NuclearDerivativeSettings : public data::Settings {
   NuclearDerivativeSettings() {
     set_default(
         "energy_calculator", data::AlgorithmRef("scf_solver", "qdk"),
-        "Algorithm used for each energy evaluation. Use an scf_solver for "
-        "direct SCF finite differences, a multi_configuration_scf solver for "
-        "MCSCF energies, or a multi_configuration_calculator such as CASCI or "
-        "ASCI for Hamiltonian-based multi-reference energies.");
+        "Electronic-structure algorithm used by the derivative calculator. "
+        "The qdk implementation requires scf_solver/qdk and uses its analytic "
+        "gradients. The qdk_finite_difference implementation also accepts a "
+        "multi_configuration_scf solver or a multi_configuration_calculator "
+        "such as CASCI or ASCI for numeric derivatives of multi-reference "
+        "energies.");
     allow_algorithm_ref_type_change("energy_calculator");
     set_default(
         "orbital_solver", data::AlgorithmRef("scf_solver", "qdk"),
@@ -195,9 +197,7 @@ struct NuclearDerivativeCalculatorFactory
   /**
    * @brief Return the default nuclear derivative implementation name.
    */
-  static std::string default_algorithm_name() {
-    return "qdk_finite_difference";
-  }
+  static std::string default_algorithm_name() { return "qdk"; }
 };
 
 }  // namespace qdk::chemistry::algorithms
