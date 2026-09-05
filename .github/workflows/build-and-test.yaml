@@ -77,33 +77,11 @@ jobs:
       QSHARP_PYTHON_TELEMETRY: 'false'
       CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
       CPP_DEPS_PREFIX: ${{ github.workspace }}/cpp_deps_install
+      EXACHEM_INSTALL_PREFIX: ${{ github.workspace }}/exachem_install
       CTEST_OUTPUT_ON_FAILURE: 1
       CMAKE_BUILD_PARALLEL_LEVEL: ${{ matrix.build-parallel }}
       QDK_UARCH: ${{ matrix.uarch }}
     steps:
-    - name: Free up disk space (Linux)
-      if: matrix.os-name == 'Linux'
-      run: |
-        echo "=== Disk space before cleanup ==="
-        df -h
-
-        # Remove unnecessary large packages commonly present on GitHub runners
-        sudo rm -rf /usr/share/dotnet || true
-        sudo rm -rf /usr/local/lib/android || true
-        sudo rm -rf /opt/ghc || true
-        sudo rm -rf /opt/hostedtoolcache/go || true
-        sudo rm -rf /opt/hostedtoolcache/Ruby || true
-
-        # Clean apt cache
-        sudo apt-get clean || true
-
-        echo "=== Disk space after cleanup ==="
-        df -h
-
-        echo "Workspace path: ${{ github.workspace }}"
-        echo "Space available:"
-        df -h "${{ github.workspace }}"
-
     - name: Checkout repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
@@ -113,7 +91,9 @@ jobs:
       run: |
         echo "PATH=${{ github.workspace }}/install/bin:${{ github.workspace }}/install/lib:$PATH" >> $GITHUB_ENV
         echo "PYTHONPATH=${{ github.workspace }}/install/lib/python${{ matrix.python-version }}/site-packages:${{ github.workspace }}/install/lib:$PYTHONPATH" >> $GITHUB_ENV
-        echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+        # ${LD_LIBRARY_PATH:+...} avoids a trailing ":" when unset -- the dynamic loader treats an empty
+        # path component as the current working directory, an untrusted-search-path risk.
+        echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
 
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -154,7 +134,11 @@ jobs:
           pkg-config \
           doxygen \
           graphviz \
-          gcovr
+          gcovr \
+          gfortran \
+          libnuma-dev \
+          openmpi-bin \
+          libopenmpi-dev
 
     - name: Install macOS system packages
       if: matrix.os-name == 'macOS'
@@ -169,10 +153,8 @@ jobs:
           hdf5 \
           graphviz \
           gcovr \
-          nlohmann-json \
           bison \
-          flex \
-          googletest
+          flex
 
     - name: Cache Doxygen (macOS)
       if: matrix.os-name == 'macOS'
@@ -206,43 +188,78 @@ jobs:
       run: |
         echo "PATH=${{ github.workspace }}/doxygen_install/bin:$PATH" >> $GITHUB_ENV
 
-    - name: Cache C++ dependency install # Checks if manifest files or build script have changed to rebuild dependencies
+    - name: Cache C++ dependencies and ExaChem install # Checks if manifest files or build scripts have changed to rebuild dependencies
       id: cache-cpp-deps
       if: ${{ !inputs.rebuild_dep_cache }}
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           ${{ env.CPP_DEPS_PREFIX }}
+          ${{ env.EXACHEM_INSTALL_PREFIX }}
         key: >-
           cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
-          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.devcontainer/scripts/install_cpp_dependencies.sh') }}
+          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/common.sh', '.pipelines/install-scripts/install-cpp-deps.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh', '.pipelines/install-scripts/exachem/**') }}
 
     - name: Add C++ deps prefix to CMake search path
       run: |
         echo "CMAKE_PREFIX_PATH=${{ env.CPP_DEPS_PREFIX }}:${CMAKE_PREFIX_PATH}" >> $GITHUB_ENV
-        echo "LD_LIBRARY_PATH=${{ env.CPP_DEPS_PREFIX }}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=${{ env.CPP_DEPS_PREFIX }}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
         echo "PATH=${{ env.CPP_DEPS_PREFIX }}/bin:${PATH}" >> $GITHUB_ENV
 
-    - name: Install C++ dependencies
+    - name: Install C++ dependencies and ExaChem (Linux)
       if: steps.cache-cpp-deps.outputs.cache-hit != 'true' # Run the dependency build if we don't find the right hash in the cache
       env:
-        INSTALL_PREFIX: ${{ env.CPP_DEPS_PREFIX }}
         BUILD_DIR: ${{ github.workspace }}/cpp_deps_build
+        MARCH: ${{ matrix.uarch }}
         KEEP_BUILD_DIR: 1
       run: |
-        bash ${{ github.workspace }}/.devcontainer/scripts/install_cpp_dependencies.sh \
-          ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json \
-          ${{ github.workspace }}/external/macis/manifest/cgmanifest.json
+        # This step's own JOBS, scoped here only: the matrix's build-parallel is sized for the
+        # already-built qdk-chemistry/ExaChem binaries (test run, no compilation), not for building
+        # ExaChem/TAMM's memory-hungry translation units from scratch, so cap by available RAM instead.
+        cpu=$(command -v nproc >/dev/null 2>&1 && nproc || sysctl -n hw.logicalcpu)
+        if [ -r /proc/meminfo ]; then
+          ram_gb=$(( $(grep MemTotal /proc/meminfo | awk '{print $2}') / 1024 / 1024 ))
+        else
+          ram_gb=$(( $(sysctl -n hw.memsize) / 1024 / 1024 / 1024 ))
+        fi
+        jobs=$(printf "%.0f" "$(awk "BEGIN { print $ram_gb / 8 }")")
+        [ "$jobs" -lt 1 ] && jobs=1
+        [ "$jobs" -gt "$cpu" ] && jobs=$cpu
+        echo "CPUs=$cpu RAM=${ram_gb}GB -> JOBS=$jobs"
 
-    - name: Save C++ dependency cache
+        # macOS has no BLAS package installed, so let BLAS++ auto-detect Apple's Accelerate framework; Linux
+        # installs OpenBLAS via apt above.
+        if [ "${{ matrix.os-name }}" == "macOS" ]; then
+          BLAS_VENDOR=auto
+        else
+          BLAS_VENDOR=openblas
+        fi
+        INSTALL_PREFIX="${{ env.CPP_DEPS_PREFIX }}" \
+        JOBS="$jobs" \
+          bash ${{ github.workspace }}/.pipelines/install-scripts/install-cpp-deps.sh \
+          ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json \
+          ${{ github.workspace }}/external/macis/manifest/cgmanifest.json \
+          "$BLAS_VENDOR"
+
+        if [ "${{ matrix.os-name }}" == "Linux" ]; then
+          # A separate prefix from CPP_DEPS_PREFIX: TAMM's CMSB superbuild rebuilds its own BLAS/LAPACK, which
+          # would shadow the real OpenBLAS for the main build otherwise (caused SEGFAULTs).
+          INSTALL_PREFIX="${{ env.EXACHEM_INSTALL_PREFIX }}" \
+          BUILD_ROOT="${{ github.workspace }}/exachem_build" \
+          JOBS="$jobs" \
+            bash ${{ github.workspace }}/.pipelines/install-scripts/exachem/install-exachem.sh
+        fi
+
+    - name: Save C++ dependencies and ExaChem cache
       if: steps.cache-cpp-deps.outputs.cache-hit != 'true'
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           ${{ env.CPP_DEPS_PREFIX }}
+          ${{ env.EXACHEM_INSTALL_PREFIX }}
         key: >-
           cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
-          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.devcontainer/scripts/install_cpp_dependencies.sh') }}
+          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/common.sh', '.pipelines/install-scripts/install-cpp-deps.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh', '.pipelines/install-scripts/exachem/**') }}
 
     - name: Configure C++ RelWithDebInfo/Coverage build
       run: |
@@ -350,10 +367,24 @@ jobs:
         # Register the Jupyter kernel for notebook tests
         python -m ipykernel install --user --name python3 --display-name "Python 3"
 
+    # test-with-qdk-branch reuses this build instead of rebuilding; only uploaded when that job will run.
+    - name: Upload install dir (for test-with-qdk-branch)
+      if: matrix.os-name == 'Linux' && matrix.python-version == '3.13' && github.event_name == 'workflow_dispatch' && inputs.test_with_qdk_branch
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: qdk-chemistry-install-linux-x86-64-v3-py3.13
+        path: ${{ github.workspace }}/install
+        retention-days: 1
+
     - name: Run Python tests
       env:
         OMP_NUM_THREADS: ${{ matrix.python-test-threads }}
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
+        # Scoped to this step only, for the ExaChem CCSD integration test.
+        PATH: ${{ matrix.os-name == 'Linux' && format('{0}/bin:{1}', env.EXACHEM_INSTALL_PREFIX, env.PATH) || env.PATH }}
+        # The nested ternary omits the trailing ":" when env.LD_LIBRARY_PATH is empty -- an empty path
+        # component is otherwise treated as the current working directory by the dynamic loader.
+        LD_LIBRARY_PATH: ${{ matrix.os-name == 'Linux' && (env.LD_LIBRARY_PATH && format('{0}/lib:{0}/lib64:{1}', env.EXACHEM_INSTALL_PREFIX, env.LD_LIBRARY_PATH) || format('{0}/lib:{0}/lib64', env.EXACHEM_INSTALL_PREFIX)) || env.LD_LIBRARY_PATH }}
       working-directory: python
       run: |
         set -e
@@ -1012,27 +1043,14 @@ jobs:
 
   test-with-qdk-branch:
     name: Full Test with QDK Branch
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_with_qdk_branch }}
+    needs: coverage
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_with_qdk_branch && needs.coverage.result == 'success' }}
     runs-on: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly]
     env:
-      BUILD_DIR: cpp/build
       QSHARP_PYTHON_TELEMETRY: 'false'
       CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
-      CPP_DEPS_PREFIX: ${{ github.workspace }}/cpp_deps_install
-      CTEST_OUTPUT_ON_FAILURE: 1
-      CMAKE_BUILD_PARALLEL_LEVEL: 32
-      QDK_UARCH: x86-64-v3
       QDK_BRANCH: main
     steps:
-    - name: Free up disk space
-      run: |
-        sudo rm -rf /usr/share/dotnet || true
-        sudo rm -rf /usr/local/lib/android || true
-        sudo rm -rf /opt/ghc || true
-        sudo rm -rf /opt/hostedtoolcache/go || true
-        sudo rm -rf /opt/hostedtoolcache/Ruby || true
-        sudo apt-get clean || true
-
     - name: Checkout repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
@@ -1042,7 +1060,9 @@ jobs:
       run: |
         echo "PATH=${{ github.workspace }}/install/bin:${{ github.workspace }}/install/lib:$PATH" >> $GITHUB_ENV
         echo "PYTHONPATH=${{ github.workspace }}/install/lib/python3.13/site-packages:${{ github.workspace }}/install/lib:$PYTHONPATH" >> $GITHUB_ENV
-        echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+        # ${LD_LIBRARY_PATH:+...} avoids a trailing ":" when unset -- the dynamic loader treats an empty
+        # path component as the current working directory, an untrusted-search-path risk.
+        echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
 
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -1051,7 +1071,8 @@ jobs:
         cache: pip
         cache-dependency-path: python/pyproject.toml
 
-    - name: Install Linux system packages
+    # Runtime shared-library deps only (OpenBLAS/HDF5/libgfortran); this job doesn't build anything itself.
+    - name: Install Linux runtime packages
       run: |
         MAX_WAIT_SECONDS=300
         WAIT_INTERVAL_SECONDS=5
@@ -1068,65 +1089,24 @@ jobs:
 
         sudo apt-get update
         sudo apt-get install -y \
-          build-essential \
-          ninja-build \
-          cmake \
-          libeigen3-dev \
-          libboost-all-dev \
           libhdf5-dev \
           libopenblas-dev \
-          libgfortran5 \
-          pkg-config
+          libgfortran5
 
-    - name: Cache C++ dependency install
-      id: cache-cpp-deps
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+    # Reuses the coverage job's build instead of rebuilding (see the matching upload step there).
+    - name: Download coverage build (Linux x86-64-v3, Python 3.13)
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
-        path: |
-          ${{ env.CPP_DEPS_PREFIX }}
-        key: >-
-          cpp-deps-Linux-x86-64-v3-
-          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.devcontainer/scripts/install_cpp_dependencies.sh') }}
+        name: qdk-chemistry-install-linux-x86-64-v3-py3.13
+        path: ${{ github.workspace }}/install
 
-    - name: Add C++ deps prefix to CMake search path
+    # actions/download-artifact doesn't preserve the executable bit, so install/bin/* (e.g. pytest) needs it
+    # restored before it can be run.
+    - name: Restore executable permissions
+      run: chmod -R +x "${{ github.workspace }}/install/bin"
+
+    - name: Test pre-installed qdk_chemistry package
       run: |
-        echo "CMAKE_PREFIX_PATH=${{ env.CPP_DEPS_PREFIX }}:${CMAKE_PREFIX_PATH}" >> $GITHUB_ENV
-        echo "LD_LIBRARY_PATH=${{ env.CPP_DEPS_PREFIX }}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
-        echo "PATH=${{ env.CPP_DEPS_PREFIX }}/bin:${PATH}" >> $GITHUB_ENV
-
-    - name: Install C++ dependencies
-      if: steps.cache-cpp-deps.outputs.cache-hit != 'true'
-      env:
-        INSTALL_PREFIX: ${{ env.CPP_DEPS_PREFIX }}
-        BUILD_DIR: ${{ github.workspace }}/cpp_deps_build
-        KEEP_BUILD_DIR: 1
-      run: |
-        bash ${{ github.workspace }}/.devcontainer/scripts/install_cpp_dependencies.sh \
-          ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json \
-          ${{ github.workspace }}/external/macis/manifest/cgmanifest.json
-
-    - name: Configure and build C++
-      run: |
-        cmake -S cpp -B "$BUILD_DIR" \
-          -GNinja \
-          -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/.pipelines/toolchains/linux.cmake" \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_INSTALL_PREFIX="$CMAKE_INSTALL_PREFIX" \
-          -DQDK_UARCH="$QDK_UARCH" \
-          -DQDK_ENABLE_OPENMP=ON \
-          -DBUILD_TESTING=OFF
-        cmake --build "$BUILD_DIR"
-
-    - name: Install C++ library
-      run: cmake --install "$BUILD_DIR" --prefix "$CMAKE_INSTALL_PREFIX"
-
-    - name: Install Python package
-      working-directory: python
-      env:
-        CMAKE_BUILD_TYPE: Release
-      run: |
-        rm -r ${{ github.workspace }}/install/lib/cmake/qdk
-        python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[test,docs]
         python -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
         python -m ipykernel install --user --name python3 --display-name "Python 3"
 
