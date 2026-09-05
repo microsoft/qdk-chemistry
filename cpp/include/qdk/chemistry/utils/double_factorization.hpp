@@ -32,11 +32,30 @@ struct TwoBodyFragment {
                            ///< shift.
 };
 
+/// Selects how the reshaped (ij),(kl) two-electron supermatrix is decomposed
+/// into rank-one fragments.
+///
+/// Both methods reconstruct g_ijkl identically, but writing M = X X^T fixes X
+/// only up to X -> X Q for orthogonal Q, and lambda_df is not invariant under
+/// that gauge freedom. Choose deliberately when the 1-norm itself matters.
+enum class DoubleFactorizationMethod {
+  /// Pivoted Cholesky, O(R * norb^4) for rank R. Requires a positive
+  /// semi-definite supermatrix, which holds for physical two-electron
+  /// integrals; all fragments have sign = +1. Falls back to Eigen with a
+  /// warning if the supermatrix is indefinite.
+  Cholesky,
+  /// Eigendecomposition via LAPACK syev, O(norb^6). Handles indefinite input
+  /// (producing sign = -1 fragments) and yields the conventional literature
+  /// ordering by decreasing eigenvalue magnitude.
+  Eigen,
+};
+
 /// Double-factorize the spin-free two-electron integral tensor g_ijkl
 /// (flattened in the same chemist-notation layout as
 /// CanonicalFourCenterHamiltonianContainer::get_two_body_index(), i.e.
 /// index = i*norb^3 + j*norb^2 + k*norb + l) into a set of low-rank
-/// fragments via eigendecomposition of the reshaped (ij),(kl) supermatrix.
+/// fragments, by decomposing the reshaped (ij),(kl) supermatrix (see
+/// DoubleFactorizationMethod for the available decompositions).
 ///
 /// This is a standalone diagnostic/analysis utility: it does not require an
 /// Algorithm/Settings/Factory instance and can be called directly (e.g. by
@@ -49,15 +68,20 @@ struct TwoBodyFragment {
 ///        tensor, and both in-tree callers pass the physical coefficient
 ///        V = 1/2 * g rather than the raw g.
 /// @param norb Number of (spatial) orbitals.
-/// @param truncation_threshold Fragments whose eigenvalue magnitude of the
-///        reshaped supermatrix falls below this threshold are dropped.
-///        Defaults to 0.0 (no truncation -- the factorization is
-///        exact/lossless unless the caller explicitly opts into
-///        compression).
-/// @return The list of retained fragments, sorted by decreasing
-///         eigenvalue magnitude.
+/// @param truncation_threshold Cutoff below which fragment candidates are
+///        dropped. The units are method-dependent, so the same numeric value
+///        does not give the same rank for both methods: Eigen compares against
+///        the supermatrix eigenvalue magnitude, Cholesky against the largest
+///        remaining residual diagonal. Defaults to 0.0, meaning "lossless" for
+///        both. A literal 0.0 is unreachable in floating point for Cholesky,
+///        so that path floors the cutoff at machine epsilon to stop at the
+///        true numerical rank rather than emit roundoff fragments.
+/// @param method Which decomposition to use. Defaults to Cholesky.
+/// @return The list of retained fragments, sorted by decreasing contribution
+///         (eigenvalue magnitude for Eigen, sum_p |eps_p| for Cholesky).
 std::vector<TwoBodyFragment> double_factorize(
     const Eigen::VectorXd& two_body_integrals, size_t norb,
-    double truncation_threshold = 0.0);
+    double truncation_threshold = 0.0,
+    DoubleFactorizationMethod method = DoubleFactorizationMethod::Cholesky);
 
 }  // namespace qdk::chemistry::utils

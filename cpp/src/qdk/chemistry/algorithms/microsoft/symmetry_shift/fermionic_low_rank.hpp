@@ -142,29 +142,36 @@ OneElectronShiftResult solve_one_electron_shift(
 /// @param hamiltonian The Hamiltonian to analyze (restricted).
 /// @param n_alpha_electrons Target number of alpha electrons.
 /// @param n_beta_electrons Target number of beta electrons.
-/// @param df_truncation_threshold Fragments whose eigenvalue magnitude falls
-///        below this threshold are dropped (0.0 = no truncation).
+/// @param df_truncation_threshold Fragments below this cutoff are dropped
+///        (0.0 = no truncation). Units are method-dependent; see
+///        qdk::chemistry::utils::double_factorize().
+/// @param method Supermatrix decomposition used for the double factorization.
+///        Not merely a cost knob: the BLISS parameters (mu2, xi) are derived
+///        from the gauge-dependent fragments, so different methods yield
+///        different (individually valid) shifts. Defaults to Cholesky.
 /// @return The computed shift, or a zero (norb x norb) shift if the computed
 ///         one would not reduce the fermionic 1-norm.
 SymmetryShift compute_fermionic_low_rank_shift(
     const qdk::chemistry::data::Hamiltonian& hamiltonian,
     unsigned int n_alpha_electrons, unsigned int n_beta_electrons,
-    double df_truncation_threshold);
+    double df_truncation_threshold,
+    qdk::chemistry::utils::DoubleFactorizationMethod method =
+        qdk::chemistry::utils::DoubleFactorizationMethod::Cholesky);
 
 /**
  * @class FermionicLowRankShifterSettings
  * @brief Settings container for the fermionic low-rank symmetry shifter.
  *
  * Default settings:
- * - df_truncation_threshold: 0.0 - drop double-factorization fragments whose
- *   eigenvalue magnitude is below this threshold. Must be non-negative
- *   (the threshold is compared against |eigenvalue|). The default of 0.0
- *   performs no truncation (exact double factorization).
+ * - df_truncation_threshold: 0.0 - drop double-factorization fragments below
+ *   this cutoff. Must be non-negative. The default of 0.0 performs no
+ *   truncation (exact double factorization).
+ * - df_method: "cholesky" - which decomposition of the two-electron
+ *   supermatrix to use ("cholesky" or "eigen").
  *
  * @see qdk::chemistry::algorithms::microsoft::FermionicLowRankShifter
  */
-class FermionicLowRankShifterSettings
-    : public qdk::chemistry::data::Settings {
+class FermionicLowRankShifterSettings : public qdk::chemistry::data::Settings {
  public:
   /**
    * @brief Constructor that initializes the default settings.
@@ -172,11 +179,22 @@ class FermionicLowRankShifterSettings
   FermionicLowRankShifterSettings() {
     set_default<double>(
         "df_truncation_threshold", 0.0,
-        "Drop double-factorization fragments whose supermatrix eigenvalue "
-        "magnitude is below this threshold. Must be non-negative; 0.0 "
-        "performs no truncation (exact double factorization).",
+        "Drop double-factorization fragments below this cutoff. Must be "
+        "non-negative; 0.0 performs no truncation (exact double "
+        "factorization). The units depend on df_method: a supermatrix "
+        "eigenvalue magnitude for \"eigen\", a residual diagonal for "
+        "\"cholesky\".",
         qdk::chemistry::data::BoundConstraint<double>{
             0.0, std::numeric_limits<double>::max()});
+    set_default<std::string>(
+        "df_method", "cholesky",
+        "Decomposition used for the two-electron supermatrix. \"cholesky\" "
+        "(pivoted Cholesky) costs O(R norb^4) and usually yields a tighter "
+        "1-norm; \"eigen\" costs O(norb^6), matches the DF literature "
+        "convention, and supports indefinite supermatrices. The choice "
+        "changes the resulting shift, not just its cost.",
+        qdk::chemistry::data::ListConstraint<std::string>{
+            {std::vector<std::string>{"cholesky", "eigen"}}});
   }
 };
 

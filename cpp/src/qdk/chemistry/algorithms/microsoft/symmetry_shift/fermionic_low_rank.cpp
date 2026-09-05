@@ -148,7 +148,8 @@ OneElectronShiftResult solve_one_electron_shift(
 SymmetryShift compute_fermionic_low_rank_shift(
     const qdk::chemistry::data::Hamiltonian& hamiltonian,
     unsigned int n_alpha_electrons, unsigned int n_beta_electrons,
-    double df_truncation_threshold) {
+    double df_truncation_threshold,
+    qdk::chemistry::utils::DoubleFactorizationMethod method) {
   QDK_LOG_TRACE_ENTERING();
 
   if (!hamiltonian.is_restricted()) {
@@ -174,7 +175,7 @@ SymmetryShift compute_fermionic_low_rank_shift(
 
   const Eigen::VectorXd two_body_coefficient = 0.5 * g_aaaa;
   auto fragments = qdk::chemistry::utils::double_factorize(
-      two_body_coefficient, norb, df_truncation_threshold);
+      two_body_coefficient, norb, df_truncation_threshold, method);
 
   if (fragments.empty()) {
     QDK_LOGGER().warn(
@@ -183,8 +184,8 @@ SymmetryShift compute_fermionic_low_rank_shift(
         df_truncation_threshold);
   }
 
-  auto global_shift = accumulate_fragment_shifts(
-      fragments, static_cast<Eigen::Index>(norb));
+  auto global_shift =
+      accumulate_fragment_shifts(fragments, static_cast<Eigen::Index>(norb));
 
   auto one_electron = solve_one_electron_shift(
       h_alpha, g_aaaa, global_shift.mu2, global_shift.xi, num_electrons);
@@ -246,10 +247,13 @@ SymmetryShift FermionicLowRankShifter::compute_shift(
 
   const double df_truncation_threshold =
       _settings->get<double>("df_truncation_threshold");
+  const std::string df_method = _settings->get<std::string>("df_method");
 
-  return compute_fermionic_low_rank_shift(hamiltonian, n_alpha_electrons,
-                                          n_beta_electrons,
-                                          df_truncation_threshold);
+  return compute_fermionic_low_rank_shift(
+      hamiltonian, n_alpha_electrons, n_beta_electrons, df_truncation_threshold,
+      df_method == "eigen"
+          ? qdk::chemistry::utils::DoubleFactorizationMethod::Eigen
+          : qdk::chemistry::utils::DoubleFactorizationMethod::Cholesky);
 }
 
 std::shared_ptr<data::Hamiltonian> FermionicLowRankShifter::_run_impl(

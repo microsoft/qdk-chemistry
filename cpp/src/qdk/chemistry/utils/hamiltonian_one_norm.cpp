@@ -21,7 +21,7 @@ inline std::size_t two_body_index(std::size_t i, std::size_t j, std::size_t k,
 
 HamiltonianOneNorm hamiltonian_one_norm(
     const qdk::chemistry::data::Hamiltonian& hamiltonian,
-    double df_truncation_threshold) {
+    double df_truncation_threshold, DoubleFactorizationMethod method) {
   if (!hamiltonian.is_restricted()) {
     throw std::runtime_error(
         "hamiltonian_one_norm currently only supports restricted "
@@ -68,10 +68,11 @@ HamiltonianOneNorm hamiltonian_one_norm(
 
   // lambda_2e: double-factorize the PHYSICAL two-electron coefficient
   // V = 1/2 * g into low-rank fragments; each contributes Eq. (17)'s
-  // lambda_DF^(alpha) = 1/2 (sum_i |eps_i^(alpha)|)^2.
+  // lambda_DF^(alpha) = 1/2 (sum_i |eps_i^(alpha)|)^2. Note that the value
+  // depends on `method`, not just its cost -- see the header.
   Eigen::VectorXd two_body_coefficient = 0.5 * g_aaaa;
-  auto fragments =
-      double_factorize(two_body_coefficient, norb, df_truncation_threshold);
+  auto fragments = double_factorize(two_body_coefficient, norb,
+                                    df_truncation_threshold, method);
   double lambda_two_body = 0.0;
   for (const auto& fragment : fragments) {
     lambda_two_body += fragment.lambda_df;

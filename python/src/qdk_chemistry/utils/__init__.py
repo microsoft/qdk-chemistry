@@ -6,6 +6,7 @@
 
 # Import C++ utilities from the compiled extension
 from qdk_chemistry._core.utils import (
+    DoubleFactorizationMethod,
     HamiltonianOneNorm,
     Logger,
     TwoBodyFragment,
@@ -25,6 +26,7 @@ from . import model_hamiltonians
 
 __all__ = [
     "CaseInsensitiveStrEnum",
+    "DoubleFactorizationMethod",
     "HamiltonianOneNorm",
     "CubeGenerator",
     "CubeGrid",

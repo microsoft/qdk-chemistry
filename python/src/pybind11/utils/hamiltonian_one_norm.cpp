@@ -43,10 +43,19 @@ restricted electronic Hamiltonian.
             hamiltonian : qdk_chemistry.data.Hamiltonian
                 Restricted Hamiltonian to analyze.
             df_truncation_threshold : float, optional
-                Fragments whose reshaped-supermatrix eigenvalue magnitude is
-                below this are dropped from the two-body 1-norm. Defaults to
-                0.0 (no truncation -- exact/lossless factorization unless the
-                caller explicitly opts into compression).
+                Cutoff below which double-factorization fragments are dropped
+                from the two-body 1-norm. The units are method-dependent; see
+                ``double_factorize``. Defaults to 0.0 (no truncation --
+                exact/lossless factorization unless the caller explicitly opts
+                into compression).
+            method : DoubleFactorizationMethod, optional
+                Which supermatrix decomposition the underlying
+                ``double_factorize`` should use. Defaults to ``CHOLESKY``.
+                This affects the reported ``two_body`` value, not just its
+                cost: ``two_body`` is an upper bound that is not invariant
+                under the M = X X^T gauge freedom, so each method gives a
+                different but individually valid bound. ``CHOLESKY`` is
+                typically tighter; ``EIGEN`` matches the DF literature.
 
             Returns
             -------
@@ -58,5 +67,7 @@ restricted electronic Hamiltonian.
             RuntimeError
                 If the Hamiltonian is not restricted.
         )",
-        py::arg("hamiltonian"), py::arg("df_truncation_threshold") = 0.0);
+        py::arg("hamiltonian"), py::arg("df_truncation_threshold") = 0.0,
+        py::arg("method") =
+            qdk::chemistry::utils::DoubleFactorizationMethod::Cholesky);
 }

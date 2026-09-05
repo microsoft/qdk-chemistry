@@ -5,14 +5,17 @@
 #include <gtest/gtest.h>
 
 #include <Eigen/Dense>
+#include <memory>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/utils/double_factorization.hpp>
 #include <qdk/chemistry/utils/hamiltonian_one_norm.hpp>
+#include <tuple>
 
 #include "ut_common.hpp"
 
 using qdk::chemistry::utils::double_factorize;
+using qdk::chemistry::utils::DoubleFactorizationMethod;
 using qdk::chemistry::utils::hamiltonian_one_norm;
 using qdk::chemistry::utils::TwoBodyFragment;
 
@@ -136,4 +139,153 @@ TEST_F(DoubleFactorizationTest,
   // A larger threshold should never retain more fragments than a smaller one.
   auto fragments_loose = double_factorize(g_aaaa, n, 1e-2);
   EXPECT_LE(fragments_loose.size(), fragments_explicit_zero.size());
+}
+
+// The default method is Cholesky. These tests pin the properties that make the
+// Cholesky path a valid drop-in replacement for the eigendecomposition, and
+// the one property that legitimately differs between them (lambda_df).
+class DoubleFactorizationCholeskyTest : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    auto water = testing::create_water_structure();
+    auto scf_solver = qdk::chemistry::algorithms::ScfSolverFactory::create();
+    auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
+    auto hamiltonian_constructor =
+        qdk::chemistry::algorithms::HamiltonianConstructorFactory::create();
+    ham_ = hamiltonian_constructor->run(wfn_HF->get_orbitals());
+    std::tie(g_aaaa_, std::ignore, std::ignore) =
+        ham_->get_two_body_integrals();
+    norb_ =
+        static_cast<size_t>(ham_->get_orbitals()->get_num_molecular_orbitals());
+  }
+
+  std::shared_ptr<qdk::chemistry::data::Hamiltonian> ham_;
+  Eigen::VectorXd g_aaaa_;
+  size_t norb_ = 0;
+};
+
+TEST_F(DoubleFactorizationCholeskyTest, ReconstructsTensorExactly) {
+  auto fragments = double_factorize(g_aaaa_, norb_, 0.0,
+                                    DoubleFactorizationMethod::Cholesky);
+  ASSERT_FALSE(fragments.empty());
+  Eigen::VectorXd g_reconstructed = reconstruct(fragments, norb_);
+  EXPECT_TRUE(g_reconstructed.isApprox(g_aaaa_,
+                                       testing::numerical_zero_tolerance * 100))
+      << "Reconstruction max abs diff: "
+      << (g_reconstructed - g_aaaa_).cwiseAbs().maxCoeff();
+}
+
+TEST_F(DoubleFactorizationCholeskyTest, IsTheDefaultMethod) {
+  auto fragments_default = double_factorize(g_aaaa_, norb_, 0.0);
+  auto fragments_cholesky = double_factorize(
+      g_aaaa_, norb_, 0.0, DoubleFactorizationMethod::Cholesky);
+  ASSERT_EQ(fragments_default.size(), fragments_cholesky.size());
+  for (size_t i = 0; i < fragments_default.size(); ++i) {
+    EXPECT_NEAR(fragments_default[i].lambda_df, fragments_cholesky[i].lambda_df,
+                testing::numerical_zero_tolerance);
+  }
+}
+
+TEST_F(DoubleFactorizationCholeskyTest, RankIsBoundedBySymmetricPairDimension) {
+  // The supermatrix M_(ij),(kl) satisfies M = M^T and is invariant under
+  // (ij) -> (ji), so every antisymmetric pair vector lies in its null space
+  // and the rank cannot exceed the symmetric-pair dimension.
+  auto fragments = double_factorize(g_aaaa_, norb_, 0.0,
+                                    DoubleFactorizationMethod::Cholesky);
+  EXPECT_LE(fragments.size(), norb_ * (norb_ + 1) / 2);
+}
+
+TEST_F(DoubleFactorizationCholeskyTest,
+       PhysicalIntegralsGiveOnlyPositiveSigns) {
+  // Raw electron-repulsion integrals form a positive semi-definite
+  // supermatrix, so Cholesky never needs a negative fragment and never falls
+  // back to the eigensolver.
+  auto fragments = double_factorize(g_aaaa_, norb_, 0.0,
+                                    DoubleFactorizationMethod::Cholesky);
+  ASSERT_FALSE(fragments.empty());
+  for (const auto& fragment : fragments) {
+    EXPECT_EQ(fragment.sign, 1);
+  }
+}
+
+TEST_F(DoubleFactorizationCholeskyTest, IndefiniteInputFallsBackToEigen) {
+  // Negating the tensor makes the supermatrix negative definite. Cholesky
+  // cannot represent it, so double_factorize() must warn and fall back to the
+  // eigendecomposition, which still reconstructs it exactly using negative
+  // fragments.
+  Eigen::VectorXd g_negated = -g_aaaa_;
+  auto fragments = double_factorize(g_negated, norb_, 0.0,
+                                    DoubleFactorizationMethod::Cholesky);
+  ASSERT_FALSE(fragments.empty());
+
+  bool has_negative_fragment = false;
+  for (const auto& fragment : fragments) {
+    if (fragment.sign == -1) {
+      has_negative_fragment = true;
+    }
+  }
+  EXPECT_TRUE(has_negative_fragment)
+      << "Expected the eigen fallback to produce negative fragments";
+
+  Eigen::VectorXd g_reconstructed = reconstruct(fragments, norb_);
+  EXPECT_TRUE(g_reconstructed.isApprox(g_negated,
+                                       testing::numerical_zero_tolerance * 100))
+      << "Reconstruction max abs diff: "
+      << (g_reconstructed - g_negated).cwiseAbs().maxCoeff();
+}
+
+TEST_F(DoubleFactorizationCholeskyTest,
+       BothMethodsReconstructButLambdaDiffers) {
+  // Both methods reconstruct the tensor exactly, and sum_r ||A_r||_F^2 =
+  // tr(M) is gauge invariant, but lambda = sum_r ||A_r||_*^2 / 2 is not.
+  auto cholesky = double_factorize(g_aaaa_, norb_, 0.0,
+                                   DoubleFactorizationMethod::Cholesky);
+  auto eigen =
+      double_factorize(g_aaaa_, norb_, 0.0, DoubleFactorizationMethod::Eigen);
+  ASSERT_FALSE(cholesky.empty());
+  ASSERT_FALSE(eigen.empty());
+
+  EXPECT_TRUE(reconstruct(cholesky, norb_)
+                  .isApprox(g_aaaa_, testing::numerical_zero_tolerance * 100));
+  EXPECT_TRUE(reconstruct(eigen, norb_)
+                  .isApprox(g_aaaa_, testing::numerical_zero_tolerance * 100));
+
+  // Gauge-invariant quantity: the total squared Frobenius norm, i.e. the sum
+  // of squared fragment eigenvalues, equals tr(M) for both methods.
+  auto frobenius_squared = [](const std::vector<TwoBodyFragment>& fragments) {
+    double total = 0.0;
+    for (const auto& fragment : fragments) {
+      total += fragment.sign * fragment.eps.squaredNorm();
+    }
+    return total;
+  };
+  EXPECT_NEAR(frobenius_squared(cholesky), frobenius_squared(eigen),
+              testing::numerical_zero_tolerance * 100);
+
+  auto one_norm = [](const std::vector<TwoBodyFragment>& fragments) {
+    double total = 0.0;
+    for (const auto& fragment : fragments) {
+      total += fragment.lambda_df;
+    }
+    return total;
+  };
+  // Not an equality: lambda is gauge dependent, so the two methods report
+  // genuinely different two-body 1-norms for the same operator.
+  EXPECT_GT(one_norm(eigen), 0.0);
+  EXPECT_GT(one_norm(cholesky), 0.0);
+}
+
+TEST_F(DoubleFactorizationCholeskyTest, HamiltonianOneNormAcceptsBothMethods) {
+  auto norm_cholesky =
+      hamiltonian_one_norm(*ham_, 0.0, DoubleFactorizationMethod::Cholesky);
+  auto norm_eigen =
+      hamiltonian_one_norm(*ham_, 0.0, DoubleFactorizationMethod::Eigen);
+  auto norm_default = hamiltonian_one_norm(*ham_, 0.0);
+
+  // The one-body term does not depend on the two-body factorization.
+  EXPECT_NEAR(norm_cholesky.one_body, norm_eigen.one_body,
+              testing::numerical_zero_tolerance);
+  EXPECT_NEAR(norm_default.two_body, norm_cholesky.two_body,
+              testing::numerical_zero_tolerance);
+  EXPECT_GT(norm_eigen.two_body, 0.0);
 }

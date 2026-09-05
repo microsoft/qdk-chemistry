@@ -11,11 +11,13 @@
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/settings.hpp>
 #include <qdk/chemistry/utils/hamiltonian_one_norm.hpp>
+#include <string>
 
 #include "../src/qdk/chemistry/algorithms/microsoft/symmetry_shift/fermionic_low_rank.hpp"
 #include "ut_common.hpp"
 
 using namespace qdk::chemistry::algorithms;
+using qdk::chemistry::utils::DoubleFactorizationMethod;
 
 class SymmetryShiftTest : public ::testing::Test {};
 
@@ -186,14 +188,31 @@ TEST_F(SymmetryShiftTest, Water_STO3G_OneNormRegression) {
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   auto ham = hamiltonian_constructor->run(wfn_HF->get_orbitals());
 
-  auto shifter =
-      SymmetryShifterFactory::create("fermionic_low_rank");
-  auto shifted_ham = shifter->run(ham, 5, 5);
+  // The reported two-body 1-norm depends on which double factorization was
+  // used, because lambda is not invariant under the M = X X^T gauge freedom.
+  // The BLISS shift is also derived from the fragments, so both the shift and
+  // the reported norm move with the method. Pin all four combinations.
+  auto shifted_one_norm = [&](const std::string& shift_method,
+                              DoubleFactorizationMethod report_method) {
+    auto shifter = SymmetryShifterFactory::create("fermionic_low_rank");
+    shifter->settings().set("df_method", shift_method);
+    auto shifted_ham = shifter->run(ham, 5, 5);
+    return qdk::chemistry::utils::hamiltonian_one_norm(*shifted_ham, 0.0,
+                                                       report_method)
+        .total;
+  };
 
-  auto norm_after =
-      qdk::chemistry::utils::hamiltonian_one_norm(*shifted_ham, 0.0);
-
-  EXPECT_NEAR(norm_after.total, 27.590504297492, 1e-6);
+  // Default path: Cholesky shift reported in the Cholesky gauge.
+  EXPECT_NEAR(shifted_one_norm("cholesky", DoubleFactorizationMethod::Cholesky),
+              27.482617251, 1e-6);
+  EXPECT_NEAR(shifted_one_norm("eigen", DoubleFactorizationMethod::Cholesky),
+              27.436391399, 1e-6);
+  EXPECT_NEAR(shifted_one_norm("cholesky", DoubleFactorizationMethod::Eigen),
+              27.549852521, 1e-6);
+  // Historical value: this is the number the eigen-only implementation
+  // reported, and it must not move.
+  EXPECT_NEAR(shifted_one_norm("eigen", DoubleFactorizationMethod::Eigen),
+              27.590504297, 1e-6);
 }
 
 /**

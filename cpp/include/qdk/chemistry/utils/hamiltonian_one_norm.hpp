@@ -5,6 +5,7 @@
 #pragma once
 
 #include <qdk/chemistry/data/hamiltonian.hpp>
+#include <qdk/chemistry/utils/double_factorization.hpp>
 
 namespace qdk::chemistry::utils {
 
@@ -58,15 +59,22 @@ struct HamiltonianOneNorm {
 /// since lambda_DF scales linearly with the tensor.
 ///
 /// @param hamiltonian Restricted Hamiltonian to analyze.
-/// @param df_truncation_threshold Fragments whose reshaped-supermatrix
-///        eigenvalue magnitude is below this are dropped from the two-body
-///        1-norm.
+/// @param df_truncation_threshold Cutoff below which double-factorization
+///        fragments are dropped from the two-body 1-norm. Its units are
+///        method-dependent; see qdk::chemistry::utils::double_factorize().
 ///        Defaults to 0.0 (no truncation -- exact/lossless factorization
 ///        unless the caller explicitly opts into compression).
+/// @param method Which supermatrix decomposition the underlying
+///        double_factorize() should use. Defaults to Cholesky. This affects
+///        the reported two_body value, not just its cost: lambda_2e is an
+///        upper bound that is not invariant under the M = X X^T gauge freedom,
+///        so each method gives a different but individually valid bound.
+///        Cholesky is typically tighter; Eigen matches the DF literature.
 /// @return The one-body, two-body, and total DF fermionic 1-norm.
 /// @throws std::runtime_error if the Hamiltonian is not restricted.
 HamiltonianOneNorm hamiltonian_one_norm(
     const qdk::chemistry::data::Hamiltonian& hamiltonian,
-    double df_truncation_threshold = 0.0);
+    double df_truncation_threshold = 0.0,
+    DoubleFactorizationMethod method = DoubleFactorizationMethod::Cholesky);
 
 }  // namespace qdk::chemistry::utils
