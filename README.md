@@ -46,23 +46,102 @@ its runtime behavior.
 
 ## Installing
 
+**Linux / macOS:**
+
 ```bash
 python3 -m venv venv && source venv/bin/activate
 python3 -m pip install 'qdk-chemistry[all]'
 ```
 
+**Windows (PowerShell):**
+
+```powershell
+python -m venv venv; .\venv\Scripts\Activate.ps1
+python -m pip install "qdk-chemistry[all]"
+```
+
 The `[all]` extra pulls in all optional dependencies so that examples and tests work without chasing missing packages. For other installation methods (Dev Container, building from source) and platform-specific notes, see [INSTALL.md](./INSTALL.md).
+On Windows arm64, dependencies without native wheels, including MCP, are omitted from `[all]`.
+
+Prebuilt wheels are published for Linux (x86_64, arm64), macOS (Apple Silicon), and Windows (x86_64, arm64). On Windows, [WSL](https://learn.microsoft.com/windows/wsl/install) is supported as well. See [Notes for Windows users](./INSTALL.md#notes-for-windows-users) for Windows-specific caveats.
 
 For a complete, end-to-end walkthrough from installation through a full quantum chemistry pipeline, see the [Quickstart guide](https://microsoft.github.io/qdk-chemistry/user/quickstart.html) and the [examples/](./examples/) directory.
+
+## Copilot Plugin
+
+QDK Chemistry publishes a Copilot plugin containing skills and an MCP server
+configuration. Register the repository marketplace, then run the plugin
+installer from the virtual environment containing QDK Chemistry:
+
+```bash
+python -m pip install 'qdk-chemistry[mcp]'
+copilot plugin marketplace add https://github.com/microsoft/qdk-chemistry.git
+qc plugin install qdk-chemistry@qdk-chemistry
+```
+
+Installing the `mcp` extra automatically activates the server endpoint, tool
+registration, workspace middleware, and available MCP Apps visualizations.
+The `qc` CLI remains available without this extra.
+
+With no target directory, Copilot installs the plugin for the current user and
+QDK Chemistry pins its MCP command to that virtual environment. A local plugin
+directory is also accepted; QDK Chemistry registers its ancestor marketplace in
+the same Copilot scope before installation. Copilot repository subdirectory
+specs are accepted directly:
+
+```bash
+qc plugin install ./copilot-plugins/qdk-chemistry
+qc plugin install OWNER/REPO:copilot-plugins/qdk-chemistry
+```
+
+To configure one workspace instead, pass its root. QDK Chemistry copies the
+fetched skills into `.github`, merges its MCP server into
+`.vscode/mcp.json` and `.github/mcp.json`, and keeps fetch/update state beneath
+the ignored `.qdk_chem` directory:
+
+```bash
+qc plugin install ./copilot-plugins/qdk-chemistry \
+    --target-dir /path/to/workspace
+```
+
+Update through the same CLI so the virtual-environment binding is restored
+after Copilot refreshes the plugin files. Pass the same `--target-dir` for a
+workspace installation:
+
+```bash
+qc plugin update qdk-chemistry
+qc plugin update --all
+qc plugin rebind qdk-chemistry
+```
+
+VS Code discovers user plugins installed by Copilot CLI and workspace assets
+written by `--target-dir`. The plugin supplies:
+
+- QDK Chemistry overview, MCP, coding, remote-execution, and visualization skills; and
+- the `qdk_chemistry` MCP server configuration.
+
+Plugin MCP processes start in the installed plugin directory. Call
+`bind_workspace` before any other QDK Chemistry tool. It uses a single
+client-provided file root when available; otherwise pass the active workspace as
+an absolute `workspace_root`. Plugin-launched servers reject other tool calls
+until binding succeeds and cannot be rebound to another workspace.
+
+**Skills** provide tested domain knowledge: tool references, workflow recipes, parameter guidance, and common pitfalls.
 
 ## Telemetry
 
 By default, this library collects anonymous usage and performance data to help improve the user experience and product quality. The telemetry implementation can be found in [telemetry.py](./python/src/qdk_chemistry/utils/telemetry.py) and all telemetry events are defined in [telemetry_events.py](./python/src/qdk_chemistry/utils/telemetry_events.py).
 
-To disable telemetry via bash, set the environment variable `QSHARP_PYTHON_TELEMETRY` to one of the following values: `none`, `disabled`, `false`, or `0`. For example:
+To disable telemetry, set the environment variable `QSHARP_PYTHON_TELEMETRY` to one of the following values: `none`, `disabled`, `false`, or `0`. For example:
 
 ```bash
+# Linux / macOS
 export QSHARP_PYTHON_TELEMETRY='false'
+```
+
+```powershell
+# Windows (PowerShell)
+$env:QSHARP_PYTHON_TELEMETRY = 'false'
 ```
 
 Alternatively, telemetry can be disabled within a python script by including the following at the top of the `.py` file:

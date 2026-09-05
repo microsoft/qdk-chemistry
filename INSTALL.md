@@ -20,26 +20,60 @@ Most users should start with the PyPI install.
 
 - Python 3.10 or newer
 - pip (on Ubuntu/Debian you may need `sudo apt install python3-pip python3-venv`)
-- Supported platforms:
-  - Linux: x86_64, arm64
-  - macOS: arm64 (Apple Silicon)
-  - Windows: x86_64 and arm64 via [WSL](https://learn.microsoft.com/windows/wsl/install)
+
+Prebuilt wheels are published for the following platforms:
+
+| Platform | Architecture | Notes |
+|----------|--------------|-------|
+| Linux | x86_64, arm64 | |
+| macOS | arm64 (Apple Silicon) | |
+| Windows | x86_64, arm64 | See [Windows notes](#notes-for-windows-users) |
+
+On Windows you can either install natively or work inside the
+[Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/windows/wsl/install). Both are
+supported: WSL uses the Linux wheels and the Linux instructions throughout this document, and is the
+simplest option when you need PySCF.
+
+> **NOTE:** Commands below are given for Linux/macOS (`bash`) and Windows (PowerShell). Where the
+> Linux/macOS commands use `python3`, use `python` on Windows.
 
 ### Step 1: Create a virtual environment
 
 Use a virtual environment to avoid conflicts with other packages:
+
+**Linux / macOS:**
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 ```
 
+**Windows (PowerShell):**
+
+```powershell
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+```
+
+> **NOTE:** If PowerShell refuses to run the activation script, activate from `cmd.exe` with
+> `venv\Scripts\activate.bat` instead. See the Microsoft
+> [execution policy documentation](https://learn.microsoft.com/powershell/module/microsoft.powershell.core/about/about_execution_policies)
+> before changing your execution policy.
+
 ### Step 2: Install the package
 
 For most users, **`[all]` is the recommended install target**. It pulls in all optional dependencies so that examples and tests work without chasing missing packages:
 
+**Linux / macOS:**
+
 ```bash
 python3 -m pip install 'qdk-chemistry[all]'
+```
+
+**Windows (PowerShell):**
+
+```powershell
+python -m pip install "qdk-chemistry[all]"
 ```
 
 > **Tip:** `[all]` is the path of least resistance if you're just getting started.
@@ -51,7 +85,10 @@ If you prefer a minimal install (core library only, no optional backends):
 python3 -m pip install qdk-chemistry
 ```
 
-> **NOTE:** On Python 3.14, `qiskit-aer` is omitted from the `qiskit-extras` and `all` extras on Linux ARM64 (aarch64), because Qiskit does not yet publish a Python 3.14 wheel for that platform. All other platforms (Linux x86_64, macOS, Windows) install the full set. See the [Optional Extras](#optional-extras) table below for details.
+> **NOTE:** On Python 3.14, `qiskit-aer` is omitted from the `qiskit-extras` and `all` extras on Linux ARM64 (aarch64), because Qiskit does not yet publish a Python 3.14 wheel for that platform. See the [Optional Extras](#optional-extras) table below for details.
+>
+> **NOTE:** On Windows, PySCF is skipped from the `plugins` extra because it publishes no Windows wheels; on Windows arm64 the Qiskit stack, PennyLane, RDKit and the Microsoft Discovery backend are skipped as well. See [Notes for Windows users](#notes-for-windows-users).
+> The MCP extra is also omitted from `[all]` and `[test]` on Windows arm64.
 
 ### Step 3: Verify the installation
 
@@ -67,10 +104,10 @@ The examples and test suite live in the source repository. Clone it and check ou
 pip show qdk-chemistry          # check your installed version
 git clone https://github.com/microsoft/qdk-chemistry.git
 cd qdk-chemistry
-git checkout stable/1.1          # match major.minor to your version
+git checkout v2.2.0              # match the tag to your installed version
 ```
 
-> **NOTE:** The `main` branch is the active development branch and may be incompatible with the released pip package. Always use the `stable/major.minor` branch for examples.
+> **NOTE:** The `main` branch is the active development branch and may be incompatible with the released pip package. Check out the release tag matching the exact version reported by `pip show qdk-chemistry`.
 
 Some examples require additional packages not included in any extra. See the [examples README](examples/README.md) for per-example requirements.
 
@@ -81,16 +118,18 @@ If you chose the minimal `pip install qdk-chemistry` above, you can add specific
 | Extra | Description | Included Packages |
 |-------|-------------|-------------------|
 | `coverage` | Coverage reporting tools | coverage, pytest, pytest-cov, gcovr |
+| `discovery` | Microsoft Discovery remote backend | azure-ai-discovery, azure-identity, azure-storage-blob |
 | `jupyter` | Jupyter notebook support | ipykernel, pandas |
-| `plugins` | Third-party quantum chemistry backends | PySCF |
+| `mcp` | MCP server, transports, workspace binding, and MCP Apps integration | mcp |
+| `plugins` | Third-party quantum chemistry backends | geomeTRIC, PySCF (no Windows wheels) |
 | `qiskit-extras` | Qiskit ecosystem packages | qiskit, qiskit-aer, qiskit-nature |
 | `openfermion-extras` | OpenFermion ecosystem packages | openfermion |
 | `networkx-extras` | NetworkX ecosystem packages | networkx |
 | `docs` | [Sphinx documentation build tools](docs/README.md) | sphinx, sphinx-rtd-theme, myst-parser, breathe, sphinx-autodoc-typehints, sphinx-inline-tabs, sphinxcontrib-napoleon, sphinxcontrib-bibtex, sphinx_copybutton |
 | `qre` | Quantum Resource Estimator support | qdk[qre,jupyter]>=1.30.0 |
 | `dev` | Development and testing tools | pytest, ruff, mypy, and related tooling |
-| `test` | Testing tools and optional runtime dependencies; does not include `docs` | qdk-chemistry[coverage,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre], nbclient, nbformat, pennylane, rdkit, requests>=2.33.0 |
-| `all` | Union of all defined extras | coverage, dev, docs, jupyter, networkx-extras, openfermion-extras, plugins, qiskit-extras, qre, test |
+| `test` | Testing tools and optional runtime dependencies; does not include `docs` | qdk-chemistry[coverage,discovery,jupyter,mcp,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre], nbclient, nbformat, pennylane, rdkit, requests>=2.33.0 |
+| `all` | Union of all defined extras | coverage, dev, discovery, docs, jupyter, mcp, networkx-extras, openfermion-extras, plugins, qiskit-extras, qre, test |
 
 To build the documentation, install the `docs` extra (for example,
 `python3 -m pip install 'qdk-chemistry[docs]'`), install the Doxygen system
@@ -100,15 +139,40 @@ Ubuntu), then run `cd docs && make all`. See the
 
 Install one or more extras with:
 
+**Linux / macOS:**
+
 ```bash
 python3 -m pip install 'qdk-chemistry[plugins,dev]'
 ```
+
+**Windows (PowerShell):**
+
+```powershell
+python -m pip install "qdk-chemistry[plugins,dev]"
+```
+
+> **NOTE:** In PowerShell, use double quotes around targets containing square brackets.
+> Single quotes also work in PowerShell but not in `cmd.exe`, where no quoting is required at all.
 
 Installing with the `dev` extra lets you run the test suite (you need to clone the repository first; see [Step 4](#step-4-clone-the-repository-for-examples-and-tests)):
 
 ```bash
 pytest python/tests
 ```
+
+### Notes for Windows Users
+
+Windows is a supported platform on both x86_64 and arm64: the project is built and tested on both
+architectures in CI, and wheels are published for both (x86_64 from Python 3.10, arm64 from Python
+3.11, which is the first version CPython ships a win-arm64 build for). The following caveats apply
+to native Windows installs; none of them apply under
+[WSL](https://learn.microsoft.com/windows/wsl/install).
+
+| Topic | Detail |
+|-------|--------|
+| PySCF plugin | PySCF publishes no Windows wheels, so the `plugins` extra installs no PySCF and the PySCF plugin is unavailable. The native implementations are unaffected. |
+| arm64 dependencies and extras | MCP is omitted from the `all` and `test` extras because its `cryptography` dependency publishes no win-arm64 wheel. A base, `all`, or `test` install therefore needs neither Rust nor a source build of `cryptography`; installing the `mcp` extra explicitly may require an ARM64 Rust toolchain, MSVC C/C++ build tools, and ARM64 OpenSSL development libraries. Qiskit (and Qiskit Aer, Nature, IBM Runtime), PennyLane and RDKit are skipped because they require `rustworkx`, which also publishes no win-arm64 wheel. The Microsoft Discovery backend (`azure-ai-discovery`, `azure-identity`, `azure-storage-blob`) is skipped as well. The features that depend on those skipped extras are unavailable. |
+| OpenMP | Shared-memory threading via OpenMP is disabled on Windows. |
 
 ---
 
@@ -179,10 +243,12 @@ These must be installed before starting a from-source build. See [Managed Depend
 
 QDK/Chemistry requires both a C and a C++ compiler supporting the ISO C++20 standard. See [this reference](https://en.cppreference.com/w/cpp/compiler_support/20) to check your compiler's C++20 support.
 
-| Compiler Family | Tested Versions |
-|-----------------|----------|
-| GNU  | 13+ |
-| AppleClang | 17+ |
+| Compiler Family | Tested Versions | Platform |
+|-----------------|-----------------|----------|
+| GNU  | 13+ | Linux |
+| AppleClang | 17+ | macOS |
+| MSVC | Visual Studio 2022 Build Tools | Windows |
+| clang-cl | 17+ | Windows |
 
 **NOTE**: Before installing dependencies on Ubuntu/Debian, update package indices with:
 
@@ -196,14 +262,21 @@ For Fedora/RHEL systems, update package metadata with:
 sudo dnf makecache
 ```
 
-| Dependency | Description | Requirements | Source Location | Ubuntu / Debian | Redhat |
-|------------|-------------|--------------------|-----------------|-----------------|---------|
-| Python 3 | Python interpreter and package tools | Version 3.10+ | [source](https://www.python.org/) | `apt install python3 python3-pip python3-venv` | `dnf install python3 python3-pip` |
-| CMake | Build system manager | Version > 3.15 | [source](https://github.com/Kitware/CMake) | `apt install cmake` | `dnf install cmake` |
-| Eigen | C++ linear algebra templates | Version > 3.4.0 | [source](https://libeigen.gitlab.io/) | `apt install libeigen3-dev` | `dnf install eigen3-devel` |
-| LAPACK | C library for linear algebra. See [this note](#note-on-lapack-usage) for further information | N/A | e.g. [source](https://github.com/OpenMathLib/OpenBLAS) | e.g. `apt install libopenblas-dev` | e.g. `dnf install openblas-devel`|
-| HDF5 | A portable data file library | Version > 1.12 + C++ bindings | [source](https://www.hdfgroup.org/download-hdf5/) | `apt install libhdf5-serial-dev` | `dnf install hdf5-devel`|
-| Boost | A collection of useful C++ libraries | Version > 1.80 | [source](https://github.com/boostorg/wiki/wiki/Getting-Started%3A-Overview) | `apt install libboost-all-dev` | `dnf install boost-devel` |
+On Windows, dependencies come from two places: the compiler, CMake, and Ninja ship with the
+Visual Studio 2022 Build Tools, and the C++ libraries come from
+[vcpkg](https://learn.microsoft.com/vcpkg/). The Windows column below gives the vcpkg port name for
+each library; they are all declared in [`vcpkg.json`](vcpkg.json), so a single
+`vcpkg install --overlay-ports=vcpkg-overlay/ports` resolves the whole set.
+
+| Dependency | Description | Requirements | Source Location | Ubuntu / Debian | Redhat | Windows |
+|------------|-------------|--------------------|-----------------|-----------------|---------|-----------------|
+| Python 3 | Python interpreter and package tools | Version 3.10+ | [source](https://www.python.org/) | `apt install python3 python3-pip python3-venv` | `dnf install python3 python3-pip` | `winget install --id Python.Python.3.12 -e -s winget` |
+| CMake | Build system manager | Version > 3.15 | [source](https://github.com/Kitware/CMake) | `apt install cmake` | `dnf install cmake` | VS Build Tools |
+| Ninja | Build tool used for the Windows builds | N/A | [source](https://github.com/ninja-build/ninja) | `apt install ninja-build` | `dnf install ninja-build` | VS Build Tools |
+| Eigen | C++ linear algebra templates | Version > 3.4.0 | [source](https://libeigen.gitlab.io/) | `apt install libeigen3-dev` | `dnf install eigen3-devel` | `eigen3` |
+| LAPACK | C library for linear algebra. See [this note](#note-on-lapack-usage) for further information | N/A | e.g. [source](https://github.com/OpenMathLib/OpenBLAS) | e.g. `apt install libopenblas-dev` | e.g. `dnf install openblas-devel`| `openblas` |
+| HDF5 | A portable data file library | Version > 1.12 + C++ bindings | [source](https://www.hdfgroup.org/download-hdf5/) | `apt install libhdf5-serial-dev` | `dnf install hdf5-devel`| `hdf5[cpp]` |
+| Boost | A collection of useful C++ libraries | Version > 1.80 | [source](https://github.com/boostorg/wiki/wiki/Getting-Started%3A-Overview) | `apt install libboost-all-dev` | `dnf install boost-devel` | `boost-headers`, `boost-container-hash`, `boost-dynamic-bitset`, `boost-sort` |
 
 See [Python dependencies](#python-dependencies) for a list of dependencies installed by `pip`.
 
@@ -211,21 +284,39 @@ See [Python dependencies](#python-dependencies) for a list of dependencies insta
 
 ```bash
 sudo apt update
-sudo apt install python3 python3-pip python3-venv cmake libeigen3-dev \
+sudo apt install python3 python3-pip python3-venv cmake ninja-build libeigen3-dev \
     libopenblas-dev libhdf5-serial-dev libboost-all-dev
 ```
+
+#### Quick install (Windows)
+
+Install the Visual Studio 2022 Build Tools with the C++ workload, which also provides CMake and
+Ninja:
+
+```powershell
+winget install --id Microsoft.VisualStudio.2022.BuildTools -e -s winget `
+    --override "--quiet --wait --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
+```
+
+`--includeRecommended` is required: the MSVC toolset, CMake, and Ninja are recommended (not
+required) components of the `VCTools` workload. This is the
+[Microsoft-documented](https://learn.microsoft.com/cpp/overview/acquire-msvc#install-msvc-by-using-winget)
+way to script a Build Tools install; the installer itself prompts for elevation.
+
+The remaining C++ dependencies are installed by vcpkg during the build. The
+[from-source build scripts](#step-4-build-the-python-package) do this for you.
 
 ### Managed Dependencies
 
 These dependencies are automatically downloaded and built by the CMake build system if not found. Pre-installing them is optional but **strongly encouraged** for faster rebuilds. See the [C++ configuration section](#configuring-the-c-library) for how to point the build system at pre-installed locations.
 
-| Dependency | Description | Tested Versions | Source Location | Ubuntu / Debian | Redhat |
-|------------|-------------|--------------------|-----------------|-----------------|---------|
-| nlohmann/json | A C++ library for JSON manipulation | v3.12.0 | [source](https://github.com/nlohmann/json) | `apt install nlohmann-json3-dev` | `dnf install json-devel` |
-| Libint2 | A C++ library for molecular integral evaluation | v2.9.0 | [source](https://github.com/evaleev/libint) | N/A | N/A |
-| Libecpint | A C++ library for molecular integrals involving [effective core potentials](https://en.wikipedia.org/wiki/Pseudopotential) | v1.0.7 | [source](https://github.com/robashaw/libecpint) | `apt install libecpint-dev` | N/A |
-| GauXC | A C++ library for molecular integrals on numerical grids | v1.0 | [source](https://github.com/wavefunction91/gauxc) | N/A | N/A |
-| MACIS | A C++ library for configuration interaction methods | N/A | [source](https://github.com/wavefunction91/macis) | N/A | N/A |
+| Dependency | Description | Tested Versions | Source Location | Ubuntu / Debian | Redhat | Windows |
+|------------|-------------|--------------------|-----------------|-----------------|---------|-----------------|
+| nlohmann/json | A C++ library for JSON manipulation | v3.12.0 | [source](https://github.com/nlohmann/json) | `apt install nlohmann-json3-dev` | `dnf install json-devel` | `nlohmann-json` |
+| Libint2 | A C++ library for molecular integral evaluation | v2.13.1 | [source](https://github.com/evaleev/libint) | N/A | N/A | N/A |
+| Libecpint | A C++ library for molecular integrals involving [effective core potentials](https://en.wikipedia.org/wiki/Pseudopotential) | v1.0.7 | [source](https://github.com/robashaw/libecpint) | `apt install libecpint-dev` | N/A | N/A |
+| GauXC | A C++ library for molecular integrals on numerical grids | v1.0 | [source](https://github.com/wavefunction91/gauxc) | N/A | N/A | N/A |
+| MACIS | A C++ library for configuration interaction methods | N/A | [source](https://github.com/wavefunction91/macis) | N/A | N/A | N/A |
 
 **NOTE**: As Libint and GauXC exhibit very long build times, it is **strongly encouraged** that these dependencies are separately installed to avoid excessive build costs. See the [Libint2](https://github.com/evaleev/libint) and [GauXC](https://github.com/wavefunction91/gauxc) project documentation for build instructions.
 
@@ -253,7 +344,11 @@ Build from source if you need to modify the C++ core, work with unreleased featu
 
 **Linux**: A Debian-based distribution is recommended for the broadest package availability. Other distributions may require building some dependencies (e.g. Eigen3, nlohmann-json) from source.
 
-**Windows**: Native Windows builds (MSVC / clang-cl with vcpkg) are **experimental** and in active development. Helper scripts are available under [`.pipelines/windows/`](.pipelines/windows/). For a fully supported build, use the [Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/en-us/windows/wsl/install) instead.
+**Windows**: Native builds use MSVC or clang-cl with dependencies supplied by
+[vcpkg](https://learn.microsoft.com/vcpkg/). Turnkey build scripts are available under
+[`.pipelines/windows/`](.pipelines/windows/) — see [Building on Windows](#building-on-windows).
+Source builds work on x86_64 and arm64; [WSL](https://learn.microsoft.com/windows/wsl/install) is
+also supported and follows the Linux instructions.
 
 **macOS**: The latest version of [Xcode](https://apps.apple.com/us/app/xcode/id497799835?mt=12) must be installed.
 
@@ -276,6 +371,8 @@ The simplest way to build from source is via `pip`. If the C++ library hasn't be
 
 > **Tip:** **`[all]` is the recommended install target here too.** It pulls in all optional dependencies so examples and tests work without extra steps. See the [Optional Extras](#optional-extras) table for details and platform-specific exclusions.
 
+**Linux / macOS:**
+
 ```bash
 cd python
 python3 -m pip install '.[all]'
@@ -283,9 +380,80 @@ pytest tests/
 cd ..
 ```
 
-**NOTE:** Building this Python package may require significant memory, since the C++ library build uses all available threads by default and some compilations can consume around 3 GB of RAM. To avoid running out of memory, set `CMAKE_BUILD_PARALLEL_LEVEL` to a reasonably small value. For example, use: `CMAKE_BUILD_PARALLEL_LEVEL=1 python3 -m pip install '.[all]'` to perform a single-threaded C++ library build.
+**Windows (PowerShell):**
+
+Run from a **Developer PowerShell for VS 2022** so that the compiler is on `PATH`, with the vcpkg
+dependencies already installed. The [build scripts](#building-on-windows) do both for you.
+
+```powershell
+cd python
+python -m pip install ".[all]"
+pytest tests/
+cd ..
+```
+
+**NOTE:** Building this Python package may require significant memory, since the C++ library build uses all available threads by default and some compilation units, especially Libint2 under MSVC, require several GiB of RAM. As a conservative default, reserve at least 8 GiB of available memory per compile job. Set `CMAKE_BUILD_PARALLEL_LEVEL=1` when that cannot be guaranteed:
+
+```bash
+# Linux / macOS
+CMAKE_BUILD_PARALLEL_LEVEL=1 python3 -m pip install '.[all]'
+```
+
+```powershell
+# Windows (PowerShell) - no inline environment variable syntax
+$env:CMAKE_BUILD_PARALLEL_LEVEL = 1
+python -m pip install ".[all]"
+```
 
 > **For active developers:** The pip source build includes a full C++ compilation, which is slow. For faster iteration, [build and install the C++ library separately](#building-the-c-library) first, then [link the Python build to it](#linking-to-an-existing-c-installation). That way `pip install` only rebuilds the pybind11 bindings.
+
+#### Building on Windows
+
+Two scripts under [`.pipelines/windows/`](.pipelines/windows/) perform a complete build — prerequisite
+installation, vcpkg dependency resolution, C++ configure/build/test/install, and the Python package
+build and test:
+
+| Script | Compiler |
+|--------|----------|
+| [`windows-build-msvc-cmake.ps1`](.pipelines/windows/windows-build-msvc-cmake.ps1) | MSVC `cl.exe` |
+| [`windows-build-clang-cl-cmake.ps1`](.pipelines/windows/windows-build-clang-cl-cmake.ps1) | clang-cl |
+
+Run from the repository root in a normal, non-elevated PowerShell, after installing the
+[prerequisites](#quick-install-windows):
+
+```powershell
+.\.pipelines\windows\windows-build-msvc-cmake.ps1 -SkipPrereqs
+```
+
+Without `-SkipPrereqs` the scripts install any missing prerequisites themselves: they download and
+run the Visual Studio Build Tools bootstrapper (which requires administrator rights), clone
+[vcpkg](https://github.com/microsoft/vcpkg), and install
+[`uv`](https://docs.astral.sh/uv/getting-started/installation/). Installing the prerequisites
+yourself keeps the build off an elevated shell.
+
+Useful switches:
+
+| Switch | Effect |
+|--------|--------|
+| `-Arch` | Target architecture: `x64` (default) or `arm64`. `windows-build-clang-cl-cmake.ps1` only supports building natively (host and target arch must match); `windows-build-msvc-cmake.ps1` also supports cross-compiling arm64 from an x64 host. |
+| `-SkipPrereqs` | Reuse the existing toolchain and vcpkg installation |
+| `-SkipConfigure` | Incremental build; skip the CMake configure step |
+| `-SkipCpp` / `-SkipPython` | Build only one half of the project |
+| `-SkipTests` | Skip the `ctest` and `pytest` runs |
+| `-BuildType` | `Release` (default), `RelWithDebInfo`, or `Debug` |
+| `-DynamicDeps` | Link dependencies dynamically (`$Arch-windows`) instead of statically (`$Arch-windows-static-md`) |
+
+The default `$Arch-windows-static-md` triplet (e.g. `x64-windows-static-md`, `arm64-windows-static-md`)
+links the vcpkg dependencies statically while keeping the dynamic CRT, so no dependency DLLs need to
+sit alongside the Python extension. `-DynamicDeps` switches to `$Arch-windows`, whose DLLs must be
+discoverable at import time.
+
+Windows builds are pinned to a microarchitecture level via `QDK_UARCH`: `x86-64-v3` on x64, and
+`armv8-a` on arm64 for clang-cl. Native MSVC `cl.exe` has no equivalent generic arm64 `/arch:` value,
+so `QDK_UARCH` is left unset there and the compiler's default ISA is used instead (see
+[`cpp/cmake/qdk-uarch.cmake`](cpp/cmake/qdk-uarch.cmake)). The
+[`.pipelines/toolchains/windows.cmake`](.pipelines/toolchains/windows.cmake) toolchain file is
+chainloaded after the vcpkg toolchain to force the dynamic CRT (`/MD`) across subprojects.
 
 #### Accelerating Rebuilds with Build Caching
 
@@ -298,8 +466,15 @@ python3 -m pip install . -C build-dir="build/{wheel_tag}"
 **Warning:** When using a persistent build directory, CMake caches configuration decisions (such as whether the C++ library was found pre-installed or built from source). If your environment changes (e.g., you add or remove a pre-installed C++ library, or C++ dependencies change), the cached state may cause subtle build failures. In this case, remove the build directory and try again:
 
 ```bash
+# Linux / macOS
 rm -rf build/
 python3 -m pip install .
+```
+
+```powershell
+# Windows (PowerShell)
+Remove-Item -Recurse -Force build
+python -m pip install .
 ```
 
 #### Environment Variables for the Python Build
@@ -320,11 +495,23 @@ For the most up-to-date list of python dependencies, see [`pyproject.toml`](pyth
 
 If you have already [built and installed](#building-the-c-library) the C++ QDK/Chemistry library, you may link the python package build to your existing installation to avoid rebuilding the C++ library.
 
-The official way to notify the python package build of an existing QDK/Chemistry C++ installation is to append the `CMAKE_PREFIX_PATH` environment variable with the installation prefix: e.g. `CMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH:/full/qdk/chemistry/prefix"`. See the [CMake documentation](https://cmake.org/cmake/help/latest/variable/CMAKE_PREFIX_PATH.html) for a discussing surrounding the use of environment variables for prefix paths.
+The official way to notify the python package build of an existing QDK/Chemistry C++ installation is to append the `CMAKE_PREFIX_PATH` environment variable with the installation prefix. As an environment variable it uses the platform's `PATH` separator — `:` on Linux and macOS, `;` on Windows — unlike the [CMake cache variable](#note-on-cmake-lists-from-the-command-line) of the same name, which is always semicolon-separated. See the [CMake documentation](https://cmake.org/cmake/help/latest/envvar/CMAKE_PREFIX_PATH.html) for further details.
+
+```bash
+# Linux / macOS
+export CMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH:/full/qdk/chemistry/prefix"
+```
+
+```powershell
+# Windows (PowerShell)
+$env:CMAKE_PREFIX_PATH = "$env:CMAKE_PREFIX_PATH;C:\full\qdk\chemistry\prefix"
+```
 
 #### Note on `QDK_UARCH` specification
 
-Specification of the instruction set architecture (ISA) is highly compiler specific and requires careful examination of the compiler documentation to ensure appropriate usage. Here we provide a number of common possibilities for the GNU family of compilers. These may or may not work on your machine depending on your processor's ISA and the compiler you are using.
+Specification of the instruction set architecture (ISA) is highly compiler specific and requires careful examination of the compiler documentation to ensure appropriate usage. The accepted values differ by compiler family, and may or may not work on your machine depending on your processor's ISA.
+
+**GNU / Clang / AppleClang** — `QDK_UARCH` is passed through as `-march=<value>`:
 
 | `QDK_UARCH` | Description |
 |--------------|-----|
@@ -332,10 +519,26 @@ Specification of the instruction set architecture (ISA) is highly compiler speci
 |`x86-64-v3` | AMD64: x86_64 + AVX2 + FMA. Applicable to most modern x86_64 processors |
 |`armv8-a` | AARCH64: 64-bit ARM. Applicable to Apple Silicon and Microsoft Surface ARM architectures |
 
+**MSVC (`cl.exe`)** — `QDK_UARCH` is passed through as `/arch:<value>`, so the GNU-style values above are *not* valid. MSVC has no generic baseline `/arch:` flag; when `QDK_UARCH` is left unset, the compiler default ISA is used. See the [MSVC `/arch` documentation](https://learn.microsoft.com/cpp/build/reference/arch-x64) for the full list:
+
+| `QDK_UARCH` | Description |
+|--------------|-----|
+| *(unset)* | Compiler default ISA. Portable, but forgoes newer vector instructions |
+|`AVX2` | x86_64 + AVX2 + FMA. Roughly equivalent to `x86-64-v3` |
+|`AVX512` | x86_64 + AVX-512. Only for processors that support it |
+
+clang-cl accepts MSVC-style flags, so the MSVC values apply there as well. Values that the compiler rejects are detected during configure and dropped with a warning.
+
+> **NOTE:** The Windows [build scripts](#building-on-windows) and release wheels set
+> `QDK_UARCH=x86-64-v3`. Recent clang-cl versions accept this; native `cl.exe` does not, so use
+> `AVX2` there.
+
 ### Building the C++ Library
 
 With all system dependencies installed, the C++ QDK/Chemistry
-library may be build and installed via
+library may be built and installed via
+
+**Linux / macOS:**
 
 ```bash
 cd [/full/path/to/qdk-chemistry]
@@ -344,6 +547,25 @@ cmake --build cpp/build
 [cmake --build cpp/build --target test] # Optional but encouraged, tests the C++ library if testing is enabled
 [cmake --install cpp/build] # Optional, installs to CMAKE_INSTALL_PREFIX
 ```
+
+**Windows (PowerShell):**
+
+From a Developer PowerShell for VS 2022, with the vcpkg dependencies already installed:
+
+```powershell
+cd C:\full\path\to\qdk-chemistry
+cmake -S cpp -B cpp/build -GNinja `
+    -DCMAKE_BUILD_TYPE=Release `
+    -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl `
+    -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" `
+    -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=".pipelines\toolchains\windows.cmake" `
+    -DVCPKG_TARGET_TRIPLET=x64-windows-static-md
+cmake --build cpp/build
+ctest --test-dir cpp/build --output-on-failure   # Optional, tests the C++ library if testing is enabled
+cmake --install cpp/build                        # Optional, installs to CMAKE_INSTALL_PREFIX
+```
+
+Alternatively, the [Windows build scripts](#building-on-windows) wrap this entire sequence.
 
 #### Configuring the C++ Library
 
@@ -358,13 +580,16 @@ Where possible, the official CMake documentation is linked for further informati
 | Variable | Description | Type | Default | Other Values |
 |----------|-------------|------|---------|--------------|
 |[`CMAKE_BUILD_TYPE`](https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html) | The optimization level for the C++ build. | String | `Release` | `Debug`, `RelWithDebInfo`|
-|[`CMAKE_INSTALL_PREFIX`](https://cmake.org/cmake/help/latest/variable/CMAKE_INSTALL_PREFIX.html)| The desired installation prefix | String | `/usr/local` | User defined |
+|[`CMAKE_INSTALL_PREFIX`](https://cmake.org/cmake/help/latest/variable/CMAKE_INSTALL_PREFIX.html)| The desired installation prefix | String | `/usr/local` (Linux/macOS), `C:\Program Files\<project>` (Windows) | User defined |
 |[`CMAKE_PREFIX_PATH`](https://cmake.org/cmake/help/latest/variable/CMAKE_PREFIX_PATH.html)| Location of installed dependencies | [List](#note-on-cmake-lists-from-the-command-line) | N/A | User defined |
 |[`CMAKE_CXX_FLAGS`](https://cmake.org/cmake/help/latest/variable/CMAKE_LANG_FLAGS.html#variable:CMAKE_%3CLANG%3E_FLAGS) | Space-delimited set of C++ compilation flags to append to the C++ compilation | String | N/A | User defined |
+|[`CMAKE_TOOLCHAIN_FILE`](https://cmake.org/cmake/help/latest/variable/CMAKE_TOOLCHAIN_FILE.html) | Toolchain file. On Windows, set to the vcpkg toolchain | String | N/A | User defined |
+|[`VCPKG_TARGET_TRIPLET`](https://learn.microsoft.com/vcpkg/users/triplets) | Windows only. vcpkg triplet selecting the target architecture and dependency link mode | String | N/A | `x64-windows-static-md`, `x64-windows`, `arm64-windows-static-md`, `arm64-windows` |
 |[`BUILD_TESTING`](https://cmake.org/cmake/help/latest/variable/BUILD_TESTING.html) | Whether to build unit and integration tests | Bool | `True` | `False` |
 |`QDK_UARCH`| The instruction set architecture (ISA) to compile for. This is not a mandatory setting, but it is strongly encouraged for good performance | String | N/A | [See below](#note-on-qdk_uarch-specification) |
-|`QDK_CHEMISTRY_ENABLE_COVERAGE` | Enable coverage reports | Bool | `True` | `False` |
+|`QDK_CHEMISTRY_ENABLE_COVERAGE` | Enable coverage reports. Requires a `Debug` or `RelWithDebInfo` build and a GNU/Clang compiler; under MSVC the build warns and continues without coverage instrumentation | Bool | `False` | `True` |
 |`QDK_CHEMISTRY_ENABLE_LONG_TESTS` | Enable long running tests (useful on HPC architectures) | Bool | `False` | `True` |
+|`QDK_ENABLE_OPENMP` | Enable OpenMP support. Off by default on Windows and on macOS with AppleClang | Bool | `True` (`False` on Windows / AppleClang) | `False` |
 
 #### Note on CMake Lists from the Command Line
 
@@ -373,3 +598,5 @@ Lists in CMake are stored as semicolon delimited strings. On the command line, L
 ```bash
 cmake [...] -DCMAKE_PREFIX_PATH="/opt/openblas;/opt/hdf5"
 ```
+
+This applies on Windows too: the CMake cache variable is always semicolon-delimited, regardless of platform.
