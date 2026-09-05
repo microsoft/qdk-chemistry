@@ -6,23 +6,59 @@
 # --------------------------------------------------------------------------------------------
 
 import math
+from typing import ClassVar
 
 import numpy as np
 import pytest
 import scipy
 
-from qdk_chemistry.algorithms import create
+from qdk_chemistry.algorithms import create, register
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.plaquette_trotter import (
     PlaquetteTrotter,
     _plaquette_terms,
     plaquette_sections,
 )
-from qdk_chemistry.data import LatticeGraph, MajoranaMapping, QubitOperator
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter
+from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import IterativePhaseEstimation
+from qdk_chemistry.data import AlgorithmRef, Circuit, LatticeGraph, MajoranaMapping, QubitOperator
+from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
 from qdk_chemistry.utils.model_hamiltonians import create_hubbard_hamiltonian
+from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+
+#: Name under which the single-plaquette builder below is registered.
+_SINGLE_PLAQUETTE_ALGORITHM = "single_plaquette_for_tests"
+
+
+class _SinglePlaquetteBuilder(Trotter):
+    """Evolve one four-cycle by the plaquette decomposition, for the IQPE test.
+
+    The real builder needs a lattice of at least 4x4, which is 32 qubits and far past
+    state-vector simulation. A lone plaquette is small enough to simulate and is the
+    same decomposition, so it exercises the emitted terms, the container's
+    control-exemption check, the controlled mapper, and the Q# end to end.
+    """
+
+    def name(self) -> str:
+        """Return the registered algorithm name."""
+        return _SINGLE_PLAQUETTE_ALGORITHM
+
+    def _decompose_trotter_step(self, qubit_hamiltonian, time, atol=1e-12):  # noqa: ARG002
+        """Return the plaquette factors for the cycle 0-1-2-3-0."""
+        if qubit_hamiltonian.num_qubits != 4:
+            raise ValueError(
+                f"This test builder is pinned to a single four-mode plaquette, "
+                f"got {qubit_hamiltonian.num_qubits} qubits."
+            )
+        return _plaquette_terms((0, 1, 2, 3), hopping=1.0, time=time)
+
+
+register(lambda: _SinglePlaquetteBuilder())
+
 
 _PAULI = {
     "I": np.eye(2, dtype=complex),
@@ -321,3 +357,86 @@ class TestControlExemption:
         )
         exempt = sum(1 for t in container.step_terms if not t.needs_control)
         assert exempt == 4 * 2 * 4 * 12
+
+
+class TestPlaquetteIterativePhaseEstimation:
+    """End-to-end: simulate the plaquette circuit under IQPE and read back the energy.
+
+    A single four-cycle is the entire Hamiltonian, so the plaquette decomposition is
+    exact there and phase estimation must land on an exact eigenvalue. That makes this
+    the sharpest available check on the whole chain -- the emitted terms, the
+    container's control-exemption bookkeeping, the controlled mapper, and the Q#
+    -- because a fault anywhere in it shifts the recovered phase.
+
+    In particular it exercises the control-OFF branch, which no test of the evolution
+    alone can see: if the conjugating factors failed to cancel, the ancilla would
+    entangle with the system and the phase would be wrong.
+    """
+
+    # Jordan-Wigner image of -t sum_<ab> (a_a^dag a_b + h.c.) on the cycle 0-1-2-3-0,
+    # verified against the dense second-quantized operator.
+    _LABELS: ClassVar[list[str]] = ["IIXX", "IIYY", "IXXI", "IYYI", "XXII", "YYII", "XZZX", "YZZY"]
+    _COEFFS: ClassVar[list[float]] = [-0.5] * 8
+
+    # The eigenvalue -2 with t = pi/8 puts the phase at exactly 1/8, which four bits
+    # represent exactly, so the expected bitstring is unambiguous.
+    _ENERGY = -2.0
+    _TIME = math.pi / 8.0
+    _PHASE = 0.125
+    _BITS: ClassVar[list[int]] = [0, 0, 1, 0]
+
+    @staticmethod
+    def _eigenstate():
+        """Return an exact eigenvector of the cycle Hamiltonian for energy -2."""
+        dense = pauli_to_dense_matrix(
+            TestPlaquetteIterativePhaseEstimation._LABELS, TestPlaquetteIterativePhaseEstimation._COEFFS
+        )
+        values, vectors = np.linalg.eigh(dense)
+        index = int(np.argmin(np.abs(values - TestPlaquetteIterativePhaseEstimation._ENERGY)))
+        assert np.isclose(values[index], TestPlaquetteIterativePhaseEstimation._ENERGY)
+        return np.real(vectors[:, index])
+
+    def _run(self, unitary_builder_name: str, num_bits: int = 4):
+        state = self._eigenstate()
+        num_qubits = int(np.log2(len(state)))
+        params = {
+            "rowMap": list(range(num_qubits - 1, -1, -1)),
+            "stateVector": state.tolist(),
+            "expansionOps": [],
+            "numQubits": num_qubits,
+        }
+        state_prep = Circuit(
+            qsharp_factory=QsharpFactoryData(
+                program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameter=params
+            ),
+            qsharp_op=QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(params),
+        )
+
+        iqpe = IterativePhaseEstimation(shots_per_bit=25)
+        iqpe.settings().set(
+            "qpe_circuit_builder",
+            AlgorithmRef(
+                "qpe_circuit_builder",
+                "qdk_iterative",
+                num_bits=num_bits,
+                controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+                unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", unitary_builder_name, time=self._TIME),
+            ),
+        )
+        iqpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=42))
+        return iqpe.run(
+            qubit_hamiltonian=QubitOperator(pauli_strings=self._LABELS, coefficients=self._COEFFS),
+            state_preparation=state_prep,
+        )
+
+    def test_recovers_the_exact_eigenvalue(self):
+        """The plaquette circuit must reproduce the eigenvalue to simulator precision."""
+        result = self._run(_SINGLE_PLAQUETTE_ALGORITHM)
+        assert list(result.bits_msb_first or []) == self._BITS
+        assert np.isclose(result.phase_fraction, self._PHASE, atol=1e-9)
+        assert np.isclose(result.raw_energy, self._ENERGY, atol=1e-9)
+
+    def test_is_at_least_as_accurate_as_the_term_by_term_path(self):
+        """The plaquette decomposition is exact here; term-by-term Trotter is not."""
+        plaquette = self._run(_SINGLE_PLAQUETTE_ALGORITHM)
+        assert abs(plaquette.raw_energy - self._ENERGY) <= 1e-9
