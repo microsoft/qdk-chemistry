@@ -15,6 +15,7 @@
 #include "microsoft/active_space/autocas_active_space.hpp"
 #include "microsoft/active_space/entropy_active_space.hpp"
 #include "microsoft/active_space/occupation_active_space.hpp"
+#include "microsoft/active_space/qicas_active_space.hpp"
 #include "microsoft/active_space/valence_active_space.hpp"
 
 namespace qdk::chemistry::algorithms {
@@ -391,6 +392,13 @@ std::unique_ptr<ActiveSpaceSelector> make_occupation_active_space_selector() {
       qdk::chemistry::algorithms::microsoft::OccupationActiveSpaceSelector>();
 }
 
+std::unique_ptr<ActiveSpaceSelector> make_qicas_active_space_selector() {
+  QDK_LOG_TRACE_ENTERING();
+
+  return std::make_unique<
+      qdk::chemistry::algorithms::microsoft::QICASActiveSpaceSelector>();
+}
+
 std::unique_ptr<ActiveSpaceSelector> make_autocas_active_space_selector() {
   QDK_LOG_TRACE_ENTERING();
 
@@ -411,6 +419,8 @@ void ActiveSpaceSelectorFactory::register_default_instances() {
       &make_valence_active_space_selector);
   ActiveSpaceSelectorFactory::register_instance(
       &make_occupation_active_space_selector);
+  ActiveSpaceSelectorFactory::register_instance(
+      &make_qicas_active_space_selector);
   ActiveSpaceSelectorFactory::register_instance(
       &make_autocas_active_space_selector);
   ActiveSpaceSelectorFactory::register_instance(

@@ -19,6 +19,7 @@ from qdk_chemistry.algorithms.active_space_selector import (
     QdkAutocasActiveSpaceSelector,
     QdkAutocasEosActiveSpaceSelector,
     QdkOccupationActiveSpaceSelector,
+    QdkQICASActiveSpaceSelector,
     QdkValenceActiveSpaceSelector,
 )
 from qdk_chemistry.algorithms.amplitude_amplification.amplitude_amplification import AmplitudeAmplification
@@ -110,6 +111,7 @@ __all__ = [
     "QdkOccupationActiveSpaceSelector",
     "QdkPipekMezeyLocalizer",
     "QdkPopulationAnalyzer",
+    "QdkQICASActiveSpaceSelector",
     "QdkQubitMapper",
     "QdkScfSolver",
     "QdkStabilityChecker",
