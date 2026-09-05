@@ -19,7 +19,10 @@ PYTHON_SRC_DIR = ../python/src
 # Format of generated documentation (can override from environment)
 SPHINX_FORMAT ?= html
 
-.PHONY: check help clean doxygen breathe sphinx-api sphinx-autosummary sphinx-docs clean-doxygen clean-breathe clean-sphinx-api clean-sphinx-autosummary clean-sphinx-docs
+.PHONY: check help clean doxygen breathe sphinx-api sphinx-autosummary sphinx-docs check-sidebar clean-doxygen clean-breathe clean-sphinx-api clean-sphinx-autosummary clean-sphinx-docs
+
+# The build stages share $(BUILD_DIR) and must run in the listed order.
+.NOTPARALLEL:
 
 default: check
 	@echo "Try running 'make clean' to clean things up or 'make all' to build everything."
@@ -35,8 +38,33 @@ check:
 clean: check clean-doxygen clean-breathe clean-sphinx-api clean-sphinx-autosummary clean-sphinx-docs
 	@echo "** Done cleaning."
 
-all: check sphinx-docs
+all: check sphinx-docs check-sidebar
 	@echo "** Built all documentation."
+
+# The sidebar navigation comes from a template that overrides a theme-internal
+# one, so a theme upgrade could empty it without any build warning.
+MIN_SIDEBAR_LINKS = 20
+
+check-sidebar: check
+	@if [ "$(SPHINX_FORMAT)" != "html" ]; then \
+	    echo "** Skipping HTML sidebar check for $(SPHINX_FORMAT) output."; \
+	    exit 0; \
+	fi; \
+	links=$$(python3 -c "import re; from pathlib import Path; \
+	    h=Path('$(BUILD_DIR)/html/index.html').read_text(encoding='utf-8'); \
+	    m=re.search(r'bd-docs-nav.*?</nav>', h, re.S); \
+	    print(len(re.findall(r'reference internal', m.group(0))) if m else 0)"); \
+	case "$$links" in \
+	    '' | *[!0-9]*) \
+	        echo "** ERROR: could not count sidebar links in $(BUILD_DIR)/html/index.html."; \
+	        exit 1;; \
+	esac; \
+	if [ "$$links" -lt $(MIN_SIDEBAR_LINKS) ]; then \
+	    echo "** ERROR: sidebar navigation has $$links links, expected at least $(MIN_SIDEBAR_LINKS)."; \
+	    echo "** Check docs/source/_templates/sidebar-nav-all.html against the installed theme."; \
+	    exit 1; \
+	fi; \
+	echo "** Sidebar navigation has $$links links."
 
 ################################################################################
 # Doxygen XML build

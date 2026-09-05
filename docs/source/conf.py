@@ -41,7 +41,25 @@ if not _version_file.exists():
     raise FileNotFoundError(
         f"VERSION file not found at {_version_file}. Ensure you have a complete checkout of the repository."
     )
-release = _version_file.read_text().strip()
+# The publishing workflow overrides this to label builds of unreleased `main`.
+release = (
+    os.environ.get("QDK_CHEMISTRY_DOCS_VERSION") or _version_file.read_text().strip()
+)
+version = release
+_release_match = re.fullmatch(r"(\d+)\.(\d+)\.\d+(?:\.\d+)?", release)
+_switcher_version = (
+    f"{_release_match.group(1)}.{_release_match.group(2)}"
+    if _release_match
+    else release
+)
+
+# Canonical URL of this build.
+html_baseurl = os.environ.get(
+    "QDK_CHEMISTRY_DOCS_BASE_URL", "https://microsoft.github.io/qdk-chemistry/stable/"
+)
+
+# Root of the versioned site, one level above this build's own directory.
+_site_url = html_baseurl.rstrip("/").rsplit("/", 1)[0] + "/"
 
 # Expose tutorial compatibility versions to reStructuredText.
 rst_epilog = f"""
@@ -155,7 +173,36 @@ breathe_default_members = (
 )
 
 # HTML output and theme settings
-html_theme = "sphinx_rtd_theme"  # Use the ReadTheDocs theme for styling
+# Shorter than Sphinx's "<project> <release> documentation" default, which
+# overflows the header into the search box.
+html_title = f"QDK/Chemistry {release}"
+html_theme = "pydata_sphinx_theme"
+html_theme_options = {
+    "github_url": "https://github.com/microsoft/qdk-chemistry",
+    # The version sits next to the name, in the switcher, rather than in the brand text.
+    "logo": {"text": "QDK/Chemistry"},
+    "navbar_start": ["navbar-logo", "version-switcher"],
+    "navbar_end": ["theme-switcher", "navbar-icon-links"],
+    # Keep the whole table of contents in the left sidebar, as the previous theme did.
+    "navbar_center": [],
+    "show_nav_level": 1,
+    "navigation_depth": 3,
+    "show_version_warning_banner": True,
+    # The theme defaults to a11y-high-contrast-*, which is louder than the
+    # previous theme. `default` is what it used, token for token; `material` is
+    # a muted dark counterpart without underlined imports or orange strings.
+    "pygments_light_style": "default",
+    "pygments_dark_style": "material",
+    # switcher.json only exists on the published site, so it cannot be fetched at build time
+    "check_switcher": False,
+    "switcher": {
+        "json_url": f"{_site_url}switcher.json",
+        "version_match": _switcher_version,
+    },
+}
+# Deliberately not named sidebar-nav-bs: the theme drops that template on pages
+# that have no sub-navigation, such as the landing page.
+html_sidebars = {"**": ["sidebar-nav-all"]}
 templates_path = ["_templates"]  # Path to custom HTML templates
 html_static_path: list[str] = ["_static"]  # Path to static files (CSS, JS, images)
 html_css_files = [  # Include custom CSS file for additional styling

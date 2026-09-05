@@ -83,7 +83,7 @@ dev = [
 ]
 docs = [
   "sphinx",
-  "sphinx-rtd-theme",
+  "pydata-sphinx-theme>=0.20,<0.21",
   "myst-parser",
   "breathe",
   "sphinx-autodoc-typehints",

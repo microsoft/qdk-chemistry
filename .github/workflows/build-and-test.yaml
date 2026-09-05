@@ -334,7 +334,7 @@ jobs:
         # Install Python dependencies and build package
         # Use persistent build directory for coverage analysis
         if [ "${{ matrix.python-version }}" = "3.13" ]; then
-          python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[test,docs]
+          python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[test,discovery,docs]
         else
           python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[test]
         fi
@@ -522,10 +522,22 @@ jobs:
         # Add to job summary
         cat coverage-summary.md >> $GITHUB_STEP_SUMMARY
 
+    - name: Test documentation site assembly
+      if: matrix.python-version == '3.13' && matrix.os-name == 'Linux'
+      run: python -m unittest discover -s .github/scripts/tests -p 'test_*.py'
+
     - name: Build documentation
       if: matrix.python-version == '3.13'
       working-directory: docs
       run: |
+        if [[ ("$GITHUB_EVENT_NAME" == "push" || "$GITHUB_EVENT_NAME" == "workflow_dispatch") &&
+              "$GITHUB_REF_NAME" == "${{ github.event.repository.default_branch }}" ]]; then
+          OWNER="$(echo "${GITHUB_REPOSITORY%%/*}" | tr '[:upper:]' '[:lower:]')"
+          NAME="$(echo "${GITHUB_REPOSITORY#*/}" | tr '[:upper:]' '[:lower:]')"
+          export QDK_CHEMISTRY_DOCS_VERSION=dev
+          export QDK_CHEMISTRY_DOCS_BASE_URL="https://${OWNER}.github.io/${NAME}/dev/"
+        fi
+
         set +e
         make clean all
         MAKE_EXIT_CODE=$?
@@ -543,6 +555,20 @@ jobs:
           done
           exit $MAKE_EXIT_CODE
         fi
+
+    # Consumed by the Docs workflow to publish `dev`; only the Linux build is
+    # published, so that the output does not depend on which runner produced it.
+    - name: Upload documentation artifact
+      if: >-
+        matrix.python-version == '3.13' &&
+        matrix.os-name == 'Linux' &&
+        (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+        github.ref_name == github.event.repository.default_branch
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: docs-html
+        path: docs/build/html
+        retention-days: 7
 
   coverage-windows:
     name: ${{ matrix.compiler }} - Build & test (Windows)

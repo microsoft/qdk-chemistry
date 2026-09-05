@@ -1,11 +1,124 @@
-/* Increase main content width */
-.wy-nav-content {
-    max-width: 1300px !important;
+/* The brand area is a fixed 25% grid column, so the version switcher overflows
+   it and collides with the search box on mid-width screens. Letting it grow to
+   its content only when it has to keeps the theme's original alignment. */
+@media (min-width: 960px) {
+    .bd-header .navbar-header-items__start {
+        min-width: max-content;
+    }
 }
 
-/* Also increase the inner content area */
-.wy-nav-content .rst-content {
-    max-width: 1300px !important;
+.bd-header .navbar-header-items__start {
+    align-items: center;
+    flex-wrap: wrap;
+    row-gap: 0;
+}
+
+/* The switcher button otherwise sits above the brand on narrow screens: the
+   theme gives it a bottom margin below 960px, where it expects the switcher to
+   be stacked rather than sitting next to the logo. */
+.bd-header .version-switcher__container {
+    display: flex;
+    align-items: center;
+}
+
+.bd-header button.btn.version-switcher__button {
+    margin-bottom: 0;
+}
+
+/* Keep the brand and switcher on one line for as long as possible on phones,
+   and close the gap left by the 4rem header row once the switcher does wrap. */
+@media (max-width: 959.98px) {
+    html {
+        --pst-header-height: 2.75rem;
+    }
+
+    .bd-header .navbar-brand {
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+
+    .bd-header button.btn.version-switcher__button {
+        font-size: 0.8rem;
+        padding: 2px 6px;
+    }
+
+    /* Below the grid breakpoint the brand area is content-sized, so without
+       this it pushes the toggles off-screen instead of wrapping. */
+    .bd-header .navbar-header-items__start {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+}
+
+/* Below this width the brand and version switcher wrap onto two lines. The
+   theme's normal anchor offset only accounts for a single-row sticky header. */
+@media (max-width: 460px) {
+    .bd-article-container section[id] {
+        scroll-margin-top: 1.6rem;
+    }
+}
+
+.bd-header .navbar-header-items__start > .navbar-item {
+    display: flex;
+    align-items: center;
+}
+
+/* Wider than the theme defaults (60em article, 88rem page), closer to the
+   previous theme, so wide tables and code blocks need less scrolling.
+   These must stay separate rules to stay more specific than the theme's. */
+.bd-main .bd-content .bd-article-container {
+    max-width: 80em;
+}
+
+.bd-page-width {
+    max-width: 100rem;
+}
+
+/* The sidebar otherwise grows to fit long API entries, squeezing the article. */
+.bd-sidebar-primary {
+    max-width: 18rem;
+}
+
+/* Pages with a local `contents` directive get docutils back-references that wrap
+   the whole heading in a link back to the contents list. Keep the behaviour, but
+   render it as heading text rather than something inviting a click. */
+.bd-article-container a.toc-backref {
+    color: inherit;
+    text-decoration: none;
+}
+
+/* Section headings get no permalink anchor; the ones on API objects are kept,
+   so a specific class or function can still be linked to. */
+.bd-article-container :is(h1, h2, h3, h4, h5, h6) > a.headerlink {
+    display: none;
+}
+
+/* The theme resets width on .docutils.container, which cancels the full-row
+   width sphinx-inline-tabs relies on; without this the panel sits beside the
+   tab labels instead of below them. */
+.tab-set > .tab-content.docutils.container {
+    width: 100%;
+}
+
+/* Code sizing close to the previous theme, which used 12px at a 1.4 line
+   height; the theme's own 14px/1.25 makes code blocks dominate the page. */
+.bd-article-container div.highlight pre,
+.bd-article-container pre,
+.bd-article-container code.literal,
+.bd-article-container code.docutils {
+    font-size: 0.8125rem;
+}
+
+.bd-article-container div.highlight pre,
+.bd-article-container pre {
+    line-height: 1.5;
+}
+
+/* The dark palette italicises keyword tokens such as `import` and `in`.
+   Comments and docstrings stay italic, matching the light palette. */
+html[data-theme="dark"] .highlight .kn,
+html[data-theme="dark"] .highlight .ow {
+    font-style: normal;
 }
 
 /* Italicize the definition term to increase contrast in text formatting */
@@ -21,10 +134,10 @@ p.rubric {
     font-weight: bold;
     padding-left: 10px;
     /* Space text away from border */
-    border-left: 4px solid #2980b9;
-    /* Thick blue line on the left */
-    background-color: #f8f9fa;
-    /* Very light grey background */
+    border-left: 4px solid var(--pst-color-primary);
+    /* Thick accent line on the left */
+    background-color: var(--pst-color-surface);
+    color: var(--pst-color-text-base);
     display: inline-block;
     /* Hug the text length */
     width: 100%;
@@ -34,55 +147,83 @@ p.rubric {
 /* Style for bibtex citations transformed from Doxygen :cite: markers */
 a.bibtex.internal {
     text-decoration: none;
-    color: #2980b9;
+    color: var(--pst-color-link);
 }
 
 a.bibtex.internal:hover {
     text-decoration: underline;
 }
 
-/* Distinguish tutorial chapter orientation from notes, assignments, and hints. */
-.rst-content .admonition.chapter-focus {
-    background-color: #f7f2fa;
+/* Distinguish tutorial chapter orientation from notes, assignments, and hints.
+   Bodies use theme surfaces so they stay legible in dark mode; the accent
+   colour survives in the left border and the title bar. */
+.admonition.chapter-focus {
+    background-color: var(--pst-color-surface);
     border-left: 4px solid #6d3f8c;
 }
 
-.rst-content .admonition.chapter-focus > .admonition-title {
+.admonition.chapter-focus > .admonition-title {
     background-color: #6d3f8c;
     color: #ffffff;
 }
 
-/* Required cumulative course work: blue title with a pale blue body. */
-.rst-content .admonition.lab-notebook-assignment {
-    background-color: #eef7fb;
+.admonition.chapter-focus > .admonition-title::after,
+.admonition.lab-notebook-assignment > .admonition-title::after,
+details.admonition.quiz-question > .admonition-title::after {
+    color: inherit;
+}
+
+/* Required cumulative course work. */
+.admonition.lab-notebook-assignment {
+    background-color: var(--pst-color-surface);
     border-left: 4px solid #005a8d;
 }
 
-.rst-content .admonition.lab-notebook-assignment > .admonition-title {
+.admonition.lab-notebook-assignment > .admonition-title {
     background-color: #005a8d;
     color: #ffffff;
 }
 
-/* Collapsible course questions: orange title with a pale amber body. */
-.rst-content details.admonition.quiz-question {
-    background-color: #fff8e6;
+/* Collapsible course questions. */
+details.admonition.quiz-question {
+    background-color: var(--pst-color-surface);
     border-left: 4px solid #8c4a00;
 }
 
-.rst-content details.admonition.quiz-question > .admonition-title {
+/* The label is absolutely positioned against the title, which the theme already
+   makes a positioning context for its own admonition icon. */
+details.admonition.quiz-question > .admonition-title {
     background-color: #8c4a00;
     color: #ffffff;
     cursor: pointer;
+    list-style: none;
+    padding-right: 7rem;
 }
 
-.rst-content details.admonition.quiz-question > .admonition-title::after {
+details.admonition.quiz-question > .admonition-title::-webkit-details-marker {
+    display: none;
+}
+
+details.admonition.quiz-question > .admonition-title::before {
+    color: inherit;
     content: "Show answer";
-    float: right;
+    font: inherit;
     font-size: 0.85em;
     font-weight: normal;
+    height: auto;
+    left: auto;
+    line-height: inherit;
+    margin: 0;
+    pointer-events: none;
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
     white-space: nowrap;
+    width: auto;
+    z-index: auto;
 }
 
-.rst-content details.admonition.quiz-question[open] > .admonition-title::after {
+details.admonition.quiz-question[open] > .admonition-title::before {
     content: "Hide answer";
 }

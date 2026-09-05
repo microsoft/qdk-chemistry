@@ -1,0 +1,308 @@
+name: Docs
+
+on:
+  # Build and Test already builds dev from main, so reuse that trusted artifact.
+  # Branch filters cannot take expressions, so this one name is hardcoded; the
+  # job conditions below compare against the repository's default branch.
+  workflow_run:
+    workflows: [Build and Test]
+    types: [completed]
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Immutable release tag to build (vX.Y.Z)
+        required: true
+        type: string
+      publish:
+        description: Push the result to the gh-pages branch
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  config:
+    name: Resolve configuration
+    # workflow_run has a write-capable downstream token. Only consume artifacts
+    # produced by a successful push or manual run on this repository's default branch.
+    if: >-
+      (github.event_name != 'release' || github.event.release.prerelease == false) &&
+      (github.event_name != 'workflow_run' ||
+       ((github.event.workflow_run.event == 'push' ||
+         github.event.workflow_run.event == 'workflow_dispatch') &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == github.event.repository.default_branch &&
+        github.event.workflow_run.head_repository.full_name == github.repository))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      base_url: ${{ steps.resolve.outputs.base_url }}
+      package_version: ${{ steps.resolve.outputs.package_version }}
+      publish: ${{ steps.resolve.outputs.publish }}
+      ref: ${{ steps.resolve.outputs.ref }}
+      sha: ${{ steps.resolve.outputs.sha }}
+      source: ${{ steps.resolve.outputs.source }}
+      source_run_id: ${{ steps.resolve.outputs.source_run_id }}
+      target: ${{ steps.resolve.outputs.target }}
+      version: ${{ steps.resolve.outputs.version }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        ref: ${{ github.event_name == 'workflow_run' && github.event.repository.default_branch || format('refs/tags/{0}', inputs.release_tag || github.event.release.tag_name) }}
+
+    - name: Resolve inputs
+      id: resolve
+      env:
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        EVENT: ${{ github.event_name }}
+        INPUT_PUBLISH: ${{ inputs.publish }}
+        INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
+        RELEASE_TAG: ${{ github.event.release.tag_name }}
+        RUN_ID: ${{ github.event.workflow_run.id }}
+        RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+      run: |
+        if [[ "$EVENT" == "workflow_run" ]]; then
+          PACKAGE_VERSION=""
+          PUBLISH=true
+          REF="$DEFAULT_BRANCH"
+          SHA="$RUN_SHA"
+          SOURCE=artifact
+          SOURCE_RUN_ID="$RUN_ID"
+          TARGET=dev
+          VERSION=dev
+        else
+          if [[ "$EVENT" == "release" ]]; then
+            PUBLISH=true
+            REF="$RELEASE_TAG"
+          else
+            PUBLISH="${INPUT_PUBLISH:-false}"
+            REF="$INPUT_RELEASE_TAG"
+          fi
+
+          PACKAGE_VERSION="$(cat VERSION)"
+          if [[ ! "$PACKAGE_VERSION" =~ ^([0-9]+)\.([0-9]+)\.[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "::error::Invalid stable release version '$PACKAGE_VERSION'; expected X.Y.Z or X.Y.Z.T."
+            exit 1
+          fi
+          TARGET="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
+          VERSION="$TARGET"
+          SHA="$(git rev-parse HEAD)"
+          EXPECTED_REF="v${PACKAGE_VERSION}"
+          if [[ "$REF" != "$EXPECTED_REF" ]]; then
+            echo "::error::Selected release tag '$REF' does not match VERSION '$PACKAGE_VERSION'; expected ${EXPECTED_REF}."
+            exit 1
+          fi
+          EXPECTED_SHA="$(git rev-parse --verify "refs/tags/${EXPECTED_REF}^{commit}")"
+          if [[ "$SHA" != "$EXPECTED_SHA" ]]; then
+            echo "::error::Selected release tag ${EXPECTED_REF} resolves to ${EXPECTED_SHA}, but the checkout is ${SHA}."
+            exit 1
+          fi
+          SOURCE=build
+          SOURCE_RUN_ID=""
+        fi
+
+        OWNER="$(echo "${GITHUB_REPOSITORY%%/*}" | tr '[:upper:]' '[:lower:]')"
+        NAME="$(echo "${GITHUB_REPOSITORY#*/}" | tr '[:upper:]' '[:lower:]')"
+        {
+          echo "base_url=https://${OWNER}.github.io/${NAME}/"
+          echo "package_version=$PACKAGE_VERSION"
+          echo "publish=$PUBLISH"
+          echo "ref=$REF"
+          echo "sha=$SHA"
+          echo "source=$SOURCE"
+          echo "source_run_id=$SOURCE_RUN_ID"
+          echo "target=$TARGET"
+          echo "version=$VERSION"
+        } >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build release documentation
+    needs: config
+    if: needs.config.outputs.source == 'build'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+    - name: Checkout documentation sources
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        ref: ${{ needs.config.outputs.sha }}
+
+    - name: Set up Python
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      with:
+        cache: pip
+        python-version: '3.13'
+
+    - name: Install system packages
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y doxygen graphviz
+
+    - name: Install released qdk-chemistry
+      env:
+        PACKAGE_VERSION: ${{ needs.config.outputs.package_version }}
+      run: |
+        python -m pip install --upgrade pip
+        if ! python -m pip install "qdk-chemistry[all]==${PACKAGE_VERSION}"; then
+          echo "::error::Could not install qdk-chemistry ${PACKAGE_VERSION} from PyPI. The wheel pipeline is separately approved; rerun Docs after the wheel is published."
+          exit 1
+        fi
+
+    - name: Build documentation
+      working-directory: docs
+      env:
+        # Releases canonicalise to stable/ rather than to their own directory,
+        # so search results follow the current documentation instead of pinning
+        # to whichever version happened to be newest when they were indexed.
+        QDK_CHEMISTRY_DOCS_BASE_URL: ${{ needs.config.outputs.base_url }}stable/
+        QDK_CHEMISTRY_DOCS_VERSION: ${{ needs.config.outputs.package_version }}
+      run: make clean all
+
+    - name: Show documentation warnings
+      if: failure()
+      working-directory: docs
+      run: |
+        for txtfile in *-output.txt *-warnings.txt; do
+          if [ -s "$txtfile" ]; then
+            echo "==== File: $txtfile ===="
+            cat "$txtfile"
+            echo
+          fi
+        done
+
+    - name: Upload documentation artifact
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: docs-html
+        path: docs/build/html
+        retention-days: 7
+
+  publish:
+    name: Publish documentation
+    needs: [config, build]
+    if: >-
+      !cancelled() &&
+      needs.config.outputs.publish == 'true' &&
+      (needs.config.outputs.source == 'artifact' || needs.build.result == 'success')
+    # Equivalent runs may coalesce, but dev and distinct releases must not
+    # replace one another while pending. Cross-target push races retry below.
+    concurrency:
+      group: docs-publish-${{ needs.config.outputs.source == 'artifact' && 'dev' || needs.config.outputs.package_version }}
+      cancel-in-progress: false
+    permissions:
+      actions: read
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+    # Always use the current assembler, including when old release sources were built.
+    - name: Checkout repository
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        ref: ${{ github.event.repository.default_branch }}
+
+    - name: Check for a gh-pages branch
+      id: gh_pages
+      run: |
+        if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "exists=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Checkout gh-pages branch
+      if: steps.gh_pages.outputs.exists == 'true'
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        path: gh-pages
+        ref: gh-pages
+
+    - name: Checkout for a new gh-pages branch
+      if: steps.gh_pages.outputs.exists != 'true'
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        path: gh-pages
+
+    - name: Create gh-pages branch
+      if: steps.gh_pages.outputs.exists != 'true'
+      working-directory: gh-pages
+      run: |
+        git checkout --orphan gh-pages
+        git rm -rf --quiet .
+
+    - name: Download release documentation
+      if: needs.config.outputs.source == 'build'
+      uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+      with:
+        name: docs-html
+        path: docs-html
+
+    - name: Download dev documentation
+      if: needs.config.outputs.source == 'artifact'
+      uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+      with:
+        github-token: ${{ github.token }}
+        name: docs-html
+        path: docs-html
+        run-id: ${{ needs.config.outputs.source_run_id }}
+
+    - name: Update, commit, and push
+      env:
+        BASE_URL: ${{ needs.config.outputs.base_url }}
+        PACKAGE_VERSION: ${{ needs.config.outputs.package_version }}
+        REF: ${{ needs.config.outputs.ref }}
+        SHA: ${{ needs.config.outputs.sha }}
+        SITE: gh-pages/docs
+        SOURCE: ${{ needs.config.outputs.source }}
+        TARGET: ${{ needs.config.outputs.target }}
+        VERSION: ${{ needs.config.outputs.version }}
+      run: |
+        STABLE_ARG=()
+        if [[ "$SOURCE" == "build" ]]; then
+          STABLE_ARG=(--stable)
+        fi
+        git -C gh-pages config user.name "github-actions[bot]"
+        git -C gh-pages config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+        for ATTEMPT in 1 2 3; do
+          if git -C gh-pages ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            git -C gh-pages fetch --depth=1 origin gh-pages
+            # The checkout is disposable; regenerate this publication from the
+            # latest remote tree instead of merging generated HTML.
+            git -C gh-pages reset --hard FETCH_HEAD
+            git -C gh-pages clean -fdx
+          fi
+
+          mkdir -p "$SITE"
+          python3 .github/scripts/docs_site.py --site "$SITE" --base-url "$BASE_URL" \
+            install --html docs-html --target "$TARGET" --version "$VERSION" \
+            --package-version "$PACKAGE_VERSION" --commit "$SHA" --ref "$REF" \
+            --source-run-id "${{ needs.config.outputs.source_run_id }}" \
+            "${STABLE_ARG[@]}"
+          git -C gh-pages add --all --force docs
+
+          if git -C gh-pages diff --cached --quiet; then
+            echo "Documentation is already up to date."
+            exit 0
+          fi
+
+          LABEL="${PACKAGE_VERSION:-dev}"
+          git -C gh-pages commit -m "Update ${TARGET} docs to ${LABEL} (${SHA:0:8})"
+          if git -C gh-pages push origin HEAD:gh-pages; then
+            exit 0
+          fi
+          echo "::warning::gh-pages changed during publication; retrying from the latest remote tree (${ATTEMPT}/3)."
+        done
+
+        echo "::error::Could not publish documentation after three attempts."
+        exit 1

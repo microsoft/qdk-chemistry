@@ -2,11 +2,13 @@
 
 ## Install QDK/Chemistry
 
-The main QDK/Chemistry python package must be installed following the instructions in the main [README](../README.md) file.
-[Sphinx](https://www.sphinx-doc.org/en/master/), [breathe](https://breathe.readthedocs.io/en/latest/), and several related dependencies must be installed. This can be done when installing the main QDK/Chemistry package by using the `docs` extra:
+The main QDK/Chemistry Python package must be installed following the instructions in [INSTALL.md](../INSTALL.md).
+[Sphinx](https://www.sphinx-doc.org/en/master/), [breathe](https://breathe.readthedocs.io/en/latest/), and several related dependencies are also required.
+Installing with the `all` extra covers both:
 
 ```bash
-pip install .[all]
+cd python
+pip install '.[all]'
 ```
 
 ## Install other dependencies
@@ -47,7 +49,7 @@ make clean all
 ```
 
 This will generate the HTML documentation in the `docs/build/html/` directory.
-You can open the [`index.html`](docs/build/html/index.html) file in that directory with your web browser to view the documentation.
+You can open the [`index.html`](build/html/index.html) file in that directory with your web browser to view the documentation.
 
 ### Building on Windows
 
@@ -63,8 +65,8 @@ The [`Makefile`](Makefile) requires GNU make and a POSIX shell (it uses `rm`, `g
 
 #### Running the pipeline from PowerShell
 
-Run each step in order from the `docs/` directory. This mirrors what `make all` does, minus the
-warning-count checks that fail the build in CI.
+Run each step in order from the `docs/` directory. This mirrors the five build stages used by
+`make all`; the Makefile's validation checks are not included.
 
 ```powershell
 # 1. Doxygen XML for the C++ API
@@ -113,3 +115,31 @@ Any output means the equivalent `make` build would have failed.
 The [ground-state QPE figure maintenance guide](source/_static/diagrams/README.md)
 documents source ownership, regeneration commands, and screenshot-derived asset
 maintenance.
+
+## Publishing the documentation
+
+The published site is served by GitHub Pages from the `docs/` directory of the `gh-pages` branch, and holds one directory per documentation version:
+
+```text
+docs/
+  index.html      redirect to stable/
+  404.html        rewrites unversioned paths into stable/
+  switcher.json   version list for the theme version switcher
+  dev/            latest successful main build
+  stable/         copy of the newest published release
+  2.1/  ...       one directory per minor version
+```
+
+The [`Docs`](../.github/workflows/docs.yaml) workflow maintains it, and [`.github/scripts/docs_site.py`](../.github/scripts/docs_site.py) does the site assembly.
+
+`dev/` is republished automatically after every successful `Build and Test` run on `main`. If publication fails, rerun the downstream `Docs` workflow while the artifact is available. To rebuild an expired or missing artifact, run `Build and Test` manually on `main`.
+
+Final releases are rebuilt from their tag against the exact package version from PyPI. Publishing `2.1.3` replaces `2.1/` if it is newer than the version already there; its sidebar shows `Documentation 2.1.3`, while the version switcher and URL use `2.1`. Patch-version directories are not retained. The newest published release also replaces `stable/`, while a release on an older minor line updates only its own minor directory. Older releases cannot overwrite newer documentation, and prereleases are not published.
+
+Historical tags can be selected in a manual run. Releases that predate the current theme retain their old theme and have no version switcher, so a reader who lands in one of those directories has no in-page way back to `stable/`. If that becomes a problem for a maintained line, update its documentation configuration and publish a patch release.
+
+Python wheels are published by a separate, approval-gated pipeline. If the exact package version is not on PyPI when the GitHub release is published, the release-triggered `Docs` workflow fails with a direct error. Rerun that same workflow after the wheel is available; GitHub preserves the original release tag for the rerun.
+
+Manual runs (`workflow_dispatch`) accept one immutable final-release tag for validating or backfilling a release. The exact PyPI package version and minor-version target are derived from that tag's root [`VERSION`](../VERSION) file, and the workflow verifies that the checkout resolves to the matching tag.
+
+Published minor versions are retained. A build is currently about 50 MB and GitHub Pages limits a published site to 1 GB. The site assembler warns at 800 MB and rejects publication above 1 GB.
