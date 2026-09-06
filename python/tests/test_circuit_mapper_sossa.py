@@ -432,6 +432,64 @@ class TestSelectFullFidelity:
             "State is too concentrated; Givens rotation may not be applied correctly"
         )
 
+    @pytest.mark.parametrize("N", [2, 3])
+    def test_select_dq_applies_the_analytic_rotated_majorana(self, N):  # noqa: N803
+        r"""SELECT must satisfy Eq. 94: :math:`U^\dagger \gamma_{00x} U = \tilde\gamma_{u0x}`.
+
+        The other tests here compare the two rotation backends against *each other*, so a
+        rotation that is wrong in the same way on both paths passes them. This one compares
+        against the closed form instead, which is what pins the Givens chain.
+
+        Acting on the single-electron state :math:`|d_0=1\rangle`, the rotated Majorana is
+
+            gamma_u |d_0=1> = u_0 |vac> - sum_{p>0} u_p |d_0=1, d_p=1>
+
+        the minus sign coming from the Jordan-Wigner string ``Z_0`` on qubit 0. Reading the
+        ratios off the dump therefore recovers ``u`` directly.
+
+        Without the control on ``sysRegDown[j+1]`` the chain rotates by ``-2*theta`` instead
+        of ``theta``, so this reports a ratio of ``tan(2*theta)/tan(theta)`` -- almost exactly
+        double -- with the wrong sign.
+        """
+        rng = np.random.default_rng(2024)
+        u = rng.standard_normal(N)
+        u /= np.linalg.norm(u)
+        other = rng.standard_normal(N)
+        other /= np.linalg.norm(other)
+        select_data = {
+            "numOrbitals": N,
+            "numRanks": 1,
+            "numBases": 1,
+            "numCopies": 1,
+            "numPositiveOneBody": N,
+            # x_o = 0 is the generator under test; the rest only need to be well formed.
+            "OneBodyRotationAngles": [_vector_to_givens_angles(u)]
+            + [_vector_to_givens_angles(other)] * (N - 1),
+            "TwoBodyRotationAngles": [_vector_to_givens_angles(other)] * 2,
+            "rotationBitPrecision": 14,
+            "numFreeRiderBits": 2,
+        }
+        sv = self._run_select(select_data, use_phase_gradient=False, xo_value=0, b_value=0)
+
+        total = int(round(math.log2(len(sv))))
+        xo_bits = math.ceil(math.log2(N + 1)) if N + 1 > 1 else 1
+        system0 = xo_bits + (1 + 2) + 2  # outer + (b bits + free-rider) + spin
+        spin_dq = xo_bits + 1 + 2
+
+        def amplitude(occupied):
+            index = sum(1 << (total - 1 - (system0 + q)) for q in occupied)
+            return sv[index].real  # spinDQ = 0 selects the spin-down branch
+
+        vacuum = amplitude([])
+        assert abs(vacuum) > 1e-6, "SELECT produced no gamma_0 component"
+        measured = [1.0] + [-amplitude([0, p]) / vacuum for p in range(1, N)]
+        measured = np.array(measured) * u[0]
+
+        assert measured == pytest.approx(u, abs=1e-3), (
+            f"SELECT applied the Majorana of {measured} where the angles encode {u}; "
+            f"the Givens chain is not the rotation U(u) of Eq. 93"
+        )
+        assert spin_dq < system0  # layout guard: spinDQ precedes the system register
     @pytest.mark.parametrize("rotation_bit_precision", [8, 12])
     @pytest.mark.parametrize("N", [2, 3])
     def test_select_dq_rotation_backends_agree(self, N, rotation_bit_precision):  # noqa: N803

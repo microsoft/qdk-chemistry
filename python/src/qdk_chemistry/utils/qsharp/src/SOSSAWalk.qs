@@ -226,6 +226,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     ///
     /// RyViaPhaseGradient applies Ry(4π·x/2^b). To achieve Ry(-2θ):
     ///   4π·x/2^b = -2θ  →  x = -2^b · θ / (2π)  (mod 2^b)
+
     internal function QuantizeGivensAngle(angle : Double, bRot : Int) : Int {
         // Rejects NaN and ±∞ as well as absurd magnitudes: the comparison is false for
         // NaN, so this fails loudly instead of silently folding a non-finite angle into
@@ -300,10 +301,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         // tables once per SELECT rather than twice. The direct-rotation path has no table to
         // amortize, so it keeps the plain within/apply shape.
         let majoranaStep : (Unit => Unit is Adj + Ctl) = () => {
-            MajoranaOp(isSF, dvsq, bEqBQubit, spin, sysRegDown[0]);
-            within { X(isSF); } apply {
-                Controlled Z([isSF], spinSF);
-            }
+            MajoranaOp(isSF, dvsq, bEqBQubit, spin, spinSF, sysRegDown[0]);
         };
 
         within {
@@ -492,7 +490,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         sysRegDown : Qubit[],
         bEqBQubit : Qubit
     ) : Unit is Adj + Ctl {
-        for j in 0..numRotAngles - 1 {
+        for j in numRotAngles - 1..-1..0 {
             CNOT(sysRegDown[j], sysRegDown[j + 1]);
 
             // DQ rotations: x_o in [0, N)
@@ -502,7 +500,12 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             // properly uncomputes after MajoranaOp changes the particle number.
             for a in 0..N - 1 {
                 let angle = params.OneBodyRotationAngles[a][j];
-                ApplyControlledOnInt(a, Ry(-2.0 * angle, _), xoReg, sysRegDown[j]);
+                ApplyControlledOnInt(
+                    a + (1 <<< xoBits),
+                    Ry(2.0 * angle, _),
+                    xoReg + [sysRegDown[j + 1]],
+                    sysRegDown[j]
+                );
             }
 
             // SF rotations: x_o in [N, N+numSF), conditioned on b
@@ -513,8 +516,13 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                     let angleIdx = b * params.numRanks + r;
                     if angleIdx < Length(params.TwoBodyRotationAngles) and j < Length(params.TwoBodyRotationAngles[angleIdx]) {
                         let angle = params.TwoBodyRotationAngles[angleIdx][j];
-                        let condValue = xo + b * (1 <<< xoBits);
-                        ApplyControlledOnInt(condValue, Ry(-2.0 * angle, _), xoReg + bReg, sysRegDown[j]);
+                        let condValue = xo + b * (1 <<< xoBits) + (1 <<< (xoBits + Length(bReg)));
+                        ApplyControlledOnInt(
+                            condValue,
+                            Ry(2.0 * angle, _),
+                            xoReg + bReg + [sysRegDown[j + 1]],
+                            sysRegDown[j]
+                        );
                     }
                 }
             }
@@ -618,7 +626,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                 // Cost: 1 CNOT (vs ⌈log₂(B+1)⌉ Toffoli for ApplyControlledOnInt).
                 CNOT(rotTarget[nRotBits], bEqBQubit);
 
-                for j in 0..numRotAngles - 1 {
+                for j in numRotAngles - 1..-1..0 {
                     within {
                         CNOT(sysRegDown[j], sysRegDown[j + 1]);
                     } apply {
@@ -643,20 +651,23 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         d_vs_q : Qubit,
         bEqB : Qubit,
         spin : Qubit,
+        majoranaSel : Qubit,
         system_reg_0 : Qubit
     ) : Unit is Adj + Ctl {
         // SF two-body (b < B): Z on system_reg_0 when sf_vs_dq=1 AND bEqB=0
         within { X(bEqB); } apply {
             Controlled Z([sf_vs_dq, bEqB], system_reg_0);
         }
-        // DQ: X on system_reg_0 with spin-dependent Z
+        // DQ: a_k = (X + iY)/2 as a two-term LCU on majoranaSel, which the inner
+        // reflection projects. X on the |0> branch, ZX = iY on the |1> branch.
         within { X(sf_vs_dq); } apply {
             CNOT(sf_vs_dq, system_reg_0);
-            Controlled Z([sf_vs_dq, spin], system_reg_0);
+            Controlled Z([sf_vs_dq, majoranaSel], system_reg_0);
         }
-        // DQ Q1 sign flip: Z(spin) when sf_vs_dq=0 AND d_vs_q=1
+        // Q1 uses a_k^dagger = (X - iY)/2, so the sign flip belongs on the branch that
+        // carries the iY term -- the Majorana selector, not the spin selector.
         within { X(sf_vs_dq); } apply {
-            Controlled Z([sf_vs_dq, d_vs_q], spin);
+            Controlled Z([sf_vs_dq, d_vs_q], majoranaSel);
         }
     }
 
